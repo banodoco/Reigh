@@ -747,7 +747,21 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     strength: parseFloat(l.strength?.toString() ?? '0') || 0.0
   }));
   
-  if (advancedMode && phaseConfig) {
+  // Use advanced mode ONLY if:
+  // 1. advancedMode is explicitly true
+  // 2. phaseConfig exists
+  // 3. motionMode is NOT 'basic' (explicit check to ensure Basic mode UI selection is respected)
+  const useAdvancedMode = advancedMode && phaseConfig && motionMode !== 'basic';
+  
+  console.log('[Generation] Mode decision:', {
+    advancedMode,
+    hasPhaseConfig: !!phaseConfig,
+    motionMode,
+    useAdvancedMode,
+    amountOfMotion
+  });
+  
+  if (useAdvancedMode) {
     // ADVANCED MODE: Use user's phase config
     let adjustedPhaseConfig = phaseConfig;
     
@@ -792,7 +806,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     });
     
   } else {
-    // BASIC MODE: Build phase config automatically
+    // BASIC MODE: Build phase config automatically based on Amount of Motion
+    console.log('[Generation] Using BASIC MODE - building phase config from Amount of Motion');
+    
     const basicConfig = buildBasicModePhaseConfig(
       !!structureVideoPath,
       amountOfMotion,
@@ -808,6 +824,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       modelType,
       hasStructureVideo: !!structureVideoPath,
       amountOfMotion,
+      motionLoraApplied: amountOfMotion > 0,
+      motionLoraStrength: amountOfMotion > 0 ? (amountOfMotion / 100).toFixed(2) : 'N/A',
       userLorasCount: userLorasForPhaseConfig.length,
       numPhases: effectivePhaseConfig.num_phases,
       stepsPerPhase: effectivePhaseConfig.steps_per_phase,

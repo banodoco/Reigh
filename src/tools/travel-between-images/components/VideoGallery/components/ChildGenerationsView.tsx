@@ -18,7 +18,7 @@ import { Card, CardContent } from '@/shared/components/ui/card';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
-import { joinClipsSettings } from '@/tools/join-clips/settings';
+import { useJoinClipsSettings } from '@/tools/join-clips/hooks/useJoinClipsSettings';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useLoraManager, type LoraModel, type ActiveLora } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
@@ -213,15 +213,19 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     // Join Clips State
     const [isJoiningClips, setIsJoiningClips] = useState(false);
     const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
-    // const [showJoinModal, setShowJoinModal] = useState(false); // Removed modal state
-    const [joinPrompt, setJoinPrompt] = useState('');
-    const [joinNegativePrompt, setJoinNegativePrompt] = useState('');
-    const [joinContextFrames, setJoinContextFrames] = useState(joinClipsSettings.defaults.contextFrameCount);
-    const [joinGapFrames, setJoinGapFrames] = useState(joinClipsSettings.defaults.gapFrameCount);
-    const [joinReplaceMode, setJoinReplaceMode] = useState(joinClipsSettings.defaults.replaceMode);
-    const [keepBridgingImages, setKeepBridgingImages] = useState(joinClipsSettings.defaults.keepBridgingImages);
     const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
     const queryClient = useQueryClient();
+    
+    // Use project-persisted join clips settings (shared with JoinClipsPage)
+    const joinSettings = useJoinClipsSettings(projectId);
+    const {
+        prompt: joinPrompt = '',
+        negativePrompt: joinNegativePrompt = '',
+        contextFrameCount: joinContextFrames = 8,
+        gapFrameCount: joinGapFrames = 12,
+        replaceMode: joinReplaceMode = true,
+        keepBridgingImages = true,
+    } = joinSettings.settings;
 
     // Fetch parent generation details to check for final output
     const { data: parentGeneration } = useQuery({
@@ -497,12 +501,15 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     }, [parentGenerationId, queryClient, toast]);
 
     const handleRestoreDefaults = () => {
-        setJoinContextFrames(joinClipsSettings.defaults.contextFrameCount);
-        setJoinGapFrames(joinClipsSettings.defaults.gapFrameCount);
-        setJoinReplaceMode(joinClipsSettings.defaults.replaceMode);
-        setKeepBridgingImages(joinClipsSettings.defaults.keepBridgingImages);
-        setJoinPrompt('');
-        setJoinNegativePrompt('');
+        // Reset to defaults using the settings hook
+        joinSettings.updateFields({
+            contextFrameCount: 8,
+            gapFrameCount: 12,
+            replaceMode: true,
+            keepBridgingImages: true,
+            prompt: '',
+            negativePrompt: '',
+        });
         loraManager.setSelectedLoras([]);
         toast({
             title: "Settings restored",
@@ -755,17 +762,24 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                 </div>
                             }
                             gapFrames={joinGapFrames}
-                            setGapFrames={setJoinGapFrames}
+                            setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
                             contextFrames={joinContextFrames}
-                            setContextFrames={setJoinContextFrames}
+                            setContextFrames={(val) => {
+                                const maxGap = Math.max(1, 81 - (val * 2));
+                                const newGapFrames = joinGapFrames > maxGap ? maxGap : joinGapFrames;
+                                joinSettings.updateFields({ 
+                                    contextFrameCount: val, 
+                                    gapFrameCount: newGapFrames 
+                                });
+                            }}
                             replaceMode={joinReplaceMode}
-                            setReplaceMode={setJoinReplaceMode}
+                            setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
                             keepBridgingImages={keepBridgingImages}
-                            setKeepBridgingImages={setKeepBridgingImages}
+                            setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
                             prompt={joinPrompt}
-                            setPrompt={setJoinPrompt}
+                            setPrompt={(val) => joinSettings.updateField('prompt', val)}
                             negativePrompt={joinNegativePrompt}
-                            setNegativePrompt={setJoinNegativePrompt}
+                            setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
                             availableLoras={availableLoras}
                             projectId={projectId}
                             loraPersistenceKey="join-clips-segments"

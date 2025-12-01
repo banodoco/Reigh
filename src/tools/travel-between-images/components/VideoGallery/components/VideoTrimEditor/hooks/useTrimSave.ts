@@ -230,7 +230,6 @@ export const useTrimSave = ({
       setSaveSuccess(true);
 
       console.log('[useTrimSave] Complete! MP4 saved with proper duration.');
-      toast.success('Trimmed video saved');
 
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['generation-variants'] });

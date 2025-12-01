@@ -354,11 +354,6 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
             </>
           )}
         </Button>
-
-        {/* Help text */}
-        <p className={cn(labelSize, 'text-muted-foreground text-center')}>
-          Saving creates a new version. You can switch between versions anytime.
-        </p>
       </div>
     </div>
   );
