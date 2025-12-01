@@ -786,7 +786,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             onGenerate={handleConfirmJoin}
                             isGenerating={isJoiningClips}
                             generateSuccess={joinClipsSuccess}
-                            generateButtonText={`Generate Joined Video (${segmentProgress.completed} Segments)`}
+                            generateButtonText="Create Joined Video"
                         />
                     </div>
                 </div>
