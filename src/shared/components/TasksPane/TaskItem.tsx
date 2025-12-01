@@ -112,18 +112,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   }, [task.params]);
 
   // Consolidated task type detection using content_type from database
-  // With fallback for known video task types (in case DB lookup is loading or missing)
   const taskInfo = useMemo(() => {
     const contentType = taskTypeInfo?.content_type;
-    
-    // Known video task types as fallback (when DB lookup is still loading or missing)
-    const knownVideoTaskTypes = [
-      'travel_orchestrator', 'travel_segment', 'travel_stitch',
-      'join_clips_orchestrator', 'join_clips_segment',
-      'animate_character'
-    ];
-    const isVideoTask = contentType === 'video' || knownVideoTaskTypes.includes(task.taskType);
-    
+    const isVideoTask = contentType === 'video';
     const isImageTask = contentType === 'image';
     const isCompletedVideoTask = isVideoTask && task.status === 'Complete' && !!task.outputLocation;
     const isCompletedImageTask = isImageTask && task.status === 'Complete';
@@ -142,7 +133,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       isSingleImageTask: isImageTask,
       isCompletedTravelTask: isCompletedVideoTask
     };
-  }, [taskTypeInfo?.content_type, task.status, task.outputLocation, task.taskType]);
+  }, [taskTypeInfo?.content_type, task.status, task.outputLocation]);
 
   // Check if this is a successful Image Generation task with output
   const hasGeneratedImage = React.useMemo(() => {
@@ -764,25 +755,30 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
             )}
           </div>
           {/* Action buttons overlay on hover - desktop only */}
-          {isHoveringTaskItem && shotId && !isMobile && (
+          {/* Show overlay if: hovering + not mobile + (has shotId OR is completed video task) */}
+          {isHoveringTaskItem && !isMobile && (shotId || taskInfo.isCompletedVideoTask) && (
             <div 
               className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center gap-2"
               onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
             >
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleVisitShot}
-                className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
-              >
-                Visit Shot
-              </Button>
-              {taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0 && travelData.videoOutputs[0]?.videoUrl && (
+              {/* Only show Visit Shot button if we have a shotId */}
+              {shotId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleVisitShot}
+                  className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
+                >
+                  Visit Shot
+                </Button>
+              )}
+              {/* Show Open Video button - loading state while fetching, enabled when data ready */}
+              {taskInfo.isCompletedVideoTask && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleViewVideo}
-                  disabled={isLoadingVideoGen}
+                  disabled={isLoadingVideoGen || !travelData.videoOutputs || travelData.videoOutputs.length === 0}
                   className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all disabled:opacity-50"
                 >
                   {isLoadingVideoGen ? 'Loading...' : 'Open Video'}
@@ -945,6 +941,24 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
             className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
           >
             Open Image
+          </Button>
+        </div>
+      )}
+
+      {/* Action button overlay for video tasks WITHOUT input images (like Join Clips) on hover - desktop only */}
+      {isHoveringTaskItem && imagesToShow.length === 0 && taskInfo.isCompletedVideoTask && !isMobile && (
+        <div 
+          className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleViewVideo}
+            disabled={isLoadingVideoGen || !travelData.videoOutputs || travelData.videoOutputs.length === 0}
+            className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all disabled:opacity-50"
+          >
+            {isLoadingVideoGen ? 'Loading...' : 'Open Video'}
           </Button>
         </div>
       )}
