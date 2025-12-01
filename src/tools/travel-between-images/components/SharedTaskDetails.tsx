@@ -203,6 +203,18 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
     orchestratorPayload?.gap_frame_count
   ) : null;
   
+  const replaceMode = isJoinClipsTask ? (
+    task?.params?.replace_mode ?? 
+    orchestratorDetails?.replace_mode ?? 
+    orchestratorPayload?.replace_mode
+  ) : null;
+  
+  const keepBridgingImages = isJoinClipsTask ? (
+    task?.params?.keep_bridging_images ?? 
+    orchestratorDetails?.keep_bridging_images ?? 
+    orchestratorPayload?.keep_bridging_images
+  ) : null;
+  
   // Video loaded states - support multiple clips
   const [videoLoadedStates, setVideoLoadedStates] = useState<{[key: number]: boolean}>({});
   const setClipVideoLoaded = (index: number, loaded: boolean) => {
@@ -569,13 +581,13 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           )}
 
           {/* Frame Configuration */}
-          {(contextFrameCount !== null || gapFrameCount !== null) && (
+          {(contextFrameCount !== null || gapFrameCount !== null || replaceMode !== null || keepBridgingImages !== null) && (
             <div className="space-y-2 pt-2 border-t border-muted-foreground/20">
               <p className={`${config.textSize} font-medium text-muted-foreground`}>Frame Configuration</p>
               <div className="grid grid-cols-2 gap-3">
                 {contextFrameCount !== null && (
                   <div className="space-y-1">
-                    <p className={`${config.textSize} text-muted-foreground`}>Context Duration</p>
+                    <p className={`${config.textSize} text-muted-foreground`}>Context Frames</p>
                     <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
                       {framesToSeconds(contextFrameCount)} ({contextFrameCount} frames)
                     </p>
@@ -583,9 +595,25 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                 )}
                 {gapFrameCount !== null && (
                   <div className="space-y-1">
-                    <p className={`${config.textSize} text-muted-foreground`}>Gap Duration</p>
+                    <p className={`${config.textSize} text-muted-foreground`}>Gap Frames</p>
                     <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
                       {framesToSeconds(gapFrameCount)} ({gapFrameCount} frames)
+                    </p>
+                  </div>
+                )}
+                {replaceMode !== null && (
+                  <div className="space-y-1">
+                    <p className={`${config.textSize} text-muted-foreground`}>Transition Mode</p>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                      {replaceMode ? 'Replace' : 'Insert'}
+                    </p>
+                  </div>
+                )}
+                {keepBridgingImages !== null && (
+                  <div className="space-y-1">
+                    <p className={`${config.textSize} text-muted-foreground`}>Bridge Anchors</p>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                      {keepBridgingImages ? 'On' : 'Off'}
                     </p>
                   </div>
                 )}
