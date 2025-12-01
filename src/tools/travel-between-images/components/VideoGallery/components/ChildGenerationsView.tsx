@@ -162,16 +162,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     location: transformed.location?.substring(0, 50),
                     timestamp: Date.now()
                 });
-                // Debug duration for trimmed videos
-                console.log('[TrimDurationFix] ChildGenerationsView transformed item:', {
-                    id: transformed.id?.substring(0, 8),
-                    'params.duration_seconds': transformed.params?.duration_seconds,
-                    'params.trimmed_duration': transformed.params?.trimmed_duration,
-                    'metadata.duration_seconds': item.metadata?.duration_seconds,
-                    'metadata.trimmed_duration': item.metadata?.trimmed_duration,
-                    'raw_params.duration_seconds': item.params?.duration_seconds,
-                    paramsKeys: transformed.params ? Object.keys(transformed.params).slice(0, 10) : [],
-                });
             }
             
             return transformed;

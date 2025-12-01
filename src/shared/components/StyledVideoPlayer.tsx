@@ -13,8 +13,6 @@ interface StyledVideoPlayerProps {
   autoPlay?: boolean;
   playsInline?: boolean;
   preload?: 'auto' | 'metadata' | 'none';
-  /** Expected duration in seconds - fallback for WebM files with broken metadata */
-  expectedDuration?: number;
   /** Callback when video metadata loads */
   onLoadedMetadata?: (e: React.SyntheticEvent<HTMLVideoElement>) => void;
 }
@@ -29,7 +27,6 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   autoPlay = true,
   playsInline = true,
   preload = 'auto',
-  expectedDuration,
   onLoadedMetadata,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -40,23 +37,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
 
-  // When expectedDuration changes and is valid, always use it (it's the source of truth from DB)
-  useEffect(() => {
-    console.log('[TrimDurationFix] StyledVideoPlayer expectedDuration prop changed:', {
-      expectedDuration,
-      isFinite: expectedDuration ? Number.isFinite(expectedDuration) : 'N/A',
-      currentDurationState: duration,
-    });
-    
-    // If we have a valid expectedDuration, always use it (DB is source of truth for trimmed videos)
-    if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
-      console.log('[TrimDurationFix] StyledVideoPlayer: setting duration from expectedDuration:', expectedDuration);
-      setDuration(expectedDuration);
-    }
-  }, [expectedDuration]); // Only depend on expectedDuration, not duration (to avoid loops)
-
   const formatTime = (seconds: number): string => {
-    // Handle invalid values (Infinity, NaN, negative)
     if (!Number.isFinite(seconds) || seconds < 0) {
       return '0:00';
     }
@@ -112,15 +93,8 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
 
     const updateTime = () => setCurrentTime(video.currentTime);
     const updateDuration = () => {
-      // Only use video duration if it's valid (not Infinity for broken WebM)
       if (Number.isFinite(video.duration) && video.duration > 0) {
-        console.log('[TrimDurationFix] StyledVideoPlayer: valid duration from video:', video.duration);
         setDuration(video.duration);
-      } else if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
-        console.log('[TrimDurationFix] StyledVideoPlayer: using expectedDuration:', expectedDuration);
-        setDuration(expectedDuration);
-      } else {
-        console.log('[TrimDurationFix] StyledVideoPlayer: invalid duration and no fallback:', video.duration);
       }
     };
     const handlePlay = () => setIsPlaying(true);
@@ -137,7 +111,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
     };
-  }, [expectedDuration]);
+  }, []);
 
   useEffect(() => {
     let timeout: NodeJS.Timeout;
@@ -152,7 +126,6 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   }, [isHovering]);
 
   const handleContainerClick = useCallback((e: React.MouseEvent) => {
-    // Only toggle if clicking on the video itself, not on controls
     const target = e.target as HTMLElement;
     if (target.tagName === 'VIDEO' || target.closest('.video-clickable-area')) {
       togglePlayPause();

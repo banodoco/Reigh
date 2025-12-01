@@ -2,14 +2,14 @@
  * useTrimSave Hook
  * 
  * Handles saving a trimmed video as a new variant.
- * Manages the full workflow: trim video, upload, create variant record.
+ * Uses the server-side trim-video Edge Function for proper MP4 output with correct duration metadata.
  */
 
 import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { trimAndUploadVideo } from '../utils/videoTrimmer';
+import { extractAndUploadThumbnailOnly } from '@/shared/utils/videoThumbnailGenerator';
 import type { TrimState, UseTrimSaveReturn } from '../types';
 
 interface UseTrimSaveProps {
@@ -20,6 +20,17 @@ interface UseTrimSaveProps {
   sourceVariantId?: string | null;
   /** Called with the new variant ID after successful save */
   onSuccess?: (newVariantId: string) => void;
+}
+
+interface TrimVideoResponse {
+  success: boolean;
+  video_url?: string;
+  thumbnail_url?: string | null;
+  duration?: number;
+  format?: string;
+  file_size?: number;
+  processing_time_ms?: number;
+  error?: string;
 }
 
 export const useTrimSave = ({
@@ -56,7 +67,7 @@ export const useTrimSave = ({
     }
 
     const { startTrim, endTrim, videoDuration } = trimState;
-    const previewEndTime = videoDuration - endTrim;
+    const endTime = videoDuration - endTrim;
 
     if (startTrim === 0 && endTrim === 0) {
       setSaveError('No changes to save');
@@ -64,33 +75,81 @@ export const useTrimSave = ({
       return;
     }
 
-    console.log('[useTrimSave] Starting save:', {
+    // Get user ID for storage path
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setSaveError('Not authenticated');
+      toast.error('Please log in to save');
+      return;
+    }
+
+    console.log('[useTrimSave] Starting server-side trim:', {
       generationId: generationId.substring(0, 8),
       projectId: projectId.substring(0, 8),
       startTrim,
-      endTrim,
+      endTime,
       videoDuration,
     });
 
     setIsSaving(true);
-    setSaveProgress(0);
+    setSaveProgress(10);
     setSaveError(null);
     setSaveSuccess(false);
 
     try {
-      // Step 1: Trim and upload video + thumbnail
-      const { videoUrl, thumbnailUrl, duration: actualDuration } = await trimAndUploadVideo(
-        sourceVideoUrl,
-        startTrim,
-        previewEndTime,
-        projectId,
-        generationId,
-        (progress) => setSaveProgress(Math.round(progress * 0.8)) // 0-80%
-      );
+      // Step 1: Call the Edge Function to trim and convert to MP4
+      console.log('[useTrimSave] Calling trim-video Edge Function...');
+      setSaveProgress(20);
 
-      setSaveProgress(85);
+      const response = await supabase.functions.invoke<TrimVideoResponse>('trim-video', {
+        body: {
+          video_url: sourceVideoUrl,
+          start_time: startTrim,
+          end_time: endTime,
+          project_id: projectId,
+          user_id: user.id,
+        },
+      });
 
-      // Step 2: Fetch source variant params if we have a source variant ID
+      if (response.error) {
+        throw new Error(response.error.message || 'Edge Function call failed');
+      }
+
+      const result = response.data;
+      if (!result?.success || !result.video_url) {
+        throw new Error(result?.error || 'No video URL in response');
+      }
+
+      console.log('[useTrimSave] Edge Function completed:', {
+        videoUrl: result.video_url.substring(0, 60) + '...',
+        duration: result.duration,
+        format: result.format,
+        processingTimeMs: result.processing_time_ms,
+      });
+
+      setSaveProgress(60);
+
+      // Step 2: Extract thumbnail from the trimmed video (client-side)
+      // Use a unique ID (timestamp + random) so each variant gets its own thumbnail
+      const variantThumbId = `trim-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      console.log('[useTrimSave] Extracting thumbnail from trimmed video...', { variantThumbId });
+      let thumbnailUrl: string | null = null;
+      try {
+        const thumbResult = await extractAndUploadThumbnailOnly(result.video_url, variantThumbId, projectId);
+        if (thumbResult.success && thumbResult.thumbnailUrl) {
+          thumbnailUrl = thumbResult.thumbnailUrl;
+          console.log('[useTrimSave] Thumbnail extracted:', thumbnailUrl.substring(0, 60) + '...');
+        } else {
+          console.warn('[useTrimSave] Thumbnail extraction failed:', thumbResult.error);
+        }
+      } catch (thumbError) {
+        console.warn('[useTrimSave] Thumbnail extraction error:', thumbError);
+        // Don't fail the whole save, just continue without thumbnail
+      }
+
+      setSaveProgress(70);
+
+      // Step 3: Fetch source variant params if we have a source variant ID
       let sourceVariantParams: Record<string, any> | null = null;
       if (sourceVariantId) {
         console.log('[useTrimSave] Fetching source variant params:', sourceVariantId.substring(0, 8));
@@ -103,7 +162,6 @@ export const useTrimSave = ({
         if (fetchError) {
           console.warn('[useTrimSave] Failed to fetch source variant params:', fetchError);
         } else if (sourceVariant?.params) {
-          // Handle case where params might be a JSON string
           sourceVariantParams = typeof sourceVariant.params === 'string' 
             ? JSON.parse(sourceVariant.params) 
             : sourceVariant.params;
@@ -111,36 +169,35 @@ export const useTrimSave = ({
         }
       }
 
-      // Step 3: Create variant record in database
+      setSaveProgress(80);
+
+      // Step 4: Create variant record in database
       console.log('[useTrimSave] Creating variant record');
       
-      // Merge source variant params with trim-specific params
-      // Trim-specific params take precedence over source params
       const trimParams = {
         trim_start: startTrim,
         trim_end: endTrim,
         original_duration: videoDuration,
-        trimmed_duration: actualDuration, // Use actual duration from trimmer
-        duration_seconds: actualDuration, // Store for easy access in UI
+        trimmed_duration: result.duration,
+        duration_seconds: result.duration,
+        format: result.format || 'mp4',
         source_variant_id: sourceVariantId || null,
       };
       
       const variantParams = sourceVariantParams 
         ? { ...sourceVariantParams, ...trimParams }
         : trimParams;
-      
-      console.log('[useTrimSave] Merged params keys:', Object.keys(variantParams));
 
       const { data: insertedVariant, error: insertError } = await supabase
         .from('generation_variants')
         .insert({
           generation_id: generationId,
-          location: videoUrl,
+          location: result.video_url,
           thumbnail_url: thumbnailUrl,
           params: variantParams,
-          is_primary: true, // New trimmed version becomes primary
+          is_primary: true,
           variant_type: 'trimmed',
-          name: null, // No naming as per user request
+          name: null,
         })
         .select('id')
         .single();
@@ -153,41 +210,37 @@ export const useTrimSave = ({
       const newVariantId = insertedVariant.id;
       console.log('[useTrimSave] Created variant with ID:', newVariantId.substring(0, 8));
 
-      // Also directly update the generation's params as a fallback
-      // (in case the sync trigger isn't deployed yet)
-      console.log('[TrimDurationFix] Directly updating generation params with duration_seconds:', actualDuration);
+      setSaveProgress(90);
+
+      // Step 5: Update the generation record directly
       const { error: updateError } = await supabase
         .from('generations')
         .update({
-          location: videoUrl,
+          location: result.video_url,
           thumbnail_url: thumbnailUrl,
           params: variantParams,
         })
         .eq('id', generationId);
 
       if (updateError) {
-        console.warn('[useTrimSave] Failed to update generation params:', updateError);
-        // Don't throw - variant was created successfully
+        console.warn('[useTrimSave] Failed to update generation:', updateError);
       }
 
       setSaveProgress(100);
       setSaveSuccess(true);
 
-      console.log('[TrimDurationFix] useTrimSave complete! Duration stored:', actualDuration);
+      console.log('[useTrimSave] Complete! MP4 saved with proper duration.');
       toast.success('Trimmed video saved');
 
-      // Invalidate ALL relevant queries to ensure fresh data is fetched
-      console.log('[TrimDurationFix] Invalidating queries for generationId:', generationId);
+      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['generation-variants'] });
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       queryClient.invalidateQueries({ queryKey: ['generation'] });
-      // Force refetch by removing stale data
       queryClient.removeQueries({ queryKey: ['unified-generations'], exact: false });
 
-      // Call success callback with the new variant ID
+      // Call success callback
       onSuccess?.(newVariantId);
 
-      // Reset success state after a delay
       setTimeout(() => {
         setSaveSuccess(false);
       }, 2000);
@@ -221,4 +274,3 @@ export const useTrimSave = ({
 };
 
 export default useTrimSave;
-

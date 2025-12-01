@@ -2,10 +2,11 @@
  * VideoTrimEditor Module
  * 
  * Provides video trimming functionality for segment videos.
+ * Uses server-side Edge Function (trim-video) for MP4 conversion with proper duration metadata.
+ * 
  * Following the MediaLightbox pattern:
  * - hooks/ for business logic
  * - components/ for UI
- * - utils/ for lower-level operations
  * - types.ts for TypeScript interfaces
  * 
  * Usage:
@@ -20,9 +21,6 @@ export * from './hooks';
 
 // Re-export components
 export * from './components';
-
-// Re-export utils
-export * from './utils';
 
 // Re-export types
 export * from './types';

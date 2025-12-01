@@ -793,7 +793,7 @@ serve(async (req) => {
                   .select('params, thumbnail_url')
                   .eq('id', generationId)
                   .single();
-                
+
                 if (fetchError) {
                   console.error(`[ImageUpscale] Error fetching source generation:`, fetchError);
                 }

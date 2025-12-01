@@ -79,11 +79,6 @@ interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>
    * Callback for video loaded data
    */
   onLoadedData?: React.ReactEventHandler<HTMLVideoElement>;
-  /**
-   * Expected duration in seconds. Overrides video.duration when provided.
-   * Useful for WebM files from MediaRecorder that have broken duration metadata.
-   */
-  expectedDuration?: number;
 }
 
 /**
@@ -111,7 +106,6 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   onVideoError,
   onLoadStart,
   onLoadedData,
-  expectedDuration,
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -123,34 +117,11 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   // Track the last mouse X position for re-calculating scrubber when metadata loads
   const lastMouseXRef = useRef<number | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [duration, setDuration] = useState(() => {
-    // Initialize with expectedDuration if provided and valid
-    if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
-      return expectedDuration;
-    }
-    return 0;
-  });
+  const [duration, setDuration] = useState(0);
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
   const [scrubberVisible, setScrubberVisible] = useState(true);
   const [hasLoadedOnDemand, setHasLoadedOnDemand] = useState(false);
 
-  // Update duration from expectedDuration prop if video duration is invalid
-  React.useEffect(() => {
-    console.log('[TrimDurationFix] HoverScrubVideo received expectedDuration:', {
-      expectedDuration,
-      currentDuration: duration,
-      isExpectedFinite: expectedDuration ? Number.isFinite(expectedDuration) : 'N/A',
-      isCurrentFinite: Number.isFinite(duration),
-      willUpdate: expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0 && (!Number.isFinite(duration) || duration <= 0),
-    });
-    if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
-      // Only update if current duration is invalid (0, Infinity, or NaN)
-      if (!Number.isFinite(duration) || duration <= 0) {
-        console.log('[TrimDurationFix] Setting duration from expectedDuration:', expectedDuration);
-        setDuration(expectedDuration);
-      }
-    }
-  }, [expectedDuration, duration]);
   // When posterOnlyUntilClick is enabled, defer activation until interaction
   const [isActivated, setIsActivated] = useState<boolean>(() => !posterOnlyUntilClick);
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
@@ -432,20 +403,11 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         });
       }
 
-      let newDuration = videoRef.current.duration;
+      const newDuration = videoRef.current.duration;
       
-      // If video duration is not valid, try to use expectedDuration prop
+      // Only set duration if valid
       if (!Number.isFinite(newDuration) || newDuration <= 0) {
-        if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
-          console.log('[SegmentCardPopulation] Using expectedDuration instead of invalid video duration:', {
-            videoDuration: newDuration,
-            expectedDuration,
-          });
-          newDuration = expectedDuration;
-        } else {
-          console.log('[SegmentCardPopulation] Duration is invalid and no expectedDuration provided:', newDuration);
-          return;
-        }
+        return;
       }
       
       setDuration(newDuration);

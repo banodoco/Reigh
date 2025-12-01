@@ -253,7 +253,7 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 
 | Service | Location | Purpose |
 |---------|----------|---------|
-| **edge functions** | `/supabase/functions/` | Task completion, post-execution billing, payments |
+| **edge functions** | `/supabase/functions/` | Task completion, post-execution billing, payments, video trimming (`trim-video`) |
 | **database triggers** | migr. SQL | Instant task processing, status broadcasts |
 | **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns, reference image recropping (`recropReferences.ts`), generation transformers (`generationTransformers.ts`), URL resolution (`imageUrlResolver.ts`) |
 | **lib/tasks/** | `/src/shared/lib/tasks/` | Task creation utilities for specific task types: `imageUpscale.ts`, `imageInpaint.ts` |

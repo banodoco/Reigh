@@ -1034,19 +1034,6 @@ export const VideoItem = React.memo<VideoItemProps>(({
             {shouldLoad && (
               <div ref={containerRef} className="relative w-full h-full">
                 {/* HoverScrubVideo with loading optimization integration */}
-                {/* Debug: Log what we're passing as expectedDuration */}
-                {(() => {
-                  const expectedDur = video.params?.duration_seconds || (video as any).metadata?.duration_seconds;
-                  console.log('[TrimDurationFix] VideoItem passing to HoverScrubVideo:', {
-                    videoId: video.id?.substring(0, 8),
-                    expectedDuration: expectedDur,
-                    hasParams: !!video.params,
-                    hasMetadata: !!(video as any).metadata,
-                    'params?.duration_seconds': video.params?.duration_seconds,
-                    'metadata?.duration_seconds': (video as any).metadata?.duration_seconds,
-                  });
-                  return null;
-                })()}
                 <HoverScrubVideo
                   key={`video-${video.id}`}
                   src={video.location || video.imageUrl}
@@ -1057,9 +1044,6 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   videoClassName="object-cover cursor-pointer"
                   poster={thumbSrcStable || video.thumbUrl}
                   data-video-id={video.id}
-                  // Pass duration from params for trimmed WebM videos with broken metadata
-                  // Also try metadata.duration_seconds since transformer moves params to metadata
-                  expectedDuration={video.params?.duration_seconds || (video as any).metadata?.duration_seconds}
                   // Interaction events
                   onDoubleClick={isMobile ? undefined : () => {
                     onLightboxOpen(originalIndex);

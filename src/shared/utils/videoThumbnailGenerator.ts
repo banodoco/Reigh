@@ -14,6 +14,12 @@ export interface ThumbnailGenerationResult {
   error?: string;
 }
 
+export interface ThumbnailExtractResult {
+  success: boolean;
+  thumbnailUrl?: string;
+  error?: string;
+}
+
 /**
  * Extracts a thumbnail from a video at a specific time
  */
@@ -203,3 +209,45 @@ export async function generateAndUploadThumbnail(
   }
 }
 
+/**
+ * Extract and upload thumbnail only (no database update)
+ * Use this for variants where you'll update the record yourself
+ */
+export async function extractAndUploadThumbnailOnly(
+  videoUrl: string,
+  uniqueId: string,
+  projectId: string
+): Promise<ThumbnailExtractResult> {
+  try {
+    console.log('[ThumbnailGenerator] Extracting thumbnail (no DB update):', {
+      uniqueId: uniqueId.substring(0, 8),
+      videoUrl: videoUrl.substring(0, 50) + '...',
+    });
+
+    // Step 1: Extract thumbnail from video (first frame)
+    const thumbnailBlob = await extractThumbnailFromVideo(videoUrl, 0.001);
+    
+    // Step 2: Upload to storage
+    const thumbnailUrl = await uploadThumbnailToStorage(thumbnailBlob, uniqueId, projectId);
+    
+    console.log('[ThumbnailGenerator] Thumbnail uploaded:', {
+      uniqueId: uniqueId.substring(0, 8),
+      thumbnailUrl: thumbnailUrl.substring(0, 50) + '...',
+    });
+
+    return {
+      success: true,
+      thumbnailUrl,
+    };
+  } catch (error) {
+    console.error('[ThumbnailGenerator] Extraction failed:', {
+      uniqueId: uniqueId.substring(0, 8),
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}

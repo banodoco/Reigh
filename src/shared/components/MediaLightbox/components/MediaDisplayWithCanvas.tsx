@@ -34,9 +34,6 @@ interface MediaDisplayWithCanvasProps {
   // Layout adjustments
   tasksPaneWidth?: number; // Width of tasks pane to adjust for (desktop only)
   
-  // Video duration fallback (for trimmed WebM files with broken metadata)
-  expectedDuration?: number;
-  
   // Debug
   debugContext?: string;
 }
@@ -62,7 +59,6 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   className = '',
   containerClassName = '',
   tasksPaneWidth = 0,
-  expectedDuration,
   debugContext = 'MediaDisplay'
 }) => {
   const [imageLoadError, setImageLoadError] = React.useState(false);
@@ -168,7 +164,6 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
           preload="auto"
           className={`shadow-wes border border-border/20 ${variant === 'regular-centered' ? 'rounded' : ''}`}
           style={mediaStyle}
-          expectedDuration={expectedDuration}
           onLoadedMetadata={onVideoLoadedMetadata}
         />
       ) : (

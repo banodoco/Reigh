@@ -609,34 +609,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     saveTrimmedVideo,
   } = trimSaveHook;
 
-  // Get fallback duration from variant params or media params (for trimmed WebM files with broken metadata)
-  const fallbackDuration = useMemo(() => {
-    // First try active variant's params (when switching variants)
-    if (activeVariant?.params?.duration_seconds) {
-      console.log('[TrimDurationFix] Using activeVariant duration:', activeVariant.params.duration_seconds);
-      return activeVariant.params.duration_seconds;
-    }
-    
-    // Handle case where params might be a JSON string
-    let params = media.params;
-    if (typeof params === 'string') {
-      try {
-        params = JSON.parse(params);
-      } catch (e) {
-        console.log('[TrimDurationFix] Failed to parse params string:', params);
-      }
-    }
-    
-    const duration = params?.duration_seconds || (media as any).metadata?.duration_seconds;
-    console.log('[TrimDurationFix] MediaLightbox fallbackDuration:', {
-      mediaId: media.id?.slice(0, 8),
-      hasActiveVariant: !!activeVariant,
-      activeVariantDuration: activeVariant?.params?.duration_seconds,
-      'params?.duration_seconds': params?.duration_seconds,
-      computedDuration: duration,
-    });
-    return duration;
-  }, [media, activeVariant]);
 
   // For segment videos (showVideoTrimEditor), hide the "Apply These Settings" button
   const adjustedTaskDetailsData = useMemo(() => {
@@ -654,29 +626,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     onTrimModeChange?.(true);
     
     // Try to capture video duration from already-loaded video element
-    // This handles the case where the video was loaded before entering trim mode
     setTimeout(() => {
       const videoElements = document.querySelectorAll('video');
-      let foundValidDuration = false;
-      
       videoElements.forEach((video) => {
-        // Only use duration if it's a valid finite number (not Infinity for broken WebM files)
         if (Number.isFinite(video.duration) && video.duration > 0) {
-          console.log('[TrimDurationFix] Captured video duration from DOM:', video.duration);
           setVideoDuration(video.duration);
-          foundValidDuration = true;
-        } else {
-          console.log('[TrimDurationFix] Invalid video duration from DOM:', video.duration, '- will try fallback');
         }
       });
-      
-      // If no valid duration from video element, use fallback from params
-      if (!foundValidDuration && fallbackDuration && Number.isFinite(fallbackDuration) && fallbackDuration > 0) {
-        console.log('[TrimDurationFix] Using fallback duration from params:', fallbackDuration);
-        setVideoDuration(fallbackDuration);
-      }
     }, 100);
-  }, [onTrimModeChange, setVideoDuration, fallbackDuration]);
+  }, [onTrimModeChange, setVideoDuration]);
 
   const handleExitVideoTrimMode = useCallback(() => {
     setIsVideoTrimMode(false);
@@ -1338,18 +1296,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     displayCanvasRef={displayCanvasRef}
                     maskCanvasRef={maskCanvasRef}
                     onImageLoad={setImageDimensions}
-                    expectedDuration={fallbackDuration}
                     onVideoLoadedMetadata={(e) => {
                       const video = e.currentTarget;
-                      // Only set duration if it's a valid finite number (not Infinity for broken WebM files)
                       if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
-                        console.log('[TrimDurationFix] MediaLightbox video duration captured:', video.duration);
                         setVideoDuration(video.duration);
-                      } else if (showVideoTrimEditor && fallbackDuration && Number.isFinite(fallbackDuration) && fallbackDuration > 0) {
-                        console.log('[TrimDurationFix] Using fallback duration:', fallbackDuration);
-                        setVideoDuration(fallbackDuration);
-                      } else if (showVideoTrimEditor) {
-                        console.log('[TrimDurationFix] MediaLightbox video duration invalid and no fallback:', video.duration);
                       }
                     }}
                     handlePointerDown={handlePointerDown}
@@ -1727,15 +1677,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         playsInline
                         preload="auto"
                         className="max-w-full max-h-full shadow-wes border border-border/20"
-                        expectedDuration={fallbackDuration}
                         onLoadedMetadata={(e) => {
                           const video = e.currentTarget;
                           if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
-                            console.log('[TrimDurationFix] Video duration (mobile):', video.duration);
                             setVideoDuration(video.duration);
-                          } else if (showVideoTrimEditor && fallbackDuration && Number.isFinite(fallbackDuration)) {
-                            console.log('[TrimDurationFix] Using fallback duration (mobile):', fallbackDuration);
-                            setVideoDuration(fallbackDuration);
                           }
                         }}
                       />
@@ -2050,15 +1995,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     playsInline
                     preload="auto"
                     className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
-                    expectedDuration={fallbackDuration}
                     onLoadedMetadata={(e) => {
                       const video = e.currentTarget;
                       if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
-                        console.log('[TrimDurationFix] Video duration (regular):', video.duration);
                         setVideoDuration(video.duration);
-                      } else if (showVideoTrimEditor && fallbackDuration && Number.isFinite(fallbackDuration)) {
-                        console.log('[TrimDurationFix] Using fallback duration (regular):', fallbackDuration);
-                        setVideoDuration(fallbackDuration);
                       }
                     }}
                   />
