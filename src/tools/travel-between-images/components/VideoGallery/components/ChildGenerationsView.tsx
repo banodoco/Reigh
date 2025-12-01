@@ -213,7 +213,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     // Join Clips State
     const [isJoiningClips, setIsJoiningClips] = useState(false);
     const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
-    const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
     const queryClient = useQueryClient();
     
     // Use project-persisted join clips settings (shared with JoinClipsPage)
@@ -225,6 +224,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         gapFrameCount: joinGapFrames = 12,
         replaceMode: joinReplaceMode = true,
         keepBridgingImages = true,
+        useIndividualPrompts = false,
     } = joinSettings.settings;
 
     // Fetch parent generation details to check for final output

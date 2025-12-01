@@ -15,6 +15,7 @@ export const joinClipsSettings = {
     priority: 0,
     prompt: '', // User's current prompt (persisted per project)
     randomSeed: true,
+    useIndividualPrompts: false, // Whether to use per-transition prompts
     // Legacy two-video format (kept for backward compatibility)
     startingVideoUrl: undefined as string | undefined,
     startingVideoPosterUrl: undefined as string | undefined,

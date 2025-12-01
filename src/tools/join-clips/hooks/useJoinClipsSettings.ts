@@ -14,6 +14,7 @@ const DEFAULT_JOIN_CLIPS_SETTINGS: JoinClipsSettings = {
   priority: 0,
   prompt: '',
   randomSeed: true,
+  useIndividualPrompts: false,
   // Legacy two-video format
   startingVideoUrl: undefined,
   startingVideoPosterUrl: undefined,

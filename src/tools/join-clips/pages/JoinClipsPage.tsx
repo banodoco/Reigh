@@ -339,6 +339,7 @@ const JoinClipsPage: React.FC = () => {
     gapFrameCount = 12,
     replaceMode = true,
     keepBridgingImages,
+    useIndividualPrompts = false,
   } = joinSettings.settings;
   
   // Track whether settings have completed their initial load
@@ -351,9 +352,6 @@ const JoinClipsPage: React.FC = () => {
       joinSettings.updateField('keepBridgingImages', true);
     }
   }, [keepBridgingImages, settingsLoaded, joinSettings]);
-  
-  // Local UI state (not persisted)
-  const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
   
   // Refs for file inputs (we'll create them dynamically)
   const fileInputRefs = useRef<{ [clipId: string]: HTMLInputElement | null }>({});
@@ -1160,7 +1158,7 @@ const JoinClipsPage: React.FC = () => {
             negativePrompt={negativePrompt}
             setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
             useIndividualPrompts={useIndividualPrompts}
-            setUseIndividualPrompts={setUseIndividualPrompts}
+            setUseIndividualPrompts={(val) => joinSettings.updateField('useIndividualPrompts', val)}
             availableLoras={availableLoras}
             projectId={selectedProjectId}
             loraPersistenceKey="join-clips"
