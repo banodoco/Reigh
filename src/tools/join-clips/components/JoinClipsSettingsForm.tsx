@@ -67,7 +67,7 @@ const Visualization: React.FC<{
     keepBridgingImages: boolean;
 }> = ({ gapFrames, contextFrames, replaceMode, keepBridgingImages }) => {
     // Handle undefined keepBridgingImages (defensive fallback)
-    const keepBridgingImagesValue = keepBridgingImages ?? true;
+    const keepBridgingImagesValue = keepBridgingImages ?? false;
     
     const totalFrames = contextFrames + gapFrames + contextFrames;
     const anchor1Idx = Math.floor(gapFrames / 3);
@@ -502,7 +502,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     headerContent
 }) => {
     // Handle undefined values (defensive fallback)
-    const keepBridgingImagesValue = keepBridgingImages ?? true;
+    const keepBridgingImagesValue = keepBridgingImages ?? false;
     const enhancePromptValue = enhancePrompt ?? true;
     
     // Debug logging for form props

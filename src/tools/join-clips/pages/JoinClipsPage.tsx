@@ -18,6 +18,7 @@ import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hook
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { SKELETON_COLUMNS } from '@/shared/components/ImageGallery/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { LoraManager } from '@/shared/components/LoraManager';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
@@ -1202,7 +1203,7 @@ const JoinClipsPage: React.FC = () => {
                 </h2>
                 <SkeletonGallery
                   count={skeletonCount}
-                  columns={{ base: 1, sm: 2, md: 2, lg: 3, xl: 3, '2xl': 3 }}
+                  columns={SKELETON_COLUMNS[3]}
                   showControls={true}
                   projectAspectRatio={projectAspectRatio}
                 />

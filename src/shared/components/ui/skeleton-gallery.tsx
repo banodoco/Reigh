@@ -14,6 +14,8 @@ interface SkeletonGalleryProps {
     xl?: number;
     '2xl'?: number;
   };
+  /** Custom gap classes (e.g. "gap-2 sm:gap-3 md:gap-4") - defaults to "gap-4" */
+  gapClasses?: string;
   /** Whether to use white text/styling (for dark panes) */
   whiteText?: boolean;
   /** Custom className for the container */
@@ -31,6 +33,7 @@ interface SkeletonGalleryProps {
 export function SkeletonGallery({ 
   count = 20, 
   columns = { base: 2, sm: 3, md: 4, lg: 5, xl: 6 },
+  gapClasses = 'gap-4',
   whiteText = false,
   className,
   showControls = false,
@@ -42,15 +45,17 @@ export function SkeletonGallery({
     console.log('[VideoSkeletonDebug] SkeletonGallery mount/render:', {
       count,
       columns,
+      gapClasses,
       whiteText,
       showControls,
       projectAspectRatio,
       timestamp: Date.now()
     });
-  }, [count, columns, whiteText, showControls, projectAspectRatio]);
+  }, [count, columns, gapClasses, whiteText, showControls, projectAspectRatio]);
 
   const gridCols = cn(
-    'grid gap-4',
+    'grid',
+    gapClasses,
     columns.base === 1 && 'grid-cols-1',
     columns.base === 2 && 'grid-cols-2',
     columns.base === 3 && 'grid-cols-3',

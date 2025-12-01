@@ -1736,10 +1736,46 @@ async function createGenerationFromTask(
   console.log(`[GenMigration] Starting generation creation for task ${taskId}`);
 
   try {
-    // Check if generation already exists (idempotency)
+    // Check if generation already exists
     const existingGeneration = await findExistingGeneration(supabase, taskId);
     if (existingGeneration) {
       console.log(`[GenMigration] Generation already exists for task ${taskId}: ${existingGeneration.id}`);
+      console.log(`[GenMigration] Creating new variant and making it primary (like trim save)`);
+
+      // Build params for the new variant
+      const variantParams = {
+        ...taskData.params,
+        source_task_id: taskId,
+        created_from: 'task_completion',
+        tool_type: taskData.tool_type,
+      };
+
+      // Create a new variant as the primary (DB trigger will unset the old primary)
+      await createVariant(
+        supabase,
+        existingGeneration.id,
+        publicUrl,                    // The new output URL
+        thumbnailUrl || null,
+        variantParams,
+        true,                         // is_primary: new one becomes primary
+        'regenerated',                // variant_type
+        null                          // name
+      );
+
+      // Update the generation record with the new location (like useTrimSave does)
+      const { error: updateError } = await supabase
+        .from('generations')
+        .update({
+          location: publicUrl,
+          thumbnail_url: thumbnailUrl,
+        })
+        .eq('id', existingGeneration.id);
+
+      if (updateError) {
+        console.error(`[GenMigration] Failed to update generation with new variant:`, updateError);
+      } else {
+        console.log(`[GenMigration] Updated generation ${existingGeneration.id} with new primary variant`);
+      }
 
       // Ensure shot link if needed
       const { shotId, addInPosition } = extractShotAndPosition(taskData.params);

@@ -7,6 +7,7 @@ import { ImageGalleryItem } from "@/shared/components/ImageGalleryItem";
 import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { GeneratedImageWithMetadata } from '../index';
 import { parseRatio } from '@/shared/lib/aspectRatios';
+import { SKELETON_COLUMNS } from '../utils/imageGallery-constants';
 
 export interface ImageGalleryGridProps {
   // Data props
@@ -177,18 +178,17 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
 
   // Show full skeleton gallery when loading new data
   if (isLoading) {
+    // Use SKELETON_COLUMNS to match the actual grid layout for this columnsPerRow value
+    const skeletonColumns = SKELETON_COLUMNS[columnsPerRow as keyof typeof SKELETON_COLUMNS] || SKELETON_COLUMNS[5];
+    // Match the gap classes used in the actual grid
+    const skeletonGapClasses = reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4';
+    
     return (
       <div className={reducedSpacing ? "" : "min-h-[400px]"}>
         <SkeletonGallery
           count={itemsPerPage}
-          columns={{ 
-            base: 2, 
-            sm: Math.min(3, columnsPerRow), 
-            md: Math.min(4, columnsPerRow), 
-            lg: columnsPerRow, 
-            xl: columnsPerRow,
-            '2xl': columnsPerRow
-          }}
+          columns={skeletonColumns}
+          gapClasses={skeletonGapClasses}
           whiteText={whiteText}
           showControls={false}
           projectAspectRatio={projectAspectRatio}

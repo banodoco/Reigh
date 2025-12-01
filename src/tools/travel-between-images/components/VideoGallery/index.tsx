@@ -963,12 +963,15 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     return { aspectRatio: '16/9' }; // Fallback
   }, [projectAspectRatio]);
 
-  // Calculate skeleton columns based on aspect ratio
-  const skeletonColumns = React.useMemo(() => {
-    const defaultCols = { base: 2, lg: 3 };
+  // Calculate grid columns based on aspect ratio - used by both skeleton AND actual grid
+  const gridColumnConfig = React.useMemo(() => {
+    const defaultConfig = { 
+      columns: { base: 2, lg: 3 },
+      classes: 'grid-cols-2 lg:grid-cols-3'
+    };
 
     if (!projectAspectRatio) {
-      return defaultCols;
+      return defaultConfig;
     }
 
     const [width, height] = projectAspectRatio.split(':').map(Number);
@@ -977,19 +980,25 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
       // For very wide aspect ratios (16:9 and wider), show 2 videos per row
       if (aspectRatio >= 16 / 9) {
-        return { base: 2, lg: 2 };
+        return { 
+          columns: { base: 2, lg: 2 },
+          classes: 'grid-cols-2 lg:grid-cols-2'
+        };
       }
       // For very narrow aspect ratios (narrower than 4:3), show 4 videos per row
       else if (aspectRatio < 4 / 3) {
-        return { base: 2, lg: 4 };
+        return { 
+          columns: { base: 2, lg: 4 },
+          classes: 'grid-cols-2 lg:grid-cols-4'
+        };
       }
       // For moderate aspect ratios (4:3 to 16:9), use default
       else {
-        return defaultCols;
+        return defaultConfig;
       }
     }
 
-    return defaultCols;
+    return defaultConfig;
   }, [projectAspectRatio]);
 
   // ===============================================================================
@@ -1023,13 +1032,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         {isLoadingGenerations ? (
           <SkeletonGallery
             count={6}
-            columns={skeletonColumns}
+            columns={gridColumnConfig.columns}
+            gapClasses="gap-2 sm:gap-3 md:gap-4"
             projectAspectRatio={projectAspectRatio}
           />
         ) : (
           <>
             {/* Video grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+            <div className={`grid ${gridColumnConfig.classes} gap-2 sm:gap-3 md:gap-4`}>
               {displaySortedVideoOutputs.map((video, index) => {
                 const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
 

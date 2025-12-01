@@ -16,6 +16,7 @@ import { createCharacterAnimateTask } from '@/shared/lib/tasks/characterAnimate'
 import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
+import { SKELETON_COLUMNS } from '@/shared/components/ImageGallery/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { cn } from '@/shared/lib/utils';
 import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
@@ -922,7 +923,7 @@ const CharacterAnimatePage: React.FC = () => {
                 </h2>
                 <SkeletonGallery
                   count={videosData.items.length}
-                  columns={{ base: 1, sm: 2, md: 2, lg: 3, xl: 3, '2xl': 3 }}
+                  columns={SKELETON_COLUMNS[3]}
                   showControls={true}
                   projectAspectRatio={projectAspectRatio}
                 />

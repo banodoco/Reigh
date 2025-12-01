@@ -42,6 +42,7 @@ import { useShotSettings } from '../hooks/useShotSettings';
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useGenerations } from '@/shared/hooks/useGenerations';
 import { ImageGallery } from '@/shared/components/ImageGallery';
+import { SKELETON_COLUMNS } from '@/shared/components/ImageGallery/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -1959,7 +1960,7 @@ const VideoTravelToolPage: React.FC = () => {
                 <div className="pb-2">
                   <SkeletonGallery
                     count={skeletonCount}
-                    columns={{ base: 1, sm: 2, md: 2, lg: 3, xl: 3, '2xl': 3 }}
+                    columns={SKELETON_COLUMNS[3]}
                     showControls={true}
                     projectAspectRatio={projectAspectRatio}
                   />

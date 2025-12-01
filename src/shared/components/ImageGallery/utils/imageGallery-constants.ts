@@ -20,6 +20,18 @@ export const GRID_COLUMN_CLASSES = {
 } as const;
 
 /**
+ * Skeleton column configs that match GRID_COLUMN_CLASSES for each columnsPerRow value.
+ * These must stay in sync with GRID_COLUMN_CLASSES to prevent layout shift during loading.
+ */
+export const SKELETON_COLUMNS = {
+  3: { base: 1, md: 2, lg: 3, xl: 3, '2xl': 3 },
+  4: { base: 2, sm: 3, md: 4, lg: 4, xl: 4, '2xl': 4 },
+  5: { base: 2, sm: 3, md: 4, lg: 5, xl: 5, '2xl': 5 },
+  6: { base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 },
+  7: { base: 3, sm: 4, md: 5, lg: 6, xl: 7, '2xl': 7 },
+} as const;
+
+/**
  * Double tap detection timing
  */
 export const DOUBLE_TAP_DELAY = 300;

@@ -866,6 +866,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         starred={(parentVideoRow as { starred?: boolean }).starred ?? false}
                         shotId={undefined}
                         showTaskDetails={true}
+                        showVideoTrimEditor={true}
                         taskDetailsData={{
                             task: parentTask,
                             isLoading: isLoadingParentTask,
