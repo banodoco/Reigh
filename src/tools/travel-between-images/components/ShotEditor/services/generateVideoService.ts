@@ -106,7 +106,7 @@ function buildBasicModePhaseConfig(
         phases: [
           {
             phase: 1,
-            guidance_scale: 3.0,
+            guidance_scale: 1.0,
             loras: [
               { url: "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors", multiplier: "1.2" },
               ...additionalLoras
