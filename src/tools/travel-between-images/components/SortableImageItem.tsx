@@ -35,6 +35,8 @@ interface SortableImageItemProps {
   isSelected: boolean;
   isDragDisabled?: boolean;
   timeline_frame?: number;
+  /** Display time in seconds (calculated from position × frames per image / fps) */
+  displayTimeSeconds?: number;
   skipConfirmation: boolean;
   onSkipConfirmationSave: () => void;
   duplicatingImageId?: string | null;
@@ -57,6 +59,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
   isSelected,
   isDragDisabled = false,
   timeline_frame,
+  displayTimeSeconds,
   skipConfirmation,
   onSkipConfirmationSave,
   duplicatingImageId,
@@ -316,10 +319,14 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
         }}
       />
       
-      {/* Frame number overlay - bottom (matching timeline style) */}
-      {timeline_frame !== undefined && (
+      {/* Time overlay - bottom (showing position-based time in seconds) */}
+      {(displayTimeSeconds !== undefined || timeline_frame !== undefined) && (
         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5 pointer-events-none whitespace-nowrap overflow-hidden">
-          <span className="inline-block">{framesToSeconds(timeline_frame)}</span>
+          <span className="inline-block">
+            {displayTimeSeconds !== undefined 
+              ? `${displayTimeSeconds.toFixed(2)}s`
+              : framesToSeconds(timeline_frame!)}
+          </span>
         </div>
       )}
       
@@ -460,6 +467,7 @@ export const SortableImageItem = React.memo(
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.isDragDisabled === nextProps.isDragDisabled &&
       prevProps.timeline_frame === nextProps.timeline_frame &&
+      prevProps.displayTimeSeconds === nextProps.displayTimeSeconds &&
       prevProps.skipConfirmation === nextProps.skipConfirmation &&
       prevProps.duplicatingImageId === nextProps.duplicatingImageId &&
       prevProps.duplicateSuccessImageId === nextProps.duplicateSuccessImageId &&
@@ -482,6 +490,7 @@ export const SortableImageItem = React.memo(
         isSelected: prevProps.isSelected !== nextProps.isSelected,
         isDragDisabled: prevProps.isDragDisabled !== nextProps.isDragDisabled,
         timeline_frame: prevProps.timeline_frame !== nextProps.timeline_frame,
+        displayTimeSeconds: prevProps.displayTimeSeconds !== nextProps.displayTimeSeconds,
         skipConfirmation: prevProps.skipConfirmation !== nextProps.skipConfirmation,
         duplicating: prevProps.duplicatingImageId !== nextProps.duplicatingImageId,
         success: prevProps.duplicateSuccessImageId !== nextProps.duplicateSuccessImageId,

@@ -10,6 +10,7 @@ import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 import { MobileImageItemProps } from './types';
+import { framesToSeconds } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
 
 export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   image,
@@ -123,7 +124,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
         {/* Frame number overlay - bottom (matching timeline style) */}
         {frameNumber !== undefined && (
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5 pointer-events-none whitespace-nowrap overflow-hidden">
-            <span className="inline-block">{frameNumber}</span>
+            <span className="inline-block">{framesToSeconds(frameNumber)}</span>
           </div>
         )}
 
