@@ -307,6 +307,40 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
           ) : null}
         </div>
 
+        {/* Pagination info - at top */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pb-1 border-b border-border/30">
+            <span className="text-[10px] text-muted-foreground">
+              {currentPage * ITEMS_PER_PAGE + 1}-{Math.min((currentPage + 1) * ITEMS_PER_PAGE, filteredVariants.length)} of {filteredVariants.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+                className={cn(
+                  'p-0.5 rounded hover:bg-muted transition-colors',
+                  currentPage === 0 && 'opacity-30 cursor-not-allowed'
+                )}
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-[10px] text-muted-foreground min-w-[3ch] text-center">
+                {currentPage + 1}/{totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={currentPage >= totalPages - 1}
+                className={cn(
+                  'p-0.5 rounded hover:bg-muted transition-colors',
+                  currentPage >= totalPages - 1 && 'opacity-30 cursor-not-allowed'
+                )}
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Variants grid - 4 per row */}
         <div className="grid grid-cols-4 gap-1 w-full">
           {paginatedVariants.map((variant) => {
@@ -421,40 +455,6 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
         {filteredVariants.length === 0 && (
           <div className="text-xs text-muted-foreground text-center py-2">
             No variants match this filter
-          </div>
-        )}
-
-        {/* Pagination controls */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-1 border-t border-border/30">
-            <span className="text-[10px] text-muted-foreground">
-              {currentPage * ITEMS_PER_PAGE + 1}-{Math.min((currentPage + 1) * ITEMS_PER_PAGE, filteredVariants.length)} of {filteredVariants.length}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-                disabled={currentPage === 0}
-                className={cn(
-                  'p-0.5 rounded hover:bg-muted transition-colors',
-                  currentPage === 0 && 'opacity-30 cursor-not-allowed'
-                )}
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-[10px] text-muted-foreground min-w-[3ch] text-center">
-                {currentPage + 1}/{totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={currentPage >= totalPages - 1}
-                className={cn(
-                  'p-0.5 rounded hover:bg-muted transition-colors',
-                  currentPage >= totalPages - 1 && 'opacity-30 cursor-not-allowed'
-                )}
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
           </div>
         )}
       </div>

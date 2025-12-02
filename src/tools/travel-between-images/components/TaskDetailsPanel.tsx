@@ -250,47 +250,47 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
         </div>
       </ScrollArea>
       
-      {/* Footer with controls - Sticky to bottom */}
-      <div className="flex-shrink-0 p-4 border-t bg-background sticky bottom-0">
-        <div className="flex flex-col sm:flex-col space-y-3">
-          {/* Mobile: horizontal layout with checkbox left, button right */}
-          {inputImages.length > 0 && onApplySettingsFromTask && task && taskId && (
-            <div className="flex items-center gap-3 sm:hidden">
-              <div className="flex items-center space-x-2">
+      {/* Footer with controls - Sticky to bottom - only show when Apply Settings is available */}
+      {onApplySettingsFromTask && task && taskId && (
+        <div className="flex-shrink-0 p-4 border-t bg-background sticky bottom-0">
+          <div className="flex flex-col sm:flex-col space-y-3">
+            {/* Mobile: horizontal layout with checkbox left, button right */}
+            {inputImages.length > 0 && (
+              <div className="flex items-center gap-3 sm:hidden">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="replaceImages"
+                    checked={replaceImages}
+                    onCheckedChange={(checked) => onReplaceImagesChange(checked as boolean)}
+                  />
+                  <Label htmlFor="replaceImages" className="text-xs font-light whitespace-nowrap">
+                    Replace images
+                  </Label>
+                </div>
+                <Button 
+                  variant="default" 
+                  onClick={handleApplySettingsFromTask}
+                  className="text-sm flex-1"
+                >
+                  Apply These Settings
+                </Button>
+              </div>
+            )}
+            
+            {/* Desktop: vertical layout */}
+            {inputImages.length > 0 && (
+              <div className="hidden sm:flex items-center space-x-2">
                 <Checkbox 
-                  id="replaceImages"
+                  id="replaceImages-desktop"
                   checked={replaceImages}
                   onCheckedChange={(checked) => onReplaceImagesChange(checked as boolean)}
                 />
-                <Label htmlFor="replaceImages" className="text-xs font-light whitespace-nowrap">
+                <Label htmlFor="replaceImages-desktop" className="text-sm font-light">
                   Replace images
                 </Label>
               </div>
-              <Button 
-                variant="default" 
-                onClick={handleApplySettingsFromTask}
-                className="text-sm flex-1"
-              >
-                Apply These Settings
-              </Button>
-            </div>
-          )}
-          
-          {/* Desktop: vertical layout */}
-          {inputImages.length > 0 && (
-            <div className="hidden sm:flex items-center space-x-2">
-              <Checkbox 
-                id="replaceImages-desktop"
-                checked={replaceImages}
-                onCheckedChange={(checked) => onReplaceImagesChange(checked as boolean)}
-              />
-              <Label htmlFor="replaceImages-desktop" className="text-sm font-light">
-                Replace images
-              </Label>
-            </div>
-          )}
-          
-          {onApplySettingsFromTask && task && taskId && (
+            )}
+            
             <Button 
               variant="default" 
               onClick={handleApplySettingsFromTask}
@@ -298,9 +298,9 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
             >
               Apply These Settings
             </Button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

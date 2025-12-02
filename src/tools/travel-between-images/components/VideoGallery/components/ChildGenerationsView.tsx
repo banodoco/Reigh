@@ -1150,34 +1150,80 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [regenerateSuccess, setRegenerateSuccess] = useState(false);
 
-    // Extract input images and generation IDs for this segment
-    const segmentImages = useMemo(() => {
+    // Extract generation IDs for this segment's input images
+    const segmentGenerationIds = useMemo(() => {
         const orchestratorDetails = params.orchestrator_details || {};
-        const allImages = orchestratorDetails.input_image_paths_resolved || params.input_image_paths_resolved || [];
         const allGenerationIds = orchestratorDetails.input_image_generation_ids || params.input_image_generation_ids || [];
+        const allFallbackUrls = orchestratorDetails.input_image_paths_resolved || params.input_image_paths_resolved || [];
         
         // For segment at index N, we need images[N] and images[N+1]
-        const startImage = allImages[index];
-        const endImage = allImages[index + 1];
-        const startGenId = allGenerationIds[index];
-        const endGenId = allGenerationIds[index + 1];
-        
-        console.log('[SegmentImageFlow] Extracting images for segment', index);
-        console.log('[SegmentImageFlow] allImages array:', allImages);
-        console.log('[SegmentImageFlow] allGenerationIds array:', allGenerationIds);
-        console.log('[SegmentImageFlow] startImage URL:', startImage);
-        console.log('[SegmentImageFlow] endImage URL:', endImage);
-        console.log('[SegmentImageFlow] startGenId:', startGenId);
-        console.log('[SegmentImageFlow] endGenId:', endGenId);
-        console.log('[SegmentImageFlow] params.orchestrator_details keys:', Object.keys(orchestratorDetails));
-        console.log('[SegmentImageFlow] params keys:', Object.keys(params));
-        
         return {
-            start: startImage ? { url: startImage, generationId: startGenId } : null,
-            end: endImage ? { url: endImage, generationId: endGenId } : null,
-            hasImages: !!(startImage || endImage),
+            startGenId: allGenerationIds[index] as string | undefined,
+            endGenId: allGenerationIds[index + 1] as string | undefined,
+            startFallbackUrl: allFallbackUrls[index] as string | undefined,
+            endFallbackUrl: allFallbackUrls[index + 1] as string | undefined,
         };
     }, [params, index]);
+
+    // Fetch fresh URLs from database for segment input images (always use main variant)
+    const { data: freshGenerationUrls } = useQuery({
+        queryKey: ['segment-input-generations', segmentGenerationIds.startGenId, segmentGenerationIds.endGenId],
+        queryFn: async () => {
+            const idsToFetch = [segmentGenerationIds.startGenId, segmentGenerationIds.endGenId].filter(Boolean) as string[];
+            if (idsToFetch.length === 0) return {};
+            
+            const { data, error } = await supabase
+                .from('generations')
+                .select('id, location, thumbnail_url')
+                .in('id', idsToFetch);
+            
+            if (error) {
+                console.error('[SegmentImageFlow] Error fetching fresh generation URLs:', error);
+                return {};
+            }
+            
+            const urlMap: Record<string, { location: string | null; thumbnail_url: string | null }> = {};
+            data?.forEach(gen => {
+                urlMap[gen.id] = { location: gen.location, thumbnail_url: gen.thumbnail_url };
+            });
+            
+            console.log('[SegmentImageFlow] Fetched fresh generation URLs:', {
+                idsRequested: idsToFetch,
+                urlsFound: Object.keys(urlMap).length,
+                startUrl: segmentGenerationIds.startGenId ? urlMap[segmentGenerationIds.startGenId]?.location?.substring(0, 50) : 'no-id',
+                endUrl: segmentGenerationIds.endGenId ? urlMap[segmentGenerationIds.endGenId]?.location?.substring(0, 50) : 'no-id',
+            });
+            
+            return urlMap;
+        },
+        enabled: !!(segmentGenerationIds.startGenId || segmentGenerationIds.endGenId),
+        staleTime: 10000, // Refresh every 10 seconds to pick up variant changes
+    });
+
+    // Build segmentImages using fresh URLs (from main variant) with fallback to cached URLs
+    const segmentImages = useMemo(() => {
+        const { startGenId, endGenId, startFallbackUrl, endFallbackUrl } = segmentGenerationIds;
+        
+        // Use fresh URL if available, otherwise fall back to cached URL
+        const startUrl = (startGenId && freshGenerationUrls?.[startGenId]?.location) 
+            || startFallbackUrl;
+        const endUrl = (endGenId && freshGenerationUrls?.[endGenId]?.location) 
+            || endFallbackUrl;
+        
+        console.log('[SegmentImageFlow] Building segmentImages for segment', index);
+        console.log('[SegmentImageFlow] Using fresh URLs:', {
+            startUsedFresh: !!(startGenId && freshGenerationUrls?.[startGenId]?.location),
+            endUsedFresh: !!(endGenId && freshGenerationUrls?.[endGenId]?.location),
+            startUrl: startUrl?.substring(0, 50),
+            endUrl: endUrl?.substring(0, 50),
+        });
+        
+        return {
+            start: startUrl ? { url: startUrl, generationId: startGenId } : null,
+            end: endUrl ? { url: endUrl, generationId: endGenId } : null,
+            hasImages: !!(startUrl || endUrl),
+        };
+    }, [segmentGenerationIds, freshGenerationUrls, index]);
     
     // Motion control state - derived from params
     const [motionMode, setMotionMode] = useState<'basic' | 'presets' | 'advanced'>(() => {
@@ -1293,48 +1339,19 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         setRegenerateSuccess(false);
 
         try {
-            // Extract input images - prefer fetching fresh URLs from database if generation IDs available
-            const orchestratorDetails = params.orchestrator_details || {};
-            const inputImages = orchestratorDetails.input_image_paths_resolved || params.input_image_paths_resolved || [];
-            const inputGenerationIds = orchestratorDetails.input_image_generation_ids || params.input_image_generation_ids || [];
-            
-            // Get generation IDs for this segment
-            const startGenId = inputGenerationIds[index] || segmentImages.start?.generationId;
-            const endGenId = inputGenerationIds[index + 1] || segmentImages.end?.generationId;
-            
-            // Try to fetch fresh URLs from database if we have generation IDs
-            let startImageUrl: string | undefined;
-            let endImageUrl: string | undefined;
-            
-            if (startGenId || endGenId) {
-                console.log('[RegenerateSegment] Fetching fresh image URLs from database...');
-                const genIdsToFetch = [startGenId, endGenId].filter(Boolean) as string[];
-                
-                const { data: generations, error } = await supabase
-                    .from('generations')
-                    .select('id, location')
-                    .in('id', genIdsToFetch);
-                
-                if (!error && generations) {
-                    const genMap = new Map(generations.map(g => [g.id, g.location]));
-                    if (startGenId && genMap.has(startGenId)) {
-                        startImageUrl = genMap.get(startGenId) || undefined;
-                        console.log('[RegenerateSegment] Using fresh start image URL from DB');
-                    }
-                    if (endGenId && genMap.has(endGenId)) {
-                        endImageUrl = genMap.get(endGenId) || undefined;
-                        console.log('[RegenerateSegment] Using fresh end image URL from DB');
-                    }
-                }
-            }
-            
-            // Fallback to stored URLs if database fetch didn't work
-            if (!startImageUrl) {
-                startImageUrl = inputImages[index] || params.start_image_url;
-            }
-            if (!endImageUrl) {
-                endImageUrl = inputImages[index + 1] || params.end_image_url;
-            }
+            // Use segmentImages which already contains fresh URLs from the main variant
+            // These are fetched via useQuery and reflect the current primary variant
+            const startImageUrl = segmentImages.start?.url;
+            const endImageUrl = segmentImages.end?.url;
+            const startGenId = segmentImages.start?.generationId;
+            const endGenId = segmentImages.end?.generationId;
+
+            console.log('[RegenerateSegment] Using fresh image URLs from main variants:', {
+                startImageUrl: startImageUrl?.substring(0, 50),
+                endImageUrl: endImageUrl?.substring(0, 50),
+                startGenId: startGenId?.substring(0, 8),
+                endGenId: endGenId?.substring(0, 8),
+            });
 
             if (!startImageUrl || !endImageUrl) {
                 throw new Error("Could not determine input images for this segment");
@@ -1368,7 +1385,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 endImageUrl: endImageUrl?.substring(0, 50),
                 startGenId: startGenId?.substring(0, 8),
                 endGenId: endGenId?.substring(0, 8),
-                usedFreshUrls: !!(startGenId || endGenId),
                 numFrames: params.num_frames,
                 hasOriginalParams: !!params,
                 loraCount: lorasForTask.length,
@@ -1386,8 +1402,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 start_image_url: startImageUrl,
                 end_image_url: endImageUrl,
                 // Include generation IDs for clickable images (if available)
-                start_image_generation_id: segmentImages.start?.generationId,
-                end_image_generation_id: segmentImages.end?.generationId,
+                start_image_generation_id: startGenId,
+                end_image_generation_id: endGenId,
                 // Pass the full original params with updated resolution - the function will extract what it needs
                 originalParams: paramsWithResolution,
                 // ALL overrides from UI state (everything editable in SegmentCard)

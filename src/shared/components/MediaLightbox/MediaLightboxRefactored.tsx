@@ -1814,8 +1814,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </div>
                         
                         {/* Variants section - bottom half, scrollable */}
-                        <div ref={variantsSectionRef} className="flex-1 overflow-y-auto min-h-0 border-t border-border">
-                          <div className="p-4">
+                        <div ref={variantsSectionRef} className="flex-1 overflow-y-auto min-h-0">
+                          <div className="p-4 pt-2">
                             <VariantSelector
                               variants={variants}
                               activeVariantId={activeVariant?.id || null}
