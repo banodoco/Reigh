@@ -338,10 +338,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   const travelData = React.useMemo(() => {
     if (!taskInfo.isVideoTask) return { imageUrls: [], videoOutputs: null };
     
-    // Check both orchestrator_details (for travel_orchestrator) and top-level (for individual_travel_segment)
-    const imageUrls = taskParams.parsed?.orchestrator_details?.input_image_paths_resolved || 
-                      taskParams.parsed?.input_image_paths_resolved || 
-                      [];
+    // For individual_travel_segment, use top-level input_image_paths_resolved (2 images for this segment)
+    // For travel_orchestrator, use orchestrator_details (all images)
+    const isIndividualSegment = task.taskType === 'individual_travel_segment';
+    const imageUrls = isIndividualSegment
+      ? (taskParams.parsed?.input_image_paths_resolved || [])
+      : (taskParams.parsed?.orchestrator_details?.input_image_paths_resolved || 
+         taskParams.parsed?.input_image_paths_resolved || 
+         []);
     
     // Convert video generations from database to GenerationRow format
     const videoOutputs = videoGenerations?.map(gen => {
