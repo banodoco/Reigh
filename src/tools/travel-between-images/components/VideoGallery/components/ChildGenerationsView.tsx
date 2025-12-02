@@ -1053,6 +1053,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
             });
 
             // Pass the full original params so the task structure matches travel_segment exactly
+            // All UI-editable values are passed as overrides
             await createIndividualTravelSegmentTask({
                 project_id: projectId,
                 parent_generation_id: parentGenerationId,
@@ -1062,11 +1063,13 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 end_image_url: endImageUrl,
                 // Pass the full original params - the function will extract what it needs
                 originalParams: params,
-                // Overrides from UI state (if user changed them in the SegmentCard)
+                // ALL overrides from UI state (everything editable in SegmentCard)
                 base_prompt: params.base_prompt || params.prompt,
                 negative_prompt: params.negative_prompt,
                 num_frames: params.num_frames,
+                seed: randomSeed ? undefined : (params.seed_to_use || params.seed), // Use original seed if not random
                 random_seed: randomSeed,
+                amount_of_motion: amountOfMotion / 100, // Convert from 0-100 to 0-1
                 advanced_mode: advancedMode,
                 phase_config: phaseConfig,
                 motion_mode: motionMode,
@@ -1100,6 +1103,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         index, 
         params, 
         selectedLoras, 
+        amountOfMotion,
         advancedMode, 
         phaseConfig, 
         motionMode,

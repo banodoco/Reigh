@@ -148,10 +148,11 @@ function buildIndividualTravelSegmentParams(
   const modelSwitchPhase = orig.model_switch_phase ?? orchDetails.model_switch_phase ?? 1;
   const switchThreshold = orig.switch_threshold ?? orchDetails.switch_threshold;
   
-  // Segment-specific settings
+  // Segment-specific settings (UI overrides take precedence)
   const numFrames = params.num_frames ?? orig.num_frames ?? 49;
   const basePrompt = params.base_prompt ?? orig.base_prompt ?? orig.prompt ?? "";
   const negativePrompt = params.negative_prompt ?? orig.negative_prompt ?? "";
+  const amountOfMotion = params.amount_of_motion ?? orig.amount_of_motion ?? orchDetails.amount_of_motion ?? 0.5;
   
   // Build input_image_paths_resolved for orchestrator_details
   // Include all input images from the original orchestrator if available
@@ -175,6 +176,7 @@ function buildIndividualTravelSegmentParams(
     additional_loras: additionalLoras,
     advanced_mode: advancedMode,
     motion_mode: params.motion_mode ?? orchDetails.motion_mode ?? 'basic',
+    amount_of_motion: amountOfMotion,
     // Add parent_generation_id for variant creation
     parent_generation_id: params.parent_generation_id,
   };
@@ -230,6 +232,9 @@ function buildIndividualTravelSegmentParams(
     
     // Frame settings
     num_frames: numFrames,
+    
+    // Motion settings (UI override)
+    amount_of_motion: amountOfMotion,
     
     // The full orchestrator_details object
     orchestrator_details: orchestratorDetails,
