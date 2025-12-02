@@ -109,6 +109,11 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const [projects, setProjects] = useState<Project[]>([]);
+  // CROSS-DEVICE SYNC: Track if we had a localStorage value at startup
+  // If not, we'll update selection from server preferences when they load
+  const hadLocalStorageValueRef = useRef<boolean>(false);
+  const hasAppliedServerPreferencesRef = useRef<boolean>(false);
+  
   // FAST RESUME: Try to restore selectedProjectId from localStorage immediately
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(() => {
     console.log('[ProjectContext:FastResume] ATTEMPTING localStorage restoration');
@@ -117,12 +122,15 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       console.log(`[ProjectContext:FastResume] localStorage result: ${stored}`);
       if (stored) {
         console.log(`[ProjectContext:FastResume] Restored selectedProjectId from localStorage: ${stored}`);
+        hadLocalStorageValueRef.current = true;
         return stored;
       } else {
         console.log('[ProjectContext:FastResume] No stored selectedProjectId found in localStorage');
+        hadLocalStorageValueRef.current = false;
       }
     } catch (e) {
       console.error('[ProjectContext:FastResume] localStorage access failed:', e);
+      hadLocalStorageValueRef.current = false;
     }
     console.log('[ProjectContext:FastResume] Falling back to null selectedProjectId');
     return null;
@@ -391,8 +399,61 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         clearTimeout(preferencesTimeoutRef.current);
         preferencesTimeoutRef.current = undefined;
       }
+      // CROSS-DEVICE SYNC: Reset sync flag so we re-sync on next login
+      hasAppliedServerPreferencesRef.current = false;
     }
   }, [userId, fetchUserPreferences]);
+
+  // CROSS-DEVICE SYNC: When preferences load on a new device (no localStorage),
+  // update the selected project to match the server's lastOpenedProjectId
+  useEffect(() => {
+    // Skip if we had a localStorage value - it takes priority for fast resume
+    if (hadLocalStorageValueRef.current) {
+      return;
+    }
+    
+    // Skip if we already applied server preferences this session
+    if (hasAppliedServerPreferencesRef.current) {
+      return;
+    }
+    
+    // Wait for preferences to finish loading
+    if (isLoadingPreferences || !userPreferences) {
+      return;
+    }
+    
+    // Wait for projects to be loaded
+    if (!projects.length) {
+      return;
+    }
+    
+    const serverLastOpenedId = userPreferences.lastOpenedProjectId;
+    console.log('[ProjectContext:CrossDeviceSync] Checking server preferences', {
+      serverLastOpenedId,
+      currentSelectedId: selectedProjectId,
+      hadLocalStorageValue: hadLocalStorageValueRef.current,
+    });
+    
+    // If server has a different project selected, switch to it
+    if (serverLastOpenedId && serverLastOpenedId !== selectedProjectId) {
+      const projectExists = projects.some(p => p.id === serverLastOpenedId);
+      if (projectExists) {
+        console.log(`[ProjectContext:CrossDeviceSync] Syncing to server preference: ${serverLastOpenedId}`);
+        setSelectedProjectIdState(serverLastOpenedId);
+        // Also save to localStorage so future loads on this device are fast
+        try {
+          localStorage.setItem('lastSelectedProjectId', serverLastOpenedId);
+        } catch (e) {
+          console.error('[ProjectContext:CrossDeviceSync] Failed to save to localStorage:', e);
+        }
+      } else {
+        console.log(`[ProjectContext:CrossDeviceSync] Server project ${serverLastOpenedId} not found in user's projects`);
+      }
+    }
+    
+    // Mark that we've applied server preferences (don't do it again this session)
+    hasAppliedServerPreferencesRef.current = true;
+  }, [isLoadingPreferences, userPreferences, projects, selectedProjectId]);
 
   const handleSetSelectedProjectId = useCallback((projectId: string | null) => {
     console.info('[TabReactivation] 🔥 SELECTED PROJECT ID CHANGING', {

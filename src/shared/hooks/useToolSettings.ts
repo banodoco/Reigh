@@ -59,7 +59,9 @@ interface UpdateToolSettingsParams {
  * This replaces the Express API approach for better mobile reliability
  */
 // Helper function to add timeout to auth calls - aligned with Supabase global timeout
-async function getUserWithTimeout(timeoutMs = 7000) {
+// Mobile networks can be much slower - use a more generous default timeout
+// to prevent falling back to defaults when the network is just slow
+async function getUserWithTimeout(timeoutMs = 15000) {
   const controller = new AbortController();
   
   const timeoutId = setTimeout(() => {
@@ -153,7 +155,8 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
     const promise = (async () => {
       // Mobile optimization: Cache user info to avoid repeated auth calls
       // Add timeout to prevent hanging on mobile connections (aligned with Supabase global timeout)
-      const { data: { user }, error: authError } = await getUserWithTimeout(7000);
+      // Use generous timeout for mobile networks
+      const { data: { user }, error: authError } = await getUserWithTimeout();
       if (authError || !user) {
         throw new Error('Authentication required');
       }
@@ -481,7 +484,8 @@ export function useToolSettings<T>(
       if (!idForScope) {
         if (scope === 'user') {
           // Get userId from auth for user scope with timeout protection (aligned with global timeout)
-          const { data: { user } } = await getUserWithTimeout(7000);
+          // Use generous timeout for mobile networks
+          const { data: { user } } = await getUserWithTimeout();
           idForScope = user?.id;
         } else if (scope === 'project') {
           idForScope = projectId;

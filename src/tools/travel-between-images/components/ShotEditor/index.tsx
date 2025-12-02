@@ -820,15 +820,28 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     isReady: state.isModeReady
   }), [contextImages.length, settingsLoading, isPhone, generationMode, state.settingsError, selectedShot?.id, state.isModeReady]);
 
+  // Track if we've applied the mobile mode override to prevent re-triggering
+  const mobileOverrideAppliedRef = useRef(false);
+  
+  // Reset mobile override flag when shot changes
+  useEffect(() => {
+    mobileOverrideAppliedRef.current = false;
+  }, [selectedShot?.id]);
+  
   useEffect(() => {
     const { hasImageData, criticalSettingsReady, modeCorrect, hasError, isReady } = readinessState;
     
     // Skip if already ready
     if (isReady) return;
 
-    // Handle mobile mode correction
-    if (!modeCorrect) {
-      onGenerationModeChange('batch');
+    // Handle mobile mode correction - LOCAL OVERRIDE ONLY, don't save to database
+    // This ensures opening a shot on mobile doesn't change the saved settings
+    if (!modeCorrect && !mobileOverrideAppliedRef.current) {
+      console.log('[MobileMode] Phone detected with timeline mode - applying local batch override (not saving to DB)');
+      mobileOverrideAppliedRef.current = true;
+      // Don't call onGenerationModeChange as that saves to DB
+      // Just mark as ready - the UI will use batch mode based on isPhone check
+      actions.setModeReady(true);
       return;
     }
 

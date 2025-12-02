@@ -247,6 +247,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const lastTapTargetRef = useRef<EventTarget | null>(null);
   const touchStartTargetRef = useRef<EventTarget | null>(null); // Track where touch started
   const touchStartedOnOverlayRef = useRef<boolean>(false); // Track if touch started on overlay background
+  const variantsSectionRef = useRef<HTMLDivElement>(null); // For scrolling to variants section
   const DOUBLE_TAP_DELAY = 300; // ms
 
   // Basic hooks
@@ -1707,33 +1708,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   ) : (
                     <div className="w-full">
-                      {/* Top bar with Based On (left) and Info/Edit Toggle + Close (right) - Sticky */}
+                      {/* Top bar with Variants count (left) and Info/Edit Toggle + Close (right) - Sticky */}
                       <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
-                        {/* Based On display - Show source image OR primary variant */}
-                        {(() => {
-                          console.log('[ReplaceInShot] MediaLightbox passing props', {
-                            hasSourceGeneration: !!sourceGenerationData,
-                            isViewingNonPrimaryVariant,
-                            hasPrimaryVariant: !!primaryVariant,
-                            selectedShotId: selectedShotId?.substring(0, 8),
-                            currentMediaId: media.id.substring(0, 8),
-                          });
-                          return null;
-                        })()}
-                        {sourceGenerationData && onOpenExternalGeneration ? (
-                          <SourceGenerationDisplay
-                            sourceGeneration={sourceGenerationData}
-                            onNavigate={onOpenExternalGeneration}
-                            variant="compact"
-                            currentShotId={selectedShotId || shotId}
-                            allShots={allShots}
-                            currentMediaId={media.id}
-                            isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
-                            onReplaceInShot={handleReplaceInShot}
-                            sourcePrimaryVariant={sourcePrimaryVariant}
-                            onMakeMainVariant={handleMakeMainVariant}
-                            canMakeMainVariant={canMakeMainVariant}
-                          />
+                        {/* Variants count - scrolls to variants section */}
+                        {variants && variants.length > 1 ? (
+                          <button
+                            onClick={() => variantsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+                          >
+                            <span>{variants.length} variants</span>
+                            <svg className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                            </svg>
+                          </button>
                         ) : (
                           <div></div>
                         )}
@@ -1814,7 +1801,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     
                     {/* Variants section - below task details */}
                     {variants && variants.length > 1 && (
-                      <div className="px-4 pb-2 -mt-2">
+                      <div ref={variantsSectionRef} className="px-4 pb-2 -mt-2">
                         <VariantSelector
                           variants={variants}
                           activeVariantId={activeVariant?.id || null}
@@ -2067,23 +2054,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   ) : (
                     <div className="w-full">
-                      {/* Top bar with Based On (left) and Info/Edit Toggle + Close (right) - Sticky */}
+                      {/* Top bar with Variants count (left) and Info/Edit Toggle + Close (right) - Sticky */}
                       <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
-                        {/* Based On display - Show source image OR primary variant */}
-                        {sourceGenerationData && onOpenExternalGeneration ? (
-                          <SourceGenerationDisplay
-                            sourceGeneration={sourceGenerationData}
-                            onNavigate={onOpenExternalGeneration}
-                            variant="compact"
-                            currentShotId={selectedShotId || shotId}
-                            allShots={allShots}
-                            currentMediaId={media.id}
-                            isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
-                            onReplaceInShot={handleReplaceInShot}
-                            sourcePrimaryVariant={sourcePrimaryVariant}
-                            onMakeMainVariant={handleMakeMainVariant}
-                            canMakeMainVariant={canMakeMainVariant}
-                          />
+                        {/* Variants count - scrolls to variants section */}
+                        {variants && variants.length > 1 ? (
+                          <button
+                            onClick={() => variantsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+                          >
+                            <span>{variants.length} variants</span>
+                            <svg className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                            </svg>
+                          </button>
                         ) : (
                           <div></div>
                         )}
@@ -2148,7 +2131,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     
                     {/* Variants section - below task details */}
                     {variants && variants.length > 1 && (
-                      <div className="px-3 pb-2 -mt-2">
+                      <div ref={variantsSectionRef} className="px-3 pb-2 -mt-2">
                         <VariantSelector
                           variants={variants}
                           activeVariantId={activeVariant?.id || null}
