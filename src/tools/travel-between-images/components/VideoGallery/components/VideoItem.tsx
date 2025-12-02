@@ -1079,10 +1079,10 @@ export const VideoItem = React.memo<VideoItemProps>(({
         )}
 
 
-        {/* Top Overlay - Timestamp in top-left */}
+        {/* Top Overlay - Timestamp in top-left (always visible on mobile, hover-only on desktop) */}
         <div className="absolute top-0 left-0 p-3 transition-opacity duration-300 z-20 pointer-events-none">
           <div className="pointer-events-auto inline-flex whitespace-nowrap">
-            <TimeStamp createdAt={video.created_at} />
+            <TimeStamp createdAt={video.created_at} showOnHover={!isMobile} />
           </div>
         </div>
 
