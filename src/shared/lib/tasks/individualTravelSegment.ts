@@ -158,17 +158,6 @@ function buildIndividualTravelSegmentParams(
   // Include all input images from the original orchestrator if available
   const allInputImages = orchDetails.input_image_paths_resolved || [params.start_image_url, params.end_image_url];
   
-  // Build segment_frames_expanded - for individual segment, create array with this segment's frame count
-  // The GPU worker expects segment_frames_expanded[segment_index] to have the frame count
-  const segmentFramesExpanded = orchDetails.segment_frames_expanded 
-    ? [...orchDetails.segment_frames_expanded]  // Copy original array
-    : [];
-  // Ensure the array has enough elements and set the correct frame count for this segment
-  while (segmentFramesExpanded.length <= params.segment_index) {
-    segmentFramesExpanded.push(numFrames);
-  }
-  segmentFramesExpanded[params.segment_index] = numFrames;
-
   // Build orchestrator_details to match travel_segment structure exactly
   const orchestratorDetails: Record<string, any> = {
     ...orchDetails,
@@ -188,8 +177,6 @@ function buildIndividualTravelSegmentParams(
     advanced_mode: advancedMode,
     motion_mode: params.motion_mode ?? orchDetails.motion_mode ?? 'basic',
     amount_of_motion: amountOfMotion,
-    // Frame count in expanded array format (matching travel_segment)
-    segment_frames_expanded: segmentFramesExpanded,
     // Add parent_generation_id for variant creation
     parent_generation_id: params.parent_generation_id,
   };
@@ -243,6 +230,9 @@ function buildIndividualTravelSegmentParams(
     // Resolution
     parsed_resolution_wh: finalResolution,
     
+    // Frame settings
+    num_frames: numFrames,
+    
     // Motion settings (UI override)
     amount_of_motion: amountOfMotion,
     
@@ -272,6 +262,43 @@ function buildIndividualTravelSegmentParams(
   if (params.generation_name) {
     taskParams.generation_name = params.generation_name;
   }
+
+  // Build individual_segment_params - all UI overrides in one place
+  // GPU worker should check these first before falling back to top-level values
+  const individualSegmentParams: Record<string, unknown> = {
+    // Prompts
+    base_prompt: basePrompt,
+    negative_prompt: negativePrompt,
+    
+    // Frame settings
+    num_frames: numFrames,
+    
+    // Seed settings
+    seed_to_use: finalSeed,
+    random_seed: params.random_seed ?? false,
+    
+    // Motion settings
+    amount_of_motion: amountOfMotion,
+    motion_mode: params.motion_mode ?? orchDetails.motion_mode ?? 'basic',
+    advanced_mode: advancedMode,
+    
+    // LoRA settings
+    additional_loras: additionalLoras,
+    
+    // Post-processing
+    after_first_post_generation_saturation: orig.after_first_post_generation_saturation ?? 
+      orchDetails.after_first_post_generation_saturation ?? 1,
+    after_first_post_generation_brightness: orig.after_first_post_generation_brightness ?? 
+      orchDetails.after_first_post_generation_brightness ?? 0,
+  };
+
+  // Add phase_config to individual_segment_params if in advanced mode
+  if (advancedMode && phaseConfig) {
+    individualSegmentParams.phase_config = phaseConfig;
+  }
+
+  // Add the individual_segment_params to task params
+  taskParams.individual_segment_params = individualSegmentParams;
 
   return taskParams;
 }
