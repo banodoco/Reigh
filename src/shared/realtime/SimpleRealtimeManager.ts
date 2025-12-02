@@ -176,6 +176,21 @@ export class SimpleRealtimeManager {
             });
             this.handleGenerationUpdate(payload);
           }
+        )
+        // Listen to generation_variants table for variant changes (segment regenerations, etc.)
+        .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'generation_variants' }, 
+          (payload: any) => {
+            console.log('[SimpleRealtime] 📨 Generation variant inserted:', payload?.new?.id?.substring(0, 8));
+            this.handleVariantChange(payload, 'INSERT');
+          }
+        )
+        .on('postgres_changes', 
+          { event: 'UPDATE', schema: 'public', table: 'generation_variants' }, 
+          (payload: any) => {
+            console.log('[SimpleRealtime] 📨 Generation variant updated:', payload?.new?.id?.substring(0, 8));
+            this.handleVariantChange(payload, 'UPDATE');
+          }
         );
 
       // Subscribe with status callback
@@ -331,6 +346,8 @@ export class SimpleRealtimeManager {
         this.dispatchBatchedShotGenerationChanges(payloads);
       } else if (eventType === 'generation-update') {
         this.dispatchBatchedGenerationUpdates(payloads);
+      } else if (eventType === 'variant-change') {
+        this.dispatchBatchedVariantChanges(payloads);
       }
     });
 
@@ -455,6 +472,48 @@ export class SimpleRealtimeManager {
   }
 
   /**
+   * Dispatch batched variant change events (e.g., segment regenerations)
+   */
+  private dispatchBatchedVariantChanges(payloads: any[]) {
+    // Update global snapshot with latest event time
+    this.updateGlobalSnapshot('joined', Date.now());
+
+    // Collect unique generation IDs affected by this batch
+    const affectedGenerationIds = new Set<string>();
+    payloads.forEach((p: any) => {
+      if (p.generationId) {
+        affectedGenerationIds.add(p.generationId);
+      }
+    });
+
+    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched variant changes:', {
+      count: payloads.length,
+      affectedGenerations: affectedGenerationIds.size,
+      generationIds: Array.from(affectedGenerationIds).map(id => id.substring(0, 8)),
+      timestamp: Date.now()
+    });
+
+    // Build query keys for each affected generation's variants
+    const queryKeys = Array.from(affectedGenerationIds).map(generationId => 
+      ['generation-variants', generationId]
+    );
+    
+    dataFreshnessManager.onRealtimeEvent('variant-change', queryKeys);
+
+    // Emit single consolidated event with all payloads
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('realtime:variant-change-batch', {
+        detail: {
+          payloads,
+          count: payloads.length,
+          affectedGenerationIds: Array.from(affectedGenerationIds),
+          timestamp: Date.now()
+        }
+      }));
+    }
+  }
+
+  /**
    * Dispatch batched generation update events (e.g., upscale completion)
    */
   private dispatchBatchedGenerationUpdates(payloads: any[]) {
@@ -539,6 +598,21 @@ export class SimpleRealtimeManager {
     // Batch this event to prevent conflicts with optimistic updates during drag operations
     console.log('[SimpleRealtime:Batching] 📦 Batching shot generation change for shot:', shotId.substring(0, 8));
     this.batchEvent('shot-generation-change', { ...payload, eventType, shotId, isPositioned: isNowPositioned });
+  }
+
+  private handleVariantChange(payload: any, eventType: 'INSERT' | 'UPDATE') {
+    const newRecord = payload?.new;
+    const generationId = newRecord?.generation_id;
+    
+    if (!generationId) {
+      console.warn('[SimpleRealtime] ⚠️  Variant change missing generation_id, cannot invalidate');
+      return;
+    }
+    
+    console.log('[SimpleRealtime] 🎯 Variant change for generation:', generationId.substring(0, 8), eventType);
+    
+    // Batch this event to prevent rapid invalidation from multiple variant changes
+    this.batchEvent('variant-change', { ...payload, eventType, generationId });
   }
 
   private handleGenerationUpdate(payload: any) {

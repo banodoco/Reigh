@@ -3,9 +3,10 @@
  * 
  * Fetches and manages variants for a generation.
  * Allows switching between variants and setting the primary variant.
+ * Supports realtime updates via SimpleRealtimeManager.
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -57,6 +58,25 @@ export const useVariants = ({
     enabled: enabled && !!generationId,
     staleTime: 30000, // 30 seconds
   });
+
+  // Listen for realtime variant changes and refetch when our generationId is affected
+  useEffect(() => {
+    if (!generationId || !enabled) return;
+
+    const handleVariantChange = (event: CustomEvent) => {
+      const affectedIds = event.detail?.affectedGenerationIds || [];
+      if (affectedIds.includes(generationId)) {
+        console.log('[useVariants] 🔄 Realtime: variant change detected for generation:', generationId.substring(0, 8));
+        refetch();
+      }
+    };
+
+    window.addEventListener('realtime:variant-change-batch', handleVariantChange as EventListener);
+
+    return () => {
+      window.removeEventListener('realtime:variant-change-batch', handleVariantChange as EventListener);
+    };
+  }, [generationId, enabled, refetch]);
 
   // Find the primary variant
   const primaryVariant = useMemo(() => {
