@@ -674,14 +674,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
 
   // For segment videos (showVideoTrimEditor), hide the "Apply These Settings" button
+  // For variants, show the variant's params instead of the original task
   const adjustedTaskDetailsData = useMemo(() => {
+    // If viewing a non-primary variant, create task data from the variant's params
+    if (activeVariant && !activeVariant.is_primary && activeVariant.params) {
+      const variantParams = activeVariant.params as Record<string, any>;
+      return {
+        task: {
+          id: activeVariant.id,
+          taskType: variantParams.created_from || variantParams.tool_type || activeVariant.variant_type || 'variant',
+          params: variantParams,
+          status: 'Complete',
+          createdAt: activeVariant.created_at,
+        },
+        isLoading: false,
+        error: null,
+        inputImages: variantParams.image ? [variantParams.image] : [],
+        taskId: variantParams.source_task_id || activeVariant.id,
+        // Don't allow applying settings from a variant
+        onApplySettingsFromTask: undefined,
+      };
+    }
+    
     if (!taskDetailsData) return undefined;
     if (!showVideoTrimEditor) return taskDetailsData;
     
     // Strip onApplySettingsFromTask for segment videos
     const { onApplySettingsFromTask, ...rest } = taskDetailsData;
     return rest;
-  }, [taskDetailsData, showVideoTrimEditor]);
+  }, [taskDetailsData, showVideoTrimEditor, activeVariant]);
 
   // Handle entering/exiting video trim mode
   const handleEnterVideoTrimMode = useCallback(() => {
@@ -1707,23 +1728,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       variant="desktop"
                     />
                   ) : (
-                    <div className="w-full">
-                      {/* Top bar with Variants count (left) and Info/Edit Toggle + Close (right) - Sticky */}
-                      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
-                        {/* Variants count - scrolls to variants section */}
-                        {variants && variants.length > 1 ? (
-                          <button
-                            onClick={() => variantsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
-                          >
-                            <span>{variants.length} variants</span>
-                            <svg className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                            </svg>
-                          </button>
-                        ) : (
-                          <div></div>
-                        )}
+                    <div className="w-full h-full flex flex-col">
+                      {/* Top bar with Info/Edit Toggle + Close (right) - Sticky */}
+                      <div className="flex-shrink-0 flex items-center justify-between border-b border-border p-4 bg-background">
+                        <div></div>
                         
                         {/* Info | Edit | Trim Toggle and Close Button */}
                         <div className="flex items-center gap-3">
@@ -1774,40 +1782,76 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </div>
                       </div>
 
-                    <TaskDetailsPanelWrapper
-                      taskDetailsData={adjustedTaskDetailsData}
-                      generationName={generationName}
-                      onGenerationNameChange={handleGenerationNameChange}
-                      isEditingGenerationName={isEditingGenerationName}
-                      onEditingGenerationNameChange={setIsEditingGenerationName}
-                      derivedItems={derivedItems}
-                      derivedGenerations={derivedGenerations}
-                      paginatedDerived={paginatedDerived}
-                      derivedPage={derivedPage}
-                      derivedTotalPages={derivedTotalPages}
-                      onSetDerivedPage={setDerivedPage}
-                      onNavigateToGeneration={onOpenExternalGeneration}
-                      onVariantSelect={setActiveVariantId}
-                      currentMediaId={media.id}
-                      currentShotId={selectedShotId || shotId}
-                      replaceImages={replaceImages}
-                      onReplaceImagesChange={setReplaceImages}
-                      onClose={onClose}
-                      variant="desktop"
-                      activeVariant={activeVariant}
-                      primaryVariant={primaryVariant}
-                      onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
-                    />
-                    
-                    {/* Variants section - below task details */}
-                    {variants && variants.length > 1 && (
-                      <div ref={variantsSectionRef} className="px-4 pb-2 -mt-2">
-                        <VariantSelector
-                          variants={variants}
-                          activeVariantId={activeVariant?.id || null}
+                    {/* Split layout when variants available, otherwise full height for task details */}
+                    {variants && variants.length > 1 ? (
+                      <div className="flex-1 flex flex-col min-h-0">
+                        {/* Task details - top half, scrollable */}
+                        <div className="flex-1 overflow-y-auto min-h-0">
+                          <TaskDetailsPanelWrapper
+                            taskDetailsData={adjustedTaskDetailsData}
+                            generationName={generationName}
+                            onGenerationNameChange={handleGenerationNameChange}
+                            isEditingGenerationName={isEditingGenerationName}
+                            onEditingGenerationNameChange={setIsEditingGenerationName}
+                            derivedItems={derivedItems}
+                            derivedGenerations={derivedGenerations}
+                            paginatedDerived={paginatedDerived}
+                            derivedPage={derivedPage}
+                            derivedTotalPages={derivedTotalPages}
+                            onSetDerivedPage={setDerivedPage}
+                            onNavigateToGeneration={onOpenExternalGeneration}
+                            onVariantSelect={setActiveVariantId}
+                            currentMediaId={media.id}
+                            currentShotId={selectedShotId || shotId}
+                            replaceImages={replaceImages}
+                            onReplaceImagesChange={setReplaceImages}
+                            onClose={onClose}
+                            variant="desktop"
+                            activeVariant={activeVariant}
+                            primaryVariant={primaryVariant}
+                            onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
+                          />
+                        </div>
+                        
+                        {/* Variants section - bottom half, scrollable */}
+                        <div ref={variantsSectionRef} className="flex-1 overflow-y-auto min-h-0 border-t border-border">
+                          <div className="p-4">
+                            <VariantSelector
+                              variants={variants}
+                              activeVariantId={activeVariant?.id || null}
+                              onVariantSelect={setActiveVariantId}
+                              onMakePrimary={setPrimaryVariant}
+                              isLoading={isLoadingVariants}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* No variants - full height for task details */
+                      <div className="flex-1 overflow-y-auto">
+                        <TaskDetailsPanelWrapper
+                          taskDetailsData={adjustedTaskDetailsData}
+                          generationName={generationName}
+                          onGenerationNameChange={handleGenerationNameChange}
+                          isEditingGenerationName={isEditingGenerationName}
+                          onEditingGenerationNameChange={setIsEditingGenerationName}
+                          derivedItems={derivedItems}
+                          derivedGenerations={derivedGenerations}
+                          paginatedDerived={paginatedDerived}
+                          derivedPage={derivedPage}
+                          derivedTotalPages={derivedTotalPages}
+                          onSetDerivedPage={setDerivedPage}
+                          onNavigateToGeneration={onOpenExternalGeneration}
                           onVariantSelect={setActiveVariantId}
-                          onMakePrimary={setPrimaryVariant}
-                          isLoading={isLoadingVariants}
+                          currentMediaId={media.id}
+                          currentShotId={selectedShotId || shotId}
+                          replaceImages={replaceImages}
+                          onReplaceImagesChange={setReplaceImages}
+                          onClose={onClose}
+                          variant="desktop"
+                          activeVariant={activeVariant}
+                          primaryVariant={primaryVariant}
+                          onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
                         />
                       </div>
                     )}
