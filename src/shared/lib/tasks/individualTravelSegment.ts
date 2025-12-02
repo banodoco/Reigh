@@ -266,6 +266,11 @@ function buildIndividualTravelSegmentParams(
   // Build individual_segment_params - all UI overrides in one place
   // GPU worker should check these first before falling back to top-level values
   const individualSegmentParams: Record<string, unknown> = {
+    // Input images for this segment (just 2 images)
+    input_image_paths_resolved: [params.start_image_url, params.end_image_url],
+    start_image_url: params.start_image_url,
+    end_image_url: params.end_image_url,
+    
     // Prompts
     base_prompt: basePrompt,
     negative_prompt: negativePrompt,
