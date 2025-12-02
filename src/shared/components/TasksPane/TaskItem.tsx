@@ -338,7 +338,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   const travelData = React.useMemo(() => {
     if (!taskInfo.isVideoTask) return { imageUrls: [], videoOutputs: null };
     
-    const imageUrls = taskParams.parsed?.orchestrator_details?.input_image_paths_resolved || [];
+    // Check both orchestrator_details (for travel_orchestrator) and top-level (for individual_travel_segment)
+    const imageUrls = taskParams.parsed?.orchestrator_details?.input_image_paths_resolved || 
+                      taskParams.parsed?.input_image_paths_resolved || 
+                      [];
     
     // Convert video generations from database to GenerationRow format
     const videoOutputs = videoGenerations?.map(gen => {

@@ -25,7 +25,7 @@ INSERT INTO task_types (
   'generation',                                    -- CRITICAL: 'generation' category for proper processing
   'travel-between-images',                         -- Same tool type as travel_segment
   'video',                                         -- Produces video output
-  'Regenerate Segment',                            -- Display name in TasksPane
+  'Travel Segment',                                -- Display name in TasksPane
   'Individual segment regeneration triggered from segment details view. Creates a variant on the parent generation.',
   'per_second',                                    -- Billed per second of generated video
   0.000001,                                        -- Minimal unit cost (required field)

@@ -104,7 +104,7 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
   // Individual segment regeneration (visible - standalone task)
   individual_travel_segment: {
     isVisible: true,
-    displayName: 'Regenerate Segment',
+    displayName: 'Travel Segment',
     canCancel: true,
     category: 'generation',
     description: 'Standalone segment regeneration from segment details view'
