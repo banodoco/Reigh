@@ -158,6 +158,17 @@ function buildIndividualTravelSegmentParams(
   // Include all input images from the original orchestrator if available
   const allInputImages = orchDetails.input_image_paths_resolved || [params.start_image_url, params.end_image_url];
   
+  // Build segment_frames_expanded - for individual segment, create array with this segment's frame count
+  // The GPU worker expects segment_frames_expanded[segment_index] to have the frame count
+  const segmentFramesExpanded = orchDetails.segment_frames_expanded 
+    ? [...orchDetails.segment_frames_expanded]  // Copy original array
+    : [];
+  // Ensure the array has enough elements and set the correct frame count for this segment
+  while (segmentFramesExpanded.length <= params.segment_index) {
+    segmentFramesExpanded.push(numFrames);
+  }
+  segmentFramesExpanded[params.segment_index] = numFrames;
+
   // Build orchestrator_details to match travel_segment structure exactly
   const orchestratorDetails: Record<string, any> = {
     ...orchDetails,
@@ -177,6 +188,8 @@ function buildIndividualTravelSegmentParams(
     advanced_mode: advancedMode,
     motion_mode: params.motion_mode ?? orchDetails.motion_mode ?? 'basic',
     amount_of_motion: amountOfMotion,
+    // Frame count in expanded array format (matching travel_segment)
+    segment_frames_expanded: segmentFramesExpanded,
     // Add parent_generation_id for variant creation
     parent_generation_id: params.parent_generation_id,
   };
@@ -229,9 +242,6 @@ function buildIndividualTravelSegmentParams(
     
     // Resolution
     parsed_resolution_wh: finalResolution,
-    
-    // Frame settings
-    num_frames: numFrames,
     
     // Motion settings (UI override)
     amount_of_motion: amountOfMotion,
