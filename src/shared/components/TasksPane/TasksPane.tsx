@@ -206,6 +206,15 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const deriveInputImages = (task: any): string[] => {
     if (!task?.params) return [];
     const params = task.params;
+    
+    // For individual_travel_segment, use top-level or individual_segment_params (2 images only)
+    if (task.taskType === 'individual_travel_segment') {
+      const images = params.individual_segment_params?.input_image_paths_resolved || 
+                     params.input_image_paths_resolved || 
+                     [];
+      return images.filter(Boolean);
+    }
+    
     const inputImages: string[] = [];
     if (params.input_image) inputImages.push(params.input_image);
     if (params.image) inputImages.push(params.image);
@@ -219,6 +228,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     }
     if (params.orchestrator_details?.input_image_paths_resolved && Array.isArray(params.orchestrator_details.input_image_paths_resolved)) {
       inputImages.push(...params.orchestrator_details.input_image_paths_resolved);
+    }
+    // Also check top-level input_image_paths_resolved
+    if (params.input_image_paths_resolved && Array.isArray(params.input_image_paths_resolved)) {
+      inputImages.push(...params.input_image_paths_resolved);
     }
     return inputImages.filter(Boolean);
   };
