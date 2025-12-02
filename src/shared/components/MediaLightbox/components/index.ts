@@ -30,6 +30,9 @@ export { TopLeftControls, TopRightControls, BottomLeftControls, BottomRightContr
 export { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
 export type { DerivedGenerationsGridProps } from './DerivedGenerationsGrid';
 
+export { ActiveVariantDisplay } from './ActiveVariantDisplay';
+export type { VariantInfo } from './TaskDetailsPanelWrapper';
+
 export { EditModePanel } from './EditModePanel';
 export type { EditModePanelProps } from './EditModePanel';
 

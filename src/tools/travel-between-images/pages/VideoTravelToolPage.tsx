@@ -788,7 +788,7 @@ const VideoTravelToolPage: React.FC = () => {
   const {
     videoControlMode = 'batch',
     batchVideoPrompt = '',
-    batchVideoFrames = 60,
+    batchVideoFrames = 61, // Must be 4N+1 format for Wan model compatibility
     batchVideoSteps = 6,
     enhancePrompt = false,
     turboMode = false,

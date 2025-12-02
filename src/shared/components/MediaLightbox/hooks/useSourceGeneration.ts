@@ -7,19 +7,35 @@ interface UseSourceGenerationParams {
   onOpenExternalGeneration?: (generationId: string, derivedContext?: string[]) => Promise<void>;
 }
 
+export interface SourceVariantData {
+  id: string;
+  location: string;
+  thumbnail_url: string | null;
+  variant_type: string | null;
+  is_primary: boolean;
+}
+
 interface UseSourceGenerationReturn {
   sourceGenerationData: GenerationRow | null;
+  sourcePrimaryVariant: SourceVariantData | null;
 }
 
 /**
  * Hook to fetch and manage source generation (based_on) data
- * Fetches the generation that this media was derived from
+ * Fetches the generation that this media was derived from, plus its primary variant
  */
 export const useSourceGeneration = ({
   media,
   onOpenExternalGeneration
 }: UseSourceGenerationParams): UseSourceGenerationReturn => {
   const [sourceGenerationData, setSourceGenerationData] = useState<GenerationRow | null>(null);
+  const [sourcePrimaryVariant, setSourcePrimaryVariant] = useState<SourceVariantData | null>(null);
+
+  console.log('[VariantClickDebug] useSourceGeneration hook called:', {
+    mediaId: media.id?.substring(0, 8),
+    basedOn: (media as any).based_on?.substring(0, 8),
+    basedOnFromMetadata: (media.metadata as any)?.based_on?.substring(0, 8),
+  });
 
   useEffect(() => {
     const basedOnId = (media as any).based_on;
@@ -56,7 +72,7 @@ export const useSourceGeneration = ({
       });
       
       try {
-        // Fetch source generation with shot associations to check timeline position
+        // Fetch source generation with shot associations and primary variant
         // Use left join (no !inner) so we get the generation even if it's not in any shot
         const { data, error } = await supabase
           .from('generations')
@@ -65,6 +81,13 @@ export const useSourceGeneration = ({
             shot_generations(
               shot_id,
               timeline_frame
+            ),
+            generation_variants!generation_variants_generation_id_fkey(
+              id,
+              location,
+              thumbnail_url,
+              variant_type,
+              is_primary
             )
           `)
           .eq('id', effectiveBasedOnId)
@@ -75,17 +98,27 @@ export const useSourceGeneration = ({
         if (data) {
           // Extract shot associations from joined data
           const shotAssociations = (data as any).shot_generations || [];
+          const variants = (data as any).generation_variants || [];
           
-          console.log('[BasedOnDebug] ✅ Fetched source generation:', {
+          // Find primary variant
+          const primaryVariant = variants.find((v: any) => v.is_primary) || null;
+          
+          console.log('[VariantClickDebug] ✅ Fetched source generation:', {
             sourceId: data.id.substring(0, 8),
             type: data.type,
             location: data.location?.substring(0, 50),
-            shotAssociationsCount: shotAssociations.length,
-            shotAssociations: shotAssociations.map((assoc: any) => ({
-              shotId: assoc.shot_id?.substring(0, 8),
-              timelineFrame: assoc.timeline_frame
+            variantsCount: variants.length,
+            allVariants: variants.map((v: any) => ({
+              id: v.id?.substring(0, 8),
+              type: v.variant_type,
+              isPrimary: v.is_primary,
+              location: v.location?.substring(0, 30),
+              thumbnail: v.thumbnail_url?.substring(0, 30),
             })),
-            timestamp: Date.now()
+            primaryVariantId: primaryVariant?.id?.substring(0, 8),
+            primaryVariantType: primaryVariant?.variant_type,
+            primaryVariantLocation: primaryVariant?.location?.substring(0, 50),
+            primaryVariantThumbnail: primaryVariant?.thumbnail_url?.substring(0, 50),
           });
           
           // Add shot associations to the data for easy access
@@ -95,14 +128,17 @@ export const useSourceGeneration = ({
           };
           
           setSourceGenerationData(enrichedData as any);
+          setSourcePrimaryVariant(primaryVariant);
         } else {
-          console.log('[BasedOnDebug] ⚠️ No data returned from query');
+          console.log('[VariantClickDebug] ⚠️ No data returned from source generation query');
           setSourceGenerationData(null);
+          setSourcePrimaryVariant(null);
         }
       } catch (error) {
         console.error('[BasedOnDebug] ❌ Failed to fetch source generation:', error);
         // Don't show toast - this is a non-critical feature
         setSourceGenerationData(null);
+        setSourcePrimaryVariant(null);
       }
     };
     
@@ -110,7 +146,8 @@ export const useSourceGeneration = ({
   }, [media.id, (media as any).based_on, (media.metadata as any)?.based_on, onOpenExternalGeneration]);
 
   return {
-    sourceGenerationData
+    sourceGenerationData,
+    sourcePrimaryVariant
   };
 };
 

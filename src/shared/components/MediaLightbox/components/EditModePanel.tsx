@@ -4,9 +4,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CheckCircle, Loader2, Paintbrush, Pencil, Sparkles, Type, X, XCircle } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
-import { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
 import { GenerationRow } from '@/types/shots';
 import type { LoraMode } from '../hooks';
+import type { SourceVariantData } from '../hooks/useSourceGeneration';
+import { VariantSelector } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/components/VariantSelector';
+import type { GenerationVariant } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/types';
 
 export interface EditModePanelProps {
   // Source generation
@@ -16,6 +18,9 @@ export interface EditModePanelProps {
   allShots?: Array<{ id: string; name: string }>; // Optional: for shot names
   isCurrentMediaPositioned?: boolean;
   onReplaceInShot?: (parentGenerationId: string, currentMediaId: string, parentTimelineFrame: number, currentShotId: string) => Promise<void>;
+  sourcePrimaryVariant?: SourceVariantData | null;
+  onMakeMainVariant?: () => Promise<void>;
+  canMakeMainVariant?: boolean;
   
   // Edit mode state
   editMode: 'text' | 'inpaint' | 'annotate';
@@ -53,13 +58,20 @@ export interface EditModePanelProps {
   handleUnifiedGenerate: () => void;
   handleGenerateAnnotatedEdit: () => void;
   
-  // Derived generations
-  derivedGenerations: GenerationRow[] | null;
-  paginatedDerived: GenerationRow[];
-  derivedPage: number;
-  derivedTotalPages: number;
-  setDerivedPage: (page: number | ((prev: number) => number)) => void;
+  // Derived generations (legacy - kept for compatibility)
+  derivedGenerations?: GenerationRow[] | null;
+  paginatedDerived?: GenerationRow[];
+  derivedPage?: number;
+  derivedTotalPages?: number;
+  setDerivedPage?: (page: number | ((prev: number) => number)) => void;
   currentMediaId: string;
+  
+  // Variants - for VariantSelector
+  variants?: GenerationVariant[];
+  activeVariantId?: string | null;
+  onVariantSelect?: (variantId: string) => void;
+  onMakePrimary?: (variantId: string) => Promise<void>;
+  isLoadingVariants?: boolean;
   
   // Variant
   variant: 'desktop' | 'mobile';
@@ -78,6 +90,9 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   allShots,
   isCurrentMediaPositioned,
   onReplaceInShot,
+  sourcePrimaryVariant,
+  onMakeMainVariant,
+  canMakeMainVariant,
   editMode,
   setEditMode,
   setIsInpaintMode,
@@ -103,6 +118,11 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   derivedTotalPages,
   setDerivedPage,
   currentMediaId,
+  variants,
+  activeVariantId,
+  onVariantSelect,
+  onMakePrimary,
+  isLoadingVariants,
   onClose,
   variant,
   hideInfoEditToggle = false,
@@ -164,6 +184,9 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             currentMediaId={currentMediaId}
             isCurrentMediaPositioned={isCurrentMediaPositioned}
             onReplaceInShot={onReplaceInShot}
+            sourcePrimaryVariant={sourcePrimaryVariant}
+            onMakeMainVariant={onMakeMainVariant}
+            canMakeMainVariant={canMakeMainVariant}
           />
         ) : (
           <div></div>
@@ -388,21 +411,17 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           )}
         </Button>
       
-      {/* Derived Generations Section */}
-      {derivedGenerations && derivedGenerations.length > 0 && onOpenExternalGeneration && (
-        <DerivedGenerationsGrid
-          derivedGenerations={derivedGenerations}
-          paginatedDerived={paginatedDerived}
-          derivedPage={derivedPage}
-          derivedTotalPages={derivedTotalPages}
-          onSetDerivedPage={setDerivedPage}
-          onNavigate={onOpenExternalGeneration}
-          currentMediaId={currentMediaId}
-          currentShotId={currentShotId}
-          variant={variant}
-          title={`Edits of this image (${derivedGenerations.length})`}
-          showTopBorder={true}
-        />
+      {/* Variants Section */}
+      {variants && variants.length > 1 && onVariantSelect && (
+        <div className="border-t border-border pt-4 mt-4">
+          <VariantSelector
+            variants={variants}
+            activeVariantId={activeVariantId || null}
+            onVariantSelect={onVariantSelect}
+            onMakePrimary={onMakePrimary}
+            isLoading={isLoadingVariants}
+          />
+        </div>
       )}
       </div>
     </div>

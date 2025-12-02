@@ -22,7 +22,17 @@ export const useVariants = ({
   enabled = true,
 }: UseVariantsProps): UseVariantsReturn => {
   const queryClient = useQueryClient();
-  const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
+  const [activeVariantId, setActiveVariantIdInternal] = useState<string | null>(null);
+  
+  // Wrap setActiveVariantId with logging
+  const setActiveVariantId = useCallback((variantId: string | null) => {
+    console.log('[VariantClickDebug] useVariants.setActiveVariantId called:', {
+      newVariantId: variantId?.substring(0, 8),
+      currentActiveVariantId: activeVariantId?.substring(0, 8),
+      generationId: generationId?.substring(0, 8),
+    });
+    setActiveVariantIdInternal(variantId);
+  }, [activeVariantId, generationId]);
 
   // Fetch variants for this generation
   const {
@@ -85,10 +95,21 @@ export const useVariants = ({
 
   // Get the active variant (selected or primary)
   const activeVariant = useMemo(() => {
+    console.log('[VariantClickDebug] useVariants.activeVariant computing:', {
+      activeVariantId: activeVariantId?.substring(0, 8),
+      variantsCount: variants?.length,
+      primaryVariantId: primaryVariant?.id?.substring(0, 8),
+    });
+    
     if (activeVariantId) {
       const found = variants.find((v) => v.id === activeVariantId);
-      if (found) return found;
+      if (found) {
+        console.log('[VariantClickDebug] useVariants.activeVariant found:', found.id.substring(0, 8));
+        return found;
     }
+      console.log('[VariantClickDebug] useVariants.activeVariant NOT FOUND in variants list!');
+    }
+    console.log('[VariantClickDebug] useVariants.activeVariant using primaryVariant');
     return primaryVariant;
   }, [variants, activeVariantId, primaryVariant]);
 

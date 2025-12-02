@@ -782,10 +782,11 @@ serve(async (req) => {
                 console.error(`[ImageEdit] Source generation ${basedOnGenerationId} not found:`, fetchError);
                 // Fall through to regular generation creation with based_on link
               } else {
-                // Build variant params
+                // Build variant params - include source_variant_id if editing from a variant
                 const variantParams = {
                   ...taskData.params,
                   source_task_id: taskIdString,
+                  source_variant_id: taskData.params?.source_variant_id || null, // Track which variant this was edited from
                   created_from: taskData.task_type,
                   tool_type: toolType,
                 };

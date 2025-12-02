@@ -321,6 +321,55 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Edit Mode LoRAs hook
   const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, loraMode, setLoraMode, customLoraUrl, setCustomLoraUrl, editModeLoRAs } = useEditModeLoRAs();
 
+  // Variants hook - fetch available variants for this generation
+  // Moved early so activeVariant is available for edit hooks
+  const variantsHook = useVariants({
+    generationId: media.id,
+    enabled: true, // Always enabled to support variant display in DerivedGenerationsGrid
+  });
+  const {
+    variants,
+    primaryVariant,
+    activeVariant,
+    isLoading: isLoadingVariants,
+    setActiveVariantId: rawSetActiveVariantId,
+    refetch: refetchVariants,
+    setPrimaryVariant,
+  } = variantsHook;
+  
+  // Wrap setActiveVariantId with logging
+  const setActiveVariantId = React.useCallback((variantId: string) => {
+    console.log('[VariantClickDebug] setActiveVariantId called:', {
+      variantId: variantId?.substring(0, 8),
+      currentActiveVariant: activeVariant?.id?.substring(0, 8),
+      variantsCount: variants?.length,
+    });
+    rawSetActiveVariantId(variantId);
+  }, [rawSetActiveVariantId, activeVariant, variants]);
+  
+  // Log when activeVariant changes
+  React.useEffect(() => {
+    console.log('[VariantClickDebug] activeVariant changed:', {
+      activeVariantId: activeVariant?.id?.substring(0, 8),
+      activeVariantType: activeVariant?.variant_type,
+      activeVariantIsPrimary: activeVariant?.is_primary,
+      activeVariantLocation: activeVariant?.location?.substring(0, 50),
+    });
+  }, [activeVariant]);
+
+  // Compute isViewingNonPrimaryVariant early for edit hooks
+  const isViewingNonPrimaryVariant = activeVariant && !activeVariant.is_primary;
+  
+  // Log variant info for edit tracking
+  React.useEffect(() => {
+    console.log('[VariantRelationship] Edit mode variant info:');
+    console.log('[VariantRelationship] - isViewingNonPrimaryVariant:', isViewingNonPrimaryVariant);
+    console.log('[VariantRelationship] - activeVariantId:', activeVariant?.id);
+    console.log('[VariantRelationship] - activeVariantType:', activeVariant?.variant_type);
+    console.log('[VariantRelationship] - activeVariantIsPrimary:', activeVariant?.is_primary);
+    console.log('[VariantRelationship] - willPassSourceVariantId:', isViewingNonPrimaryVariant ? activeVariant?.id : null);
+  }, [activeVariant, isViewingNonPrimaryVariant]);
+
   // Inpainting hook
   const inpaintingHook = useInpainting({
     media,
@@ -397,7 +446,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     imageDimensions,
     toolTypeOverride,
     isInSceneBoostEnabled,
-    setIsInSceneBoostEnabled
+    setIsInSceneBoostEnabled,
+    // Pass variant info for tracking source_variant_id
+    activeVariantId: isViewingNonPrimaryVariant ? activeVariant?.id : null,
+    activeVariantLocation: isViewingNonPrimaryVariant ? activeVariant?.location : null,
   });
   const {
         isMagicEditMode,
@@ -433,7 +485,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   } = layoutHook;
 
   // Source generation hook
-  const { sourceGenerationData } = useSourceGeneration({
+  const { sourceGenerationData, sourcePrimaryVariant } = useSourceGeneration({
     media,
     onOpenExternalGeneration
   });
@@ -553,22 +605,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // VIDEO TRIM HOOKS (only when showVideoTrimEditor is true)
   // ========================================
 
-  // Variants hook - fetch available variants for this generation
-  // Enabled for all media types to support variant selection in "Based on this" grid
-  const variantsHook = useVariants({
-    generationId: media.id,
-    enabled: true, // Always enabled to support variant display in DerivedGenerationsGrid
-  });
-  const {
-    variants,
-    primaryVariant,
-    activeVariant,
-    isLoading: isLoadingVariants,
-    setActiveVariantId,
-    refetch: refetchVariants,
-    setPrimaryVariant,
-  } = variantsHook;
-
   // Video trimming hook - manage trim state
   const trimmingHook = useVideoTrimming();
   const {
@@ -591,19 +627,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     return effectiveImageUrl;
   }, [showVideoTrimEditor, activeVariant, effectiveImageUrl]);
 
-  // For images, use the active variant's location if a non-primary variant is selected
-  // (e.g., user clicked an edit variant in DerivedGenerationsGrid)
+  // For images, use the active variant's location when a variant is explicitly selected
   const effectiveMediaUrl = useMemo(() => {
-    // If an active variant is set and it's not the primary, use its location
-    if (activeVariant && !activeVariant.is_primary && activeVariant.location) {
-      console.log('[DerivedItems] Using active variant location:', {
-        variantId: activeVariant.id.substring(0, 8),
-        variantType: activeVariant.variant_type,
-        isPrimary: activeVariant.is_primary,
-      });
+    console.log('[VariantClickDebug] effectiveMediaUrl computing:', {
+      hasActiveVariant: !!activeVariant,
+      activeVariantId: activeVariant?.id?.substring(0, 8),
+      activeVariantIsPrimary: activeVariant?.is_primary,
+      activeVariantLocation: activeVariant?.location?.substring(0, 50),
+      effectiveImageUrl: effectiveImageUrl?.substring(0, 50),
+    });
+    
+    // If an active variant is set (any variant, including primary), use its location
+    if (activeVariant && activeVariant.location) {
+      console.log('[VariantClickDebug] ✅ Using active variant location:', activeVariant.location.substring(0, 50));
       return activeVariant.location;
     }
     // Otherwise use the standard effective image URL
+    console.log('[VariantClickDebug] Using effectiveImageUrl:', effectiveImageUrl?.substring(0, 50));
     return effectiveImageUrl;
   }, [activeVariant, effectiveImageUrl]);
 
@@ -783,6 +823,116 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       throw error;
     }
   }, [onClose]);
+
+  // Determine if current view can show "Make main variant" button
+  // Case 1: Viewing a child generation that's based on something
+  // Case 2: Viewing a non-primary variant of the current generation
+  // Note: isViewingNonPrimaryVariant is defined earlier with the variants hook
+  const canMakeMainVariantFromChild = !!sourceGenerationData && !!media.location;
+  const canMakeMainVariantFromVariant = isViewingNonPrimaryVariant && !!activeVariant.location;
+  const canMakeMainVariant = canMakeMainVariantFromChild || canMakeMainVariantFromVariant;
+
+  // Log the canMakeMainVariant state
+  console.log('[VariantClickDebug] canMakeMainVariant computed:', {
+    canMakeMainVariant,
+    canMakeMainVariantFromChild,
+    canMakeMainVariantFromVariant,
+    isViewingNonPrimaryVariant,
+    activeVariantId: activeVariant?.id?.substring(0, 8),
+    activeVariantIsPrimary: activeVariant?.is_primary,
+    hasSourceGenerationData: !!sourceGenerationData,
+    sourceGenerationId: sourceGenerationData?.id?.substring(0, 8),
+    hasMediaLocation: !!media.location,
+  });
+
+  // Make main variant handler - handles two cases:
+  // 1. Viewing a child generation: creates a variant on the parent with child's content
+  // 2. Viewing a non-primary variant: sets that variant as primary
+  const handleMakeMainVariant = React.useCallback(async () => {
+    console.log('[VariantClickDebug] handleMakeMainVariant called in MediaLightbox', {
+      canMakeMainVariantFromChild,
+      canMakeMainVariantFromVariant,
+      activeVariantId: activeVariant?.id?.substring(0, 8),
+    });
+    
+    // Case 2: We're viewing a non-primary variant - just set it as primary
+    if (canMakeMainVariantFromVariant && activeVariant) {
+      console.log('[VariantClickDebug] Setting existing variant as primary:', activeVariant.id.substring(0, 8));
+      try {
+        await setPrimaryVariant(activeVariant.id);
+        console.log('[VariantClickDebug] Successfully set variant as primary');
+        // Refetch variants to update UI
+        refetchVariants();
+      } catch (error) {
+        console.error('[VariantClickDebug] Failed to set variant as primary:', error);
+      }
+      return;
+    }
+    
+    // Case 1: We're viewing a child generation - create variant on parent
+    if (!sourceGenerationData || !media.location) {
+      console.log('[VariantClickDebug] handleMakeMainVariant bailing - missing data:', {
+        hasSourceGenerationData: !!sourceGenerationData,
+        hasMediaLocation: !!media.location,
+      });
+      return;
+    }
+    
+    const parentGenId = sourceGenerationData.id;
+    console.log('[VariantClickDebug] Creating variant on parent generation', {
+      parentId: parentGenId.substring(0, 8),
+      currentId: media.id.substring(0, 8),
+      currentLocation: media.location.substring(0, 50)
+    });
+    
+    try {
+      // 1. Create a new variant on the parent generation with current media's location
+      const { data: insertedVariant, error: insertError } = await supabase
+        .from('generation_variants')
+        .insert({
+          generation_id: parentGenId,
+          location: media.location,
+          thumbnail_url: media.thumbUrl || (media as any).thumbnail_url || null,
+          is_primary: true,
+          variant_type: 'child_promoted',
+          name: null,
+          params: {
+            source_generation_id: media.id,
+            promoted_at: new Date().toISOString()
+          }
+        })
+        .select('id')
+        .single();
+
+      if (insertError) {
+        console.error('[VariantClickDebug] Failed to create variant:', insertError);
+        throw insertError;
+      }
+
+      console.log('[VariantClickDebug] Created variant:', insertedVariant?.id?.substring(0, 8));
+
+      // 2. Update the parent generation's location and thumbnail
+      const { error: updateError } = await supabase
+        .from('generations')
+        .update({
+          location: media.location,
+          thumbnail_url: media.thumbUrl || (media as any).thumbnail_url
+        })
+        .eq('id', parentGenId);
+
+      if (updateError) {
+        console.warn('[VariantClickDebug] Failed to update parent generation:', updateError);
+      }
+
+      console.log('[VariantClickDebug] Successfully made current media the main variant');
+      
+      // Refresh the page to show updated data
+      onClose();
+    } catch (error) {
+      console.error('[VariantClickDebug] handleMakeMainVariant failed:', error);
+      throw error;
+    }
+  }, [sourceGenerationData, media, onClose, canMakeMainVariantFromChild, canMakeMainVariantFromVariant, activeVariant, setPrimaryVariant, refetchVariants]);
 
   return (
     <TooltipProvider delayDuration={500}>
@@ -1519,6 +1669,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       currentMediaId={media.id}
                       isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
                       onReplaceInShot={handleReplaceInShot}
+                      sourcePrimaryVariant={sourcePrimaryVariant}
+                      onMakeMainVariant={handleMakeMainVariant}
+                      canMakeMainVariant={canMakeMainVariant}
                       editMode={editMode}
                       setEditMode={setEditMode}
                       setIsInpaintMode={setIsInpaintMode}
@@ -1544,6 +1697,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       derivedPage={derivedPage}
                       derivedTotalPages={derivedTotalPages}
                       setDerivedPage={setDerivedPage}
+                      variants={variants}
+                      activeVariantId={activeVariant?.id || null}
+                      onVariantSelect={setActiveVariantId}
+                      onMakePrimary={setPrimaryVariant}
+                      isLoadingVariants={isLoadingVariants}
                       onClose={onClose}
                       variant="desktop"
                     />
@@ -1551,18 +1709,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <div className="w-full">
                       {/* Top bar with Based On (left) and Info/Edit Toggle + Close (right) - Sticky */}
                       <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
-                        {/* Based On display - Show source image this was derived from */}
+                        {/* Based On display - Show source image OR primary variant */}
                         {(() => {
                           console.log('[ReplaceInShot] MediaLightbox passing props', {
                             hasSourceGeneration: !!sourceGenerationData,
+                            isViewingNonPrimaryVariant,
+                            hasPrimaryVariant: !!primaryVariant,
                             selectedShotId: selectedShotId?.substring(0, 8),
-                            shotId: shotId?.substring(0, 8),
-                            effectiveShotId: (selectedShotId || shotId)?.substring(0, 8),
-                            allShotsCount: allShots?.length || 0,
-                            allShotsFirstThree: allShots?.slice(0, 3).map(s => ({ id: s.id.substring(0, 8), name: s.name })),
                             currentMediaId: media.id.substring(0, 8),
-                            isCurrentMediaPositioned: isAlreadyPositionedInSelectedShot,
-                            hasOnReplaceInShot: !!handleReplaceInShot
                           });
                           return null;
                         })()}
@@ -1576,6 +1730,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             currentMediaId={media.id}
                             isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
                             onReplaceInShot={handleReplaceInShot}
+                            sourcePrimaryVariant={sourcePrimaryVariant}
+                            onMakeMainVariant={handleMakeMainVariant}
+                            canMakeMainVariant={canMakeMainVariant}
                           />
                         ) : (
                           <div></div>
@@ -1630,19 +1787,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </div>
                       </div>
 
-                    {/* Variant Selector (for videos with multiple variants) */}
-                    {showVideoTrimEditor && isVideo && variants.length > 1 && (
-                      <div className="p-4 border-b border-border">
-                        <VariantSelector
-                          variants={variants}
-                          activeVariantId={activeVariant?.id || null}
-                          onVariantSelect={setActiveVariantId}
-                          onMakePrimary={setPrimaryVariant}
-                          isLoading={isLoadingVariants}
-                        />
-                      </div>
-                    )}
-                    
                     <TaskDetailsPanelWrapper
                       taskDetailsData={adjustedTaskDetailsData}
                       generationName={generationName}
@@ -1663,7 +1807,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onReplaceImagesChange={setReplaceImages}
                       onClose={onClose}
                       variant="desktop"
+                      activeVariant={activeVariant}
+                      primaryVariant={primaryVariant}
+                      onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
                     />
+                    
+                    {/* Variants section - below task details */}
+                    {variants && variants.length > 1 && (
+                      <div className="px-4 pb-2 -mt-2">
+                        <VariantSelector
+                          variants={variants}
+                          activeVariantId={activeVariant?.id || null}
+                          onVariantSelect={setActiveVariantId}
+                          onMakePrimary={setPrimaryVariant}
+                          isLoading={isLoadingVariants}
+                        />
+                      </div>
+                    )}
                     </div>
                   )}
                 </div>
@@ -1869,6 +2029,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       currentMediaId={media.id}
                       isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
                       onReplaceInShot={handleReplaceInShot}
+                      sourcePrimaryVariant={sourcePrimaryVariant}
+                      onMakeMainVariant={handleMakeMainVariant}
+                      canMakeMainVariant={canMakeMainVariant}
                       editMode={editMode}
                       setEditMode={setEditMode}
                       setIsInpaintMode={setIsInpaintMode}
@@ -1894,6 +2057,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       derivedPage={derivedPage}
                       derivedTotalPages={derivedTotalPages}
                       setDerivedPage={setDerivedPage}
+                      variants={variants}
+                      activeVariantId={activeVariant?.id || null}
+                      onVariantSelect={setActiveVariantId}
+                      onMakePrimary={setPrimaryVariant}
+                      isLoadingVariants={isLoadingVariants}
                       onClose={onClose}
                       variant="mobile"
                     />
@@ -1901,7 +2069,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <div className="w-full">
                       {/* Top bar with Based On (left) and Info/Edit Toggle + Close (right) - Sticky */}
                       <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
-                        {/* Based On display - Show source image this was derived from */}
+                        {/* Based On display - Show source image OR primary variant */}
                         {sourceGenerationData && onOpenExternalGeneration ? (
                           <SourceGenerationDisplay
                             sourceGeneration={sourceGenerationData}
@@ -1912,6 +2080,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             currentMediaId={media.id}
                             isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
                             onReplaceInShot={handleReplaceInShot}
+                            sourcePrimaryVariant={sourcePrimaryVariant}
+                            onMakeMainVariant={handleMakeMainVariant}
+                            canMakeMainVariant={canMakeMainVariant}
                           />
                         ) : (
                           <div></div>
@@ -1949,6 +2120,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </div>
                       </div>
                     
+                    {/* Variant Selector (for images/videos with multiple variants) - Mobile */}
                     <TaskDetailsPanelWrapper
                       taskDetailsData={adjustedTaskDetailsData}
                       generationName={generationName}
@@ -1969,7 +2141,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onReplaceImagesChange={setReplaceImages}
                       onClose={onClose}
                       variant="mobile"
+                      activeVariant={activeVariant}
+                      primaryVariant={primaryVariant}
+                      onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
                     />
+                    
+                    {/* Variants section - below task details */}
+                    {variants && variants.length > 1 && (
+                      <div className="px-3 pb-2 -mt-2">
+                        <VariantSelector
+                          variants={variants}
+                          activeVariantId={activeVariant?.id || null}
+                          onVariantSelect={setActiveVariantId}
+                          onMakePrimary={setPrimaryVariant}
+                          isLoading={isLoadingVariants}
+                        />
+                      </div>
+                    )}
                     </div>
                   )}
                 </div>

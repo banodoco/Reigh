@@ -67,6 +67,7 @@ import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPosition
 import { useTimelinePositionUtils } from "@/shared/hooks/useTimelinePositionUtils";
 import { timelineDebugger } from "./Timeline/utils/timeline-debug";
 import { calculateMaxGap, validateGaps } from "./Timeline/utils/timeline-utils";
+import { quantizeGap } from "./Timeline/utils/time-utils";
 import { useExternalGenerations } from "@/shared/components/ShotImageManager/hooks/useExternalGenerations";
 import { useDerivedNavigation } from "@/shared/hooks/useDerivedNavigation";
 
@@ -629,15 +630,20 @@ const Timeline: React.FC<TimelineProps> = ({
   */
 
   // Handle resetting frames to evenly spaced intervals and setting context frames
+  // Gap values are quantized to 4N+1 format for Wan model compatibility
   const handleResetFrames = useCallback(async (gap: number) => {
     // First set the context frames (this will trigger all constraint recalculations)
     // onContextFramesChange(newContextFrames); // Removed
     
-    // Then set the positions with the specified gap
+    // Quantize the gap to 4N+1 format (5, 9, 13, 17, 21, 25, 29, 33, ...)
+    const quantizedGap = quantizeGap(gap, 5);
+    
+    // Then set the positions with the specified quantized gap
     const newPositions = new Map<string, number>();
     images.forEach((image, index) => {
       // Use id (shot_generations.id) for position mapping - unique per entry
-      newPositions.set(image.id, index * gap);
+      // First image at 0, subsequent images at quantized intervals
+      newPositions.set(image.id, index * quantizedGap);
     });
 
     await setFramePositions(newPositions);

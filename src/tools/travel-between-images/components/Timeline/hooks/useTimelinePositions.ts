@@ -18,6 +18,7 @@ import { GenerationRow } from '@/types/shots';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { ShotGeneration } from '@/shared/hooks/useEnhancedShotPositions';
+import { quantizePositions } from '../utils/timeline-utils';
 
 // ============================================================================
 // TYPES
@@ -350,6 +351,7 @@ export function useTimelinePositions({
   /**
    * Update positions with optimistic UI and database persistence
    * This is the main entry point for position changes
+   * NOTE: Positions are automatically quantized to ensure 4N+1 gaps for Wan model compatibility
    */
   const updatePositions = useCallback(async (
     newPositions: Map<string, number>,
@@ -367,17 +369,22 @@ export function useTimelinePositions({
       return;
     }
     
+    // Quantize positions to ensure 4N+1 gaps for Wan model compatibility
+    const quantizedPositions = quantizePositions(newPositions);
+    
     const operationId = `op-${++operationIdRef.current}-${operation}`;
     
     console.log(`[TimelinePositions] 🚀 Starting ${operation} operation:`, {
       operationId,
-      newPositionsCount: newPositions.size
+      newPositionsCount: newPositions.size,
+      quantizedPositionsCount: quantizedPositions.size,
+      quantizationApplied: true
     });
     
-    // Calculate what changed
+    // Calculate what changed (using quantized positions)
     const changes: Array<{ id: string; oldPos: number | null; newPos: number }> = [];
     
-    for (const [id, newPos] of newPositions) {
+    for (const [id, newPos] of quantizedPositions) {
       const oldPos = positions.get(id);
       if (oldPos !== newPos) {
         changes.push({ id, oldPos: oldPos ?? null, newPos });
@@ -390,14 +397,14 @@ export function useTimelinePositions({
     }
     
     // Validate: no duplicate positions
-    const positionValues = [...newPositions.values()];
+    const positionValues = [...quantizedPositions.values()];
     const uniquePositions = new Set(positionValues);
     if (uniquePositions.size !== positionValues.length) {
       console.error('[TimelinePositions] ❌ Duplicate positions detected!');
       
       // Find and log duplicates
       const counts = new Map<number, string[]>();
-      for (const [id, pos] of newPositions) {
+      for (const [id, pos] of quantizedPositions) {
         if (!counts.has(pos)) counts.set(pos, []);
         counts.get(pos)!.push(id);
       }

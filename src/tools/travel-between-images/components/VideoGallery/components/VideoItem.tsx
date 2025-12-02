@@ -14,6 +14,7 @@ import { TimeStamp } from '@/shared/components/TimeStamp';
 import { useVideoLoader, useThumbnailLoader, useVideoElementIntegration } from '../hooks';
 import { determineVideoPhase, createLoadingSummary } from '../utils/video-loading-utils';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import {
   Tooltip,
   TooltipContent,
@@ -235,6 +236,18 @@ export const VideoItem = React.memo<VideoItemProps>(({
         name: `Segment ${index + 1}`,
       }));
       
+      // Calculate resolution from project's aspect ratio
+      let resolutionTuple: [number, number] | undefined;
+      if (projectAspectRatio) {
+        const resolutionStr = ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio];
+        if (resolutionStr) {
+          const [width, height] = resolutionStr.split('x').map(Number);
+          if (width && height) {
+            resolutionTuple = [width, height];
+          }
+        }
+      }
+      
       console.log('[JoinClips] Creating join task for segments:', {
         parentId: video.id?.substring(0, 8),
         clipCount: clips.length,
@@ -244,6 +257,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
         replaceMode: joinReplaceMode,
         keepBridgingImages: keepBridgingImages,
         clips: clips.map(c => ({ name: c.name, url: c.url?.substring(0, 50) + '...' })),
+        projectAspectRatio,
+        resolution: resolutionTuple,
       });
       
       // Create the join clips task with user settings
@@ -260,6 +275,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         num_inference_steps: 6,
         guidance_scale: 3.0,
         seed: -1,
+        ...(resolutionTuple && { resolution: resolutionTuple }),
       });
       
       toast({

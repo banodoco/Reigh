@@ -26,11 +26,14 @@ import { useListPublicResources } from '@/shared/hooks/useResources';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePanes } from '@/shared/contexts/PanesContext';
+import { useProject } from '@/shared/contexts/ProjectContext';
 import { MotionControl } from '@/tools/travel-between-images/components/MotionControl';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
+import { quantizeFrameCount, framesToSeconds } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
 import { createMobileTapHandler, deriveInputImages } from '../utils/gallery-utils';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
+import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 
 // TypeScript declaration for global mobile video preload map
 declare global {
@@ -62,6 +65,12 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     } | null>(null);
     const isMobile = useIsMobile();
     const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth } = usePanes();
+    
+    // Get current project's aspect ratio for resolution calculation (similar to VideoTravelToolPage)
+    const { projects } = useProject();
+    const currentProject = projects.find(p => p.id === projectId);
+    const projectAspectRatio = currentProject?.aspectRatio;
+    const projectResolution = projectAspectRatio ? ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio] : undefined;
     
     // Refs for mobile double-tap detection
     const lastTouchTimeRef = React.useRef<number>(0);
@@ -250,6 +259,56 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         },
         enabled: !!parentGenerationId,
     });
+
+    // Extract shot_id from parent generation params (if available)
+    // This is set when the original travel-between-images task was created
+    const parentShotId = useMemo(() => {
+        const parentParams = parentGeneration?.params as any;
+        return parentParams?.shot_id || parentParams?.orchestrator_details?.shot_id;
+    }, [parentGeneration?.params]);
+    
+    // Fetch shot's aspect ratio if we have a shot_id (takes priority over project)
+    const { data: shotData } = useQuery({
+        queryKey: ['shot-aspect-ratio', parentShotId],
+        queryFn: async () => {
+            if (!parentShotId) return null;
+            const { data, error } = await supabase
+                .from('shots')
+                .select('id, aspect_ratio')
+                .eq('id', parentShotId)
+                .single();
+            if (error) {
+                console.error('[ChildGenerationsView] Error fetching shot aspect ratio:', error);
+                return null;
+            }
+            return data;
+        },
+        enabled: !!parentShotId,
+    });
+    
+    // Resolution priority: shot's aspect_ratio > project's aspect_ratio > undefined (fallback to task creation logic)
+    const effectiveResolution = useMemo(() => {
+        // Priority 1: Shot's aspect ratio
+        if (shotData?.aspect_ratio) {
+            const resolution = ASPECT_RATIO_TO_RESOLUTION[shotData.aspect_ratio];
+            console.log('[ChildGenerationsView] Using shot aspect ratio:', {
+                shotId: parentShotId?.substring(0, 8),
+                aspectRatio: shotData.aspect_ratio,
+                resolution
+            });
+            return resolution;
+        }
+        // Priority 2: Project's aspect ratio
+        if (projectResolution) {
+            console.log('[ChildGenerationsView] Using project aspect ratio:', {
+                aspectRatio: projectAspectRatio,
+                resolution: projectResolution
+            });
+            return projectResolution;
+        }
+        // Priority 3: Let the task creation logic handle it (fetches from project)
+        return undefined;
+    }, [shotData?.aspect_ratio, projectResolution, projectAspectRatio, parentShotId]);
 
     // Extract expected segment count and data from parent's orchestrator_details
     const expectedSegmentData = React.useMemo(() => {
@@ -615,6 +674,15 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 strength: lora.strength,
             }));
 
+            // Parse resolution from string format (e.g., "840x552") to tuple format [width, height]
+            let resolutionTuple: [number, number] | undefined;
+            if (effectiveResolution) {
+                const [width, height] = effectiveResolution.split('x').map(Number);
+                if (width && height) {
+                    resolutionTuple = [width, height];
+                }
+            }
+
             console.log('[JoinClips] Creating join task for segments:', {
                 clipCount: clips.length,
                 prompt: joinPrompt,
@@ -622,7 +690,9 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 gapFrames: joinGapFrames,
                 replaceMode: joinReplaceMode,
                 keepBridgingImages: keepBridgingImages,
-                loras: lorasForTask.length
+                loras: lorasForTask.length,
+                resolution: resolutionTuple,
+                effectiveResolution,
             });
 
             await createJoinClipsTask({
@@ -640,6 +710,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 seed: -1,
                 parent_generation_id: parentGenerationId,
                 ...(lorasForTask.length > 0 && { loras: lorasForTask }),
+                ...(resolutionTuple && { resolution: resolutionTuple }),
             });
 
             toast({
@@ -791,6 +862,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 onMobileTap={handleMobileTap}
                                                 onUpdate={refetch}
                                                 availableLoras={availableLoras}
+                                                projectResolution={effectiveResolution}
                                                 onImageLightboxOpen={(imageIndex, images) => {
                                                     console.log('[SegmentImageFlow] onImageLightboxOpen called in parent');
                                                     console.log('[SegmentImageFlow] imageIndex:', imageIndex);
@@ -1064,9 +1136,10 @@ interface SegmentCardProps {
     onUpdate: () => void;
     availableLoras: LoraModel[];
     onImageLightboxOpen: (imageIndex: 0 | 1, images: { start: { url: string; generationId?: string } | null; end: { url: string; generationId?: string } | null }) => void;
+    projectResolution?: string; // Resolution derived from project's aspect ratio
 }
 
-const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen }) => {
+const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution }) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [params, setParams] = useState<any>(child.params || {});
@@ -1273,6 +1346,19 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 strength: lora.strength,
             }));
 
+            // Build originalParams with current project resolution if available
+            // This ensures regenerated segments use the project's aspect ratio settings
+            const paramsWithResolution = projectResolution 
+                ? {
+                    ...params,
+                    parsed_resolution_wh: projectResolution,
+                    orchestrator_details: {
+                        ...(params.orchestrator_details || {}),
+                        parsed_resolution_wh: projectResolution,
+                    },
+                }
+                : params;
+
             console.log('[RegenerateSegment] Creating individual_travel_segment task:', {
                 projectId,
                 parentGenerationId,
@@ -1286,6 +1372,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 numFrames: params.num_frames,
                 hasOriginalParams: !!params,
                 loraCount: lorasForTask.length,
+                projectResolution,
+                usingProjectResolution: !!projectResolution,
             });
 
             // Pass the full original params so the task structure matches travel_segment exactly
@@ -1300,8 +1388,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 // Include generation IDs for clickable images (if available)
                 start_image_generation_id: segmentImages.start?.generationId,
                 end_image_generation_id: segmentImages.end?.generationId,
-                // Pass the full original params - the function will extract what it needs
-                originalParams: params,
+                // Pass the full original params with updated resolution - the function will extract what it needs
+                originalParams: paramsWithResolution,
                 // ALL overrides from UI state (everything editable in SegmentCard)
                 base_prompt: params.base_prompt || params.prompt,
                 negative_prompt: params.negative_prompt,
@@ -1349,6 +1437,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         motionMode,
         selectedPhasePresetId,
         randomSeed,
+        projectResolution,
         toast
     ]);
     
@@ -1357,7 +1446,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         basePrompt: params.base_prompt || params.prompt || '',
         negativePrompt: params.negative_prompt || '',
         enhancePrompt: params.enhancePrompt || params.orchestrator_details?.enhance_prompt || false,
-        durationFrames: params.num_frames || 61,
+        durationFrames: quantizeFrameCount(params.num_frames || 61, 9), // Quantize to 4N+1 format
         selectedLoras: selectedLoras.map(l => ({ id: l.id, name: l.name, strength: l.strength })),
     }), [params, selectedLoras]);
 
@@ -1598,14 +1687,17 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <Label className="text-xs font-medium">Frames</Label>
-                        <span className="text-xs text-muted-foreground">{params.num_frames || 0}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {params.num_frames || 0} ({framesToSeconds(params.num_frames || 0)})
+                        </span>
                     </div>
+                    {/* Frame counts are quantized to 4N+1 format for Wan model compatibility */}
                     <Slider
-                        value={[params.num_frames || 0]}
-                        onValueChange={([value]) => handleChange('num_frames', value)}
-                        min={1}
+                        value={[quantizeFrameCount(params.num_frames || 9, 9)]}
+                        onValueChange={([value]) => handleChange('num_frames', quantizeFrameCount(value, 9))}
+                        min={9}
                         max={81}
-                        step={1}
+                        step={4}
                         className="w-full"
                     />
                 </div>

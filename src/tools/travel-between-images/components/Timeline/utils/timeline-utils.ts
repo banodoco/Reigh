@@ -1,14 +1,19 @@
 import { log } from "@/shared/lib/logger";
+import { quantizeGap, isValidFrameCount } from "./time-utils";
 
 // Calculate max gap based on context frames
 export const calculateMaxGap = (): number => {
   return 81;
 };
 
-// Validate gap constraints
+// Minimum gap between frames (4N+1 format, starting at 5)
+const MIN_GAP = 5;
+
+// Validate gap constraints (max gap and 4N+1 format)
 export const validateGaps = (
   testPositions: Map<string, number>, 
-  excludeId?: string
+  excludeId?: string,
+  checkQuantization: boolean = false // Set to true to also validate 4N+1 format
 ): boolean => {
   const positions = [...testPositions.entries()]
     .filter(([id]) => id !== excludeId)
@@ -19,7 +24,7 @@ export const validateGaps = (
   const maxGap = calculateMaxGap();
 
   // Debug: log every validation attempt
-  log('TimelineFrameLimitIssue', 'validateGaps check', { excludeId, maxGap, positions });
+  log('TimelineFrameLimitIssue', 'validateGaps check', { excludeId, maxGap, positions, checkQuantization });
 
   for (let i = 1; i < positions.length; i++) {
     const diff = positions[i] - positions[i - 1];
@@ -37,6 +42,18 @@ export const validateGaps = (
       });
       return false;
     }
+    
+    // Optionally validate 4N+1 format for Wan model compatibility
+    if (checkQuantization && diff > 0 && !isValidFrameCount(diff)) {
+      log('TimelineFrameLimitIssue', 'Gap not in 4N+1 format', {
+        index: i,
+        prevFrame: positions[i - 1],
+        nextFrame: positions[i],
+        diff,
+        expectedFormat: '4N+1 (1, 5, 9, 13, 17, 21, ...)',
+      });
+      return false;
+    }
   }
   return true;
 };
@@ -44,7 +61,7 @@ export const validateGaps = (
 // ---------------------------------------------------------------------------
 // Utility: shrink oversized gaps by left-shifting subsequent frames so that
 // every gap ≤ maxGap.  Returns a **new** Map (does not mutate input).
-// NOTE: All gaps are constrained to 81 frames.
+// NOTE: All gaps are constrained to 81 frames AND quantized to 4N+1 format.
 // ---------------------------------------------------------------------------
 export const shrinkOversizedGaps = (
   positions: Map<string, number>,
@@ -74,11 +91,15 @@ export const shrinkOversizedGaps = (
       result.set(id, 0);
       prev = 0;
     } else {
-      const desiredPos = Math.max(originalPos, prev + 1); // keep minGap of 1
+      // Calculate the desired gap and quantize it to 4N+1 format
+      const desiredGap = Math.max(originalPos - prev, MIN_GAP);
+      const quantizedDesiredGap = quantizeGap(desiredGap, MIN_GAP);
       
-      // All gaps constrained to 81 frames
-      const effectiveMaxGap = maxGap;
-      const allowedPos = Math.min(desiredPos, prev + effectiveMaxGap);
+      // Constrain gap to max and quantize the result
+      const constrainedGap = Math.min(quantizedDesiredGap, maxGap);
+      const quantizedGapValue = quantizeGap(constrainedGap, MIN_GAP);
+      
+      const allowedPos = prev + quantizedGapValue;
       
       result.set(id, allowedPos);
       prev = allowedPos;
@@ -90,6 +111,51 @@ export const shrinkOversizedGaps = (
     result.set(excludeId, positions.get(excludeId)!);
   }
 
+  return result;
+};
+
+// ---------------------------------------------------------------------------
+// Utility: Quantize all positions in a map to ensure 4N+1 gaps between items.
+// Maintains the relative order of items while adjusting positions.
+// Returns a **new** Map (does not mutate input).
+// ---------------------------------------------------------------------------
+export const quantizePositions = (
+  positions: Map<string, number>,
+  minGap: number = MIN_GAP
+): Map<string, number> => {
+  const entries = [...positions.entries()].sort((a, b) => a[1] - b[1]);
+  
+  if (entries.length === 0) return new Map();
+  
+  const result = new Map<string, number>();
+  
+  // First item stays at its position (quantized to be a valid start)
+  const [firstId, firstPos] = entries[0];
+  // First position should be at 0 or a 4N+1 value from 0
+  const quantizedFirstPos = firstPos === 0 ? 0 : quantizeGap(firstPos, minGap);
+  result.set(firstId, quantizedFirstPos);
+  
+  let prev = quantizedFirstPos;
+  
+  // Process remaining items
+  for (let i = 1; i < entries.length; i++) {
+    const [id, originalPos] = entries[i];
+    const currentGap = originalPos - entries[i - 1][1];
+    
+    // Quantize the gap to 4N+1 format
+    const quantizedCurrentGap = quantizeGap(currentGap, minGap);
+    
+    const newPos = prev + quantizedCurrentGap;
+    result.set(id, newPos);
+    prev = newPos;
+  }
+  
+  console.log('[QuantizePositions] 📐 Positions quantized to 4N+1 gaps:', {
+    original: [...positions.entries()].map(([id, pos]) => ({ id: id.substring(0, 8), pos })),
+    quantized: [...result.entries()].map(([id, pos]) => ({ id: id.substring(0, 8), pos })),
+    gaps: entries.slice(1).map((_, i) => result.get(entries[i + 1][0])! - result.get(entries[i][0])!)
+  });
+  
   return result;
 };
 

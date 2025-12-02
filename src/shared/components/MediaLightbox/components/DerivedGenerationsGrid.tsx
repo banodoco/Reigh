@@ -84,6 +84,27 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
   showTopBorder = true,
 }) => {
   const isMobile = variant === 'mobile';
+
+  // [VariantClickDebug] Log component mount/update with all relevant props
+  console.log('[VariantClickDebug] DerivedGenerationsGrid render:', {
+    hasDerivedItems: !!derivedItems,
+    derivedItemsCount: derivedItems?.length || 0,
+    hasDerivedGenerations: !!derivedGenerations,
+    derivedGenerationsCount: derivedGenerations?.length || 0,
+    paginatedDerivedCount: paginatedDerived?.length || 0,
+    hasOnVariantSelect: !!onVariantSelect,
+    currentMediaId: currentMediaId?.substring(0, 8),
+    title,
+  });
+  
+  // Log item types in the list
+  if (paginatedDerived && paginatedDerived.length > 0) {
+    console.log('[VariantClickDebug] Items in grid:', paginatedDerived.map(item => ({
+      id: item.id?.substring(0, 8),
+      itemType: isDerivedItem(item) ? item.itemType : 'legacy-generation',
+      variantType: isDerivedItem(item) && item.itemType === 'variant' ? item.variantType : null,
+    })));
+  }
   const gridCols = 'grid-cols-3';
   const gap = isMobile ? 'gap-1.5' : 'gap-2';
   const starSize = isMobile ? 'h-2.5 w-2.5' : 'h-3 w-3';
@@ -209,28 +230,37 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
                 : 'border-border hover:border-primary'
             }`}
             onClick={async () => {
-              console.log('[DerivedNav] 🖼️ DerivedGenerationsGrid item clicked', {
-                derivedId: itemId.substring(0, 8),
+              console.log('[VariantClickDebug] 🖼️ Item clicked:', {
+                itemId: itemId.substring(0, 8),
                 isVariant,
+                isGeneration,
                 variantType,
+                isNewFormat,
+                hasOnVariantSelect: !!onVariantSelect,
                 currentMediaId: currentMediaId.substring(0, 8),
-                timestamp: Date.now()
               });
               
               if (isVariant && onVariantSelect) {
                 // For variants: switch to that variant (stay on same generation)
-                console.log('[DerivedNav] 🎯 Switching to variant');
+                console.log('[VariantClickDebug] 🎯 Calling onVariantSelect for variant:', itemId.substring(0, 8));
                 onVariantSelect(itemId);
+                console.log('[VariantClickDebug] ✅ onVariantSelect completed');
+              } else if (isVariant && !onVariantSelect) {
+                // Variant but no handler!
+                console.warn('[VariantClickDebug] ⚠️ Variant clicked but onVariantSelect is not provided!');
+                console.log('[VariantClickDebug] 🔄 Falling back to onNavigate for variant');
+                // Fall back to navigating - this won't work ideally but at least logs the issue
+                await onNavigate(itemId, []);
               } else {
                 // For generations: navigate to that generation
-                console.log('[DerivedNav] 🎯 Navigating to generation');
+                console.log('[VariantClickDebug] 🎯 Navigating to generation:', itemId.substring(0, 8));
                 // Only pass generation IDs in the context (not variant IDs)
                 const generationIds = (allDerivedItems || [])
                   .filter(d => isDerivedItem(d) ? d.itemType === 'generation' : true)
                   .map(d => d.id);
                 await onNavigate(itemId, generationIds);
+                console.log('[VariantClickDebug] ✅ onNavigate completed');
               }
-              console.log('[DerivedNav] ✅ Action completed');
             }}
           >
             <img

@@ -17,7 +17,7 @@ import { SectionHeader } from '@/tools/image-generation/components/ImageGenerati
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
-import { framesToSeconds } from './Timeline/utils/time-utils';
+import { framesToSeconds, quantizeFrameCount, getValidFrameCounts } from './Timeline/utils/time-utils';
 
 interface BatchSettingsFormProps {
   batchVideoPrompt: string;
@@ -329,6 +329,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             */}
             
             {/* Frames per pair - shown in both Timeline and Batch modes */}
+            {/* Note: Frame counts must be in 4N+1 format (9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81) */}
             <div className="relative">
               <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
                 {isTimelineMode ? 'Duration per pair' : (imageCount === 1 ? 'Duration to generate' : 'Duration per pair')}: {framesToSeconds(batchVideoFrames)} ({batchVideoFrames} frames)
@@ -346,11 +347,11 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </Tooltip>
               <Slider
                 id="batchVideoFrames"
-                min={10}
+                min={9}
                 max={81} 
-                step={1}
-                value={[batchVideoFrames]}
-                onValueChange={(value) => onBatchVideoFramesChange(value[0])}
+                step={4}
+                value={[quantizeFrameCount(batchVideoFrames, 9)]}
+                onValueChange={(value) => onBatchVideoFramesChange(quantizeFrameCount(value[0], 9))}
                 disabled={turboMode || isTimelineMode}
                 className={(turboMode || isTimelineMode) ? 'opacity-50' : ''}
               />

@@ -25,6 +25,9 @@ interface UseMagicEditModeParams {
   toolTypeOverride?: string;
   isInSceneBoostEnabled: boolean;
   setIsInSceneBoostEnabled: (enabled: boolean) => void;
+  // Variant tracking - when editing from a non-primary variant
+  activeVariantId?: string | null;
+  activeVariantLocation?: string | null;
 }
 
 interface UseMagicEditModeReturn {
@@ -68,6 +71,8 @@ export const useMagicEditMode = ({
   toolTypeOverride,
   isInSceneBoostEnabled,
   setIsInSceneBoostEnabled,
+  activeVariantId,
+  activeVariantLocation,
 }: UseMagicEditModeParams): UseMagicEditModeReturn => {
   // Magic Edit mode state
   const [isMagicEditMode, setIsMagicEditMode] = useState(false);
@@ -191,10 +196,21 @@ export const useMagicEditMode = ({
       setMagicEditTasksCreated(false);
       
       try {
+        // Use active variant's location if viewing a non-primary variant
+        const effectiveImageUrl = activeVariantLocation || sourceUrlForTasks;
+        
+        // Log variant tracking info
+        console.log('[VariantRelationship] Creating magic edit task:');
+        console.log('[VariantRelationship] activeVariantId:', activeVariantId);
+        console.log('[VariantRelationship] activeVariantLocation:', activeVariantLocation?.substring(0, 60));
+        console.log('[VariantRelationship] sourceUrlForTasks:', sourceUrlForTasks?.substring(0, 60));
+        console.log('[VariantRelationship] effectiveImageUrl:', effectiveImageUrl?.substring(0, 60));
+        console.log('[VariantRelationship] isEditingFromVariant:', !!activeVariantId);
+        
         const batchParams = {
           project_id: selectedProjectId,
           prompt,
-          image_url: sourceUrlForTasks,
+          image_url: effectiveImageUrl,
           numImages: inpaintNumGenerations,
           negative_prompt: "",
           resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
@@ -203,12 +219,16 @@ export const useMagicEditMode = ({
           tool_type: toolTypeOverride,
           loras: editModeLoRAs,
           based_on: media.id, // Track source generation for lineage
+          source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
         };
         
-        console.log('[MediaLightbox] Creating magic edit tasks with loras:', {
+        console.log('[VariantRelationship] Task params source_variant_id:', batchParams.source_variant_id);
+        console.log('[MediaLightbox] Creating magic edit tasks:', {
           ...batchParams,
           lorasEnabled: !!editModeLoRAs,
-          lorasCount: editModeLoRAs?.length || 0
+          lorasCount: editModeLoRAs?.length || 0,
+          isFromVariant: !!activeVariantId,
+          activeVariantId: activeVariantId?.substring(0, 8),
         });
         const results = await createBatchMagicEditTasks(batchParams);
         console.log(`[MediaLightbox] Created ${results.length} magic edit tasks`);

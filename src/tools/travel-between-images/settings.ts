@@ -126,7 +126,7 @@ export const videoTravelSettings = {
     
     // Configuration fields - these inherit to both new shots and new projects
     videoControlMode: 'batch' as const,
-    batchVideoFrames: 60,
+    batchVideoFrames: 61, // Must be 4N+1 format for Wan model compatibility (61 = 4*15+1)
     batchVideoSteps: 6,
     dimensionSource: 'firstImage' as const,
     generationMode: 'timeline' as const,

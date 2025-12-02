@@ -4,7 +4,7 @@ import { Slider } from "@/shared/components/ui/slider";
 import { Label } from "@/shared/components/ui/label";
 import { Info, ZoomOut, ZoomIn, RotateCcw, MoveLeft } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
-import { framesToSeconds } from './utils/time-utils';
+import { framesToSeconds, quantizeGap } from './utils/time-utils';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
 interface TimelineControlsProps {
@@ -42,13 +42,16 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
   structureVideoMotionStrength = 1.0,
   onStructureVideoChange,
 }) => {
-  const [resetGap, setResetGap] = React.useState<number>(10);
+  // Default to 9 (valid 4N+1 value: 4*2+1)
+  const [resetGap, setResetGap] = React.useState<number>(9);
   
-  // Fixed max gap of 81
+  // Fixed max gap of 81 (valid 4N+1 value: 4*20+1)
   const maxGap = 81;
   React.useEffect(() => {
-    if (resetGap > maxGap) {
-      setResetGap(maxGap);
+    // Ensure gap is quantized to 4N+1 format
+    const quantizedGap = quantizeGap(resetGap, 5);
+    if (quantizedGap !== resetGap || resetGap > maxGap) {
+      setResetGap(Math.min(quantizedGap, maxGap));
     }
   }, [maxGap, resetGap]);
   return (
@@ -58,15 +61,16 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
         <div className="flex items-center gap-4 flex-1">
           <div className="w-64">
             <Label htmlFor="resetGap" className="text-sm font-light">
-              Gap to reset to: {resetGap}
+              Gap to reset to: {resetGap} frames ({framesToSeconds(resetGap)})
             </Label>
+            {/* Gap values are quantized to 4N+1 format for Wan model compatibility */}
             <Slider
               id="resetGap"
-              min={1}
+              min={5}
               max={maxGap}
-              step={1}
-              value={[resetGap]}
-              onValueChange={(value) => setResetGap(value[0])}
+              step={4}
+              value={[quantizeGap(resetGap, 5)]}
+              onValueChange={(value) => setResetGap(quantizeGap(value[0], 5))}
               className="w-full mt-1"
             />
           </div>

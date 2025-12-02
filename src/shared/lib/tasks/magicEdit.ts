@@ -32,6 +32,7 @@ export interface MagicEditTaskParams {
   tool_type?: string; // Optional: override tool type for generation association
   loras?: LoraConfig[]; // Optional: array of lora configurations for model enhancement
   based_on?: string; // Optional: source generation ID for lineage tracking
+  source_variant_id?: string; // Optional: source variant ID when editing from a non-primary variant
 }
 
 /**
@@ -54,6 +55,7 @@ export interface BatchMagicEditTaskParams {
   tool_type?: string; // Optional: override tool type for generation association
   loras?: LoraConfig[]; // Optional: array of lora configurations for model enhancement
   based_on?: string; // Optional: source generation ID for lineage tracking
+  source_variant_id?: string; // Optional: source variant ID when editing from a non-primary variant
 }
 
 /**
@@ -183,6 +185,12 @@ function buildMagicEditTaskParams(
     taskParams.based_on = params.based_on;
   }
 
+  // Add source_variant_id if provided (for variant relationship tracking)
+  if (params.source_variant_id) {
+    taskParams.source_variant_id = params.source_variant_id;
+    console.log('[VariantRelationship] Adding source_variant_id to task params:', params.source_variant_id);
+  }
+
   return taskParams;
 }
 
@@ -266,6 +274,7 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
         tool_type: params.tool_type, // Pass through tool type override
         loras: params.loras, // Pass through lora configurations
         based_on: params.based_on, // Pass through source generation ID for lineage tracking
+        source_variant_id: params.source_variant_id, // Pass through source variant ID for relationship tracking
       } as MagicEditTaskParams;
     });
 

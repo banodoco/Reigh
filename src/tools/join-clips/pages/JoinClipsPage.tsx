@@ -25,6 +25,7 @@ import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
+import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { Card } from '@/shared/components/ui/card';
 import { extractVideoPosterFrame, extractVideoFinalFrame } from '@/shared/utils/videoPosterExtractor';
 import { useJoinClipsSettings } from '../hooks/useJoinClipsSettings';
@@ -924,6 +925,23 @@ const JoinClipsPage: React.FC = () => {
         strength: lora.strength,
       }));
       
+      // Calculate resolution from project's aspect ratio
+      let resolutionTuple: [number, number] | undefined;
+      if (projectAspectRatio) {
+        const resolutionStr = ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio];
+        if (resolutionStr) {
+          const [width, height] = resolutionStr.split('x').map(Number);
+          if (width && height) {
+            resolutionTuple = [width, height];
+          }
+        }
+      }
+      
+      console.log('[JoinClips] Resolution from project:', {
+        projectAspectRatio,
+        resolutionTuple
+      });
+      
       const taskParams: import('@/shared/lib/tasks/joinClips').JoinClipsTaskParams = {
         project_id: selectedProjectId,
         clips: clipsForTask,
@@ -940,6 +958,7 @@ const JoinClipsPage: React.FC = () => {
         negative_prompt: negativePrompt,
         priority: joinSettings.settings.priority || 0,
         ...(lorasForTask.length > 0 && { loras: lorasForTask }),
+        ...(resolutionTuple && { resolution: resolutionTuple }),
       };
       
       console.log('[JoinClips] Creating task with params:', taskParams);
