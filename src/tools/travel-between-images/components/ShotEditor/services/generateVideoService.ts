@@ -301,6 +301,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   // IMPORTANT: Query fresh data directly from database to avoid using stale cached data
   // This prevents deleted items from appearing in the task
   let absoluteImageUrls: string[];
+  let imageGenerationIds: string[] = []; // Track generation IDs for clickable images in SegmentCard
   try {
     console.log('[TaskSubmission] Fetching fresh image data from database for task...');
     const { data: freshShotGenerations, error } = await supabase
@@ -327,22 +328,37 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
 
     // Filter and process - location already contains the best version (upscaled if available)
     // Uses canonical isVideoShotGenerations from typeGuards
-    const freshImages = (freshShotGenerations || [])
+    const filteredShotGenerations = (freshShotGenerations || [])
       .filter(sg => sg.timeline_frame != null && !isVideoShotGenerations(sg as ShotGenerationsLike))
-      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
-      .map(sg => {
-        const gen = sg.generations as any;
-        return gen?.location;
-      })
-      .filter((location): location is string => Boolean(location));
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
 
-    absoluteImageUrls = freshImages
-      .map((location) => getDisplayUrl(location))
+    // Extract both URLs and generation IDs
+    const freshImagesWithIds = filteredShotGenerations.map(sg => {
+      const gen = sg.generations as any;
+      return {
+        location: gen?.location,
+        generationId: gen?.id || sg.generation_id // Prefer joined id, fallback to FK
+      };
+    }).filter(item => Boolean(item.location));
+
+    absoluteImageUrls = freshImagesWithIds
+      .map(item => getDisplayUrl(item.location))
       .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
 
-    console.log('[TaskSubmission] Using fresh image URLs:', {
+    // Extract generation IDs in the same order as URLs
+    imageGenerationIds = freshImagesWithIds
+      .filter(item => {
+        const url = getDisplayUrl(item.location);
+        return Boolean(url) && url !== '/placeholder.svg';
+      })
+      .map(item => item.generationId)
+      .filter((id): id is string => Boolean(id));
+
+    console.log('[TaskSubmission] Using fresh image URLs and generation IDs:', {
       count: absoluteImageUrls.length,
-      urls: absoluteImageUrls.map(url => url.substring(0, 50) + '...')
+      urls: absoluteImageUrls.map(url => url.substring(0, 50) + '...'),
+      generationIds: imageGenerationIds.map(id => id.substring(0, 8) + '...'),
+      idsMatchUrls: absoluteImageUrls.length === imageGenerationIds.length
     });
   } catch (err) {
     console.error('[TaskSubmission] Error fetching fresh image data:', err);
@@ -894,6 +910,10 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     project_id: projectId,
     shot_id: selectedShot.id,
     image_urls: absoluteImageUrls,
+    // Include generation IDs for clickable images in SegmentCard
+    ...(imageGenerationIds.length > 0 && imageGenerationIds.length === absoluteImageUrls.length 
+      ? { image_generation_ids: imageGenerationIds } 
+      : {}),
     base_prompts: basePrompts,
     base_prompt: batchVideoPrompt, // Singular - the default/base prompt used for all segments
     segment_frames: segmentFrames,

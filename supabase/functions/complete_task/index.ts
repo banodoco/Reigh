@@ -1743,6 +1743,171 @@ async function createGenerationFromTask(
       return existingGeneration;
     }
 
+    // ===== SPECIAL CASE HANDLERS (checked BEFORE general sub-task logic) =====
+    // These task types create variants on a parent generation rather than child generations.
+    // They must be checked first because they may also have orchestrator_task_id which would
+    // incorrectly route them to the sub-task handling path.
+
+    // Helper function to create variant and update parent generation
+    const createVariantOnParent = async (
+      parentGenId: string,
+      variantType: string,
+      extraParams: Record<string, any> = {},
+      variantName?: string | null
+    ): Promise<any | null> => {
+      console.log(`[GenMigration] ${taskData.task_type} task ${taskId} - creating variant for parent generation ${parentGenId}`);
+
+      // Fetch the parent generation
+      const { data: parentGen, error: fetchError } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', parentGenId)
+        .single();
+
+      if (fetchError || !parentGen) {
+        console.error(`[GenMigration] Error fetching parent generation ${parentGenId}:`, fetchError);
+        return null; // Signal to fall through to regular handling
+      }
+
+      try {
+        // Build variant params
+        const variantParams = {
+          ...taskData.params,
+          source_task_id: taskId,
+          ...extraParams,
+        };
+
+        // Create variant (DB trigger will unset old primary if exists)
+        await createVariant(
+          supabase,
+          parentGen.id,
+          publicUrl,
+          thumbnailUrl || null,
+          variantParams,
+          true,           // is_primary - new becomes primary
+          variantType,
+          variantName || null
+        );
+
+        // Update the parent generation with the new location
+        const { error: updateError } = await supabase
+          .from('generations')
+          .update({
+            location: publicUrl,
+            thumbnail_url: thumbnailUrl,
+            type: 'video'
+          })
+          .eq('id', parentGen.id);
+
+        if (updateError) {
+          console.error(`[GenMigration] Error updating parent generation:`, updateError);
+        } else {
+          console.log(`[GenMigration] Successfully created ${variantType} variant and updated parent generation ${parentGen.id}`);
+        }
+
+        // Mark task as generation_created
+        await supabase
+          .from('tasks')
+          .update({ generation_created: true })
+          .eq('id', taskId);
+
+        return parentGen;
+
+      } catch (variantErr) {
+        console.error(`[GenMigration] Exception creating variant for ${taskData.task_type}:`, variantErr);
+        return null; // Signal to fall through to regular handling
+      }
+    };
+
+    // SPECIAL CASE 1: individual_travel_segment with child_generation_id
+    // Triggered from ChildGenerationsView "Regenerate Segment" button
+    // Variant is associated with the CHILD (segment) generation, not the parent
+    if (taskData.task_type === 'individual_travel_segment' && taskData.params?.child_generation_id) {
+      const childGenId = taskData.params.child_generation_id;
+      console.log(`[GenMigration] individual_travel_segment task ${taskId} - creating variant for child generation ${childGenId}`);
+
+      // Fetch the child generation
+      const { data: childGen, error: fetchError } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', childGenId)
+        .single();
+
+      if (!fetchError && childGen) {
+        try {
+          // Build variant params
+          const variantParams = {
+            ...taskData.params,
+            source_task_id: taskId,
+            created_from: 'individual_segment_regeneration',
+            segment_index: taskData.params.segment_index,
+            parent_generation_id: taskData.params.parent_generation_id,
+          };
+
+          // Create variant on the CHILD generation (DB trigger will unset old primary if exists)
+          await createVariant(
+            supabase,
+            childGen.id,  // <-- Use CHILD generation ID, not parent
+            publicUrl,
+            thumbnailUrl || null,
+            variantParams,
+            true,           // is_primary - new becomes primary
+            'individual_segment',
+            taskData.params.generation_name || null
+          );
+
+          // Update the CHILD generation with the new location
+          const { error: updateError } = await supabase
+            .from('generations')
+            .update({
+              location: publicUrl,
+              thumbnail_url: thumbnailUrl,
+              type: 'video'
+            })
+            .eq('id', childGen.id);
+
+          if (updateError) {
+            console.error(`[GenMigration] Error updating child generation:`, updateError);
+          } else {
+            console.log(`[GenMigration] Successfully created variant and updated child generation ${childGen.id}`);
+          }
+
+          // Mark task as generation_created
+          await supabase
+            .from('tasks')
+            .update({ generation_created: true })
+            .eq('id', taskId);
+
+          return childGen;
+
+        } catch (variantErr) {
+          console.error(`[GenMigration] Exception creating variant for individual_travel_segment:`, variantErr);
+          // Fall through to regular generation creation
+        }
+      } else {
+        console.error(`[GenMigration] Error fetching child generation ${childGenId}:`, fetchError);
+        // Fall through to regular generation creation
+      }
+    }
+
+    // SPECIAL CASE 2: travel_stitch with parent_generation_id
+    // The final stitched video output of a travel orchestrator
+    const travelStitchParentId = taskData.task_type === 'travel_stitch' 
+      ? (taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id)
+      : null;
+    
+    if (travelStitchParentId) {
+      const result = await createVariantOnParent(
+        travelStitchParentId,
+        'travel_stitch',
+        { created_from: 'travel_stitch_completion' }
+      );
+      if (result) return result;
+      // Fall through to regular generation creation if variant creation failed
+    }
+
+    // ===== END SPECIAL CASE HANDLERS =====
+
     // Check if this is a sub-task (segment)
     const orchestratorTaskId = extractOrchestratorTaskId(taskData.params, 'GenMigration');
     let parentGenerationId: string | null = null;
@@ -1777,33 +1942,36 @@ async function createGenerationFromTask(
 
             // SPECIAL CASE: For travel orchestrators with only 1 segment, the segment IS the final output
             // This covers both 1-image i2v and 2-image travel (no travel_stitch needed)
-            // Update the parent generation immediately with this segment's output
+            // Create a variant on the parent generation with this segment's output
             if (childOrder === 0) {
               const numSegments = orchDetails.num_new_segments_to_generate;
-              if (numSegments === 1) {
-                console.log(`[TravelSingleSegment] Detected segment 0 of single-segment orchestrator - updating parent generation ${parentGenerationId}`);
+              if (numSegments === 1 && parentGenerationId) {
+                console.log(`[TravelSingleSegment] Detected segment 0 of single-segment orchestrator - creating variant for parent generation ${parentGenerationId}`);
                 
-                // Update parent generation with this segment's output
-                // We use publicUrl and thumbnailUrl from the current segment task execution
-                const { error: updateParentError } = await supabase
-                  .from('generations')
-                  .update({
-                    location: publicUrl,
-                    thumbnail_url: thumbnailUrl,
-                    type: 'video' // Ensure type is video
-                  })
-                  .eq('id', parentGenerationId);
-                  
-                if (updateParentError) {
-                  console.error(`[TravelSingleSegment] Error updating parent generation:`, updateParentError);
-                } else {
-                  console.log(`[TravelSingleSegment] Successfully updated parent generation with segment output`);
+                // Use createVariantOnParent to properly create a variant and update the parent
+                const singleSegmentResult = await createVariantOnParent(
+                  parentGenerationId,
+                  'travel_segment',
+                  {
+                    created_from: 'single_segment_travel',
+                    segment_index: 0,
+                    is_single_segment: true,
+                  }
+                );
+                
+                if (singleSegmentResult) {
+                  console.log(`[TravelSingleSegment] Successfully created variant and updated parent generation`);
                   
                   // Also mark the orchestrator task as generation_created=true to be safe
                   await supabase
                     .from('tasks')
                     .update({ generation_created: true })
                     .eq('id', orchestratorTaskId);
+                  
+                  // Return early - we've handled this as a variant, not a child generation
+                  return singleSegmentResult;
+                } else {
+                  console.error(`[TravelSingleSegment] Failed to create variant, falling through to child generation creation`);
                 }
               }
             }
@@ -1849,133 +2017,6 @@ async function createGenerationFromTask(
             taskData.params = specificParams;
           }
         }
-      }
-    } else if (taskData.task_type === 'travel_stitch' && (taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id)) {
-      // SPECIAL CASE: travel_stitch IS the final output of the travel orchestrator.
-      // Create a variant and update the parent generation with the final URL.
-      const parentGenId = taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id;
-      console.log(`[GenMigration] travel_stitch task ${taskId} completing - creating variant for parent generation ${parentGenId}`);
-
-      // Fetch the parent generation
-      const { data: parentGen, error: fetchError } = await supabase
-        .from('generations')
-        .select('*')
-        .eq('id', parentGenId)
-        .single();
-
-      if (fetchError || !parentGen) {
-        console.error(`[GenMigration] Error fetching parent generation ${parentGenId}:`, fetchError);
-        // Continue with regular generation creation as fallback
-      } else {
-        try {
-          // Build variant params
-          const variantParams = {
-            ...taskData.params,
-            source_task_id: taskId,
-            created_from: 'travel_stitch_completion',
-          };
-
-          // Create variant (DB trigger will unset old primary if exists)
-          await createVariant(
-            supabase,
-            parentGen.id,
-            publicUrl,
-            thumbnailUrl || null,
-            variantParams,
-            true,              // is_primary
-            'travel_stitch',   // variant_type
-            null               // name
-          );
-
-          // Update the parent generation with the new location
-          const { error: updateError } = await supabase
-            .from('generations')
-            .update({
-              location: publicUrl,
-              thumbnail_url: thumbnailUrl,
-              type: 'video'
-            })
-            .eq('id', parentGen.id);
-
-          if (updateError) {
-            console.error(`[GenMigration] Error updating parent generation:`, updateError);
-          } else {
-            console.log(`[GenMigration] Successfully created variant and updated parent generation ${parentGen.id}`);
-          }
-        } catch (variantErr) {
-          console.error(`[GenMigration] Exception creating variant:`, variantErr);
-        }
-
-        // We return the parent generation as the result
-        return parentGen;
-      }
-    } else if (taskData.task_type === 'individual_travel_segment' && taskData.params?.parent_generation_id) {
-      // SPECIAL CASE: individual_travel_segment creates a variant on an existing parent generation.
-      // This is triggered from the ChildGenerationsView "Regenerate Segment" button.
-      const parentGenId = taskData.params.parent_generation_id;
-      console.log(`[GenMigration] individual_travel_segment task ${taskId} completing - creating variant for parent generation ${parentGenId}`);
-
-      // Fetch the parent generation
-      const { data: parentGen, error: fetchError } = await supabase
-        .from('generations')
-        .select('*')
-        .eq('id', parentGenId)
-        .single();
-
-      if (fetchError || !parentGen) {
-        console.error(`[GenMigration] Error fetching parent generation ${parentGenId}:`, fetchError);
-        // Continue with regular generation creation as fallback
-      } else {
-        try {
-          // Build variant params with segment info
-          const variantParams = {
-            ...taskData.params,
-            source_task_id: taskId,
-            created_from: 'individual_segment_regeneration',
-            segment_index: taskData.params.segment_index,
-            child_generation_id: taskData.params.child_generation_id,
-          };
-
-          // Create variant (DB trigger will unset old primary if exists)
-          await createVariant(
-            supabase,
-            parentGen.id,
-            publicUrl,
-            thumbnailUrl || null,
-            variantParams,
-            true,                         // is_primary - new regeneration becomes primary
-            'individual_segment',         // variant_type
-            taskData.params.generation_name || null // name
-          );
-
-          // Update the parent generation with the new location
-          const { error: updateError } = await supabase
-            .from('generations')
-            .update({
-              location: publicUrl,
-              thumbnail_url: thumbnailUrl,
-              type: 'video'
-            })
-            .eq('id', parentGen.id);
-
-          if (updateError) {
-            console.error(`[GenMigration] Error updating parent generation:`, updateError);
-          } else {
-            console.log(`[GenMigration] Successfully created variant and updated parent generation ${parentGen.id} with individual segment output`);
-          }
-
-          // Mark task as generation_created
-          await supabase
-            .from('tasks')
-            .update({ generation_created: true })
-            .eq('id', taskId);
-
-        } catch (variantErr) {
-          console.error(`[GenMigration] Exception creating variant for individual_travel_segment:`, variantErr);
-        }
-
-        // We return the parent generation as the result
-        return parentGen;
       }
     } else if (taskData.task_types?.category === 'orchestration') {
       // This IS the orchestrator task completing
@@ -2095,6 +2136,35 @@ async function createGenerationFromTask(
 
     const newGeneration = await insertGeneration(supabase, generationRecord);
     console.log(`[GenMigration] Created generation ${newGeneration.id} for task ${taskId}`);
+
+    // For child generations (segments), ALSO create a variant on the parent to track history
+    // This allows the parent to show all segment outputs in its variant history
+    // NOTE: We set is_primary=false for multi-segment travels - the travel_stitch output becomes primary
+    if (isChild && parentGenerationId) {
+      console.log(`[GenMigration] Creating variant on parent ${parentGenerationId} for child segment ${childOrder}`);
+      try {
+        await createVariant(
+          supabase,
+          parentGenerationId,
+          publicUrl,
+          thumbnailUrl || null,
+          {
+            ...taskData.params,
+            source_task_id: taskId,
+            created_from: 'travel_segment',
+            segment_index: childOrder,
+            child_generation_id: newGeneration.id,
+          },
+          false,              // is_primary=false - travel_stitch will set the final primary
+          'travel_segment',   // variant_type
+          `Segment ${(childOrder ?? 0) + 1}` // name
+        );
+        console.log(`[GenMigration] Created segment variant on parent ${parentGenerationId}`);
+      } catch (variantErr) {
+        console.error(`[GenMigration] Error creating variant for child segment:`, variantErr);
+        // Don't fail - the child generation was already created successfully
+      }
+    }
 
     // Link to shot if applicable
     // NOTE: For child generations, we typically DON'T link them to the shot directly if the parent is linked

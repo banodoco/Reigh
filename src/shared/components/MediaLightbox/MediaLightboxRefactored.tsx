@@ -775,14 +775,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             className={cn(
               "fixed inset-0 z-[100000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
               // Disable animations on mobile to prevent blink during zoom/fade
-              isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-              "p-0 border-none shadow-none",
-              // Layout: Full screen for special modes on tablet+, otherwise centered
-              shouldShowSidePanel
-                ? "left-0 top-0 w-full h-full" // Full screen layout for side panel modes
-                : isMobile 
-                  ? "inset-0 w-full h-full" // Full screen on mobile
-                  : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+              isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+              "p-0 border-none shadow-none"
             )}
             onPointerDown={(e) => {
               // Track where the pointer down started

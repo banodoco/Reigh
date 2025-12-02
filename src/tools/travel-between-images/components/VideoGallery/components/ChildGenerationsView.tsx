@@ -53,6 +53,13 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const { toast } = useToast();
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
+    // State for segment input image lightbox (lifted from SegmentCard for proper z-index)
+    const [segmentImageLightbox, setSegmentImageLightbox] = useState<{
+        segmentIndex: number;
+        imageIndex: 0 | 1; // 0 = start, 1 = end
+        startImage: { url: string; generationId?: string } | null;
+        endImage: { url: string; generationId?: string } | null;
+    } | null>(null);
     const isMobile = useIsMobile();
     const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth } = usePanes();
     
@@ -711,6 +718,12 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 onMobileTap={handleMobileTap}
                                                 onUpdate={refetch}
                                                 availableLoras={availableLoras}
+                                                onImageLightboxOpen={(imageIndex, images) => setSegmentImageLightbox({
+                                                    segmentIndex: slot.index,
+                                                    imageIndex,
+                                                    startImage: images.start,
+                                                    endImage: images.end,
+                                                })}
                                             />
                                         );
                                     } else {
@@ -881,6 +894,54 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     />
                 );
             })()}
+
+            {/* Lightbox for Segment Input Images */}
+            {segmentImageLightbox && (() => {
+                const currentImage = segmentImageLightbox.imageIndex === 0 
+                    ? segmentImageLightbox.startImage 
+                    : segmentImageLightbox.endImage;
+                const hasRealGenerationId = !!(currentImage?.generationId && 
+                    !currentImage.generationId.startsWith('segment-'));
+                
+                console.log('[SegmentImageLightbox] Opening lightbox:', {
+                    imageIndex: segmentImageLightbox.imageIndex,
+                    segmentIndex: segmentImageLightbox.segmentIndex,
+                    generationId: currentImage?.generationId,
+                    hasRealGenerationId,
+                    url: currentImage?.url?.substring(0, 50),
+                });
+                
+                return (
+                    <MediaLightbox
+                        media={{
+                            id: currentImage?.generationId || `segment-${segmentImageLightbox.segmentIndex}-image-${segmentImageLightbox.imageIndex}`,
+                            location: currentImage?.url,
+                            imageUrl: currentImage?.url,
+                            thumbUrl: currentImage?.url,
+                            type: 'image',
+                        } as any}
+                        onClose={() => setSegmentImageLightbox(null)}
+                        onNext={() => setSegmentImageLightbox(prev => 
+                            prev && prev.imageIndex === 0 && prev.endImage 
+                                ? { ...prev, imageIndex: 1 } 
+                                : prev
+                        )}
+                        onPrevious={() => setSegmentImageLightbox(prev => 
+                            prev && prev.imageIndex === 1 && prev.startImage 
+                                ? { ...prev, imageIndex: 0 } 
+                                : prev
+                        )}
+                        showNavigation={!!(segmentImageLightbox.startImage && segmentImageLightbox.endImage)}
+                        showImageEditTools={hasRealGenerationId}
+                        showDownload={true}
+                        hasNext={segmentImageLightbox.imageIndex === 0 && !!segmentImageLightbox.endImage}
+                        hasPrevious={segmentImageLightbox.imageIndex === 1 && !!segmentImageLightbox.startImage}
+                        starred={false}
+                        shotId={undefined}
+                        showTaskDetails={hasRealGenerationId}
+                    />
+                );
+            })()}
         </div>
     );
 };
@@ -894,9 +955,10 @@ interface SegmentCardProps {
     onMobileTap: (index: number) => void;
     onUpdate: () => void;
     availableLoras: LoraModel[];
+    onImageLightboxOpen: (imageIndex: 0 | 1, images: { start: { url: string; generationId?: string } | null; end: { url: string; generationId?: string } | null }) => void;
 }
 
-const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onMobileTap, onUpdate, availableLoras }) => {
+const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen }) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [params, setParams] = useState<any>(child.params || {});
@@ -906,6 +968,36 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
     const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [regenerateSuccess, setRegenerateSuccess] = useState(false);
+
+    // Extract input images and generation IDs for this segment
+    const segmentImages = useMemo(() => {
+        const orchestratorDetails = params.orchestrator_details || {};
+        const allImages = orchestratorDetails.input_image_paths_resolved || params.input_image_paths_resolved || [];
+        const allGenerationIds = orchestratorDetails.input_image_generation_ids || params.input_image_generation_ids || [];
+        
+        // For segment at index N, we need images[N] and images[N+1]
+        const startImage = allImages[index];
+        const endImage = allImages[index + 1];
+        const startGenId = allGenerationIds[index];
+        const endGenId = allGenerationIds[index + 1];
+        
+        console.log('[SegmentImages] Extracting images for segment', index, {
+            hasOrchestratorDetails: !!orchestratorDetails,
+            allImagesCount: allImages.length,
+            allGenerationIdsCount: allGenerationIds.length,
+            startImage: startImage?.substring(0, 50),
+            endImage: endImage?.substring(0, 50),
+            startGenId,
+            endGenId,
+            hasGenerationIds: allGenerationIds.length > 0,
+        });
+        
+        return {
+            start: startImage ? { url: startImage, generationId: startGenId } : null,
+            end: endImage ? { url: endImage, generationId: endGenId } : null,
+            hasImages: !!(startImage || endImage),
+        };
+    }, [params, index]);
     
     // Motion control state - derived from params
     const [motionMode, setMotionMode] = useState<'basic' | 'presets' | 'advanced'>(() => {
@@ -1021,14 +1113,48 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         setRegenerateSuccess(false);
 
         try {
-            // Extract input images from orchestrator_details or params
+            // Extract input images - prefer fetching fresh URLs from database if generation IDs available
             const orchestratorDetails = params.orchestrator_details || {};
             const inputImages = orchestratorDetails.input_image_paths_resolved || params.input_image_paths_resolved || [];
+            const inputGenerationIds = orchestratorDetails.input_image_generation_ids || params.input_image_generation_ids || [];
             
-            // Get start and end images for this segment
-            // For segment at index N, we need images[N] and images[N+1]
-            const startImageUrl = inputImages[index] || params.start_image_url;
-            const endImageUrl = inputImages[index + 1] || params.end_image_url;
+            // Get generation IDs for this segment
+            const startGenId = inputGenerationIds[index] || segmentImages.start?.generationId;
+            const endGenId = inputGenerationIds[index + 1] || segmentImages.end?.generationId;
+            
+            // Try to fetch fresh URLs from database if we have generation IDs
+            let startImageUrl: string | undefined;
+            let endImageUrl: string | undefined;
+            
+            if (startGenId || endGenId) {
+                console.log('[RegenerateSegment] Fetching fresh image URLs from database...');
+                const genIdsToFetch = [startGenId, endGenId].filter(Boolean) as string[];
+                
+                const { data: generations, error } = await supabase
+                    .from('generations')
+                    .select('id, location')
+                    .in('id', genIdsToFetch);
+                
+                if (!error && generations) {
+                    const genMap = new Map(generations.map(g => [g.id, g.location]));
+                    if (startGenId && genMap.has(startGenId)) {
+                        startImageUrl = genMap.get(startGenId) || undefined;
+                        console.log('[RegenerateSegment] Using fresh start image URL from DB');
+                    }
+                    if (endGenId && genMap.has(endGenId)) {
+                        endImageUrl = genMap.get(endGenId) || undefined;
+                        console.log('[RegenerateSegment] Using fresh end image URL from DB');
+                    }
+                }
+            }
+            
+            // Fallback to stored URLs if database fetch didn't work
+            if (!startImageUrl) {
+                startImageUrl = inputImages[index] || params.start_image_url;
+            }
+            if (!endImageUrl) {
+                endImageUrl = inputImages[index + 1] || params.end_image_url;
+            }
 
             if (!startImageUrl || !endImageUrl) {
                 throw new Error("Could not determine input images for this segment");
@@ -1047,6 +1173,9 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 segmentIndex: index,
                 startImageUrl: startImageUrl?.substring(0, 50),
                 endImageUrl: endImageUrl?.substring(0, 50),
+                startGenId: startGenId?.substring(0, 8),
+                endGenId: endGenId?.substring(0, 8),
+                usedFreshUrls: !!(startGenId || endGenId),
                 numFrames: params.num_frames,
                 hasOriginalParams: !!params,
                 loraCount: lorasForTask.length,
@@ -1061,6 +1190,9 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 segment_index: index,
                 start_image_url: startImageUrl,
                 end_image_url: endImageUrl,
+                // Include generation IDs for clickable images (if available)
+                start_image_generation_id: segmentImages.start?.generationId,
+                end_image_generation_id: segmentImages.end?.generationId,
                 // Pass the full original params - the function will extract what it needs
                 originalParams: params,
                 // ALL overrides from UI state (everything editable in SegmentCard)
@@ -1103,6 +1235,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         index, 
         params, 
         selectedLoras, 
+        segmentImages,
         amountOfMotion,
         advancedMode, 
         phaseConfig, 
@@ -1286,6 +1419,45 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
 
             {/* Settings Form */}
             <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
+                {/* Input Images - Clickable thumbnails */}
+                {segmentImages.hasImages && (
+                    <div className="space-y-1.5">
+                        <Label className="text-xs font-medium text-muted-foreground">Input Images</Label>
+                        <div className="flex gap-2">
+                            {segmentImages.start && (
+                                <button
+                                    onClick={() => onImageLightboxOpen(0, segmentImages)}
+                                    className="relative w-16 h-16 rounded-md overflow-hidden border border-border/50 hover:border-primary/50 transition-colors group"
+                                    title="View start image"
+                                >
+                                    <img 
+                                        src={segmentImages.start.url} 
+                                        alt="Start frame"
+                                        className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                                    <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">Start</span>
+                                </button>
+                            )}
+                            {segmentImages.end && (
+                                <button
+                                    onClick={() => onImageLightboxOpen(1, segmentImages)}
+                                    className="relative w-16 h-16 rounded-md overflow-hidden border border-border/50 hover:border-primary/50 transition-colors group"
+                                    title="View end image"
+                                >
+                                    <img 
+                                        src={segmentImages.end.url} 
+                                        alt="End frame"
+                                        className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                                    <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">End</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <div className="space-y-2 flex-1">
                     <Label className="text-xs font-medium">Prompt</Label>
                     <Textarea

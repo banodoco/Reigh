@@ -17,6 +17,7 @@ export interface TravelBetweenImagesTaskParams {
   project_id: string;
   shot_id?: string;
   image_urls: string[];
+  image_generation_ids?: string[]; // Generation IDs corresponding to image_urls (for clickable images in SegmentCard)
   base_prompts: string[];
   base_prompt?: string; // Singular - the default/base prompt used for all segments
   negative_prompts?: string[];
@@ -189,6 +190,10 @@ function buildTravelBetweenImagesPayload(
     orchestrator_task_id: taskId,
     run_id: runId,
     input_image_paths_resolved: params.image_urls,
+    // Include generation IDs for clickable images in SegmentCard
+    ...(params.image_generation_ids && params.image_generation_ids.length > 0 
+      ? { input_image_generation_ids: params.image_generation_ids } 
+      : {}),
     num_new_segments_to_generate: numSegments,
     base_prompts_expanded: basePromptsExpanded,
     base_prompt: params.base_prompt, // Singular - the default/base prompt

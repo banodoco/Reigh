@@ -47,6 +47,10 @@ export interface IndividualTravelSegmentParams {
   start_image_url: string;
   end_image_url: string;
   
+  // Generation IDs for the input images (for clickable images in SegmentCard)
+  start_image_generation_id?: string;
+  end_image_generation_id?: string;
+  
   // Overrides - these can override values from originalParams
   base_prompt?: string;
   negative_prompt?: string;
