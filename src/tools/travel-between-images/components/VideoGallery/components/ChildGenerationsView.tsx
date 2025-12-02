@@ -16,6 +16,7 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
+import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import { useJoinClipsSettings } from '@/tools/join-clips/hooks/useJoinClipsSettings';
@@ -705,6 +706,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 child={slot.child}
                                                 index={slot.index}
                                                 projectId={projectId}
+                                                parentGenerationId={parentGenerationId}
                                                 onLightboxOpen={() => setLightboxIndex(slot.index)}
                                                 onMobileTap={handleMobileTap}
                                                 onUpdate={refetch}
@@ -887,13 +889,14 @@ interface SegmentCardProps {
     child: GenerationRow;
     index: number;
     projectId: string | null;
+    parentGenerationId: string;
     onLightboxOpen: () => void;
     onMobileTap: (index: number) => void;
     onUpdate: () => void;
     availableLoras: LoraModel[];
 }
 
-const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLightboxOpen, onMobileTap, onUpdate, availableLoras }) => {
+const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onMobileTap, onUpdate, availableLoras }) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [params, setParams] = useState<any>(child.params || {});
@@ -901,6 +904,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
     const [isSaving, setIsSaving] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
+    const [isRegenerating, setIsRegenerating] = useState(false);
+    const [regenerateSuccess, setRegenerateSuccess] = useState(false);
     
     // Motion control state - derived from params
     const [motionMode, setMotionMode] = useState<'basic' | 'presets' | 'advanced'>(() => {
@@ -1000,6 +1005,117 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
         setSelectedLoras(prev => prev.map(l => l.id === loraId ? { ...l, strength } : l));
         setIsDirty(true);
     }, []);
+
+    // Handle segment regeneration
+    const handleRegenerateSegment = useCallback(async () => {
+        if (!projectId) {
+            toast({
+                title: "Error",
+                description: "No project selected",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setIsRegenerating(true);
+        setRegenerateSuccess(false);
+
+        try {
+            // Extract input images from orchestrator_details or params
+            const orchestratorDetails = params.orchestrator_details || {};
+            const inputImages = orchestratorDetails.input_image_paths_resolved || params.input_image_paths_resolved || [];
+            
+            // Get start and end images for this segment
+            // For segment at index N, we need images[N] and images[N+1]
+            const startImageUrl = inputImages[index] || params.start_image_url;
+            const endImageUrl = inputImages[index + 1] || params.end_image_url;
+
+            if (!startImageUrl || !endImageUrl) {
+                throw new Error("Could not determine input images for this segment");
+            }
+
+            // Get resolution from params
+            const resolution = params.parsed_resolution_wh || 
+                               orchestratorDetails.parsed_resolution_wh || 
+                               params.resolution;
+
+            // Convert selectedLoras to the format expected by the task
+            const lorasForTask = selectedLoras.map(lora => ({
+                path: lora.path || lora.id,
+                strength: lora.strength,
+            }));
+
+            console.log('[RegenerateSegment] Creating individual_travel_segment task:', {
+                projectId,
+                parentGenerationId,
+                childGenerationId: child.id,
+                segmentIndex: index,
+                startImageUrl: startImageUrl?.substring(0, 50),
+                endImageUrl: endImageUrl?.substring(0, 50),
+                numFrames: params.num_frames,
+                amountOfMotion: amountOfMotion / 100,
+                loraCount: lorasForTask.length,
+            });
+
+            await createIndividualTravelSegmentTask({
+                project_id: projectId,
+                parent_generation_id: parentGenerationId,
+                child_generation_id: child.id,
+                segment_index: index,
+                start_image_url: startImageUrl,
+                end_image_url: endImageUrl,
+                base_prompt: params.base_prompt || params.prompt || "",
+                negative_prompt: params.negative_prompt || "",
+                num_frames: params.num_frames || 61,
+                frame_overlap: params.frame_overlap || 4,
+                resolution,
+                model_name: params.model_name || orchestratorDetails.model_name,
+                seed: params.seed_to_use || params.seed,
+                random_seed: randomSeed,
+                amount_of_motion: amountOfMotion / 100, // Convert from 0-100 to 0-1
+                advanced_mode: advancedMode,
+                phase_config: phaseConfig,
+                motion_mode: motionMode,
+                selected_phase_preset_id: selectedPhasePresetId,
+                loras: lorasForTask,
+                after_first_post_generation_saturation: params.after_first_post_generation_saturation,
+                after_first_post_generation_brightness: params.after_first_post_generation_brightness,
+            });
+
+            setRegenerateSuccess(true);
+            toast({
+                title: "Regeneration started",
+                description: `Segment ${index + 1} is being regenerated. Check the Tasks pane for progress.`,
+            });
+
+            // Clear success state after 3 seconds
+            setTimeout(() => setRegenerateSuccess(false), 3000);
+
+        } catch (error: any) {
+            console.error('[RegenerateSegment] Error:', error);
+            toast({
+                title: "Error",
+                description: error.message || "Failed to start regeneration",
+                variant: "destructive",
+            });
+        } finally {
+            setIsRegenerating(false);
+        }
+    }, [
+        projectId, 
+        parentGenerationId, 
+        child.id, 
+        index, 
+        params, 
+        selectedLoras, 
+        amountOfMotion, 
+        advancedMode, 
+        phaseConfig, 
+        motionMode,
+        selectedPhasePresetId,
+        randomSeed,
+        toast
+    ]);
     
     // Current settings for MotionControl
     const currentMotionSettings = useMemo(() => ({
@@ -1285,21 +1401,31 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                     </CollapsibleContent>
                 </Collapsible>
 
-                {/* Regenerate Video Button - TODO: Implement regenerate functionality
+                {/* Regenerate Segment Button */}
                 <Button
                     size="sm"
-                    onClick={() => {
-                        toast({
-                            title: "Regenerate Video",
-                            description: "This feature is coming soon!",
-                        });
-                    }}
+                    onClick={handleRegenerateSegment}
+                    disabled={isRegenerating}
                     className="w-full gap-2"
+                    variant={regenerateSuccess ? "outline" : "default"}
                 >
-                    <Film className="w-3 h-3" />
-                    Regenerate Video
+                    {isRegenerating ? (
+                        <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Starting...
+                        </>
+                    ) : regenerateSuccess ? (
+                        <>
+                            <Check className="w-3 h-3 text-green-500" />
+                            Task Created
+                        </>
+                    ) : (
+                        <>
+                            <RotateCcw className="w-3 h-3" />
+                            Regenerate Segment
+                        </>
+                    )}
                 </Button>
-                */}
             </CardContent>
         </Card>
     );

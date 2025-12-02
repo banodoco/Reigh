@@ -101,6 +101,15 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
     description: 'Individual join segment generation (part of join clips workflow)'
   },
 
+  // Individual segment regeneration (visible - standalone task)
+  individual_travel_segment: {
+    isVisible: true,
+    displayName: 'Regenerate Segment',
+    canCancel: true,
+    category: 'generation',
+    description: 'Standalone segment regeneration from segment details view'
+  },
+
   // Add more task types as needed...
 };
 

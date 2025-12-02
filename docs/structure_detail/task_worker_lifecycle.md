@@ -66,6 +66,7 @@ For a complete step-by-step breakdown with error handling, see: [**Task Processi
 - **`travel_orchestrator`** - Manages multi-segment travel workflows
 - **`travel_segment`** - Creates guide videos and runs WGP generation using VACE
 - **`travel_stitch`** - Stitches segment videos with crossfades and timing
+- **`individual_travel_segment`** - Standalone segment regeneration (visible in TasksPane, creates variant on parent generation)
 - **`image-generation`** - Fallback for basic image generation tasks
 
 #### Deployment Options
