@@ -1034,11 +1034,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 throw new Error("Could not determine input images for this segment");
             }
 
-            // Get resolution from params
-            const resolution = params.parsed_resolution_wh || 
-                               orchestratorDetails.parsed_resolution_wh || 
-                               params.resolution;
-
             // Convert selectedLoras to the format expected by the task
             const lorasForTask = selectedLoras.map(lora => ({
                 path: lora.path || lora.id,
@@ -1053,10 +1048,11 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 startImageUrl: startImageUrl?.substring(0, 50),
                 endImageUrl: endImageUrl?.substring(0, 50),
                 numFrames: params.num_frames,
-                amountOfMotion: amountOfMotion / 100,
+                hasOriginalParams: !!params,
                 loraCount: lorasForTask.length,
             });
 
+            // Pass the full original params so the task structure matches travel_segment exactly
             await createIndividualTravelSegmentTask({
                 project_id: projectId,
                 parent_generation_id: parentGenerationId,
@@ -1064,22 +1060,18 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 segment_index: index,
                 start_image_url: startImageUrl,
                 end_image_url: endImageUrl,
-                base_prompt: params.base_prompt || params.prompt || "",
-                negative_prompt: params.negative_prompt || "",
-                num_frames: params.num_frames || 61,
-                frame_overlap: params.frame_overlap || 4,
-                resolution,
-                model_name: params.model_name || orchestratorDetails.model_name,
-                seed: params.seed_to_use || params.seed,
+                // Pass the full original params - the function will extract what it needs
+                originalParams: params,
+                // Overrides from UI state (if user changed them in the SegmentCard)
+                base_prompt: params.base_prompt || params.prompt,
+                negative_prompt: params.negative_prompt,
+                num_frames: params.num_frames,
                 random_seed: randomSeed,
-                amount_of_motion: amountOfMotion / 100, // Convert from 0-100 to 0-1
                 advanced_mode: advancedMode,
                 phase_config: phaseConfig,
                 motion_mode: motionMode,
                 selected_phase_preset_id: selectedPhasePresetId,
                 loras: lorasForTask,
-                after_first_post_generation_saturation: params.after_first_post_generation_saturation,
-                after_first_post_generation_brightness: params.after_first_post_generation_brightness,
             });
 
             setRegenerateSuccess(true);
@@ -1108,7 +1100,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         index, 
         params, 
         selectedLoras, 
-        amountOfMotion, 
         advancedMode, 
         phaseConfig, 
         motionMode,
