@@ -459,7 +459,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const lineageHook = useGenerationLineage({ media });
   const {
     sourceGeneration,
-    derivedGenerations,
+    derivedItems,        // NEW: Unified list of generations + variants
+    derivedGenerations,  // Legacy: Just generations (backwards compat)
     derivedPage,
     derivedTotalPages,
     paginatedDerived,
@@ -468,7 +469,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   // Log lineage data for debugging "Based On" feature
   useEffect(() => {
-    console.log('[MediaLightbox:BasedOn] 📊 Lineage hook results:', {
+    console.log('[MediaLightbox:DerivedItems] 📊 Lineage hook results:', {
       mediaId: media.id.substring(0, 8),
       hasBasedOnField: !!(media as any).based_on,
       basedOnValue: (media as any).based_on?.substring(0, 8) || 'null',
@@ -476,12 +477,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       metadataBasedOn: (media.metadata as any)?.based_on?.substring(0, 8) || 'null',
       hasSourceGeneration: !!sourceGeneration,
       sourceGenerationId: sourceGeneration?.id.substring(0, 8) || 'null',
-      hasDerivedGenerations: !!derivedGenerations && derivedGenerations.length > 0,
-      derivedCount: derivedGenerations?.length || 0,
+      hasDerivedItems: !!derivedItems && derivedItems.length > 0,
+      derivedItemsCount: derivedItems?.length || 0,
+      derivedGenerationsCount: derivedItems?.filter(d => d.itemType === 'generation').length || 0,
+      derivedVariantsCount: derivedItems?.filter(d => d.itemType === 'variant').length || 0,
       hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
       timestamp: Date.now()
     });
-  }, [media.id, sourceGeneration, derivedGenerations, onOpenExternalGeneration]);
+  }, [media.id, sourceGeneration, derivedItems, onOpenExternalGeneration]);
 
   // Shot creation hook
   const shotCreationHook = useShotCreation({ 
@@ -551,9 +554,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // ========================================
 
   // Variants hook - fetch available variants for this generation
+  // Enabled for all media types to support variant selection in "Based on this" grid
   const variantsHook = useVariants({
-    generationId: showVideoTrimEditor ? media.id : null,
-    enabled: showVideoTrimEditor && isVideo,
+    generationId: media.id,
+    enabled: true, // Always enabled to support variant display in DerivedGenerationsGrid
   });
   const {
     variants,
@@ -577,13 +581,31 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     hasTrimChanges,
   } = trimmingHook;
 
-  // Get the effective video URL (active variant or current media)
+  // Get the effective media URL (active variant or current media)
+  // For videos with trim editor, use active variant
+  // For images with selected edit variant, also use that variant
   const effectiveVideoUrl = useMemo(() => {
     if (showVideoTrimEditor && activeVariant) {
       return activeVariant.location;
     }
     return effectiveImageUrl;
   }, [showVideoTrimEditor, activeVariant, effectiveImageUrl]);
+
+  // For images, use the active variant's location if a non-primary variant is selected
+  // (e.g., user clicked an edit variant in DerivedGenerationsGrid)
+  const effectiveMediaUrl = useMemo(() => {
+    // If an active variant is set and it's not the primary, use its location
+    if (activeVariant && !activeVariant.is_primary && activeVariant.location) {
+      console.log('[DerivedItems] Using active variant location:', {
+        variantId: activeVariant.id.substring(0, 8),
+        variantType: activeVariant.variant_type,
+        isPrimary: activeVariant.is_primary,
+      });
+      return activeVariant.location;
+    }
+    // Otherwise use the standard effective image URL
+    return effectiveImageUrl;
+  }, [activeVariant, effectiveImageUrl]);
 
   // Trim save hook - handle saving trimmed video
   const trimSaveHook = useTrimSave({
@@ -656,7 +678,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // ========================================
 
   const handleDownload = async () => {
-    await downloadMedia(effectiveImageUrl, media.id, isVideo);
+    // Use the effective media URL (may be a variant)
+    const urlToDownload = isVideo ? effectiveVideoUrl : effectiveMediaUrl;
+    await downloadMedia(urlToDownload, media.id, isVideo);
   };
 
   const handleDelete = () => {
@@ -1278,7 +1302,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                   {/* Media Content */}
                   <MediaDisplayWithCanvas
-                    effectiveImageUrl={isVideo ? effectiveVideoUrl : effectiveImageUrl}
+                    effectiveImageUrl={isVideo ? effectiveVideoUrl : effectiveMediaUrl}
                     thumbUrl={activeVariant?.thumbnail_url || media.thumbUrl}
                     isVideo={isVideo}
                     isFlippedHorizontally={isFlippedHorizontally}
@@ -1360,7 +1384,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isSaving={isSaving}
                       handleFlip={handleFlip}
                       handleSave={handleSave}
-                      effectiveImageUrl={effectiveImageUrl}
+                      effectiveImageUrl={effectiveMediaUrl}
                     />
 
                     {/* Floating Tool Controls - Tablet (landscape with sidebar) */}
@@ -1625,12 +1649,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
+                      derivedItems={derivedItems}
                       derivedGenerations={derivedGenerations}
                       paginatedDerived={paginatedDerived}
                       derivedPage={derivedPage}
                       derivedTotalPages={derivedTotalPages}
                       onSetDerivedPage={setDerivedPage}
                       onNavigateToGeneration={onOpenExternalGeneration}
+                      onVariantSelect={setActiveVariantId}
                       currentMediaId={media.id}
                       currentShotId={selectedShotId || shotId}
                       replaceImages={replaceImages}
@@ -1680,8 +1706,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       />
                     ) : (
                     <MediaDisplayWithCanvas
-                      effectiveImageUrl={effectiveImageUrl}
-                      thumbUrl={media.thumbUrl}
+                      effectiveImageUrl={effectiveMediaUrl}
+                      thumbUrl={activeVariant?.thumbnail_url || media.thumbUrl}
                       isVideo={false}
                       isFlippedHorizontally={isFlippedHorizontally}
                       isSaving={isSaving}
@@ -1734,7 +1760,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isSaving={isSaving}
                       handleFlip={handleFlip}
                       handleSave={handleSave}
-                      effectiveImageUrl={effectiveImageUrl}
+                      effectiveImageUrl={effectiveMediaUrl}
                     />
 
                     {/* Top Right Controls - Download, Delete & Close */}
@@ -1929,12 +1955,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
+                      derivedItems={derivedItems}
                       derivedGenerations={derivedGenerations}
                       paginatedDerived={paginatedDerived}
                       derivedPage={derivedPage}
                       derivedTotalPages={derivedTotalPages}
                       onSetDerivedPage={setDerivedPage}
                       onNavigateToGeneration={onOpenExternalGeneration}
+                      onVariantSelect={setActiveVariantId}
                       currentMediaId={media.id}
                       currentShotId={selectedShotId || shotId}
                       replaceImages={replaceImages}
@@ -1998,8 +2026,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   />
                 ) : (
                   <MediaDisplayWithCanvas
-                    effectiveImageUrl={effectiveImageUrl}
-                    thumbUrl={media.thumbUrl}
+                    effectiveImageUrl={effectiveMediaUrl}
+                    thumbUrl={activeVariant?.thumbnail_url || media.thumbUrl}
                     isVideo={false}
                     isFlippedHorizontally={isFlippedHorizontally}
                     isSaving={isSaving}
@@ -2143,7 +2171,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isSaving={isSaving}
                     handleFlip={handleFlip}
                     handleSave={handleSave}
-                    effectiveImageUrl={effectiveImageUrl}
+                    effectiveImageUrl={effectiveMediaUrl}
                   />
 
                   {/* Top Right Controls - Download, Delete & Close */}

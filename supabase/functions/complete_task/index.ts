@@ -763,8 +763,78 @@ serve(async (req) => {
             content_type: contentType
           };
 
-          if (taskCategory === 'generation' || (taskCategory === 'processing' && isSubTask)) {
-            console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete (category=${taskCategory}, isSubTask=${!!isSubTask})...`);
+          // ===== PRIORITY CHECK: Tasks with based_on create variants instead of new generations =====
+          // This handles: image_inpaint, annotated_image_edit, qwen_image_edit, and any task with based_on
+          const basedOnGenerationId = extractBasedOn(taskData.params);
+          
+          if (basedOnGenerationId && !isSubTask) {
+            console.log(`[ImageEdit] Task ${taskIdString} has based_on=${basedOnGenerationId} - creating variant instead of new generation`);
+            
+            try {
+              // Fetch the source generation to verify it exists
+              const { data: sourceGen, error: fetchError } = await supabaseAdmin
+                .from('generations')
+                .select('id, params, thumbnail_url, project_id')
+                .eq('id', basedOnGenerationId)
+                .single();
+
+              if (fetchError || !sourceGen) {
+                console.error(`[ImageEdit] Source generation ${basedOnGenerationId} not found:`, fetchError);
+                // Fall through to regular generation creation with based_on link
+              } else {
+                // Build variant params
+                const variantParams = {
+                  ...taskData.params,
+                  source_task_id: taskIdString,
+                  created_from: taskData.task_type,
+                  tool_type: toolType,
+                };
+
+                // Determine variant type based on task type
+                let variantType = 'edit';
+                if (taskData.task_type === 'image_inpaint') {
+                  variantType = 'inpaint';
+                } else if (taskData.task_type === 'annotated_image_edit') {
+                  variantType = 'annotated_edit';
+                } else if (taskData.task_type === 'qwen_image_edit' || taskData.task_type === 'image_edit' || taskData.task_type === 'magic_edit') {
+                  variantType = 'magic_edit';
+                }
+
+                // Create variant on source generation (non-primary - doesn't replace original)
+                await createVariant(
+                  supabaseAdmin,
+                  basedOnGenerationId,
+                  publicUrl,
+                  thumbnailUrl || null,
+                  variantParams,
+                  false,        // is_primary: false - edits don't replace the original
+                  variantType,
+                  taskData.params?.prompt ? `Edit: ${taskData.params.prompt.substring(0, 40)}...` : 'Edit'
+                );
+
+                console.log(`[ImageEdit] Successfully created ${variantType} variant on generation ${basedOnGenerationId}`);
+
+                // Mark task as generation_created (variant counts)
+                await supabaseAdmin
+                  .from('tasks')
+                  .update({ generation_created: true })
+                  .eq('id', taskIdString);
+
+                // Skip the rest of generation creation - we're done
+                // (Don't create a separate generation record)
+              }
+            } catch (variantErr) {
+              console.error(`[ImageEdit] Error creating variant for task ${taskIdString}:`, variantErr);
+              // Don't fail - continue with task completion
+            }
+          } else if (
+            taskCategory === 'generation' || 
+            (taskCategory === 'processing' && isSubTask) ||
+            // Processing tasks that produce images (inpaint, annotated_edit) should create generations
+            // when they don't have based_on (standalone generation, not an edit of existing)
+            (taskCategory === 'processing' && contentType === 'image')
+          ) {
+            console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete (category=${taskCategory}, isSubTask=${!!isSubTask}, contentType=${contentType})...`);
             try {
               await createGenerationFromTask(
                 supabaseAdmin,
@@ -829,77 +899,10 @@ serve(async (req) => {
             } else {
               console.log(`[ImageUpscale] No generation_id in task params, skipping upscaled variant creation`);
             }
-          } else if (taskCategory === 'inpaint') {
-            // Special handling for inpaint tasks: create new generation(s) based on source
-            console.log(`[ImageInpaint] Processing inpaint task ${taskIdString} (task_type: ${taskData.task_type})`);
-            console.log(`[ImageInpaint] Task params:`, JSON.stringify(taskData.params, null, 2));
-
-            // Inpaint creates generation(s) as usual, but should link via based_on to source generation
-            const sourceGenerationId = extractBasedOn(taskData.params);
-
-            if (sourceGenerationId) {
-              console.log(`[ImageInpaint] Will create new generation(s) based on source: ${sourceGenerationId}`);
-
-              // Extract shot_id from task params
-              const shotIdForInpaint = taskData.params?.shot_id;
-              if (shotIdForInpaint) {
-                console.log(`[ImageInpaint] Shot ID found in task params: ${shotIdForInpaint}`);
-              }
-
-              // Build inpaint generation params
-              const inpaintParams = {
-                ...taskData.params,
-                based_on: sourceGenerationId, // Link to source generation
-                tool_type: taskData.tool_type,
-                prompt: taskData.params?.prompt, // Inpaint prompt
-                num_generations: taskData.params?.num_generations || 1,
-                mask_url: taskData.params?.mask_url, // Reference to mask used
-              };
-
-              // For inpaint tasks, always use 'image' as the type since inpainting always produces images
-              // even if tool_type override suggests video (tool_type is for tracking/UI, not content type)
-              console.log(`[ImageInpaint] Using 'image' type for inpaint generation (ignoring tool_type override if present)`);
-
-              // Create generation record for inpaint result
-              const newGenerationId = crypto.randomUUID();
-              const generationRecord = {
-                id: newGenerationId,
-                tasks: [taskIdString],
-                params: inpaintParams,
-                location: publicUrl,
-                type: 'image', // Inpaint always produces images regardless of tool_type
-                project_id: taskData.project_id,
-                thumbnail_url: thumbnailUrl,
-                based_on: sourceGenerationId, // Track lineage
-                created_at: new Date().toISOString()
-              };
-
-              try {
-                const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
-                console.log(`[ImageInpaint] Created inpaint generation ${newGeneration.id} based on ${sourceGenerationId}`);
-
-                // Link to shot if shot_id is provided (unpositioned by default)
-                if (shotIdForInpaint) {
-                  console.log(`[ImageInpaint] Linking inpaint generation ${newGeneration.id} to shot ${shotIdForInpaint} (unpositioned)`);
-                  await linkGenerationToShot(supabaseAdmin, shotIdForInpaint, newGeneration.id, false);
-                  console.log(`[ImageInpaint] Successfully linked generation to shot without position`);
-                }
-              } catch (genError) {
-                console.error(`[ImageInpaint] Error creating inpaint generation:`, genError);
-                // Don't fail the task - the inpaint result is still in output_location
-              }
-            } else {
-              console.log(`[ImageInpaint] No based_on in task params, treating as regular generation`);
-              // Fall back to regular generation creation
-              await createGenerationFromTask(
-                supabaseAdmin,
-                taskIdString,
-                combinedTaskData,
-                publicUrl,
-                thumbnailUrl || undefined
-              );
-            }
           } else {
+            // Note: The old 'inpaint' category handler was removed because:
+            // 1. image_inpaint and annotated_image_edit have category='processing' in DB, not 'inpaint'
+            // 2. Tasks with based_on are now handled above (creating variants on source generation)
             console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
           }
         }

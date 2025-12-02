@@ -1,34 +1,82 @@
 import React, { useMemo } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Star, Paintbrush, Wand2, PenTool, Edit3 } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
+import { DerivedItem } from '@/shared/hooks/useGenerations';
 import { formatDistanceToNow } from 'date-fns';
 
 export interface DerivedGenerationsGridProps {
-  derivedGenerations: GenerationRow[];
-  paginatedDerived: GenerationRow[];
+  /** All derived items (generations + variants) - use this for new code */
+  derivedItems?: DerivedItem[];
+  /** Paginated derived items for display */
+  paginatedDerived: DerivedItem[];
   derivedPage: number;
   derivedTotalPages: number;
   onSetDerivedPage: (page: number | ((prev: number) => number)) => void;
+  /** Navigate to a generation (for generation items) */
   onNavigate: (derivedId: string, derivedContext: string[]) => Promise<void>;
+  /** Switch to a variant (for variant items) */
+  onVariantSelect?: (variantId: string) => void;
   currentMediaId: string;
   currentShotId?: string; // To check if items are positioned in current shot
   variant?: 'desktop' | 'mobile';
   title?: string;
   showTopBorder?: boolean; // Whether to show the top border (when task details are present above)
+  
+  /** @deprecated Use derivedItems instead */
+  derivedGenerations?: GenerationRow[];
 }
 
 /**
+ * Helper to check if an item is a DerivedItem (has itemType) vs legacy GenerationRow
+ */
+function isDerivedItem(item: DerivedItem | GenerationRow): item is DerivedItem {
+  return 'itemType' in item;
+}
+
+// Get icon for variant type
+const getVariantTypeIcon = (variantType: string | undefined) => {
+  switch (variantType) {
+    case 'inpaint':
+      return Paintbrush;
+    case 'magic_edit':
+      return Wand2;
+    case 'annotated_edit':
+      return PenTool;
+    default:
+      return Edit3;
+  }
+};
+
+// Get label for variant type
+const getVariantTypeLabel = (variantType: string | undefined) => {
+  switch (variantType) {
+    case 'inpaint':
+      return 'Inpaint';
+    case 'magic_edit':
+      return 'Magic Edit';
+    case 'annotated_edit':
+      return 'Annotated';
+    case 'edit':
+      return 'Edit';
+    default:
+      return variantType || 'Edit';
+  }
+};
+
+/**
  * DerivedGenerationsGrid Component
- * Displays a paginated grid of generations derived from the current media
+ * Displays a paginated grid of derived items (generations + variants)
  */
 export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
-  derivedGenerations,
+  derivedItems,
+  derivedGenerations, // Legacy prop, ignored if derivedItems is provided
   paginatedDerived,
   derivedPage,
   derivedTotalPages,
   onSetDerivedPage,
   onNavigate,
+  onVariantSelect,
   currentMediaId,
   currentShotId,
   variant = 'desktop',
@@ -43,24 +91,36 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
   const buttonSize = isMobile ? 'h-6 w-6' : 'h-7 w-7';
   const iconSize = isMobile ? 'h-3 w-3' : 'h-4 w-4';
   const textSize = isMobile ? 'text-sm' : 'text-lg';
+
+  // Use derivedItems if provided, otherwise fall back to legacy derivedGenerations
+  const allDerivedItems = derivedItems || derivedGenerations;
+  const totalCount = allDerivedItems?.length || 0;
   
-  // Sort derived generations: starred first, then in-shot, then others
+  // Sort derived items: starred first, then in-shot (generations only), then others
   const sortedDerived = useMemo(() => {
     if (!paginatedDerived) return [];
     
     return [...paginatedDerived].sort((a, b) => {
-      // Starred items first
-      if (a.starred && !b.starred) return -1;
-      if (!a.starred && b.starred) return 1;
+      // Starred items first (only generations have starred)
+      const aStarred = isDerivedItem(a) ? a.starred : (a as GenerationRow).starred;
+      const bStarred = isDerivedItem(b) ? b.starred : (b as GenerationRow).starred;
+      if (aStarred && !bStarred) return -1;
+      if (!aStarred && bStarred) return 1;
       
-      // Then items in current shot (with timeline_frame - must be positioned)
-      if (currentShotId) {
-        const aInShot = Array.isArray((a as any).all_shot_associations) && 
-          (a as any).all_shot_associations.some((assoc: any) => 
+      // Then items in current shot (with timeline_frame - must be positioned, only for generations)
+      const aIsGen = isDerivedItem(a) ? a.itemType === 'generation' : true;
+      const bIsGen = isDerivedItem(b) ? b.itemType === 'generation' : true;
+      
+      if (currentShotId && aIsGen && bIsGen) {
+        const aAssocs = isDerivedItem(a) ? a.all_shot_associations : (a as any).all_shot_associations;
+        const bAssocs = isDerivedItem(b) ? b.all_shot_associations : (b as any).all_shot_associations;
+        
+        const aInShot = Array.isArray(aAssocs) && 
+          aAssocs.some((assoc: any) => 
             assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
           );
-        const bInShot = Array.isArray((b as any).all_shot_associations) && 
-          (b as any).all_shot_associations.some((assoc: any) => 
+        const bInShot = Array.isArray(bAssocs) && 
+          bAssocs.some((assoc: any) => 
             assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
           );
         
@@ -78,7 +138,7 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
       <div className={`mb-${isMobile ? '2' : '3'} flex items-${isMobile ? 'center' : 'start'} justify-between`}>
         <div>
           <h3 className={`${textSize} font-${isMobile ? 'medium' : 'light'}`}>
-            {title || `Edits of this image (${derivedGenerations.length})`}
+            {title || `Edits of this image (${totalCount})`}
           </h3>
         </div>
         
@@ -112,52 +172,97 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
       
       <div className={`grid ${gridCols} ${gap}`}>
         {sortedDerived.map((derived) => {
-          // Check if item is in current shot with timeline position (must have timeline_frame)
-          const isInShot = currentShotId && 
-            Array.isArray((derived as any).all_shot_associations) && 
-            (derived as any).all_shot_associations.some((assoc: any) => 
+          // Determine if this is a variant or generation
+          const isNewFormat = isDerivedItem(derived);
+          const isVariant = isNewFormat && derived.itemType === 'variant';
+          const isGeneration = !isVariant; // Either new format generation or legacy GenerationRow
+          
+          // Get fields with proper type handling
+          const itemId = derived.id;
+          const thumbUrl = isNewFormat ? derived.thumbUrl : (derived as GenerationRow).thumbUrl;
+          const createdAt = derived.createdAt;
+          const starred = isNewFormat ? derived.starred : (derived as GenerationRow).starred;
+          const derivedCount = isNewFormat ? derived.derivedCount : (derived as GenerationRow).derivedCount;
+          const variantType = isNewFormat && isVariant ? derived.variantType : undefined;
+          const allShotAssocs = isNewFormat ? derived.all_shot_associations : (derived as any).all_shot_associations;
+          
+          // Check if item is in current shot with timeline position (only for generations)
+          const isInShot = isGeneration && currentShotId && 
+            Array.isArray(allShotAssocs) && 
+            allShotAssocs.some((assoc: any) => 
               assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
             );
           
           // Check if item is new (created in last 2 minutes)
-          const isNew = derived.createdAt && 
-            (Date.now() - new Date(derived.createdAt).getTime()) < 2 * 60 * 1000;
+          const isNew = createdAt && 
+            (Date.now() - new Date(createdAt).getTime()) < 2 * 60 * 1000;
+
+          // Get variant icon if it's a variant
+          const VariantIcon = isVariant ? getVariantTypeIcon(variantType) : null;
           
           return (
           <div
-            key={derived.id}
-            className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
+            key={itemId}
+            className={`relative aspect-square group overflow-hidden rounded border transition-colors cursor-pointer ${
+              isVariant 
+                ? 'border-purple-500/50 hover:border-purple-400' 
+                : 'border-border hover:border-primary'
+            }`}
             onClick={async () => {
-              console.log('[BasedOnNav] 🖼️ DerivedGenerationsGrid thumbnail clicked', {
-                derivedId: derived.id.substring(0, 8),
+              console.log('[DerivedNav] 🖼️ DerivedGenerationsGrid item clicked', {
+                derivedId: itemId.substring(0, 8),
+                isVariant,
+                variantType,
                 currentMediaId: currentMediaId.substring(0, 8),
-                derivedGenerationsCount: derivedGenerations?.length,
                 timestamp: Date.now()
               });
               
-              console.log('[BasedOnNav] 🎯 Calling onNavigate WITH derivedContext to enter derived mode');
-              await onNavigate(
-                derived.id,
-                derivedGenerations?.map(d => d.id) || []
-              );
-              console.log('[BasedOnNav] ✅ onNavigate completed');
+              if (isVariant && onVariantSelect) {
+                // For variants: switch to that variant (stay on same generation)
+                console.log('[DerivedNav] 🎯 Switching to variant');
+                onVariantSelect(itemId);
+              } else {
+                // For generations: navigate to that generation
+                console.log('[DerivedNav] 🎯 Navigating to generation');
+                // Only pass generation IDs in the context (not variant IDs)
+                const generationIds = (allDerivedItems || [])
+                  .filter(d => isDerivedItem(d) ? d.itemType === 'generation' : true)
+                  .map(d => d.id);
+                await onNavigate(itemId, generationIds);
+              }
+              console.log('[DerivedNav] ✅ Action completed');
             }}
           >
             <img
-              src={derived.thumbUrl}
-              alt="Derived generation"
+              src={thumbUrl}
+              alt={isVariant ? `${getVariantTypeLabel(variantType)} variant` : "Derived generation"}
               className="w-full h-full object-contain bg-black/20"
             />
             
             {/* Simple hover overlay */}
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
             
-            {/* Timestamp and NEW badge - top left */}
-            {derived.createdAt && (
+            {/* Variant type badge - top left for variants */}
+            {isVariant && VariantIcon && (
+              <div className={`absolute ${isMobile ? 'top-0.5 left-0.5' : 'top-1 left-1'} pointer-events-none flex items-center gap-1`}>
+                <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-purple-600/90 text-white rounded flex items-center gap-0.5`}>
+                  <VariantIcon className={isMobile ? 'h-2 w-2' : 'h-2.5 w-2.5'} />
+                  {getVariantTypeLabel(variantType)}
+                </span>
+                {isNew && (
+                  <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-green-500 text-white rounded font-semibold`}>
+                    NEW
+                  </span>
+                )}
+              </div>
+            )}
+            
+            {/* Timestamp and NEW badge - top left for generations */}
+            {isGeneration && createdAt && (
               <div className={`absolute ${isMobile ? 'top-0.5 left-0.5' : 'top-1 left-1'} pointer-events-none flex items-center gap-1`}>
                 <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-black/70 text-white rounded`}>
                   {(() => {
-                    const formatted = formatDistanceToNow(new Date(derived.createdAt), { addSuffix: true });
+                    const formatted = formatDistanceToNow(new Date(createdAt), { addSuffix: true });
                     if (formatted.includes('less than')) return 'Just now';
                     return formatted
                       .replace('about ', '')
@@ -182,23 +287,23 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
               </div>
             )}
             
-            {/* Star - top right */}
-            {derived.starred && (
+            {/* Star - top right (only for generations) */}
+            {isGeneration && starred && (
               <div className={`absolute ${starPosition} pointer-events-none`}>
                 <Star className={`${starSize} fill-yellow-500 text-yellow-500`} />
               </div>
             )}
             
-            {/* Derived count - bottom left */}
-            {derived.derivedCount !== undefined && derived.derivedCount > 0 && (
+            {/* Derived count - bottom left (only for generations) */}
+            {isGeneration && derivedCount !== undefined && derivedCount > 0 && (
               <div className={`absolute ${isMobile ? 'bottom-0.5 left-0.5' : 'bottom-1 left-1'} pointer-events-none`}>
                 <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-black/70 text-white rounded`}>
-                  {derived.derivedCount} based on this
+                  {derivedCount} based on this
                 </span>
               </div>
             )}
             
-            {/* In shot badge - bottom right */}
+            {/* In shot badge - bottom right (only for generations) */}
             {isInShot && (
               <div className={`absolute ${isMobile ? 'bottom-0.5 right-0.5' : 'bottom-1 right-1'} pointer-events-none`}>
                 <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-black/70 text-white rounded`}>

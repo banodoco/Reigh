@@ -733,6 +733,210 @@ export function useDerivedGenerations(
   });
 }
 
+// ===== UNIFIED DERIVED ITEMS (Generations + Variants) =====
+
+/**
+ * Variant types that represent edits (should appear in "Based on this")
+ */
+export const EDIT_VARIANT_TYPES = ['inpaint', 'magic_edit', 'annotated_edit', 'edit'] as const;
+
+/**
+ * A derived item can be either a generation (old mode) or a variant (new mode)
+ */
+export interface DerivedItem {
+  id: string;
+  thumbUrl: string;
+  url: string;
+  createdAt: string;
+  derivedCount: number;
+  starred?: boolean;
+  prompt?: string;
+  
+  /** Discriminator: 'generation' for old based_on, 'variant' for new variant edits */
+  itemType: 'generation' | 'variant';
+  
+  /** Variant-specific fields */
+  variantType?: string;
+  variantName?: string;
+  
+  /** Generation-specific fields */
+  basedOn?: string;
+  shot_id?: string;
+  timeline_frame?: number | null;
+  all_shot_associations?: Array<{ shot_id: string; timeline_frame: number | null; position: number | null }>;
+}
+
+/**
+ * Fetch derived items: BOTH child generations (based_on) AND edit variants
+ * This provides backwards compatibility while supporting the new variant model.
+ */
+export async function fetchDerivedItems(
+  sourceGenerationId: string | null
+): Promise<DerivedItem[]> {
+  console.log('[DerivedItems] fetchDerivedItems called', { sourceGenerationId });
+
+  if (!sourceGenerationId) {
+    console.log('[DerivedItems] returning empty - no sourceGenerationId');
+    return [];
+  }
+
+  // Fetch both in parallel
+  const [generationsResult, variantsResult] = await Promise.all([
+    // 1. Child generations (backwards compatible - generations with based_on = this)
+    supabase
+      .from('generations')
+      .select(`
+        id,
+        location,
+        thumbnail_url,
+        type,
+        created_at,
+        params,
+        starred,
+        tasks,
+        based_on,
+        shot_generations(shot_id, timeline_frame)
+      `)
+      .eq('based_on', sourceGenerationId)
+      .order('starred', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false }),
+    
+    // 2. Edit variants (new mode - variants with edit types, excluding primary/original)
+    supabase
+      .from('generation_variants')
+      .select('id, location, thumbnail_url, created_at, variant_type, name, params, is_primary')
+      .eq('generation_id', sourceGenerationId)
+      .in('variant_type', EDIT_VARIANT_TYPES)
+      .eq('is_primary', false) // Exclude primary - that's the "current" version
+      .order('created_at', { ascending: false })
+  ]);
+
+  if (generationsResult.error) {
+    console.error('[DerivedItems] Error fetching child generations:', generationsResult.error);
+  }
+  if (variantsResult.error) {
+    console.error('[DerivedItems] Error fetching edit variants:', variantsResult.error);
+  }
+
+  const childGenerations = generationsResult.data || [];
+  const editVariants = variantsResult.data || [];
+
+  console.log('[DerivedItems] Fetched', {
+    childGenerationsCount: childGenerations.length,
+    editVariantsCount: editVariants.length,
+    sourceGenerationId: sourceGenerationId.substring(0, 8)
+  });
+
+  // Fetch derived counts for child generations (how many generations are based on each)
+  const generationIds = childGenerations.map(d => d.id);
+  let derivedCounts: Record<string, number> = {};
+
+  if (generationIds.length > 0) {
+    const { data: countsData, error: countsError } = await supabase
+      .from('generations')
+      .select('based_on')
+      .in('based_on', generationIds);
+
+    if (!countsError && countsData) {
+      derivedCounts = countsData.reduce((acc, item) => {
+        const basedOnId = item.based_on;
+        acc[basedOnId] = (acc[basedOnId] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+    }
+  }
+
+  // Normalize generations to DerivedItem format
+  const normalizePosition = (timelineFrame: number | null | undefined) => {
+    if (timelineFrame === null || timelineFrame === undefined) return null;
+    return Math.floor(timelineFrame / 50);
+  };
+
+  const generationItems: DerivedItem[] = childGenerations.map((item: any) => {
+    const shotGenerations = item.shot_generations || [];
+    const allAssociations = shotGenerations.length > 1
+      ? shotGenerations.map((sg: any) => ({
+          shot_id: sg.shot_id,
+          timeline_frame: sg.timeline_frame,
+          position: normalizePosition(sg.timeline_frame),
+        }))
+      : undefined;
+
+    const primaryShot = shotGenerations[0];
+
+    return {
+      id: item.id,
+      thumbUrl: item.thumbnail_url || item.location,
+      url: item.location,
+      createdAt: item.created_at,
+      derivedCount: derivedCounts[item.id] || 0,
+      starred: item.starred || false,
+      prompt: item.params?.prompt || item.params?.originalParams?.orchestrator_details?.prompt,
+      itemType: 'generation' as const,
+      basedOn: item.based_on,
+      shot_id: primaryShot?.shot_id,
+      timeline_frame: primaryShot?.timeline_frame,
+      all_shot_associations: allAssociations,
+    };
+  });
+
+  // Normalize variants to DerivedItem format
+  const variantItems: DerivedItem[] = editVariants.map((variant: any) => ({
+    id: variant.id,
+    thumbUrl: variant.thumbnail_url || variant.location,
+    url: variant.location,
+    createdAt: variant.created_at,
+    derivedCount: 0, // Variants can't have children
+    starred: false, // Variants don't have starred flag
+    prompt: variant.params?.prompt,
+    itemType: 'variant' as const,
+    variantType: variant.variant_type,
+    variantName: variant.name,
+  }));
+
+  // Merge and sort by created_at (newest first), with starred generations at top
+  const allItems = [...generationItems, ...variantItems].sort((a, b) => {
+    // Starred items first (only generations can be starred)
+    if (a.starred && !b.starred) return -1;
+    if (!a.starred && b.starred) return 1;
+    // Then by date (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  console.log('[DerivedItems] Merged result', {
+    totalCount: allItems.length,
+    generations: generationItems.length,
+    variants: variantItems.length,
+  });
+
+  return allItems;
+}
+
+/**
+ * Hook to fetch derived items (generations + variants based on this generation)
+ * Use this instead of useDerivedGenerations for the unified "Based on this" feature.
+ */
+export function useDerivedItems(
+  sourceGenerationId: string | null,
+  enabled: boolean = true
+) {
+  // 🎯 SMART POLLING: Use intelligent polling for derived items so new edits appear immediately
+  const smartPollingConfig = useSmartPollingConfig(['derived-items', sourceGenerationId]);
+
+  return useQuery<DerivedItem[], Error>({
+    queryKey: ['derived-items', sourceGenerationId],
+    queryFn: () => fetchDerivedItems(sourceGenerationId),
+    enabled: !!sourceGenerationId && enabled,
+    gcTime: 5 * 60 * 1000, // 5 minutes
+
+    // 🎯 SMART POLLING: Intelligent polling based on realtime health
+    ...smartPollingConfig,
+    refetchIntervalInBackground: true, // Continue polling when tab inactive
+    refetchOnWindowFocus: false, // Prevent double-fetches
+    refetchOnReconnect: false, // Prevent double-fetches
+  });
+}
+
 /**
  * Fetch a single source generation by ID (for "based on" display)
  */
