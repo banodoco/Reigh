@@ -47,6 +47,9 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   // Helper to safely access orchestrator payload from multiple possible locations (memoized)
   const orchestratorPayload = useMemo(() => task?.params?.full_orchestrator_payload as any, [task?.params?.full_orchestrator_payload]);
   const orchestratorDetails = useMemo(() => task?.params?.orchestrator_details as any, [task?.params?.orchestrator_details]);
+  // For individual_travel_segment tasks, UI overrides are stored in individual_segment_params
+  const individualSegmentParams = useMemo(() => task?.params?.individual_segment_params as any, [task?.params?.individual_segment_params]);
+  const isIndividualSegmentTask = task?.taskType === 'individual_travel_segment';
   
   // Check if this is a character animate task
   const isCharacterAnimateTask = task?.taskType === 'animate_character';
@@ -55,20 +58,24 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   const isJoinClipsTask = task?.taskType === 'join_clips_orchestrator' || task?.taskType === 'join_clips_segment' || task?.taskType === 'join_clips';
   
   // Get LoRAs from the correct location (try all possible paths)
+  // For individual_travel_segment, check individual_segment_params first (UI overrides)
   const additionalLoras = (
+    individualSegmentParams?.additional_loras ||
     orchestratorPayload?.additional_loras || 
     orchestratorDetails?.additional_loras || 
     task?.params?.additional_loras
   ) as Record<string, any> | undefined;
 
   // Get phase_config for phase-by-phase LoRA display (memoized to prevent random changes)
+  // For individual_travel_segment, check individual_segment_params first (UI overrides)
   const phaseConfig = useMemo(() => {
     return (
+      individualSegmentParams?.phase_config ||
       orchestratorPayload?.phase_config || 
       orchestratorDetails?.phase_config || 
       task?.params?.phase_config
     ) as any;
-  }, [orchestratorPayload?.phase_config, orchestratorDetails?.phase_config, task?.params?.phase_config]);
+  }, [individualSegmentParams?.phase_config, orchestratorPayload?.phase_config, orchestratorDetails?.phase_config, task?.params?.phase_config]);
 
   // Memoize computed phase values to prevent flickering
   const phaseStepsDisplay = useMemo(() => {
@@ -898,15 +905,16 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           {/* Prompt */}
           {(() => {
             // For segment tasks, prioritize segment-specific base_prompt over orchestrator_details
-            // Segment tasks have their own base_prompt directly in params
+            // For individual_travel_segment, check individual_segment_params first (UI overrides)
             const isSegmentTask = task?.params?.segment_index !== undefined;
-            const prompt = isSegmentTask 
-              ? (task?.params?.base_prompt || task?.params?.prompt)
-              : (orchestratorDetails?.base_prompts_expanded?.[0] || 
-                 orchestratorPayload?.base_prompts_expanded?.[0] || 
-                 orchestratorDetails?.base_prompt ||
-                 orchestratorPayload?.base_prompt ||
-                 task?.params?.prompt);
+            const prompt = individualSegmentParams?.base_prompt ||
+              (isSegmentTask 
+                ? (task?.params?.base_prompt || task?.params?.prompt)
+                : (orchestratorDetails?.base_prompts_expanded?.[0] || 
+                   orchestratorPayload?.base_prompts_expanded?.[0] || 
+                   orchestratorDetails?.base_prompt ||
+                   orchestratorPayload?.base_prompt ||
+                   task?.params?.prompt));
             const enhancePrompt = orchestratorDetails?.enhance_prompt || 
                                  orchestratorPayload?.enhance_prompt || 
                                  task?.params?.enhance_prompt;
@@ -948,10 +956,12 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           {/* Negative Prompt */}
           {(() => {
             // For segment tasks, prioritize segment-specific negative_prompt
+            // For individual_travel_segment, check individual_segment_params first (UI overrides)
             const isSegmentTask = task?.params?.segment_index !== undefined;
-            const negativePrompt = isSegmentTask
-              ? task?.params?.negative_prompt
-              : (orchestratorDetails?.negative_prompts_expanded?.[0] || orchestratorPayload?.negative_prompts_expanded?.[0] || task?.params?.negative_prompt);
+            const negativePrompt = individualSegmentParams?.negative_prompt ||
+              (isSegmentTask 
+                ? task?.params?.negative_prompt
+                : (orchestratorDetails?.negative_prompts_expanded?.[0] || orchestratorPayload?.negative_prompts_expanded?.[0] || task?.params?.negative_prompt));
             if (negativePrompt && negativePrompt !== 'N/A') {
               const shouldTruncate = negativePrompt.length > config.negativePromptLength;
               const displayText = showFullNegativePrompt || !shouldTruncate ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...';
@@ -1039,7 +1049,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
             </p>
             <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
               {task?.params?.segment_index !== undefined
-                ? (task?.params?.segment_frames_target || 'N/A')
+                ? (individualSegmentParams?.num_frames || task?.params?.num_frames || task?.params?.segment_frames_target || 'N/A')
                 : (orchestratorDetails?.segment_frames_expanded?.[0] || orchestratorPayload?.segment_frames_expanded?.[0] || task?.params?.segment_frames_expanded || 'N/A')}
             </p>
           </div>
@@ -1047,7 +1057,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
             <p className={`${config.textSize} font-medium text-muted-foreground`}>Amount of Motion</p>
             <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
               {(() => {
-                const motion = orchestratorDetails?.amount_of_motion ?? orchestratorPayload?.amount_of_motion ?? task?.params?.amount_of_motion;
+                // For individual_travel_segment, check individual_segment_params first (UI overrides)
+                const motion = individualSegmentParams?.amount_of_motion ?? orchestratorDetails?.amount_of_motion ?? orchestratorPayload?.amount_of_motion ?? task?.params?.amount_of_motion;
                 return motion !== undefined && motion !== null ? `${Math.round(motion * 100)}%` : 'N/A';
               })()}
             </p>
