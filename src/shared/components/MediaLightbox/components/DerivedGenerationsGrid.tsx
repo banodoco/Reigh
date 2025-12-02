@@ -154,7 +154,7 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
             
             {/* Timestamp and NEW badge - top left */}
             {derived.createdAt && (
-              <div className={`absolute ${isMobile ? 'top-0.5 left-0.5' : 'top-1 left-1'} z-10 pointer-events-none flex items-center gap-1`}>
+              <div className={`absolute ${isMobile ? 'top-0.5 left-0.5' : 'top-1 left-1'} pointer-events-none flex items-center gap-1`}>
                 <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-black/70 text-white rounded`}>
                   {(() => {
                     const formatted = formatDistanceToNow(new Date(derived.createdAt), { addSuffix: true });
@@ -184,14 +184,14 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
             
             {/* Star - top right */}
             {derived.starred && (
-              <div className={`absolute ${starPosition} z-10 pointer-events-none`}>
+              <div className={`absolute ${starPosition} pointer-events-none`}>
                 <Star className={`${starSize} fill-yellow-500 text-yellow-500`} />
               </div>
             )}
             
             {/* Derived count - bottom left */}
             {derived.derivedCount !== undefined && derived.derivedCount > 0 && (
-              <div className={`absolute ${isMobile ? 'bottom-0.5 left-0.5' : 'bottom-1 left-1'} z-10 pointer-events-none`}>
+              <div className={`absolute ${isMobile ? 'bottom-0.5 left-0.5' : 'bottom-1 left-1'} pointer-events-none`}>
                 <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-black/70 text-white rounded`}>
                   {derived.derivedCount} based on this
                 </span>
@@ -200,7 +200,7 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
             
             {/* In shot badge - bottom right */}
             {isInShot && (
-              <div className={`absolute ${isMobile ? 'bottom-0.5 right-0.5' : 'bottom-1 right-1'} z-10 pointer-events-none`}>
+              <div className={`absolute ${isMobile ? 'bottom-0.5 right-0.5' : 'bottom-1 right-1'} pointer-events-none`}>
                 <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-black/70 text-white rounded`}>
                   In shot
                 </span>

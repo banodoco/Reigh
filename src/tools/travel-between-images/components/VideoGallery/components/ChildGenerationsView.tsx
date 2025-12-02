@@ -57,8 +57,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [segmentImageLightbox, setSegmentImageLightbox] = useState<{
         segmentIndex: number;
         imageIndex: 0 | 1; // 0 = start, 1 = end
-        startImage: { url: string; generationId?: string } | null;
-        endImage: { url: string; generationId?: string } | null;
+        startImage: { url: string; generationId?: string; based_on?: string | null } | null;
+        endImage: { url: string; generationId?: string; based_on?: string | null } | null;
     } | null>(null);
     const isMobile = useIsMobile();
     const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth } = usePanes();
@@ -449,6 +449,27 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const { data: parentTask, isLoading: isLoadingParentTask, error: parentTaskError } = useGetTask(parentTaskId);
     const parentInputImages: string[] = useMemo(() => deriveInputImages(parentTask), [parentTask]);
 
+    // Get task data for segment input image lightbox
+    const segmentImageGenerationId = segmentImageLightbox 
+        ? (segmentImageLightbox.imageIndex === 0 
+            ? segmentImageLightbox.startImage?.generationId 
+            : segmentImageLightbox.endImage?.generationId)
+        : null;
+    const hasRealSegmentImageGenId = !!(segmentImageGenerationId && !segmentImageGenerationId.startsWith('segment-'));
+    const { data: segmentImageTaskMapping } = useTaskFromUnifiedCache(hasRealSegmentImageGenId ? segmentImageGenerationId! : '');
+    const segmentImageTaskId = typeof segmentImageTaskMapping?.taskId === 'string' ? segmentImageTaskMapping.taskId : '';
+    const { data: segmentImageTask, isLoading: isLoadingSegmentImageTask, error: segmentImageTaskError } = useGetTask(segmentImageTaskId);
+    const segmentImageInputImages: string[] = useMemo(() => deriveInputImages(segmentImageTask), [segmentImageTask]);
+    
+    console.log('[SegmentImageFlow] Task data for segment image:', {
+        segmentImageGenerationId,
+        hasRealSegmentImageGenId,
+        segmentImageTaskId,
+        hasTask: !!segmentImageTask,
+        isLoading: isLoadingSegmentImageTask,
+        inputImagesCount: segmentImageInputImages.length,
+    });
+
     // Transform parent generation for VideoItem
     // Use updated_at for timestamp since that reflects when the final video was generated
     const parentVideoRow = React.useMemo(() => {
@@ -507,6 +528,58 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             });
         }
     }, [parentGenerationId, queryClient, toast]);
+
+    // Handler for opening external generation (for "Based On" navigation in lightboxes)
+    const handleOpenExternalGeneration = useCallback(async (
+        generationId: string,
+        derivedContext?: string[]
+    ) => {
+        console.log('[SegmentImageFlow] handleOpenExternalGeneration called:', { generationId, derivedContext });
+        
+        try {
+            // Fetch the generation from the database
+            const { data, error } = await supabase
+                .from('generations')
+                .select('*')
+                .eq('id', generationId)
+                .single();
+            
+            if (error) throw error;
+            
+            if (data) {
+                const basedOnValue = (data as any).based_on || (data as any).metadata?.based_on || null;
+                const imageUrl = (data as any).location || (data as any).thumbnail_url;
+                const thumbUrl = (data as any).thumbnail_url || (data as any).location;
+                
+                console.log('[SegmentImageFlow] Fetched external generation:', {
+                    id: data.id,
+                    hasLocation: !!(data as any).location,
+                    hasThumb: !!(data as any).thumbnail_url,
+                    basedOn: basedOnValue,
+                });
+                
+                // Update the segment image lightbox to show this new generation
+                console.log('[SegmentImageFlow] Setting lightbox with based_on:', basedOnValue);
+                setSegmentImageLightbox({
+                    segmentIndex: -1, // Mark as external navigation
+                    imageIndex: 0,
+                    startImage: {
+                        url: imageUrl,
+                        generationId: data.id,
+                        based_on: basedOnValue,
+                    },
+                    endImage: null,
+                });
+            }
+        } catch (error) {
+            console.error('[SegmentImageFlow] Failed to fetch external generation:', error);
+            toast({
+                title: "Error",
+                description: "Failed to load generation",
+                variant: "destructive",
+            });
+        }
+    }, [toast]);
 
     const handleRestoreDefaults = () => {
         // Reset to defaults using the settings hook
@@ -718,12 +791,19 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 onMobileTap={handleMobileTap}
                                                 onUpdate={refetch}
                                                 availableLoras={availableLoras}
-                                                onImageLightboxOpen={(imageIndex, images) => setSegmentImageLightbox({
-                                                    segmentIndex: slot.index,
-                                                    imageIndex,
-                                                    startImage: images.start,
-                                                    endImage: images.end,
-                                                })}
+                                                onImageLightboxOpen={(imageIndex, images) => {
+                                                    console.log('[SegmentImageFlow] onImageLightboxOpen called in parent');
+                                                    console.log('[SegmentImageFlow] imageIndex:', imageIndex);
+                                                    console.log('[SegmentImageFlow] images.start:', images.start);
+                                                    console.log('[SegmentImageFlow] images.end:', images.end);
+                                                    console.log('[SegmentImageFlow] slot.index:', slot.index);
+                                                    setSegmentImageLightbox({
+                                                        segmentIndex: slot.index,
+                                                        imageIndex,
+                                                        startImage: images.start,
+                                                        endImage: images.end,
+                                                    });
+                                                }}
                                             />
                                         );
                                     } else {
@@ -903,12 +983,29 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 const hasRealGenerationId = !!(currentImage?.generationId && 
                     !currentImage.generationId.startsWith('segment-'));
                 
-                console.log('[SegmentImageLightbox] Opening lightbox:', {
-                    imageIndex: segmentImageLightbox.imageIndex,
-                    segmentIndex: segmentImageLightbox.segmentIndex,
-                    generationId: currentImage?.generationId,
-                    hasRealGenerationId,
-                    url: currentImage?.url?.substring(0, 50),
+                console.log('[SegmentImageFlow] === LIGHTBOX RENDER ===');
+                console.log('[SegmentImageFlow] segmentImageLightbox state:', segmentImageLightbox);
+                console.log('[SegmentImageFlow] imageIndex (0=start, 1=end):', segmentImageLightbox.imageIndex);
+                console.log('[SegmentImageFlow] segmentIndex:', segmentImageLightbox.segmentIndex);
+                console.log('[SegmentImageFlow] startImage in state:', segmentImageLightbox.startImage);
+                console.log('[SegmentImageFlow] endImage in state:', segmentImageLightbox.endImage);
+                console.log('[SegmentImageFlow] currentImage selected:', currentImage);
+                console.log('[SegmentImageFlow] currentImage.url:', currentImage?.url);
+                console.log('[SegmentImageFlow] currentImage.generationId:', currentImage?.generationId);
+                console.log('[SegmentImageFlow] hasRealGenerationId:', hasRealGenerationId);
+                console.log('[SegmentImageFlow] Media object being passed to lightbox:', {
+                    id: currentImage?.generationId || `segment-${segmentImageLightbox.segmentIndex}-image-${segmentImageLightbox.imageIndex}`,
+                    location: currentImage?.url,
+                    imageUrl: currentImage?.url,
+                    thumbUrl: currentImage?.url,
+                    type: 'image',
+                    based_on: currentImage?.based_on,
+                });
+                
+                console.log('[SegmentImageFlow] Rendering MediaLightbox with taskDetailsData:', {
+                    hasTaskDetailsData: !!segmentImageTask,
+                    taskId: segmentImageTaskId,
+                    inputImagesCount: segmentImageInputImages.length,
                 });
                 
                 return (
@@ -919,6 +1016,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             imageUrl: currentImage?.url,
                             thumbUrl: currentImage?.url,
                             type: 'image',
+                            based_on: currentImage?.based_on || null,
                         } as any}
                         onClose={() => setSegmentImageLightbox(null)}
                         onNext={() => setSegmentImageLightbox(prev => 
@@ -939,6 +1037,16 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         starred={false}
                         shotId={undefined}
                         showTaskDetails={hasRealGenerationId}
+                        taskDetailsData={hasRealGenerationId ? {
+                            task: segmentImageTask,
+                            isLoading: isLoadingSegmentImageTask,
+                            error: segmentImageTaskError,
+                            inputImages: segmentImageInputImages,
+                            taskId: segmentImageTaskId || null,
+                            onApplySettingsFromTask: undefined,
+                            onClose: () => setSegmentImageLightbox(null),
+                        } : undefined}
+                        onOpenExternalGeneration={handleOpenExternalGeneration}
                     />
                 );
             })()}
@@ -981,16 +1089,15 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         const startGenId = allGenerationIds[index];
         const endGenId = allGenerationIds[index + 1];
         
-        console.log('[SegmentImages] Extracting images for segment', index, {
-            hasOrchestratorDetails: !!orchestratorDetails,
-            allImagesCount: allImages.length,
-            allGenerationIdsCount: allGenerationIds.length,
-            startImage: startImage?.substring(0, 50),
-            endImage: endImage?.substring(0, 50),
-            startGenId,
-            endGenId,
-            hasGenerationIds: allGenerationIds.length > 0,
-        });
+        console.log('[SegmentImageFlow] Extracting images for segment', index);
+        console.log('[SegmentImageFlow] allImages array:', allImages);
+        console.log('[SegmentImageFlow] allGenerationIds array:', allGenerationIds);
+        console.log('[SegmentImageFlow] startImage URL:', startImage);
+        console.log('[SegmentImageFlow] endImage URL:', endImage);
+        console.log('[SegmentImageFlow] startGenId:', startGenId);
+        console.log('[SegmentImageFlow] endGenId:', endGenId);
+        console.log('[SegmentImageFlow] params.orchestrator_details keys:', Object.keys(orchestratorDetails));
+        console.log('[SegmentImageFlow] params keys:', Object.keys(params));
         
         return {
             start: startImage ? { url: startImage, generationId: startGenId } : null,
@@ -1426,7 +1533,13 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                         <div className="flex gap-2">
                             {segmentImages.start && (
                                 <button
-                                    onClick={() => onImageLightboxOpen(0, segmentImages)}
+                                    onClick={() => {
+                                        console.log('[SegmentImageFlow] START image clicked for segment', index);
+                                        console.log('[SegmentImageFlow] START image URL:', segmentImages.start?.url);
+                                        console.log('[SegmentImageFlow] START image generationId:', segmentImages.start?.generationId);
+                                        console.log('[SegmentImageFlow] Full segmentImages object:', segmentImages);
+                                        onImageLightboxOpen(0, segmentImages);
+                                    }}
                                     className="relative w-16 h-16 rounded-md overflow-hidden border border-border/50 hover:border-primary/50 transition-colors group"
                                     title="View start image"
                                 >
@@ -1441,7 +1554,13 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                             )}
                             {segmentImages.end && (
                                 <button
-                                    onClick={() => onImageLightboxOpen(1, segmentImages)}
+                                    onClick={() => {
+                                        console.log('[SegmentImageFlow] END image clicked for segment', index);
+                                        console.log('[SegmentImageFlow] END image URL:', segmentImages.end?.url);
+                                        console.log('[SegmentImageFlow] END image generationId:', segmentImages.end?.generationId);
+                                        console.log('[SegmentImageFlow] Full segmentImages object:', segmentImages);
+                                        onImageLightboxOpen(1, segmentImages);
+                                    }}
                                     className="relative w-16 h-16 rounded-md overflow-hidden border border-border/50 hover:border-primary/50 transition-colors group"
                                     title="View end image"
                                 >
