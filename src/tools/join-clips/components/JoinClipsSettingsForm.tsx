@@ -518,13 +518,20 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
         });
     }, [keepBridgingImages, keepBridgingImagesValue, enhancePrompt, enhancePromptValue, replaceMode, gapFrames, contextFrames]);
     
+    // Auto-disable bridge anchors when gap frames is 8 or fewer
+    useEffect(() => {
+        if (gapFrames <= 8 && keepBridgingImagesValue) {
+            setKeepBridgingImages?.(false);
+        }
+    }, [gapFrames, keepBridgingImagesValue, setKeepBridgingImages]);
+    
     // Handle context frames change with auto-adjustment of gap frames
     const handleContextFramesChange = (val: number) => {
         const newContextFrames = Math.max(4, val);
         setContextFrames(newContextFrames);
         
         // Adjust gap frames if they exceed the max allowed by context
-        const maxGap = Math.max(8, 81 - (newContextFrames * 2));
+        const maxGap = Math.max(2, 81 - (newContextFrames * 2));
         if (gapFrames > maxGap) {
             setGapFrames(maxGap);
         }
@@ -552,10 +559,10 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                         </div>
                         <Slider
                             id="join-gap-frames"
-                                min={8}
-                                max={Math.max(8, 81 - (contextFrames * 2))}
+                                min={2}
+                                max={Math.max(2, 81 - (contextFrames * 2))}
                             step={1}
-                                value={[Math.max(8, gapFrames)]}
+                                value={[Math.max(2, gapFrames)]}
                             onValueChange={(values) => setGapFrames(values[0])}
                                 className="py-2"
                         />
@@ -599,20 +606,37 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                         {/* Keep Bridge Images */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between h-5">
-                                <Label className="text-sm font-medium">Bridge Anchors</Label>
+                                <Label className={cn("text-sm font-medium", gapFrames <= 8 && "text-muted-foreground")}>Bridge Anchors</Label>
                             </div>
-                            <div className="flex items-center justify-between gap-2 border rounded-lg p-2 bg-background/50">
-                                <span className={cn("text-xs transition-colors", !keepBridgingImagesValue ? "font-medium text-foreground" : "text-muted-foreground")}>Off</span>
-                                <Switch
-                                    id="join-keep-bridge"
-                                    checked={keepBridgingImagesValue}
-                                    onCheckedChange={(val) => {
-                                        console.log('[JoinClips] Toggle keepBridgingImages:', val);
-                                        setKeepBridgingImages?.(val);
-                                    }}
-                                />
-                                <span className={cn("text-xs transition-colors", keepBridgingImagesValue ? "font-medium text-foreground" : "text-muted-foreground")}>On</span>
-                            </div>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className={cn(
+                                            "flex items-center justify-between gap-2 border rounded-lg p-2 bg-background/50",
+                                            gapFrames <= 8 && "opacity-50 cursor-not-allowed"
+                                        )}>
+                                            <span className={cn("text-xs transition-colors", !keepBridgingImagesValue ? "font-medium text-foreground" : "text-muted-foreground")}>Off</span>
+                                            <Switch
+                                                id="join-keep-bridge"
+                                                checked={gapFrames <= 8 ? false : keepBridgingImagesValue}
+                                                disabled={gapFrames <= 8}
+                                                onCheckedChange={(val) => {
+                                                    console.log('[JoinClips] Toggle keepBridgingImages:', val);
+                                                    setKeepBridgingImages?.(val);
+                                                }}
+                                            />
+                                            <span className={cn("text-xs transition-colors", keepBridgingImagesValue && gapFrames > 8 ? "font-medium text-foreground" : "text-muted-foreground")}>On</span>
+                                        </div>
+                                    </TooltipTrigger>
+                                    {gapFrames <= 8 && (
+                                        <TooltipContent>
+                                            <p className="max-w-xs text-xs">
+                                                Bridge anchors require more than 8 gap frames to have enough space for anchor placement.
+                                            </p>
+                                        </TooltipContent>
+                                    )}
+                                </Tooltip>
+                            </TooltipProvider>
                         </div>
                     </div>
                 </div>

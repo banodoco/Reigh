@@ -899,76 +899,6 @@ serve(async (req) => {
                 thumbnailUrl || undefined
               );
             }
-          } else if (taskCategory === 'orchestration') {
-            // Special handling for orchestrator tasks
-            console.log(`[Orchestrator] Processing orchestrator task ${taskIdString} (task_type: ${taskData.task_type})`);
-
-            // 1. Check if this is a FINAL OUTPUT orchestrator (like join_clips with parent_generation_id)
-            // If it has a parent_generation_id in params, it means this task PRODUCED the final output for that parent
-            if (taskData.params?.parent_generation_id) {
-              const parentGenId = taskData.params.parent_generation_id;
-              console.log(`[Orchestrator] Task has parent_generation_id ${parentGenId} - updating final output`);
-              
-              try {
-                // Fetch and update parent generation directly
-                const { data: parentGen, error: fetchError } = await supabaseAdmin
-                  .from('generations')
-                  .select('id')
-                  .eq('id', parentGenId)
-                  .single();
-
-                if (fetchError || !parentGen) {
-                  console.error(`[Orchestrator] Error fetching parent generation ${parentGenId}:`, fetchError);
-                } else {
-                  console.log(`[Orchestrator] Updating parent generation ${parentGen.id} with final video URL`);
-                  
-                  const { error: updateError } = await supabaseAdmin
-                    .from('generations')
-                    .update({
-                      location: publicUrl,
-                      thumbnail_url: thumbnailUrl,
-                      type: 'video'
-                    })
-                    .eq('id', parentGen.id);
-
-                  if (updateError) {
-                    console.error(`[Orchestrator] Error updating parent generation:`, updateError);
-                  } else {
-                    console.log(`[Orchestrator] Successfully updated parent generation with final video`);
-                  }
-                }
-              } catch (err) {
-                console.error(`[Orchestrator] Exception updating parent generation:`, err);
-              }
-            } 
-            // 2. Fallback: Ensure placeholder exists (for lazy parent creation)
-            else {
-              try {
-                // Check if placeholder generation already exists (created by first child)
-                const existingGen = await findExistingGeneration(supabaseAdmin, taskIdString);
-                
-                if (existingGen) {
-                  console.log(`[Orchestrator] Placeholder generation ${existingGen.id} already exists`);
-                } else {
-                  // Create placeholder if it doesn't exist (edge case where orchestrator completes before any children)
-                  console.log(`[Orchestrator] Creating placeholder generation for orchestrator ${taskIdString}`);
-                  
-                  const parentGen = await getOrCreateParentGeneration(supabaseAdmin, taskIdString, taskData.project_id);
-                  if (parentGen) {
-                    console.log(`[Orchestrator] Created placeholder generation ${parentGen.id}`);
-                  }
-                }
-              } catch (genError) {
-                console.error(`[Orchestrator] Error handling generation for orchestrator task ${taskIdString}:`, genError);
-                // Don't fail the task
-              }
-            }
-            
-            // Mark task as having created a generation
-            await supabaseAdmin
-              .from('tasks')
-              .update({ generation_created: true })
-              .eq('id', taskIdString);
           } else {
             console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
           }
@@ -1185,9 +1115,30 @@ serve(async (req) => {
                                         orchestratorTask.params?.parent_generation_id;
                     
                     if (parentGenId) {
-                      console.log(`[OrchestratorComplete] Updating parent generation ${parentGenId} with final video URL`);
+                      console.log(`[OrchestratorComplete] Creating variant for parent generation ${parentGenId}`);
                       
                       try {
+                        // Build variant params
+                        const variantParams = {
+                          ...orchestratorTask.params,
+                          source_task_id: taskIdString,
+                          orchestrator_task_id: orchestratorTaskId,
+                          created_from: 'join_clips_complete',
+                        };
+
+                        // Create variant (DB trigger will unset old primary if exists)
+                        await createVariant(
+                          supabaseAdmin,
+                          parentGenId,
+                          publicUrl,
+                          thumbnailUrl || null,
+                          variantParams,
+                          true,           // is_primary
+                          'clip_join',    // variant_type
+                          null            // name
+                        );
+
+                        // Update generation record with new location
                         const { error: updateGenError } = await supabaseAdmin
                           .from('generations')
                           .update({
@@ -1200,7 +1151,7 @@ serve(async (req) => {
                         if (updateGenError) {
                           console.error(`[OrchestratorComplete] Failed to update parent generation ${parentGenId}:`, updateGenError);
                         } else {
-                          console.log(`[OrchestratorComplete] Successfully updated parent generation ${parentGenId} with final video`);
+                          console.log(`[OrchestratorComplete] Successfully created variant and updated parent generation ${parentGenId}`);
                         }
                       } catch (genUpdateErr) {
                         console.error(`[OrchestratorComplete] Exception updating parent generation:`, genUpdateErr);
@@ -1901,12 +1852,11 @@ async function createGenerationFromTask(
       }
     } else if (taskData.task_type === 'travel_stitch' && (taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id)) {
       // SPECIAL CASE: travel_stitch IS the final output of the travel orchestrator.
-      // Instead of creating a child generation, we should UPDATE the parent generation with the final URL.
-      // NOTE: join_clips_orchestrator is handled in the segment completion logic (OrchestratorComplete) above.
+      // Create a variant and update the parent generation with the final URL.
       const parentGenId = taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id;
-      console.log(`[GenMigration] ${taskData.task_type} task ${taskId} completing - updating parent generation ${parentGenId}`);
+      console.log(`[GenMigration] travel_stitch task ${taskId} completing - creating variant for parent generation ${parentGenId}`);
 
-      // Fetch the parent generation directly
+      // Fetch the parent generation
       const { data: parentGen, error: fetchError } = await supabase
         .from('generations')
         .select('*')
@@ -1917,23 +1867,43 @@ async function createGenerationFromTask(
         console.error(`[GenMigration] Error fetching parent generation ${parentGenId}:`, fetchError);
         // Continue with regular generation creation as fallback
       } else {
-        console.log(`[GenMigration] Updating parent generation ${parentGen.id} with final video URL`);
+        try {
+          // Build variant params
+          const variantParams = {
+            ...taskData.params,
+            source_task_id: taskId,
+            created_from: 'travel_stitch_completion',
+          };
 
-        // Update the parent generation with the location (video URL) and thumbnail
-        const { error: updateError } = await supabase
-          .from('generations')
-          .update({
-            location: publicUrl,
-            thumbnail_url: thumbnailUrl,
-            // Ensure type is video (should already be, but just in case)
-            type: 'video'
-          })
-          .eq('id', parentGen.id);
+          // Create variant (DB trigger will unset old primary if exists)
+          await createVariant(
+            supabase,
+            parentGen.id,
+            publicUrl,
+            thumbnailUrl || null,
+            variantParams,
+            true,              // is_primary
+            'travel_stitch',   // variant_type
+            null               // name
+          );
 
-        if (updateError) {
-          console.error(`[GenMigration] Error updating parent generation with final video:`, updateError);
-        } else {
-          console.log(`[GenMigration] Successfully updated parent generation with final video`);
+          // Update the parent generation with the new location
+          const { error: updateError } = await supabase
+            .from('generations')
+            .update({
+              location: publicUrl,
+              thumbnail_url: thumbnailUrl,
+              type: 'video'
+            })
+            .eq('id', parentGen.id);
+
+          if (updateError) {
+            console.error(`[GenMigration] Error updating parent generation:`, updateError);
+          } else {
+            console.log(`[GenMigration] Successfully created variant and updated parent generation ${parentGen.id}`);
+          }
+        } catch (variantErr) {
+          console.error(`[GenMigration] Exception creating variant:`, variantErr);
         }
 
         // We return the parent generation as the result
