@@ -120,13 +120,17 @@ export const useUpscale = ({
         throw new Error('No image URL available');
       }
 
-      console.log('[ImageUpscale] Starting upscale for generation:', media.id);
+      // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+      // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
+      const actualGenerationId = (media as any).generation_id || media.id;
+      
+      console.log('[ImageUpscale] Starting upscale for generation:', actualGenerationId);
 
       // Create upscale task - this will create a new variant that becomes primary
       await createImageUpscaleTask({
         project_id: selectedProjectId,
         image_url: imageUrl,
-        generation_id: media.id,
+        generation_id: actualGenerationId,
       });
 
       console.log('[ImageUpscale] ✅ Upscale task created successfully');

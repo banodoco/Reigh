@@ -144,6 +144,14 @@ const imageGalleryStateReducer = (
       const newUnpositioned = new Set(state.optimisticUnpositionedIds);
       newPositioned.add(key);
       newUnpositioned.delete(key);
+      console.log('[OptimisticDebug] MARK_OPTIMISTIC_POSITIONED reducer:', {
+        mediaId: mediaId?.substring(0, 8),
+        shotId: shotId?.substring(0, 8),
+        key,
+        newPositionedSize: newPositioned.size,
+        newPositionedContents: Array.from(newPositioned),
+        timestamp: Date.now()
+      });
       return {
         ...state,
         optimisticPositionedIds: newPositioned,
@@ -182,6 +190,20 @@ const imageGalleryStateReducer = (
         if (currentImageIds.has(mediaId)) {
           newPositioned.add(key);
         }
+      }
+      
+      // [OptimisticDebug] Log reconciliation
+      const removedFromPositioned = Array.from(state.optimisticPositionedIds).filter(k => !newPositioned.has(k));
+      if (removedFromPositioned.length > 0 || state.optimisticPositionedIds.size > 0) {
+        console.log('[OptimisticDebug] RECONCILE_OPTIMISTIC_STATE:', {
+          beforeSize: state.optimisticPositionedIds.size,
+          beforeContents: Array.from(state.optimisticPositionedIds),
+          afterSize: newPositioned.size,
+          afterContents: Array.from(newPositioned),
+          removedKeys: removedFromPositioned,
+          currentImageIdsSize: currentImageIds.size,
+          timestamp: Date.now()
+        });
       }
       
       const newDeleted = new Set<string>();

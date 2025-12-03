@@ -132,14 +132,18 @@ export const useStarToggle = ({ media, starred, shotId }: UseStarToggleProps): U
       newLocalStarred: newStarred
     });
     
+    // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+    // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
+    const actualGenerationId = (media as any).generation_id || media.id;
+    
     // Trigger mutation
     console.log('[StarPersist] 🚀 Triggering database mutation', {
-      mutatingGenerationId: media.id,
+      mutatingGenerationId: actualGenerationId,
       starred: newStarred,
       shotId,
       note: 'Passing shotId so mutation can target the exact all-shot-generations cache'
     });
-    toggleStarMutation.mutate({ id: media.id, starred: newStarred, shotId });
+    toggleStarMutation.mutate({ id: actualGenerationId, starred: newStarred, shotId });
   };
 
   return {

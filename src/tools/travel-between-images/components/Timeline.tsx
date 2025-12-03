@@ -152,8 +152,9 @@ export interface TimelineProps {
   allShots?: Array<{ id: string; name: string }>;
   selectedShotId?: string;
   onShotChange?: (shotId: string) => void;
-  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
 }
 
@@ -481,26 +482,30 @@ const Timeline: React.FC<TimelineProps> = ({
   const hasNext = derivedHasNext;
   const hasPrevious = derivedHasPrevious;
   
-  // Adapter functions for onAddToShot that use the lightbox selected shot ID
+  // Adapter functions for onAddToShot that use the target shot ID from the callback
+  // CRITICAL FIX: Now receives targetShotId from the callback, not from local state!
+  // This ensures the image is added to the shot the user SELECTED in the dropdown
   const handleAddToShotAdapter = useCallback(async (
+    targetShotId: string,
     generationId: string,
     imageUrl?: string,
     thumbUrl?: string
   ): Promise<boolean> => {
-    if (!onAddToShot || !lightboxSelectedShotId) {
-      console.warn('[Timeline] Cannot add to shot: missing onAddToShot or lightboxSelectedShotId');
+    if (!onAddToShot || !targetShotId) {
+      console.warn('[Timeline] Cannot add to shot: missing onAddToShot or targetShotId');
       return false;
     }
 
     try {
       console.log('[Timeline] Adding generation to shot with position', {
         generationId: generationId.substring(0, 8),
-        shotId: lightboxSelectedShotId.substring(0, 8)
+        targetShotId: targetShotId.substring(0, 8),
+        lightboxSelectedShotId: lightboxSelectedShotId?.substring(0, 8)
       });
 
-      // Call parent's onAddToShot with the selected shot ID
-      // Position is a number according to ShotEditor's signature: (shotId: string, generationId: string, position: number)
-      await onAddToShot(lightboxSelectedShotId as any, generationId as any, 0 as any);
+      // Call parent's onAddToShot with the target shot ID from the callback
+      // Position is undefined to let the mutation calculate the correct position for the TARGET shot
+      await onAddToShot(targetShotId as any, generationId as any, undefined as any);
       toast.success('Added to shot');
       return true;
     } catch (error) {
@@ -510,24 +515,26 @@ const Timeline: React.FC<TimelineProps> = ({
     }
   }, [lightboxSelectedShotId, onAddToShot]);
 
+  // CRITICAL FIX: Now receives targetShotId from the callback
   const handleAddToShotWithoutPositionAdapter = useCallback(async (
+    targetShotId: string,
     generationId: string,
     imageUrl?: string,
     thumbUrl?: string
   ): Promise<boolean> => {
-    if (!onAddToShotWithoutPosition || !lightboxSelectedShotId) {
-      console.warn('[Timeline] Cannot add to shot without position: missing handler or lightboxSelectedShotId');
+    if (!onAddToShotWithoutPosition || !targetShotId) {
+      console.warn('[Timeline] Cannot add to shot without position: missing handler or targetShotId');
       return false;
     }
 
     try {
       console.log('[Timeline] Adding generation to shot without position', {
         generationId: generationId.substring(0, 8),
-        shotId: lightboxSelectedShotId.substring(0, 8)
+        targetShotId: targetShotId.substring(0, 8)
       });
 
-      // Call parent's onAddToShotWithoutPosition with the selected shot ID
-      await onAddToShotWithoutPosition(lightboxSelectedShotId as any, generationId as any);
+      // Call parent's onAddToShotWithoutPosition with the target shot ID from callback
+      await onAddToShotWithoutPosition(targetShotId as any, generationId as any);
       toast.success('Added to shot (unpositioned)');
       return true;
     } catch (error) {

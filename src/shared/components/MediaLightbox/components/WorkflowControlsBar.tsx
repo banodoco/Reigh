@@ -11,7 +11,8 @@ interface ShotOption {
 
 export interface WorkflowControlsBarProps {
   // Visibility
-  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onDelete?: (id: string) => void;
   onApplySettings?: (metadata: any) => void;
   isSpecialEditMode: boolean;
@@ -35,7 +36,8 @@ export interface WorkflowControlsBarProps {
   showTickForSecondaryImageId?: string | null;
   
   // Shot actions
-  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   
   // Optimistic updates
   onShowTick?: (imageId: string) => void;

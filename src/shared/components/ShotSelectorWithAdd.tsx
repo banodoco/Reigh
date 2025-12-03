@@ -27,7 +27,8 @@ export interface ShotSelectorWithAddProps {
   onShotChange: (shotId: string) => void;
   
   // Add to shot functionality
-  onAddToShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShot: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   
   // Shot creation (optional)
   onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
@@ -212,7 +213,16 @@ export const ShotSelectorWithAdd: React.FC<ShotSelectorWithAddProps> = ({
     }
     
     try {
-      const success = await onAddToShot(imageId, imageUrl, thumbUrl);
+      // CRITICAL: Pass selectedShotId (the dropdown value) as targetShotId
+      // This ensures the image is added to the shot the user SELECTED, not the shot being viewed
+      console.log('[ShotSelectorWithAdd] Adding to shot', {
+        targetShotId: selectedShotId,
+        imageId,
+        hasImageUrl: !!imageUrl,
+        hasThumbUrl: !!thumbUrl,
+        timestamp: Date.now()
+      });
+      const success = await onAddToShot(selectedShotId, imageId, imageUrl, thumbUrl);
       
       if (success) {
         onShowTick?.(imageId);

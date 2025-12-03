@@ -298,7 +298,11 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   });
 
   // Task details functionality
-  const lightboxImageId = stateHook.state.activeLightboxMedia?.id || null;
+  // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+  // For ShotImageManager images, id is shot_generations.id but generation_id is the actual generation ID
+  const lightboxImageId = (stateHook.state.activeLightboxMedia as any)?.generation_id 
+    || stateHook.state.activeLightboxMedia?.id 
+    || null;
   const { data: lightboxTaskMapping } = useTaskFromUnifiedCache(lightboxImageId || '');
   const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask((lightboxTaskMapping?.taskId as string) || '');
   
@@ -483,6 +487,23 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
       console.warn('[BasedOnDebug] Invalid index for navigation', { index, filteredImagesLength: filteredImages.length });
     }
   }, [actionsHook.handleOpenLightbox]);
+
+  // Wrapper functions to adapt 3-parameter onAddToLastShot to 4-parameter signature expected by ImageGalleryLightbox
+  // The lightbox passes (targetShotId, generationId, imageUrl, thumbUrl) but parent provides (generationId, imageUrl, thumbUrl)
+  // We ignore targetShotId because the parent's handler uses lastAffectedShotId (updated via onShotChange)
+  const adaptedOnAddToShot = useMemo(() => {
+    if (!onAddToLastShot) return undefined;
+    return async (_targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
+      return onAddToLastShot(generationId, imageUrl, thumbUrl);
+    };
+  }, [onAddToLastShot]);
+
+  const adaptedOnAddToShotWithoutPosition = useMemo(() => {
+    if (!onAddToLastShotWithoutPosition) return undefined;
+    return async (_targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
+      return onAddToLastShotWithoutPosition(generationId, imageUrl, thumbUrl);
+    };
+  }, [onAddToLastShotWithoutPosition]);
 
   // Additional action handlers
   const handleSwitchToAssociatedShot = useCallback(() => {
@@ -771,8 +792,8 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
         simplifiedShotOptions={simplifiedShotOptions}
         selectedShotIdLocal={stateHook.state.selectedShotIdLocal}
         onShotChange={actionsHook.handleShotChange}
-        onAddToShot={onAddToLastShot}
-        onAddToShotWithoutPosition={onAddToLastShotWithoutPosition}
+        onAddToShot={adaptedOnAddToShot}
+        onAddToShotWithoutPosition={adaptedOnAddToShotWithoutPosition}
         showTickForImageId={stateHook.state.showTickForImageId}
         setShowTickForImageId={stateHook.setShowTickForImageId}
         showTickForSecondaryImageId={stateHook.state.showTickForSecondaryImageId}

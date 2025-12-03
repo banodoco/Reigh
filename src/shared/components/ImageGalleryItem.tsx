@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Star, Eye, Link, Plus, Pencil, Share2, Copy, Loader2, CornerDownLeft } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import HoverScrubVideo from './HoverScrubVideo';
-import { hasVideoExtension } from '@/shared/lib/typeGuards';
 import { 
   Tooltip, 
   TooltipContent, 
@@ -146,8 +145,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   
   // Fetch task data for video tasks to show proper details
   // Try to get task ID from metadata first (more efficient), fallback to cache query
+  // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+  // For ShotImageManager images, id is shot_generations.id but generation_id is the actual generation ID
   const taskIdFromMetadata = (image.metadata as any)?.taskId;
-  const { data: taskIdMapping } = useTaskFromUnifiedCache(image.id);
+  const actualGenerationId = (image as any).generation_id || image.id;
+  const { data: taskIdMapping } = useTaskFromUnifiedCache(actualGenerationId);
   const taskIdFromCache = typeof taskIdMapping?.taskId === 'string' ? taskIdMapping.taskId : null;
   const taskId: string | null = taskIdFromMetadata || taskIdFromCache;
   
@@ -587,20 +589,31 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Determine if it's a video ONLY if the display URL points to a video file
   // Thumbnails for videos are images (png/jpg) and must be treated as images here
-  // Uses canonical hasVideoExtension from typeGuards
-  const urlIsVideo = hasVideoExtension(actualDisplayUrl);
+  const urlIsVideo = Boolean(
+    actualDisplayUrl && (
+      actualDisplayUrl.toLowerCase().endsWith('.webm') ||
+      actualDisplayUrl.toLowerCase().endsWith('.mp4') ||
+      actualDisplayUrl.toLowerCase().endsWith('.mov')
+    )
+  );
   // If the display URL is not a video file, force image rendering even if image.isVideo is true
   const isActuallyVideo = urlIsVideo;
   // Content type: whether this item represents a video generation at all
   const isVideoContent = useMemo(() => {
     if (typeof image.isVideo === 'boolean') return image.isVideo;
-    return hasVideoExtension(image.url);
+    const url = image.url || '';
+    const lower = url.toLowerCase();
+    return lower.endsWith('.webm') || lower.endsWith('.mp4') || lower.endsWith('.mov');
   }, [image.isVideo, image.url]);
 
   // Check if we have a real image thumbnail (not a video file)
   const hasThumbnailImage = useMemo(() => {
-    if (!image.thumbUrl) return false;
-    return !hasVideoExtension(image.thumbUrl);
+    const thumb = image.thumbUrl || '';
+    if (!thumb) return false;
+    const lower = thumb.toLowerCase();
+    // Treat as image only if not a video extension
+    const isVideoExt = lower.endsWith('.webm') || lower.endsWith('.mp4') || lower.endsWith('.mov');
+    return !isVideoExt;
   }, [image.thumbUrl]);
 
   const videoUrl = useMemo(() => (isVideoContent ? (image.url || null) : null), [isVideoContent, image.url]);
@@ -613,8 +626,22 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isAlreadyPositionedInSelectedShot = useMemo(() => {
     if (!selectedShotIdLocal || !image.id) return false;
     
-    // Check optimistic state first (uses composite key: mediaId:shotId)
-    if (optimisticPositionedIds?.has(`${image.id}:${selectedShotIdLocal}`)) return true;
+    // Check optimistic state first - uses composite key format: imageId:shotId
+    const optimisticKey = `${image.id}:${selectedShotIdLocal}`;
+    const hasOptimisticKey = optimisticPositionedIds?.has(optimisticKey);
+    
+    // [OptimisticDebug] Log the check
+    console.log('[OptimisticDebug] isAlreadyPositionedInSelectedShot check:', {
+      imageId: image.id?.substring(0, 8),
+      selectedShotIdLocal: selectedShotIdLocal?.substring(0, 8),
+      optimisticKey,
+      hasOptimisticKey,
+      optimisticSetSize: optimisticPositionedIds?.size || 0,
+      optimisticSetContents: optimisticPositionedIds ? Array.from(optimisticPositionedIds) : [],
+      timestamp: Date.now()
+    });
+    
+    if (hasOptimisticKey) return true;
     
     // Optimized: Check single shot first (most common case)
     if (image.shot_id === selectedShotIdLocal) {
@@ -638,8 +665,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isAlreadyAssociatedWithoutPosition = useMemo(() => {
     if (!selectedShotIdLocal || !image.id) return false;
     
-    // Check optimistic state first (uses composite key: mediaId:shotId)
-    if (optimisticUnpositionedIds?.has(`${image.id}:${selectedShotIdLocal}`)) return true;
+    // Check optimistic state first - uses composite key format: imageId:shotId
+    const optimisticKey = `${image.id}:${selectedShotIdLocal}`;
+    if (optimisticUnpositionedIds?.has(optimisticKey)) return true;
     
     // Optimized: Check single shot first (most common case)
     if (image.shot_id === selectedShotIdLocal) {
@@ -890,9 +918,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onClick={enableSingleClick ? (e) => {
-          // Only handle single-click when explicitly enabled (e.g., selection mode)
-          // Normal behavior: desktop uses double-click, mobile uses touch events
+        onClick={enableSingleClick || !isMobile ? (e) => {
           if (onImageClick) {
             e.stopPropagation();
             onImageClick(image);
@@ -1077,7 +1103,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                         ? 'bg-gray-500/60 hover:bg-gray-600/70 !text-white'
                                         : ''
                             }`}
-                          onClick={async () => {
+                          onClick={async (e) => {
+                              // Prevent event from bubbling up and opening lightbox
+                              e.stopPropagation();
                               // If in transient success or already positioned, navigate to shot
                               if ((showTickForImageId === image.id || isAlreadyPositionedInSelectedShot) && selectedShotIdLocal && simplifiedShotOptions) {
                                   const targetShot = simplifiedShotOptions.find(s => s.id === selectedShotIdLocal);
@@ -1145,6 +1173,14 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                           if (success) {
                                               console.log(`[GenerationsPane] ✅ Success on attempt ${retryCount + 1} for image ${image.id}`);
                                               onShowTick(image.id!);
+                                              const optimisticKey = `${image.id}:${selectedShotIdLocal}`;
+                                              console.log('[OptimisticDebug] Calling onOptimisticPositioned:', {
+                                                imageId: image.id?.substring(0, 8),
+                                                shotId: selectedShotIdLocal?.substring(0, 8),
+                                                optimisticKey,
+                                                hasCallback: !!onOptimisticPositioned,
+                                                timestamp: Date.now()
+                                              });
                                               onOptimisticPositioned?.(image.id!, selectedShotIdLocal);
                                               log('MobileAddToShot', `Success on attempt ${retryCount + 1} for image ${image.id}`);
                                           } else {
@@ -1236,7 +1272,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                             ? 'bg-gray-500/80 hover:bg-gray-600/90 text-white'
                                             : 'bg-black/60 hover:bg-black/80 text-white'
                                     }`}
-                                    onClick={async () => {
+                                    onClick={async (e) => {
+                                        // Prevent event from bubbling up and opening lightbox
+                                        e.stopPropagation();
                                         // If already associated without position, navigate to shot
                                         if (isAlreadyAssociatedWithoutPosition && selectedShotIdLocal && simplifiedShotOptions) {
                                             const targetShot = simplifiedShotOptions.find(s => s.id === selectedShotIdLocal);

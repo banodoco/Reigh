@@ -71,7 +71,7 @@ const SelectContent = React.forwardRef<
     container?: HTMLElement | null;
     onCloseAutoFocus?: (event: Event) => void;
   }
->(({ className, children, position = "popper", header, container, onPointerDownOutside, onInteractOutside, ...props }, ref) => (
+>(({ className, children, position = "popper", header, container, onPointerDownOutside, ...props }, ref) => (
   <SelectPrimitive.Portal container={container as unknown as HTMLElement | undefined}>
     <SelectPrimitive.Content
       ref={ref}
@@ -83,7 +83,6 @@ const SelectContent = React.forwardRef<
       )}
       position={position}
       onPointerDownOutside={onPointerDownOutside}
-      onInteractOutside={onInteractOutside}
       {...props}
     >
       {header}

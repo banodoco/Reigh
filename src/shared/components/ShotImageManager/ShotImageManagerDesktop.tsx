@@ -18,8 +18,9 @@ import BatchDropZone from '../BatchDropZone';
 import MediaLightbox from '../MediaLightbox';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTaskDetails } from './hooks/useTaskDetails';
+import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 
 interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   selection: any;
@@ -45,6 +46,41 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   setLightboxSelectedShotId,
   ...props
 }) => {
+  // State for showing success tick after adding to shot (positioned)
+  const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
+  // State for showing success tick after adding to shot (without position)
+  const [showTickForSecondaryImageId, setShowTickForSecondaryImageIdInternal] = useState<string | null>(null);
+  
+  // Wrapper to log when setter is called
+  const setShowTickForSecondaryImageId = useCallback((id: string | null) => {
+    console.log('[AddWithoutPosDebug] 🎯 setShowTickForSecondaryImageId CALLED with:', id);
+    setShowTickForSecondaryImageIdInternal(id);
+  }, []);
+  
+  // Debug: Log when secondary tick state changes
+  useEffect(() => {
+    console.log('[AddWithoutPosDebug] 📌 showTickForSecondaryImageId STATE VALUE:', showTickForSecondaryImageId);
+  }, [showTickForSecondaryImageId]);
+  
+  // Clear ticks after 3 seconds
+  useEffect(() => {
+    if (showTickForImageId) {
+      const timer = setTimeout(() => {
+        setShowTickForImageId(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showTickForImageId]);
+  
+  useEffect(() => {
+    if (showTickForSecondaryImageId) {
+      const timer = setTimeout(() => {
+        setShowTickForSecondaryImageId(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showTickForSecondaryImageId]);
+  
   // Debug: Log props received
   console.log('[ShotSelectorDebug] ShotImageManagerDesktop received props', {
     component: 'ShotImageManagerDesktop',
@@ -68,12 +104,18 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   });
 
   // Fetch task details for current lightbox image
-  const currentLightboxImageId = lightbox.lightboxIndex !== null 
-    ? lightbox.currentImages[lightbox.lightboxIndex]?.id 
+  // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+  // For ShotImageManager, id is shot_generations.id but generation_id is the actual generation ID
+  const currentLightboxImage = lightbox.lightboxIndex !== null 
+    ? lightbox.currentImages[lightbox.lightboxIndex] 
     : null;
+  const currentLightboxImageId = (currentLightboxImage as any)?.generation_id || currentLightboxImage?.id || null;
   const { taskDetailsData } = useTaskDetails({ generationId: currentLightboxImageId });
   const gridColsClass = GRID_COLS_CLASSES[props.columns || 4] || 'grid-cols-4';
   const isMobile = useIsMobile();
+  
+  // Shot navigation for "add without position" flow
+  const { navigateToShot } = useShotNavigation();
   
   // Detect tablet/iPad size for task details
   const { isTabletOrLarger } = useDeviceDetection();
@@ -94,7 +136,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
         onDragEnd={dragAndDrop.handleDragEnd}
       >
         <SortableContext
-          items={lightbox.currentImages.map((img: any) => img.id)}
+          items={lightbox.currentImages.map((img: any) => img.shotImageEntryId ?? img.id)}
           strategy={rectSortingStrategy}
         >
           <ImageGrid
@@ -110,6 +152,8 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             onDelete={batchOps.handleIndividualDelete}
             onDuplicate={props.onImageDuplicate}
             isMobile={isMobile}
+            imageDeletionSettings={batchOps.imageDeletionSettings}
+            updateImageDeletionSettings={batchOps.updateImageDeletionSettings}
             duplicatingImageId={props.duplicatingImageId}
             duplicateSuccessImageId={props.duplicateSuccessImageId}
             projectAspectRatio={props.projectAspectRatio}
@@ -126,7 +170,6 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             enhancedPrompts={props.enhancedPrompts}
             defaultPrompt={props.defaultPrompt}
             defaultNegativePrompt={props.defaultNegativePrompt}
-            onClearEnhancedPrompt={props.onClearEnhancedPrompt}
           />
         </SortableContext>
         
@@ -178,6 +221,19 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             ? (currentImage as any).timeline_frame === null || (currentImage as any).timeline_frame === undefined
             : undefined;
 
+          // [AddToShotDebug] Detailed logging for position detection
+          console.log('[AddToShotDebug] 📊 ShotImageManagerDesktop POSITION CHECK:');
+          console.log('[AddToShotDebug] mediaId:', lightbox.currentImages[lightbox.lightboxIndex]?.id.substring(0, 8));
+          console.log('[AddToShotDebug] props.shotId:', props.shotId?.substring(0, 8));
+          console.log('[AddToShotDebug] effectiveSelectedShotId:', effectiveSelectedShotId?.substring(0, 8));
+          console.log('[AddToShotDebug] isExternalGen:', isExternalGen);
+          console.log('[AddToShotDebug] isInSelectedShot:', isInSelectedShot);
+          console.log('[AddToShotDebug] currentImage.timeline_frame:', (currentImage as any).timeline_frame);
+          console.log('[AddToShotDebug] currentImage.shot_id:', (currentImage as any).shot_id?.substring(0, 8));
+          console.log('[AddToShotDebug] positionedInSelectedShot:', positionedInSelectedShot);
+          console.log('[AddToShotDebug] associatedWithoutPositionInSelectedShot:', associatedWithoutPositionInSelectedShot);
+          console.log('[AddToShotDebug] showTickForImageId:', showTickForImageId);
+          
           console.log('[BasedOnNav] 📊 MediaLightbox props (Desktop):', {
             mediaId: lightbox.currentImages[lightbox.lightboxIndex]?.id.substring(0, 8),
             showTaskDetails: true,
@@ -229,28 +285,8 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               onPrevious={lightbox.handlePrevious}
               onDelete={!props.readOnly ? (mediaId: string) => {
                 const currentImage = lightbox.currentImages[lightbox.lightboxIndex];
-                console.log('[DELETE:ShotImageManager] 🗑️ STEP 1: Delete clicked in lightbox', {
-                  lightboxIndex: lightbox.lightboxIndex,
-                  mediaIdFromCallback: mediaId?.substring(0, 8),
-                  currentImage: {
-                    id: currentImage.id?.substring(0, 8), // shot_generations.id
-                    generation_id: currentImage.generation_id?.substring(0, 8),
-                    type: currentImage.type,
-                    hasImageUrl: !!currentImage.imageUrl,
-                    timeline_frame: (currentImage as any).timeline_frame
-                  },
-                  willCallWith: currentImage.id?.substring(0, 8), // shot_generations.id
-                  timestamp: Date.now()
-                });
-                // Use id (shot_generations.id) for deletion to target the specific entry
-                if (!currentImage.id) {
-                  console.error('[DELETE:ShotImageManager] ❌ Missing id!', {
-                    currentImage,
-                    allKeys: Object.keys(currentImage)
-                  });
-                  return;
-                }
-                props.onImageDelete(currentImage.id);
+                const shotImageEntryId = currentImage.shotImageEntryId || currentImage.id;
+                props.onImageDelete(shotImageEntryId);
               } : undefined}
               onImageSaved={props.onImageSaved ? async (newImageUrl: string, createNew?: boolean) =>
                 await props.onImageSaved!(lightbox.currentImages[lightbox.lightboxIndex].id, newImageUrl, createNew) : undefined}
@@ -298,6 +334,14 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               onCreateShot={props.onCreateShot}
               positionedInSelectedShot={positionedInSelectedShot}
               associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
+              showTickForImageId={showTickForImageId}
+              onShowTick={setShowTickForImageId}
+              showTickForSecondaryImageId={showTickForSecondaryImageId}
+              onShowSecondaryTick={setShowTickForSecondaryImageId}
+              onNavigateToShot={(shot) => {
+                console.log('[AddWithoutPosDebug] 🚀 onNavigateToShot called with:', shot?.name);
+                navigateToShot(shot, { scrollToTop: true });
+              }}
             />
           );
         })()}

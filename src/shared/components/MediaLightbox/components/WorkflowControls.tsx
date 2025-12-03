@@ -37,8 +37,9 @@ export interface WorkflowControlsProps {
   showTickForSecondaryImageId?: string | null;
   
   // Shot actions
-  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   
   // Optimistic updates
   onShowTick?: (imageId: string) => void;

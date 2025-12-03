@@ -37,8 +37,12 @@ export interface UseGenerationLineageReturn {
 export const useGenerationLineage = ({
   media,
 }: UseGenerationLineageProps): UseGenerationLineageReturn => {
+  // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+  // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
+  const actualGenerationId = (media as any).generation_id || media.id;
+  
   // Fetch derived items (both generations AND variants) - NEW UNIFIED
-  const { data: derivedItems, isLoading: isDerivedLoading } = useDerivedItems(media.id);
+  const { data: derivedItems, isLoading: isDerivedLoading } = useDerivedItems(actualGenerationId);
   const [derivedPage, setDerivedPage] = useState(1);
   const derivedPerPage = 6;
   const derivedTotalPages = derivedItems ? Math.ceil(derivedItems.length / derivedPerPage) : 0;

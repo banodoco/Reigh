@@ -114,7 +114,7 @@ interface ShotImagesEditorProps {
   allShots?: any[];
   onShotChange?: (shotId: string) => void;
   onAddToShot?: (shotId: string, generationId: string, position: number) => Promise<void>;
-  onAddToShotWithoutPosition?: (shotId: string, generationId: string) => Promise<void>;
+  onAddToShotWithoutPosition?: (shotId: string, generationId: string) => Promise<boolean>;
   onCreateShot?: (name: string) => Promise<string>;
 }
 
@@ -699,7 +699,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   }, [onDefaultPromptChange, clearAllEnhancedPrompts]);
 
   // Adapter functions to convert between ShotImageManager's signature and ShotEditor's signature
+  // CRITICAL FIX: Now receives targetShotId from the callback, not from props!
+  // This ensures the image is added to the shot the user SELECTED in the dropdown, not the shot being viewed
   const handleAddToShotAdapter = React.useCallback(async (
+    targetShotId: string,
     generationId: string,
     imageUrl?: string,
     thumbUrl?: string
@@ -707,50 +710,48 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     console.log('[ShotSelectorDebug] ShotImagesEditor handleAddToShotAdapter called', {
       component: 'ShotImagesEditor',
       hasOnAddToShot: !!onAddToShot,
-      selectedShotId: selectedShotId,
-      generationId: generationId?.substring(0, 8)
+      targetShotId: targetShotId?.substring(0, 8),
+      viewedShotId: selectedShotId?.substring(0, 8),
+      generationId: generationId?.substring(0, 8),
+      isDifferentShot: targetShotId !== selectedShotId
     });
 
-    if (!onAddToShot || !selectedShotId) {
-      console.warn('[ShotImagesEditor] Cannot add to shot: missing onAddToShot or selectedShotId');
+    if (!onAddToShot || !targetShotId) {
+      console.warn('[ShotImagesEditor] Cannot add to shot: missing onAddToShot or targetShotId');
       return false;
     }
 
     try {
-      // Calculate next available position for the target shot
-      // Get max position from current images
-      const maxPosition = images.reduce((max, img) => {
-        const pos = (img as any).timeline_frame ?? (img as any).position ?? 0;
-        return Math.max(max, pos);
-      }, -1);
-      const nextPosition = maxPosition + 1;
-
-      await onAddToShot(selectedShotId, generationId, nextPosition);
+      // Pass position as undefined to let the mutation calculate the correct position for the TARGET shot
+      // CRITICAL: We can't use `images` here because `images` are for the VIEWED shot, not the TARGET shot
+      await onAddToShot(targetShotId, generationId, undefined as any);
       return true;
     } catch (error) {
       console.error('[ShotImagesEditor] Error adding to shot:', error);
       return false;
     }
-  }, [onAddToShot, selectedShotId, images]);
+  }, [onAddToShot, selectedShotId]);
 
+  // CRITICAL FIX: Now receives targetShotId from the callback
   const handleAddToShotWithoutPositionAdapter = React.useCallback(async (
+    targetShotId: string,
     generationId: string,
     imageUrl?: string,
     thumbUrl?: string
   ): Promise<boolean> => {
-    if (!onAddToShotWithoutPosition || !selectedShotId) {
-      console.warn('[ShotImagesEditor] Cannot add to shot without position: missing handler or selectedShotId');
+    if (!onAddToShotWithoutPosition || !targetShotId) {
+      console.warn('[ShotImagesEditor] Cannot add to shot without position: missing handler or targetShotId');
       return false;
     }
 
     try {
-      await onAddToShotWithoutPosition(selectedShotId, generationId);
+      await onAddToShotWithoutPosition(targetShotId, generationId);
       return true;
     } catch (error) {
       console.error('[ShotImagesEditor] Error adding to shot without position:', error);
       return false;
     }
-  }, [onAddToShotWithoutPosition, selectedShotId]);
+  }, [onAddToShotWithoutPosition]);
 
   // [ShotNavPerf] Removed redundant render completion log - use STATE CHANGED log instead
 

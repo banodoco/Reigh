@@ -96,8 +96,12 @@ export const useGenerationName = ({
       isSubmittingRef.current = true;
       isDebouncingRef.current = false;
       
+      // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+      // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
+      const actualGenerationId = (media as any).generation_id || media.id;
+      
       updateGenerationNameMutation.mutate({ 
-        id: media.id, 
+        id: actualGenerationId, 
         name: newName 
       }, {
         onSuccess: () => console.log('[VariantName] ✅ Mutation success'),

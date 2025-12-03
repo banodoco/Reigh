@@ -106,8 +106,9 @@ interface MediaLightboxProps {
   allShots?: ShotOption[];
   selectedShotId?: string;
   onShotChange?: (shotId: string) => void;
-  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onDelete?: (id: string) => void;
   isDeleting?: string | null;
   onApplySettings?: (metadata: any) => void;
@@ -141,8 +142,8 @@ interface MediaLightboxProps {
   // Optimistic updates
   optimisticPositionedIds?: Set<string>;
   optimisticUnpositionedIds?: Set<string>;
-  onOptimisticPositioned?: (mediaId: string) => void;
-  onOptimisticUnpositioned?: (mediaId: string) => void;
+  onOptimisticPositioned?: (mediaId: string, shotId: string) => void;
+  onOptimisticUnpositioned?: (mediaId: string, shotId: string) => void;
   // Precomputed overrides from gallery source record
   positionedInSelectedShot?: boolean;
   associatedWithoutPositionInSelectedShot?: boolean;
@@ -328,8 +329,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Variants hook - fetch available variants for this generation
   // Moved early so activeVariant is available for edit hooks
+  // Uses actualGenerationId (defined above) which is the actual generations.id
+  // This is critical for Timeline/ShotImageManager where media.id is shot_generations.id
   const variantsHook = useVariants({
-    generationId: media.id,
+    generationId: actualGenerationId,
     enabled: true, // Always enabled to support variant display in DerivedGenerationsGrid
   });
   const {
@@ -680,9 +683,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // For segment videos (showVideoTrimEditor), hide the "Apply These Settings" button
   // For variants, show the variant's params instead of the original task
   const adjustedTaskDetailsData = useMemo(() => {
-    // If viewing a non-primary variant, create task data from the variant's params
-    if (activeVariant && !activeVariant.is_primary && activeVariant.params) {
-      const variantParams = activeVariant.params as Record<string, any>;
+    // Check if we're viewing a variant that was created by a task (has source_task_id in params)
+    // This applies to BOTH primary and non-primary variants
+    // Primary variants can also be task-created (e.g., upscaled image that became primary)
+    const variantParams = activeVariant?.params as Record<string, any> | undefined;
+    const isTaskCreatedVariant = activeVariant && variantParams && (
+      variantParams.source_task_id || 
+      variantParams.created_from ||
+      (activeVariant.variant_type && activeVariant.variant_type !== 'original')
+    );
+    
+    if (isTaskCreatedVariant && variantParams) {
+      console.log('[VariantTaskDetails] Showing task details for variant:', {
+        variantId: activeVariant.id?.substring(0, 8),
+        variantType: activeVariant.variant_type,
+        isPrimary: activeVariant.is_primary,
+        sourceTaskId: variantParams.source_task_id?.substring(0, 8),
+        createdFrom: variantParams.created_from,
+      });
       return {
         task: {
           id: activeVariant.id,
@@ -695,11 +713,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         error: null,
         inputImages: variantParams.image ? [variantParams.image] : [],
         taskId: variantParams.source_task_id || activeVariant.id,
-        // Don't allow applying settings from a variant
+        // Don't allow applying settings from a variant (use original generation's settings)
         onApplySettingsFromTask: undefined,
       };
     }
     
+    // For original variants or when no variant is selected, use the generation's task details
     if (!taskDetailsData) return undefined;
     if (!showVideoTrimEditor) return taskDetailsData;
     
@@ -1652,6 +1671,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       showTickForSecondaryImageId={showTickForSecondaryImageId}
                       onAddToShotWithoutPosition={onAddToShotWithoutPosition}
                       onShowTick={onShowTick}
+                      onShowSecondaryTick={onShowSecondaryTick}
                       contentRef={contentRef}
                       handleApplySettings={handleApplySettings}
                       onNavigateToShot={handleNavigateToShotFromSelector}
@@ -1786,7 +1806,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
 
                     {/* Split layout when variants available, otherwise full height for task details */}
-                    {variants && variants.length > 1 ? (
+                    {variants && variants.length >= 1 ? (
                       <div className="flex-1 flex flex-col min-h-0">
                         {/* Task details - top half, scrollable */}
                         <div className="flex-1 overflow-y-auto min-h-0">
@@ -2024,6 +2044,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       showTickForSecondaryImageId={showTickForSecondaryImageId}
                       onAddToShotWithoutPosition={onAddToShotWithoutPosition}
                       onShowTick={onShowTick}
+                      onShowSecondaryTick={onShowSecondaryTick}
                       contentRef={contentRef}
                       handleApplySettings={handleApplySettings}
                       onNavigateToShot={handleNavigateToShotFromSelector}
@@ -2101,7 +2122,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       {/* Top bar with Variants count (left) and Info/Edit Toggle + Close (right) - Sticky */}
                       <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
                         {/* Variants count - scrolls to variants section */}
-                        {variants && variants.length > 1 ? (
+                        {variants && variants.length >= 1 ? (
                           <button
                             onClick={() => variantsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
@@ -2174,7 +2195,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                     
                     {/* Variants section - below task details */}
-                    {variants && variants.length > 1 && (
+                    {variants && variants.length >= 1 && (
                       <div ref={variantsSectionRef} className="px-3 pb-2 -mt-2">
                         <VariantSelector
                           variants={variants}
@@ -2456,6 +2477,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     showTickForSecondaryImageId={showTickForSecondaryImageId}
                     onAddToShotWithoutPosition={onAddToShotWithoutPosition}
                     onShowTick={onShowTick}
+                    onShowSecondaryTick={onShowSecondaryTick}
                     contentRef={contentRef}
                     handleApplySettings={handleApplySettings}
                     onNavigateToShot={handleNavigateToShotFromSelector}

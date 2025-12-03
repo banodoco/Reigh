@@ -190,8 +190,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
 
   const hasRelationships = parentVariants.size > 0 || childVariants.size > 0;
 
-  // Don't show if only one variant
-  if (!isLoading && variants.length <= 1) {
+  // Don't show if no variants at all
+  if (!isLoading && variants.length === 0) {
     return null;
   }
 

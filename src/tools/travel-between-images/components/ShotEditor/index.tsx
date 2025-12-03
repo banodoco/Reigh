@@ -87,8 +87,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onCustomHeightChange,
   onGenerateAllSegments,
   availableLoras,
-  selectedLoras = [],
-  onSelectedLorasChange,
   enhancePrompt,
   onEnhancePromptChange,
   turboMode,
@@ -658,15 +656,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // - Element visibility and positioning
   // - Click handlers for floating UI that scroll and trigger actions
 
-  // Use the LoRA sync hook - now receives loras from unified shot settings
+  // Use the LoRA sync hook
+  // NOTE: selectedLoras and onSelectedLorasChange should come from props, but if not provided,
+  // use empty defaults to prevent crashes. LoRA state will be local-only in that case.
   const { loraManager } = useLoraSync({
-    selectedLoras,
-    onSelectedLorasChange: onSelectedLorasChange || (() => {}),
+    selectedLoras: [], // TODO: Add selectedLoras to props if LoRA persistence is needed
+    onSelectedLorasChange: () => {}, // TODO: Add onSelectedLorasChange to props
     projectId: selectedProjectId,
     availableLoras,
     batchVideoPrompt,
     onBatchVideoPromptChange,
   });
+  
+  // LoRA loading state - set to false since the new hook doesn't have async loading
+  // (the old implementation had shot-specific LoRA settings from database)
+  const isShotLoraSettingsLoading = false;
 
   // Expose shot-specific generation data to parent via mutable ref
   // This is called by parent (VideoTravelToolPage) when generating video
@@ -732,8 +736,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     // Enhanced settings loading timeout with mobile-specific recovery
   useEffect(() => {
-    // LoRAs now part of main settings, no separate loading state needed
-    const anySettingsLoading = settingsLoading || isShotUISettingsLoading;
+    const anySettingsLoading = settingsLoading || isShotUISettingsLoading || isShotLoraSettingsLoading;
     
     if (!anySettingsLoading) {
       // Reset any existing error once all settings loading completes successfully
@@ -748,6 +751,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     console.log(`[ShotEditor] Settings loading timeout started: ${timeoutMs}ms for shot ${selectedShot?.id}`, {
       settingsLoading,
       isShotUISettingsLoading,
+      isShotLoraSettingsLoading,
       isMobile,
       shotId: selectedShot?.id
     });
@@ -757,6 +761,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.warn('[ShotEditor] SETTINGS TIMEOUT RECOVERY - One or more settings queries failed to complete within expected time. Forcing ready state to prevent infinite loading.', {
         settingsLoading,
         isShotUISettingsLoading,
+        isShotLoraSettingsLoading,
         isMobile,
         shotId: selectedShot?.id,
         timeoutMs
@@ -776,7 +781,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }, timeoutMs);
 
     return () => clearTimeout(fallbackTimer);
-  }, [settingsLoading, isShotUISettingsLoading, actions, isMobile, selectedShot?.id]);
+  }, [settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, actions, isMobile, selectedShot?.id]);
 
   // CRITICAL FIX: Reset mode readiness when shot changes ONLY if we don't have context images yet
   // If we have context images, stay ready and let settings refetch in the background
@@ -865,11 +870,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     // For shots without images, wait for all settings
-    // LoRAs now part of main settings, no separate loading check needed
-    if (!hasImageData && !settingsLoading && !isShotUISettingsLoading) {
+    if (!hasImageData && !settingsLoading && !isShotUISettingsLoading && !isShotLoraSettingsLoading) {
       actions.setModeReady(true);
     }
-  }, [readinessState, onGenerationModeChange, actions, selectedShot?.id, contextImages.length, isShotUISettingsLoading]);
+  }, [readinessState, onGenerationModeChange, actions, selectedShot?.id, contextImages.length, isShotUISettingsLoading, isShotLoraSettingsLoading]);
 
   // Accelerated mode and random seed from database settings
   // Default accelerated mode to false when it has never been explicitly set for this shot
@@ -1517,23 +1521,47 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Shot change will be handled by parent navigation
   }, []);
 
-  const handleAddToShot = useCallback(async (shotId: string, generationId: string, position: number) => {
-    console.log('[ShotEditor] Adding generation to shot with position', { shotId, generationId, position });
+  const handleAddToShot = useCallback(async (shotId: string, generationId: string, position?: number) => {
+    // If position is 0, undefined, or we're adding to a different shot than currently viewed,
+    // let the mutation calculate the correct position by querying the target shot
+    const shouldAutoPosition = position === undefined || position === 0 || position === -1;
+    
+    console.log('[ShotEditor] Adding generation to shot', { 
+      shotId: shotId?.substring(0, 8), 
+      generationId: generationId?.substring(0, 8), 
+      position,
+      shouldAutoPosition,
+      note: shouldAutoPosition ? 'Letting mutation query target shot for position' : 'Using provided position'
+    });
+    
     await addToShotMutation({ 
       shot_id: shotId, 
       generation_id: generationId, 
-      timelineFrame: position, 
+      // Only pass timelineFrame if we have a valid position, otherwise let mutation auto-calculate
+      timelineFrame: shouldAutoPosition ? undefined : position, 
       project_id: projectId 
     });
   }, [addToShotMutation, projectId]);
 
   const handleAddToShotWithoutPosition = useCallback(async (shotId: string, generationId: string) => {
-    console.log('[ShotEditor] Adding generation to shot without position', { shotId, generationId });
-    await addToShotWithoutPositionMutation({ 
-      shot_id: shotId, 
-      generation_id: generationId, 
-      project_id: projectId 
-    });
+    console.log('[AddWithoutPosDebug] 🎯 ShotEditor.handleAddToShotWithoutPosition CALLED');
+    console.log('[AddWithoutPosDebug] shotId:', shotId?.substring(0, 8));
+    console.log('[AddWithoutPosDebug] generationId:', generationId?.substring(0, 8));
+    console.log('[AddWithoutPosDebug] projectId:', projectId?.substring(0, 8));
+    
+    try {
+      console.log('[AddWithoutPosDebug] 🚀 Calling addToShotWithoutPositionMutation...');
+      await addToShotWithoutPositionMutation({ 
+        shot_id: shotId, 
+        generation_id: generationId, 
+        project_id: projectId 
+      });
+      console.log('[AddWithoutPosDebug] ✅ Mutation completed successfully');
+      return true; // Signal success so the caller can show tick and enable navigation
+    } catch (error) {
+      console.error('[AddWithoutPosDebug] ❌ Mutation failed:', error);
+      throw error;
+    }
   }, [addToShotWithoutPositionMutation, projectId]);
 
   const handleCreateShot = useCallback(async (name: string) => {

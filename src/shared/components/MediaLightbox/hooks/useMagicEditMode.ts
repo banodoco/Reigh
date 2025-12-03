@@ -207,6 +207,10 @@ export const useMagicEditMode = ({
         console.log('[VariantRelationship] effectiveImageUrl:', effectiveImageUrl?.substring(0, 60));
         console.log('[VariantRelationship] isEditingFromVariant:', !!activeVariantId);
         
+        // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+        // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
+        const actualGenerationId = (media as any).generation_id || media.id;
+        
         const batchParams = {
           project_id: selectedProjectId,
           prompt,
@@ -218,7 +222,7 @@ export const useMagicEditMode = ({
           shot_id: currentShotId || undefined,
           tool_type: toolTypeOverride,
           loras: editModeLoRAs,
-          based_on: media.id, // Track source generation for lineage
+          based_on: actualGenerationId, // Track source generation for lineage (must be generations.id, not shot_generations.id)
           source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
         };
         

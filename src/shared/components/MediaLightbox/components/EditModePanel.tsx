@@ -412,7 +412,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         </Button>
       
       {/* Variants Section */}
-      {variants && variants.length > 1 && onVariantSelect && (
+      {variants && variants.length >= 1 && onVariantSelect && (
         <div className="border-t border-border pt-4 mt-4">
           <VariantSelector
             variants={variants}

@@ -33,8 +33,9 @@ export interface ImageGalleryLightboxProps {
   simplifiedShotOptions: { id: string; name: string }[];
   selectedShotIdLocal: string;
   onShotChange: (shotId: string) => void;
-  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   
   // UI state
   showTickForImageId: string | null;

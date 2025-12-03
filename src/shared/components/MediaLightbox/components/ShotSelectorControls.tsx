@@ -28,8 +28,9 @@ export interface ShotSelectorControlsProps {
   showTickForSecondaryImageId?: string | null;
   
   // Shot actions
-  onAddToShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShot: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   
   // Optimistic updates
   onShowTick?: (imageId: string) => void;
@@ -84,17 +85,59 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
   isAddingWithoutPosition = false,
 }) => {
   // Handle add without position
+  // CRITICAL: Pass selectedShotId (the dropdown value) as targetShotId
   const handleAddWithoutPosition = async () => {
-    if (!onAddToShotWithoutPosition || !selectedShotId) return;
+    console.log('[AddWithoutPosDebug] 1️⃣ handleAddWithoutPosition CALLED');
+    console.log('[AddWithoutPosDebug] selectedShotId:', selectedShotId);
+    console.log('[AddWithoutPosDebug] mediaId:', mediaId);
+    console.log('[AddWithoutPosDebug] hasOnAddToShotWithoutPosition:', !!onAddToShotWithoutPosition);
+    
+    if (!selectedShotId) {
+      console.log('[AddWithoutPosDebug] ❌ No selectedShotId, returning early');
+      return;
+    }
+
+    // Check if we should jump instead of add
+    const isAlreadyAdded = isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === mediaId;
+    
+    console.log('[AddWithoutPosDebug] 2️⃣ State check:');
+    console.log('[AddWithoutPosDebug] isAlreadyAssociatedWithoutPosition:', isAlreadyAssociatedWithoutPosition);
+    console.log('[AddWithoutPosDebug] showTickForSecondaryImageId:', showTickForSecondaryImageId);
+    console.log('[AddWithoutPosDebug] isAlreadyAdded:', isAlreadyAdded);
+    console.log('[AddWithoutPosDebug] hasOnNavigateToShot:', !!onNavigateToShot);
+
+    if (isAlreadyAdded) {
+      console.log('[AddWithoutPosDebug] 3️⃣ Already added - will navigate');
+      if (onNavigateToShot) {
+        const targetShot = allShots.find(s => s.id === selectedShotId);
+        console.log('[AddWithoutPosDebug] Navigating to shot:', targetShot?.name);
+        if (targetShot) {
+          onNavigateToShot(targetShot);
+        }
+      }
+      return;
+    }
+
+    if (!onAddToShotWithoutPosition) {
+      console.log('[AddWithoutPosDebug] ❌ No onAddToShotWithoutPosition callback, returning');
+      return;
+    }
     
     try {
-      const success = await onAddToShotWithoutPosition(mediaId, imageUrl, thumbUrl);
+      console.log('[AddWithoutPosDebug] 4️⃣ Calling onAddToShotWithoutPosition...');
+      console.log('[AddWithoutPosDebug] Args: shotId=', selectedShotId?.substring(0, 8), ', mediaId=', mediaId?.substring(0, 8));
+      const success = await onAddToShotWithoutPosition(selectedShotId, mediaId, imageUrl, thumbUrl);
+      console.log('[AddWithoutPosDebug] 5️⃣ onAddToShotWithoutPosition returned:', success);
       if (success) {
+        console.log('[AddWithoutPosDebug] 6️⃣ Success! Calling onShowSecondaryTick');
+        console.log('[AddWithoutPosDebug] hasOnShowSecondaryTick:', !!onShowSecondaryTick);
         onShowSecondaryTick?.(mediaId);
         onOptimisticUnpositioned?.(mediaId, selectedShotId);
+      } else {
+        console.log('[AddWithoutPosDebug] ⚠️ Success was falsy:', success);
       }
     } catch (error) {
-      console.error('[ShotSelectorControls] Error adding without position:', error);
+      console.error('[AddWithoutPosDebug] ❌ Error adding without position:', error);
     }
   };
 
@@ -121,36 +164,49 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
         buttonClassName="h-8 w-8"
       />
 
-      {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleAddWithoutPosition}
-              disabled={!selectedShotId || isAddingWithoutPosition}
-              className={`h-8 px-3 text-white ${
-                isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === mediaId
-                  ? 'bg-green-600/80 hover:bg-green-600'
-                  : 'bg-purple-600/80 hover:bg-purple-600'
-              }`}
-            >
-              {isAddingWithoutPosition ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
-              ) : isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === mediaId ? (
-                <CheckCircle className="h-4 w-4" />
-              ) : (
-                <PlusCircle className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="z-[100001]">
-            {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === mediaId
-              ? 'Added without position. Jump to shot.'
-              : 'Add to shot without position'}
-          </TooltipContent>
-        </Tooltip>
-      )}
+      {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (() => {
+        const isShowingTick = isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === mediaId;
+        const isDisabled = !selectedShotId || isAddingWithoutPosition;
+        
+        console.log('[AddWithoutPosDebug] 🔘 Button render state:');
+        console.log('[AddWithoutPosDebug] showTickForSecondaryImageId:', showTickForSecondaryImageId);
+        console.log('[AddWithoutPosDebug] mediaId:', mediaId?.substring(0, 8));
+        console.log('[AddWithoutPosDebug] isAlreadyAssociatedWithoutPosition:', isAlreadyAssociatedWithoutPosition);
+        console.log('[AddWithoutPosDebug] isShowingTick:', isShowingTick);
+        console.log('[AddWithoutPosDebug] isDisabled:', isDisabled);
+        console.log('[AddWithoutPosDebug] isAddingWithoutPosition:', isAddingWithoutPosition);
+        
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleAddWithoutPosition}
+                disabled={isDisabled}
+                className={`h-8 px-3 text-white ${
+                  isShowingTick
+                    ? 'bg-green-600/80 hover:bg-green-600'
+                    : 'bg-purple-600/80 hover:bg-purple-600'
+                }`}
+              >
+                {isAddingWithoutPosition ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                ) : isShowingTick ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : (
+                  <PlusCircle className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="z-[100001]">
+              {isShowingTick
+                ? 'Added without position. Jump to shot.'
+                : 'Add to shot without position'}
+            </TooltipContent>
+          </Tooltip>
+        );
+      })()}
     </>
   );
 };

@@ -25,7 +25,7 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
   
   console.log('[DataTrace] 🎯 ShotImageManager received props.images:', {
     count: props.images?.length || 0,
-    imageIds: props.images?.map(img => img.id?.substring(0, 8)) || [], // shot_generations.id
+    imageIds: props.images?.map(img => ((img as any).shotImageEntryId ?? (img as any).id)?.substring(0, 8)) || [],
   });
   
   // ============================================================================

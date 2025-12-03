@@ -17,8 +17,9 @@ export interface UseShotPositioningProps {
   optimisticUnpositionedIds?: Set<string>;
   onNavigateToShot?: (shot: Shot) => void;
   onClose: () => void;
-  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onShowTick?: (imageId: string) => void;
   onShowSecondaryTick?: (imageId: string) => void;
   onOptimisticPositioned?: (mediaId: string, shotId: string) => void;
@@ -54,6 +55,21 @@ export const useShotPositioning = ({
   onOptimisticUnpositioned,
 }: UseShotPositioningProps): UseShotPositioningReturn => {
   const { navigateToShot } = useShotNavigation();
+  
+  // [OptimisticDebug] Log what callbacks we received
+  useEffect(() => {
+    console.log('[OptimisticDebug] [Lightbox] useShotPositioning received callbacks:', {
+      hasOnOptimisticPositioned: !!onOptimisticPositioned,
+      callbackType: typeof onOptimisticPositioned,
+      hasOnOptimisticUnpositioned: !!onOptimisticUnpositioned,
+      optimisticPositionedIdsSize: optimisticPositionedIds?.size || 0,
+      timestamp: Date.now()
+    });
+  }, [onOptimisticPositioned, onOptimisticUnpositioned, optimisticPositionedIds]);
+  
+  // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+  // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
+  const actualGenerationId = (media as any).generation_id || media.id;
 
   const isAlreadyPositionedInSelectedShot = useMemo(() => {
     if (!selectedShotId || !media.id) return false;
@@ -75,24 +91,12 @@ export const useShotPositioning = ({
     // Simple keys mean "added to SOME shot" but we don't know which one, so they're ambiguous.
     // Only use simple keys as a last resort if we can't determine shot-specific state.
     
-    // Only use override if optimistic state is empty (no recent changes)
-    // BUT verify the override matches the selected shot by checking media's actual shot associations
+    // Trust the override from parent component (ShotImageManagerDesktop)
+    // The parent already verified the media is in the selected shot using props.shotId comparison
+    // Don't re-verify using media.shot_id since the image objects may not have shot_id populated
     if (typeof positionedInSelectedShot === 'boolean') {
-      // Verify media is actually associated with the selected shot
-      const allShotAssociations = (media as any).all_shot_associations;
-      let mediaIsInSelectedShot = false;
-      if ((media as any).shot_id === selectedShotId) {
-        mediaIsInSelectedShot = true;
-      } else if (allShotAssociations && Array.isArray(allShotAssociations)) {
-        mediaIsInSelectedShot = allShotAssociations.some(
-          (assoc: any) => assoc.shot_id === selectedShotId
-        );
-      }
-      
-      // Only trust override if media is actually in the selected shot
-      // If override says true but media isn't in selected shot, ignore it (override is stale/wrong)
-      const shouldTrustOverride = positionedInSelectedShot && mediaIsInSelectedShot;
-      return shouldTrustOverride ? positionedInSelectedShot : false;
+      console.log('[AddToShotDebug] useShotPositioning using positionedInSelectedShot override:', positionedInSelectedShot);
+      return positionedInSelectedShot;
     }
     
     // Check if this media is positioned in the selected shot
@@ -173,6 +177,7 @@ export const useShotPositioning = ({
     const thumbUrl = (media as any).thumbnail_url || media.thumbUrl || imageUrl;
     
     console.log('[ShotNavDebug] [MediaLightbox] Calling onAddToShot', {
+      targetShotId: selectedShotId,
       mediaId: media?.id,
       imageUrl: (imageUrl || '').slice(0, 120),
       thumbUrl: (thumbUrl || '').slice(0, 120),
@@ -185,12 +190,14 @@ export const useShotPositioning = ({
       },
       timestamp: Date.now()
     });
-    const success = await onAddToShot(media.id, imageUrl, thumbUrl);
-    console.log('[ShotNavDebug] [MediaLightbox] onAddToShot result', { success, timestamp: Date.now() });
+    // CRITICAL: Pass selectedShotId (the dropdown value) as targetShotId
+    // Use actualGenerationId (generations.id) not media.id (which might be shot_generations.id)
+    const success = await onAddToShot(selectedShotId, actualGenerationId, imageUrl, thumbUrl);
+    console.log('[ShotNavDebug] [MediaLightbox] onAddToShot result', { success, targetShotId: selectedShotId, timestamp: Date.now() });
     if (success) {
-      onShowTick?.(media.id);
+      onShowTick?.(actualGenerationId);
       // Pass selectedShotId so optimistic state can use composite keys (mediaId:shotId)
-      onOptimisticPositioned?.(media.id, selectedShotId);
+      onOptimisticPositioned?.(actualGenerationId, selectedShotId);
       console.log('[ShotNavDebug] [MediaLightbox] Positioned optimistic + tick applied', {
         mediaId: media?.id,
         timestamp: Date.now()
@@ -290,17 +297,20 @@ export const useShotPositioning = ({
     const thumbUrl = (media as any).thumbnail_url || media.thumbUrl || imageUrl;
     
     console.log('[ShotNavDebug] [MediaLightbox] Calling onAddToShotWithoutPosition', {
+      targetShotId: selectedShotId,
       mediaId: media?.id,
       imageUrl: (imageUrl || '').slice(0, 120),
       thumbUrl: (thumbUrl || '').slice(0, 120),
       timestamp: Date.now()
     });
-    const success = await onAddToShotWithoutPosition(media.id, imageUrl, thumbUrl);
-    console.log('[ShotNavDebug] [MediaLightbox] onAddToShotWithoutPosition result', { success, timestamp: Date.now() });
+    // CRITICAL: Pass selectedShotId (the dropdown value) as targetShotId
+    // Use actualGenerationId (generations.id) not media.id (which might be shot_generations.id)
+    const success = await onAddToShotWithoutPosition(selectedShotId, actualGenerationId, imageUrl, thumbUrl);
+    console.log('[ShotNavDebug] [MediaLightbox] onAddToShotWithoutPosition result', { success, targetShotId: selectedShotId, timestamp: Date.now() });
     if (success) {
-      onShowSecondaryTick?.(media.id);
+      onShowSecondaryTick?.(actualGenerationId);
       // Pass selectedShotId so optimistic state can use composite keys (mediaId:shotId)
-      onOptimisticUnpositioned?.(media.id, selectedShotId);
+      onOptimisticUnpositioned?.(actualGenerationId, selectedShotId);
       console.log('[ShotNavDebug] [MediaLightbox] Unpositioned optimistic + tick applied', {
         mediaId: media?.id,
         timestamp: Date.now()

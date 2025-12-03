@@ -1840,11 +1840,15 @@ export const useInpainting = ({
       const sourceUrl = (media as any).url || media.location || media.imageUrl;
 
       // Create inpaint task
+      // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+      // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
+      const actualGenerationId = (media as any).generation_id || media.id;
+      
       console.log('[InpaintDebug] 📤 About to call createImageInpaintTask with:', {
         project_id: selectedProjectId?.substring(0, 8),
         shot_id: shotId?.substring(0, 8),
         tool_type: toolTypeOverride,
-        generation_id: media.id.substring(0, 8),
+        generation_id: actualGenerationId.substring(0, 8),
         prompt: inpaintPrompt.substring(0, 30)
       });
       
@@ -1854,7 +1858,7 @@ export const useInpainting = ({
         mask_url: maskUrl,
         prompt: inpaintPrompt,
         num_generations: inpaintNumGenerations,
-        generation_id: media.id,
+        generation_id: actualGenerationId, // Must be generations.id, not shot_generations.id
         shot_id: shotId, // Pass shot_id so complete_task can link results to the shot
         tool_type: toolTypeOverride, // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
@@ -1970,11 +1974,15 @@ export const useInpainting = ({
       const sourceUrl = (media as any).url || media.location || media.imageUrl;
 
       // Create annotated image edit task
+      // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+      // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
+      const actualGenerationIdForAnnotate = (media as any).generation_id || media.id;
+      
       console.log('[AnnotatedEdit] 📤 About to call createAnnotatedImageEditTask with:', {
         project_id: selectedProjectId?.substring(0, 8),
         shot_id: shotId?.substring(0, 8),
         tool_type: toolTypeOverride,
-        generation_id: media.id.substring(0, 8),
+        generation_id: actualGenerationIdForAnnotate.substring(0, 8),
         prompt: inpaintPrompt.substring(0, 30)
       });
       
@@ -1984,7 +1992,7 @@ export const useInpainting = ({
         mask_url: maskUrl,
         prompt: inpaintPrompt,
         num_generations: inpaintNumGenerations,
-        generation_id: media.id,
+        generation_id: actualGenerationIdForAnnotate, // Must be generations.id, not shot_generations.id
         shot_id: shotId, // Pass shot_id so complete_task can link results to the shot
         tool_type: toolTypeOverride, // Override tool_type if provided
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)

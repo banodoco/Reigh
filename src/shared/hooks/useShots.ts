@@ -857,8 +857,9 @@ export const useAddImageToShot = () => {
   });
 };
 
-// Add image to shot WITHOUT position logic (let caller handle it)
-// Useful for drag and drop reordering where we calculate position client-side first
+// Add image to shot WITHOUT position (associates the image but doesn't place it on timeline)
+// This creates a shot_generations record with timeline_frame = null
+// The image appears in the shot's "unpositioned" section until user places it on timeline
 export const useAddImageToShotWithoutPosition = () => {
   const queryClient = useQueryClient();
   
@@ -876,60 +877,47 @@ export const useAddImageToShotWithoutPosition = () => {
       imageUrl?: string;
       thumbUrl?: string;
     }) => {
-      // This mutation does NOT add to shot_generations table
-      // It assumes the caller will handle the database insert or it's part of a batch op
-      // But for consistency with existing code, we probably DO want it to insert, 
-      // just without the auto-position calculation logic.
-      
-      // Actually, looking at usage, it seems we often want to add it but let the UI
-      // determine the position later or use a default.
-      // If we insert with NULL position, it might break order.
-      // Let's assume we insert at end for now if this is called directly.
-      
-      // Wait, if this is "WithoutPosition", maybe it means "don't calculate, just insert"
-      // But we need a position for the unique constraint usually? 
-      // Ah, timeline_frame is nullable in some schemas or handled differently?
-      // In this codebase, timeline_frame seems important.
-      
-      // Let's implement it as "Insert at 0 or specified if provided in separate call"
-      // But typically "WithoutPosition" implies just linking them.
-      
-      // Get all existing frames for collision detection
-      const { data: existingGens } = await supabase
-        .from('shot_generations')
-        .select('timeline_frame')
-        .eq('shot_id', shot_id)
-        .not('timeline_frame', 'is', null);
-      
-      const existingFrames = (existingGens || [])
-        .map(g => g.timeline_frame)
-        .filter((f): f is number => f != null && f !== -1);
-      
-      // Calculate next frame with collision detection
-      const maxFrame = existingFrames.length > 0 ? Math.max(...existingFrames) : -60;
-      let nextFrame = maxFrame + 60;
-      
-      // Ensure unique (shouldn't be needed for append, but safety check)
-      while (existingFrames.includes(nextFrame)) {
-        nextFrame += 1;
-      }
+      console.log('[AddWithoutPosDebug] 💾 MUTATION FUNCTION CALLED');
+      console.log('[AddWithoutPosDebug] shot_id:', shot_id?.substring(0, 8));
+      console.log('[AddWithoutPosDebug] generation_id:', generation_id?.substring(0, 8));
+      console.log('[AddWithoutPosDebug] project_id:', project_id?.substring(0, 8));
 
+      console.log('[AddWithoutPosDebug] 📝 Inserting into shot_generations with timeline_frame: null');
+      
       const { data, error } = await supabase
         .from('shot_generations')
         .insert({
           shot_id,
           generation_id,
-          timeline_frame: nextFrame
+          timeline_frame: null  // No position - will show in "unpositioned" section
         })
         .select()
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error('[AddWithoutPosDebug] ❌ Supabase insert error:', error);
+        console.error('[AddWithoutPosDebug] Error code:', error.code);
+        console.error('[AddWithoutPosDebug] Error message:', error.message);
+        console.error('[AddWithoutPosDebug] Error details:', error.details);
+        throw error;
+      }
+      
+      console.log('[AddWithoutPosDebug] ✅ Insert successful!');
+      console.log('[AddWithoutPosDebug] Inserted row id:', data.id?.substring(0, 8));
+      console.log('[AddWithoutPosDebug] timeline_frame:', data.timeline_frame);
+      
       return { ...data, project_id, imageUrl, thumbUrl };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
+      console.log('[AddWithoutPosDebug] 🎉 onSuccess callback fired');
+      console.log('[AddWithoutPosDebug] Invalidating queries for project:', variables.project_id?.substring(0, 8));
       // Don't invalidate all-shot-generations - realtime will handle it
       queryClient.invalidateQueries({ queryKey: ['shots', variables.project_id] });
+    },
+    onError: (error, variables) => {
+      console.error('[AddWithoutPosDebug] 💥 onError callback fired');
+      console.error('[AddWithoutPosDebug] Error:', error);
+      console.error('[AddWithoutPosDebug] Variables:', variables);
     }
   });
 };
@@ -1147,6 +1135,7 @@ export const useUpdateShotImageOrder = () => {
 
 // Position an existing generation that already has NULL position in a shot
 // Used when viewing a shot with "Exclude items with a position" filter and adding one of those unpositioned items
+// Uses add_generation_to_shot with p_with_position=true (replaces deprecated position_existing_generation_in_shot)
 export const usePositionExistingGenerationInShot = () => {
   const queryClient = useQueryClient();
 
@@ -1160,10 +1149,13 @@ export const usePositionExistingGenerationInShot = () => {
       generation_id: string; 
       project_id: string;
     }) => {
+      // Use add_generation_to_shot with p_with_position=true to assign a position
+      // to an existing generation that has NULL timeline_frame
       const { data, error } = await supabase
-        .rpc('position_existing_generation_in_shot', {
+        .rpc('add_generation_to_shot', {
           p_shot_id: shot_id,
-          p_generation_id: generation_id
+          p_generation_id: generation_id,
+          p_with_position: true
         });
 
       if (error) throw error;

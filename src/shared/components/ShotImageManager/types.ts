@@ -26,8 +26,9 @@ export interface ShotImageManagerProps {
   allShots?: Array<{ id: string; name: string }>;
   selectedShotId?: string;
   onShotChange?: (shotId: string) => void;
-  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
+  onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
   // Pair prompt props
   onPairClick?: (pairIndex: number, pairData: any) => void;
@@ -35,7 +36,6 @@ export interface ShotImageManagerProps {
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
-  onClearEnhancedPrompt?: (pairIndex: number) => void;
 }
 
 export interface DerivedNavContext {
@@ -71,7 +71,6 @@ export interface BaseShotImageManagerProps {
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
-  onClearEnhancedPrompt?: (pairIndex: number) => void;
 }
 
 export interface MobileImageItemProps {

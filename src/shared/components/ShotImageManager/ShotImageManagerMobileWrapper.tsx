@@ -27,6 +27,30 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
   setLightboxSelectedShotId,
   ...props
 }) => {
+  // State for showing success tick after adding to shot (positioned)
+  const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
+  // State for showing success tick after adding to shot (without position)
+  const [showTickForSecondaryImageId, setShowTickForSecondaryImageId] = useState<string | null>(null);
+  
+  // Clear ticks after 3 seconds
+  useEffect(() => {
+    if (showTickForImageId) {
+      const timer = setTimeout(() => {
+        setShowTickForImageId(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showTickForImageId]);
+  
+  useEffect(() => {
+    if (showTickForSecondaryImageId) {
+      const timer = setTimeout(() => {
+        setShowTickForSecondaryImageId(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showTickForSecondaryImageId]);
+  
   // Debug: Log props received
   console.log('[ShotSelectorDebug] ShotImageManagerMobileWrapper received props', {
     component: 'ShotImageManagerMobileWrapper',
@@ -50,9 +74,12 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
   });
 
   // Fetch task details for current lightbox image
-  const currentLightboxImageId = lightbox.lightboxIndex !== null 
-    ? lightbox.currentImages[lightbox.lightboxIndex]?.id 
+  // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
+  // For ShotImageManager, id is shot_generations.id but generation_id is the actual generation ID
+  const currentLightboxImage = lightbox.lightboxIndex !== null 
+    ? lightbox.currentImages[lightbox.lightboxIndex] 
     : null;
+  const currentLightboxImageId = (currentLightboxImage as any)?.generation_id || currentLightboxImage?.id || null;
   const { taskDetailsData } = useTaskDetails({ generationId: currentLightboxImageId });
   
   // Detect tablet/iPad size for task details
@@ -231,6 +258,10 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
             onCreateShot={props.onCreateShot}
             positionedInSelectedShot={positionedInSelectedShot}
             associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
+            showTickForImageId={showTickForImageId}
+            onShowTick={setShowTickForImageId}
+            showTickForSecondaryImageId={showTickForSecondaryImageId}
+            onShowSecondaryTick={setShowTickForSecondaryImageId}
           />
         );
       })()}
