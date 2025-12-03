@@ -45,6 +45,7 @@ export interface UseInpaintingReturn {
   editMode: 'text' | 'inpaint' | 'annotate';
   annotationMode: 'rectangle' | null;
   selectedShapeId: string | null;
+  showTextModeHint: boolean;
   setIsInpaintMode: React.Dispatch<React.SetStateAction<boolean>>;
   setInpaintPrompt: (prompt: string) => void;
   setInpaintNumGenerations: (num: number) => void;

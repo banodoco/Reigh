@@ -33,3 +33,23 @@ export type { LoraMode } from './useEditModeLoRAs';
 export { useSourceGeneration } from './useSourceGeneration';
 export { useLayoutMode } from './useLayoutMode';
 export { useMagicEditMode } from './useMagicEditMode';
+
+// New edit settings persistence hooks
+export { useGenerationEditSettings } from './useGenerationEditSettings';
+export type { 
+  GenerationEditSettings, 
+  UseGenerationEditSettingsReturn,
+  EditMode,
+} from './useGenerationEditSettings';
+
+export { useLastUsedEditSettings } from './useLastUsedEditSettings';
+export type { 
+  LastUsedEditSettings, 
+  UseLastUsedEditSettingsReturn,
+} from './useLastUsedEditSettings';
+
+export { useEditSettingsPersistence } from './useEditSettingsPersistence';
+export type { 
+  UseEditSettingsPersistenceProps, 
+  UseEditSettingsPersistenceReturn,
+} from './useEditSettingsPersistence';

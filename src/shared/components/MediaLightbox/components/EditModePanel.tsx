@@ -35,7 +35,7 @@ export interface EditModePanelProps {
   inpaintNumGenerations: number;
   setInpaintNumGenerations: (value: number) => void;
   
-  // Lora Mode
+  // LoRA Mode
   loraMode: LoraMode;
   setLoraMode: (mode: LoraMode) => void;
   customLoraUrl: string;
@@ -297,12 +297,12 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           />
         </div>
         
-        {/* Lora Mode & Number of Generations */}
+        {/* LoRA & Number of Generations */}
         <div className={`flex ${isMobile ? 'flex-col gap-3' : 'gap-4'}`}>
-          {/* Lora Mode Selector */}
+          {/* LoRA Selector */}
           <div className={cn(isMobile ? "" : "flex-1")}>
             <div className="flex items-center gap-3">
-              <label className={`${labelSize} font-medium whitespace-nowrap`}>Lora Mode</label>
+              <label className={`${labelSize} font-medium whitespace-nowrap`}>LoRA</label>
               <div className="flex items-center gap-1 flex-1">
                 <Select value={loraMode} onValueChange={setLoraMode}>
                   <SelectTrigger className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>

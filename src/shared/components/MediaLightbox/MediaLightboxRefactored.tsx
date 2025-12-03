@@ -41,6 +41,7 @@ import {
   useSourceGeneration,
   useLayoutMode,
   useMagicEditMode,
+  useEditSettingsPersistence,
 } from './hooks';
 
 // Import all extracted components
@@ -324,8 +325,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     canvasRef,
   } = imageFlipHook;
 
-  // Edit Mode LoRAs hook
-  const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, loraMode, setLoraMode, customLoraUrl, setCustomLoraUrl, editModeLoRAs } = useEditModeLoRAs();
+  // Edit Settings Persistence hook - manages LoRA mode, prompt, numGenerations with persistence
+  const editSettingsPersistence = useEditSettingsPersistence({
+    generationId: actualGenerationId,
+    projectId: selectedProjectId,
+  });
+  const { 
+    loraMode, 
+    setLoraMode, 
+    customLoraUrl, 
+    setCustomLoraUrl, 
+    editModeLoRAs,
+    isInSceneBoostEnabled,
+    setIsInSceneBoostEnabled,
+    // These will be synced with useInpainting
+    editMode: persistedEditMode,
+    numGenerations: persistedNumGenerations,
+    prompt: persistedPrompt,
+    setEditMode: setPersistedEditMode,
+    setNumGenerations: setPersistedNumGenerations,
+    setPrompt: setPersistedPrompt,
+    isLoading: isLoadingEditSettings,
+    isReady: isEditSettingsReady,
+    hasPersistedSettings,
+  } = editSettingsPersistence;
 
   // Variants hook - fetch available variants for this generation
   // Moved early so activeVariant is available for edit hooks
@@ -428,6 +451,107 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleToggleFreeForm,
     getDeleteButtonPosition,
   } = inpaintingHook;
+  
+  // ============================================
+  // Sync persisted settings with useInpainting
+  // ============================================
+  
+  // Track if we've synced initial values from persistence to inpainting
+  const hasInitializedFromPersistenceRef = useRef(false);
+  const lastSyncedGenerationIdRef = useRef<string | null>(null);
+  
+  // Reset sync tracking when generation changes
+  useEffect(() => {
+    if (actualGenerationId !== lastSyncedGenerationIdRef.current) {
+      hasInitializedFromPersistenceRef.current = false;
+      lastSyncedGenerationIdRef.current = actualGenerationId;
+    }
+  }, [actualGenerationId]);
+  
+  // Initialize inpainting state from persisted/lastUsed settings (once per generation)
+  // IMPORTANT: Wait for isEditSettingsReady to ensure effective values are computed correctly
+  useEffect(() => {
+    if (
+      isEditSettingsReady && 
+      !hasInitializedFromPersistenceRef.current &&
+      actualGenerationId
+    ) {
+      hasInitializedFromPersistenceRef.current = true;
+      
+      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: Applying settings to inpainting state');
+      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: generationId:', actualGenerationId.substring(0, 8));
+      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: hasPersistedSettings:', hasPersistedSettings);
+      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: persistedEditMode:', persistedEditMode);
+      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: persistedNumGenerations:', persistedNumGenerations);
+      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: persistedPrompt:', persistedPrompt ? `"${persistedPrompt.substring(0, 30)}..."` : '(empty)');
+      
+      // Sync edit mode
+      if (persistedEditMode && persistedEditMode !== editMode) {
+        console.log('[EditSettingsPersist] 🔄 SYNC TO UI: Setting editMode from', editMode, 'to', persistedEditMode);
+        setEditMode(persistedEditMode);
+      }
+      
+      // Sync numGenerations
+      if (persistedNumGenerations && persistedNumGenerations !== inpaintNumGenerations) {
+        console.log('[EditSettingsPersist] 🔄 SYNC TO UI: Setting numGenerations from', inpaintNumGenerations, 'to', persistedNumGenerations);
+        setInpaintNumGenerations(persistedNumGenerations);
+      }
+      
+      // Sync prompt (only if has persisted settings - otherwise leave empty)
+      if (hasPersistedSettings && persistedPrompt && persistedPrompt !== inpaintPrompt) {
+        console.log('[EditSettingsPersist] 🔄 SYNC TO UI: Setting prompt');
+        setInpaintPrompt(persistedPrompt);
+      }
+    }
+  }, [
+    isEditSettingsReady, 
+    actualGenerationId, 
+    hasPersistedSettings,
+    persistedEditMode, 
+    persistedNumGenerations, 
+    persistedPrompt,
+    editMode,
+    inpaintNumGenerations,
+    inpaintPrompt,
+    setEditMode,
+    setInpaintNumGenerations,
+    setInpaintPrompt,
+  ]);
+  
+  // Sync changes FROM inpainting TO persistence (debounced via the persistence hook)
+  useEffect(() => {
+    if (!hasInitializedFromPersistenceRef.current || !isEditSettingsReady) return;
+    
+    // Sync editMode changes
+    if (editMode !== persistedEditMode) {
+      console.log('[EditSettingsPersist] 💾 SYNC FROM UI: editMode changed to:', editMode);
+      setPersistedEditMode(editMode);
+    }
+  }, [editMode, persistedEditMode, setPersistedEditMode, isEditSettingsReady]);
+  
+  useEffect(() => {
+    if (!hasInitializedFromPersistenceRef.current || !isEditSettingsReady) return;
+    
+    // Sync numGenerations changes
+    if (inpaintNumGenerations !== persistedNumGenerations) {
+      console.log('[EditSettingsPersist] 💾 SYNC FROM UI: numGenerations changed to:', inpaintNumGenerations);
+      setPersistedNumGenerations(inpaintNumGenerations);
+    }
+  }, [inpaintNumGenerations, persistedNumGenerations, setPersistedNumGenerations, isEditSettingsReady]);
+  
+  useEffect(() => {
+    if (!hasInitializedFromPersistenceRef.current || !isEditSettingsReady) return;
+    
+    // Sync prompt changes
+    if (inpaintPrompt !== persistedPrompt) {
+      console.log('[EditSettingsPersist] 💾 SYNC FROM UI: prompt changed to:', inpaintPrompt ? `"${inpaintPrompt.substring(0, 30)}..."` : '(empty)');
+      setPersistedPrompt(inpaintPrompt);
+    }
+  }, [inpaintPrompt, persistedPrompt, setPersistedPrompt, isEditSettingsReady]);
+  
+  // ============================================
+  // End sync effects
+  // ============================================
   
   // Handle exiting inpaint mode from UI buttons
   const handleExitInpaintMode = () => {
@@ -1722,7 +1846,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       editMode={editMode}
                       setEditMode={setEditMode}
                       setIsInpaintMode={setIsInpaintMode}
-                      showTextModeHint={showTextModeHint}
                       inpaintPrompt={inpaintPrompt}
                       setInpaintPrompt={setInpaintPrompt}
                       inpaintNumGenerations={inpaintNumGenerations}
@@ -2091,7 +2214,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       editMode={editMode}
                       setEditMode={setEditMode}
                       setIsInpaintMode={setIsInpaintMode}
-                      showTextModeHint={showTextModeHint}
                       inpaintPrompt={inpaintPrompt}
                       setInpaintPrompt={setInpaintPrompt}
                       inpaintNumGenerations={inpaintNumGenerations}
