@@ -413,16 +413,31 @@ export const useImageGalleryStateOptimized = ({
   const galleryTopRef = useRef<HTMLDivElement | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fix race condition: Update selectedShotIdLocal when shots data loads or context changes
-  // NOTE: Do NOT auto-sync when external filter control is enabled (e.g., GenerationsPane manages its own filter)
+  // Track previous lastShotId to detect when user navigates to a different shot
+  const prevLastShotIdRef = useRef<string | undefined>(lastShotId);
+  
+  // Sync selectedShotIdLocal when:
+  // 1. lastShotId changes (user navigated to a different shot)
+  // 2. Current selection is invalid (empty or shot no longer exists)
   useEffect(() => {
-    // SKIP auto-sync entirely - let the external filter control (ShotFilter component) manage the state
-    // The external filter can set selectedShotIdLocal directly via actions.setSelectedShotIdLocal
-    // This prevents fighting between the dropdown and the auto-sync logic
-    
-    // Only fix invalid selections (empty or shot no longer exists)
     const isCurrentSelectionValid = state.selectedShotIdLocal && simplifiedShotOptions.find(shot => shot.id === state.selectedShotIdLocal);
+    const lastShotIdChanged = lastShotId && lastShotId !== prevLastShotIdRef.current;
     
+    // Update ref for next comparison
+    prevLastShotIdRef.current = lastShotId;
+    
+    // Sync when lastShotId changes (user clicked into a shot)
+    if (lastShotIdChanged && lastShotId !== state.selectedShotIdLocal) {
+      console.log('[ShotSelectionDebug] Syncing to new lastShotId:', {
+        oldSelection: state.selectedShotIdLocal,
+        newSelection: lastShotId,
+        context: 'shot navigation'
+      });
+      actions.setSelectedShotIdLocal(lastShotId);
+      return;
+    }
+    
+    // Fix invalid selections (empty or shot no longer exists)
     if (!isCurrentSelectionValid) {
       const newSelection = lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
       if (newSelection && newSelection !== state.selectedShotIdLocal) {

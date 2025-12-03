@@ -401,28 +401,32 @@ export function useToolSettings<T>(
   // Fetch merged settings using Supabase with mobile optimizations
   const { data: settings, isLoading, error, fetchStatus, dataUpdatedAt } = useQuery({
     queryKey: ['toolSettings', toolId, projectId, shotId],
-    queryFn: ({ signal }) => {
+    queryFn: async ({ signal }) => {
       console.log('[ShotNavPerf] 🔍 useToolSettings queryFn START', {
         toolId,
         shotId: shotId?.substring(0, 8) || 'none',
         timestamp: Date.now()
       });
-      const result = fetchToolSettingsSupabase(toolId, { projectId, shotId }, signal);
-      result.then(() => {
+      try {
+        const result = await fetchToolSettingsSupabase(toolId, { projectId, shotId }, signal);
         console.log('[ShotNavPerf] ✅ useToolSettings queryFn COMPLETE', {
           toolId,
           shotId: shotId?.substring(0, 8) || 'none',
           timestamp: Date.now()
         });
-      }).catch(err => {
-        console.log('[ShotNavPerf] ❌ useToolSettings queryFn FAILED', {
-          toolId,
-          shotId: shotId?.substring(0, 8) || 'none',
-          error: err.message,
-          timestamp: Date.now()
-        });
-      });
-      return result;
+        return result;
+      } catch (err: any) {
+        // Don't log cancelled requests - they're expected during navigation/unmount
+        if (!err?.message?.includes('Request was cancelled')) {
+          console.log('[ShotNavPerf] ❌ useToolSettings queryFn FAILED', {
+            toolId,
+            shotId: shotId?.substring(0, 8) || 'none',
+            error: err.message,
+            timestamp: Date.now()
+          });
+        }
+        throw err;
+      }
     },
     enabled: !!toolId && fetchEnabled,
     staleTime: 10 * 60 * 1000, // 10 minutes

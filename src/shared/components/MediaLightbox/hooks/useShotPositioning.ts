@@ -197,6 +197,16 @@ export const useShotPositioning = ({
     if (success) {
       onShowTick?.(actualGenerationId);
       // Pass selectedShotId so optimistic state can use composite keys (mediaId:shotId)
+      const optimisticKey = `${actualGenerationId}:${selectedShotId}`;
+      console.log('[OptimisticDebug] [Lightbox] SUCCESS - Calling onOptimisticPositioned:', {
+        actualGenerationId: actualGenerationId?.substring(0, 8),
+        mediaId: media?.id?.substring(0, 8),
+        shotId: selectedShotId?.substring(0, 8),
+        optimisticKey,
+        hasCallback: !!onOptimisticPositioned,
+        callbackType: typeof onOptimisticPositioned,
+        timestamp: Date.now()
+      });
       onOptimisticPositioned?.(actualGenerationId, selectedShotId);
       console.log('[ShotNavDebug] [MediaLightbox] Positioned optimistic + tick applied', {
         mediaId: media?.id,

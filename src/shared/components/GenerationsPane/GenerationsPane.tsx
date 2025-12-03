@@ -564,7 +564,7 @@ const GenerationsPaneComponent: React.FC = () => {
                 )}
             </div>
         </div>
-        <div className="flex-grow px-1 sm:px-3 pt-1 sm:pt-3 overflow-y-auto flex flex-col">
+        <div className="flex-grow px-1 sm:px-3 pt-1 sm:pt-3 overflow-y-auto overscroll-contain flex flex-col">
             {isLoading && (
                 <SkeletonGallery 
                     count={12}

@@ -57,6 +57,27 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  // Lock body scroll when pane is open on mobile to prevent scroll bleed-through
+  useEffect(() => {
+    if (!isMobile) return;
+    
+    if (isOpen) {
+      // Store original overflow style
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+      
+      // Lock body scroll
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+      
+      return () => {
+        // Restore original styles
+        document.body.style.overflow = originalOverflow;
+        document.body.style.touchAction = originalTouchAction;
+      };
+    }
+  }, [isMobile, isOpen]);
+
   // Click outside handler for mobile
   useEffect(() => {
     if (!isMobile || !isOpen) return;
@@ -66,6 +87,19 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
       // Ignore if click is on any pane-control opener/closer
       if (targetEl.closest('[data-pane-control]')) {
         return; // allow event to proceed
+      }
+      
+      // Ignore clicks on Radix UI portal elements (Select, Popover, Dialog, etc.)
+      // These are rendered outside the pane but should be considered "inside" for interaction purposes
+      if (
+        targetEl.closest('[data-radix-select-content]') ||
+        targetEl.closest('[data-radix-select-viewport]') ||
+        targetEl.closest('[data-radix-popper-content-wrapper]') ||
+        targetEl.closest('[data-radix-popover-content]') ||
+        targetEl.closest('[data-radix-dialog-content]') ||
+        targetEl.closest('[role="listbox"]') // fallback for select dropdowns
+      ) {
+        return; // allow event to proceed, don't close pane
       }
 
       if (paneRef.current && !paneRef.current.contains(targetEl) && !additionalRefs?.some(ref => ref.current?.contains(targetEl))) {

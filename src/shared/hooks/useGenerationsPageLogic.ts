@@ -41,6 +41,10 @@ export function useGenerationsPageLogic({
   
   const { data: shotsData } = useListShots(shouldLoadData ? selectedProjectId : null);
   const { currentShotId } = useCurrentShot();
+  
+  // Get last affected shot context early so it's available for effects below
+  const lastAffectedShotContext = useContext(LastAffectedShotContext);
+  const { lastAffectedShotId = null, setLastAffectedShotId = () => {} } = lastAffectedShotContext || {};
 
   // Use shots.settings to store GenerationsPane settings for the current shot
   const { 
@@ -177,6 +181,10 @@ export function useGenerationsPageLogic({
       setExcludePositioned(settingsToApply.excludePositioned);
       setLastCurrentShotId(currentShotId);
       
+      // Sync the dropdown selection to the current shot when navigating to a shot
+      // This pre-selects the current shot in the "Add to Shot" dropdown
+      setLastAffectedShotId(currentShotId);
+      
     } else if (!currentShotId) {
       // When no shot is selected, revert to 'all' shots
       console.log('[ShotFilterLogic] No current shot, reverting to all shots');
@@ -186,7 +194,7 @@ export function useGenerationsPageLogic({
     } else {
       console.log('[ShotFilterLogic] Shot not found in shots data');
     }
-  }, [currentShotId, shotsData, isLoadingShotSettings, shotSettings]);
+  }, [currentShotId, shotsData, isLoadingShotSettings, shotSettings, setLastAffectedShotId]);
 
   // Create wrapper functions that save user customizations when called
   const handleShotFilterChange = (newShotFilter: string) => {
@@ -234,9 +242,6 @@ export function useGenerationsPageLogic({
     shouldLoadData,
     filters
   );
-
-  const lastAffectedShotContext = useContext(LastAffectedShotContext);
-  const { lastAffectedShotId = null, setLastAffectedShotId = () => {} } = lastAffectedShotContext || {};
   
   const addImageToShotMutation = useAddImageToShot();
   const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
@@ -289,7 +294,8 @@ export function useGenerationsPageLogic({
 
   const handleAddToShot = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
     // Fast path: minimal validation and direct execution
-    const targetShotId = currentShotId || lastAffectedShotId;
+    // Priority: dropdown selection (lastAffectedShotId) > current viewing shot (currentShotId)
+    const targetShotId = lastAffectedShotId || currentShotId;
     
     console.log('[PATH_COMPARE] 🔵 BUTTON PATH START - handleAddToShot:', {
       generationId: generationId?.substring(0, 8),
@@ -427,7 +433,8 @@ export function useGenerationsPageLogic({
 
   const handleAddToShotWithoutPosition = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
     // Fast path: minimal validation and direct execution
-    const targetShotId = currentShotId || lastAffectedShotId;
+    // Priority: dropdown selection (lastAffectedShotId) > current viewing shot (currentShotId)
+    const targetShotId = lastAffectedShotId || currentShotId;
     
     if (!targetShotId || !selectedProjectId) {
       toast.error("No shot selected", {

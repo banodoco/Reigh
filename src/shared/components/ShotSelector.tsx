@@ -255,6 +255,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
           }}
           onClick={(e) => {
             console.log('[ShotSelectorDebug] SelectTrigger onClick');
+            e.stopPropagation();
           }}
         >
           <SelectValue placeholder={placeholder}>
