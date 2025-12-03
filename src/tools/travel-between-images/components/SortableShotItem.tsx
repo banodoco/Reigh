@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Shot } from '@/types/shots';
 import VideoShotDisplay from './VideoShotDisplay';
+import { cn } from '@/shared/lib/utils';
+
+interface GenerationDropData {
+  generationId: string;
+  imageUrl: string;
+  thumbUrl?: string;
+  metadata?: any;
+}
 
 interface SortableShotItemProps {
   shot: Shot;
@@ -14,6 +22,8 @@ interface SortableShotItemProps {
   shotIndex?: number;
   projectAspectRatio?: string;
   isHighlighted?: boolean;
+  // Drop handling for generations from GenerationsPane
+  onGenerationDrop?: (shotId: string, data: GenerationDropData) => Promise<void>;
 }
 
 const SortableShotItem: React.FC<SortableShotItemProps> = ({
@@ -26,6 +36,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   shotIndex = 0,
   projectAspectRatio,
   isHighlighted = false,
+  onGenerationDrop,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -41,6 +52,72 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
     id: shot.id,
     disabled: isDragDisabled,
   });
+
+  // Drop state for visual feedback
+  const [isDropTarget, setIsDropTarget] = useState(false);
+  const [isProcessingDrop, setIsProcessingDrop] = useState(false);
+
+  // Detect if this is a generation drag from GenerationsPane
+  const isGenerationDrag = useCallback((e: React.DragEvent): boolean => {
+    return e.dataTransfer.types.includes('application/x-generation');
+  }, []);
+
+  // Handle drag enter for drop feedback
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    if (isGenerationDrag(e) && onGenerationDrop) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDropTarget(true);
+    }
+  }, [isGenerationDrag, onGenerationDrop]);
+
+  // Handle drag over to allow drop
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (isGenerationDrag(e) && onGenerationDrop) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDropTarget(true);
+    }
+  }, [isGenerationDrag, onGenerationDrop]);
+
+  // Handle drag leave
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only clear if we're leaving the container entirely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDropTarget(false);
+    }
+  }, []);
+
+  // Handle drop
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDropTarget(false);
+
+    if (!onGenerationDrop || !isGenerationDrag(e)) return;
+
+    try {
+      const dataString = e.dataTransfer.getData('application/x-generation');
+      if (!dataString) return;
+
+      const data: GenerationDropData = JSON.parse(dataString);
+      
+      console.log('[ShotDrop] Dropping generation onto shot:', {
+        shotId: shot.id.substring(0, 8),
+        shotName: shot.name,
+        generationId: data.generationId?.substring(0, 8),
+        timestamp: Date.now()
+      });
+
+      setIsProcessingDrop(true);
+      await onGenerationDrop(shot.id, data);
+    } catch (error) {
+      console.error('[ShotDrop] Error handling drop:', error);
+    } finally {
+      setIsProcessingDrop(false);
+    }
+  }, [onGenerationDrop, isGenerationDrag, shot.id, shot.name]);
 
   // [ShotReorderDebug] Log dragging state changes (only when actually dragging to reduce noise)
   React.useEffect(() => {
@@ -66,6 +143,15 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={cn(
+        'transition-all duration-200',
+        isDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]',
+        isProcessingDrop && 'opacity-70 pointer-events-none'
+      )}
     >
       <VideoShotDisplay
         shot={shot}
@@ -80,7 +166,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
         shouldLoadImages={shouldLoadImages}
         shotIndex={shotIndex}
         projectAspectRatio={projectAspectRatio}
-        isHighlighted={isHighlighted}
+        isHighlighted={isHighlighted || isDropTarget}
       />
     </div>
   );

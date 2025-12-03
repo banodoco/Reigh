@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect, useCallback, startTransition } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
-import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
+import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName, useAddImageToShot } from '@/shared/hooks/useShots';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
@@ -25,6 +25,7 @@ import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useT
 import { VideoTravelSettings, PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
 import { PageFadeIn } from '@/shared/components/transitions';
@@ -352,6 +353,7 @@ const VideoTravelToolPage: React.FC = () => {
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const updateShotNameMutation = useUpdateShotName();
+  const addImageToShotMutation = useAddImageToShot();
 
   // Memoized callbacks to prevent infinite re-renders
   // FIX: Use shotSettingsRef.current instead of shotSettings to prevent callback recreation
@@ -1502,6 +1504,123 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [currentShotId, shots, viaShotClick, navigate, location.pathname, selectedShot, setCurrentShotId]);
 
+  // ============================================================================
+  // DROP HANDLERS FOR GENERATIONS FROM GENERATIONSPANE
+  // ============================================================================
+  
+  // Handle dropping a generation onto an existing shot
+  const handleGenerationDropOnShot = useCallback(async (
+    shotId: string,
+    data: { generationId: string; imageUrl: string; thumbUrl?: string; metadata?: any }
+  ) => {
+    if (!selectedProjectId) {
+      toast.error('No project selected');
+      return;
+    }
+
+    const targetShot = shots?.find(s => s.id === shotId);
+    console.log('[ShotDrop] Adding generation to shot:', {
+      shotId: shotId.substring(0, 8),
+      shotName: targetShot?.name,
+      generationId: data.generationId?.substring(0, 8),
+      timestamp: Date.now()
+    });
+
+    try {
+      await addImageToShotMutation.mutateAsync({
+        shot_id: shotId,
+        generation_id: data.generationId,
+        project_id: selectedProjectId,
+        imageUrl: data.imageUrl,
+        thumbUrl: data.thumbUrl,
+      });
+    } catch (error) {
+      console.error('[ShotDrop] Failed to add to shot:', error);
+      toast.error(`Failed to add to shot: ${(error as Error).message}`);
+    }
+  }, [selectedProjectId, shots, addImageToShotMutation]);
+
+  // Handle dropping a generation to create a new shot
+  const handleGenerationDropForNewShot = useCallback(async (
+    data: { generationId: string; imageUrl: string; thumbUrl?: string; metadata?: any }
+  ) => {
+    if (!selectedProjectId) {
+      toast.error('No project selected');
+      return;
+    }
+
+    const newShotName = `Shot ${(shots?.length ?? 0) + 1}`;
+    console.log('[ShotDrop] Creating new shot with generation:', {
+      newShotName,
+      generationId: data.generationId?.substring(0, 8),
+      timestamp: Date.now()
+    });
+
+    try {
+      // First create the shot
+      const result = await createShotMutation.mutateAsync({
+        name: newShotName,
+        projectId: selectedProjectId,
+      } as any);
+
+      const newShotId = result.shot?.id;
+      if (!newShotId) {
+        throw new Error('Failed to create shot - no ID returned');
+      }
+
+      // Then add the generation to it
+      await addImageToShotMutation.mutateAsync({
+        shot_id: newShotId,
+        generation_id: data.generationId,
+        project_id: selectedProjectId,
+        imageUrl: data.imageUrl,
+        thumbUrl: data.thumbUrl,
+      });
+
+      // Switch to "Newest First" so the new shot appears at the top
+      setShotSortMode('newest');
+
+      // Refetch shots to update the list
+      await refetchShots();
+    } catch (error) {
+      console.error('[ShotDrop] Failed to create new shot:', error);
+      toast.error(`Failed to create shot: ${(error as Error).message}`);
+    }
+  }, [selectedProjectId, shots, createShotMutation, addImageToShotMutation, refetchShots, setShotSortMode]);
+
+  // Handle dropping files to create a new shot
+  const handleFilesDropForNewShot = useCallback(async (files: File[]) => {
+    if (!selectedProjectId) {
+      toast.error('No project selected');
+      return;
+    }
+
+    console.log('[ShotDrop] Creating new shot with files:', {
+      fileCount: files.length,
+      fileNames: files.map(f => f.name),
+      timestamp: Date.now()
+    });
+
+    try {
+      // Use the external image drop mutation which handles file uploads and shot creation
+      const result = await handleExternalImageDropMutation.mutateAsync({
+        imageFiles: files,
+        targetShotId: null, // Create new shot
+        currentProjectQueryKey: selectedProjectId,
+        currentShotCount: shots?.length ?? 0
+      });
+
+      // Switch to "Newest First" so the new shot appears at the top
+      setShotSortMode('newest');
+
+      // Refetch shots to update the list
+      await refetchShots();
+    } catch (error) {
+      console.error('[ShotDrop] Failed to create new shot from files:', error);
+      toast.error(`Failed to create shot: ${(error as Error).message}`);
+    }
+  }, [selectedProjectId, shots, handleExternalImageDropMutation, refetchShots, setShotSortMode]);
+
   const handleShotSelect = (shot: Shot) => {
     console.log('[ShotNavPerf] === SHOT CLICKED FROM LIST ===', {
       timestamp: Date.now(),
@@ -2015,7 +2134,11 @@ const VideoTravelToolPage: React.FC = () => {
                 onCreateNewShot={handleCreateNewShot}
                 shots={filteredShots}
                 sortMode={shotSortMode}
+                onSortModeChange={setShotSortMode}
                 highlightedShotId={highlightedShotId}
+                onGenerationDropOnShot={handleGenerationDropOnShot}
+                onGenerationDropForNewShot={handleGenerationDropForNewShot}
+                onFilesDropForNewShot={handleFilesDropForNewShot}
               />
               </div>
             )

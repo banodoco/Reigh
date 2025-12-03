@@ -6,7 +6,8 @@ import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages,
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye } from 'lucide-react';
+import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye, Sparkles } from 'lucide-react';
+import { ImageGenerationModal } from '@/shared/components/ImageGenerationModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { usePanes } from '@/shared/contexts/PanesContext';
@@ -69,6 +70,9 @@ const GenerationsPaneComponent: React.FC = () => {
   // Dropdown states to prevent unwanted opening
   const [shotFilterOpen, setShotFilterOpen] = useState(false);
   const [mediaTypeFilterOpen, setMediaTypeFilterOpen] = useState(false);
+  
+  // Image generation modal state
+  const [isGenerationModalOpen, setIsGenerationModalOpen] = useState(false);
 
   // Use the generalized logic - data loading now enabled on all pages
   const {
@@ -372,7 +376,18 @@ const GenerationsPaneComponent: React.FC = () => {
         >
           <div className="p-2 border-b border-zinc-800">
             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-light text-zinc-200 ml-2">Generations</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-light text-zinc-200 ml-2">Generations</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsGenerationModalOpen(true)}
+                    className="h-7 px-2 text-xs bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-md shadow-sm"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    <span>Create</span>
+                  </Button>
+                </div>
                 <div className="flex items-center space-x-4 mr-2">
                     {/* Star Filter */}
                     <div 
@@ -591,6 +606,12 @@ const GenerationsPaneComponent: React.FC = () => {
         </div>
         </div> {/* Close inner wrapper with delayed pointer events */}
       </div>
+      
+      {/* Image Generation Modal */}
+      <ImageGenerationModal
+        isOpen={isGenerationModalOpen}
+        onClose={() => setIsGenerationModalOpen(false)}
+      />
     </>
   );
 };

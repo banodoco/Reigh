@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -24,13 +24,28 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useCurrentProject } from '@/shared/hooks/useCurrentProject';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { cn } from '@/shared/lib/utils';
+import { Plus, Upload } from 'lucide-react';
+
+interface GenerationDropData {
+  generationId: string;
+  imageUrl: string;
+  thumbUrl?: string;
+  metadata?: any;
+}
 
 interface ShotListDisplayProps {
   onSelectShot: (shot: Shot) => void;
   onCreateNewShot?: () => void;
   shots?: Shot[]; // Optional - if not provided, will use context
   sortMode?: 'ordered' | 'newest' | 'oldest'; // Sort mode for shots
+  onSortModeChange?: (mode: 'ordered' | 'newest' | 'oldest') => void; // Callback to change sort mode
   highlightedShotId?: string | null; // Shot to highlight for visual feedback
+  // Drop handling for generations from GenerationsPane
+  onGenerationDropOnShot?: (shotId: string, data: GenerationDropData) => Promise<void>;
+  onGenerationDropForNewShot?: (data: GenerationDropData) => Promise<void>;
+  // Drop handling for external files
+  onFilesDropForNewShot?: (files: File[]) => Promise<void>;
 }
 
 
@@ -40,7 +55,11 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   onCreateNewShot,
   shots: propShots,
   sortMode = 'ordered',
+  onSortModeChange,
   highlightedShotId,
+  onGenerationDropOnShot,
+  onGenerationDropForNewShot,
+  onFilesDropForNewShot,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -372,6 +391,103 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     return items;
   }, [shots]);
 
+  // Drop state for "New Shot" drop zone
+  const [isNewShotDropTarget, setIsNewShotDropTarget] = useState(false);
+  const [isProcessingNewShotDrop, setIsProcessingNewShotDrop] = useState(false);
+  const [newShotDropType, setNewShotDropType] = useState<'generation' | 'file' | null>(null);
+
+  // Detect drag type
+  const getDragType = useCallback((e: React.DragEvent): 'generation' | 'file' | null => {
+    if (e.dataTransfer.types.includes('application/x-generation')) {
+      return 'generation';
+    }
+    if (e.dataTransfer.types.includes('Files')) {
+      return 'file';
+    }
+    return null;
+  }, []);
+
+  // Handle drag enter for new shot drop zone
+  const handleNewShotDragEnter = useCallback((e: React.DragEvent) => {
+    const dragType = getDragType(e);
+    if (dragType && (onGenerationDropForNewShot || onFilesDropForNewShot)) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsNewShotDropTarget(true);
+      setNewShotDropType(dragType);
+    }
+  }, [getDragType, onGenerationDropForNewShot, onFilesDropForNewShot]);
+
+  // Handle drag over for new shot drop zone
+  const handleNewShotDragOver = useCallback((e: React.DragEvent) => {
+    const dragType = getDragType(e);
+    if (dragType && (onGenerationDropForNewShot || onFilesDropForNewShot)) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
+      setIsNewShotDropTarget(true);
+      setNewShotDropType(dragType);
+    }
+  }, [getDragType, onGenerationDropForNewShot, onFilesDropForNewShot]);
+
+  // Handle drag leave for new shot drop zone
+  const handleNewShotDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsNewShotDropTarget(false);
+      setNewShotDropType(null);
+    }
+  }, []);
+
+  // Handle drop for new shot
+  const handleNewShotDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsNewShotDropTarget(false);
+    setNewShotDropType(null);
+
+    const dragType = getDragType(e);
+    if (!dragType) return;
+
+    setIsProcessingNewShotDrop(true);
+
+    try {
+      if (dragType === 'generation' && onGenerationDropForNewShot) {
+        const dataString = e.dataTransfer.getData('application/x-generation');
+        if (!dataString) return;
+
+        const data: GenerationDropData = JSON.parse(dataString);
+        
+        console.log('[ShotDrop] Dropping generation to create new shot:', {
+          generationId: data.generationId?.substring(0, 8),
+          timestamp: Date.now()
+        });
+
+        await onGenerationDropForNewShot(data);
+      } else if (dragType === 'file' && onFilesDropForNewShot) {
+        const files = Array.from(e.dataTransfer.files);
+        const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+        const validFiles = files.filter(file => validImageTypes.includes(file.type));
+        
+        if (validFiles.length === 0) {
+          toast.error('No valid image files. Only JPEG, PNG, and WebP are supported.');
+          return;
+        }
+
+        console.log('[ShotDrop] Dropping files to create new shot:', {
+          fileCount: validFiles.length,
+          timestamp: Date.now()
+        });
+
+        await onFilesDropForNewShot(validFiles);
+      }
+    } catch (error) {
+      console.error('[ShotDrop] Error creating new shot from drop:', error);
+      toast.error(`Failed to create shot: ${(error as Error).message}`);
+    } finally {
+      setIsProcessingNewShotDrop(false);
+    }
+  }, [getDragType, onGenerationDropForNewShot, onFilesDropForNewShot]);
+
   // Show loading skeleton while data is being fetched
   if (shotsLoading || shots === undefined) {
     return (
@@ -424,6 +540,37 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         strategy={rectSortingStrategy}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
+          {/* New Shot Drop Zone - appears at start of grid */}
+          {(onGenerationDropForNewShot || onFilesDropForNewShot) && (
+            <div
+              onDragEnter={handleNewShotDragEnter}
+              onDragOver={handleNewShotDragOver}
+              onDragLeave={handleNewShotDragLeave}
+              onDrop={handleNewShotDrop}
+              onClick={onCreateNewShot}
+              className={cn(
+                'min-h-48 p-4 border-2 border-dashed rounded-lg bg-card/30 hover:bg-card/50 hover:border-primary/50 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-3',
+                isNewShotDropTarget && 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]',
+                isProcessingNewShotDrop && 'opacity-70 pointer-events-none'
+              )}
+            >
+              {isNewShotDropTarget ? (
+                <>
+                  <Upload className="h-10 w-10 text-primary animate-bounce" />
+                  <span className="text-sm font-medium text-primary">
+                    {newShotDropType === 'file' ? 'Drop files to create new shot' : 'Drop to create new shot'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Plus className="h-8 w-8 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">New Shot</span>
+                  <span className="text-xs text-muted-foreground/60">Click or drop image here</span>
+                </>
+              )}
+            </div>
+          )}
+          
           {shots.map((shot, index) => {
             return (
               <SortableShotItem
@@ -437,6 +584,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 shotIndex={index}
                 projectAspectRatio={currentProject?.aspectRatio}
                 isHighlighted={highlightedShotId === shot.id}
+                onGenerationDrop={onGenerationDropOnShot}
               />
             );
           })}
