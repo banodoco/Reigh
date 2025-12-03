@@ -39,8 +39,8 @@ export function useJoinClipsSettings(projectId: string | null | undefined) {
     projectId,
     DEFAULT_JOIN_CLIPS_SETTINGS,
     {
-      debug: false, // Set to true for debugging
-      debugTag: '[JoinClips]'
+      debug: true, // TEMP: Enable for debugging persistence
+      debugTag: '[JoinClipsPersist]'
     }
   );
 }
