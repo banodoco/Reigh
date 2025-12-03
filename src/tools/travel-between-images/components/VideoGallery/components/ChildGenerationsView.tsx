@@ -571,15 +571,17 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         lastSyncedKey: '',
     });
     
-    // Load saved LoRAs into loraManager on mount (once availableLoras are ready)
+    // Load saved LoRAs into loraManager on mount (once BOTH availableLoras AND joinSettings are ready)
     useEffect(() => {
         console.log('[JoinClipsPersist] LoRA init effect running:');
         console.log('[JoinClipsPersist] initialized:', lorasSyncStateRef.current.initialized);
+        console.log('[JoinClipsPersist] joinSettings.status:', joinSettings.status);
         console.log('[JoinClipsPersist] availableLoras.length:', availableLoras.length);
         console.log('[JoinClipsPersist] joinLoras.length:', joinLoras.length);
         
-        if (lorasSyncStateRef.current.initialized || availableLoras.length === 0) {
-            console.log('[JoinClipsPersist] Skipping init - already initialized or no availableLoras');
+        // Wait for BOTH: availableLoras loaded AND joinSettings loaded from DB
+        if (lorasSyncStateRef.current.initialized || availableLoras.length === 0 || joinSettings.status !== 'ready') {
+            console.log('[JoinClipsPersist] Skipping init - already initialized, no availableLoras, or settings not ready');
             return;
         }
         lorasSyncStateRef.current.initialized = true;
@@ -607,7 +609,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         } else {
             console.log('[JoinClipsPersist] No saved LoRAs to load');
         }
-    }, [joinLoras, availableLoras, loraManager]);
+    }, [joinLoras, availableLoras, loraManager, joinSettings.status]);
     
     // Sync loraManager changes back to joinSettings for persistence
     useEffect(() => {
