@@ -1794,12 +1794,20 @@ async function createGenerationFromTask(
         );
 
         // Update the parent generation with the new location
+        // CRITICAL: Also update params to include tool_type for proper filtering in the gallery
+        // We merge in extraParams (which may contain tool_type) into the existing params
+        const updatedParams = {
+          ...(parentGen.params || {}),
+          ...extraParams,
+        };
+        
         const { error: updateError } = await supabase
           .from('generations')
           .update({
             location: publicUrl,
             thumbnail_url: thumbnailUrl,
-            type: 'video'
+            type: 'video',
+            params: updatedParams
           })
           .eq('id', parentGen.id);
 
@@ -1840,8 +1848,10 @@ async function createGenerationFromTask(
       if (!fetchError && childGen) {
         try {
           // Build variant params
+          // CRITICAL: Include tool_type for proper filtering in the gallery
           const variantParams = {
             ...taskData.params,
+            tool_type: 'travel-between-images',
             source_task_id: taskId,
             created_from: 'individual_segment_regeneration',
             segment_index: taskData.params.segment_index,
@@ -1861,12 +1871,19 @@ async function createGenerationFromTask(
           );
 
           // Update the CHILD generation with the new location
+          // CRITICAL: Also update params to include tool_type for proper filtering in the gallery
+          const updatedChildParams = {
+            ...(childGen.params || {}),
+            tool_type: 'travel-between-images',
+          };
+          
           const { error: updateError } = await supabase
             .from('generations')
             .update({
               location: publicUrl,
               thumbnail_url: thumbnailUrl,
-              type: 'video'
+              type: 'video',
+              params: updatedChildParams
             })
             .eq('id', childGen.id);
 
@@ -1904,7 +1921,10 @@ async function createGenerationFromTask(
       const result = await createVariantOnParent(
         travelStitchParentId,
         'travel_stitch',
-        { created_from: 'travel_stitch_completion' }
+        { 
+          tool_type: 'travel-between-images',
+          created_from: 'travel_stitch_completion' 
+        }
       );
       if (result) return result;
       // Fall through to regular generation creation if variant creation failed
@@ -1953,10 +1973,12 @@ async function createGenerationFromTask(
                 console.log(`[TravelSingleSegment] Detected segment 0 of single-segment orchestrator - creating variant for parent generation ${parentGenerationId}`);
                 
                 // Use createVariantOnParent to properly create a variant and update the parent
+                // CRITICAL: Include tool_type for proper filtering in the gallery
                 const singleSegmentResult = await createVariantOnParent(
                   parentGenerationId,
                   'travel_segment',
                   {
+                    tool_type: 'travel-between-images',
                     created_from: 'single_segment_travel',
                     segment_index: 0,
                     is_single_segment: true,
@@ -2154,6 +2176,7 @@ async function createGenerationFromTask(
           thumbnailUrl || null,
           {
             ...taskData.params,
+            tool_type: 'travel-between-images', // CRITICAL: Include tool_type for proper filtering in the gallery
             source_task_id: taskId,
             created_from: 'travel_segment',
             segment_index: childOrder,
