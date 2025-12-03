@@ -55,7 +55,6 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
 
   // Drop state for visual feedback
   const [isDropTarget, setIsDropTarget] = useState(false);
-  const [isProcessingDrop, setIsProcessingDrop] = useState(false);
 
   // Detect if this is a generation drag from GenerationsPane
   const isGenerationDrag = useCallback((e: React.DragEvent): boolean => {
@@ -110,12 +109,10 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
         timestamp: Date.now()
       });
 
-      setIsProcessingDrop(true);
+      // Don't set processing state - let mutation handle its own loading states
       await onGenerationDrop(shot.id, data);
     } catch (error) {
       console.error('[ShotDrop] Error handling drop:', error);
-    } finally {
-      setIsProcessingDrop(false);
     }
   }, [onGenerationDrop, isGenerationDrag, shot.id, shot.name]);
 
@@ -149,8 +146,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
       onDrop={handleDrop}
       className={cn(
         'transition-all duration-200',
-        isDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]',
-        isProcessingDrop && 'opacity-70 pointer-events-none'
+        isDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]'
       )}
     >
       <VideoShotDisplay

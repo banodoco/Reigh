@@ -1580,8 +1580,8 @@ const VideoTravelToolPage: React.FC = () => {
       // Switch to "Newest First" so the new shot appears at the top
       setShotSortMode('newest');
 
-      // Refetch shots to update the list
-      await refetchShots();
+      // Refetch shots to update the list (don't await - mutations already invalidate cache)
+      refetchShots();
     } catch (error) {
       console.error('[ShotDrop] Failed to create new shot:', error);
       toast.error(`Failed to create shot: ${(error as Error).message}`);
@@ -1613,8 +1613,8 @@ const VideoTravelToolPage: React.FC = () => {
       // Switch to "Newest First" so the new shot appears at the top
       setShotSortMode('newest');
 
-      // Refetch shots to update the list
-      await refetchShots();
+      // Refetch shots to update the list (don't await - mutations already invalidate cache)
+      refetchShots();
     } catch (error) {
       console.error('[ShotDrop] Failed to create new shot from files:', error);
       toast.error(`Failed to create shot: ${(error as Error).message}`);

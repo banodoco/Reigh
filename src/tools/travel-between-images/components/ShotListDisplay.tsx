@@ -393,7 +393,6 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
 
   // Drop state for "New Shot" drop zone
   const [isNewShotDropTarget, setIsNewShotDropTarget] = useState(false);
-  const [isProcessingNewShotDrop, setIsProcessingNewShotDrop] = useState(false);
   const [newShotDropType, setNewShotDropType] = useState<'generation' | 'file' | null>(null);
 
   // Detect drag type
@@ -448,8 +447,6 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     const dragType = getDragType(e);
     if (!dragType) return;
 
-    setIsProcessingNewShotDrop(true);
-
     try {
       if (dragType === 'generation' && onGenerationDropForNewShot) {
         const dataString = e.dataTransfer.getData('application/x-generation');
@@ -462,6 +459,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
           timestamp: Date.now()
         });
 
+        // Don't set processing state - let mutation handle its own loading states
         await onGenerationDropForNewShot(data);
       } else if (dragType === 'file' && onFilesDropForNewShot) {
         const files = Array.from(e.dataTransfer.files);
@@ -478,13 +476,12 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
           timestamp: Date.now()
         });
 
+        // Don't set processing state - let mutation handle its own loading states
         await onFilesDropForNewShot(validFiles);
       }
     } catch (error) {
       console.error('[ShotDrop] Error creating new shot from drop:', error);
       toast.error(`Failed to create shot: ${(error as Error).message}`);
-    } finally {
-      setIsProcessingNewShotDrop(false);
     }
   }, [getDragType, onGenerationDropForNewShot, onFilesDropForNewShot]);
 
@@ -550,8 +547,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
               onClick={onCreateNewShot}
               className={cn(
                 'min-h-48 p-4 border-2 border-dashed rounded-lg bg-card/30 hover:bg-card/50 hover:border-primary/50 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-3',
-                isNewShotDropTarget && 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]',
-                isProcessingNewShotDrop && 'opacity-70 pointer-events-none'
+                isNewShotDropTarget && 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]'
               )}
             >
               {isNewShotDropTarget ? (
