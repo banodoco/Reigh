@@ -950,6 +950,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             availableLoras={availableLoras}
                             projectId={projectId}
                             loraPersistenceKey="join-clips"
+                            loraManager={loraManager}
                             onGenerate={handleConfirmJoin}
                             isGenerating={isJoiningClips}
                             generateSuccess={joinClipsSuccess}
