@@ -242,6 +242,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         replaceMode: joinReplaceMode = true,
         keepBridgingImages = true,
         useIndividualPrompts = false,
+        loras: joinLoras = [],
     } = joinSettings.settings;
 
     // Fetch parent generation details to check for final output
@@ -547,13 +548,58 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         } as GenerationRow;
     }, [parentGeneration]);
 
-    // Initialize LoRA manager (uses availableLoras from publicLorasQuery above)
+    // Initialize LoRA manager - we disable its auto-load since we sync from joinSettings
     const loraManager = useLoraManager(availableLoras, {
         projectId: projectId || undefined,
-        persistenceScope: 'project',
-        enableProjectPersistence: true,
-        persistenceKey: 'join-clips',
+        persistenceScope: 'none', // We handle persistence via joinSettings
+        disableAutoLoad: true,
     });
+    
+    // Sync loraManager with joinSettings.loras on load
+    const hasInitializedLorasRef = React.useRef(false);
+    useEffect(() => {
+        if (!hasInitializedLorasRef.current && joinLoras.length > 0 && availableLoras.length > 0) {
+            // Convert persisted format to ActiveLora format
+            const activeLoras = joinLoras.map(saved => {
+                const fullLora = availableLoras.find(l => l['Model ID'] === saved.id);
+                return {
+                    id: saved.id,
+                    name: fullLora?.Name || saved.id,
+                    path: fullLora?.['Model Files']?.[0]?.url || saved.id,
+                    strength: saved.strength,
+                    previewImageUrl: fullLora?.Images?.[0]?.url,
+                };
+            }).filter(l => l.path); // Only include LoRAs we can find
+            
+            if (activeLoras.length > 0) {
+                loraManager.setSelectedLoras(activeLoras);
+            }
+            hasInitializedLorasRef.current = true;
+        }
+    }, [joinLoras, availableLoras, loraManager]);
+    
+    // Sync loraManager changes back to joinSettings (for persistence)
+    const prevLorasKeyRef = React.useRef<string | null>(null);
+    useEffect(() => {
+        const lorasKey = loraManager.selectedLoras.map(l => `${l.id}:${l.strength}`).sort().join(',');
+        
+        // Skip initial sync to avoid overwriting loaded data
+        if (prevLorasKeyRef.current === null) {
+            prevLorasKeyRef.current = lorasKey;
+            return;
+        }
+        
+        // Only update if LoRAs actually changed
+        if (lorasKey !== prevLorasKeyRef.current) {
+            prevLorasKeyRef.current = lorasKey;
+            // Convert to persistence format
+            const lorasToSave = loraManager.selectedLoras.map(l => ({
+                id: l.id,
+                strength: l.strength,
+            }));
+            joinSettings.updateField('loras', lorasToSave);
+        }
+    }, [loraManager.selectedLoras, joinSettings]);
 
     // Handler to clear only the output URL from the parent generation (not delete the generation itself)
     const handleClearParentOutput = useCallback(async () => {
@@ -641,7 +687,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     }, [toast]);
 
     const handleRestoreDefaults = () => {
-        // Reset to defaults using the settings hook
+        // Reset to defaults using the settings hook (including loras)
         joinSettings.updateFields({
             contextFrameCount: 8,
             gapFrameCount: 12,
@@ -649,6 +695,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             keepBridgingImages: true,
             prompt: '',
             negativePrompt: '',
+            loras: [],
         });
         loraManager.setSelectedLoras([]);
         toast({
