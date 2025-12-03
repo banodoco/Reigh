@@ -555,11 +555,18 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         disableAutoLoad: true,
     });
     
-    // Sync loraManager with joinSettings.loras on load
-    const hasInitializedLorasRef = React.useRef(false);
+    // Two-way sync between loraManager (UI state) and joinSettings.loras (persistence)
+    const lorasSyncStateRef = React.useRef<{ initialized: boolean; lastSyncedKey: string }>({
+        initialized: false,
+        lastSyncedKey: '',
+    });
+    
+    // Load saved LoRAs into loraManager on mount (once availableLoras are ready)
     useEffect(() => {
-        if (!hasInitializedLorasRef.current && joinLoras.length > 0 && availableLoras.length > 0) {
-            // Convert persisted format to ActiveLora format
+        if (lorasSyncStateRef.current.initialized || availableLoras.length === 0) return;
+        lorasSyncStateRef.current.initialized = true;
+        
+        if (joinLoras.length > 0) {
             const activeLoras = joinLoras.map(saved => {
                 const fullLora = availableLoras.find(l => l['Model ID'] === saved.id);
                 return {
@@ -569,36 +576,28 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     strength: saved.strength,
                     previewImageUrl: fullLora?.Images?.[0]?.url,
                 };
-            }).filter(l => l.path); // Only include LoRAs we can find
+            }).filter(l => l.path);
             
             if (activeLoras.length > 0) {
                 loraManager.setSelectedLoras(activeLoras);
+                // Set sync key to loaded state to prevent redundant save-back
+                lorasSyncStateRef.current.lastSyncedKey = activeLoras.map(l => `${l.id}:${l.strength}`).sort().join(',');
             }
-            hasInitializedLorasRef.current = true;
         }
     }, [joinLoras, availableLoras, loraManager]);
     
-    // Sync loraManager changes back to joinSettings (for persistence)
-    const prevLorasKeyRef = React.useRef<string | null>(null);
+    // Sync loraManager changes back to joinSettings for persistence
     useEffect(() => {
+        if (!lorasSyncStateRef.current.initialized) return;
+        
         const lorasKey = loraManager.selectedLoras.map(l => `${l.id}:${l.strength}`).sort().join(',');
+        if (lorasKey === lorasSyncStateRef.current.lastSyncedKey) return;
         
-        // Skip initial sync to avoid overwriting loaded data
-        if (prevLorasKeyRef.current === null) {
-            prevLorasKeyRef.current = lorasKey;
-            return;
-        }
-        
-        // Only update if LoRAs actually changed
-        if (lorasKey !== prevLorasKeyRef.current) {
-            prevLorasKeyRef.current = lorasKey;
-            // Convert to persistence format
-            const lorasToSave = loraManager.selectedLoras.map(l => ({
-                id: l.id,
-                strength: l.strength,
-            }));
-            joinSettings.updateField('loras', lorasToSave);
-        }
+        lorasSyncStateRef.current.lastSyncedKey = lorasKey;
+        joinSettings.updateField('loras', loraManager.selectedLoras.map(l => ({
+            id: l.id,
+            strength: l.strength,
+        })));
     }, [loraManager.selectedLoras, joinSettings]);
 
     // Handler to clear only the output URL from the parent generation (not delete the generation itself)
