@@ -110,6 +110,24 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
     description: 'Standalone segment regeneration from segment details view'
   },
 
+  // Video editing/regeneration tasks
+  edit_video_orchestrator: {
+    isVisible: true,
+    displayName: 'Edit Video',
+    supportsProgress: true,
+    canCancel: true,
+    category: 'orchestration',
+    description: 'Regenerate selected portions of a video'
+  },
+
+  // Hidden edit video subtasks
+  edit_video_segment: {
+    isVisible: false,
+    canCancel: true,
+    category: 'processing',
+    description: 'Individual portion regeneration (part of edit video workflow)'
+  },
+
   // Add more task types as needed...
 };
 

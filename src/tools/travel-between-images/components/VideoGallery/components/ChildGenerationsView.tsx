@@ -1389,23 +1389,32 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         setRegenerateSuccess(false);
 
         try {
-            // Use segmentImages which already contains fresh URLs from the main variant
-            // These are fetched via useQuery and reflect the current primary variant
-            const startImageUrl = segmentImages.start?.url;
-            const endImageUrl = segmentImages.end?.url;
-            const startGenId = segmentImages.start?.generationId;
-            const endGenId = segmentImages.end?.generationId;
+            // IMPORTANT: We must use fresh URLs from generations.location (main variant)
+            // Do NOT fall back to cached URLs from params - those may be stale
+            const { startGenId, endGenId } = segmentGenerationIds;
+            
+            // Require generation IDs to ensure we can fetch the current main variant
+            if (!startGenId || !endGenId) {
+                throw new Error("Missing generation IDs for input images. Cannot determine current main variant.");
+            }
+            
+            // Check that fresh URLs have been fetched from the database
+            const startFreshUrl = freshGenerationUrls?.[startGenId]?.location;
+            const endFreshUrl = freshGenerationUrls?.[endGenId]?.location;
+            
+            if (!startFreshUrl || !endFreshUrl) {
+                throw new Error("Fresh image URLs not loaded yet. Please wait a moment and try again.");
+            }
+            
+            const startImageUrl = startFreshUrl;
+            const endImageUrl = endFreshUrl;
 
-            console.log('[RegenerateSegment] Using fresh image URLs from main variants:', {
+            console.log('[RegenerateSegment] Using fresh image URLs from generations.location (main variant):', {
                 startImageUrl: startImageUrl?.substring(0, 50),
                 endImageUrl: endImageUrl?.substring(0, 50),
                 startGenId: startGenId?.substring(0, 8),
                 endGenId: endGenId?.substring(0, 8),
             });
-
-            if (!startImageUrl || !endImageUrl) {
-                throw new Error("Could not determine input images for this segment");
-            }
 
             // Convert selectedLoras to the format expected by the task
             const lorasForTask = selectedLoras.map(lora => ({
@@ -1496,7 +1505,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         index, 
         params, 
         selectedLoras, 
-        segmentImages,
+        segmentGenerationIds,
+        freshGenerationUrls,
         amountOfMotion,
         advancedMode, 
         phaseConfig, 

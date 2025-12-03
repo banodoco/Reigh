@@ -850,7 +850,7 @@ const VideoTravelToolPage: React.FC = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Sort mode for shots - persisted per project
-  const shotSortMode = projectUISettings?.shotSortMode ?? 'ordered';
+  const shotSortMode = projectUISettings?.shotSortMode ?? 'newest';
   const setShotSortMode = useCallback((mode: 'ordered' | 'newest' | 'oldest') => {
     updateProjectUISettings?.('project', { shotSortMode: mode });
   }, [updateProjectUISettings]);
@@ -2071,17 +2071,9 @@ const VideoTravelToolPage: React.FC = () => {
           {/* Shot List Header - Constrained */}
           <div className="px-4 max-w-7xl mx-auto pt-6 pb-4">
             <div className="flex flex-col gap-3 sm:gap-4">
-              {/* Title row with New Shot button */}
+              {/* Title row */}
               <div className="flex items-center justify-between">
                 <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
-                <Button
-                  onClick={handleCreateNewShot}
-                  variant="default"
-                  size="sm"
-                  className="whitespace-nowrap"
-                >
-                  New Shot
-                </Button>
               </div>
               {/* Controls row */}
               <div className="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">

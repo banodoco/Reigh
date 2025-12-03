@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { AppEnv, type AppEnvValue } from '../types/env';
-import { Camera, Palette, Zap, Crown, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye, Users, Link2 } from 'lucide-react';
+import { Camera, Palette, Zap, Crown, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye, Users, Link2, Clapperboard } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback, createContext, useContext } from 'react';
 import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
@@ -85,6 +85,17 @@ const assistantTools = [
     accent: 'wes-yellow',
   },
   {
+    id: 'edit-video',
+    name: 'Edit Videos',
+    description: 'Regenerate video portions.',
+    descriptionMobile: 'Fix & regenerate',
+    subtext: 'Regenerate portions',
+    tool: toolsUIManifest.find(t => t.id === 'edit-video'),
+    icon: Clapperboard,
+    gradient: 'from-wes-coral via-wes-salmon to-wes-pink',
+    accent: 'wes-coral',
+  },
+  {
     id: 'join-clips',
     name: 'Join Clips',
     description: 'Seamlessly connect video clips.',
@@ -117,6 +128,18 @@ const assistantTools = [
     gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
     accent: 'wes-dusty-blue',
     comingSoon: true,
+  },
+  {
+    id: 'empty-placeholder',
+    name: '',
+    description: '',
+    descriptionMobile: '',
+    subtext: '',
+    tool: null,
+    icon: Sparkles, // Won't be shown
+    gradient: '',
+    accent: '',
+    isEmpty: true,
   },
 ];
 
@@ -199,6 +222,15 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
       setIsWiggling(false);
     }, 600); // Match animation duration
   };
+
+  // Handle empty placeholder - render empty card for grid layout
+  if (item.isEmpty) {
+    return (
+      <div className="wes-tool-card h-full opacity-40" aria-hidden="true">
+        {/* Empty card - just the background styling, no content */}
+      </div>
+    );
+  }
 
   // Special handling for character-animate: show as disabled when not in cloud mode
   // For other tools, use comingSoon flag or missing tool to determine disabled state
@@ -456,16 +488,18 @@ const ToolSelectorPage: React.FC = () => {
   const topMargin = isLg ? 'mt-0' : isSm ? 'mt-0' : 'mt-0';
   const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';
 
-  // Filter visible assistant tools excluding "More Soon"
-  const visibleAssistantTools = assistantTools.filter(t => t.id !== 'moon-soon' && isToolVisible(t.tool, t.id));
+  // Filter visible assistant tools excluding special placeholder items
+  const visibleAssistantTools = assistantTools.filter(t => 
+    t.id !== 'moon-soon' && t.id !== 'empty-placeholder' && isToolVisible(t.tool, t.id)
+  );
   
-  // Determine if "More Soon" should be shown to avoid gaps in the grid
+  // Determine if "More Soon" and empty placeholder should be shown to avoid gaps in the grid
   // Logic adapts to the column count: 2 columns on mobile (< sm), 3 columns on desktop/tablet (>= sm)
   const columns = isSm ? 3 : 2;
   const remainder = visibleAssistantTools.length % columns;
-  // Only show "More Soon" if we have exactly (columns - 1) items in the last row
-  // This fills the single gap to make a complete row
-  const shouldShowMoreSoon = remainder === columns - 1;
+  
+  // Show "More Soon" if last row is incomplete (any empty slots)
+  const shouldShowMoreSoon = remainder !== 0;
   
   // Construct final list of assistant tools to display
   const displayedAssistantTools = [...visibleAssistantTools];
@@ -473,6 +507,16 @@ const ToolSelectorPage: React.FC = () => {
     const moreSoonTool = assistantTools.find(t => t.id === 'moon-soon');
     if (moreSoonTool) {
       displayedAssistantTools.push(moreSoonTool);
+    }
+    
+    // Check if we still have an empty slot after adding "More Soon"
+    // If so, add an empty placeholder to complete the row
+    const newRemainder = displayedAssistantTools.length % columns;
+    if (newRemainder !== 0) {
+      const emptyPlaceholder = assistantTools.find(t => t.id === 'empty-placeholder');
+      if (emptyPlaceholder) {
+        displayedAssistantTools.push(emptyPlaceholder);
+      }
     }
   }
 

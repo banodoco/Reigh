@@ -9,3 +9,4 @@
 - Remember: you can run commands like "git diff | cat" in your environment.
 - NEVER proactively create documentation files (*.md) unless explicitly requested by the user. Only create documentation when specifically asked.
 - After each change, review what you've done and how it relates to the task, and ask yourself "Did I unintentionally delete or edit something out of scope?"
+- When using toast notifications, only show toasts for errors - do not show positive/success toasts for task creation or similar successful operations.

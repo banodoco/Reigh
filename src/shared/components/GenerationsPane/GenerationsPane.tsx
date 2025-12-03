@@ -56,13 +56,12 @@ const GenerationsPaneComponent: React.FC = () => {
   // Check if we're on the generations page or image generation tool page
   const isOnGenerationsPage = location.pathname === '/generations';
   const isOnImageGenerationPage = location.pathname === '/tools/image-generation';
-  const isOnVideoTravelPage = location.pathname === '/tools/travel-between-images';
   
   // Get current project's aspect ratio
   const { selectedProjectId, projects } = useProject();
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;
-  const shouldEnableDataLoading = isOnGenerationsPage || ((isOnImageGenerationPage || isOnVideoTravelPage) && isGenerationsPaneOpen);
+  const shouldEnableDataLoading = isOnGenerationsPage || isGenerationsPaneOpen;
   
   const isMobile = useIsMobile();
   const { currentShotId } = useCurrentShot();

@@ -10,6 +10,158 @@ import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging'
 import { transformGeneration, type RawGeneration, type TransformOptions } from '@/shared/lib/generationTransformers';
 
 /**
+ * Fetch edit variants from generation_variants table for a project
+ * Filters by tool_type in params (set by complete_task)
+ * 
+ * NOTE: Requires the project_id column on generation_variants (added via migration)
+ * The column is auto-populated by a trigger from the parent generation
+ */
+async function fetchEditVariants(
+  projectId: string,
+  limit: number,
+  offset: number,
+  filters?: {
+    toolType?: string;
+    mediaType?: 'all' | 'image' | 'video';
+    sort?: 'newest' | 'oldest';
+    parentsOnly?: boolean; // Exclude child variants (those with parent_variant_id in params)
+  }
+): Promise<{
+  items: GeneratedImageWithMetadata[];
+  total: number;
+  hasMore: boolean;
+}> {
+  const toolType = filters?.toolType; // Optional - if not provided, fetch all variants
+  const sort = filters?.sort || 'newest';
+  const mediaType = filters?.mediaType || 'all';
+  const parentsOnly = filters?.parentsOnly ?? true; // Default to parents only
+  console.log('[EditVariants] Fetching variants for project', { projectId: projectId.substring(0, 8), toolType: toolType || 'all', mediaType, parentsOnly, limit, offset });
+
+  // Build count query
+  let countQuery = supabase
+    .from('generation_variants')
+    .select('*', { count: 'exact', head: true })
+    .eq('project_id', projectId);
+  
+  // Only filter by toolType if specified
+  if (toolType) {
+    countQuery = countQuery.eq('params->>tool_type', toolType);
+  }
+  
+  // Filter by media type - variants don't have a type column, so filter by URL extension
+  if (mediaType === 'video') {
+    countQuery = countQuery.or('location.ilike.%.mp4,location.ilike.%.webm,location.ilike.%.mov');
+  } else if (mediaType === 'image') {
+    countQuery = countQuery.not('location', 'ilike', '%.mp4').not('location', 'ilike', '%.webm').not('location', 'ilike', '%.mov');
+  }
+  
+  // Exclude child variants (those created from another variant)
+  if (parentsOnly) {
+    countQuery = countQuery.is('params->>parent_variant_id', null);
+  }
+
+  const { count, error: countError } = await countQuery;
+
+  if (countError) {
+    console.error('[EditVariants] Count query error:', countError);
+    throw countError;
+  }
+
+  const totalCount = count || 0;
+  console.log('[EditVariants] Total variants count:', totalCount, 'mediaType:', mediaType);
+
+  if (totalCount === 0) {
+    return { items: [], total: 0, hasMore: false };
+  }
+
+  // Data query with pagination
+  const ascending = sort === 'oldest';
+  let dataQuery = supabase
+    .from('generation_variants')
+    .select(`
+      id,
+      generation_id,
+      location,
+      thumbnail_url,
+      params,
+      variant_type,
+      name,
+      created_at
+    `)
+    .eq('project_id', projectId);
+  
+  // Only filter by toolType if specified
+  if (toolType) {
+    dataQuery = dataQuery.eq('params->>tool_type', toolType);
+  }
+  
+  // Filter by media type in data query too
+  if (mediaType === 'video') {
+    dataQuery = dataQuery.or('location.ilike.%.mp4,location.ilike.%.webm,location.ilike.%.mov');
+  } else if (mediaType === 'image') {
+    dataQuery = dataQuery.not('location', 'ilike', '%.mp4').not('location', 'ilike', '%.webm').not('location', 'ilike', '%.mov');
+  }
+  
+  // Exclude child variants in data query too
+  if (parentsOnly) {
+    dataQuery = dataQuery.is('params->>parent_variant_id', null);
+  }
+  
+  dataQuery = dataQuery
+    .order('created_at', { ascending })
+    .range(offset, offset + limit - 1);
+
+  const { data, error } = await dataQuery;
+
+  if (error) {
+    console.error('[EditVariants] Data query error:', error);
+    throw error;
+  }
+
+  console.log('[EditVariants] Fetched', data?.length || 0, 'variants');
+
+  // Helper to detect if a variant is a video based on URL
+  const isVideoUrl = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
+    return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+  };
+
+  // Transform variants to GeneratedImageWithMetadata format
+  const items: GeneratedImageWithMetadata[] = (data || []).map((variant: any) => {
+    const isVideo = isVideoUrl(variant.location);
+    return {
+      id: variant.id,
+      url: variant.location,
+      thumbUrl: variant.thumbnail_url || variant.location,
+      isVideo,
+      createdAt: variant.created_at,
+      starred: false, // Variants don't have starred flag
+      metadata: {
+        prompt: variant.params?.prompt,
+        variant_type: variant.variant_type,
+        name: variant.name,
+        generation_id: variant.generation_id,
+        tool_type: variant.params?.tool_type || toolType,
+        created_from: variant.params?.created_from,
+        source_task_id: variant.params?.source_task_id, // Task ID for fetching task details
+      },
+      shot_id: undefined,
+      position: undefined,
+      all_shot_associations: undefined,
+    };
+  });
+
+  // Media type filtering is now done in the database query
+
+  return {
+    items,
+    total: totalCount,
+    hasMore: offset + items.length < totalCount,
+  };
+}
+
+/**
  * Fetch generations using direct Supabase call with pagination support
  */
 export async function fetchGenerations(
@@ -26,6 +178,9 @@ export async function fetchGenerations(
     includeChildren?: boolean;
     parentGenerationId?: string;
     sort?: 'newest' | 'oldest';
+    editsOnly?: boolean; // Filter for images with based_on set (derived/edited images)
+    parentsOnly?: boolean; // For variants: exclude child variants (those with parent_variant_id)
+    variantsOnly?: boolean; // Fetch edit variants from generation_variants table
   }
 ): Promise<{
   items: GeneratedImageWithMetadata[];
@@ -35,6 +190,16 @@ export async function fetchGenerations(
 
   if (!projectId) {
     return { items: [], total: 0, hasMore: false };
+  }
+
+  // Special path for variantsOnly - fetch from generation_variants table
+  if (filters?.variantsOnly) {
+    return fetchEditVariants(projectId, limit, offset, {
+      toolType: filters.toolType,
+      mediaType: filters.mediaType,
+      sort: filters.sort,
+      parentsOnly: filters.parentsOnly ?? true, // Default to parents only
+    });
   }
 
   // Build count query
@@ -84,6 +249,11 @@ export async function fetchGenerations(
   // Apply starred filter if provided
   if (filters?.starredOnly) {
     countQuery = countQuery.eq('starred', true);
+  }
+
+  // Apply edits only filter - show generations that are derived from another (based_on is set)
+  if (filters?.editsOnly) {
+    countQuery = countQuery.not('based_on', 'is', null);
   }
 
   // Apply search filter to count query
@@ -184,6 +354,11 @@ export async function fetchGenerations(
   // Apply starred filter to data query
   if (filters?.starredOnly) {
     dataQuery = dataQuery.eq('starred', true);
+  }
+
+  // Apply edits only filter to data query - show generations that are derived from another (based_on is set)
+  if (filters?.editsOnly) {
+    dataQuery = dataQuery.not('based_on', 'is', null);
   }
 
   // Apply search filter to data query
@@ -410,6 +585,9 @@ export function useGenerations(
     includeChildren?: boolean;
     parentGenerationId?: string;
     sort?: 'newest' | 'oldest';
+    editsOnly?: boolean; // Filter for images with based_on set (derived/edited images)
+    parentsOnly?: boolean; // For variants: exclude child variants (those with parent_variant_id)
+    variantsOnly?: boolean; // Fetch edit variants from generation_variants table
   },
   options?: {
     disablePolling?: boolean; // Disable smart polling (useful for long-running tasks)

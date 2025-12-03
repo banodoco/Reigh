@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
-import { Image, LayoutGrid, Upload } from 'lucide-react';
+import { Image, LayoutGrid, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
 import { ReighLoading } from '@/shared/components/ReighLoading';
 import { toast } from 'sonner';
@@ -15,12 +15,36 @@ import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { generateClientThumbnail, uploadImageWithThumbnail } from '@/shared/lib/clientThumbnailGenerator';
+import MediaLightbox from '@/shared/components/MediaLightbox';
+import { useGetTask } from '@/shared/hooks/useTasks';
+import { deriveInputImages } from '@/shared/components/ImageGallery/utils';
+
+const TOOL_TYPE = 'edit-images';
+const TOOL_TYPE_NAME = 'Edit Images';
 
 export default function EditImagesPage() {
   const { selectedProjectId } = useProject();
   const [selectedMedia, setSelectedMedia] = useState<GenerationRow | null>(null);
+  const [lightboxMedia, setLightboxMedia] = useState<GenerationRow | null>(null); // For viewing results in lightbox
   const [isUploading, setIsUploading] = useState(false);
+  const [resultsPage, setResultsPage] = useState(1);
+  const [showResults, setShowResults] = useState(true);
   const isMobile = useIsMobile();
+  const { data: shots } = useListShots(selectedProjectId);
+  
+  // Fetch edit variants - all variants from generation_variants table (edits created via inpaint, magic edit, etc.)
+  const {
+    data: resultsData,
+    isLoading: isResultsLoading,
+  } = useGenerations(
+    selectedProjectId || null,
+    resultsPage,
+    12,
+    true,
+    {
+      variantsOnly: true, // Fetch edit variants from generation_variants table
+    }
+  );
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -101,84 +125,230 @@ export default function EditImagesPage() {
 
   const isEditingOnMobile = selectedMedia && isMobile;
 
+  // Get results items for navigation
+  const resultsItems = (resultsData as any)?.items || [];
+  const [lightboxIndex, setLightboxIndex] = useState<number>(-1);
+
+  // Transform variant data to GenerationRow format for lightbox
+  const transformVariantToGeneration = (media: any): GenerationRow => {
+    return {
+      id: media.metadata?.generation_id || media.id,
+      location: media.url,
+      thumbnail_url: media.thumbUrl,
+      type: 'image',
+      created_at: media.createdAt,
+      params: {
+        prompt: media.metadata?.prompt,
+        tool_type: media.metadata?.tool_type,
+        variant_type: media.metadata?.variant_type,
+        variant_id: media.id,
+      },
+      project_id: selectedProjectId || '',
+      starred: media.starred || false,
+    } as GenerationRow;
+  };
+
+  const handleResultClick = (media: any) => {
+    const index = resultsItems.findIndex((item: any) => item.id === media.id);
+    setLightboxIndex(index);
+    setLightboxMedia(transformVariantToGeneration(media));
+  };
+
+  const handleLightboxNext = () => {
+    if (lightboxIndex < resultsItems.length - 1) {
+      const nextIndex = lightboxIndex + 1;
+      setLightboxIndex(nextIndex);
+      setLightboxMedia(transformVariantToGeneration(resultsItems[nextIndex]));
+    }
+  };
+
+  const handleLightboxPrevious = () => {
+    if (lightboxIndex > 0) {
+      const prevIndex = lightboxIndex - 1;
+      setLightboxIndex(prevIndex);
+      setLightboxMedia(transformVariantToGeneration(resultsItems[prevIndex]));
+    }
+  };
+
+  const handleLightboxClose = () => {
+    setLightboxMedia(null);
+    setLightboxIndex(-1);
+  };
+
+  // Get task ID from current lightbox variant for task details
+  const currentTaskId = useMemo(() => {
+    if (lightboxIndex >= 0 && resultsItems[lightboxIndex]) {
+      const item = resultsItems[lightboxIndex];
+      // Task ID is stored in metadata.source_task_id (from variant params)
+      return item.metadata?.source_task_id || null;
+    }
+    return null;
+  }, [lightboxIndex, resultsItems]);
+
+  // Fetch task data for the current lightbox item
+  const { data: taskData, isLoading: isLoadingTask, error: taskError } = useGetTask(currentTaskId);
+
+  // Derive input images from task params
+  const inputImages = useMemo(() => {
+    if (!taskData?.params) return [];
+    return deriveInputImages(taskData.params as Record<string, unknown>);
+  }, [taskData]);
+
+  // Helper to render the results gallery (used in both views)
+  const renderResultsGallery = () => {
+    if (!(resultsData as any)?.items?.length) return null;
+    
+    return (
+      <div className="mt-6 pb-6">
+        <button 
+          onClick={() => setShowResults(!showResults)}
+          className="flex items-center gap-2 text-lg font-medium mb-4 hover:text-primary transition-colors"
+        >
+          Edited Images
+          {showResults ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          <span className="text-sm text-muted-foreground font-normal">
+            ({(resultsData as any)?.total || 0})
+          </span>
+        </button>
+        
+        {showResults && (
+          <ImageGallery
+            images={(resultsData as any)?.items || []}
+            allShots={shots || []}
+            onImageClick={handleResultClick}
+            currentToolType={TOOL_TYPE}
+            currentToolTypeName={TOOL_TYPE_NAME}
+            itemsPerPage={12}
+            offset={(resultsPage - 1) * 12}
+            totalCount={(resultsData as any)?.total || 0}
+            onServerPageChange={setResultsPage}
+            serverPage={resultsPage}
+            showDelete={false}
+            showDownload={true}
+            showShare={false}
+            showEdit={false}
+            showStar={true}
+            showAddToShot={true}
+            enableSingleClick={true}
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className={cn(
       "w-full flex flex-col",
-      isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "h-[calc(100dvh-96px)]"
+      isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "min-h-[calc(100dvh-96px)]"
     )}>
       {!selectedMedia ? (
-        <div className="w-full h-full px-4">
-          <div className="max-w-7xl mx-auto h-full flex flex-col md:flex-row bg-transparent">
-            {/* Left Panel - Placeholder */}
-            <div 
-              className="relative flex items-center justify-center bg-black w-full h-[20%] md:w-[60%] md:h-full md:flex-1 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl overflow-hidden"
-            >
-             <div className="bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 p-6 md:p-8 flex flex-col items-center justify-center space-y-4 md:space-y-6 max-w-md mx-4">
-                <div className="text-center space-y-1 md:space-y-2">
-                  <h1 className="text-xl md:text-3xl font-light tracking-tight">Edit Images</h1>
-                  <p className="text-muted-foreground text-xs md:text-base hidden md:block">
-                    Select an image from the right or upload a new one to start editing.
-                  </p>
-                </div>
+        <div className="w-full px-4 overflow-y-auto">
+          <div className="max-w-7xl mx-auto">
+            {/* Selection UI - reduced height */}
+            <div className="flex flex-col md:flex-row bg-transparent" style={{ height: isMobile ? '60vh' : '65vh' }}>
+              {/* Left Panel - Placeholder */}
+              <div 
+                className="relative flex items-center justify-center bg-black w-full h-[30%] md:w-[60%] md:h-full md:flex-1 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl overflow-hidden"
+              >
+               <div className="bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 p-6 md:p-8 flex flex-col items-center justify-center space-y-4 md:space-y-6 max-w-md mx-4">
+                  <div className="text-center space-y-1 md:space-y-2">
+                    <h1 className="text-xl md:text-3xl font-light tracking-tight">Edit Images</h1>
+                    <p className="text-muted-foreground text-xs md:text-base hidden md:block">
+                      Select an image from the right or upload a new one to start editing.
+                    </p>
+                  </div>
 
-                <div className="relative w-full max-w-xs">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                    onChange={handleFileUpload}
-                    disabled={isUploading}
-                  />
-                  <Button variant="outline" size="lg" className="w-full gap-2" disabled={isUploading}>
-                    <Upload className="w-4 h-4" />
-                    {isUploading ? "Uploading..." : "Upload Image"}
-                  </Button>
-                </div>
-             </div>
-          </div>
-
-          {/* Right Panel - Selection UI */}
-          <div 
-            className={cn(
-              "bg-background border-t md:border-t-0 md:border-l border-border overflow-hidden relative z-[60] flex flex-col w-full h-[80%] md:w-[40%] md:h-full rounded-b-2xl md:rounded-none md:rounded-r-xl"
-            )}
-          >
-             <ImageSelectionModal 
-               onSelect={(media) => setSelectedMedia(media)} 
-             />
+                  <div className="relative w-full max-w-xs">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      onChange={handleFileUpload}
+                      disabled={isUploading}
+                    />
+                    <Button variant="outline" size="lg" className="w-full gap-2" disabled={isUploading}>
+                      <Upload className="w-4 h-4" />
+                      {isUploading ? "Uploading..." : "Upload Image"}
+                    </Button>
+                  </div>
+               </div>
             </div>
+
+            {/* Right Panel - Selection UI */}
+            <div 
+              className={cn(
+                "bg-background border-t md:border-t-0 md:border-l border-border overflow-hidden relative z-[60] flex flex-col w-full h-[70%] md:w-[40%] md:h-full rounded-b-2xl md:rounded-none md:rounded-r-xl"
+              )}
+            >
+               <ImageSelectionModal 
+                 onSelect={(media) => setSelectedMedia(media)} 
+               />
+              </div>
+            </div>
+            
+            {/* Results Gallery - visible in main view */}
+            {renderResultsGallery()}
           </div>
         </div>
       ) : (
-        <div className="w-full h-full px-4 overflow-hidden">
-          <div className={cn(
-            "max-w-7xl mx-auto relative",
-            isEditingOnMobile ? "flex flex-col min-h-full" : "h-full overflow-hidden"
-          )}>
-            <InlineEditView 
-              media={selectedMedia} 
-              onClose={() => setSelectedMedia(null)}
-            onImageSaved={async (newUrl, createNew) => {
-              console.log("Image saved:", newUrl, createNew);
-            }}
-            onNavigateToGeneration={async (generationId) => {
-              try {
-                const { data, error } = await supabase
-                  .from('generations')
-                  .select('*')
-                  .eq('id', generationId)
-                  .single();
-                
-                if (data && !error) {
-                  setSelectedMedia(data as any);
-                }
-              } catch (e) {
-                console.error("Failed to navigate to generation", e);
-              }
-            }}
-            />
+        <div className="w-full px-4 overflow-y-auto" style={{ minHeight: 'calc(100dvh - 96px)' }}>
+          <div className="max-w-7xl mx-auto relative">
+            <div className={cn(
+              isEditingOnMobile ? "flex flex-col min-h-[60vh]" : "h-[70vh]"
+            )}>
+              <InlineEditView 
+                media={selectedMedia} 
+                onClose={() => setSelectedMedia(null)}
+                onImageSaved={async (newUrl, createNew) => {
+                  console.log("Image saved:", newUrl, createNew);
+                }}
+                onNavigateToGeneration={async (generationId) => {
+                  try {
+                    const { data, error } = await supabase
+                      .from('generations')
+                      .select('*')
+                      .eq('id', generationId)
+                      .single();
+                    
+                    if (data && !error) {
+                      setSelectedMedia(data as any);
+                    }
+                  } catch (e) {
+                    console.error("Failed to navigate to generation", e);
+                  }
+                }}
+              />
+            </div>
+            
+            {/* Results Gallery - also visible when editing */}
+            {renderResultsGallery()}
           </div>
         </div>
+      )}
+      
+      {/* MediaLightbox for viewing results */}
+      {lightboxMedia && (
+        <MediaLightbox
+          media={lightboxMedia}
+          onClose={handleLightboxClose}
+          toolTypeOverride="edit-images"
+          starred={lightboxMedia.starred ?? false}
+          showMagicEdit={true}
+          showNavigation={true}
+          allShots={shots || []}
+          onNext={lightboxIndex < resultsItems.length - 1 ? handleLightboxNext : undefined}
+          onPrevious={lightboxIndex > 0 ? handleLightboxPrevious : undefined}
+          hasNext={lightboxIndex < resultsItems.length - 1}
+          hasPrevious={lightboxIndex > 0}
+          showTaskDetails={true}
+          taskDetailsData={{
+            task: taskData,
+            isLoading: isLoadingTask,
+            error: taskError,
+            inputImages,
+            taskId: currentTaskId,
+          }}
+        />
       )}
     </div>
   );
@@ -244,6 +414,8 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
                images={(generationsData as any)?.items || []}
                onImageClick={(media) => onSelect(media as any)}
                allShots={shots || []}
+               currentToolType={TOOL_TYPE}
+               currentToolTypeName={TOOL_TYPE_NAME}
                showShotFilter={true}
                initialShotFilter={shotFilter}
                onShotFilterChange={setShotFilter}

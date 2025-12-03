@@ -5,6 +5,7 @@ export { editTravelSettings } from './edit-travel/settings';
 export { characterAnimateSettings } from './character-animate/settings';
 export { joinClipsSettings } from './join-clips/settings';
 export { editImagesSettings } from './edit-images/settings';
+export { editVideoSettings } from './edit-video/settings';
 export { userPreferencesSettings } from '../shared/settings/userPreferences';
 
 // Tool manifest for UI discovery and automatic registration
@@ -14,9 +15,10 @@ import { editTravelSettings } from './edit-travel/settings';
 import { characterAnimateSettings } from './character-animate/settings';
 import { joinClipsSettings } from './join-clips/settings';
 import { editImagesSettings } from './edit-images/settings';
+import { editVideoSettings } from './edit-video/settings';
 import { userPreferencesSettings } from '../shared/settings/userPreferences';
 import { AppEnv, LOCAL_ENVS, type AppEnvValue } from '../types/env';
-import { Paintbrush, Video, Edit, Users, Link2 } from 'lucide-react';
+import { Paintbrush, Video, Edit, Users, Link2, Film } from 'lucide-react';
 
 export const toolsManifest = [
   videoTravelSettings,
@@ -25,6 +27,7 @@ export const toolsManifest = [
   characterAnimateSettings,
   joinClipsSettings,
   editImagesSettings,
+  editVideoSettings,
   userPreferencesSettings,
 ] as const;
 
@@ -113,6 +116,18 @@ export const toolsUIManifest: ToolUIDefinition[] = [
     gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
     accent: 'wes-yellow',
     ornament: '✦',
+    badge: 'New',
+  },
+  {
+    id: editVideoSettings.id,
+    name: 'Edit Videos',
+    path: '/tools/edit-video',
+    description: 'Regenerate portions of videos with AI to fix issues or create variations.',
+    environments: [AppEnv.LOCAL, AppEnv.WEB],
+    icon: Film,
+    gradient: 'from-wes-coral via-wes-salmon to-wes-pink',
+    accent: 'wes-coral',
+    ornament: '◇',
     badge: 'New',
   },
 ]; 

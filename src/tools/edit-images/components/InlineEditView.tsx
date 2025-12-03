@@ -94,6 +94,7 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
     imageDimensions,
     handleExitInpaintMode: () => {},
     loras: editModeLoRAs,
+    toolTypeOverride: 'edit-images',
   });
   const {
     isInpaintMode,
@@ -147,7 +148,8 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
     sourceUrlForTasks,
     imageDimensions,
     isInSceneBoostEnabled,
-    setIsInSceneBoostEnabled
+    setIsInSceneBoostEnabled,
+    toolTypeOverride: 'edit-images',
   });
   const {
     isCreatingMagicEditTasks,

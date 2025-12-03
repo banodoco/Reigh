@@ -161,27 +161,27 @@ export const TrimTimelineBar: React.FC<TrimTimelineBarProps> = ({
           </div>
         )}
 
-        {/* Start handle */}
+        {/* Start handle - wider touch target (40px) for touch devices */}
         <div
           className={cn(
-            'absolute top-0 bottom-0 w-4 cursor-ew-resize z-10 flex items-center justify-center',
+            'absolute top-0 bottom-0 w-10 cursor-ew-resize z-10 flex items-center justify-center',
             'hover:bg-primary/20 transition-colors',
             isDragging === 'start' && 'bg-primary/30'
           )}
-          style={{ left: `calc(${startPercent}% - 8px)` }}
+          style={{ left: `calc(${startPercent}% - 20px)` }}
           onPointerDown={handlePointerDown('start')}
         >
           <div className="w-1 h-8 bg-primary rounded-full shadow-md" />
         </div>
 
-        {/* End handle */}
+        {/* End handle - wider touch target (40px) for touch devices */}
         <div
           className={cn(
-            'absolute top-0 bottom-0 w-4 cursor-ew-resize z-10 flex items-center justify-center',
+            'absolute top-0 bottom-0 w-10 cursor-ew-resize z-10 flex items-center justify-center',
             'hover:bg-primary/20 transition-colors',
             isDragging === 'end' && 'bg-primary/30'
           )}
-          style={{ right: `calc(${endPercent}% - 8px)` }}
+          style={{ right: `calc(${endPercent}% - 20px)` }}
           onPointerDown={handlePointerDown('end')}
         >
           <div className="w-1 h-8 bg-primary rounded-full shadow-md" />

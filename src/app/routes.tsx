@@ -19,6 +19,7 @@ import JoinClipsPage from '@/tools/join-clips/pages/JoinClipsPage';
 // Keep other heavy tools lazy-loaded to preserve bundle size
 const EditTravelToolPage = lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
 const EditImagesPage = lazy(() => import('@/tools/edit-images/pages/EditImagesPage'));
+const EditVideoPage = lazy(() => import('@/tools/edit-video/pages/EditVideoPage'));
 const TrainingDataHelperPage = lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
 import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will be moved here or created
 import { LastAffectedShotProvider } from '@/shared/contexts/LastAffectedShotContext';
@@ -120,6 +121,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<LazyLoadingFallback />}>
             <EditImagesPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/tools/edit-video',
+        element: (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <EditVideoPage />
           </Suspense>
         ),
       },

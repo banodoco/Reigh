@@ -72,6 +72,17 @@ export interface JoinClipsPerJoinSettings {
  * Interface for join clips task parameters
  * Supports both the legacy two-video API and the new multi-clip orchestration flow
  */
+/**
+ * Frame-accurate portion selection for video editing
+ */
+export interface PortionToRegenerate {
+  start_frame: number;
+  end_frame: number;
+  start_time_seconds: number;
+  end_time_seconds: number;
+  frame_count: number;
+}
+
 export interface JoinClipsTaskParams {
   project_id: string;
 
@@ -102,6 +113,15 @@ export interface JoinClipsTaskParams {
   priority?: number;
   loras?: Array<{ path: string; strength: number }>; // LoRA models to apply
   parent_generation_id?: string;
+  tool_type?: string; // Tool type identifier for filtering results
+  
+  // Video edit mode - for regenerating portions of a single video
+  video_edit_mode?: boolean;
+  source_video_url?: string;
+  source_video_fps?: number;
+  source_video_duration?: number;
+  source_video_total_frames?: number;
+  portions_to_regenerate?: PortionToRegenerate[];
 }
 
 /**
@@ -305,6 +325,16 @@ function buildJoinClipsPayload(
   if (params.loras && params.loras.length > 0) {
     orchestratorDetails.additional_loras = mapLorasToRecord(params.loras);
   }
+  
+  // Video edit mode - for regenerating portions of a single video
+  if (params.video_edit_mode) {
+    orchestratorDetails.video_edit_mode = true;
+    orchestratorDetails.source_video_url = params.source_video_url;
+    orchestratorDetails.source_video_fps = params.source_video_fps;
+    orchestratorDetails.source_video_duration = params.source_video_duration;
+    orchestratorDetails.source_video_total_frames = params.source_video_total_frames;
+    orchestratorDetails.portions_to_regenerate = params.portions_to_regenerate;
+  }
 
   const totalJoins = Math.max(clipSequence.length - 1, 0);
   if (totalJoins > 0) {
@@ -349,6 +379,7 @@ function buildJoinClipsPayload(
   return {
     orchestrator_details: orchestratorDetails,
     parent_generation_id: params.parent_generation_id,
+    ...(params.tool_type && { tool_type: params.tool_type }),
   };
 }
 
