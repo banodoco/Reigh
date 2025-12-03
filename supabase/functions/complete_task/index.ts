@@ -870,11 +870,14 @@ serve(async (req) => {
                 }
                 
                 // Build params for the upscaled variant
+                // CRITICAL: Preserve tool_type from source generation for proper filtering in the gallery
                 const upscaleParams = {
                   ...(sourceGen?.params || {}),
                   upscale_task_id: taskIdString,
                   upscaled_from: taskData.params?.image || null,
-                  upscale_model: taskData.params?.model || 'unknown'
+                  upscale_model: taskData.params?.model || 'unknown',
+                  // Preserve original tool_type if present, otherwise use 'image-generation' as fallback
+                  tool_type: sourceGen?.params?.tool_type || 'image-generation'
                 };
                 
                 // Create the upscaled variant as the NEW primary
@@ -1122,9 +1125,18 @@ serve(async (req) => {
                       console.log(`[OrchestratorComplete] Creating variant for parent generation ${parentGenId}`);
                       
                       try {
+                        // Fetch parent generation to get existing params
+                        const { data: parentGen } = await supabaseAdmin
+                          .from('generations')
+                          .select('params')
+                          .eq('id', parentGenId)
+                          .single();
+                        
                         // Build variant params
+                        // CRITICAL: Include tool_type for proper filtering in the gallery
                         const variantParams = {
                           ...orchestratorTask.params,
+                          tool_type: orchestratorTask.params?.tool_type || 'join-clips',
                           source_task_id: taskIdString,
                           orchestrator_task_id: orchestratorTaskId,
                           created_from: 'join_clips_complete',
@@ -1143,12 +1155,19 @@ serve(async (req) => {
                         );
 
                         // Update generation record with new location
+                        // CRITICAL: Also update params to include tool_type for proper filtering
+                        const updatedParams = {
+                          ...(parentGen?.params || {}),
+                          tool_type: orchestratorTask.params?.tool_type || 'join-clips',
+                        };
+                        
                         const { error: updateGenError } = await supabaseAdmin
                           .from('generations')
                           .update({
                             location: publicUrl,
                             thumbnail_url: thumbnailUrl,
-                            type: 'video'
+                            type: 'video',
+                            params: updatedParams
                           })
                           .eq('id', parentGenId);
                         
@@ -2265,7 +2284,14 @@ async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: st
     
     // Use orchestrator task params if available, otherwise fall back to segment params
     // This ensures we have useful params for the parent generation even if orchestrator query failed
-    const placeholderParams = orchTask?.params || segmentParams || {};
+    // CRITICAL: Ensure tool_type is set for proper filtering in the gallery
+    const baseParams = orchTask?.params || segmentParams || {};
+    const placeholderParams = {
+      ...baseParams,
+      // If orchestrator params are available, use their tool_type; otherwise default to travel-between-images
+      // (since this function is only called for travel orchestrators)
+      tool_type: baseParams.tool_type || 'travel-between-images'
+    };
     
     const placeholderRecord = {
       id: newId,
