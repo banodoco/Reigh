@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Input } from '@/shared/components/ui/input';
@@ -15,6 +15,27 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
+
+/**
+ * Quantize total generation frames to 4N+1 format (required by Wan models)
+ * Valid values: 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81...
+ * 
+ * For VACE models (used in join clips), minimum is 17 frames.
+ */
+function quantizeTotalFrames(total: number, minTotal: number = 17): number {
+    // Quantize to 4N+1 format
+    const quantized = Math.round((total - 1) / 4) * 4 + 1;
+    return Math.max(minTotal, quantized);
+}
+
+/**
+ * Get quantized gap frames for a given context, ensuring total = 2*context + gap is 4N+1
+ */
+function getQuantizedGap(desiredGap: number, context: number, minTotal: number = 17): number {
+    const total = context * 2 + desiredGap;
+    const quantizedTotal = quantizeTotalFrames(total, minTotal);
+    return Math.max(1, quantizedTotal - context * 2);
+}
 
 export interface JoinClipsSettingsFormProps {
     // Settings state
@@ -530,10 +551,11 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
         const newContextFrames = Math.max(4, val);
         setContextFrames(newContextFrames);
         
-        // Adjust gap frames if they exceed the max allowed by context
-        const maxGap = Math.max(2, 81 - (newContextFrames * 2));
-        if (gapFrames > maxGap) {
-            setGapFrames(maxGap);
+        // Re-quantize gap frames for new context to maintain 4N+1 total
+        const maxGap = Math.max(1, 81 - (newContextFrames * 2));
+        const quantizedGap = getQuantizedGap(Math.min(gapFrames, maxGap), newContextFrames);
+        if (quantizedGap !== gapFrames) {
+            setGapFrames(quantizedGap);
         }
     };
 
@@ -559,13 +581,20 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                         </div>
                         <Slider
                             id="join-gap-frames"
-                                min={2}
-                                max={Math.max(2, 81 - (contextFrames * 2))}
-                            step={1}
-                                value={[Math.max(2, gapFrames)]}
-                            onValueChange={(values) => setGapFrames(values[0])}
+                                min={1}
+                                max={Math.max(1, 81 - (contextFrames * 2))}
+                            step={4}
+                                value={[Math.max(1, gapFrames)]}
+                            onValueChange={(values) => {
+                                // Quantize gap so total = 2*context + gap is 4N+1
+                                const quantizedGap = getQuantizedGap(values[0], contextFrames);
+                                setGapFrames(quantizedGap);
+                            }}
                                 className="py-2"
                         />
+                        <p className="text-xs text-muted-foreground">
+                            Total generation: <span className="font-mono font-medium">{contextFrames * 2 + gapFrames}</span> frames (4N+1 format)
+                        </p>
                     </div>
 
                     {/* Context Frames */}

@@ -245,15 +245,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         loras: joinLoras = [],
     } = joinSettings.settings;
     
-    // Debug: Log joinSettings state
-    useEffect(() => {
-        console.log('[JoinClipsPersist] joinSettings.settings loaded:');
-        console.log('[JoinClipsPersist] projectId:', projectId);
-        console.log('[JoinClipsPersist] joinPrompt:', joinPrompt);
-        console.log('[JoinClipsPersist] joinLoras:', joinLoras);
-        console.log('[JoinClipsPersist] joinLoras.length:', joinLoras.length);
-        console.log('[JoinClipsPersist] full settings:', joinSettings.settings);
-    }, [projectId, joinPrompt, joinLoras, joinSettings.settings]);
 
     // Fetch parent generation details to check for final output
     const { data: parentGeneration } = useQuery({
@@ -573,25 +564,15 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     
     // Load saved LoRAs into loraManager on mount (once BOTH availableLoras AND joinSettings are ready)
     useEffect(() => {
-        console.log('[JoinClipsPersist] LoRA init effect running:');
-        console.log('[JoinClipsPersist] initialized:', lorasSyncStateRef.current.initialized);
-        console.log('[JoinClipsPersist] joinSettings.status:', joinSettings.status);
-        console.log('[JoinClipsPersist] availableLoras.length:', availableLoras.length);
-        console.log('[JoinClipsPersist] joinLoras.length:', joinLoras.length);
-        
         // Wait for BOTH: availableLoras loaded AND joinSettings loaded from DB
         if (lorasSyncStateRef.current.initialized || availableLoras.length === 0 || joinSettings.status !== 'ready') {
-            console.log('[JoinClipsPersist] Skipping init - already initialized, no availableLoras, or settings not ready');
             return;
         }
         lorasSyncStateRef.current.initialized = true;
-        console.log('[JoinClipsPersist] Marking as initialized');
         
         if (joinLoras.length > 0) {
-            console.log('[JoinClipsPersist] Loading saved LoRAs:', joinLoras);
             const activeLoras = joinLoras.map(saved => {
                 const fullLora = availableLoras.find(l => l['Model ID'] === saved.id);
-                console.log('[JoinClipsPersist] Mapping LoRA:', saved.id, 'found:', !!fullLora);
                 return {
                     id: saved.id,
                     name: fullLora?.Name || saved.id,
@@ -602,36 +583,19 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             }).filter(l => l.path);
             
             if (activeLoras.length > 0) {
-                console.log('[JoinClipsPersist] Setting loraManager with:', activeLoras);
                 loraManager.setSelectedLoras(activeLoras);
                 lorasSyncStateRef.current.lastSyncedKey = activeLoras.map(l => `${l.id}:${l.strength}`).sort().join(',');
             }
-        } else {
-            console.log('[JoinClipsPersist] No saved LoRAs to load');
         }
     }, [joinLoras, availableLoras, loraManager, joinSettings.status]);
     
     // Sync loraManager changes back to joinSettings for persistence
     useEffect(() => {
+        if (!lorasSyncStateRef.current.initialized) return;
+        
         const lorasKey = loraManager.selectedLoras.map(l => `${l.id}:${l.strength}`).sort().join(',');
+        if (lorasKey === lorasSyncStateRef.current.lastSyncedKey) return;
         
-        console.log('[JoinClipsPersist] Sync-back effect:');
-        console.log('[JoinClipsPersist] initialized:', lorasSyncStateRef.current.initialized);
-        console.log('[JoinClipsPersist] lorasKey:', lorasKey);
-        console.log('[JoinClipsPersist] lastSyncedKey:', lorasSyncStateRef.current.lastSyncedKey);
-        console.log('[JoinClipsPersist] selectedLoras:', loraManager.selectedLoras);
-        
-        if (!lorasSyncStateRef.current.initialized) {
-            console.log('[JoinClipsPersist] Skipping sync - not initialized');
-            return;
-        }
-        
-        if (lorasKey === lorasSyncStateRef.current.lastSyncedKey) {
-            console.log('[JoinClipsPersist] Skipping sync - no change');
-            return;
-        }
-        
-        console.log('[JoinClipsPersist] ✅ Saving LoRAs to joinSettings');
         lorasSyncStateRef.current.lastSyncedKey = lorasKey;
         joinSettings.updateField('loras', loraManager.selectedLoras.map(l => ({
             id: l.id,
@@ -1029,15 +993,9 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             keepBridgingImages={keepBridgingImages}
                             setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
                             prompt={joinPrompt}
-                            setPrompt={(val) => {
-                                console.log('[JoinClipsPersist] setPrompt called with:', val);
-                                joinSettings.updateField('prompt', val);
-                            }}
+                            setPrompt={(val) => joinSettings.updateField('prompt', val)}
                             negativePrompt={joinNegativePrompt}
-                            setNegativePrompt={(val) => {
-                                console.log('[JoinClipsPersist] setNegativePrompt called with:', val);
-                                joinSettings.updateField('negativePrompt', val);
-                            }}
+                            setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
                             availableLoras={availableLoras}
                             projectId={projectId}
                             loraPersistenceKey="join-clips"
