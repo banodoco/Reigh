@@ -707,7 +707,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
 
-      // Prepare shot settings to inherit (priority: localStorage -> project settings)
+      // Prepare shot settings to inherit (priority: localStorage -> DB -> project settings)
+      // NOTE: LoRAs are now part of travel-between-images settings (selectedLoras field)
       let shotSettingsToInherit = {};
       
       // 1. Try to get most recent active shot settings from localStorage (most up-to-date)
@@ -718,28 +719,22 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
            
            if (storedMain) {
              const mainSettings = JSON.parse(storedMain);
-             
-             // Also try to get LoRAs
-             const loraStorageKey = STORAGE_KEYS.LAST_ACTIVE_LORA_SETTINGS(selectedProjectId);
-             const storedLoras = localStorage.getItem(loraStorageKey);
-             const loraSettings = storedLoras ? JSON.parse(storedLoras) : undefined;
 
              shotSettingsToInherit = {
                'travel-between-images': {
                  ...mainSettings,
-                 // Scrub content fields for new project
+                 // Scrub content fields for new project (keep selectedLoras)
                  batchVideoPrompt: '',
                  shotImageIds: [],
                  pairConfigs: [],
                  textBeforePrompts: '',
                  textAfterPrompts: ''
-               },
-               ...(loraSettings ? { 'travel-loras': loraSettings } : {})
+               }
              };
              
              console.log('[ProjectContext] 🧬 Inheriting shot settings from localStorage (scrubbed content):', {
-               main: !!mainSettings,
-               loras: !!loraSettings
+               hasSettings: !!mainSettings,
+               loraCount: mainSettings.selectedLoras?.length || 0
              });
            }
         } catch (e) {
@@ -761,22 +756,23 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
           if (latestShot?.settings) {
             const shotSettings = latestShot.settings as any;
-            if (shotSettings['travel-between-images'] || shotSettings['travel-loras']) {
+            if (shotSettings['travel-between-images']) {
               const mainSettings = shotSettings['travel-between-images'] || {};
               
               shotSettingsToInherit = {
                 'travel-between-images': {
                   ...mainSettings,
-                  // Scrub content fields for new project
+                  // Scrub content fields for new project (keep selectedLoras)
                   batchVideoPrompt: '',
                   shotImageIds: [],
                   pairConfigs: [],
                   textBeforePrompts: '',
                   textAfterPrompts: ''
-                },
-                ...(shotSettings['travel-loras'] ? { 'travel-loras': shotSettings['travel-loras'] } : {})
+                }
               };
-              console.log('[ProjectContext] 🧬 Inheriting shot settings from LATEST DB SHOT (scrubbed content)');
+              console.log('[ProjectContext] 🧬 Inheriting shot settings from LATEST DB SHOT (scrubbed content)', {
+                loraCount: mainSettings.selectedLoras?.length || 0
+              });
             }
           }
         } catch (err) {
@@ -787,9 +783,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       // 3. Fallback: If still no settings, try to use the project-level settings
       if (Object.keys(shotSettingsToInherit).length === 0 && (settingsToInherit as any)['travel-between-images']) {
          shotSettingsToInherit = {
-           'travel-between-images': (settingsToInherit as any)['travel-between-images'],
-           // LoRAs might not be in project settings, but check anyway
-           ...((settingsToInherit as any)['travel-loras'] ? { 'travel-loras': (settingsToInherit as any)['travel-loras'] } : {})
+           'travel-between-images': (settingsToInherit as any)['travel-between-images']
          };
          console.log('[ProjectContext] 🧬 Inheriting shot settings from project defaults');
       }

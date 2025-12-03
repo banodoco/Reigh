@@ -1,5 +1,6 @@
 import { GenerationRow } from "@/types/shots";
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
+import { ShotLora } from '@/tools/travel-between-images/settings';
 
 // JSON type for compatibility with Supabase client types
 export type Json =
@@ -107,6 +108,10 @@ export interface ShotEditorProps {
   onSteerableMotionSettingsChange?: (settings: Partial<SteerableMotionSettings>) => void;
   onGenerateAllSegments: () => void;
   availableLoras: LoraModel[];
+  
+  // LoRAs - now unified with shot settings
+  selectedLoras?: ShotLora[];
+  onSelectedLorasChange?: (loras: ShotLora[]) => void;
   
   // Text before/after prompts
   textBeforePrompts?: string;

@@ -30,6 +30,7 @@ export const useShotCreation = ({
   selectedProjectId,
   allShots,
   onNavigateToShot,
+  onClose,
   onShotChange,
 }: UseShotCreationProps): UseShotCreationReturn => {
   const [isCreatingShot, setIsCreatingShot] = useState(false);
@@ -44,10 +45,18 @@ export const useShotCreation = ({
   // Handle quick create and add shot
   const handleQuickCreateAndAdd = useCallback(async () => {
     console.warn('[ShotSettingsInherit] 🚀 handleQuickCreateAndAdd called from ImageGallery');
+    
+    // CRITICAL: When viewing from ShotImagesEditor, media.id is the shot_generations.id (join table ID)
+    // We need to use media.generation_id (actual generations table ID) for creating new shot associations
+    const actualGenerationId = (media as any).generation_id || media.id;
+    
     console.log('[VisitShotDebug] handleQuickCreateAndAdd called', {
       hasSelectedProjectId: !!selectedProjectId,
       allShotsLength: allShots.length,
-      mediaId: media.id
+      mediaId: media.id,
+      generationId: (media as any).generation_id,
+      actualGenerationId,
+      usingGenerationIdField: !!(media as any).generation_id
     });
     
     if (!selectedProjectId) {
@@ -67,7 +76,7 @@ export const useShotCreation = ({
       console.log('[VisitShotDebug] Creating shot WITH image using atomic operation:', {
         shotName: newShotName,
         projectId: selectedProjectId,
-        generationId: media.id
+        generationId: actualGenerationId
       });
       
       // Use atomic database function to create shot and add image in one operation
@@ -75,7 +84,7 @@ export const useShotCreation = ({
       const result = await createShotWithImageMutation.mutateAsync({
         projectId: selectedProjectId,
         shotName: newShotName,
-        generationId: media.id
+        generationId: actualGenerationId
       });
       
       console.log('[VisitShotDebug] Atomic shot creation result:', result);
@@ -113,7 +122,7 @@ export const useShotCreation = ({
     } finally {
       setIsCreatingShot(false);
     }
-  }, [selectedProjectId, allShots, media.id, createShotWithImageMutation, onShotChange]);
+  }, [selectedProjectId, allShots, media.id, (media as any).generation_id, createShotWithImageMutation, onShotChange]);
 
   // Handle quick create success navigation
   const handleQuickCreateSuccess = useCallback(() => {
@@ -134,6 +143,9 @@ export const useShotCreation = ({
         shotOption: shotOption ? { id: shotOption.id, name: shotOption.name } : null,
         allShots: allShots?.map(s => ({ id: s.id, name: s.name })) || []
       });
+
+      // Close the lightbox first
+      onClose();
 
       if (shotOption) {
         // Build a minimal Shot object compatible with navigation
@@ -166,7 +178,7 @@ export const useShotCreation = ({
     // Clear the success state
     console.log('[VisitShotDebug] 5. MediaLightbox clearing success state');
     setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null });
-  }, [quickCreateSuccess, onNavigateToShot, allShots]);
+  }, [quickCreateSuccess, onNavigateToShot, onClose, allShots]);
 
   return {
     isCreatingShot,

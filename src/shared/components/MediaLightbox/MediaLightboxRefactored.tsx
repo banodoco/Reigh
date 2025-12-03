@@ -285,6 +285,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Derived values - uses canonical isVideoAny from typeGuards
   const isVideo = isVideoAny(media as any);
   
+  // CRITICAL: When viewing from ShotImagesEditor, media.id is the shot_generations.id (join table ID)
+  // We need to use media.generation_id (actual generations table ID) for shot operations
+  const actualGenerationId = (media as any).generation_id || media.id;
+  
   // ========================================
   // ALL HOOKS - Business logic extracted
   // ========================================
@@ -774,9 +778,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         images: [],
         position: 0,
       };
+      // Close the lightbox first, then navigate
+      onClose();
       onNavigateToShot(minimalShot);
     }
-  }, [onNavigateToShot]);
+  }, [onNavigateToShot, onClose]);
   
   // Replace in shot handler - swaps timeline position from parent to current image
   const handleReplaceInShot = React.useCallback(async (
@@ -1375,6 +1381,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               width: '100vw'
             } : undefined}
             onPointerDownOutside={(event) => {
+              const target = event.target as Element;
+              
+              // Don't close if clicking inside Radix portals (Select, Popover, DropdownMenu)
+              // This check is BEFORE the inpaint mode check because we always want to protect these
+              if (target.closest('[data-radix-select-content]') || 
+                  target.closest('[data-radix-select-viewport]') ||
+                  target.closest('[data-radix-select-item]') ||
+                  target.closest('[data-radix-popover-content]') || 
+                  target.closest('[data-radix-dropdown-menu-content]') ||
+                  target.closest('[data-shot-selector-header]') ||
+                  target.closest('[data-radix-select-trigger]')) {
+                event.preventDefault();
+                return;
+              }
+
+              // Don't close if Select is open
+              if (isSelectOpen) {
+                event.preventDefault();
+                return;
+              }
+              
               if (isInpaintMode) {
                 // 🚀 MOBILE FIX: Prevent underlying click-throughs and then close manually
                 // Always stop propagation and default so the gesture does not reach elements behind
@@ -1388,30 +1415,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 if (shouldShowSidePanel) {
                   // Tablet/Desktop with side panel: only close if clicking on the panel or buttons
-                  const target = event.target as Element;
                   if (target.closest('[data-task-details-panel]') || target.closest('[role="button"]')) {
                     return;
                   }
-                }
-
-                // Don't close if clicking inside Radix portals (Select, Popover, DropdownMenu)
-                const target = event.target as Element;
-                if (target.closest('[data-radix-select-content]') || 
-                    target.closest('[data-radix-select-viewport]') ||
-                    target.closest('[data-radix-select-item]') ||
-                    target.closest('[data-radix-popover-content]') || 
-                    target.closest('[data-radix-dropdown-menu-content]')) {
-                  return;
-                }
-
-                // Don't close if Select is open
-                if (isSelectOpen) {
-                  return;
-                }
-
-                // Don't close if clicking on ShotSelector trigger or content (additional safety)
-                if (target.closest('[data-radix-select-trigger]') || target.closest('[data-radix-select-content]')) {
-                  return;
                 }
                 
                 // Use setTimeout to ensure the event is fully blocked before closing
@@ -1633,26 +1639,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onApplySettings={onApplySettings}
                       isSpecialEditMode={isSpecialEditMode}
                       isVideo={isVideo}
+                      mediaId={actualGenerationId}
+                      imageUrl={effectiveMediaUrl}
+                      thumbUrl={media.thumbUrl}
                       allShots={allShots}
                       selectedShotId={selectedShotId}
                       onShotChange={onShotChange}
                       onCreateShot={onCreateShot}
-                      isCreatingShot={isCreatingShot}
-                      quickCreateSuccess={quickCreateSuccess}
-                      handleQuickCreateAndAdd={handleQuickCreateAndAdd}
-                      handleQuickCreateSuccess={handleQuickCreateSuccess}
                       isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
                       isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
                       showTickForImageId={showTickForImageId}
                       showTickForSecondaryImageId={showTickForSecondaryImageId}
-                      mediaId={media.id}
                       onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                      handleAddToShot={handleAddToShot}
-                      handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
-                      setIsSelectOpen={setIsSelectOpen}
+                      onShowTick={onShowTick}
                       contentRef={contentRef}
                       handleApplySettings={handleApplySettings}
                       onNavigateToShot={handleNavigateToShotFromSelector}
+                      onClose={onClose}
                     />
                   </div>
 
@@ -2008,26 +2011,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onApplySettings={onApplySettings}
                       isSpecialEditMode={isSpecialEditMode}
                       isVideo={isVideo}
+                      mediaId={actualGenerationId}
+                      imageUrl={effectiveMediaUrl}
+                      thumbUrl={media.thumbUrl}
                       allShots={allShots}
                       selectedShotId={selectedShotId}
                       onShotChange={onShotChange}
                       onCreateShot={onCreateShot}
-                                isCreatingShot={isCreatingShot}
-                                quickCreateSuccess={quickCreateSuccess}
-                      handleQuickCreateAndAdd={handleQuickCreateAndAdd}
-                      handleQuickCreateSuccess={handleQuickCreateSuccess}
                       isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
                       isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
                       showTickForImageId={showTickForImageId}
                       showTickForSecondaryImageId={showTickForSecondaryImageId}
-                      mediaId={media.id}
                       onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                      handleAddToShot={handleAddToShot}
-                      handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
-                      setIsSelectOpen={setIsSelectOpen}
+                      onShowTick={onShowTick}
                       contentRef={contentRef}
                       handleApplySettings={handleApplySettings}
                       onNavigateToShot={handleNavigateToShotFromSelector}
+                      onClose={onClose}
                     />
 
                     {/* Navigation Arrows */}
@@ -2443,26 +2443,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     onApplySettings={onApplySettings}
                     isSpecialEditMode={isSpecialEditMode}
                     isVideo={isVideo}
+                    mediaId={actualGenerationId}
+                    imageUrl={effectiveMediaUrl}
+                    thumbUrl={media.thumbUrl}
                     allShots={allShots}
                     selectedShotId={selectedShotId}
                     onShotChange={onShotChange}
                     onCreateShot={onCreateShot}
-                              isCreatingShot={isCreatingShot}
-                              quickCreateSuccess={quickCreateSuccess}
-                    handleQuickCreateAndAdd={handleQuickCreateAndAdd}
-                    handleQuickCreateSuccess={handleQuickCreateSuccess}
                     isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
                     isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
                     showTickForImageId={showTickForImageId}
                     showTickForSecondaryImageId={showTickForSecondaryImageId}
-                    mediaId={media.id}
                     onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                    handleAddToShot={handleAddToShot}
-                    handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
-                    setIsSelectOpen={setIsSelectOpen}
+                    onShowTick={onShowTick}
                     contentRef={contentRef}
                     handleApplySettings={handleApplySettings}
                     onNavigateToShot={handleNavigateToShotFromSelector}
+                    onClose={onClose}
                   />
 
                   {/* Navigation Arrows */}
@@ -2481,34 +2478,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {!readOnly && !isSpecialEditMode && (
                   <div className="w-full" onClick={(e) => e.stopPropagation()}>
                     <WorkflowControls
-                      mediaId={media.id}
+                      mediaId={actualGenerationId}
+                      imageUrl={effectiveMediaUrl}
+                      thumbUrl={media.thumbUrl}
                       isVideo={isVideo}
                       isInpaintMode={isInpaintMode}
                       allShots={allShots}
                       selectedShotId={selectedShotId}
                       onShotChange={onShotChange}
                       onCreateShot={onCreateShot}
-                      isSelectOpen={isSelectOpen}
-                      setIsSelectOpen={setIsSelectOpen}
                       contentRef={contentRef}
                       isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
                       isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
                       showTickForImageId={showTickForImageId}
                       showTickForSecondaryImageId={showTickForSecondaryImageId}
-                      isCreatingShot={isCreatingShot}
-                      quickCreateSuccess={quickCreateSuccess}
-                      handleQuickCreateAndAdd={handleQuickCreateAndAdd}
-                      handleQuickCreateSuccess={handleQuickCreateSuccess}
                       onAddToShot={onAddToShot}
                       onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                      handleAddToShot={handleAddToShot}
-                      handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+                      onShowTick={onShowTick}
                       onApplySettings={onApplySettings}
                       handleApplySettings={handleApplySettings}
                       onDelete={onDelete}
                       handleDelete={handleDelete}
                       isDeleting={isDeleting}
                       onNavigateToShot={handleNavigateToShotFromSelector}
+                      onClose={onClose}
                     />
               </div>
                 )}

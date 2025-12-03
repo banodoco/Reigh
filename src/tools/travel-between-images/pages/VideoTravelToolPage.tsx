@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect, useCallback, startTransition } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
-import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName, useAddImageToShot } from '@/shared/hooks/useShots';
+import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName, useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
+import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
@@ -92,13 +93,8 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
     enabled: !!projectId 
   });
 
-  // Fetch current shot's LoRA settings to use as defaults for new shots
-  const shotLoraSettingsQuery = useToolSettings<{
-    loras?: { id: string; strength: number }[];
-  }>('travel-loras', { 
-    shotId: selectedShotId || null,
-    enabled: !!selectedShotId 
-  });
+  // NOTE: shotLoraSettings query removed - LoRAs are now part of main settings (selectedLoras field)
+  // and are inherited via useShotSettings along with all other settings
 
   return {
     // Shots data
@@ -128,9 +124,6 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
     // Project UI settings data
     projectUISettings: projectUISettingsQuery.settings,
     updateProjectUISettings: projectUISettingsQuery.update,
-
-    // Current shot's LoRA settings (for inheriting to new shots)
-    shotLoraSettings: shotLoraSettingsQuery.settings,
   };
 };
 
@@ -261,7 +254,6 @@ const VideoTravelToolPage: React.FC = () => {
     projectSettingsUpdating,
     projectUISettings,
     updateProjectUISettings,
-    shotLoraSettings
   } = useVideoTravelData(selectedShot?.id, selectedProjectId);
   console.log('[ShotNavPerf] ✅ useVideoTravelData returned in', Date.now() - videoTravelDataStart, 'ms');
   
@@ -555,10 +547,17 @@ const VideoTravelToolPage: React.FC = () => {
     // Update the actual settings (will save to DB asynchronously)
     shotSettingsRef.current.updateField('generationMode', mode);
   }, []);
+
+  // LoRAs handler - now synced with all other settings
+  const handleSelectedLorasChange = useCallback((loras: any[]) => {
+    shotSettingsRef.current.updateField('selectedLoras', loras);
+  }, []);
+
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const [isCreatingShot, setIsCreatingShot] = useState(false);
   const queryClient = useQueryClient();
-  // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
+  const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
+  const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   // const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   // const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
   
@@ -794,7 +793,7 @@ const VideoTravelToolPage: React.FC = () => {
     batchVideoSteps = 6,
     enhancePrompt = false,
     turboMode = false,
-    amountOfMotion = 50,
+    amountOfMotion: rawAmountOfMotion,
     advancedMode = false,
     motionMode = 'basic',
     phaseConfig,
@@ -804,7 +803,24 @@ const VideoTravelToolPage: React.FC = () => {
     steerableMotionSettings = DEFAULT_STEERABLE_MOTION_SETTINGS,
     textBeforePrompts = '',
     textAfterPrompts = '',
+    selectedLoras = [], // LoRAs now synced with all other settings
   } = shotSettings.settings || {};
+  
+  // CRITICAL: Ensure amountOfMotion has a valid default (destructuring default doesn't apply when value is explicitly undefined)
+  const amountOfMotion = rawAmountOfMotion ?? 50;
+  
+  // Debug: Log amountOfMotion value to track if default is being applied
+  React.useEffect(() => {
+    if (rawAmountOfMotion === undefined || rawAmountOfMotion === null) {
+      console.log('[AmountOfMotionDebug] ⚠️ rawAmountOfMotion was undefined/null, defaulted to 50:', {
+        rawAmountOfMotion,
+        amountOfMotion,
+        shotId: selectedShot?.id?.substring(0, 8),
+        motionMode,
+        timestamp: Date.now()
+      });
+    }
+  }, [rawAmountOfMotion, amountOfMotion, selectedShot?.id, motionMode]);
   
   // Debug: Log enhance_prompt value whenever it changes
   React.useEffect(() => {
@@ -1062,6 +1078,19 @@ const VideoTravelToolPage: React.FC = () => {
         })),
         timestamp: Date.now()
       });
+      
+      // [VideoTravelAddToShot] Log shot associations for first 3 items
+      console.log('[VideoTravelAddToShot] 📊 Sample items shot associations:', 
+        vd.items.slice(0, 3).map((item: any) => ({
+          id: item.id?.substring(0, 8),
+          shot_id: item.shot_id?.substring(0, 8),
+          position: item.position,
+          all_shot_associations: item.all_shot_associations?.map((a: any) => ({
+            shot_id: a.shot_id?.substring(0, 8),
+            position: a.position
+          }))
+        }))
+      );
     }
   }, [showVideosView, videosData]);
   
@@ -1503,6 +1532,135 @@ const VideoTravelToolPage: React.FC = () => {
       }
     }
   }, [currentShotId, shots, viaShotClick, navigate, location.pathname, selectedShot, setCurrentShotId]);
+
+  // ============================================================================
+  // TARGET SHOT INFO FOR ADD TO SHOT BUTTONS (Videos Gallery)
+  // ============================================================================
+  
+  // Memoize target shot calculations for the "Add to Shot" button
+  const targetShotInfo = useMemo(() => {
+    const targetShotIdForButton = lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : undefined);
+    const targetShotNameForButtonTooltip = targetShotIdForButton 
+      ? (shots?.find(s => s.id === targetShotIdForButton)?.name || 'Selected Shot')
+      : (shots && shots.length > 0 ? shots[0].name : 'Last Shot');
+    
+    console.log('[VideoTravelAddToShot] targetShotInfo computed:', {
+      targetShotIdForButton: targetShotIdForButton?.substring(0, 8),
+      targetShotNameForButtonTooltip,
+      lastAffectedShotId: lastAffectedShotId?.substring(0, 8),
+      shotsCount: shots?.length || 0,
+      firstShotId: shots?.[0]?.id?.substring(0, 8)
+    });
+    
+    return { targetShotIdForButton, targetShotNameForButtonTooltip };
+  }, [lastAffectedShotId, shots]);
+  
+  // Handle adding a video/image to target shot WITH position
+  const handleAddVideoToTargetShot = useCallback(async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
+    console.log('[VideoTravelAddToShot] 🎯 handleAddVideoToTargetShot called:', {
+      generationId: generationId?.substring(0, 8),
+      targetShotId: targetShotInfo.targetShotIdForButton?.substring(0, 8),
+      targetShotName: targetShotInfo.targetShotNameForButtonTooltip,
+      lastAffectedShotId: lastAffectedShotId?.substring(0, 8),
+      selectedProjectId,
+      hasImageUrl: !!imageUrl,
+      hasThumbUrl: !!thumbUrl,
+      timestamp: Date.now()
+    });
+    
+    if (!targetShotInfo.targetShotIdForButton) {
+      console.error('[VideoTravelAddToShot] ❌ No target shot available');
+      toast.error("No target shot available to add to. Create a shot first or interact with one.");
+      return false;
+    }
+    if (!generationId) {
+      console.error('[VideoTravelAddToShot] ❌ No generationId provided');
+      toast.error("Item has no ID, cannot add to shot.");
+      return false;
+    }
+    if (!selectedProjectId) {
+      console.error('[VideoTravelAddToShot] ❌ No selectedProjectId');
+      toast.error("No project selected. Cannot add item to shot.");
+      return false;
+    }
+
+    try {
+      console.log('[VideoTravelAddToShot] 📤 Calling addImageToShotMutation with:', {
+        shot_id: targetShotInfo.targetShotIdForButton?.substring(0, 8),
+        generation_id: generationId?.substring(0, 8),
+        project_id: selectedProjectId
+      });
+      
+      await addImageToShotMutation.mutateAsync({
+        shot_id: targetShotInfo.targetShotIdForButton,
+        generation_id: generationId,
+        imageUrl: imageUrl,
+        thumbUrl: thumbUrl,
+        project_id: selectedProjectId, 
+      });
+      
+      console.log('[VideoTravelAddToShot] ✅ Mutation success! Setting lastAffectedShotId to:', targetShotInfo.targetShotIdForButton?.substring(0, 8));
+      setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
+      
+      // Force refresh of generations data to show updated positioning
+      console.log('[VideoTravelAddToShot] 🔄 Invalidating unified-generations query');
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+      
+      return true;
+    } catch (error) {
+      console.error("[VideoTravelAddToShot] ❌ Error adding video to target shot:", error);
+      toast.error("Failed to add item to shot.");
+      return false;
+    }
+  }, [targetShotInfo.targetShotIdForButton, targetShotInfo.targetShotNameForButtonTooltip, lastAffectedShotId, selectedProjectId, addImageToShotMutation, setLastAffectedShotId, queryClient]);
+
+  // Handle adding a video/image to target shot WITHOUT position
+  const handleAddVideoToTargetShotWithoutPosition = useCallback(async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
+    console.log('[VideoTravelAddToShot] handleAddVideoToTargetShotWithoutPosition called:', {
+      generationId: generationId?.substring(0, 8),
+      targetShotId: targetShotInfo.targetShotIdForButton?.substring(0, 8),
+      selectedProjectId
+    });
+    
+    if (!targetShotInfo.targetShotIdForButton) {
+      console.error('[VideoTravelAddToShot] No target shot available (without position)');
+      toast.error("No target shot available to add to. Create a shot first or interact with one.");
+      return false;
+    }
+    if (!generationId) {
+      console.error('[VideoTravelAddToShot] No generationId provided (without position)');
+      toast.error("Item has no ID, cannot add to shot.");
+      return false;
+    }
+    if (!selectedProjectId) {
+      console.error('[VideoTravelAddToShot] No selectedProjectId (without position)');
+      toast.error("No project selected. Cannot add item to shot.");
+      return false;
+    }
+
+    try {
+      console.log('[VideoTravelAddToShot] Calling addImageToShotWithoutPositionMutation...');
+      await addImageToShotWithoutPositionMutation.mutateAsync({
+        shot_id: targetShotInfo.targetShotIdForButton,
+        generation_id: generationId,
+        imageUrl: imageUrl,
+        thumbUrl: thumbUrl,
+        project_id: selectedProjectId, 
+      });
+      
+      console.log('[VideoTravelAddToShot] Success (without position)! Setting lastAffectedShotId');
+      setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
+      
+      // Force refresh of generations data to show updated association
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+      
+      return true;
+    } catch (error) {
+      console.error("[VideoTravelAddToShot] Error adding video to target shot without position:", error);
+      toast.error("Failed to add item to shot without position.");
+      return false;
+    }
+  }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotWithoutPositionMutation, setLastAffectedShotId, queryClient]);
 
   // ============================================================================
   // DROP HANDLERS FOR GENERATIONS FROM GENERATIONSPANE
@@ -2089,9 +2247,11 @@ const VideoTravelToolPage: React.FC = () => {
                   <ImageGallery
                     images={(videosData as any)?.items || []}
                     allShots={shots || []}
-                    // Don't pass onAddToLastShot or onAddToLastShotWithoutPosition to hide workflow controls
-                    // These bottom buttons (Add to Shot, etc.) shouldn't show for video gallery
-                    // Omitting these props completely hides the workflow controls in the lightbox
+                    // Add to Shot functionality for the videos gallery
+                    onAddToLastShot={handleAddVideoToTargetShot}
+                    onAddToLastShotWithoutPosition={handleAddVideoToTargetShotWithoutPosition}
+                    lastShotId={targetShotInfo.targetShotIdForButton}
+                    lastShotNameForTooltip={targetShotInfo.targetShotNameForButtonTooltip}
                     currentToolType="travel-between-images"
                     currentToolTypeName="Travel Between Images"
                     // Pagination props
@@ -2197,8 +2357,10 @@ const VideoTravelToolPage: React.FC = () => {
               steerableMotionSettings={steerableMotionSettings}
               onSteerableMotionSettingsChange={handleSteerableMotionSettingsChange}
               onGenerateAllSegments={noOpCallback}
-              // LoRA props removed - now managed internally by ShotEditor
+              // LoRAs now synced with all other settings
               availableLoras={availableLoras}
+              selectedLoras={selectedLoras}
+              onSelectedLorasChange={handleSelectedLorasChange}
               enhancePrompt={enhancePrompt}
               onEnhancePromptChange={handleEnhancePromptChange}
               turboMode={turboMode}

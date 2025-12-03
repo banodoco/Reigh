@@ -87,6 +87,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onCustomHeightChange,
   onGenerateAllSegments,
   availableLoras,
+  selectedLoras = [],
+  onSelectedLorasChange,
   enhancePrompt,
   onEnhancePromptChange,
   turboMode,
@@ -656,9 +658,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // - Element visibility and positioning
   // - Click handlers for floating UI that scroll and trigger actions
 
-  // Use the LoRA sync hook
-  const { loraManager, isShotLoraSettingsLoading, hasInitializedShot: loraInitialized } = useLoraSync({
-    selectedShot,
+  // Use the LoRA sync hook - now receives loras from unified shot settings
+  const { loraManager } = useLoraSync({
+    selectedLoras,
+    onSelectedLorasChange: onSelectedLorasChange || (() => {}),
     projectId: selectedProjectId,
     availableLoras,
     batchVideoPrompt,
@@ -729,7 +732,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     // Enhanced settings loading timeout with mobile-specific recovery
   useEffect(() => {
-    const anySettingsLoading = settingsLoading || isShotUISettingsLoading || isShotLoraSettingsLoading;
+    // LoRAs now part of main settings, no separate loading state needed
+    const anySettingsLoading = settingsLoading || isShotUISettingsLoading;
     
     if (!anySettingsLoading) {
       // Reset any existing error once all settings loading completes successfully
@@ -744,7 +748,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     console.log(`[ShotEditor] Settings loading timeout started: ${timeoutMs}ms for shot ${selectedShot?.id}`, {
       settingsLoading,
       isShotUISettingsLoading,
-      isShotLoraSettingsLoading,
       isMobile,
       shotId: selectedShot?.id
     });
@@ -754,7 +757,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.warn('[ShotEditor] SETTINGS TIMEOUT RECOVERY - One or more settings queries failed to complete within expected time. Forcing ready state to prevent infinite loading.', {
         settingsLoading,
         isShotUISettingsLoading,
-        isShotLoraSettingsLoading,
         isMobile,
         shotId: selectedShot?.id,
         timeoutMs
@@ -774,7 +776,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }, timeoutMs);
 
     return () => clearTimeout(fallbackTimer);
-  }, [settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, actions, isMobile, selectedShot?.id]);
+  }, [settingsLoading, isShotUISettingsLoading, actions, isMobile, selectedShot?.id]);
 
   // CRITICAL FIX: Reset mode readiness when shot changes ONLY if we don't have context images yet
   // If we have context images, stay ready and let settings refetch in the background
@@ -863,10 +865,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     // For shots without images, wait for all settings
-    if (!hasImageData && !settingsLoading && !isShotUISettingsLoading && !isShotLoraSettingsLoading) {
+    // LoRAs now part of main settings, no separate loading check needed
+    if (!hasImageData && !settingsLoading && !isShotUISettingsLoading) {
       actions.setModeReady(true);
     }
-  }, [readinessState, onGenerationModeChange, actions, selectedShot?.id, contextImages.length, isShotUISettingsLoading, isShotLoraSettingsLoading]);
+  }, [readinessState, onGenerationModeChange, actions, selectedShot?.id, contextImages.length, isShotUISettingsLoading]);
 
   // Accelerated mode and random seed from database settings
   // Default accelerated mode to false when it has never been explicitly set for this shot

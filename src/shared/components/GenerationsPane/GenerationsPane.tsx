@@ -21,6 +21,9 @@ import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { performanceMonitoredTimeout, measureAsync } from '@/shared/lib/performanceUtils';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { useCreateShot } from '@/shared/hooks/useShots';
+import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
+import { toast } from 'sonner';
 
 import { 
   Select,
@@ -105,6 +108,40 @@ const GenerationsPaneComponent: React.FC = () => {
   const shotsForFilter = (shotsData && shotsData.length > 0)
     ? shotsData
     : (contextShots || []);
+  
+  // Shot creation mutation
+  const createShotMutation = useCreateShot();
+  
+  // Handle creating a new shot from lightbox
+  const handleCreateShot = useCallback(async (shotName: string, files: File[]): Promise<void> => {
+    if (!selectedProjectId) {
+      toast.error("No project selected");
+      return;
+    }
+
+    try {
+      const result = await createShotMutation.mutateAsync({
+        name: shotName,
+        projectId: selectedProjectId,
+        shouldSelectAfterCreation: false
+      });
+
+      // Apply standardized settings inheritance
+      if (result.shot?.id) {
+        await inheritSettingsForNewShot({
+          newShotId: result.shot.id,
+          projectId: selectedProjectId,
+          shots: shotsForFilter
+        });
+      }
+
+      // Invalidate and refetch shots to update the list
+      await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+    } catch (error) {
+      console.error('[GenerationsPane] Failed to create shot:', error);
+      toast.error(`Failed to create shot: ${(error as Error).message}`);
+    }
+  }, [selectedProjectId, createShotMutation, queryClient, shotsForFilter]);
 
   // Debug: Log the current filter state
   useEffect(() => {
@@ -595,6 +632,7 @@ const GenerationsPaneComponent: React.FC = () => {
                 onServerPageChange={handleServerPageChange}
                 onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
                 currentViewingShotId={currentShotId || undefined}
+                onCreateShot={handleCreateShot}
                 />
                 </>
             )}

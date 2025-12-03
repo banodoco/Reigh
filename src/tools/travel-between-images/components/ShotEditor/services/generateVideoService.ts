@@ -228,7 +228,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     randomSeed,
     turboMode,
     enhancePrompt,
-    amountOfMotion,
+    amountOfMotion: rawAmountOfMotion,
     motionMode,
     advancedMode,
     phaseConfig,
@@ -241,6 +241,10 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     variantNameParam,
     clearAllEnhancedPrompts,
   } = params;
+  
+  // CRITICAL: Ensure amountOfMotion has a valid default value
+  // JavaScript destructuring default only applies when property is absent, not when it's undefined
+  const amountOfMotion = rawAmountOfMotion ?? 50;
 
   if (!projectId) {
     toast.error('No project selected. Please select a project first.');
@@ -774,7 +778,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     hasPhaseConfig: !!phaseConfig,
     motionMode,
     useAdvancedMode,
-    amountOfMotion
+    amountOfMotion,
+    rawAmountOfMotion,
+    amountOfMotionDefaultApplied: rawAmountOfMotion == null
   });
   
   if (useAdvancedMode) {
@@ -935,8 +941,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     turbo_mode: turboMode,
     // Amount of motion is now embedded in phase_config LoRAs - store for UI restoration only
     amount_of_motion: amountOfMotion / 100.0,
-    // UNIFIED: Always send phase_config and advanced_mode=true for consistent backend processing
-    advanced_mode: true, // Always true now since we always use phase configs
+    // UNIFIED: Always send phase_config for consistent backend processing
+    // advanced_mode reflects whether user's custom phase config is being used vs computed basic mode
+    advanced_mode: useAdvancedMode,
     motion_mode: motionMode, // Motion control mode (basic/presets/advanced) - for UI state
     phase_config: effectivePhaseConfig, // Always send phase config (computed or user-defined)
     regenerate_anchors: false, // Always false

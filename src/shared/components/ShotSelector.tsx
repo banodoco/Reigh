@@ -45,7 +45,8 @@ export interface ShotSelectorProps {
   align?: "start" | "center" | "end";
   sideOffset?: number;
   
-  // Event handlers
+  // Controlled open state
+  open?: boolean;
   onOpenChange?: (open: boolean) => void;
   container?: HTMLElement | null;
   
@@ -69,18 +70,94 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   side = "top",
   align = "start",
   sideOffset = 4,
+  open,
   onOpenChange,
   container,
   onNavigateToShot,
 }) => {
   const isMobile = useIsMobile();
   
+  // Internal state for uncontrolled mode
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  
+  // Ref to track the trigger element for click-outside detection
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  
+  // Use controlled state if provided, otherwise use internal state
+  const isOpen = open !== undefined ? open : internalOpen;
+  const setIsOpen = React.useCallback((newOpen: boolean) => {
+    if (open === undefined) {
+      setInternalOpen(newOpen);
+    }
+    onOpenChange?.(newOpen);
+  }, [open, onOpenChange]);
+  
+  // Global click handler to close dropdown when clicking outside
+  // This is needed because Radix Select's outside click detection
+  // doesn't work properly when nested inside a Dialog
+  React.useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleGlobalPointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement;
+      
+      console.log('[ShotSelectorDebug] Global pointerdown detected:', {
+        tagName: target.tagName,
+        className: target.className,
+        hasRadixContent: !!target.closest('[data-radix-select-content]'),
+        hasRadixViewport: !!target.closest('[data-radix-select-viewport]'),
+        hasRadixItem: !!target.closest('[data-radix-select-item]'),
+        hasHeader: !!target.closest('[data-shot-selector-header]'),
+        hasTrigger: triggerRef.current?.contains(target),
+      });
+      
+      // Don't close if clicking on the trigger
+      if (triggerRef.current?.contains(target)) {
+        console.log('[ShotSelectorDebug] Click on trigger - not closing');
+        return;
+      }
+      
+      // Don't close if clicking on select content (including portal)
+      // Check for data-radix-select attributes to identify select elements
+      if (
+        target.closest('[data-radix-select-content]') ||
+        target.closest('[data-radix-select-viewport]') ||
+        target.closest('[data-radix-select-item]')
+      ) {
+        console.log('[ShotSelectorDebug] Click on select content - not closing');
+        return;
+      }
+      
+      // Don't close if clicking on the header (like "Add Shot" button)
+      // The header is marked with data-shot-selector-header
+      if (target.closest('[data-shot-selector-header]')) {
+        console.log('[ShotSelectorDebug] Click on header - not closing');
+        return;
+      }
+      
+      // Click was outside - close the dropdown
+      console.log('[ShotSelectorDebug] Global pointerdown outside - closing dropdown');
+      setIsOpen(false);
+    };
+    
+    // Use pointerdown instead of click, and add a longer delay
+    // to avoid closing immediately when opening (the opening click might still be processing)
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('pointerdown', handleGlobalPointerDown, true);
+    }, 100);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('pointerdown', handleGlobalPointerDown, true);
+    };
+  }, [isOpen, setIsOpen]);
+  
   // Create the "Add Shot" header if needed
   const addShotHeader = useMemo(() => {
     if (!showAddShot || !onCreateShot) return null;
     
     return (
-      <div className="bg-zinc-900 border-b border-zinc-700 p-1">
+      <div className="bg-zinc-900 border-b border-zinc-700 p-1" data-shot-selector-header>
         {quickCreateSuccess?.isSuccessful ? (
           <Button
             variant="secondary"
@@ -94,6 +171,8 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
                 hasOnQuickCreateSuccess: !!onQuickCreateSuccess,
                 timestamp: Date.now()
               });
+              // Close dropdown before navigating
+              setIsOpen(false);
               if (onQuickCreateSuccess) {
                 onQuickCreateSuccess();
               }
@@ -110,6 +189,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              // Don't close dropdown - let it show the success state with "Visit Shot" button
               onCreateShot();
             }}
             disabled={isCreatingShot}
@@ -129,7 +209,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
         )}
       </div>
     );
-  }, [showAddShot, onCreateShot, quickCreateSuccess, onQuickCreateSuccess, isCreatingShot]);
+  }, [showAddShot, onCreateShot, quickCreateSuccess, onQuickCreateSuccess, isCreatingShot, setIsOpen]);
 
   // Get the selected shot
   const selectedShot = useMemo(() => {
@@ -151,16 +231,20 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
     <div className={`flex items-center gap-1 ${className || ''}`}>
       <Select
         value={value}
+        open={isOpen}
         onValueChange={(newValue) => {
           console.log('[ShotSelectorDebug] 🎯 Shot selected:', newValue);
           onValueChange(newValue);
+          // Close the dropdown after selection
+          setIsOpen(false);
         }}
-        onOpenChange={(open) => {
-          console.log('[ShotSelectorDebug] Dropdown open state changed:', open);
-          onOpenChange?.(open);
+        onOpenChange={(newOpen) => {
+          console.log('[ShotSelectorDebug] Dropdown open state changed:', newOpen);
+          setIsOpen(newOpen);
         }}
       >
         <SelectTrigger
+          ref={triggerRef}
           className={triggerClassName}
           aria-label="Select target shot"
           onMouseEnter={(e) => e.stopPropagation()}
@@ -211,6 +295,8 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    // Close dropdown before navigating
+                    setIsOpen(false);
                     onNavigateToShot(shot);
                   }}
                   onPointerDown={(e) => {

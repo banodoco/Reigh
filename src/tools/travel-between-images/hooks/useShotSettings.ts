@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS: VideoTravelSettings = {
   phaseConfig: undefined,
   generationMode: 'timeline',
   pairConfigs: [],
+  selectedLoras: [], // LoRAs now synced with all other settings
 };
 
 export interface UseShotSettingsReturn {

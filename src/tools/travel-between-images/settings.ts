@@ -1,5 +1,14 @@
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from './components/ShotEditor/state/types';
-// import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay'; // Removed - LoRAs now managed in ShotEditor
+
+// LoRA type for shot settings (simplified version of ActiveLora for persistence)
+export interface ShotLora {
+  id: string;
+  name: string;
+  path: string;
+  strength: number;
+  previewImageUrl?: string;
+  trigger_word?: string;
+}
 
 // PhaseConfig types for advanced video generation settings
 export interface PhaseLoraConfig {
@@ -92,7 +101,8 @@ export interface VideoTravelSettings {
   }>;
   // Store the shot images as part of settings
   shotImageIds?: string[];
-  // selectedLoras removed - now managed directly in ShotEditor with separate persistence
+  // LoRAs for this shot - now synced with all other settings via useShotSettings
+  selectedLoras?: ShotLora[];
   // Structure video settings (per-shot basis)
   structureVideo?: {
     path: string;

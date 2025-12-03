@@ -17,36 +17,38 @@ export interface WorkflowControlsBarProps {
   isSpecialEditMode: boolean;
   isVideo: boolean;
   
+  // Media info
+  mediaId: string;
+  imageUrl?: string;
+  thumbUrl?: string;
+  
   // Shot selector props
   allShots: ShotOption[];
   selectedShotId: string | undefined;
   onShotChange?: (shotId: string) => void;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
   
-  // Shot creation
-  isCreatingShot: boolean;
-  quickCreateSuccess: {
-    isSuccessful: boolean;
-    shotId: string | null;
-    shotName: string | null;
-  };
-  handleQuickCreateAndAdd: () => Promise<void>;
-  handleQuickCreateSuccess: () => void;
-  
   // Shot positioning
   isAlreadyPositionedInSelectedShot: boolean;
   isAlreadyAssociatedWithoutPosition: boolean;
   showTickForImageId?: string | null;
   showTickForSecondaryImageId?: string | null;
-  mediaId: string;
   
   // Shot actions
   onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  handleAddToShot: () => Promise<void>;
-  handleAddToShotWithoutPosition: () => Promise<void>;
+  
+  // Optimistic updates
+  onShowTick?: (imageId: string) => void;
+  onOptimisticPositioned?: (imageId: string, shotId: string) => void;
+  onShowSecondaryTick?: (imageId: string) => void;
+  onOptimisticUnpositioned?: (imageId: string, shotId: string) => void;
+  
+  // Loading states
+  isAdding?: boolean;
+  isAddingWithoutPosition?: boolean;
   
   // UI state
-  setIsSelectOpen: (isOpen: boolean) => void;
+  setIsSelectOpen?: (isOpen: boolean) => void;
   contentRef: React.RefObject<HTMLDivElement>;
   
   // Apply settings
@@ -54,6 +56,9 @@ export interface WorkflowControlsBarProps {
   
   // Navigation
   onNavigateToShot?: (shot: ShotOption) => void;
+  
+  // Close lightbox
+  onClose?: () => void;
 }
 
 /**
@@ -67,26 +72,29 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
   onApplySettings,
   isSpecialEditMode,
   isVideo,
+  mediaId,
+  imageUrl,
+  thumbUrl,
   allShots,
   selectedShotId,
   onShotChange,
   onCreateShot,
-  isCreatingShot,
-  quickCreateSuccess,
-  handleQuickCreateAndAdd,
-  handleQuickCreateSuccess,
   isAlreadyPositionedInSelectedShot,
   isAlreadyAssociatedWithoutPosition,
   showTickForImageId,
   showTickForSecondaryImageId,
-  mediaId,
   onAddToShotWithoutPosition,
-  handleAddToShot,
-  handleAddToShotWithoutPosition,
+  onShowTick,
+  onOptimisticPositioned,
+  onShowSecondaryTick,
+  onOptimisticUnpositioned,
+  isAdding = false,
+  isAddingWithoutPosition = false,
   setIsSelectOpen,
   contentRef,
   handleApplySettings,
   onNavigateToShot,
+  onClose,
 }) => {
   // Debug logging
   console.log('[ShotSelectorDebug] WorkflowControlsBar render check', {
@@ -120,25 +128,29 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
         {/* Shot Selection and Add to Shot */}
         {onAddToShot && allShots.length > 0 && !isVideo && (
           <ShotSelectorControls
+            mediaId={mediaId}
+            imageUrl={imageUrl}
+            thumbUrl={thumbUrl}
             allShots={allShots}
             selectedShotId={selectedShotId}
             onShotChange={onShotChange}
             onCreateShot={onCreateShot}
-            isCreatingShot={isCreatingShot}
-            quickCreateSuccess={quickCreateSuccess}
-            handleQuickCreateAndAdd={handleQuickCreateAndAdd}
-            handleQuickCreateSuccess={handleQuickCreateSuccess}
             isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
             isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
             showTickForImageId={showTickForImageId}
             showTickForSecondaryImageId={showTickForSecondaryImageId}
-            mediaId={mediaId}
+            onAddToShot={onAddToShot}
             onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-            handleAddToShot={handleAddToShot}
-            handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+            onShowTick={onShowTick}
+            onOptimisticPositioned={onOptimisticPositioned}
+            onShowSecondaryTick={onShowSecondaryTick}
+            onOptimisticUnpositioned={onOptimisticUnpositioned}
+            isAdding={isAdding}
+            isAddingWithoutPosition={isAddingWithoutPosition}
             setIsSelectOpen={setIsSelectOpen}
             contentRef={contentRef}
             onNavigateToShot={onNavigateToShot}
+            onClose={onClose}
           />
         )}
 
@@ -162,4 +174,3 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
     </div>
   );
 };
-

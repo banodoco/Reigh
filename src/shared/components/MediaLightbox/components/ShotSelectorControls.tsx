@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { CheckCircle, PlusCircle } from 'lucide-react';
-import ShotSelector from '@/shared/components/ShotSelector';
+import ShotSelectorWithAdd from '@/shared/components/ShotSelectorWithAdd';
 
 interface ShotOption {
   id: string;
@@ -10,114 +10,116 @@ interface ShotOption {
 }
 
 export interface ShotSelectorControlsProps {
+  // Media info
+  mediaId: string;
+  imageUrl?: string;
+  thumbUrl?: string;
+  
   // Shot selection
   allShots: ShotOption[];
   selectedShotId: string | undefined;
   onShotChange?: (shotId: string) => void;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
   
-  // Shot creation
-  isCreatingShot: boolean;
-  quickCreateSuccess: {
-    isSuccessful: boolean;
-    shotId: string | null;
-    shotName: string | null;
-  };
-  handleQuickCreateAndAdd: () => Promise<void>;
-  handleQuickCreateSuccess: () => void;
-  
   // Shot positioning
   isAlreadyPositionedInSelectedShot: boolean;
   isAlreadyAssociatedWithoutPosition: boolean;
   showTickForImageId?: string | null;
   showTickForSecondaryImageId?: string | null;
-  mediaId: string;
   
   // Shot actions
+  onAddToShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  handleAddToShot: () => Promise<void>;
-  handleAddToShotWithoutPosition: () => Promise<void>;
+  
+  // Optimistic updates
+  onShowTick?: (imageId: string) => void;
+  onOptimisticPositioned?: (imageId: string, shotId: string) => void;
+  onShowSecondaryTick?: (imageId: string) => void;
+  onOptimisticUnpositioned?: (imageId: string, shotId: string) => void;
   
   // UI state
-  setIsSelectOpen: (isOpen: boolean) => void;
+  setIsSelectOpen?: (isOpen: boolean) => void;
   contentRef: React.RefObject<HTMLDivElement>;
   
   // Navigation
   onNavigateToShot?: (shot: ShotOption) => void;
+  
+  // Close lightbox
+  onClose?: () => void;
+  
+  // Loading states
+  isAdding?: boolean;
+  isAddingWithoutPosition?: boolean;
 }
 
 /**
  * ShotSelectorControls Component
  * Consolidates the shot selector dropdown with add-to-shot buttons
- * Used in workflow controls across all layout variants
+ * Uses ShotSelectorWithAdd for the main selector + add button,
+ * and adds an optional "add without position" button
  */
 export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
+  mediaId,
+  imageUrl,
+  thumbUrl,
   allShots,
   selectedShotId,
   onShotChange,
   onCreateShot,
-  isCreatingShot,
-  quickCreateSuccess,
-  handleQuickCreateAndAdd,
-  handleQuickCreateSuccess,
   isAlreadyPositionedInSelectedShot,
   isAlreadyAssociatedWithoutPosition,
   showTickForImageId,
   showTickForSecondaryImageId,
-  mediaId,
+  onAddToShot,
   onAddToShotWithoutPosition,
-  handleAddToShot,
-  handleAddToShotWithoutPosition,
+  onShowTick,
+  onOptimisticPositioned,
+  onShowSecondaryTick,
+  onOptimisticUnpositioned,
   setIsSelectOpen,
   contentRef,
   onNavigateToShot,
+  onClose,
+  isAdding = false,
+  isAddingWithoutPosition = false,
 }) => {
+  // Handle add without position
+  const handleAddWithoutPosition = async () => {
+    if (!onAddToShotWithoutPosition || !selectedShotId) return;
+    
+    try {
+      const success = await onAddToShotWithoutPosition(mediaId, imageUrl, thumbUrl);
+      if (success) {
+        onShowSecondaryTick?.(mediaId);
+        onOptimisticUnpositioned?.(mediaId, selectedShotId);
+      }
+    } catch (error) {
+      console.error('[ShotSelectorControls] Error adding without position:', error);
+    }
+  };
+
   return (
     <>
-      <ShotSelector
-        value={selectedShotId || ''}
-        onValueChange={onShotChange || (() => {})}
+      <ShotSelectorWithAdd
+        imageId={mediaId}
+        imageUrl={imageUrl}
+        thumbUrl={thumbUrl}
         shots={allShots}
-        placeholder="Select shot"
-        triggerClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
-        onOpenChange={setIsSelectOpen}
-        showAddShot={!!onCreateShot}
-        onCreateShot={handleQuickCreateAndAdd}
-        isCreatingShot={isCreatingShot}
-        quickCreateSuccess={quickCreateSuccess}
-        onQuickCreateSuccess={handleQuickCreateSuccess}
+        selectedShotId={selectedShotId || ''}
+        onShotChange={onShotChange || (() => {})}
+        onAddToShot={onAddToShot}
+        onCreateShot={onCreateShot ? async () => {} : undefined}
+        isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
+        showTick={showTickForImageId === mediaId}
+        isAdding={isAdding}
+        onShowTick={onShowTick}
+        onOptimisticPositioned={onOptimisticPositioned}
+        onClose={onClose}
+        layout="horizontal"
         container={contentRef.current}
-        onNavigateToShot={onNavigateToShot}
+        selectorClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
+        buttonClassName="h-8 w-8"
       />
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              handleAddToShot();
-            }}
-            disabled={!selectedShotId}
-            className={`h-8 px-3 text-white ${
-              isAlreadyPositionedInSelectedShot || showTickForImageId === mediaId
-                ? 'bg-green-600/80 hover:bg-green-600'
-                : 'bg-blue-600/80 hover:bg-blue-600'
-            }`}
-          >
-            {isAlreadyPositionedInSelectedShot || showTickForImageId === mediaId ? (
-              <CheckCircle className="h-4 w-4" />
-            ) : (
-              <PlusCircle className="h-4 w-4" />
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent className="z-[100001]">
-          {isAlreadyPositionedInSelectedShot || showTickForImageId === mediaId
-            ? 'Added with position. Jump to shot.'
-            : 'Add to shot with position'}
-        </TooltipContent>
-      </Tooltip>
 
       {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
         <Tooltip>
@@ -125,15 +127,17 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
             <Button
               variant="secondary"
               size="sm"
-              onClick={handleAddToShotWithoutPosition}
-              disabled={!selectedShotId}
+              onClick={handleAddWithoutPosition}
+              disabled={!selectedShotId || isAddingWithoutPosition}
               className={`h-8 px-3 text-white ${
                 isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === mediaId
                   ? 'bg-green-600/80 hover:bg-green-600'
                   : 'bg-purple-600/80 hover:bg-purple-600'
               }`}
             >
-              {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === mediaId ? (
+              {isAddingWithoutPosition ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+              ) : isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === mediaId ? (
                 <CheckCircle className="h-4 w-4" />
               ) : (
                 <PlusCircle className="h-4 w-4" />
@@ -150,4 +154,3 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
     </>
   );
 };
-
