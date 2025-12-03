@@ -21,29 +21,29 @@ import {
  * Valid values: 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81...
  * 
  * For VACE models (used in join clips), minimum is 17 frames.
- * 
- * @param roundUp - If true, round up to next valid value; if false, round down
  */
-function quantizeTotalFrames(total: number, minTotal: number = 17, roundUp: boolean = false): number {
-    // Quantize to 4N+1 format
-    const n = roundUp ? Math.ceil((total - 1) / 4) : Math.floor((total - 1) / 4);
+function quantizeTotalFrames(total: number, minTotal: number = 17): number {
+    // Round to NEAREST 4N+1 format
+    const n = Math.round((total - 1) / 4);
     const quantized = n * 4 + 1;
     return Math.max(minTotal, quantized);
 }
 
 /**
  * Get quantized gap frames for a given context, ensuring total = 2*context + gap is 4N+1
- * Rounds DOWN to keep gap from growing unnecessarily
+ * Makes MINIMAL adjustment to gap - only ±2 or ±0 to hit nearest valid total
  */
 function getQuantizedGap(desiredGap: number, context: number, minTotal: number = 17): number {
     const total = context * 2 + desiredGap;
-    // Round DOWN to nearest valid total to prevent gap from growing
-    const quantizedTotal = quantizeTotalFrames(total, minTotal, false);
+    const quantizedTotal = quantizeTotalFrames(total, minTotal);
     const gap = quantizedTotal - context * 2;
-    // If gap would be < 1, round UP instead to get a valid gap
+    
+    // Ensure gap is at least 1
     if (gap < 1) {
-        const roundedUpTotal = quantizeTotalFrames(total, minTotal, true);
-        return Math.max(1, roundedUpTotal - context * 2);
+        // Find the next valid total that gives gap >= 1
+        const minTotalForPositiveGap = context * 2 + 1;
+        const validTotal = quantizeTotalFrames(minTotalForPositiveGap, minTotal);
+        return validTotal - context * 2;
     }
     return gap;
 }
@@ -597,13 +597,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                             step={4}
                                 value={[Math.max(1, gapFrames)]}
                             onValueChange={(values) => {
-                                // When user slides, round to nearest valid gap
-                                const desiredGap = values[0];
-                                const total = contextFrames * 2 + desiredGap;
-                                // Round to nearest (use ceil if user is increasing, floor if decreasing)
-                                const roundUp = desiredGap > gapFrames;
-                                const quantizedTotal = quantizeTotalFrames(total, 17, roundUp);
-                                const quantizedGap = Math.max(1, quantizedTotal - contextFrames * 2);
+                                const quantizedGap = getQuantizedGap(values[0], contextFrames);
                                 setGapFrames(quantizedGap);
                             }}
                                 className="py-2"
