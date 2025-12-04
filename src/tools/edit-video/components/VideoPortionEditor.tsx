@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
@@ -10,6 +10,59 @@ import { LoraManager } from '@/shared/components/LoraManager';
 import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
 import { PortionSelection } from '@/shared/components/VideoPortionTimeline';
+
+// Tiny thumbnail component for segment preview
+function SegmentThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loaded, setLoaded] = useState(false);
+  
+  useEffect(() => {
+    if (!videoUrl || time < 0) return;
+    
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.preload = 'metadata';
+    video.muted = true;
+    video.src = videoUrl;
+    
+    const captureFrame = () => {
+      if (video.readyState >= 2 && canvasRef.current) {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          setLoaded(true);
+        }
+      }
+      video.remove();
+    };
+    
+    video.onseeked = captureFrame;
+    video.currentTime = time;
+    
+    const timeout = setTimeout(() => {
+      if (!loaded) captureFrame();
+    }, 500);
+    
+    return () => {
+      clearTimeout(timeout);
+      video.onseeked = null;
+      video.remove();
+    };
+  }, [videoUrl, time, loaded]);
+  
+  return (
+    <canvas 
+      ref={canvasRef}
+      width={32}
+      height={18}
+      className={cn(
+        "rounded border border-border/50",
+        !loaded && "bg-muted/30"
+      )}
+    />
+  );
+}
 
 /**
  * Quantize total generation frames to 4N+1 format (required by Wan models)
@@ -54,6 +107,7 @@ export interface VideoPortionEditorProps {
     selections?: PortionSelection[];
     onUpdateSelectionSettings?: (id: string, updates: Partial<Pick<PortionSelection, 'gapFrameCount' | 'prompt'>>) => void;
     onRemoveSelection?: (id: string) => void;
+    videoUrl?: string; // For showing segment thumbnails
     
     // LoRA props
     availableLoras: LoraModel[];
@@ -80,6 +134,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     selections = [],
     onUpdateSelectionSettings,
     onRemoveSelection,
+    videoUrl,
     availableLoras,
     projectId,
     loraManager,
@@ -124,19 +179,23 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                                 key={selection.id} 
                                 className="border rounded-lg p-3 bg-muted/20 space-y-2"
                             >
-                                {/* Segment Header with Gap Slider */}
-                                <div className="flex items-center gap-3">
-                                    {/* Segment number and title */}
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary">
-                                            {index + 1}
-                                        </div>
-                                        <span className="text-sm font-medium">
-                                            Segment {index + 1}
-                                        </span>
+                                {/* Segment Header with thumbnails and slider */}
+                                <div className="flex items-center gap-2">
+                                    {/* Segment number */}
+                                    <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary flex-shrink-0">
+                                        {index + 1}
                                     </div>
                                     
-                                    {/* Gap Frames slider inline */}
+                                    {/* Start/End thumbnails */}
+                                    {videoUrl && (
+                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                            <SegmentThumbnail videoUrl={videoUrl} time={selection.start} />
+                                            <span className="text-[10px] text-muted-foreground">→</span>
+                                            <SegmentThumbnail videoUrl={videoUrl} time={selection.end} />
+                                        </div>
+                                    )}
+                                    
+                                    {/* Gap Frames slider */}
                                     <div className="flex-1 flex items-center gap-2">
                                         <Slider
                                             min={1}

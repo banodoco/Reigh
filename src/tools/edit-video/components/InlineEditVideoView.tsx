@@ -3,7 +3,7 @@ import { GenerationRow } from '@/types/shots';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
-import { X, ArrowLeft, Film, Loader2, Check, Plus } from 'lucide-react';
+import { X, ArrowLeft, Loader2, Check, Plus } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { TooltipProvider } from '@/shared/components/ui/tooltip';
 import { VideoPortionEditor } from './VideoPortionEditor';
@@ -584,35 +584,6 @@ export function InlineEditVideoView({
           {!isMobile && videoDuration > 0 && (
             <div className="absolute left-0 right-0 bottom-0 pb-4 px-4">
               <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Film className="w-4 h-4 text-white/70 flex-shrink-0" />
-                    <span className="text-sm text-white/70">
-                      {selections.length === 1 ? 'Select portion to regenerate' : `${selections.length} portions selected`}
-                    </span>
-                  </div>
-                  {/* FPS indicator */}
-                  <div className="flex items-center gap-2 text-xs">
-                    {fpsDetectionStatus === 'detecting' && (
-                      <span className="text-yellow-400 animate-pulse">Detecting FPS...</span>
-                    )}
-                    {(fpsDetectionStatus === 'detected' || fpsDetectionStatus === 'fallback') && videoFps && (
-                      <span className={cn(
-                        "font-mono px-2 py-0.5 rounded",
-                        fpsDetectionStatus === 'detected' ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"
-                      )}>
-                        {videoFps} fps
-                        {fpsDetectionStatus === 'fallback' && ' (assumed)'}
-                      </span>
-                    )}
-                    {videoFps && videoDuration && (
-                      <span className="text-white/50">
-                        {Math.round(videoDuration * videoFps)} frames
-                      </span>
-                    )}
-                  </div>
-                </div>
                 {/* Timeline bar */}
                 <MultiPortionTimeline
                   duration={videoDuration}
@@ -645,29 +616,6 @@ export function InlineEditVideoView({
         {/* Timeline Section - Mobile only, below video */}
         {isMobile && videoDuration > 0 && (
           <div className="bg-zinc-900 px-3 py-3 border-t border-border">
-            {/* Header row */}
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <Film className="w-4 h-4 text-white/70" />
-                <span className="text-xs text-white/70">
-                  {selections.length === 1 ? 'Tap handles to move' : `${selections.length} portions`}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-[10px]">
-                {(fpsDetectionStatus === 'detected' || fpsDetectionStatus === 'fallback') && videoFps && (
-                  <span className={cn(
-                    "font-mono px-1.5 py-0.5 rounded",
-                    fpsDetectionStatus === 'detected' ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"
-                  )}>
-                    {videoFps}fps
-                  </span>
-                )}
-                {videoFps && videoDuration && (
-                  <span className="text-white/50">{Math.round(videoDuration * videoFps)}f</span>
-                )}
-              </div>
-            </div>
-            
             {/* Timeline */}
             <MultiPortionTimeline
               duration={videoDuration}
@@ -720,6 +668,7 @@ export function InlineEditVideoView({
             selections={selections}
             onUpdateSelectionSettings={handleUpdateSelectionSettings}
             onRemoveSelection={handleRemoveSelection}
+            videoUrl={videoUrl}
             availableLoras={availableLoras}
             projectId={selectedProjectId}
             loraManager={loraManager}

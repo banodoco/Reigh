@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Trash2 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
 // Type for a portion selection
@@ -339,20 +338,7 @@ export function MultiPortionTimeline({
                   e.stopPropagation();
                   onSelectionClick(selection.id);
                 }}
-              >
-                {/* Delete button for non-first selections */}
-                {selections.length > 1 && isActive && (
-                  <button
-                    className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveSelection(selection.id);
-                    }}
-                  >
-                    <Trash2 className="w-2.5 h-2.5 text-white" />
-                  </button>
-                )}
-              </div>
+              />
               
               {/* Start handle - larger touch target on mobile */}
               <div
