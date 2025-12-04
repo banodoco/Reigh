@@ -1698,23 +1698,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       {trimState.videoDuration > 0 && (
                         <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
                           <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <Film className="w-4 h-4 text-white/70" />
-                                <span className="text-sm text-white/70">
-                                  {videoEditing.selections.length === 1 ? 'Select portion to regenerate' : `${videoEditing.selections.length} portions selected`}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 text-xs">
-                                <span className="font-mono px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
-                                  16 fps (assumed)
-                                </span>
-                                <span className="text-white/50">
-                                  {Math.round(trimState.videoDuration * 16)} frames
-                                </span>
-                              </div>
-                            </div>
-                            
                             <MultiPortionTimeline
                               duration={trimState.videoDuration}
                               selections={videoEditing.selections}
@@ -2585,23 +2568,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       {trimState.videoDuration > 0 && (
                         <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
                           <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <Film className="w-4 h-4 text-white/70" />
-                                <span className="text-sm text-white/70">
-                                  {videoEditing.selections.length === 1 ? 'Select portion to regenerate' : `${videoEditing.selections.length} portions selected`}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 text-xs">
-                                <span className="font-mono px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
-                                  16 fps (assumed)
-                                </span>
-                                <span className="text-white/50">
-                                  {Math.round(trimState.videoDuration * 16)} frames
-                                </span>
-                              </div>
-                            </div>
-                            
                             <MultiPortionTimeline
                               duration={trimState.videoDuration}
                               selections={videoEditing.selections}
