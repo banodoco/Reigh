@@ -18,6 +18,8 @@ import {
   Diamond,
   Undo2,
   X,
+  Film,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -81,6 +83,11 @@ import {
   TrimControlsPanel,
   VariantSelector,
 } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor';
+
+// Import video edit components (for regenerating portions)
+import { VideoPortionEditor } from '@/tools/edit-video/components/VideoPortionEditor';
+import { MultiPortionTimeline } from '@/shared/components/VideoPortionTimeline';
+import { useVideoEditing } from './hooks/useVideoEditing';
 
 interface ShotOption {
   id: string;
@@ -803,6 +810,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     saveTrimmedVideo,
   } = trimSaveHook;
 
+  // Video Edit Mode hooks and state (for regenerating portions)
+  // Get project for resolution
+  const { projects } = useProject();
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio;
+  
+  // Video editing hook - handles all video edit state, validation, and generation
+  const videoEditing = useVideoEditing({
+    media,
+    selectedProjectId,
+    projectAspectRatio,
+    isVideo,
+    videoDuration: trimState.videoDuration,
+    videoUrl: effectiveVideoUrl,
+    onExitVideoEditMode: () => {
+      // The hook handles setting isVideoEditMode to false internally
+      onTrimModeChange?.(false);
+    },
+  });
 
   // For segment videos (showVideoTrimEditor), hide the "Apply These Settings" button
   // For variants, show the variant's params instead of the original task
@@ -873,14 +899,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     onTrimModeChange?.(false);
   }, [resetTrim, onTrimModeChange]);
 
+  // Handle entering/exiting video edit mode (for regenerating portions)
+  // Uses the hook's mode state
+  const handleEnterVideoEditMode = useCallback(() => {
+    videoEditing.setIsVideoEditMode(true);
+    // Exit trim mode if active
+    if (isVideoTrimMode) {
+      setIsVideoTrimMode(false);
+      resetTrim();
+    }
+  }, [isVideoTrimMode, resetTrim, videoEditing]);
+
+  const handleExitVideoEditMode = useCallback(() => {
+    videoEditing.setIsVideoEditMode(false);
+  }, [videoEditing]);
+
   // Track if we're in any special edit mode (including video trim)
   const isVideoTrimModeActive = showVideoTrimEditor && isVideo && isVideoTrimMode;
+  
+  // Track if we're in video edit mode (for regenerating portions) - uses hook state
+  const isVideoEditModeActive = isVideo && videoEditing.isVideoEditMode;
+  
+  // Alias for template usage
+  const isVideoEditMode = videoEditing.isVideoEditMode;
 
   // Combined special edit mode (for hiding certain UI elements)
-  const isAnySpecialEditMode = isSpecialEditMode || isVideoTrimModeActive;
+  const isAnySpecialEditMode = isSpecialEditMode || isVideoTrimModeActive || isVideoEditModeActive;
 
-  // Should show side panel (includes video trim mode)
-  const shouldShowSidePanelWithTrim = shouldShowSidePanel || isVideoTrimModeActive;
+  // Should show side panel (includes video trim mode and video edit mode)
+  const shouldShowSidePanelWithTrim = shouldShowSidePanel || isVideoTrimModeActive || isVideoEditModeActive;
 
   // ========================================
   // SIMPLE HANDLERS - Just call props
@@ -1622,33 +1669,105 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   />
 
                   {/* Media Content */}
-                  <MediaDisplayWithCanvas
-                    effectiveImageUrl={isVideo ? effectiveVideoUrl : effectiveMediaUrl}
-                    thumbUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                    isVideo={isVideo}
-                    isFlippedHorizontally={isFlippedHorizontally}
-                    isSaving={isSaving}
-                    isInpaintMode={isInpaintMode}
-                    editMode={editMode}
-                    imageContainerRef={imageContainerRef}
-                    canvasRef={canvasRef}
-                    displayCanvasRef={displayCanvasRef}
-                    maskCanvasRef={maskCanvasRef}
-                    onImageLoad={setImageDimensions}
-                    onVideoLoadedMetadata={(e) => {
-                      const video = e.currentTarget;
-                      if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
-                        setVideoDuration(video.duration);
-                      }
-                    }}
-                    handlePointerDown={handlePointerDown}
-                    handlePointerMove={handlePointerMove}
-                    handlePointerUp={handlePointerUp}
-                    variant="desktop-side-panel"
-                    containerClassName="max-w-full max-h-full"
-                    tasksPaneWidth={tasksPaneOpen && !isMobile ? tasksPaneWidth : 0}
-                    debugContext="Desktop"
-                  />
+                  {isVideo && isVideoEditModeActive ? (
+                    // Video edit mode: Show video with timeline overlay (DESKTOP)
+                    // Video is paused by default and follows timeline marker position
+                    <div className="relative w-full h-full flex flex-col items-center justify-center">
+                      <video
+                        ref={videoEditing.videoRef}
+                        src={effectiveVideoUrl}
+                        poster={activeVariant?.thumbnail_url || media.thumbUrl}
+                        muted
+                        playsInline
+                        controls
+                        preload="auto"
+                        className="max-w-full max-h-[calc(100%-140px)] object-contain shadow-wes border border-border/20 rounded"
+                        onLoadedMetadata={(e) => {
+                          const video = e.currentTarget;
+                          if (Number.isFinite(video.duration) && video.duration > 0) {
+                            setVideoDuration(video.duration);
+                            // Seek to start of first selection when video loads
+                            if (videoEditing.selections.length > 0 && videoEditing.selections[0].start > 0) {
+                              video.currentTime = videoEditing.selections[0].start;
+                            }
+                          }
+                        }}
+                      />
+                      
+                      {/* Timeline overlay for portion selection */}
+                      {trimState.videoDuration > 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
+                          <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Film className="w-4 h-4 text-white/70" />
+                                <span className="text-sm text-white/70">
+                                  {videoEditing.selections.length === 1 ? 'Select portion to regenerate' : `${videoEditing.selections.length} portions selected`}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="font-mono px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
+                                  16 fps (assumed)
+                                </span>
+                                <span className="text-white/50">
+                                  {Math.round(trimState.videoDuration * 16)} frames
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <MultiPortionTimeline
+                              duration={trimState.videoDuration}
+                              selections={videoEditing.selections}
+                              activeSelectionId={videoEditing.activeSelectionId}
+                              onSelectionChange={videoEditing.handleUpdateSelection}
+                              onSelectionClick={videoEditing.setActiveSelectionId}
+                              onRemoveSelection={videoEditing.handleRemoveSelection}
+                              videoRef={videoEditing.videoRef}
+                              videoUrl={effectiveVideoUrl}
+                              fps={16}
+                            />
+                            
+                            {/* Add selection button */}
+                            <button
+                              onClick={videoEditing.handleAddSelection}
+                              className="mt-2 flex items-center gap-1 text-xs text-white/70 hover:text-white transition-colors"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add another portion
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <MediaDisplayWithCanvas
+                      effectiveImageUrl={isVideo ? effectiveVideoUrl : effectiveMediaUrl}
+                      thumbUrl={activeVariant?.thumbnail_url || media.thumbUrl}
+                      isVideo={isVideo}
+                      isFlippedHorizontally={isFlippedHorizontally}
+                      isSaving={isSaving}
+                      isInpaintMode={isInpaintMode}
+                      editMode={editMode}
+                      imageContainerRef={imageContainerRef}
+                      canvasRef={canvasRef}
+                      displayCanvasRef={displayCanvasRef}
+                      maskCanvasRef={maskCanvasRef}
+                      onImageLoad={setImageDimensions}
+                      onVideoLoadedMetadata={(e) => {
+                        const video = e.currentTarget;
+                        if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
+                          setVideoDuration(video.duration);
+                        }
+                      }}
+                      handlePointerDown={handlePointerDown}
+                      handlePointerMove={handlePointerMove}
+                      handlePointerUp={handlePointerUp}
+                      variant="desktop-side-panel"
+                      containerClassName="max-w-full max-h-full"
+                      tasksPaneWidth={tasksPaneOpen && !isMobile ? tasksPaneWidth : 0}
+                      debugContext="Desktop"
+                    />
+                  )}
 
                   {/* Delete button and mode toggle for selected annotation */}
                   {selectedShapeId && isAnnotateMode && (() => {
@@ -1831,6 +1950,37 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       variant="desktop"
                       videoUrl={effectiveVideoUrl}
                     />
+                  ) : isVideoEditModeActive ? (
+                    <div className="h-full overflow-y-auto">
+                      <VideoPortionEditor
+                        gapFrames={videoEditing.editSettings.settings.gapFrameCount || 12}
+                        setGapFrames={(val) => videoEditing.editSettings.updateField('gapFrameCount', val)}
+                        contextFrames={videoEditing.editSettings.settings.contextFrameCount || 8}
+                        setContextFrames={(val) => {
+                          const maxGap = Math.max(1, 81 - (val * 2));
+                          const gapFrames = videoEditing.editSettings.settings.gapFrameCount || 12;
+                          const newGapFrames = gapFrames > maxGap ? maxGap : gapFrames;
+                          videoEditing.editSettings.updateFields({ 
+                            contextFrameCount: val, 
+                            gapFrameCount: newGapFrames 
+                          });
+                        }}
+                        negativePrompt={videoEditing.editSettings.settings.negativePrompt || ''}
+                        setNegativePrompt={(val) => videoEditing.editSettings.updateField('negativePrompt', val)}
+                        enhancePrompt={videoEditing.editSettings.settings.enhancePrompt}
+                        setEnhancePrompt={(val) => videoEditing.editSettings.updateField('enhancePrompt', val)}
+                        selections={videoEditing.selections}
+                        onUpdateSelectionSettings={videoEditing.handleUpdateSelectionSettings}
+                        availableLoras={videoEditing.availableLoras}
+                        projectId={selectedProjectId}
+                        loraManager={videoEditing.loraManager}
+                        onGenerate={videoEditing.handleGenerate}
+                        isGenerating={videoEditing.isGenerating}
+                        generateSuccess={videoEditing.generateSuccess}
+                        isGenerateDisabled={!videoEditing.isValid}
+                        validationErrors={videoEditing.validationErrors}
+                      />
+                    </div>
                   ) : isSpecialEditMode ? (
                     <EditModePanel
                       sourceGenerationData={sourceGenerationData}
@@ -1902,20 +2052,56 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               </button>
                             </div>
                           )}
-                          {/* Video Trim toggle (only for segment videos with trim editor enabled) */}
-                          {showVideoTrimEditor && isVideo && !readOnly && (
+                          {/* Video controls: Trim and Edit (for videos) */}
+                          {isVideo && !readOnly && (
                             <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                               <button
-                                className="px-3 py-1.5 text-sm rounded transition-colors bg-background text-foreground shadow-sm"
-                                disabled
+                                onClick={() => {
+                                  if (isVideoTrimMode) {
+                                    handleExitVideoTrimMode();
+                                  }
+                                  if (isVideoEditMode) {
+                                    handleExitVideoEditMode();
+                                  }
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  !isVideoTrimMode && !isVideoEditMode 
+                                    ? "bg-background text-foreground shadow-sm" 
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
                               >
                                 Info
                               </button>
+                              {showVideoTrimEditor && (
+                                <button
+                                  onClick={() => {
+                                    if (isVideoEditMode) handleExitVideoEditMode();
+                                    handleEnterVideoTrimMode();
+                                  }}
+                                  className={cn(
+                                    "px-3 py-1.5 text-sm rounded transition-colors",
+                                    isVideoTrimMode 
+                                      ? "bg-background text-foreground shadow-sm" 
+                                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                  )}
+                                >
+                                  Trim
+                                </button>
+                              )}
                               <button
-                                onClick={handleEnterVideoTrimMode}
-                                className="px-3 py-1.5 text-sm rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                onClick={() => {
+                                  if (isVideoTrimMode) handleExitVideoTrimMode();
+                                  handleEnterVideoEditMode();
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  isVideoEditMode 
+                                    ? "bg-background text-foreground shadow-sm" 
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
                               >
-                                Trim
+                                Edit
                               </button>
                             </div>
                           )}
@@ -1933,7 +2119,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     {/* Split layout when variants available, otherwise full height for task details */}
                     {variants && variants.length >= 1 ? (
                       <div className="flex-1 flex flex-col min-h-0">
-                        {/* Task details - top half, scrollable */}
+                        {/* Task details - takes remaining space after variants, scrollable */}
                         <div className="flex-1 overflow-y-auto min-h-0">
                           <TaskDetailsPanelWrapper
                             taskDetailsData={adjustedTaskDetailsData}
@@ -1961,8 +2147,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           />
                         </div>
                         
-                        {/* Variants section - bottom half, scrollable */}
-                        <div ref={variantsSectionRef} className="flex-1 overflow-y-auto min-h-0">
+                        {/* Variants section - shrink-to-fit content, max 50% height, scrollable if needed */}
+                        <div ref={variantsSectionRef} className="flex-shrink-0 overflow-y-auto max-h-[50%]">
                           <div className="p-4 pt-2">
                             <VariantSelector
                               variants={variants}
@@ -2370,22 +2556,95 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   
                   {/* Media Display - The wrapper now handles centering */}
                 {isVideo ? (
-                  <StyledVideoPlayer
-                    src={effectiveVideoUrl}
-                    poster={activeVariant?.thumbnail_url || media.thumbUrl}
-                    loop
-                    muted
-                    autoPlay
-                    playsInline
-                    preload="auto"
-                    className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
-                    onLoadedMetadata={(e) => {
-                      const video = e.currentTarget;
-                      if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
-                        setVideoDuration(video.duration);
-                      }
-                    }}
-                  />
+                  isVideoEditModeActive ? (
+                    // Video edit mode: Use regular video element with ref for seeking control + timeline overlay
+                    // Video is paused by default and follows timeline marker position
+                    <div className="relative w-full h-full flex flex-col items-center justify-center">
+                      <video
+                        ref={videoEditing.videoRef}
+                        src={effectiveVideoUrl}
+                        poster={activeVariant?.thumbnail_url || media.thumbUrl}
+                        muted
+                        playsInline
+                        controls
+                        preload="auto"
+                        className="max-w-full max-h-[calc(100%-140px)] object-contain shadow-wes border border-border/20 rounded"
+                        onLoadedMetadata={(e) => {
+                          const video = e.currentTarget;
+                          if (Number.isFinite(video.duration) && video.duration > 0) {
+                            setVideoDuration(video.duration);
+                            // Seek to start of first selection when video loads
+                            if (videoEditing.selections.length > 0 && videoEditing.selections[0].start > 0) {
+                              video.currentTime = videoEditing.selections[0].start;
+                            }
+                          }
+                        }}
+                      />
+                      
+                      {/* Timeline overlay for portion selection */}
+                      {trimState.videoDuration > 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
+                          <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Film className="w-4 h-4 text-white/70" />
+                                <span className="text-sm text-white/70">
+                                  {videoEditing.selections.length === 1 ? 'Select portion to regenerate' : `${videoEditing.selections.length} portions selected`}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="font-mono px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
+                                  16 fps (assumed)
+                                </span>
+                                <span className="text-white/50">
+                                  {Math.round(trimState.videoDuration * 16)} frames
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <MultiPortionTimeline
+                              duration={trimState.videoDuration}
+                              selections={videoEditing.selections}
+                              activeSelectionId={videoEditing.activeSelectionId}
+                              onSelectionChange={videoEditing.handleUpdateSelection}
+                              onSelectionClick={videoEditing.setActiveSelectionId}
+                              onRemoveSelection={videoEditing.handleRemoveSelection}
+                              videoRef={videoEditing.videoRef}
+                              videoUrl={effectiveVideoUrl}
+                              fps={16}
+                            />
+                            
+                            {/* Add selection button */}
+                            <button
+                              onClick={videoEditing.handleAddSelection}
+                              className="mt-2 flex items-center gap-1 text-xs text-white/70 hover:text-white transition-colors"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add another portion
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Normal video display with StyledVideoPlayer
+                    <StyledVideoPlayer
+                      src={effectiveVideoUrl}
+                      poster={activeVariant?.thumbnail_url || media.thumbUrl}
+                      loop
+                      muted
+                      autoPlay
+                      playsInline
+                      preload="auto"
+                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
+                      onLoadedMetadata={(e) => {
+                        const video = e.currentTarget;
+                        if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
+                          setVideoDuration(video.duration);
+                        }
+                      }}
+                    />
+                  )
                 ) : (
                   <MediaDisplayWithCanvas
                     effectiveImageUrl={effectiveMediaUrl}

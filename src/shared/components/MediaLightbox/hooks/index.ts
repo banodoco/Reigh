@@ -53,3 +53,9 @@ export type {
   UseEditSettingsPersistenceProps, 
   UseEditSettingsPersistenceReturn,
 } from './useEditSettingsPersistence';
+
+export { useVideoEditing } from './useVideoEditing';
+export type { 
+  UseVideoEditingProps, 
+  UseVideoEditingReturn,
+} from './useVideoEditing';
