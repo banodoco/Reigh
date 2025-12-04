@@ -1611,18 +1611,21 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   variant="secondary"
                   size="icon"
                   className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                  onClick={() => {
+                  onClick={(e) => {
+                      e.stopPropagation(); // Prevent lightbox from opening
                       if (isTogglingStar) return;
                       setIsTogglingStar(true);
                       const nextStarred = !image.starred;
+                      // For variants, use the parent generation_id; otherwise use the image id
+                      const targetId = (image as any).metadata?.generation_id || (image as any).generation_id || image.id!;
                       try {
                         if (onToggleStar) {
-                          onToggleStar(image.id!, nextStarred);
+                          onToggleStar(targetId, nextStarred);
                           // Assume parent handles async; release immediately to avoid global dulling
                           setIsTogglingStar(false);
                         } else {
                           toggleStarMutation.mutate(
-                            { id: image.id!, starred: nextStarred },
+                            { id: targetId, starred: nextStarred },
                             {
                               onSettled: () => {
                                 setIsTogglingStar(false);
