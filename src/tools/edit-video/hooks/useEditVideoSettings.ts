@@ -2,7 +2,7 @@ import { useToolPageSettings } from '@/shared/hooks/useToolPageSettings';
 import { EditVideoSettings } from '../settings';
 
 const DEFAULT_EDIT_VIDEO_SETTINGS: EditVideoSettings = {
-  contextFrameCount: 8,
+  contextFrameCount: 16,
   gapFrameCount: 12,
   replaceMode: true,
   keepBridgingImages: true,

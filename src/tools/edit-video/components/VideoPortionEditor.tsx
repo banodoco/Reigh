@@ -5,7 +5,7 @@ import { Switch } from '@/shared/components/ui/switch';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Loader2, Check, Film, Wand2, AlertTriangle, Trash2 } from 'lucide-react';
+import { Loader2, Check, Film, Wand2, AlertTriangle, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { LoraManager } from '@/shared/components/LoraManager';
 import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
@@ -145,6 +145,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     validationErrors = [],
 }) => {
     const enhancePromptValue = enhancePrompt ?? true;
+    const [showAdvanced, setShowAdvanced] = useState(false);
     
     // Handle context frames change with auto-adjustment of gap frames
     const handleContextFramesChange = (val: number) => {
@@ -253,51 +254,64 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                 </div>
             </div>
             
-            {/* Context Frames - Global setting */}
-            <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                    <Label htmlFor="context-frames" className="text-sm">Context Frames</Label>
-                    <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{contextFrames}</span>
-                </div>
-                <Slider
-                    id="context-frames"
-                    min={4}
-                    max={30}
-                    step={1}
-                    value={[contextFrames]}
-                    onValueChange={(values) => handleContextFramesChange(values[0])}
-                />
-                <p className="text-xs text-muted-foreground">
-                    Frames from source video used for context on each side
-                </p>
-            </div>
+            {/* Advanced Settings Toggle */}
+            <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+            >
+                {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                Advanced Settings
+            </button>
             
-            {/* Negative Prompt */}
-            <div className="space-y-2">
-                <Label htmlFor="negative-prompt">Negative Prompt</Label>
-                <Textarea
-                    id="negative-prompt"
-                    value={negativePrompt}
-                    onChange={(e) => setNegativePrompt(e.target.value)}
-                    placeholder="What to avoid (optional)"
-                    rows={2}
-                    className="resize-none"
-                />
-            </div>
+            {showAdvanced && (
+                <div className="space-y-4 pt-2">
+                    {/* Context Frames - Global setting */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="context-frames" className="text-sm">Context Frames</Label>
+                            <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{contextFrames}</span>
+                        </div>
+                        <Slider
+                            id="context-frames"
+                            min={4}
+                            max={30}
+                            step={1}
+                            value={[contextFrames]}
+                            onValueChange={(values) => handleContextFramesChange(values[0])}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Frames from source video used for context on each side
+                        </p>
+                    </div>
+                    
+                    {/* Negative Prompt */}
+                    <div className="space-y-2">
+                        <Label htmlFor="negative-prompt">Negative Prompt</Label>
+                        <Textarea
+                            id="negative-prompt"
+                            value={negativePrompt}
+                            onChange={(e) => setNegativePrompt(e.target.value)}
+                            placeholder="What to avoid (optional)"
+                            rows={2}
+                            className="resize-none"
+                        />
+                    </div>
 
-            {/* LoRA Manager */}
-            <div className="space-y-2">
-                <LoraManager
-                    availableLoras={availableLoras}
-                    projectId={projectId || undefined}
-                    persistenceScope="project"
-                    enableProjectPersistence={true}
-                    persistenceKey="edit-video"
-                    externalLoraManager={loraManager}
-                    title="LoRA Models (Optional)"
-                    addButtonText="Add LoRAs"
-                />
-            </div>
+                    {/* LoRA Manager */}
+                    <div className="space-y-2">
+                        <LoraManager
+                            availableLoras={availableLoras}
+                            projectId={projectId || undefined}
+                            persistenceScope="project"
+                            enableProjectPersistence={true}
+                            persistenceKey="edit-video"
+                            externalLoraManager={loraManager}
+                            title="LoRA Models (Optional)"
+                            addButtonText="Add LoRAs"
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Validation Errors */}
             {validationErrors.length > 0 && (
@@ -313,12 +327,9 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                     </ul>
                 </div>
             )}
-
-            {/* Spacer for sticky button */}
-            <div className="h-20" />
             
             {/* Generate Button - Sticky at bottom */}
-            <div className="sticky bottom-0 pt-4 pb-6 -mx-6 px-6 bg-gradient-to-t from-background via-background to-transparent">
+            <div className="sticky bottom-0 pt-4 pb-4 -mx-6 px-6 bg-gradient-to-t from-background via-background to-transparent">
                 <Button
                     onClick={onGenerate}
                     disabled={isGenerateDisabled || isGenerating || generateSuccess}
