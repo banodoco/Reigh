@@ -260,8 +260,11 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                 </div>
             )}
 
-            {/* Generate Button */}
-            <div className="pt-4">
+            {/* Spacer for sticky button */}
+            <div className="h-20" />
+            
+            {/* Generate Button - Sticky at bottom */}
+            <div className="sticky bottom-0 pt-4 pb-6 -mx-6 px-6 bg-gradient-to-t from-background via-background to-transparent">
                 <Button
                     onClick={onGenerate}
                     disabled={isGenerateDisabled || isGenerating || generateSuccess}
