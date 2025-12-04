@@ -32,7 +32,7 @@ export default function EditImagesPage() {
   const isMobile = useIsMobile();
   const { data: shots } = useListShots(selectedProjectId);
   
-  // Fetch edit variants - all variants from generation_variants table (edits created via inpaint, magic edit, etc.)
+  // Fetch edit variants created by this tool
   const {
     data: resultsData,
     isLoading: isResultsLoading,
@@ -43,6 +43,7 @@ export default function EditImagesPage() {
     true,
     {
       variantsOnly: true, // Fetch edit variants from generation_variants table
+      toolType: TOOL_TYPE, // Filter to only show variants created by edit-images tool
     }
   );
 

@@ -491,11 +491,14 @@ export function InlineEditVideoView({
       });
       
       // Create the task using the createTask function
+      // Note: tool_type must be at top level for complete_task to pick it up for variant creation
       const result = await createTask({
         project_id: selectedProjectId,
         task_type: 'edit_video_orchestrator',
         params: {
           orchestrator_details: orchestratorDetails,
+          tool_type: 'edit-video', // Top level for complete_task variant creation
+          parent_generation_id: media.id, // Top level for complete_task variant creation
         },
       });
       

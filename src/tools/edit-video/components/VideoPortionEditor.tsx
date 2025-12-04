@@ -107,7 +107,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
             <div>
                 <h3 className="text-lg font-medium flex items-center gap-2">
                     <Wand2 className="w-5 h-5 text-primary" />
-                    Regenerate Portion
+                    {selections.length > 1 ? 'Regenerate Portions' : 'Regenerate Portion'}
                 </h3>
             </div>
             
@@ -278,7 +278,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                         <Film className="w-5 h-5" />
                     )}
                     <span className="font-medium">
-                        {generateSuccess ? 'Task Created' : 'Regenerate Portion'}
+                        {generateSuccess ? 'Task Created' : selections.length > 1 ? 'Regenerate Portions' : 'Regenerate Portion'}
                     </span>
                 </Button>
             </div>
