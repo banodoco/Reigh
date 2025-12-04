@@ -5,6 +5,7 @@ import { Switch } from '@/shared/components/ui/switch';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { Loader2, Check, Film, Wand2, AlertTriangle, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { LoraManager } from '@/shared/components/LoraManager';
 import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
@@ -160,6 +161,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     };
 
     return (
+        <TooltipProvider>
         <div className="p-6 space-y-6">
             {/* Header */}
             <div>
@@ -209,9 +211,16 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                                             }}
                                             className="flex-1"
                                         />
-                                        <span className="text-xs font-mono text-muted-foreground w-8 text-right">
-                                            {selection.gapFrameCount ?? gapFrames}f
-                                        </span>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="text-xs font-mono text-muted-foreground w-8 text-right cursor-help">
+                                                    {selection.gapFrameCount ?? gapFrames}f
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="z-[100001]">
+                                                <p>Frames to generate in the gap</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     </div>
                                     
                                     {/* Delete button - only show if more than 1 selection */}
@@ -351,6 +360,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                 </Button>
             </div>
         </div>
+        </TooltipProvider>
     );
 };
 

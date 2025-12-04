@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Play, Pause, Volume2, VolumeX, Maximize } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface StyledVideoPlayerProps {
   src: string;
@@ -30,6 +31,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   onLoadedMetadata,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const isMobile = useIsMobile();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(muted);
   const [currentTime, setCurrentTime] = useState(0);
@@ -77,6 +79,9 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   }, [duration]);
 
   const toggleFullscreen = useCallback(() => {
+    // Disable fullscreen on mobile
+    if (isMobile) return;
+    
     const video = videoRef.current;
     if (!video) return;
 
@@ -85,7 +90,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
     } else {
       video.requestFullscreen();
     }
-  }, []);
+  }, [isMobile]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -152,7 +157,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         preload={preload}
         className="w-full h-auto object-contain rounded-lg bg-black/5 cursor-pointer video-clickable-area"
         style={{ maxHeight: '100%' }}
-        onDoubleClick={toggleFullscreen}
+        onDoubleClick={isMobile ? undefined : toggleFullscreen}
         onLoadedMetadata={onLoadedMetadata}
       >
         Your browser does not support the video tag.
@@ -238,15 +243,17 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
               )}
             </Button>
 
-            {/* Fullscreen */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleFullscreen}
-              className="text-white hover:bg-white/20 h-8 w-8 p-0"
-            >
-              <Maximize className="h-4 w-4" />
-            </Button>
+            {/* Fullscreen - hidden on mobile */}
+            {!isMobile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleFullscreen}
+                className="text-white hover:bg-white/20 h-8 w-8 p-0"
+              >
+                <Maximize className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
       </div>
