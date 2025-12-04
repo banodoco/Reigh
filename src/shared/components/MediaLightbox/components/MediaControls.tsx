@@ -14,6 +14,7 @@ import {
   Eye,
   EyeOff,
   Trash2,
+  X,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
@@ -70,6 +71,10 @@ export interface MediaControlsProps {
   onDelete?: (id: string) => void;
   handleDelete?: () => void;
   isDeleting?: boolean;
+  
+  // Close functionality
+  onClose?: () => void;
+  showCloseButton?: boolean;
 }
 
 /**
@@ -111,9 +116,23 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
   onDelete,
   handleDelete,
   isDeleting,
+  onClose,
+  showCloseButton = false,
 }) => {
   return (
     <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
+      {/* Close Button */}
+      {showCloseButton && onClose && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onClose}
+          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+      
       {/* Star Button (hidden in readOnly and special edit modes) */}
       {!readOnly && !isSpecialEditMode && (
         <Button

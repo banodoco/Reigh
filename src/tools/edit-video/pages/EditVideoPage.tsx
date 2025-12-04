@@ -361,6 +361,7 @@ export default function EditVideoPage() {
           showNavigation={allResults.length > 1}
           showTaskDetails={true}
           initialVariantId={lightboxVariantId || undefined}
+          showCloseButton={true}
         />
       )}
     </div>

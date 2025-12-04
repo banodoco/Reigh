@@ -170,6 +170,8 @@ interface MediaLightboxProps {
   onTrimModeChange?: (isTrimMode: boolean) => void;
   // Initial variant to display (when opening lightbox from a variant click)
   initialVariantId?: string;
+  // Show close button in top right controls (useful when opening from tool galleries)
+  showCloseButton?: boolean;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -235,6 +237,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onTrimModeChange,
   // Initial variant to display
   initialVariantId,
+  // Show close button in top right
+  showCloseButton = false,
 }) => {
   // ========================================
   // REFACTORED: All logic extracted to hooks
@@ -1890,6 +1894,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isDeleting={isDeleting}
                       mediaId={media.id}
                       onClose={onClose}
+                      showCloseButton={showCloseButton}
                     />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
@@ -2300,6 +2305,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isDeleting={isDeleting}
                       mediaId={media.id}
                       onClose={onClose}
+                      showCloseButton={showCloseButton}
                     />
 
                     {/* Bottom Left Controls - Edit & Upscale */}
@@ -2790,6 +2796,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isDeleting={isDeleting}
                     mediaId={media.id}
                     onClose={onClose}
+                    showCloseButton={showCloseButton}
                   />
 
                     {/* Bottom Left Controls - Edit & Upscale */}
