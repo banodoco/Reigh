@@ -142,6 +142,13 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 }) => {
   // Local pending state to scope star button disabled to this item only
   const [isTogglingStar, setIsTogglingStar] = useState<boolean>(false);
+  // Local optimistic starred state - for variants, the parent's starred status isn't in the variant data
+  const [localStarred, setLocalStarred] = useState<boolean>(image.starred ?? false);
+  
+  // Sync local state when image changes or when image.starred updates from parent
+  useEffect(() => {
+    setLocalStarred(image.starred ?? false);
+  }, [image.id, image.starred]);
   
   // Fetch task data for video tasks to show proper details
   // Try to get task ID from metadata first (more efficient), fallback to cache query
@@ -1603,7 +1610,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
           {/* Bottom Left Buttons - Star, Edit Image */}
           <div className={`absolute bottom-2 left-2 flex items-center gap-1.5 transition-opacity z-20 ${
-            image.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            localStarred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}>
               {/* Star Button */}
               {showStar && (
@@ -1615,7 +1622,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       e.stopPropagation(); // Prevent lightbox from opening
                       if (isTogglingStar) return;
                       setIsTogglingStar(true);
-                      const nextStarred = !image.starred;
+                      const nextStarred = !localStarred;
+                      // Optimistically update local state for immediate UI feedback
+                      setLocalStarred(nextStarred);
                       // For variants, use the parent generation_id; otherwise use the image id
                       const targetId = (image as any).metadata?.generation_id || (image as any).generation_id || image.id!;
                       try {
@@ -1635,12 +1644,13 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                         }
                       } catch (_) {
                         setIsTogglingStar(false);
+                        setLocalStarred(!nextStarred); // Rollback on error
                       }
                   }}
                   disabled={isTogglingStar}
               >
                   <Star 
-                      className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
+                      className={`h-3.5 w-3.5 ${localStarred ? 'fill-current' : ''}`} 
                   />
               </Button>
               )}
