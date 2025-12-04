@@ -359,7 +359,6 @@ export default function EditImagesPage() {
             taskId: currentTaskId,
           }}
           initialVariantId={lightboxVariantId || undefined}
-          showCloseButton={true}
         />
       )}
     </div>

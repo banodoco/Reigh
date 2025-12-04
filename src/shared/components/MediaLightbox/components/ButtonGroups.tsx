@@ -101,7 +101,6 @@ interface TopRightControlsProps extends BaseButtonGroupProps {
   handleDelete?: () => void;
   isDeleting?: string | null;
   onClose: () => void;
-  showCloseButton?: boolean;
 }
 
 export const TopRightControls: React.FC<TopRightControlsProps> = ({
@@ -115,30 +114,9 @@ export const TopRightControls: React.FC<TopRightControlsProps> = ({
   isDeleting,
   mediaId,
   onClose,
-  showCloseButton = false,
 }) => {
   return (
     <div className="absolute top-4 right-4 flex items-center space-x-2 z-[70]">
-      {/* Close Button - shown when viewing from edit-images/edit-video gallery */}
-      {showCloseButton && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="bg-black/50 hover:bg-black/70 text-white"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="z-[100001]">Close</TooltipContent>
-        </Tooltip>
-      )}
-
       {/* Download Button - Keep visible in edit mode */}
       {showDownload && !readOnly && (
         <Tooltip>

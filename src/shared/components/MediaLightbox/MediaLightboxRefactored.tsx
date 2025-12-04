@@ -170,8 +170,6 @@ interface MediaLightboxProps {
   onTrimModeChange?: (isTrimMode: boolean) => void;
   // Initial variant to display (when opening lightbox from a variant click)
   initialVariantId?: string;
-  // Show close button in top right controls (useful when opening from tool galleries)
-  showCloseButton?: boolean;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -237,8 +235,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onTrimModeChange,
   // Initial variant to display
   initialVariantId,
-  // Show close button in top right
-  showCloseButton = false,
 }) => {
   // ========================================
   // REFACTORED: All logic extracted to hooks
@@ -1894,7 +1890,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isDeleting={isDeleting}
                       mediaId={media.id}
                       onClose={onClose}
-                      showCloseButton={showCloseButton}
                     />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
@@ -1954,7 +1949,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       videoUrl={effectiveVideoUrl}
                     />
                   ) : isVideoEditModeActive ? (
-                    <div className="h-full overflow-y-auto">
+                    <div className="h-full flex flex-col">
+                      {/* Header with close button */}
+                      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <Film className="w-5 h-5 text-primary" />
+                          <h2 className="text-lg font-light">Edit Video</h2>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={onClose}
+                          className="h-8 w-8 p-0 hover:bg-muted"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
                       <VideoPortionEditor
                         gapFrames={videoEditing.editSettings.settings.gapFrameCount || 12}
                         setGapFrames={(val) => videoEditing.editSettings.updateField('gapFrameCount', val)}
@@ -1983,6 +1994,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         isGenerateDisabled={!videoEditing.isValid}
                         validationErrors={videoEditing.validationErrors}
                       />
+                      </div>
                     </div>
                   ) : isSpecialEditMode ? (
                     <EditModePanel
@@ -2305,7 +2317,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isDeleting={isDeleting}
                       mediaId={media.id}
                       onClose={onClose}
-                      showCloseButton={showCloseButton}
                     />
 
                     {/* Bottom Left Controls - Edit & Upscale */}
