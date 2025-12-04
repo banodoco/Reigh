@@ -719,6 +719,7 @@ export function InlineEditVideoView({
             setEnhancePrompt={(val) => editSettings.updateField('enhancePrompt', val)}
             selections={selections}
             onUpdateSelectionSettings={handleUpdateSelectionSettings}
+            onRemoveSelection={handleRemoveSelection}
             availableLoras={availableLoras}
             projectId={selectedProjectId}
             loraManager={loraManager}

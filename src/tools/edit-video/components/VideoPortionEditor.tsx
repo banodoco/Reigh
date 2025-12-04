@@ -5,11 +5,11 @@ import { Switch } from '@/shared/components/ui/switch';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Loader2, Check, Film, Wand2, AlertTriangle, Clock } from 'lucide-react';
+import { Loader2, Check, Film, Wand2, AlertTriangle, Trash2 } from 'lucide-react';
 import { LoraManager } from '@/shared/components/LoraManager';
 import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
-import { PortionSelection, formatTime } from '@/shared/components/VideoPortionTimeline';
+import { PortionSelection } from '@/shared/components/VideoPortionTimeline';
 
 /**
  * Quantize total generation frames to 4N+1 format (required by Wan models)
@@ -53,6 +53,7 @@ export interface VideoPortionEditorProps {
     // Per-segment settings
     selections?: PortionSelection[];
     onUpdateSelectionSettings?: (id: string, updates: Partial<Pick<PortionSelection, 'gapFrameCount' | 'prompt'>>) => void;
+    onRemoveSelection?: (id: string) => void;
     
     // LoRA props
     availableLoras: LoraModel[];
@@ -78,6 +79,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     setEnhancePrompt,
     selections = [],
     onUpdateSelectionSettings,
+    onRemoveSelection,
     availableLoras,
     projectId,
     loraManager,
@@ -120,11 +122,12 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                         {selections.sort((a, b) => a.start - b.start).map((selection, index) => (
                             <div 
                                 key={selection.id} 
-                                className="border rounded-lg p-3 bg-muted/20 space-y-3"
+                                className="border rounded-lg p-3 bg-muted/20 space-y-2"
                             >
-                                {/* Segment Header */}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
+                                {/* Segment Header with Gap Slider */}
+                                <div className="flex items-center gap-3">
+                                    {/* Segment number and title */}
+                                    <div className="flex items-center gap-2 flex-shrink-0">
                                         <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary">
                                             {index + 1}
                                         </div>
@@ -132,50 +135,42 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                                             Segment {index + 1}
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
-                                        <Clock className="w-3 h-3" />
-                                        {formatTime(selection.start)} - {formatTime(selection.end)}
-                                    </div>
-                                </div>
-                                
-                                {/* Gap Frames for this segment */}
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="text-xs">Gap Frames</Label>
-                                        <Input
-                                            type="number"
+                                    
+                                    {/* Gap Frames slider inline */}
+                                    <div className="flex-1 flex items-center gap-2">
+                                        <Slider
                                             min={1}
                                             max={Math.max(1, 81 - (contextFrames * 2))}
                                             step={4}
-                                            value={selection.gapFrameCount ?? gapFrames}
-                                            onChange={(e) => {
-                                                const val = parseInt(e.target.value) || gapFrames;
-                                                const quantized = getQuantizedGap(val, contextFrames);
-                                                onUpdateSelectionSettings(selection.id, { gapFrameCount: quantized });
+                                            value={[Math.max(1, selection.gapFrameCount ?? gapFrames)]}
+                                            onValueChange={(values) => {
+                                                const quantizedGap = getQuantizedGap(values[0], contextFrames);
+                                                onUpdateSelectionSettings?.(selection.id, { gapFrameCount: quantizedGap });
                                             }}
-                                            className="w-20 h-7 text-xs font-mono text-right"
+                                            className="flex-1"
                                         />
+                                        <span className="text-xs font-mono text-muted-foreground w-8 text-right">
+                                            {selection.gapFrameCount ?? gapFrames}f
+                                        </span>
                                     </div>
-                                    <Slider
-                                        min={1}
-                                        max={Math.max(1, 81 - (contextFrames * 2))}
-                                        step={4}
-                                        value={[Math.max(1, selection.gapFrameCount ?? gapFrames)]}
-                                        onValueChange={(values) => {
-                                            const quantizedGap = getQuantizedGap(values[0], contextFrames);
-                                            onUpdateSelectionSettings(selection.id, { gapFrameCount: quantizedGap });
-                                        }}
-                                        className="h-1"
-                                    />
+                                    
+                                    {/* Delete button - only show if more than 1 selection */}
+                                    {selections.length > 1 && onRemoveSelection && (
+                                        <button
+                                            onClick={() => onRemoveSelection(selection.id)}
+                                            className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
                                 
                                 {/* Prompt for this segment */}
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs">Segment Prompt (optional)</Label>
+                                <div>
                                     <Input
                                         value={selection.prompt || ''}
-                                        onChange={(e) => onUpdateSelectionSettings(selection.id, { prompt: e.target.value })}
-                                        placeholder="Describe what should happen in this segment..."
+                                        onChange={(e) => onUpdateSelectionSettings?.(selection.id, { prompt: e.target.value })}
+                                        placeholder="Prompt for this segment (optional)..."
                                         className="h-8 text-xs"
                                     />
                                 </div>
