@@ -102,10 +102,22 @@ export function MultiPortionTimeline({
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<{ id: string; handle: 'start' | 'end' } | null>(null);
   
+  // Tap-to-move mode: tap a handle to select it, tap track to move it
+  const [selectedHandle, setSelectedHandle] = useState<{ id: string; handle: 'start' | 'end' } | null>(null);
+  
   // Store video playing state before drag
   const wasPlayingRef = useRef(false);
   
-  const handleMouseDown = (e: React.MouseEvent, id: string, handle: 'start' | 'end') => {
+  // Get position from mouse or touch event
+  const getClientX = (e: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent): number => {
+    if ('touches' in e) {
+      return e.touches[0]?.clientX ?? (e as TouchEvent).changedTouches?.[0]?.clientX ?? 0;
+    }
+    return (e as MouseEvent).clientX;
+  };
+  
+  // Start dragging (mouse or touch)
+  const startDrag = (e: React.MouseEvent | React.TouchEvent, id: string, handle: 'start' | 'end') => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -122,17 +134,71 @@ export function MultiPortionTimeline({
     }
     
     setDragging({ id, handle });
+    setSelectedHandle({ id, handle }); // Also select for tap-to-move mode
     onSelectionClick(id);
   };
   
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  // Handle tap on handle (for tap-to-move mode on mobile)
+  const handleHandleTap = (e: React.MouseEvent | React.TouchEvent, id: string, handle: 'start' | 'end') => {
+    // If already selected, deselect
+    if (selectedHandle?.id === id && selectedHandle?.handle === handle) {
+      setSelectedHandle(null);
+      return;
+    }
+    
+    // Select this handle
+    setSelectedHandle({ id, handle });
+    onSelectionClick(id);
+    
+    // Seek to handle position
+    const selection = selections.find(s => s.id === id);
+    if (selection && videoRef.current) {
+      videoRef.current.currentTime = handle === 'start' ? selection.start : selection.end;
+    }
+  };
+  
+  // Handle tap on track to move selected handle
+  const handleTrackTap = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!selectedHandle || !trackRef.current) {
+      onSelectionClick(null);
+      return;
+    }
+    
+    const selection = selections.find(s => s.id === selectedHandle.id);
+    if (!selection) return;
+    
+    const rect = trackRef.current.getBoundingClientRect();
+    const clientX = getClientX(e);
+    const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    const time = (percent / 100) * duration;
+    
+    let newTime: number;
+    if (selectedHandle.handle === 'start') {
+      newTime = Math.min(time, selection.end - 0.1);
+      onSelectionChange(selectedHandle.id, newTime, selection.end);
+    } else {
+      newTime = Math.max(time, selection.start + 0.1);
+      onSelectionChange(selectedHandle.id, selection.start, newTime);
+    }
+    
+    // Seek video to show current frame
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime;
+    }
+    
+    // Clear selection after moving
+    setSelectedHandle(null);
+  };
+  
+  const handleMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!dragging || !trackRef.current) return;
     
     const selection = selections.find(s => s.id === dragging.id);
     if (!selection) return;
     
     const rect = trackRef.current.getBoundingClientRect();
-    const percent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    const clientX = getClientX(e);
+    const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     const time = (percent / 100) * duration;
     
     let newTime: number;
@@ -150,7 +216,7 @@ export function MultiPortionTimeline({
     }
   }, [dragging, duration, selections, onSelectionChange, videoRef]);
   
-  const handleMouseUp = useCallback(() => {
+  const handleEnd = useCallback(() => {
     // Resume playing if it was playing before
     if (wasPlayingRef.current && videoRef.current) {
       videoRef.current.play();
@@ -160,14 +226,23 @@ export function MultiPortionTimeline({
   
   useEffect(() => {
     if (dragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      // Mouse events
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('mouseup', handleEnd);
+      // Touch events
+      window.addEventListener('touchmove', handleMove, { passive: false });
+      window.addEventListener('touchend', handleEnd);
+      window.addEventListener('touchcancel', handleEnd);
+      
       return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('mousemove', handleMove);
+        window.removeEventListener('mouseup', handleEnd);
+        window.removeEventListener('touchmove', handleMove);
+        window.removeEventListener('touchend', handleEnd);
+        window.removeEventListener('touchcancel', handleEnd);
       };
     }
-  }, [dragging, handleMouseMove, handleMouseUp]);
+  }, [dragging, handleMove, handleEnd]);
   
   // Colors for different selections
   const selectionColors = [
@@ -179,12 +254,20 @@ export function MultiPortionTimeline({
   ];
   
   return (
-    <div className="relative pt-12 pb-2">
+    <div className="relative pt-14 pb-2">
+      {/* Tap-to-move hint */}
+      {selectedHandle && (
+        <div className="absolute top-0 left-0 right-0 text-center text-xs text-primary animate-pulse">
+          Tap on timeline to move {selectedHandle.handle} point
+        </div>
+      )}
+      
       {/* Track */}
       <div 
         ref={trackRef}
-        className="relative h-6 bg-white/10 rounded cursor-pointer"
-        onClick={() => onSelectionClick(null)}
+        className="relative h-8 md:h-6 bg-white/10 rounded cursor-pointer touch-none"
+        onClick={handleTrackTap}
+        onTouchEnd={handleTrackTap}
       >
         {/* Render each selection */}
         {selections.map((selection, index) => {
@@ -271,30 +354,42 @@ export function MultiPortionTimeline({
                 )}
               </div>
               
-              {/* Start handle */}
+              {/* Start handle - larger touch target on mobile */}
               <div
                 className={cn(
-                  "absolute top-0 bottom-0 w-3 rounded-l cursor-ew-resize flex items-center justify-center transition-colors z-10",
+                  "absolute top-0 bottom-0 w-5 md:w-3 rounded-l cursor-ew-resize flex items-center justify-center transition-all z-10 touch-none",
                   colorClass,
-                  isActive ? "opacity-100" : "opacity-70 hover:opacity-100"
+                  isActive ? "opacity-100" : "opacity-70 hover:opacity-100",
+                  selectedHandle?.id === selection.id && selectedHandle?.handle === 'start' && "ring-2 ring-white ring-offset-1 ring-offset-black scale-110"
                 )}
                 style={{ left: `${startPercent}%`, transform: 'translateX(-50%)' }}
-                onMouseDown={(e) => handleMouseDown(e, selection.id, 'start')}
+                onMouseDown={(e) => startDrag(e, selection.id, 'start')}
+                onTouchStart={(e) => startDrag(e, selection.id, 'start')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleHandleTap(e, selection.id, 'start');
+                }}
               >
-                <div className="w-0.5 h-3 bg-white/50 rounded" />
+                <div className="w-0.5 h-4 md:h-3 bg-white/50 rounded" />
               </div>
               
-              {/* End handle */}
+              {/* End handle - larger touch target on mobile */}
               <div
                 className={cn(
-                  "absolute top-0 bottom-0 w-3 rounded-r cursor-ew-resize flex items-center justify-center transition-colors z-10",
+                  "absolute top-0 bottom-0 w-5 md:w-3 rounded-r cursor-ew-resize flex items-center justify-center transition-all z-10 touch-none",
                   colorClass,
-                  isActive ? "opacity-100" : "opacity-70 hover:opacity-100"
+                  isActive ? "opacity-100" : "opacity-70 hover:opacity-100",
+                  selectedHandle?.id === selection.id && selectedHandle?.handle === 'end' && "ring-2 ring-white ring-offset-1 ring-offset-black scale-110"
                 )}
                 style={{ left: `${endPercent}%`, transform: 'translateX(-50%)' }}
-                onMouseDown={(e) => handleMouseDown(e, selection.id, 'end')}
+                onMouseDown={(e) => startDrag(e, selection.id, 'end')}
+                onTouchStart={(e) => startDrag(e, selection.id, 'end')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleHandleTap(e, selection.id, 'end');
+                }}
               >
-                <div className="w-0.5 h-3 bg-white/50 rounded" />
+                <div className="w-0.5 h-4 md:h-3 bg-white/50 rounded" />
               </div>
             </React.Fragment>
           );

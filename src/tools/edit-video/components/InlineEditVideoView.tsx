@@ -579,32 +579,47 @@ export function InlineEditVideoView({
           
           {/* Portion Selection Overlay */}
           {videoDuration > 0 && (
-            <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
-              <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
+            <div className={cn(
+              "absolute left-0 right-0 px-2 md:px-4",
+              isMobile ? "bottom-0 pb-2" : "bottom-0 pb-4"
+            )}>
+              <div className={cn(
+                "bg-black/80 backdrop-blur-sm rounded-lg",
+                isMobile ? "p-2" : "p-3"
+              )}>
+                {/* Header - stack on mobile */}
+                <div className={cn(
+                  "mb-2",
+                  isMobile ? "space-y-1" : "flex items-center justify-between"
+                )}>
                   <div className="flex items-center gap-2">
-                    <Film className="w-4 h-4 text-white/70" />
-                    <span className="text-sm text-white/70">
-                      {selections.length === 1 ? 'Select portion to regenerate' : `${selections.length} portions selected`}
+                    <Film className="w-4 h-4 text-white/70 flex-shrink-0" />
+                    <span className={cn(
+                      "text-white/70",
+                      isMobile ? "text-xs" : "text-sm"
+                    )}>
+                      {selections.length === 1 ? 'Tap handles to move' : `${selections.length} portions`}
                     </span>
                   </div>
                   {/* FPS indicator */}
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className={cn(
+                    "flex items-center gap-2",
+                    isMobile ? "text-[10px] pl-6" : "text-xs"
+                  )}>
                     {fpsDetectionStatus === 'detecting' && (
-                      <span className="text-yellow-400 animate-pulse">Detecting FPS...</span>
+                      <span className="text-yellow-400 animate-pulse">Detecting...</span>
                     )}
                     {(fpsDetectionStatus === 'detected' || fpsDetectionStatus === 'fallback') && videoFps && (
                       <span className={cn(
-                        "font-mono px-2 py-0.5 rounded",
+                        "font-mono px-1.5 py-0.5 rounded",
                         fpsDetectionStatus === 'detected' ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"
                       )}>
-                        {videoFps} fps
-                        {fpsDetectionStatus === 'fallback' && ' (assumed)'}
+                        {videoFps}fps
                       </span>
                     )}
                     {videoFps && videoDuration && (
                       <span className="text-white/50">
-                        {Math.round(videoDuration * videoFps)} frames
+                        {Math.round(videoDuration * videoFps)}f
                       </span>
                     )}
                   </div>
@@ -622,15 +637,18 @@ export function InlineEditVideoView({
                   fps={videoFps}
                 />
                 {/* Add new selection button */}
-                <div className="flex justify-center mt-3">
+                <div className="flex justify-center mt-2">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleAddSelection}
-                    className="text-white/70 hover:text-white hover:bg-white/10 gap-1"
+                    className={cn(
+                      "text-white/70 hover:text-white hover:bg-white/10 gap-1",
+                      isMobile && "text-xs h-7 px-2"
+                    )}
                   >
-                    <Plus className="w-4 h-4" />
-                    Add new selection
+                    <Plus className="w-3 h-3 md:w-4 md:h-4" />
+                    Add selection
                   </Button>
                 </div>
               </div>
