@@ -130,6 +130,9 @@ export default function EditImagesPage() {
   const resultsItems = (resultsData as any)?.items || [];
   const [lightboxIndex, setLightboxIndex] = useState<number>(-1);
 
+  // Store the variant ID separately for lightbox
+  const [lightboxVariantId, setLightboxVariantId] = useState<string | null>(null);
+
   // Transform variant data to GenerationRow format for lightbox
   const transformVariantToGeneration = (media: any): GenerationRow => {
     return {
@@ -152,28 +155,34 @@ export default function EditImagesPage() {
   const handleResultClick = (media: any) => {
     const index = resultsItems.findIndex((item: any) => item.id === media.id);
     setLightboxIndex(index);
+    setLightboxVariantId(media.id); // Store the variant ID to pre-select it
     setLightboxMedia(transformVariantToGeneration(media));
   };
 
   const handleLightboxNext = () => {
     if (lightboxIndex < resultsItems.length - 1) {
       const nextIndex = lightboxIndex + 1;
+      const nextItem = resultsItems[nextIndex];
       setLightboxIndex(nextIndex);
-      setLightboxMedia(transformVariantToGeneration(resultsItems[nextIndex]));
+      setLightboxVariantId(nextItem.id);
+      setLightboxMedia(transformVariantToGeneration(nextItem));
     }
   };
 
   const handleLightboxPrevious = () => {
     if (lightboxIndex > 0) {
       const prevIndex = lightboxIndex - 1;
+      const prevItem = resultsItems[prevIndex];
       setLightboxIndex(prevIndex);
-      setLightboxMedia(transformVariantToGeneration(resultsItems[prevIndex]));
+      setLightboxVariantId(prevItem.id);
+      setLightboxMedia(transformVariantToGeneration(prevItem));
     }
   };
 
   const handleLightboxClose = () => {
     setLightboxMedia(null);
     setLightboxIndex(-1);
+    setLightboxVariantId(null);
   };
 
   // Get task ID from current lightbox variant for task details
@@ -349,6 +358,7 @@ export default function EditImagesPage() {
             inputImages,
             taskId: currentTaskId,
           }}
+          initialVariantId={lightboxVariantId || undefined}
         />
       )}
     </div>

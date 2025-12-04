@@ -168,6 +168,8 @@ interface MediaLightboxProps {
   // Video trim functionality (optional, only for segment videos)
   showVideoTrimEditor?: boolean;
   onTrimModeChange?: (isTrimMode: boolean) => void;
+  // Initial variant to display (when opening lightbox from a variant click)
+  initialVariantId?: string;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -231,6 +233,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Video trim functionality
   showVideoTrimEditor = false,
   onTrimModeChange,
+  // Initial variant to display
+  initialVariantId,
 }) => {
   // ========================================
   // REFACTORED: All logic extracted to hooks
@@ -394,6 +398,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       activeVariantLocation: activeVariant?.location?.substring(0, 50),
     });
   }, [activeVariant]);
+
+  // Set initial variant when variants load and initialVariantId is provided
+  React.useEffect(() => {
+    if (initialVariantId && variants && variants.length > 0 && !activeVariant) {
+      const targetVariant = variants.find(v => v.id === initialVariantId);
+      if (targetVariant) {
+        console.log('[VariantClickDebug] Setting initial variant from prop:', initialVariantId.substring(0, 8));
+        setActiveVariantId(initialVariantId);
+      }
+    }
+  }, [initialVariantId, variants, activeVariant, setActiveVariantId]);
 
   // Compute isViewingNonPrimaryVariant early for edit hooks
   const isViewingNonPrimaryVariant = activeVariant && !activeVariant.is_primary;
