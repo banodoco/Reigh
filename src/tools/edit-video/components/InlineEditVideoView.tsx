@@ -30,65 +30,8 @@ interface FrameRangeSelection {
   prompt: string;
 }
 
-// Detect video FPS using requestVideoFrameCallback or fallback methods
-async function detectVideoFPS(videoElement: HTMLVideoElement): Promise<number> {
-  return new Promise((resolve) => {
-    // Method 1: Use requestVideoFrameCallback if available (most accurate)
-    if ('requestVideoFrameCallback' in videoElement) {
-      let frameCount = 0;
-      let startTime = 0;
-      const targetFrames = 10; // Sample 10 frames for accuracy
-      
-      const countFrames = (now: number, metadata: any) => {
-        if (frameCount === 0) {
-          startTime = metadata.mediaTime;
-        }
-        frameCount++;
-        
-        if (frameCount >= targetFrames) {
-          const elapsed = metadata.mediaTime - startTime;
-          if (elapsed > 0) {
-            const fps = Math.round((frameCount - 1) / elapsed);
-            // Snap to common FPS values (including 16 for AI-generated videos)
-            const commonFps = [16, 24, 25, 30, 48, 50, 60];
-            const closestFps = commonFps.reduce((prev, curr) => 
-              Math.abs(curr - fps) < Math.abs(prev - fps) ? curr : prev
-            );
-            resolve(closestFps);
-          } else {
-            resolve(16); // Fallback
-          }
-        } else {
-          (videoElement as any).requestVideoFrameCallback(countFrames);
-        }
-      };
-      
-      // Need video to be playing to count frames
-      const wasPlaying = !videoElement.paused;
-      const originalTime = videoElement.currentTime;
-      videoElement.muted = true;
-      videoElement.currentTime = 0;
-      
-      videoElement.play().then(() => {
-        (videoElement as any).requestVideoFrameCallback(countFrames);
-        
-        // Timeout fallback
-        setTimeout(() => {
-          videoElement.pause();
-          videoElement.currentTime = originalTime;
-          if (!wasPlaying) videoElement.pause();
-          if (frameCount < targetFrames) {
-            resolve(16); // Default fallback
-          }
-        }, 1000);
-      }).catch(() => resolve(16));
-      
-    } else {
-      // Method 2: Fallback - assume 16fps (common for AI-generated videos)
-      resolve(16);
-    }
-  });
-}
+// Default FPS for AI-generated videos
+const DEFAULT_VIDEO_FPS = 16;
 
 // Convert time selections to frame ranges with per-segment settings
 function selectionsToFrameRanges(
@@ -120,13 +63,17 @@ interface InlineEditVideoViewProps {
   onClose: () => void;
   onVideoSaved?: (newVideoUrl: string) => Promise<void>;
   onNavigateToGeneration?: (generationId: string) => Promise<void>;
+  initialSegments?: PortionSelection[];
+  onSegmentsChange?: (segments: PortionSelection[]) => void;
 }
 
 export function InlineEditVideoView({ 
   media, 
   onClose, 
   onVideoSaved, 
-  onNavigateToGeneration 
+  onNavigateToGeneration,
+  initialSegments,
+  onSegmentsChange,
 }: InlineEditVideoViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isMobile = useIsMobile();
@@ -143,9 +90,30 @@ export function InlineEditVideoView({
   
   // Multiple portion selections - start at 10%-20% of video
   // Each selection can have its own gapFrameCount and prompt
-  const [selections, setSelections] = useState<PortionSelection[]>([
-    { id: generateUUID(), start: 0, end: 0, gapFrameCount: 12, prompt: '' } // Will be initialized when duration is known
-  ]);
+  // Initialize from saved segments if provided, otherwise default to empty selection
+  const [selections, setSelections] = useState<PortionSelection[]>(() => {
+    if (initialSegments && initialSegments.length > 0) {
+      return initialSegments;
+    }
+    return [{ id: generateUUID(), start: 0, end: 0, gapFrameCount: 12, prompt: '' }]; // Will be initialized when duration is known
+  });
+  
+  // Track if we've initialized from saved segments to skip the first callback
+  const hasInitializedSegments = useRef(!!initialSegments && initialSegments.length > 0);
+  
+  // Notify parent when selections change (debounced to avoid excessive updates)
+  useEffect(() => {
+    // Skip the initial call if we loaded from saved segments
+    if (hasInitializedSegments.current) {
+      hasInitializedSegments.current = false;
+      return;
+    }
+    // Skip if selections haven't been initialized yet (start/end are 0)
+    if (selections.length === 1 && selections[0].start === 0 && selections[0].end === 0) {
+      return;
+    }
+    onSegmentsChange?.(selections);
+  }, [selections, onSegmentsChange]);
   
   // Currently active selection for editing
   const [activeSelectionId, setActiveSelectionId] = useState<string | null>(null);
@@ -194,9 +162,12 @@ export function InlineEditVideoView({
   // Success state for button feedback
   const [showSuccessState, setShowSuccessState] = useState(false);
   
-  // Handle video metadata loaded - also detect FPS
-  const handleVideoLoadedMetadata = useCallback(async () => {
+  // Handle video metadata loaded - set FPS and ensure paused
+  const handleVideoLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
+      // Ensure video is paused immediately
+      videoRef.current.pause();
+      
       const duration = videoRef.current.duration;
       if (Number.isFinite(duration) && duration > 0) {
         setVideoDuration(duration);
@@ -208,19 +179,10 @@ export function InlineEditVideoView({
           return prev;
         });
         
-        // Detect FPS
+        // Set FPS to default (16fps is standard for AI-generated videos)
         if (fpsDetectionStatus === 'pending') {
-          setFpsDetectionStatus('detecting');
-          try {
-            const fps = await detectVideoFPS(videoRef.current);
-            setVideoFps(fps);
-            setFpsDetectionStatus('detected');
-            console.log('[EditVideo] Detected FPS:', fps);
-          } catch (e) {
-            console.warn('[EditVideo] FPS detection failed, using fallback:', e);
-            setVideoFps(16); // 16fps is common for AI-generated videos
-            setFpsDetectionStatus('fallback');
-          }
+          setVideoFps(DEFAULT_VIDEO_FPS);
+          setFpsDetectionStatus('detected');
         }
       }
     }
@@ -377,6 +339,43 @@ export function InlineEditVideoView({
     return selectionsToFrameRanges(selections, videoFps, videoDuration, gapFrameCount, prompt);
   }, [selections, videoFps, videoDuration, gapFrameCount, prompt]);
   
+  // Calculate max context frames based on shortest keeper clip
+  // This prevents users from setting values that would exceed keeper clip lengths
+  const maxContextFrames = useMemo(() => {
+    if (!videoFps || !videoDuration || frameRanges.length === 0) return 30; // Default max
+    
+    const totalFrames = Math.round(videoDuration * videoFps);
+    const sortedPortions = [...frameRanges].sort((a, b) => a.start_frame - b.start_frame);
+    let minKeeperFrames = totalFrames;
+    
+    // First keeper: from start of video to first portion
+    if (sortedPortions.length > 0) {
+      const firstKeeperLength = sortedPortions[0].start_frame;
+      if (firstKeeperLength > 0) {
+        minKeeperFrames = Math.min(minKeeperFrames, firstKeeperLength);
+      }
+    }
+    
+    // Middle keepers: between consecutive portions
+    for (let i = 0; i < sortedPortions.length - 1; i++) {
+      const keeperLength = sortedPortions[i + 1].start_frame - sortedPortions[i].end_frame;
+      if (keeperLength > 0) {
+        minKeeperFrames = Math.min(minKeeperFrames, keeperLength);
+      }
+    }
+    
+    // Last keeper: from last portion to end of video
+    if (sortedPortions.length > 0) {
+      const lastKeeperLength = totalFrames - sortedPortions[sortedPortions.length - 1].end_frame;
+      if (lastKeeperLength > 0) {
+        minKeeperFrames = Math.min(minKeeperFrames, lastKeeperLength);
+      }
+    }
+    
+    // Use minKeeperFrames - 1 as safety margin for off-by-one in video extraction
+    return Math.max(4, minKeeperFrames - 1); // Min 4 to match slider min
+  }, [videoFps, videoDuration, frameRanges]);
+  
   // Generate mutation using join clips task
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -439,6 +438,46 @@ export function InlineEditVideoView({
         model_switch_phase: 2
       };
       
+      // Calculate the minimum keeper clip length to cap context_frame_count
+      // Keeper clips are the segments BETWEEN the portions being regenerated
+      // context_frame_count cannot exceed the shortest keeper clip length
+      const totalFrames = Math.round(videoDuration * videoFps);
+      const sortedPortions = [...portionFrameRanges].sort((a, b) => a.start_frame - b.start_frame);
+      let minKeeperFrames = totalFrames; // Start with max possible
+      
+      // First keeper: from start of video to first portion
+      if (sortedPortions.length > 0) {
+        const firstKeeperLength = sortedPortions[0].start_frame;
+        if (firstKeeperLength > 0) {
+          minKeeperFrames = Math.min(minKeeperFrames, firstKeeperLength);
+        }
+      }
+      
+      // Middle keepers: between consecutive portions
+      for (let i = 0; i < sortedPortions.length - 1; i++) {
+        const keeperLength = sortedPortions[i + 1].start_frame - sortedPortions[i].end_frame;
+        if (keeperLength > 0) {
+          minKeeperFrames = Math.min(minKeeperFrames, keeperLength);
+        }
+      }
+      
+      // Last keeper: from last portion to end of video
+      if (sortedPortions.length > 0) {
+        const lastKeeperLength = totalFrames - sortedPortions[sortedPortions.length - 1].end_frame;
+        if (lastKeeperLength > 0) {
+          minKeeperFrames = Math.min(minKeeperFrames, lastKeeperLength);
+        }
+      }
+      
+      // Cap context_frame_count to the minimum keeper clip length
+      // Use minKeeperFrames - 1 as safety margin for off-by-one in video extraction
+      const safeMaxContextFrames = Math.max(1, minKeeperFrames - 1);
+      const cappedContextFrameCount = Math.min(contextFrameCount, safeMaxContextFrames);
+      
+      if (cappedContextFrameCount < contextFrameCount) {
+        console.log(`[EditVideo] Capped context_frame_count from ${contextFrameCount} to ${cappedContextFrameCount} (min keeper clip: ${minKeeperFrames} frames, safe max: ${safeMaxContextFrames})`);
+      }
+      
       // Build orchestrator details for edit_video_orchestrator
       const orchestratorDetails: Record<string, unknown> = {
         run_id: generateRunId(),
@@ -448,7 +487,7 @@ export function InlineEditVideoView({
         // Source video info
         source_video_url: videoUrl,
         source_video_fps: videoFps,
-        source_video_total_frames: Math.round(videoDuration * videoFps),
+        source_video_total_frames: totalFrames,
         
         // Portions to regenerate with per-segment settings
         portions_to_regenerate: portionFrameRanges,
@@ -458,8 +497,8 @@ export function InlineEditVideoView({
         resolution: resolutionTuple || [902, 508],
         seed: editSettings.settings.seed ?? -1,
         
-        // Frame settings
-        context_frame_count: contextFrameCount,
+        // Frame settings (capped to min keeper clip length)
+        context_frame_count: cappedContextFrameCount,
         gap_frame_count: gapFrameCount,
         replace_mode: replaceMode,
         keep_bridging_images: keepBridgingImages,
@@ -672,6 +711,7 @@ export function InlineEditVideoView({
                 gapFrameCount: newGapFrames 
               });
             }}
+            maxContextFrames={maxContextFrames}
             negativePrompt={negativePrompt}
             setNegativePrompt={(val) => editSettings.updateField('negativePrompt', val)}
             enhancePrompt={enhancePrompt}

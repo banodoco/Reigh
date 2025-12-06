@@ -303,6 +303,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // We need to use media.generation_id (actual generations table ID) for shot operations
   const actualGenerationId = (media as any).generation_id || media.id;
   
+  // For variant fetching: if this is a child generation (has parent_generation_id), 
+  // fetch variants from the parent since that's where edit-video variants are created.
+  // This ensures TasksPane shows the same variants as EditVideoPage gallery.
+  const variantFetchGenerationId = (media as any).parent_generation_id || actualGenerationId;
+  
+  // DEBUG: Log variant fetching context
+  console.log('[VariantFetchDebug] Media and variant context:', {
+    mediaId: media.id?.substring(0, 8),
+    actualGenerationId: actualGenerationId?.substring(0, 8),
+    hasParentGenerationId: !!(media as any).parent_generation_id,
+    parentGenerationId: (media as any).parent_generation_id?.substring(0, 8) || 'none',
+    variantFetchGenerationId: variantFetchGenerationId?.substring(0, 8),
+    mediaKeys: Object.keys(media).join(', '),
+  });
+  
   // ========================================
   // ALL HOOKS - Business logic extracted
   // ========================================
@@ -364,10 +379,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Variants hook - fetch available variants for this generation
   // Moved early so activeVariant is available for edit hooks
-  // Uses actualGenerationId (defined above) which is the actual generations.id
-  // This is critical for Timeline/ShotImageManager where media.id is shot_generations.id
+  // Uses variantFetchGenerationId which prefers parent_generation_id for child generations
+  // This ensures edit-video variants show correctly when viewing from TasksPane
   const variantsHook = useVariants({
-    generationId: actualGenerationId,
+    generationId: variantFetchGenerationId,
     enabled: true, // Always enabled to support variant display in DerivedGenerationsGrid
   });
   const {
@@ -2038,6 +2053,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             gapFrameCount: newGapFrames 
                           });
                         }}
+                        maxContextFrames={videoEditing.maxContextFrames}
                         negativePrompt={videoEditing.editSettings.settings.negativePrompt || ''}
                         setNegativePrompt={(val) => videoEditing.editSettings.updateField('negativePrompt', val)}
                         enhancePrompt={videoEditing.editSettings.settings.enhancePrompt}

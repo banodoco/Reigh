@@ -10,6 +10,110 @@ import { RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { FilterGroup } from './TasksPane';
 import { GenerationRow } from '@/types/shots';
+import { cn } from '@/shared/lib/utils';
+
+// Realistic task item skeleton that mimics the TaskItem layout
+interface TaskItemSkeletonProps {
+  variant?: 'processing' | 'complete' | 'failed';
+  showImages?: boolean;
+  showPrompt?: boolean;
+}
+
+const TaskItemSkeleton: React.FC<TaskItemSkeletonProps> = ({ 
+  variant = 'processing',
+  showImages = false,
+  showPrompt = false
+}) => {
+  const statusColors = {
+    processing: 'bg-blue-500/60',
+    complete: 'bg-green-500/60',
+    failed: 'bg-red-500/60',
+  };
+
+  return (
+    <div className="relative p-3 mb-2 bg-zinc-800/95 rounded-md shadow border border-zinc-600 animate-pulse">
+      {/* Header row: task type + status badge */}
+      <div className="flex justify-between items-center mb-1 gap-2">
+        <Skeleton className="h-4 w-24 bg-zinc-600" />
+        <Skeleton className={cn("h-5 w-16 rounded-full", statusColors[variant])} />
+      </div>
+      
+      {/* Image previews (for travel tasks) */}
+      {showImages && (
+        <div className="flex items-center gap-1 mb-1 mt-2">
+          <Skeleton className="w-12 h-12 rounded bg-zinc-700" />
+          <Skeleton className="w-12 h-12 rounded bg-zinc-700" />
+          <Skeleton className="w-12 h-12 rounded bg-zinc-700" />
+        </div>
+      )}
+      
+      {/* Prompt box (for image generation tasks) */}
+      {showPrompt && (
+        <div className="mb-1 mt-3">
+          <div className="bg-blue-500/10 border border-blue-400/20 rounded px-2 py-1.5 flex items-center justify-between">
+            <Skeleton className="h-3 flex-1 mr-2 bg-zinc-600" />
+            <Skeleton className="w-8 h-8 rounded bg-zinc-600 flex-shrink-0" />
+          </div>
+        </div>
+      )}
+      
+      {/* Timestamp row */}
+      <div className="flex items-center mt-2">
+        <Skeleton className="h-3 w-20 bg-zinc-700" />
+      </div>
+    </div>
+  );
+};
+
+// Loading skeleton for the task list that shows varied task types
+const TaskListSkeleton: React.FC<{ activeFilter: FilterGroup }> = ({ activeFilter }) => {
+  // Different skeleton configurations based on filter type
+  const getSkeletonConfig = () => {
+    switch (activeFilter) {
+      case 'Processing':
+        return [
+          { variant: 'processing' as const, showImages: true },
+          { variant: 'processing' as const, showPrompt: true },
+          { variant: 'processing' as const, showImages: true },
+          { variant: 'processing' as const, showPrompt: true },
+        ];
+      case 'Succeeded':
+        return [
+          { variant: 'complete' as const, showImages: true },
+          { variant: 'complete' as const, showPrompt: true },
+          { variant: 'complete' as const, showImages: true },
+          { variant: 'complete' as const, showPrompt: true },
+        ];
+      case 'Failed':
+        return [
+          { variant: 'failed' as const, showImages: true },
+          { variant: 'failed' as const, showPrompt: true },
+          { variant: 'failed' as const, showImages: true },
+        ];
+      default:
+        return [
+          { variant: 'processing' as const, showImages: true },
+          { variant: 'processing' as const, showPrompt: true },
+          { variant: 'processing' as const, showImages: true },
+        ];
+    }
+  };
+
+  const skeletonItems = getSkeletonConfig();
+
+  return (
+    <div className="space-y-1">
+      {skeletonItems.map((config, idx) => (
+        <React.Fragment key={idx}>
+          <TaskItemSkeleton {...config} />
+          {idx < skeletonItems.length - 1 && (
+            <div className="h-0 border-b border-zinc-700/40 my-1" />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+};
 
 interface TaskListProps {
   filterStatuses: TaskStatus[];
@@ -166,11 +270,7 @@ const TaskList: React.FC<TaskListProps> = ({
       )}
       
       {isLoading && (
-        <div className="space-y-4">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <Skeleton key={idx} className="h-24 rounded-lg bg-zinc-700/60" />
-          ))}
-        </div>
+        <TaskListSkeleton activeFilter={activeFilter} />
       )}
       
       {!isLoading && filteredTasks.length === 0 && !summaryMessage && (

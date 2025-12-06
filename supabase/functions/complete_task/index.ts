@@ -2253,21 +2253,9 @@ async function createGenerationFromTask(
  */
 async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: string, projectId: string, segmentParams?: any): Promise<any> {
   try {
-    // 1. Try to find existing generation for this orchestrator task
-    const existing = await findExistingGeneration(supabase, orchestratorTaskId);
-    if (existing) {
-      return existing;
-    }
-
-    console.log(`[GenMigration] Creating placeholder parent generation for orchestrator ${orchestratorTaskId}`);
-
-    // 2. Create placeholder parent
-    // We need to fetch orchestrator task details to get correct params/type if possible,
-    // but we might not have access to it easily or it might be expensive.
-    // For now, create a minimal placeholder.
-
-    // Try to fetch orchestrator task to get better metadata
-    // Note: This may fail if orchestratorTaskId is not a UUID (e.g., "sm_travel_orchestrator_...")
+    // 0. FIRST: Check if the orchestrator already specifies a parent_generation_id
+    // This is used by edit-video and similar tools where the user selects an existing video to edit
+    // In this case, we should use that existing generation as the parent, NOT create a placeholder
     let orchTask: { task_type?: string; params?: any } | null = null;
     try {
       const { data } = await supabase
@@ -2279,7 +2267,38 @@ async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: st
     } catch (orchQueryError) {
       console.log(`[GenMigration] Could not fetch orchestrator task ${orchestratorTaskId} (may not be a UUID), using segment params as fallback`);
     }
+    
+    // Check for parent_generation_id in orchestrator params (or orchestrator_details)
+    const parentGenId = orchTask?.params?.parent_generation_id || 
+                        orchTask?.params?.orchestrator_details?.parent_generation_id ||
+                        segmentParams?.full_orchestrator_payload?.parent_generation_id;
+    
+    if (parentGenId) {
+      console.log(`[GenMigration] Orchestrator has parent_generation_id: ${parentGenId}, using existing generation`);
+      // Fetch and return the existing generation
+      const { data: existingParent, error: parentError } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', parentGenId)
+        .single();
+      
+      if (existingParent && !parentError) {
+        console.log(`[GenMigration] Using existing parent generation ${parentGenId}`);
+        return existingParent;
+      } else {
+        console.warn(`[GenMigration] parent_generation_id ${parentGenId} not found in database, falling back to placeholder creation`);
+      }
+    }
+    
+    // 1. Try to find existing generation for this orchestrator task
+    const existing = await findExistingGeneration(supabase, orchestratorTaskId);
+    if (existing) {
+      return existing;
+    }
 
+    console.log(`[GenMigration] Creating placeholder parent generation for orchestrator ${orchestratorTaskId}`);
+
+    // 2. Create placeholder parent (orchTask was already fetched above)
     const generationType = 'video'; // Orchestrators usually produce video (travel, etc)
     // If we could look up task_type -> content_type that would be better, but 'video' is safe for now for travel.
 

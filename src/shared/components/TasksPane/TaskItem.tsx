@@ -117,8 +117,26 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   }, [task.params]);
 
   // Consolidated task type detection using content_type from database
+  // With fallback for known image task types that may not have content_type set in DB
   const taskInfo = useMemo(() => {
-    const contentType = taskTypeInfo?.content_type;
+    const dbContentType = taskTypeInfo?.content_type;
+    
+    // Fallback: Infer content_type from task type name if not in database
+    // This ensures "Open Image" button shows for image editing tasks
+    const knownImageTaskTypes = [
+      'image_inpaint',
+      'qwen_image',
+      'qwen_image_edit',
+      'image_generation',
+      'magic_edit',
+      'kontext_image_edit',
+      'flux_image_edit',
+      'upscale_image',
+      'style_transfer',
+    ];
+    const inferredContentType = knownImageTaskTypes.includes(task.taskType) ? 'image' : null;
+    const contentType = dbContentType || inferredContentType;
+    
     const isVideoTask = contentType === 'video';
     const isImageTask = contentType === 'image';
     const isCompletedVideoTask = isVideoTask && task.status === 'Complete' && !!task.outputLocation;
@@ -138,7 +156,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       isSingleImageTask: isImageTask,
       isCompletedTravelTask: isCompletedVideoTask
     };
-  }, [taskTypeInfo?.content_type, task.status, task.outputLocation]);
+  }, [taskTypeInfo?.content_type, task.status, task.outputLocation, task.taskType]);
 
   // Check if this is a successful Image Generation task with output
   const hasGeneratedImage = React.useMemo(() => {
@@ -287,6 +305,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       based_on: basedOnValue,
       // Also include as sourceGenerationId for compatibility
       sourceGenerationId: basedOnValue,
+      // CRITICAL: Include parent_generation_id for variant fetching in MediaLightbox
+      // When viewing a child generation, variants should be fetched from the parent
+      parent_generation_id: (actualGeneration as any).parent_generation_id || undefined,
       // Shot associations for "Add to Shot" button state
       shotIds,
       timelineFrames,
@@ -352,9 +373,31 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
          taskParams.parsed?.input_image_paths_resolved || 
          []);
     
+    // For edit-video tasks, the REAL parent is in task params, not the generation's parent_generation_id
+    // The generation's parent_generation_id points to a placeholder created by GenMigration
+    // But we need the ORIGINAL input video (from orchestrator_details.parent_generation_id)
+    const taskParentGenerationId = 
+      taskParams.parsed?.parent_generation_id ||
+      taskParams.parsed?.orchestrator_details?.parent_generation_id ||
+      taskParams.parsed?.full_orchestrator_payload?.parent_generation_id;
+    
     // Convert video generations from database to GenerationRow format
     const videoOutputs = videoGenerations?.map(gen => {
       const genAny = gen as any; // Type assertion for database fields not in type definition
+      
+      // Use task params parent_generation_id (original input) over generation's parent_generation_id (placeholder)
+      const effectiveParentGenId = taskParentGenerationId || genAny.parent_generation_id;
+      
+      // DEBUG: Log what we're getting from the database
+      console.log('[VariantFetchDebug] Video generation from DB:', {
+        id: gen.id?.substring(0, 8),
+        hasParentGenerationId: !!genAny.parent_generation_id,
+        parentGenerationId: genAny.parent_generation_id?.substring(0, 8) || 'none',
+        taskParentGenerationId: taskParentGenerationId?.substring(0, 8) || 'none',
+        effectiveParentGenId: effectiveParentGenId?.substring(0, 8) || 'none',
+        allKeys: Object.keys(gen).join(', '),
+      });
+      
       return {
         id: gen.id,
         location: gen.location,
@@ -366,6 +409,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         taskId: genAny.task_id, // ✅ Include taskId for proper task details display
         metadata: gen.params || {},
         name: genAny.name || undefined, // ✅ Include variant name from generation record
+        // CRITICAL: Include parent_generation_id for variant fetching in MediaLightbox
+        // Prefer task params parent (original input) over generation's parent (placeholder)
+        parent_generation_id: effectiveParentGenId || undefined,
       } as GenerationRow;
     }) || null;
     

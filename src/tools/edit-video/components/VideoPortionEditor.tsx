@@ -165,6 +165,8 @@ export interface VideoPortionEditorProps {
     setGapFrames: (val: number) => void;
     contextFrames: number;
     setContextFrames: (val: number) => void;
+    /** Max context frames based on shortest keeper clip (prevents invalid inputs) */
+    maxContextFrames?: number;
     
     negativePrompt: string;
     setNegativePrompt: (val: string) => void;
@@ -197,6 +199,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     setGapFrames,
     contextFrames,
     setContextFrames,
+    maxContextFrames,
     negativePrompt,
     setNegativePrompt,
     enhancePrompt,
@@ -363,14 +366,21 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                         <Slider
                             id="context-frames"
                             min={4}
-                            max={30}
+                            max={maxContextFrames !== undefined ? Math.min(30, maxContextFrames) : 30}
                             step={1}
                             value={[contextFrames]}
                             onValueChange={(values) => handleContextFramesChange(values[0])}
                         />
-                        <p className="text-xs text-muted-foreground">
-                            Frames from source video used for context on each side
-                        </p>
+                        {maxContextFrames !== undefined && maxContextFrames < 30 ? (
+                            <p className="text-xs text-amber-500 flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                Limited to {maxContextFrames} based on shortest video segment
+                            </p>
+                        ) : (
+                            <p className="text-xs text-muted-foreground">
+                                Frames from source video used for context on each side
+                            </p>
+                        )}
                     </div>
                     
                     {/* Negative Prompt */}

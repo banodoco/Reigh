@@ -32,19 +32,13 @@ export const useModal = (size: ModalSize = 'medium'): ModalStyling => {
   }[size];
   
   // Mobile-specific styles (only for medium and larger modals)
+  // Note: z-index is handled by the Dialog component CSS (z-[100003]) so we don't override it here
   const mobileStyle = isMobile && size !== 'small' ? {
     width: 'calc(100vw - 2rem)', // 16px edges
     maxHeight: (size === 'large' || size === 'extra-large')
       ? 'min(80vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 80px))'
       : 'min(90vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 64px))',
-    // Apply z-index via inline style to ensure it takes precedence
-    // 50001 puts it above the DialogOverlay (50000) and other normal UI elements
-    // but below MediaLightbox (100000) and GuidanceVideoStrip preview (999999)
-    zIndex: 50001
-  } : {
-    // Apply same z-index on desktop for consistency
-    zIndex: 50001
-  };
+  } : {};
 
   // Mobile props to prevent auto-focus (prevents keyboard popup)
   const mobileProps = isMobile ? { 

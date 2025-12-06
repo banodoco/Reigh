@@ -16,6 +16,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
 import MediaLightbox from '@/shared/components/MediaLightbox/MediaLightboxRefactored';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import type { PortionSelection } from '@/shared/components/VideoPortionTimeline';
 
 const TOOL_TYPE = 'edit-video';
 const TOOL_TYPE_NAME = 'Edit Video';
@@ -23,11 +24,13 @@ const TOOL_TYPE_NAME = 'Edit Video';
 // Settings interface for last edited media persistence
 interface EditVideoUISettings {
   lastEditedMediaId?: string;
+  lastEditedMediaSegments?: PortionSelection[];
 }
 
 export default function EditVideoPage() {
   const { selectedProjectId } = useProject();
   const [selectedMedia, setSelectedMedia] = useState<GenerationRow | null>(null);
+  const [savedSegments, setSavedSegments] = useState<PortionSelection[] | undefined>(undefined);
   const [isUploading, setIsUploading] = useState(false);
   const [resultsPage, setResultsPage] = useState(1);
   const [showResults, setShowResults] = useState(true);
@@ -52,6 +55,7 @@ export default function EditVideoPage() {
     if (!selectedProjectId || isUISettingsLoading || hasLoadedFromSettings.current) return;
     
     const storedId = uiSettings?.lastEditedMediaId;
+    const storedSegments = uiSettings?.lastEditedMediaSegments;
     if (storedId && !selectedMedia) {
       hasLoadedFromSettings.current = true;
       // Fetch the generation from the database
@@ -63,13 +67,17 @@ export default function EditVideoPage() {
         .then(({ data, error }) => {
           if (data && !error) {
             setSelectedMedia(data as any);
+            // Also restore saved segments if they exist
+            if (storedSegments && storedSegments.length > 0) {
+              setSavedSegments(storedSegments);
+            }
           } else {
-            // Clear invalid stored ID
-            updateUISettings('project', { lastEditedMediaId: undefined });
+            // Clear invalid stored ID and segments
+            updateUISettings('project', { lastEditedMediaId: undefined, lastEditedMediaSegments: undefined });
           }
         });
     }
-  }, [selectedProjectId, uiSettings?.lastEditedMediaId, isUISettingsLoading, selectedMedia, updateUISettings]);
+  }, [selectedProjectId, uiSettings?.lastEditedMediaId, uiSettings?.lastEditedMediaSegments, isUISettingsLoading, selectedMedia, updateUISettings]);
   
   // Persist selected media ID to database settings (or clear it when media is removed)
   useEffect(() => {
@@ -78,10 +86,16 @@ export default function EditVideoPage() {
     if (selectedMedia && selectedMedia.id !== uiSettings?.lastEditedMediaId) {
       updateUISettings('project', { lastEditedMediaId: selectedMedia.id });
     } else if (!selectedMedia && uiSettings?.lastEditedMediaId) {
-      // Clear the stored ID when media is removed/closed
-      updateUISettings('project', { lastEditedMediaId: undefined });
+      // Clear the stored ID and segments when media is removed/closed
+      updateUISettings('project', { lastEditedMediaId: undefined, lastEditedMediaSegments: undefined });
     }
   }, [selectedMedia?.id, selectedProjectId, isUISettingsLoading, uiSettings?.lastEditedMediaId, updateUISettings]);
+  
+  // Callback to save segments when they change in InlineEditVideoView
+  const handleSegmentsChange = useCallback((segments: PortionSelection[]) => {
+    if (!selectedProjectId || isUISettingsLoading) return;
+    updateUISettings('project', { lastEditedMediaSegments: segments });
+  }, [selectedProjectId, isUISettingsLoading, updateUISettings]);
   
   // Lightbox state
   const [isLightboxOpen, setLightboxOpen] = useState(false);
@@ -341,8 +355,12 @@ export default function EditVideoPage() {
               isEditingOnMobile ? "flex flex-col min-h-[60vh]" : "h-[70vh]"
             )}>
               <InlineEditVideoView 
+                key={selectedMedia.id} // Force remount when media changes
                 media={selectedMedia} 
-                onClose={() => setSelectedMedia(null)}
+                onClose={() => {
+                  setSelectedMedia(null);
+                  setSavedSegments(undefined);
+                }}
                 onVideoSaved={async (newUrl) => {
                   console.log("Video regenerated:", newUrl);
                 }}
@@ -356,11 +374,14 @@ export default function EditVideoPage() {
                     
                     if (data && !error) {
                       setSelectedMedia(data as any);
+                      setSavedSegments(undefined); // Clear saved segments when navigating to new generation
                     }
                   } catch (e) {
                     console.error("Failed to navigate to generation", e);
                   }
                 }}
+                initialSegments={savedSegments}
+                onSegmentsChange={handleSegmentsChange}
               />
             </div>
             

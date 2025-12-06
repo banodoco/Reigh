@@ -40,6 +40,8 @@ export interface UseVideoEditingReturn {
   // Validation
   isValid: boolean;
   validationErrors: string[];
+  /** Max context frames based on shortest keeper clip (prevents invalid inputs) */
+  maxContextFrames: number;
   
   // Settings (from useEditVideoSettings)
   editSettings: ReturnType<typeof useEditVideoSettings>;
@@ -102,13 +104,11 @@ export const useVideoEditing = ({
     }));
   }, [publicLoras]);
   
-  // LoRA manager
-  const loraManager = useLoraManager(
-    editSettings.settings.loras || [],
-    (loras) => editSettings.updateField('loras', loras),
-    editSettings.settings.hasEverSetLoras || false,
-    (hasEver) => editSettings.updateField('hasEverSetLoras', hasEver)
-  );
+  // LoRA manager - using current hook API with options object
+  const loraManager = useLoraManager(availableLoras, {
+    projectId: selectedProjectId || undefined,
+    persistenceScope: 'none', // Don't auto-persist, we manage via editSettings
+  });
   
   // Get default gap frame count from settings
   const defaultGapFrameCount = editSettings.settings.gapFrameCount || 12;
@@ -271,6 +271,48 @@ export const useVideoEditing = ({
     }));
   }, [selections]);
   
+  // Calculate max context frames based on shortest keeper clip
+  // This prevents users from setting values that would exceed keeper clip lengths
+  const maxContextFrames = useMemo(() => {
+    const fps = 16; // Assume 16 FPS for AI-generated videos
+    if (videoDuration <= 0 || selections.length === 0) return 30; // Default max
+    
+    const totalFrames = Math.round(videoDuration * fps);
+    const frameRanges = selections.map(s => ({
+      start_frame: Math.round(s.start * fps),
+      end_frame: Math.round(s.end * fps),
+    }));
+    const sortedPortions = [...frameRanges].sort((a, b) => a.start_frame - b.start_frame);
+    let minKeeperFrames = totalFrames;
+    
+    // First keeper: from start of video to first portion
+    if (sortedPortions.length > 0) {
+      const firstKeeperLength = sortedPortions[0].start_frame;
+      if (firstKeeperLength > 0) {
+        minKeeperFrames = Math.min(minKeeperFrames, firstKeeperLength);
+      }
+    }
+    
+    // Middle keepers: between consecutive portions
+    for (let i = 0; i < sortedPortions.length - 1; i++) {
+      const keeperLength = sortedPortions[i + 1].start_frame - sortedPortions[i].end_frame;
+      if (keeperLength > 0) {
+        minKeeperFrames = Math.min(minKeeperFrames, keeperLength);
+      }
+    }
+    
+    // Last keeper: from last portion to end of video
+    if (sortedPortions.length > 0) {
+      const lastKeeperLength = totalFrames - sortedPortions[sortedPortions.length - 1].end_frame;
+      if (lastKeeperLength > 0) {
+        minKeeperFrames = Math.min(minKeeperFrames, lastKeeperLength);
+      }
+    }
+    
+    // Use minKeeperFrames - 1 as safety margin for off-by-one in video extraction
+    return Math.max(4, minKeeperFrames - 1); // Min 4 to match slider min
+  }, [videoDuration, selections]);
+  
   // Generate mutation - creates an edit_video_orchestrator task
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -280,11 +322,11 @@ export const useVideoEditing = ({
       if (!media) throw new Error('No media selected');
       
       const fps = 16; // Assume 16 FPS for AI-generated videos
+      const totalFrames = Math.round(videoDuration * fps);
       
       // Get global settings
       const globalPrompt = editSettings.settings.prompt || '';
       const negativePrompt = editSettings.settings.negativePrompt || '';
-      const contextFrameCount = editSettings.settings.contextFrameCount || 8;
       const globalGapFrameCount = editSettings.settings.gapFrameCount || 12;
       const enhancePrompt = editSettings.settings.enhancePrompt ?? true;
       
@@ -295,8 +337,48 @@ export const useVideoEditing = ({
       // Convert selections to frame ranges with per-segment settings
       const portionFrameRanges = selectionsToFrameRanges(fps, globalGapFrameCount, globalPrompt);
       
+      // Calculate the minimum keeper clip length to cap context_frame_count
+      // Keeper clips are the segments BETWEEN the portions being regenerated
+      // context_frame_count cannot exceed the shortest keeper clip length
+      const sortedPortions = [...portionFrameRanges].sort((a, b) => a.start_frame - b.start_frame);
+      let minKeeperFrames = totalFrames; // Start with max possible
+      
+      // First keeper: from start of video to first portion
+      if (sortedPortions.length > 0) {
+        const firstKeeperLength = sortedPortions[0].start_frame;
+        if (firstKeeperLength > 0) {
+          minKeeperFrames = Math.min(minKeeperFrames, firstKeeperLength);
+        }
+      }
+      
+      // Middle keepers: between consecutive portions
+      for (let i = 0; i < sortedPortions.length - 1; i++) {
+        const keeperLength = sortedPortions[i + 1].start_frame - sortedPortions[i].end_frame;
+        if (keeperLength > 0) {
+          minKeeperFrames = Math.min(minKeeperFrames, keeperLength);
+        }
+      }
+      
+      // Last keeper: from last portion to end of video
+      if (sortedPortions.length > 0) {
+        const lastKeeperLength = totalFrames - sortedPortions[sortedPortions.length - 1].end_frame;
+        if (lastKeeperLength > 0) {
+          minKeeperFrames = Math.min(minKeeperFrames, lastKeeperLength);
+        }
+      }
+      
+      // Cap context_frame_count to the minimum keeper clip length
+      // Use minKeeperFrames - 1 as safety margin for off-by-one in video extraction
+      const requestedContextFrameCount = editSettings.settings.contextFrameCount || 8;
+      const safeMaxContextFrames = Math.max(1, minKeeperFrames - 1);
+      const contextFrameCount = Math.min(requestedContextFrameCount, safeMaxContextFrames);
+      
+      if (contextFrameCount < requestedContextFrameCount) {
+        console.log(`[VideoEdit] Capped context_frame_count from ${requestedContextFrameCount} to ${contextFrameCount} (min keeper clip: ${minKeeperFrames} frames, safe max: ${safeMaxContextFrames})`);
+      }
+      
       // Get LoRAs
-      const lorasForTask = loraManager.loras
+      const lorasForTask = loraManager.selectedLoras
         .filter(l => l.path)
         .map(l => ({ path: l.path, strength: l.strength }));
       
@@ -390,11 +472,14 @@ export const useVideoEditing = ({
       });
       
       // Create the task using the createTask function
+      // Note: tool_type and parent_generation_id must be at top level for complete_task variant creation
       const result = await createTask({
         project_id: selectedProjectId,
         task_type: 'edit_video_orchestrator',
         params: {
           orchestrator_details: orchestratorDetails,
+          tool_type: 'edit-video', // Top level for complete_task variant creation
+          parent_generation_id: media.id, // Top level for complete_task variant creation
         },
       });
       
@@ -458,6 +543,7 @@ export const useVideoEditing = ({
     // Validation
     isValid: validation.isValid,
     validationErrors: validation.errors,
+    maxContextFrames,
     
     // Settings
     editSettings,
