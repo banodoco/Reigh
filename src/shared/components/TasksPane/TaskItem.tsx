@@ -277,7 +277,56 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   });
 
   // Create GenerationRow data for MediaLightbox using the actual generation
+  // Fallback: If no generation record exists, create a minimal GenerationRow from outputLocation
   const generationData: GenerationRow | null = React.useMemo(() => {
+    // If we have an outputLocation but no generation record, create a fallback GenerationRow
+    // This allows "Open Image" button to work even when generation wasn't created in DB
+    if (taskInfo.isImageTask && hasGeneratedImage && task.outputLocation && !actualGeneration) {
+      // Extract source generation ID from task params for variant fetching
+      // Image edit tasks (qwen_image_edit, image_inpaint, etc.) edit an existing image
+      // The source generation is where variants should be fetched from
+      const sourceGenerationId = 
+        taskParams.parsed?.based_on ||
+        taskParams.parsed?.source_generation_id ||
+        taskParams.parsed?.generation_id ||
+        taskParams.parsed?.input_generation_id ||
+        taskParams.parsed?.parent_generation_id;
+      
+      // DEBUG: Log all task param keys to find the right source field
+      console.log('[OpenImageButtonDebug] Creating fallback generationData from outputLocation:');
+      console.log('[OpenImageButtonDebug] taskId:', task.id?.substring(0, 8));
+      console.log('[OpenImageButtonDebug] taskType:', task.taskType);
+      console.log('[OpenImageButtonDebug] outputLocation:', task.outputLocation?.substring(0, 50) || 'none');
+      console.log('[OpenImageButtonDebug] sourceGenerationId:', sourceGenerationId?.substring(0, 8) || 'none');
+      console.log('[OpenImageButtonDebug] taskParams.parsed keys:', taskParams.parsed ? Object.keys(taskParams.parsed).join(', ') : 'none');
+      // Log specific fields that might contain generation ID
+      if (taskParams.parsed) {
+        console.log('[OpenImageButtonDebug] based_on:', taskParams.parsed?.based_on?.substring(0, 8) || 'none');
+        console.log('[OpenImageButtonDebug] source_generation_id:', taskParams.parsed?.source_generation_id?.substring(0, 8) || 'none');
+        console.log('[OpenImageButtonDebug] generation_id:', taskParams.parsed?.generation_id?.substring(0, 8) || 'none');
+        console.log('[OpenImageButtonDebug] input_generation_id:', taskParams.parsed?.input_generation_id?.substring(0, 8) || 'none');
+        console.log('[OpenImageButtonDebug] parent_generation_id:', taskParams.parsed?.parent_generation_id?.substring(0, 8) || 'none');
+      }
+      
+      // Create a minimal GenerationRow from the outputLocation
+      // Include parent_generation_id for variant fetching if we found a source
+      return {
+        id: task.id, // Use task ID as a temporary ID
+        location: task.outputLocation,
+        imageUrl: task.outputLocation,
+        thumbUrl: task.outputLocation, // Use same URL for thumbnail
+        type: 'image',
+        createdAt: task.createdAt || new Date().toISOString(),
+        metadata: task.params || {},
+        taskId: task.id,
+        // CRITICAL: Set parent_generation_id for variant fetching
+        // MediaLightbox will use this to fetch variants from the source image
+        parent_generation_id: sourceGenerationId || undefined,
+        // Also set based_on for the "Based On" feature
+        based_on: sourceGenerationId || undefined,
+      } as GenerationRow;
+    }
+    
     // DEBUG: Log why generationData might be null for image tasks
     if (taskInfo.isImageTask && (!hasGeneratedImage || !actualGeneration)) {
       console.log('[OpenImageButtonDebug] generationData is null:', {
@@ -285,8 +334,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         taskType: task.taskType,
         hasGeneratedImage,
         hasActualGeneration: !!actualGeneration,
-        taskStatus: task.status,
         hasOutputLocation: !!task.outputLocation,
+        taskStatus: task.status,
         outputLocation: task.outputLocation?.substring(0, 50) || 'none',
       });
     }
