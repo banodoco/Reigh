@@ -75,12 +75,15 @@ export default function EditImagesPage() {
     }
   }, [selectedProjectId, uiSettings?.lastEditedMediaId, isUISettingsLoading, selectedMedia, updateUISettings]);
   
-  // Persist selected media ID to database settings
+  // Persist selected media ID to database settings (or clear it when media is removed)
   useEffect(() => {
     if (!selectedProjectId || isUISettingsLoading) return;
     
     if (selectedMedia && selectedMedia.id !== uiSettings?.lastEditedMediaId) {
       updateUISettings('project', { lastEditedMediaId: selectedMedia.id });
+    } else if (!selectedMedia && uiSettings?.lastEditedMediaId) {
+      // Clear the stored ID when media is removed/closed
+      updateUISettings('project', { lastEditedMediaId: undefined });
     }
   }, [selectedMedia?.id, selectedProjectId, isUISettingsLoading, uiSettings?.lastEditedMediaId, updateUISettings]);
   
@@ -303,18 +306,22 @@ export default function EditImagesPage() {
       "w-full flex flex-col",
       isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "min-h-[calc(100dvh-96px)]"
     )}>
+      {/* Header */}
+      <div className="px-4 pt-6 pb-6 max-w-7xl mx-auto w-full">
+        <h1 className="text-3xl font-light tracking-tight text-foreground">Edit Images</h1>
+      </div>
+      
       {!selectedMedia ? (
         <div className="w-full px-4 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             {/* Selection UI - reduced height */}
-            <div className="flex flex-col md:flex-row bg-transparent" style={{ height: isMobile ? '60vh' : '65vh' }}>
+            <div className="flex flex-col md:flex-row rounded-2xl overflow-hidden" style={{ height: isMobile ? '60vh' : '65vh' }}>
               {/* Left Panel - Placeholder */}
               <div 
-                className="relative flex items-center justify-center bg-black w-full h-[30%] md:w-[60%] md:h-full md:flex-1 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl overflow-hidden"
+                className="relative flex items-center justify-center bg-black w-full h-[30%] md:w-[60%] md:h-full md:flex-1"
               >
                <div className="bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 p-6 md:p-8 flex flex-col items-center justify-center space-y-4 md:space-y-6 max-w-md mx-4">
                   <div className="text-center space-y-1 md:space-y-2">
-                    <h1 className="text-xl md:text-3xl font-light tracking-tight">Edit Images</h1>
                     <p className="text-muted-foreground text-xs md:text-base hidden md:block">
                       Select an image from the right or upload a new one to start editing.
                     </p>
@@ -339,7 +346,7 @@ export default function EditImagesPage() {
             {/* Right Panel - Selection UI */}
             <div 
               className={cn(
-                "bg-background border-t md:border-t-0 md:border-l border-border overflow-hidden relative z-[60] flex flex-col w-full h-[70%] md:w-[40%] md:h-full rounded-b-2xl md:rounded-none md:rounded-r-xl"
+                "bg-background border-t md:border-t-0 md:border-l border-border overflow-hidden relative z-[60] flex flex-col w-full h-[70%] md:w-[40%] md:h-full"
               )}
             >
                <ImageSelectionModal 
@@ -356,6 +363,7 @@ export default function EditImagesPage() {
         <div className="w-full px-4 overflow-y-auto" style={{ minHeight: 'calc(100dvh - 96px)' }}>
           <div className="max-w-7xl mx-auto relative">
             <div className={cn(
+              "rounded-2xl overflow-hidden",
               isEditingOnMobile ? "flex flex-col min-h-[60vh]" : "h-[70vh]"
             )}>
               <InlineEditView 

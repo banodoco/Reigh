@@ -4,7 +4,7 @@ import { Task, TaskStatus, TASK_STATUS } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '../contexts/ProjectContext';
-import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
+import { filterVisibleTasks, isTaskVisible, getTaskDisplayName } from '@/shared/lib/taskConfig';
 // Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
 import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
 
@@ -44,6 +44,7 @@ interface PaginatedTasksParams {
   status?: TaskStatus[];
   limit?: number;
   offset?: number;
+  taskType?: string | null; // Filter by specific task type
 }
 
 export interface PaginatedTasksResponse {
@@ -52,6 +53,54 @@ export interface PaginatedTasksResponse {
   hasMore: boolean;
   totalPages: number;
 }
+
+/**
+ * Hook to fetch ALL distinct visible task types for a project.
+ * This is a SEPARATE query that stays stable regardless of pagination or status filters.
+ * The result is cached and only refetches when the project changes.
+ */
+export const useDistinctTaskTypes = (projectId?: string | null) => {
+  const effectiveProjectId = projectId ?? (typeof window !== 'undefined' ? (window as any).__PROJECT_CONTEXT__?.selectedProjectId : null);
+  
+  return useQuery({
+    queryKey: [TASKS_QUERY_KEY, 'distinctTaskTypes', effectiveProjectId],
+    queryFn: async () => {
+      if (!effectiveProjectId) {
+        return [];
+      }
+      
+      // Fetch ALL task types from the project (no status/pagination filters)
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('task_type')
+        .eq('project_id', effectiveProjectId);
+      
+      if (error) {
+        console.error('[useDistinctTaskTypes] Query failed:', error);
+        throw error;
+      }
+      
+      // Get unique, visible task types
+      const allTaskTypes = [...new Set((data || []).map((row: any) => row.task_type))];
+      const visibleTaskTypes = allTaskTypes.filter(taskType => isTaskVisible(taskType));
+      
+      console.log('[useDistinctTaskTypes] All types:', allTaskTypes.join(', '));
+      console.log('[useDistinctTaskTypes] Visible types:', visibleTaskTypes.join(', '));
+      
+      return visibleTaskTypes
+        .map(taskType => ({
+          value: taskType,
+          label: getTaskDisplayName(taskType),
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    },
+    enabled: !!effectiveProjectId,
+    // Long cache time - task types don't change often
+    staleTime: 5 * 60 * 1000, // 5 minutes before considered stale
+    gcTime: 30 * 60 * 1000, // 30 minutes in cache
+    refetchOnWindowFocus: false,
+  });
+};
 
 // Helper to convert DB row (snake_case) to Task interface (camelCase)
 const mapDbTaskToTask = (row: any): Task => ({
@@ -259,7 +308,7 @@ export const useListTasks = (params: ListTasksParams) => {
 
 // Hook to list tasks with pagination - GALLERY PATTERN
 export const usePaginatedTasks = (params: PaginatedTasksParams) => {
-  const { projectId, status, limit = 50, offset = 0 } = params;
+  const { projectId, status, limit = 50, offset = 0, taskType } = params;
   const page = Math.floor(offset / limit) + 1;
   
   // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
@@ -273,11 +322,11 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const effectiveProjectId = projectId ?? (typeof window !== 'undefined' ? (window as any).__PROJECT_CONTEXT__?.selectedProjectId : null);
   const query = useQuery<PaginatedTasksResponse, Error>({
     // CRITICAL: Use page-based cache keys like gallery
-    queryKey: [TASKS_QUERY_KEY, 'paginated', effectiveProjectId, page, limit, status],
+    queryKey: [TASKS_QUERY_KEY, 'paginated', effectiveProjectId, page, limit, status, taskType],
     queryFn: async (queryContext) => {
       
       if (!effectiveProjectId) {
-        return { tasks: [], total: 0, hasMore: false, totalPages: 0 }; 
+        return { tasks: [], total: 0, hasMore: false, totalPages: 0, distinctTaskTypes: [] }; 
       }
       
       // GALLERY PATTERN: Get count and data separately, efficiently
@@ -293,6 +342,11 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
 
       if (status && status.length > 0) {
         countQuery = countQuery.in('status', status);
+      }
+      
+      // Apply task type filter to count query (server-side filter)
+      if (taskType) {
+        countQuery = countQuery.eq('task_type', taskType);
       }
 
       // 2. Get paginated data with proper database pagination
@@ -318,6 +372,11 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
 
       if (status && status.length > 0) {
         dataQuery = dataQuery.in('status', status);
+      }
+      
+      // Apply task type filter to data query (server-side filter)
+      if (taskType) {
+        dataQuery = dataQuery.eq('task_type', taskType);
       }
 
       if (needsCustomSorting) {
@@ -346,7 +405,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       // Execute queries (skip count for fast polling scenarios)
       const [countResult, { data, error: dataError }] = await Promise.all([
         shouldSkipCount ? Promise.resolve({ count: null, error: null }) : countQuery,
-        dataQuery
+        dataQuery,
       ]);
       
       const { count, error: countError } = countResult;
@@ -397,7 +456,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       const totalPages = Math.ceil(total / limit);
       const hasMore = count !== null ? offset + limit < total : paginatedTasks.length >= limit;
 
-      const result = {
+      const result: PaginatedTasksResponse = {
         tasks: paginatedTasks,
         total,
         hasMore,
@@ -796,4 +855,4 @@ export const useTaskStatusCounts = (projectId: string | null) => {
     ...smartPollingConfig,
     refetchIntervalInBackground: true, // Enable background polling like the gallery
   });
-}; 
+};

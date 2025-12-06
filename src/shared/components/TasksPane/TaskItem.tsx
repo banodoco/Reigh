@@ -102,6 +102,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   // Use display_name from task_types table, with fallback to legacy logic
   const displayTaskType = taskTypeInfo?.display_name || getTaskDisplayName(task.taskType);
   const abbreviatedTaskType = getAbbreviatedTaskName(displayTaskType);
+  
+  // Debug: Log what task type is being rendered
+  console.log('[TaskItem] Rendering task:', task.id.substring(0, 8), '| taskType:', task.taskType, '| displayTaskType:', displayTaskType);
 
   // Consolidated parameter parsing
   const taskParams = useMemo(() => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { cn } from '@/shared/lib/utils';
 import { BrushStroke } from '../types';
 import { Type, Paintbrush, Pencil, Move } from 'lucide-react';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import {
   BrushSizeSlider,
   PaintEraseToggle,
@@ -81,7 +82,7 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
   onSetPanelPosition,
 }) => {
   const isTablet = variant === 'tablet';
-  const isMobile = variant === 'mobile';
+  const isMobile = useIsMobile();
   
   // Variant-specific styling
   const containerWidth = isTablet ? 'w-40' : 'w-32';
@@ -107,7 +108,11 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
         containerWidth
       )}>
         {/* Mode Toggle - Text | Inpaint | Annotate | Reposition */}
-        <div className="flex items-center gap-0.5 bg-muted rounded-md p-1">
+        {/* Mobile: 2x2 grid, Tablet: 4 in a row */}
+        <div className={cn(
+          "bg-muted rounded-md p-1",
+          isMobile ? "grid grid-cols-2 gap-0.5" : "flex items-center gap-0.5"
+        )}>
           <button
             onClick={() => onSetEditMode('text')}
             className={cn(

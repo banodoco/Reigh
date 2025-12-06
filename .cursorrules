@@ -10,3 +10,14 @@
 - NEVER proactively create documentation files (*.md) unless explicitly requested by the user. Only create documentation when specifically asked.
 - After each change, review what you've done and how it relates to the task, and ask yourself "Did I unintentionally delete or edit something out of scope?"
 - When using toast notifications, only show toasts for errors - do not show positive/success toasts for task creation or similar successful operations.
+- When creating task lists, save them in the `tasks/` folder with a date-based filename (e.g., `tasks/2025-12-06-video-player-tasks.md`). Use this structure per task:
+  1. **Header** - Task number, title, status emoji (✅/🚧/❌/⏸️)
+  2. **Area** - Where in the app
+  3. **Description** - What's wrong or needed
+  4. **Observed Behavior** - Current state (if bug)
+  5. **Requirements** - Bulleted list of what to implement
+  6. **Impacted Files** - File paths with brief descriptions
+  7. **Execution Notes** - Fill during/after with what was changed
+  8. **Additional Data Needed** - Debug tag if logs added, or "None"
+  9. **Testing Instructions** - Step-by-step verification
+  Include a Master Checklist at top with `[ ]`/`[x]` checkboxes grouped by dependency order. Group by: Quick Wins (easy fixes that unblock testing), then logical clusters (tasks touching same files), with brief notes on why order matters (e.g., "depends on Task 1", "do together - same files").

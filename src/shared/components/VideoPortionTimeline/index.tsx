@@ -22,12 +22,22 @@ export function formatTime(seconds: number): string {
 function FrameThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
   const loadedRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   
   useEffect(() => {
     // Reset loaded state when videoUrl or time changes
     setLoaded(false);
+    setError(false);
     loadedRef.current = false;
+    
+    // Cleanup previous video
+    if (videoRef.current) {
+      videoRef.current.src = '';
+      videoRef.current.load();
+      videoRef.current = null;
+    }
   }, [videoUrl, time]);
   
   useEffect(() => {
@@ -36,10 +46,13 @@ function FrameThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) 
     if (loadedRef.current) return;
     
     const video = document.createElement('video');
+    videoRef.current = video;
     video.crossOrigin = 'anonymous';
-    video.preload = 'metadata';
+    video.preload = 'auto'; // Use 'auto' for better mobile support
     video.muted = true;
     video.playsInline = true; // Important for iOS
+    video.setAttribute('playsinline', ''); // iOS Safari needs this attribute
+    video.setAttribute('webkit-playsinline', ''); // Older iOS Safari
     video.src = videoUrl;
     
     const captureFrame = () => {
@@ -48,34 +61,70 @@ function FrameThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) 
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          loadedRef.current = true;
-          setLoaded(true);
+          try {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            loadedRef.current = true;
+            setLoaded(true);
+          } catch (e) {
+            console.error('[FrameThumbnail] Failed to draw frame:', e);
+            setError(true);
+          }
         }
       }
-      video.remove();
     };
     
-    video.onseeked = captureFrame;
-    video.onloadeddata = () => {
+    const handleSeeked = () => {
+      captureFrame();
+    };
+    
+    const handleLoadedData = () => {
       // Seek to time once video data is ready
-      video.currentTime = time;
+      if (video.duration && time <= video.duration) {
+        video.currentTime = time;
+      } else if (video.duration) {
+        // If time is beyond duration, use duration
+        video.currentTime = Math.max(0, video.duration - 0.1);
+      }
     };
     
-    // Fallback timeout - increased for mobile
+    const handleCanPlay = () => {
+      // Alternative trigger for mobile browsers
+      if (video.currentTime === 0 && time > 0) {
+        video.currentTime = Math.min(time, video.duration || time);
+      }
+    };
+    
+    const handleError = () => {
+      console.error('[FrameThumbnail] Video load error for', videoUrl);
+      setError(true);
+    };
+    
+    video.addEventListener('seeked', handleSeeked);
+    video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('error', handleError);
+    
+    // Increased timeout for slower mobile connections
     const timeout = setTimeout(() => {
-      if (!loadedRef.current) {
+      if (!loadedRef.current && !error) {
+        // Try to capture whatever we have
         captureFrame();
       }
-    }, 1000);
+    }, 2000);
+    
+    // Try to trigger loading
+    video.load();
     
     return () => {
       clearTimeout(timeout);
-      video.onseeked = null;
-      video.onloadeddata = null;
-      video.remove();
+      video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('error', handleError);
+      video.src = '';
+      video.load();
     };
-  }, [videoUrl, time]);
+  }, [videoUrl, time, error]);
   
   return (
     <canvas 
@@ -84,7 +133,7 @@ function FrameThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) 
       height={27}
       className={cn(
         "rounded border border-white/30 shadow-lg",
-        !loaded && "bg-white/10"
+        !loaded && !error && "bg-white/10"
       )}
     />
   );
@@ -122,6 +171,17 @@ export function MultiPortionTimeline({
   
   // Store video playing state before drag
   const wasPlayingRef = useRef(false);
+  
+  // Store drag offset for immediate visual feedback (avoids React re-render lag on mobile)
+  const dragOffsetRef = useRef<{ id: string; handle: 'start' | 'end'; offsetPx: number } | null>(null);
+  // Lightweight state to trigger re-render for transform updates
+  const [, setDragTick] = useState(0);
+  // Store current drag time for video seeking (avoids closure issues)
+  const currentDragTimeRef = useRef<number | null>(null);
+  
+  // Keep a ref to selections so handleMove doesn't need to depend on it
+  const selectionsRef = useRef(selections);
+  selectionsRef.current = selections;
   
   // Get position from mouse or touch event
   const getClientX = (e: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent): number => {
@@ -205,10 +265,17 @@ export function MultiPortionTimeline({
     setSelectedHandle(null);
   };
   
+  // Throttle state updates using requestAnimationFrame
+  const rafIdRef = useRef<number | null>(null);
+  const pendingUpdateRef = useRef<{ id: string; handle: 'start' | 'end'; time: number } | null>(null);
+  
   const handleMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!dragging || !trackRef.current) return;
     
-    const selection = selections.find(s => s.id === dragging.id);
+    e.preventDefault(); // Prevent scrolling on mobile
+    
+    // Use ref to get current selections (avoids dependency on selections array)
+    const selection = selectionsRef.current.find(s => s.id === dragging.id);
     if (!selection) return;
     
     const rect = trackRef.current.getBoundingClientRect();
@@ -216,28 +283,85 @@ export function MultiPortionTimeline({
     const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     const time = (percent / 100) * duration;
     
+    // Calculate drag offset for immediate visual feedback (no React re-render)
+    const currentPercent = dragging.handle === 'start' 
+      ? (selection.start / duration) * 100 
+      : (selection.end / duration) * 100;
+    const currentPx = (currentPercent / 100) * rect.width;
+    const newPx = ((percent / 100) * rect.width);
+    const offsetPx = newPx - currentPx;
+    
+    // Store offset for immediate visual update via CSS transform
+    dragOffsetRef.current = { id: dragging.id, handle: dragging.handle, offsetPx };
+    
+    // Trigger lightweight re-render to apply transform immediately
+    setDragTick(t => t + 1);
+    
+    // Store pending update
     let newTime: number;
     if (dragging.handle === 'start') {
       newTime = Math.min(time, selection.end - 0.1);
-      onSelectionChange(dragging.id, newTime, selection.end);
     } else {
       newTime = Math.max(time, selection.start + 0.1);
-      onSelectionChange(dragging.id, selection.start, newTime);
     }
+    pendingUpdateRef.current = { id: dragging.id, handle: dragging.handle, time: newTime };
+    currentDragTimeRef.current = newTime;
     
-    // Seek video to show current frame
-    if (videoRef.current) {
+    // Immediately seek video (before RAF throttle)
+    if (videoRef?.current) {
       videoRef.current.currentTime = newTime;
     }
-  }, [dragging, duration, selections, onSelectionChange, videoRef]);
+    
+    // Throttle actual state updates using RAF (reduces re-renders)
+    if (!rafIdRef.current) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null;
+        const update = pendingUpdateRef.current;
+        if (update && dragging) {
+          const sel = selectionsRef.current.find(s => s.id === update.id);
+          if (sel) {
+            if (update.handle === 'start') {
+              onSelectionChange(update.id, update.time, sel.end);
+            } else {
+              onSelectionChange(update.id, sel.start, update.time);
+            }
+          }
+        }
+        pendingUpdateRef.current = null;
+      });
+    }
+  }, [dragging, duration, onSelectionChange, videoRef]);
   
   const handleEnd = useCallback(() => {
+    // Clear any pending RAF
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    
+    // Apply final pending update if any
+    if (pendingUpdateRef.current && dragging) {
+      const update = pendingUpdateRef.current;
+      const sel = selectionsRef.current.find(s => s.id === update.id);
+      if (sel) {
+        if (update.handle === 'start') {
+          onSelectionChange(update.id, update.time, sel.end);
+        } else {
+          onSelectionChange(update.id, sel.start, update.time);
+        }
+      }
+      pendingUpdateRef.current = null;
+    }
+    
+    // Clear drag offset
+    dragOffsetRef.current = null;
+    
     // Resume playing if it was playing before
     if (wasPlayingRef.current && videoRef.current) {
       videoRef.current.play();
     }
     setDragging(null);
-  }, [videoRef]);
+  }, [videoRef, dragging, onSelectionChange]);
   
   useEffect(() => {
     if (dragging) {
@@ -269,14 +393,7 @@ export function MultiPortionTimeline({
   ];
   
   return (
-    <div className="relative pt-14 pb-2 select-none">
-      {/* Tap-to-move hint */}
-      {selectedHandle && (
-        <div className="absolute top-0 left-0 right-0 text-center text-xs text-primary animate-pulse">
-          Tap on timeline to move {selectedHandle.handle} point
-        </div>
-      )}
-      
+    <div className="relative pt-16 md:pt-12 pb-2 select-none">
       {/* Track */}
       <div 
         ref={trackRef}
@@ -286,8 +403,27 @@ export function MultiPortionTimeline({
       >
         {/* Render each selection */}
         {selections.map((selection, index) => {
-          const startPercent = (selection.start / duration) * 100;
-          const endPercent = (selection.end / duration) * 100;
+          // Calculate base percentages
+          let startPercent = (selection.start / duration) * 100;
+          let endPercent = (selection.end / duration) * 100;
+          
+          // Apply drag offset for immediate visual feedback
+          if (dragOffsetRef.current?.id === selection.id && trackRef.current) {
+            const rect = trackRef.current.getBoundingClientRect();
+            const trackWidth = rect.width;
+            const offsetPercent = (dragOffsetRef.current.offsetPx / trackWidth) * 100;
+            
+            if (dragOffsetRef.current.handle === 'start') {
+              startPercent = Math.max(0, Math.min(100, startPercent + offsetPercent));
+              // Ensure start doesn't go past end
+              startPercent = Math.min(startPercent, endPercent - 0.1);
+            } else {
+              endPercent = Math.max(0, Math.min(100, endPercent + offsetPercent));
+              // Ensure end doesn't go before start
+              endPercent = Math.max(endPercent, startPercent + 0.1);
+            }
+          }
+          
           const isActive = selection.id === activeSelectionId;
           const colorClass = selectionColors[index % selectionColors.length];
           
@@ -339,16 +475,21 @@ export function MultiPortionTimeline({
                 </div>
               </div>
               
-              {/* Selected portion highlight */}
+              {/* Selected portion highlight - use colorClass with opacity instead of /50 syntax */}
               <div 
                 className={cn(
-                  "absolute top-0 bottom-0 rounded cursor-pointer transition-opacity",
-                  isActive ? `${colorClass}/50` : `${colorClass}/30`,
-                  !isActive && "hover:opacity-80"
+                  "absolute top-0 bottom-0 rounded cursor-pointer",
+                  colorClass,
+                  isActive ? "opacity-50" : "opacity-30",
+                  !isActive && "hover:opacity-50",
+                  // Remove transition during drag for instant feedback
+                  dragOffsetRef.current?.id !== selection.id ? "transition-opacity" : ""
                 )}
                 style={{ 
                   left: `${startPercent}%`, 
-                  width: `${endPercent - startPercent}%` 
+                  width: `${endPercent - startPercent}%`,
+                  // Remove transition during drag
+                  transition: dragOffsetRef.current?.id === selection.id ? 'none' : undefined
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -356,42 +497,66 @@ export function MultiPortionTimeline({
                 }}
               />
               
-              {/* Start handle - larger touch target on mobile */}
+              {/* Start handle - larger touch target on mobile, prevent text selection on iPad */}
               <div
                 className={cn(
-                  "absolute top-0 bottom-0 w-5 md:w-3 rounded-l cursor-ew-resize flex items-center justify-center transition-all z-10 touch-none",
+                  "absolute top-0 bottom-0 w-5 md:w-3 rounded-l cursor-ew-resize flex items-center justify-center z-10 touch-none select-none",
                   colorClass,
                   isActive ? "opacity-100" : "opacity-70 hover:opacity-100",
-                  selectedHandle?.id === selection.id && selectedHandle?.handle === 'start' && "ring-2 ring-white ring-offset-1 ring-offset-black scale-110"
+                  selectedHandle?.id === selection.id && selectedHandle?.handle === 'start' && "ring-2 ring-white ring-offset-1 ring-offset-black scale-110",
+                  // Remove transition during drag for instant feedback
+                  dragging?.id !== selection.id || dragging?.handle !== 'start' ? "transition-all" : ""
                 )}
-                style={{ left: `${startPercent}%`, transform: 'translateX(-50%)' }}
+                style={{ 
+                  left: `${startPercent}%`, 
+                  transform: dragOffsetRef.current?.id === selection.id && dragOffsetRef.current?.handle === 'start'
+                    ? `translateX(calc(-50% + ${dragOffsetRef.current.offsetPx}px))`
+                    : 'translateX(-50%)',
+                  WebkitTouchCallout: 'none',
+                  WebkitUserSelect: 'none',
+                }}
                 onMouseDown={(e) => startDrag(e, selection.id, 'start')}
-                onTouchStart={(e) => startDrag(e, selection.id, 'start')}
+                onTouchStart={(e) => {
+                  e.preventDefault(); // Prevent text selection on iPad
+                  startDrag(e, selection.id, 'start');
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleHandleTap(e, selection.id, 'start');
                 }}
               >
-                <div className="w-0.5 h-4 md:h-3 bg-white/50 rounded" />
+                <div className="w-0.5 h-4 md:h-3 bg-white/50 rounded pointer-events-none" />
               </div>
               
-              {/* End handle - larger touch target on mobile */}
+              {/* End handle - larger touch target on mobile, prevent text selection on iPad */}
               <div
                 className={cn(
-                  "absolute top-0 bottom-0 w-5 md:w-3 rounded-r cursor-ew-resize flex items-center justify-center transition-all z-10 touch-none",
+                  "absolute top-0 bottom-0 w-5 md:w-3 rounded-r cursor-ew-resize flex items-center justify-center z-10 touch-none select-none",
                   colorClass,
                   isActive ? "opacity-100" : "opacity-70 hover:opacity-100",
-                  selectedHandle?.id === selection.id && selectedHandle?.handle === 'end' && "ring-2 ring-white ring-offset-1 ring-offset-black scale-110"
+                  selectedHandle?.id === selection.id && selectedHandle?.handle === 'end' && "ring-2 ring-white ring-offset-1 ring-offset-black scale-110",
+                  // Remove transition during drag for instant feedback
+                  dragging?.id !== selection.id || dragging?.handle !== 'end' ? "transition-all" : ""
                 )}
-                style={{ left: `${endPercent}%`, transform: 'translateX(-50%)' }}
+                style={{ 
+                  left: `${endPercent}%`, 
+                  transform: dragOffsetRef.current?.id === selection.id && dragOffsetRef.current?.handle === 'end'
+                    ? `translateX(calc(-50% + ${dragOffsetRef.current.offsetPx}px))`
+                    : 'translateX(-50%)',
+                  WebkitTouchCallout: 'none',
+                  WebkitUserSelect: 'none',
+                }}
                 onMouseDown={(e) => startDrag(e, selection.id, 'end')}
-                onTouchStart={(e) => startDrag(e, selection.id, 'end')}
+                onTouchStart={(e) => {
+                  e.preventDefault(); // Prevent text selection on iPad
+                  startDrag(e, selection.id, 'end');
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleHandleTap(e, selection.id, 'end');
                 }}
               >
-                <div className="w-0.5 h-4 md:h-3 bg-white/50 rounded" />
+                <div className="w-0.5 h-4 md:h-3 bg-white/50 rounded pointer-events-none" />
               </div>
             </React.Fragment>
           );

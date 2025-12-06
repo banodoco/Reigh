@@ -16,12 +16,22 @@ import { PortionSelection } from '@/shared/components/VideoPortionTimeline';
 function SegmentThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
   const loadedRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   
   useEffect(() => {
     // Reset loaded state when videoUrl or time changes
     setLoaded(false);
+    setError(false);
     loadedRef.current = false;
+    
+    // Cleanup previous video
+    if (videoRef.current) {
+      videoRef.current.src = '';
+      videoRef.current.load();
+      videoRef.current = null;
+    }
   }, [videoUrl, time]);
   
   useEffect(() => {
@@ -30,10 +40,13 @@ function SegmentThumbnail({ videoUrl, time }: { videoUrl: string; time: number }
     if (loadedRef.current) return;
     
     const video = document.createElement('video');
+    videoRef.current = video;
     video.crossOrigin = 'anonymous';
-    video.preload = 'metadata';
+    video.preload = 'auto'; // Use 'auto' for better mobile support
     video.muted = true;
     video.playsInline = true; // Important for iOS
+    video.setAttribute('playsinline', ''); // iOS Safari needs this attribute
+    video.setAttribute('webkit-playsinline', ''); // Older iOS Safari
     video.src = videoUrl;
     
     const captureFrame = () => {
@@ -42,40 +55,80 @@ function SegmentThumbnail({ videoUrl, time }: { videoUrl: string; time: number }
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          loadedRef.current = true;
-          setLoaded(true);
+          try {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            loadedRef.current = true;
+            setLoaded(true);
+          } catch (e) {
+            console.error('[SegmentThumbnail] Failed to draw frame:', e);
+            setError(true);
+          }
         }
       }
-      video.remove();
     };
     
-    video.onseeked = captureFrame;
-    video.onloadeddata = () => {
+    const handleSeeked = () => {
+      captureFrame();
+    };
+    
+    const handleLoadedData = () => {
       // Seek to time once video data is ready
-      video.currentTime = time;
+      if (video.duration && time <= video.duration) {
+        video.currentTime = time;
+      } else if (video.duration) {
+        // If time is beyond duration, use duration
+        video.currentTime = Math.max(0, video.duration - 0.1);
+      }
     };
     
+    const handleCanPlay = () => {
+      // Alternative trigger for mobile browsers
+      if (video.currentTime === 0 && time > 0) {
+        video.currentTime = Math.min(time, video.duration || time);
+      }
+    };
+    
+    const handleError = () => {
+      console.error('[SegmentThumbnail] Video load error for', videoUrl);
+      setError(true);
+    };
+    
+    video.addEventListener('seeked', handleSeeked);
+    video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('error', handleError);
+    
+    // Increased timeout for slower mobile connections
     const timeout = setTimeout(() => {
-      if (!loadedRef.current) captureFrame();
-    }, 1000); // Increased timeout for slower mobile connections
+      if (!loadedRef.current && !error) {
+        // Try to capture whatever we have
+        captureFrame();
+      }
+    }, 2000);
+    
+    // Try to trigger loading
+    video.load();
     
     return () => {
       clearTimeout(timeout);
-      video.onseeked = null;
-      video.onloadeddata = null;
-      video.remove();
+      video.removeEventListener('seeked', handleSeeked);
+      video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('error', handleError);
+      video.src = '';
+      video.load();
     };
-  }, [videoUrl, time]);
+  }, [videoUrl, time, error]);
   
   return (
     <canvas 
       ref={canvasRef}
-      width={32}
-      height={18}
+      width={48}
+      height={27}
       className={cn(
-        "rounded border border-border/50",
-        !loaded && "bg-muted/30"
+        "rounded border border-border/50 w-8 h-[18px]",
+        !loaded && !error && "bg-muted/30 animate-pulse",
+        error && "bg-destructive/20"
       )}
     />
   );

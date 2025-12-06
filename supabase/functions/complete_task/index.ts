@@ -1117,6 +1117,8 @@ serve(async (req) => {
                   // Update parent_generation_id if present
                   // ONLY for join_clips_segment - the final segment IS the combined video
                   // For travel_segment, the travel_stitch task produces the final video and handles this update
+                  // Note: edit_video_orchestrator also uses join_clips_segment tasks, and the tool_type
+                  // is determined from orchestratorTask.params.tool_type (e.g., 'edit-video')
                   if (taskType === 'join_clips_segment') {
                     const parentGenId = orchestratorTask.params?.orchestrator_details?.parent_generation_id || 
                                         orchestratorTask.params?.parent_generation_id;
@@ -1134,9 +1136,10 @@ serve(async (req) => {
                         
                         // Build variant params
                         // CRITICAL: Include tool_type for proper filtering in the gallery
+                        // The tool_type should come from the orchestrator's params (e.g., 'edit-video' or 'join-clips')
                         const variantParams = {
                           ...orchestratorTask.params,
-                          tool_type: orchestratorTask.params?.tool_type || 'join-clips',
+                          tool_type: orchestratorTask.params?.tool_type || orchestratorTask.params?.orchestrator_details?.tool_type || 'join-clips',
                           source_task_id: taskIdString,
                           orchestrator_task_id: orchestratorTaskId,
                           created_from: 'join_clips_complete',

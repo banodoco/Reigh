@@ -10,12 +10,12 @@ import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useCancelAllPendingTasks, useTaskStatusCounts, usePaginatedTasks, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
+import { useCancelAllPendingTasks, useTaskStatusCounts, usePaginatedTasks, useDistinctTaskTypes, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
-import { filterVisibleTasks, isTaskVisible, TASK_TYPE_CONFIG, getTaskDisplayName } from '@/shared/lib/taskConfig';
+import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
 import { useSimpleRealtime } from '@/shared/providers/SimpleRealtimeProvider';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { GenerationRow } from '@/types/shots';
@@ -38,14 +38,6 @@ const STATUS_GROUPS: Record<FilterGroup, TaskStatus[]> = {
   Failed: ['Failed', 'Cancelled'],
 };
 
-// Get visible task types for the filter dropdown
-const VISIBLE_TASK_TYPES = Object.entries(TASK_TYPE_CONFIG)
-  .filter(([_, config]) => config.isVisible)
-  .map(([taskType, config]) => ({
-    value: taskType,
-    label: config.displayName || taskType,
-  }))
-  .sort((a, b) => a.label.localeCompare(b.label));
 
 // Status indicator component with count and styling
 interface StatusIndicatorProps {
@@ -273,12 +265,13 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Realtime connection status
   const { isConnected: realtimeConnected, isConnecting: realtimeConnecting, error: realtimeError } = useSimpleRealtime();
   
-  // Get paginated tasks
+  // Get paginated tasks - task type filter is now applied server-side
   const { data: paginatedData, isLoading: isPaginatedLoading, error: paginatedError, refetch: refetchPaginatedTasks } = usePaginatedTasks({
     projectId: shouldLoadTasks ? selectedProjectId : null,
     status: STATUS_GROUPS[selectedFilter],
     limit: ITEMS_PER_PAGE,
     offset: (currentPage - 1) * ITEMS_PER_PAGE,
+    taskType: selectedTaskType, // Server-side task type filter
   });
 
   // NOTE: Task invalidation is now handled by the centralized TaskInvalidationSubscriber
@@ -286,6 +279,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   
   // Get status counts for indicators
   const { data: statusCounts, isLoading: isStatusCountsLoading, error: statusCountsError } = useTaskStatusCounts(shouldLoadTasks ? selectedProjectId : null);
+  
+  // Get distinct task types from a SEPARATE stable query (not affected by pagination/status filters)
+  const { data: taskTypeOptions = [] } = useDistinctTaskTypes(selectedProjectId);
   
   // Store previous status counts to avoid flickering during loading
   const [displayStatusCounts, setDisplayStatusCounts] = useState<typeof statusCounts>(statusCounts);
@@ -843,7 +839,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
                   <SelectItem value="all" className="text-xs text-zinc-300">All task types</SelectItem>
-                  {VISIBLE_TASK_TYPES.map((type) => (
+                  {taskTypeOptions.map((type) => (
                     <SelectItem key={type.value} value={type.value} className="text-xs text-zinc-300">
                       {type.label}
                     </SelectItem>

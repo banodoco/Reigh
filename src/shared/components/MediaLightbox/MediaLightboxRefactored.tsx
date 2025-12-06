@@ -401,15 +401,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [activeVariant]);
 
   // Set initial variant when variants load and initialVariantId is provided
+  // Track which initialVariantId we've already handled to avoid re-setting on every render
+  const handledInitialVariantRef = React.useRef<string | null>(null);
+  
   React.useEffect(() => {
-    if (initialVariantId && variants && variants.length > 0 && !activeVariant) {
-      const targetVariant = variants.find(v => v.id === initialVariantId);
-      if (targetVariant) {
-        console.log('[VariantClickDebug] Setting initial variant from prop:', initialVariantId.substring(0, 8));
-        setActiveVariantId(initialVariantId);
+    // Only process if we have a new initialVariantId different from what we've handled
+    if (initialVariantId && variants && variants.length > 0) {
+      if (handledInitialVariantRef.current !== initialVariantId) {
+        const targetVariant = variants.find(v => v.id === initialVariantId);
+        if (targetVariant) {
+          console.log('[VariantClickDebug] Setting initial variant from prop:', initialVariantId.substring(0, 8));
+          setActiveVariantId(initialVariantId);
+          handledInitialVariantRef.current = initialVariantId;
+        }
       }
     }
-  }, [initialVariantId, variants, activeVariant, setActiveVariantId]);
+  }, [initialVariantId, variants, setActiveVariantId]);
+  
+  // Reset handled ref when media changes (new item opened)
+  React.useEffect(() => {
+    handledInitialVariantRef.current = null;
+  }, [media.id]);
 
   // Compute isViewingNonPrimaryVariant early for edit hooks
   const isViewingNonPrimaryVariant = activeVariant && !activeVariant.is_primary;
@@ -1860,6 +1872,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handleFlip={handleFlip}
                       handleSave={handleSave}
                       effectiveImageUrl={effectiveMediaUrl}
+                      handleEnterMagicEditMode={handleEnterMagicEditMode}
                     />
 
                     {/* Floating Tool Controls - Tablet (landscape with sidebar) */}
@@ -2215,8 +2228,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           />
                         </div>
                         
-                        {/* Variants section - shrink-to-fit content, max 50% height, scrollable if needed */}
-                        <div ref={variantsSectionRef} className="flex-shrink-0 overflow-y-auto max-h-[50%]">
+                        {/* Variants section - shrink-to-fit content, max 200px height, scrollable if needed */}
+                        <div ref={variantsSectionRef} className="flex-shrink-0 overflow-y-auto max-h-[200px]">
                           <div className="p-4 pt-2">
                             <VariantSelector
                               variants={variants}
@@ -2364,6 +2377,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handleFlip={handleFlip}
                       handleSave={handleSave}
                       effectiveImageUrl={effectiveMediaUrl}
+                      handleEnterMagicEditMode={handleEnterMagicEditMode}
                     />
 
                     {/* Top Right Controls - Download, Delete & Close */}
@@ -2591,9 +2605,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
                     />
                     
-                    {/* Variants section - below task details, constrained height with scroll */}
+                    {/* Variants section - below task details, small fixed height on mobile */}
                     {variants && variants.length >= 1 && (
-                      <div ref={variantsSectionRef} className="px-3 pb-2 -mt-2 max-h-[200px] overflow-y-auto">
+                      <div ref={variantsSectionRef} className="px-3 pb-2 -mt-2 max-h-[120px] overflow-y-auto flex-shrink-0">
                         <VariantSelector
                           variants={variants}
                           activeVariantId={activeVariant?.id || null}
@@ -2862,6 +2876,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     handleFlip={handleFlip}
                     handleSave={handleSave}
                     effectiveImageUrl={effectiveMediaUrl}
+                    handleEnterMagicEditMode={handleEnterMagicEditMode}
                   />
 
                   {/* Top Right Controls - Download, Delete & Close */}

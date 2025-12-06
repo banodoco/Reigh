@@ -6,8 +6,8 @@ import { createImageInpaintTask } from '@/shared/lib/tasks/imageInpaint';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ImageTransform {
-  translateX: number; // pixels
-  translateY: number; // pixels
+  translateX: number; // percentage (0-100)
+  translateY: number; // percentage (0-100)
   scale: number;      // 1.0 = original size
   rotation: number;   // degrees
   flipH: boolean;     // flip horizontal
@@ -157,11 +157,20 @@ export const useRepositionMode = ({
     const scaleX = transform.flipH ? -transform.scale : transform.scale;
     const scaleY = transform.flipV ? -transform.scale : transform.scale;
     
+    // Convert percentages to pixels for CSS transform
+    let translateXPx = 0;
+    let translateYPx = 0;
+    if (imageDimensions) {
+      // translateX/translateY are percentages (0-100), convert to pixels
+      translateXPx = (transform.translateX / 100) * imageDimensions.width;
+      translateYPx = (transform.translateY / 100) * imageDimensions.height;
+    }
+    
     return {
-      transform: `translate(${transform.translateX}px, ${transform.translateY}px) scale(${scaleX}, ${scaleY}) rotate(${transform.rotation}deg)`,
+      transform: `translate(${translateXPx}px, ${translateYPx}px) scale(${scaleX}, ${scaleY}) rotate(${transform.rotation}deg)`,
       transformOrigin: 'center center',
     };
-  }, [transform]);
+  }, [transform, imageDimensions]);
   
   // Helper function to create transformed canvas
   const createTransformedCanvas = useCallback(async (): Promise<HTMLCanvasElement> => {
@@ -206,8 +215,11 @@ export const useRepositionMode = ({
     transformedCtx.translate(outputWidth / 2, outputHeight / 2);
     
     // Apply user transforms (scaled to output size)
+    // translateX/translateY are percentages (0-100), convert to pixels
+    const translateXPx = (transform.translateX / 100) * imageDimensions.width;
+    const translateYPx = (transform.translateY / 100) * imageDimensions.height;
     const scaleRatio = outputWidth / imageDimensions.width;
-    transformedCtx.translate(transform.translateX * scaleRatio, transform.translateY * scaleRatio);
+    transformedCtx.translate(translateXPx * scaleRatio, translateYPx * scaleRatio);
     
     // Apply scale with flip
     const scaleX = transform.flipH ? -transform.scale : transform.scale;
@@ -467,7 +479,7 @@ export const useRepositionMode = ({
           variant_type: 'repositioned',
           name: 'Repositioned',
           params: {
-            transform: transform,
+            transform: transform as any,
             saved_at: new Date().toISOString()
           }
         })

@@ -128,7 +128,57 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
     description: 'Individual portion regeneration (part of edit video workflow)'
   },
 
-  // Add more task types as needed...
+  // Image inpainting task
+  image_inpaint: {
+    isVisible: true,
+    displayName: 'Image Inpaint',
+    canCancel: true,
+    category: 'generation',
+    description: 'Inpaint or extend images'
+  },
+
+  // Qwen image generation
+  qwen_image: {
+    isVisible: true,
+    displayName: 'Qwen Image',
+    canCancel: true,
+    category: 'generation',
+    description: 'Generate images using Qwen model'
+  },
+
+  // Qwen image editing
+  qwen_image_edit: {
+    isVisible: true,
+    displayName: 'Qwen Image Edit',
+    canCancel: true,
+    category: 'generation',
+    description: 'Edit images using Qwen model'
+  },
+
+  // Internal/utility tasks that should be hidden
+  extract_frame: {
+    isVisible: false,
+    category: 'utility',
+    description: 'Extract frames from video'
+  },
+
+  generate_openpose: {
+    isVisible: false,
+    category: 'utility',
+    description: 'Generate OpenPose skeleton'
+  },
+
+  rife_interpolate_images: {
+    isVisible: false,
+    category: 'utility',
+    description: 'RIFE frame interpolation'
+  },
+
+  wgp: {
+    isVisible: false,
+    category: 'utility',
+    description: 'Workflow graph processing'
+  },
 };
 
 /**
@@ -136,7 +186,7 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
  */
 export function getTaskConfig(taskType: string): TaskTypeConfig {
   return TASK_TYPE_CONFIG[taskType] || {
-    isVisible: true, // Default to visible for unknown task types
+    isVisible: false, // Default to hidden for unknown task types (they may be internal/utility tasks)
     canCancel: true,
     category: 'utility'
   };

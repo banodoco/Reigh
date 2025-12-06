@@ -223,7 +223,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex flex-col gap-2 p-2 bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg">
+      <div className="flex flex-col gap-2 p-2 bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg overflow-hidden">
         {/* Header row */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -343,8 +343,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
           </div>
         )}
 
-        {/* Variants grid - 4 per row */}
-        <div className="grid grid-cols-4 gap-1 w-full">
+        {/* Variants grid - 4 per row, scrollable */}
+        <div className="grid grid-cols-4 gap-1 w-full overflow-y-auto flex-1 min-h-0">
           {paginatedVariants.map((variant) => {
             const isActive = variant.id === activeVariantId;
             const isPrimary = variant.is_primary;

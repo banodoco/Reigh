@@ -52,11 +52,9 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
   const iconSize = variant === 'tablet' ? 'h-3 w-3' : 'h-2.5 w-2.5';
   const sliderIconSize = variant === 'tablet' ? 'h-3.5 w-3.5' : 'h-3 w-3';
   
-  // Calculate max translate based on image dimensions
-  // Allow moving until the edge of the image reaches the opposite edge of the canvas
-  // At scale 1.0, this means the image can move its full width/height
-  const maxTranslateX = imageDimensions ? Math.round(imageDimensions.width * transform.scale) : 500;
-  const maxTranslateY = imageDimensions ? Math.round(imageDimensions.height * transform.scale) : 500;
+  // Max translate as percentage - at scale 1.0, can move 100% of image dimensions
+  // This scales with the scale factor so larger images can move further proportionally
+  const maxTranslatePercent = Math.round(100 * transform.scale);
   
   // Check if any transform has been applied
   const hasChanges = 
@@ -109,15 +107,15 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
           <MoveHorizontal className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
           <div className="flex-1 flex items-center justify-between">
             <label className={cn("font-medium text-foreground", textSize)}>X</label>
-            <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.translateX}px</span>
+            <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.translateX.toFixed(0)}%</span>
           </div>
         </div>
         <input
           type="range"
-          min={-maxTranslateX}
-          max={maxTranslateX}
+          min={-maxTranslatePercent}
+          max={maxTranslatePercent}
           value={transform.translateX}
-          onChange={(e) => onTranslateXChange(parseInt(e.target.value))}
+          onChange={(e) => onTranslateXChange(parseFloat(e.target.value))}
           className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
         />
       </div>
@@ -128,15 +126,15 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
           <MoveVertical className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
           <div className="flex-1 flex items-center justify-between">
             <label className={cn("font-medium text-foreground", textSize)}>Y</label>
-            <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.translateY}px</span>
+            <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.translateY.toFixed(0)}%</span>
           </div>
         </div>
         <input
           type="range"
-          min={-maxTranslateY}
-          max={maxTranslateY}
+          min={-maxTranslatePercent}
+          max={maxTranslatePercent}
           value={transform.translateY}
-          onChange={(e) => onTranslateYChange(parseInt(e.target.value))}
+          onChange={(e) => onTranslateYChange(parseFloat(e.target.value))}
           className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
         />
       </div>

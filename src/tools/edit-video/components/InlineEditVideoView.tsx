@@ -548,104 +548,112 @@ export function InlineEditVideoView({
           </div>
         )}
         
-        {/* Video Display Area */}
+        {/* Left side: Video + Timeline (stacked vertically) */}
         <div className={cn(
-          "relative flex items-center justify-center bg-black",
+          "flex flex-col min-h-0",
           isMobile ? "w-full" : "flex-1 h-full"
         )}>
-          {/* Close button - Desktop */}
-          {!isMobile && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="absolute top-4 left-4 z-10 bg-black/50 hover:bg-black/70 text-white"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          )}
-          
-          {/* Video Player */}
+          {/* Video Display Area - constrained height on desktop to leave room for timeline */}
           <div className={cn(
-            "w-full flex items-center justify-center",
-            isMobile ? "p-2 aspect-video" : "h-full p-4"
+            "relative flex items-center justify-center bg-zinc-900 overflow-hidden",
+            isMobile ? "w-full" : "flex-shrink rounded-t-lg"
           )}>
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              controls
-              playsInline // Prevents fullscreen on iOS when video plays
-              className="max-w-full max-h-full object-contain rounded-lg"
-              onLoadedMetadata={handleVideoLoadedMetadata}
-              preload="metadata"
-              // Prevent double-click fullscreen on mobile
-              onDoubleClick={isMobile ? (e) => e.preventDefault() : undefined}
-            />
+            {/* Close button - Desktop */}
+            {!isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="absolute top-4 left-4 z-10 bg-black/50 hover:bg-black/70 text-white"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            )}
+            
+            {/* Video Player */}
+            <div className={cn(
+              "w-full flex items-center justify-center",
+              isMobile ? "p-2 pt-20 aspect-video" : "p-4 pt-24"
+            )}>
+              <video
+                ref={videoRef}
+                src={videoUrl}
+                controls={!isMobile} // Hide controls on mobile to avoid play button overlay
+                playsInline // Prevents fullscreen on iOS when video plays
+                poster={(media as any).thumbnail_url || media.thumbUrl || undefined} // Show thumbnail instead of play button
+                className={cn(
+                  "max-w-full object-contain rounded-lg",
+                  isMobile 
+                    ? "max-h-full cursor-pointer [&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden" 
+                    : "max-h-[40vh]" // Slightly smaller than original to accommodate buffer
+                )}
+                style={isMobile ? {
+                  // Additional CSS to hide native controls overlay on mobile
+                  WebkitAppearance: 'none',
+                } : undefined}
+                onLoadedMetadata={handleVideoLoadedMetadata}
+                preload="metadata"
+                // Prevent double-click fullscreen on mobile
+                onDoubleClick={isMobile ? (e) => e.preventDefault() : undefined}
+                // On mobile, tap to play/pause (no autoplay)
+                onClick={isMobile ? (e) => {
+                  e.preventDefault();
+                  const video = e.currentTarget;
+                  if (video.paused) {
+                    video.play().catch(() => {
+                      // Ignore play errors (e.g., user interaction required)
+                    });
+                  } else {
+                    video.pause();
+                  }
+                } : undefined}
+              />
+            </div>
           </div>
           
-          {/* Portion Selection Overlay - Desktop only */}
-          {!isMobile && videoDuration > 0 && (
-            <div className="absolute left-0 right-0 bottom-0 pb-4 px-4 select-none">
-              <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
-                {/* Timeline bar */}
-                <MultiPortionTimeline
-                  duration={videoDuration}
-                  selections={selections}
-                  activeSelectionId={activeSelectionId}
-                  onSelectionChange={handleUpdateSelection}
-                  onSelectionClick={setActiveSelectionId}
-                  onRemoveSelection={handleRemoveSelection}
-                  videoRef={videoRef}
-                  videoUrl={videoUrl}
-                  fps={videoFps}
-                />
-                {/* Add new selection button */}
-                <div className="flex justify-center mt-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAddSelection}
-                    className="text-white/70 hover:text-white hover:bg-white/10 gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add new selection
-                  </Button>
-                </div>
+          {/* Spacer between video and timeline on desktop */}
+          {!isMobile && videoDuration > 0 && <div className="h-4 bg-zinc-900" />}
+          
+          {/* Timeline Section - Below video on both mobile and desktop */}
+          {videoDuration > 0 && (
+            <div className={cn(
+              "bg-zinc-900 select-none touch-manipulation flex-shrink-0",
+              isMobile ? "px-3 py-3" : "px-4 pt-3 pb-4 rounded-b-lg"
+            )}>
+              {/* Timeline */}
+              <MultiPortionTimeline
+                duration={videoDuration}
+                selections={selections}
+                activeSelectionId={activeSelectionId}
+                onSelectionChange={handleUpdateSelection}
+                onSelectionClick={setActiveSelectionId}
+                onRemoveSelection={handleRemoveSelection}
+                videoRef={videoRef}
+                videoUrl={videoUrl}
+                fps={videoFps}
+              />
+              
+              {/* Add button */}
+              <div className={cn(
+                "flex justify-center",
+                isMobile ? "-mt-1" : "mt-2"
+              )}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleAddSelection}
+                  className={cn(
+                    "text-white/70 hover:text-white hover:bg-white/10 gap-1",
+                    isMobile ? "text-xs h-7 px-2" : "text-sm h-8"
+                  )}
+                >
+                  <Plus className={isMobile ? "w-3 h-3" : "w-4 h-4"} />
+                  {isMobile ? "Add selection" : "Add new selection"}
+                </Button>
               </div>
             </div>
           )}
         </div>
-        
-        {/* Timeline Section - Mobile only, below video */}
-        {isMobile && videoDuration > 0 && (
-          <div className="bg-zinc-900 px-3 py-3 border-t border-border select-none touch-manipulation">
-            {/* Timeline */}
-            <MultiPortionTimeline
-              duration={videoDuration}
-              selections={selections}
-              activeSelectionId={activeSelectionId}
-              onSelectionChange={handleUpdateSelection}
-              onSelectionClick={setActiveSelectionId}
-              onRemoveSelection={handleRemoveSelection}
-              videoRef={videoRef}
-              videoUrl={videoUrl}
-              fps={videoFps}
-            />
-            
-            {/* Add button */}
-            <div className="flex justify-center mt-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleAddSelection}
-                className="text-white/70 hover:text-white hover:bg-white/10 gap-1 text-xs h-7 px-2"
-              >
-                <Plus className="w-3 h-3" />
-                Add selection
-              </Button>
-            </div>
-          </div>
-        )}
         
         {/* Settings Panel */}
         <div className={cn(

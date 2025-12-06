@@ -695,7 +695,7 @@ export function useTaskFromUnifiedCache(generationId: string) {
         .from('generations')
         .select('tasks')
         .eq('id', generationId)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('[TaskDetailsSidebar] useTaskFromUnifiedCache: fetch error', {
@@ -703,6 +703,12 @@ export function useTaskFromUnifiedCache(generationId: string) {
           error
         });
         throw error;
+      }
+      
+      // If generation doesn't exist, return null taskId
+      if (!data) {
+        console.log('[TaskDetailsSidebar] useTaskFromUnifiedCache: generation not found', { generationId });
+        return { taskId: null };
       }
       
       const taskId = Array.isArray(data?.tasks) && data.tasks.length > 0 ? data.tasks[0] : null;

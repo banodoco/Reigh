@@ -4,7 +4,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/
 import {
   Star,
   Download,
-  FlipHorizontal,
   Save,
   CheckCircle,
   Loader2,
@@ -32,7 +31,7 @@ interface BaseButtonGroupProps {
 }
 
 // ============================================================================
-// TOP LEFT CONTROLS - Flip & Save
+// TOP LEFT CONTROLS - Edit Button (moved from bottom-left)
 // ============================================================================
 
 interface TopLeftControlsProps extends BaseButtonGroupProps {
@@ -42,40 +41,53 @@ interface TopLeftControlsProps extends BaseButtonGroupProps {
   handleFlip: () => void;
   handleSave: (url: string) => Promise<void>;
   effectiveImageUrl: string;
+  handleEnterMagicEditMode?: () => void;
 }
 
 export const TopLeftControls: React.FC<TopLeftControlsProps> = ({
   isVideo,
   readOnly,
   isSpecialEditMode,
+  selectedProjectId,
+  isCloudMode,
   showImageEditTools,
   hasChanges,
   isSaving,
-  handleFlip,
   handleSave,
   effectiveImageUrl,
+  handleEnterMagicEditMode,
 }) => {
-  if (isVideo || readOnly || isSpecialEditMode || !showImageEditTools) {
+  // Show Edit button when: not video, not readOnly, not in special edit mode, has project, is cloud mode
+  const showEditButton = !isVideo && !readOnly && !isSpecialEditMode && selectedProjectId && isCloudMode && handleEnterMagicEditMode;
+  
+  // Show Save button when: not video, not readOnly, not in special edit mode, has changes, showImageEditTools
+  const showSaveButton = !isVideo && !readOnly && !isSpecialEditMode && showImageEditTools && hasChanges;
+  
+  if (!showEditButton && !showSaveButton) {
     return null;
   }
 
   return (
     <div className="absolute top-4 left-4 flex items-center space-x-2 z-10">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleFlip}
-            className="bg-black/50 hover:bg-black/70 text-white"
-          >
-            <FlipHorizontal className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
-      </Tooltip>
+      {/* Edit Button - moved from bottom-left */}
+      {showEditButton && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleEnterMagicEditMode}
+              className="bg-black/50 hover:bg-black/70 text-white"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="z-[100001]">Edit image</TooltipContent>
+        </Tooltip>
+      )}
 
-      {hasChanges && (
+      {/* Save Button - only shown when there are changes */}
+      {showSaveButton && (
         <Button
           variant="secondary"
           size="sm"
@@ -167,11 +179,11 @@ export const TopRightControls: React.FC<TopRightControlsProps> = ({
 };
 
 // ============================================================================
-// BOTTOM LEFT CONTROLS - Edit & Upscale
+// BOTTOM LEFT CONTROLS - Upscale Only (Edit moved to top-left)
 // ============================================================================
 
 interface BottomLeftControlsProps extends BaseButtonGroupProps {
-  handleEnterMagicEditMode: () => void;
+  handleEnterMagicEditMode: () => void; // Kept for backwards compatibility, but not used here
   isUpscaling: boolean;
   isPendingUpscale: boolean;
   hasUpscaledVersion: boolean;
@@ -186,7 +198,6 @@ export const BottomLeftControls: React.FC<BottomLeftControlsProps> = ({
   isSpecialEditMode,
   selectedProjectId,
   isCloudMode,
-  handleEnterMagicEditMode,
   isUpscaling,
   isPendingUpscale,
   hasUpscaledVersion,
@@ -198,57 +209,43 @@ export const BottomLeftControls: React.FC<BottomLeftControlsProps> = ({
     return null;
   }
 
+  // Only show if upscale button should be visible
+  if (readOnly || isVideo || !selectedProjectId || !isCloudMode) {
+    return null;
+  }
+
   return (
     <div className="absolute bottom-4 left-4 flex items-center space-x-2 z-10">
-      {/* Unified Edit Button */}
-      {!isVideo && !readOnly && selectedProjectId && isCloudMode && (
-        <Tooltip>
-          <TooltipTrigger asChild>
+      {/* Upscale Button */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
             <Button
               variant="secondary"
               size="sm"
-              onClick={handleEnterMagicEditMode}
-              className="bg-black/50 hover:bg-black/70 text-white"
+              onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
+              disabled={isUpscaling || isPendingUpscale}
+              className={cn(
+                "transition-colors text-white",
+                isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
+              )}
             >
-              <Pencil className="h-4 w-4" />
+              {isUpscaling ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isPendingUpscale ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : hasUpscaledVersion ? (
+                showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
+              ) : (
+                <ArrowUpCircle className="h-4 w-4" />
+              )}
             </Button>
-          </TooltipTrigger>
-          <TooltipContent className="z-[100001]">Edit image</TooltipContent>
-        </Tooltip>
-      )}
-
-      {/* Upscale Button */}
-      {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                disabled={isUpscaling || isPendingUpscale}
-                className={cn(
-                  "transition-colors text-white",
-                  isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
-                )}
-              >
-                {isUpscaling ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : isPendingUpscale ? (
-                  <CheckCircle className="h-4 w-4" />
-                ) : hasUpscaledVersion ? (
-                  showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
-                ) : (
-                  <ArrowUpCircle className="h-4 w-4" />
-                )}
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent className="z-[100001]">
-            {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
-          </TooltipContent>
-        </Tooltip>
-      )}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="z-[100001]">
+          {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 };
