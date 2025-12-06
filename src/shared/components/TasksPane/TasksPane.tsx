@@ -10,7 +10,7 @@ import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useCancelAllPendingTasks, useTaskStatusCounts, usePaginatedTasks, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
+import { useCancelAllPendingTasks, useTaskStatusCounts, usePaginatedTasks, useAllTaskTypes, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
@@ -280,20 +280,28 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Get status counts for indicators
   const { data: statusCounts, isLoading: isStatusCountsLoading, error: statusCountsError } = useTaskStatusCounts(shouldLoadTasks ? selectedProjectId : null);
   
-  // Derive task type options from the currently displayed tasks (after visibility filtering)
+  // Fetch all unique task types for this project (across ALL statuses, ALL pages)
+  // This ensures the filter shows all available task types, not just current page
+  const { data: allTaskTypes } = useAllTaskTypes(shouldLoadTasks ? selectedProjectId : null);
+  
+  // Convert to dropdown options format
   const taskTypeOptions = React.useMemo(() => {
-    const tasks = (paginatedData as any)?.tasks || [];
-    // Filter to visible tasks first, then extract unique task types
-    const visibleTasks = filterVisibleTasks(tasks);
-    const uniqueTaskTypes = [...new Set(visibleTasks.map((t: any) => t.taskType))];
+    console.log('[TaskTypeFilterDebug] Building dropdown options:', {
+      allTaskTypes,
+      hasAllTaskTypes: !!allTaskTypes,
+      length: allTaskTypes?.length || 0,
+    });
+    if (!allTaskTypes || allTaskTypes.length === 0) return [];
     
-    return uniqueTaskTypes
+    const options = allTaskTypes
       .map(taskType => ({
         value: taskType,
         label: getTaskDisplayName(taskType),
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [paginatedData]);
+    console.log('[TaskTypeFilterDebug] Final options:', options);
+    return options;
+  }, [allTaskTypes]);
   
   // Store previous status counts to avoid flickering during loading
   const [displayStatusCounts, setDisplayStatusCounts] = useState<typeof statusCounts>(statusCounts);
@@ -341,6 +349,11 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   
   // Handle task type filter change
   const handleTaskTypeChange = (taskType: string | null) => {
+    console.log('[TaskTypeFilterDebug] Filter changed:', {
+      from: selectedTaskType,
+      to: taskType,
+      projectId: selectedProjectId?.substring(0, 8),
+    });
     setSelectedTaskType(taskType);
     setCurrentPage(1);
     setMobileActiveTaskId(null);

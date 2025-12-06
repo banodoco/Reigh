@@ -269,9 +269,12 @@ export default function EditVideoPage() {
               <div 
                 className="relative flex items-center justify-center bg-black w-full h-[30%] md:w-[60%] md:h-full md:flex-1"
               >
-               <div className="bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 p-6 md:p-8 flex flex-col items-center justify-center space-y-4 md:space-y-6 max-w-md mx-4">
+                 <div className="bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 p-6 md:p-8 flex flex-col items-center justify-center space-y-4 md:space-y-6 max-w-md mx-4">
                   <div className="text-center space-y-1 md:space-y-2">
-                    <p className="text-muted-foreground text-xs md:text-base hidden md:block">
+                    <p className="text-muted-foreground text-xs md:hidden">
+                      Select or upload a video
+                    </p>
+                    <p className="text-muted-foreground text-base hidden md:block">
                       Select a video from the right or upload a new one to regenerate portions.
                     </p>
                   </div>

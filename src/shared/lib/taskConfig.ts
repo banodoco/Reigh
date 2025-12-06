@@ -48,18 +48,18 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
     description: 'Video stitching task (part of travel workflow)'
   },
 
-  // Image generation tasks
+  // Image generation tasks (hidden - legacy)
   single_image: {
-    isVisible: true,
+    isVisible: false,
     displayName: 'Image Generation',
     canCancel: true,
     category: 'generation',
     description: 'Single image generation task'
   },
 
-  // Edit travel tasks
+  // Edit travel tasks (hidden - legacy)
   edit_travel_kontext: {
-    isVisible: true,
+    isVisible: false,
     displayName: 'Edit Travel (Kontext)',
     canCancel: true,
     category: 'generation',
@@ -67,7 +67,7 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
   },
 
   edit_travel_flux: {
-    isVisible: true,
+    isVisible: false,
     displayName: 'Edit Travel (Flux)',
     canCancel: true,
     category: 'generation',

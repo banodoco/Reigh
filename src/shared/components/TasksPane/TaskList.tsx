@@ -233,6 +233,12 @@ const TaskList: React.FC<TaskListProps> = ({
     if (!tasks) return [] as Task[];
     const visible = filterVisibleTasks(tasks);
     
+    // [TaskTypeFilterDebug] Log what task types are actually being shown in the task list
+    const visibleTaskTypes = [...new Set(visible.map(t => t.taskType))];
+    const allTaskTypes = [...new Set(tasks.map(t => t.taskType))];
+    console.log('[TaskTypeFilterDebug] TaskList - DISPLAYED task types:', visibleTaskTypes);
+    console.log('[TaskTypeFilterDebug] TaskList - ALL task types before filter:', allTaskTypes);
+    
     // [TasksPaneCountMismatch] Log when local filtering hides tasks that might be counted
     try {
       const hidden = tasks.filter(t => !isTaskVisible(t.taskType));

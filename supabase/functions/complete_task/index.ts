@@ -2267,7 +2267,7 @@ async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: st
     } catch (orchQueryError) {
       console.log(`[GenMigration] Could not fetch orchestrator task ${orchestratorTaskId} (may not be a UUID), using segment params as fallback`);
     }
-    
+
     // Check for parent_generation_id in orchestrator params (or orchestrator_details)
     const parentGenId = orchTask?.params?.parent_generation_id || 
                         orchTask?.params?.orchestrator_details?.parent_generation_id ||

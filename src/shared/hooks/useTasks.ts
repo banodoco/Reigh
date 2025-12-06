@@ -4,7 +4,7 @@ import { Task, TaskStatus, TASK_STATUS } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '../contexts/ProjectContext';
-import { filterVisibleTasks, isTaskVisible, getTaskDisplayName, getTaskConfig } from '@/shared/lib/taskConfig';
+import { filterVisibleTasks, isTaskVisible, getTaskDisplayName, getTaskConfig, getVisibleTaskTypes } from '@/shared/lib/taskConfig';
 // Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
 import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
 
@@ -332,6 +332,13 @@ export const useListTasks = (params: ListTasksParams) => {
 export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const { projectId, status, limit = 50, offset = 0, taskType } = params;
   const page = Math.floor(offset / limit) + 1;
+  
+  console.log('[TaskTypeFilterDebug] usePaginatedTasks called:', {
+    projectId: projectId?.substring(0, 8),
+    taskType,
+    page,
+    status,
+  });
   
   // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
   const smartPollingConfig = useSmartPollingConfig([TASKS_QUERY_KEY, 'paginated', projectId]);
@@ -876,5 +883,23 @@ export const useTaskStatusCounts = (projectId: string | null) => {
     // 🎯 SMART POLLING: Intelligent polling based on realtime health
     ...smartPollingConfig,
     refetchIntervalInBackground: true, // Enable background polling like the gallery
+  });
+};
+
+/**
+ * Hook to get all visible task types from the config
+ * Simply returns the allowlist from taskConfig - no database query needed
+ */
+export const useAllTaskTypes = (_projectId: string | null) => {
+  return useQuery({
+    queryKey: ['all-task-types'],
+    queryFn: () => {
+      // Just use the hardcoded allowlist from taskConfig
+      const visibleTypes = getVisibleTaskTypes();
+      console.log('[TaskTypeFilterDebug] Using hardcoded visible task types:', visibleTypes);
+      return visibleTypes;
+    },
+    staleTime: Infinity, // Never stale - it's a static list
+    gcTime: Infinity,
   });
 };
