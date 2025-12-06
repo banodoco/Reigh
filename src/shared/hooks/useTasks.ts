@@ -4,7 +4,7 @@ import { Task, TaskStatus, TASK_STATUS } from '@/types/tasks';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useProject } from '../contexts/ProjectContext';
-import { filterVisibleTasks, isTaskVisible, getTaskDisplayName } from '@/shared/lib/taskConfig';
+import { filterVisibleTasks, isTaskVisible, getTaskDisplayName, getTaskConfig } from '@/shared/lib/taskConfig';
 // Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
 import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
 
@@ -70,9 +70,10 @@ export const useDistinctTaskTypes = (projectId?: string | null) => {
       }
       
       // Fetch ALL task types from the project (no status/pagination filters)
+      // Include status for debugging to verify we're getting all statuses
       const { data, error } = await supabase
         .from('tasks')
-        .select('task_type')
+        .select('task_type, status')
         .eq('project_id', effectiveProjectId);
       
       if (error) {
@@ -80,12 +81,33 @@ export const useDistinctTaskTypes = (projectId?: string | null) => {
         throw error;
       }
       
+      // [TaskFilterDropdownDebug] Log status breakdown to verify we're fetching all statuses
+      const statusBreakdown: Record<string, number> = {};
+      const typesByStatus: Record<string, Set<string>> = {};
+      (data || []).forEach((row: any) => {
+        statusBreakdown[row.status] = (statusBreakdown[row.status] || 0) + 1;
+        if (!typesByStatus[row.status]) typesByStatus[row.status] = new Set();
+        typesByStatus[row.status].add(row.task_type);
+      });
+      console.log('[TaskFilterDropdownDebug] Status breakdown of ALL tasks:', statusBreakdown);
+      console.log('[TaskFilterDropdownDebug] Task types by status:');
+      Object.entries(typesByStatus).forEach(([status, types]) => {
+        console.log('[TaskFilterDropdownDebug]   ' + status + ':', [...types]);
+      });
+      
       // Get unique, visible task types
       const allTaskTypes = [...new Set((data || []).map((row: any) => row.task_type))];
       const visibleTaskTypes = allTaskTypes.filter(taskType => isTaskVisible(taskType));
       
-      console.log('[useDistinctTaskTypes] All types:', allTaskTypes.join(', '));
-      console.log('[useDistinctTaskTypes] Visible types:', visibleTaskTypes.join(', '));
+      // [TaskFilterDropdownDebug] Detailed logging to understand task type filtering
+      console.log('[TaskFilterDropdownDebug] Total rows from DB:', data?.length || 0);
+      console.log('[TaskFilterDropdownDebug] All unique task types from DB:', allTaskTypes);
+      console.log('[TaskFilterDropdownDebug] Visible task types (after isTaskVisible filter):', visibleTaskTypes);
+      const hiddenTypes = allTaskTypes.filter(taskType => !isTaskVisible(taskType));
+      console.log('[TaskFilterDropdownDebug] HIDDEN task types (filtered OUT by isTaskVisible):', hiddenTypes);
+      hiddenTypes.forEach(taskType => {
+        console.log('[TaskFilterDropdownDebug] Why hidden:', taskType, '-> config:', getTaskConfig(taskType));
+      });
       
       return visibleTaskTypes
         .map(taskType => ({

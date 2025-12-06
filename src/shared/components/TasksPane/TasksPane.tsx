@@ -10,12 +10,12 @@ import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useCancelAllPendingTasks, useTaskStatusCounts, usePaginatedTasks, useDistinctTaskTypes, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
+import { useCancelAllPendingTasks, useTaskStatusCounts, usePaginatedTasks, type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
 import { useToast } from '@/shared/hooks/use-toast';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
-import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
+import { filterVisibleTasks, isTaskVisible, getTaskDisplayName } from '@/shared/lib/taskConfig';
 import { useSimpleRealtime } from '@/shared/providers/SimpleRealtimeProvider';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { GenerationRow } from '@/types/shots';
@@ -280,8 +280,20 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Get status counts for indicators
   const { data: statusCounts, isLoading: isStatusCountsLoading, error: statusCountsError } = useTaskStatusCounts(shouldLoadTasks ? selectedProjectId : null);
   
-  // Get distinct task types from a SEPARATE stable query (not affected by pagination/status filters)
-  const { data: taskTypeOptions = [] } = useDistinctTaskTypes(selectedProjectId);
+  // Derive task type options from the currently displayed tasks (after visibility filtering)
+  const taskTypeOptions = React.useMemo(() => {
+    const tasks = (paginatedData as any)?.tasks || [];
+    // Filter to visible tasks first, then extract unique task types
+    const visibleTasks = filterVisibleTasks(tasks);
+    const uniqueTaskTypes = [...new Set(visibleTasks.map((t: any) => t.taskType))];
+    
+    return uniqueTaskTypes
+      .map(taskType => ({
+        value: taskType,
+        label: getTaskDisplayName(taskType),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [paginatedData]);
   
   // Store previous status counts to avoid flickering during loading
   const [displayStatusCounts, setDisplayStatusCounts] = useState<typeof statusCounts>(statusCounts);
