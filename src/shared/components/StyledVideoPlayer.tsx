@@ -104,19 +104,75 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
     };
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
+    
+    // iOS debug logging
+    const handleLoadStart = () => {
+      console.log('[iOSPlaybackDebug] loadstart - video beginning to load:', {
+        src: src?.substring(0, 80),
+        readyState: video.readyState,
+        networkState: video.networkState,
+      });
+    };
+    
+    const handleCanPlay = () => {
+      console.log('[iOSPlaybackDebug] canplay - video can start playing:', {
+        src: src?.substring(0, 80),
+        readyState: video.readyState,
+        duration: video.duration,
+      });
+    };
+    
+    const handleError = (e: Event) => {
+      const mediaError = video.error;
+      console.error('[iOSPlaybackDebug] Video error:', {
+        src: src?.substring(0, 80),
+        errorCode: mediaError?.code,
+        errorMessage: mediaError?.message,
+        readyState: video.readyState,
+        networkState: video.networkState,
+        // NetworkState: 0=EMPTY, 1=IDLE, 2=LOADING, 3=NO_SOURCE
+        networkStateLabel: ['EMPTY', 'IDLE', 'LOADING', 'NO_SOURCE'][video.networkState],
+      });
+    };
+    
+    const handleStalled = () => {
+      console.warn('[iOSPlaybackDebug] Video stalled (download interrupted):', {
+        src: src?.substring(0, 80),
+        readyState: video.readyState,
+        networkState: video.networkState,
+        buffered: video.buffered.length > 0 ? `${video.buffered.start(0)}-${video.buffered.end(0)}` : 'none',
+      });
+    };
+    
+    const handleWaiting = () => {
+      console.log('[iOSPlaybackDebug] waiting - video waiting for more data:', {
+        currentTime: video.currentTime,
+        readyState: video.readyState,
+      });
+    };
 
     video.addEventListener('timeupdate', updateTime);
     video.addEventListener('loadedmetadata', updateDuration);
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
+    video.addEventListener('loadstart', handleLoadStart);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('error', handleError);
+    video.addEventListener('stalled', handleStalled);
+    video.addEventListener('waiting', handleWaiting);
 
     return () => {
       video.removeEventListener('timeupdate', updateTime);
       video.removeEventListener('loadedmetadata', updateDuration);
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
+      video.removeEventListener('loadstart', handleLoadStart);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('error', handleError);
+      video.removeEventListener('stalled', handleStalled);
+      video.removeEventListener('waiting', handleWaiting);
     };
-  }, []);
+  }, [src]);
 
   useEffect(() => {
     let timeout: NodeJS.Timeout;

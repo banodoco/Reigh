@@ -44,6 +44,7 @@ import {
   useLayoutMode,
   useMagicEditMode,
   useEditSettingsPersistence,
+  useRepositionMode,
 } from './hooks';
 
 // Import all extracted components
@@ -429,7 +430,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     selectedProjectId,
     shotId,
     toolTypeOverride,
-      isVideo,
+    isVideo,
     displayCanvasRef,
     maskCanvasRef,
     imageContainerRef,
@@ -438,6 +439,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       // The hook will handle the state reset
     },
     loras: editModeLoRAs,
+    activeVariantId: activeVariant?.id, // Store strokes per-variant, not per-generation
   });
   const {
     isInpaintMode,
@@ -621,6 +623,40 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleUnifiedGenerate,
     isSpecialEditMode
   } = magicEditHook;
+
+  // Reposition mode hook
+  const repositionHook = useRepositionMode({
+    media,
+    selectedProjectId,
+    imageDimensions,
+    imageContainerRef,
+    loras: editModeLoRAs,
+    inpaintPrompt,
+    inpaintNumGenerations,
+    handleExitInpaintMode: handleExitMagicEditMode,
+    toolTypeOverride,
+    shotId,
+    onVariantCreated: setActiveVariantId,
+    refetchVariants,
+  });
+  const {
+    transform: repositionTransform,
+    hasTransformChanges,
+    isGeneratingReposition,
+    repositionGenerateSuccess,
+    isSavingAsVariant,
+    saveAsVariantSuccess,
+    setTranslateX,
+    setTranslateY,
+    setScale,
+    setRotation,
+    toggleFlipH,
+    toggleFlipV,
+    resetTransform,
+    handleGenerateReposition,
+    handleSaveAsVariant,
+    getTransformStyle,
+  } = repositionHook;
 
   // Layout mode hook
   const layoutHook = useLayoutMode({
@@ -1746,6 +1782,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isSaving={isSaving}
                       isInpaintMode={isInpaintMode}
                       editMode={editMode}
+                      repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
                       imageContainerRef={imageContainerRef}
                       canvasRef={canvasRef}
                       displayCanvasRef={displayCanvasRef}
@@ -1837,6 +1874,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         onSetIsEraseMode={setIsEraseMode}
                         annotationMode={annotationMode}
                         onSetAnnotationMode={setAnnotationMode}
+                        repositionTransform={repositionTransform}
+                        onRepositionTranslateXChange={setTranslateX}
+                        onRepositionTranslateYChange={setTranslateY}
+                        onRepositionScaleChange={setScale}
+                        onRepositionRotationChange={setRotation}
+                        onRepositionFlipH={toggleFlipH}
+                        onRepositionFlipV={toggleFlipV}
+                        onRepositionReset={resetTransform}
+                        imageDimensions={imageDimensions}
                         brushStrokes={brushStrokes}
                         onUndo={handleUndo}
                         onClearMask={handleClearMask}
@@ -2027,6 +2073,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handleExitMagicEditMode={handleExitMagicEditMode}
                       handleUnifiedGenerate={handleUnifiedGenerate}
                       handleGenerateAnnotatedEdit={handleGenerateAnnotatedEdit}
+                      handleGenerateReposition={handleGenerateReposition}
+                      isGeneratingReposition={isGeneratingReposition}
+                      repositionGenerateSuccess={repositionGenerateSuccess}
+                      hasTransformChanges={hasTransformChanges}
+                      handleSaveAsVariant={handleSaveAsVariant}
+                      isSavingAsVariant={isSavingAsVariant}
+                      saveAsVariantSuccess={saveAsVariantSuccess}
                       derivedGenerations={derivedGenerations}
                       paginatedDerived={paginatedDerived}
                       derivedPage={derivedPage}
@@ -2253,6 +2306,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isSaving={isSaving}
                       isInpaintMode={isInpaintMode}
                       editMode={editMode}
+                      repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
                       imageContainerRef={imageContainerRef}
                       canvasRef={canvasRef}
                       displayCanvasRef={displayCanvasRef}
@@ -2279,6 +2333,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         onSetIsEraseMode={setIsEraseMode}
                         annotationMode={annotationMode}
                         onSetAnnotationMode={setAnnotationMode}
+                        repositionTransform={repositionTransform}
+                        onRepositionTranslateXChange={setTranslateX}
+                        onRepositionTranslateYChange={setTranslateY}
+                        onRepositionScaleChange={setScale}
+                        onRepositionRotationChange={setRotation}
+                        onRepositionFlipH={toggleFlipH}
+                        onRepositionFlipV={toggleFlipV}
+                        onRepositionReset={resetTransform}
+                        imageDimensions={imageDimensions}
                         brushStrokes={brushStrokes}
                         onUndo={handleUndo}
                         onClearMask={handleClearMask}
@@ -2431,6 +2494,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handleExitMagicEditMode={handleExitMagicEditMode}
                       handleUnifiedGenerate={handleUnifiedGenerate}
                       handleGenerateAnnotatedEdit={handleGenerateAnnotatedEdit}
+                      handleGenerateReposition={handleGenerateReposition}
+                      isGeneratingReposition={isGeneratingReposition}
+                      repositionGenerateSuccess={repositionGenerateSuccess}
+                      hasTransformChanges={hasTransformChanges}
+                      handleSaveAsVariant={handleSaveAsVariant}
+                      isSavingAsVariant={isSavingAsVariant}
+                      saveAsVariantSuccess={saveAsVariantSuccess}
                       derivedGenerations={derivedGenerations}
                       paginatedDerived={paginatedDerived}
                       derivedPage={derivedPage}
@@ -2521,9 +2591,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
                     />
                     
-                    {/* Variants section - below task details */}
+                    {/* Variants section - below task details, constrained height with scroll */}
                     {variants && variants.length >= 1 && (
-                      <div ref={variantsSectionRef} className="px-3 pb-2 -mt-2">
+                      <div ref={variantsSectionRef} className="px-3 pb-2 -mt-2 max-h-[200px] overflow-y-auto">
                         <VariantSelector
                           variants={variants}
                           activeVariantId={activeVariant?.id || null}
@@ -2652,6 +2722,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isSaving={isSaving}
                     isInpaintMode={isInpaintMode}
                     editMode={editMode}
+                    repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
                     imageContainerRef={imageContainerRef}
                     canvasRef={canvasRef}
                     displayCanvasRef={displayCanvasRef}

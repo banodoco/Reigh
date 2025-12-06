@@ -22,22 +22,34 @@ export function formatTime(seconds: number): string {
 function FrameThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
+  const loadedRef = useRef(false);
+  
+  useEffect(() => {
+    // Reset loaded state when videoUrl or time changes
+    setLoaded(false);
+    loadedRef.current = false;
+  }, [videoUrl, time]);
   
   useEffect(() => {
     if (!videoUrl || time < 0) return;
+    // Skip if already loaded
+    if (loadedRef.current) return;
     
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous';
     video.preload = 'metadata';
     video.muted = true;
+    video.playsInline = true; // Important for iOS
     video.src = videoUrl;
     
     const captureFrame = () => {
+      if (loadedRef.current) return; // Prevent double capture
       if (video.readyState >= 2 && canvasRef.current) {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          loadedRef.current = true;
           setLoaded(true);
         }
       }
@@ -45,21 +57,25 @@ function FrameThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) 
     };
     
     video.onseeked = captureFrame;
-    video.currentTime = time;
+    video.onloadeddata = () => {
+      // Seek to time once video data is ready
+      video.currentTime = time;
+    };
     
-    // Fallback timeout
+    // Fallback timeout - increased for mobile
     const timeout = setTimeout(() => {
-      if (!loaded) {
+      if (!loadedRef.current) {
         captureFrame();
       }
-    }, 500);
+    }, 1000);
     
     return () => {
       clearTimeout(timeout);
       video.onseeked = null;
+      video.onloadeddata = null;
       video.remove();
     };
-  }, [videoUrl, time, loaded]);
+  }, [videoUrl, time]);
   
   return (
     <canvas 
@@ -253,7 +269,7 @@ export function MultiPortionTimeline({
   ];
   
   return (
-    <div className="relative pt-14 pb-2">
+    <div className="relative pt-14 pb-2 select-none">
       {/* Tap-to-move hint */}
       {selectedHandle && (
         <div className="absolute top-0 left-0 right-0 text-center text-xs text-primary animate-pulse">
@@ -264,7 +280,7 @@ export function MultiPortionTimeline({
       {/* Track */}
       <div 
         ref={trackRef}
-        className="relative h-8 md:h-6 bg-white/10 rounded cursor-pointer touch-none"
+        className="relative h-8 md:h-6 bg-white/10 rounded cursor-pointer touch-none select-none"
         onClick={handleTrackTap}
         onTouchEnd={handleTrackTap}
       >

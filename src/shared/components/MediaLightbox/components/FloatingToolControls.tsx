@@ -1,19 +1,21 @@
 import React from 'react';
 import { cn } from '@/shared/lib/utils';
 import { BrushStroke } from '../types';
-import { Type, Paintbrush, Pencil } from 'lucide-react';
+import { Type, Paintbrush, Pencil, Move } from 'lucide-react';
 import {
   BrushSizeSlider,
   PaintEraseToggle,
   AnnotationModeToggle,
   UndoClearButtons,
   PositionToggleButton,
+  RepositionControls,
 } from './controls';
+import type { ImageTransform } from '../hooks/useRepositionMode';
 
 export interface FloatingToolControlsProps {
   variant: 'tablet' | 'mobile';
-  editMode: 'text' | 'inpaint' | 'annotate';
-  onSetEditMode: (mode: 'text' | 'inpaint' | 'annotate') => void;
+  editMode: 'text' | 'inpaint' | 'annotate' | 'reposition';
+  onSetEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition') => void;
   
   // Inpaint props
   brushSize: number;
@@ -24,6 +26,17 @@ export interface FloatingToolControlsProps {
   // Annotate props
   annotationMode: 'rectangle' | null;
   onSetAnnotationMode: (mode: 'rectangle' | null) => void;
+  
+  // Reposition props
+  repositionTransform?: ImageTransform;
+  onRepositionTranslateXChange?: (value: number) => void;
+  onRepositionTranslateYChange?: (value: number) => void;
+  onRepositionScaleChange?: (value: number) => void;
+  onRepositionRotationChange?: (value: number) => void;
+  onRepositionFlipH?: () => void;
+  onRepositionFlipV?: () => void;
+  onRepositionReset?: () => void;
+  imageDimensions?: { width: number; height: number } | null;
   
   // Common props
   brushStrokes: BrushStroke[];
@@ -52,6 +65,15 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
   onSetIsEraseMode,
   annotationMode,
   onSetAnnotationMode,
+  repositionTransform,
+  onRepositionTranslateXChange,
+  onRepositionTranslateYChange,
+  onRepositionScaleChange,
+  onRepositionRotationChange,
+  onRepositionFlipH,
+  onRepositionFlipV,
+  onRepositionReset,
+  imageDimensions,
   brushStrokes,
   onUndo,
   onClearMask,
@@ -84,7 +106,7 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
         "bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 border border-border shadow-xl",
         containerWidth
       )}>
-        {/* Mode Toggle - Text | Inpaint | Annotate */}
+        {/* Mode Toggle - Text | Inpaint | Annotate | Reposition */}
         <div className="flex items-center gap-0.5 bg-muted rounded-md p-1">
           <button
             onClick={() => onSetEditMode('text')}
@@ -122,6 +144,18 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
           >
             <Pencil className={iconSize} />
           </button>
+          <button
+            onClick={() => onSetEditMode('reposition')}
+            className={cn(
+              "flex-1 flex items-center justify-center p-2 rounded transition-all",
+              editMode === 'reposition'
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            )}
+            title="Reposition mode - move, scale, rotate to fill edges with AI"
+          >
+            <Move className={iconSize} />
+          </button>
         </div>
         
         {/* Inpaint Mode Controls */}
@@ -149,8 +183,24 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
           />
         )}
         
+        {/* Reposition Mode Controls */}
+        {editMode === 'reposition' && repositionTransform && onRepositionTranslateXChange && onRepositionTranslateYChange && onRepositionScaleChange && onRepositionRotationChange && onRepositionFlipH && onRepositionFlipV && onRepositionReset && (
+          <RepositionControls
+            transform={repositionTransform}
+            onTranslateXChange={onRepositionTranslateXChange}
+            onTranslateYChange={onRepositionTranslateYChange}
+            onScaleChange={onRepositionScaleChange}
+            onRotationChange={onRepositionRotationChange}
+            onFlipH={onRepositionFlipH}
+            onFlipV={onRepositionFlipV}
+            onReset={onRepositionReset}
+            variant={variant}
+            imageDimensions={imageDimensions}
+          />
+        )}
+        
         {/* Common Controls - Undo & Clear (only for inpaint and annotate modes) */}
-        {editMode !== 'text' && (
+        {(editMode === 'inpaint' || editMode === 'annotate') && (
           <UndoClearButtons 
             onUndo={onUndo} 
             onClear={onClearMask} 

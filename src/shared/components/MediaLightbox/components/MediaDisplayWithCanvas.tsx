@@ -11,7 +11,10 @@ interface MediaDisplayWithCanvasProps {
   isFlippedHorizontally: boolean;
   isSaving: boolean;
   isInpaintMode: boolean;
-  editMode?: 'text' | 'inpaint' | 'annotate';
+  editMode?: 'text' | 'inpaint' | 'annotate' | 'reposition';
+  
+  // Reposition mode transform style
+  repositionTransformStyle?: React.CSSProperties;
   
   // Refs
   imageContainerRef: React.RefObject<HTMLDivElement>;
@@ -46,6 +49,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   isSaving,
   isInpaintMode,
   editMode = 'text',
+  repositionTransformStyle,
   imageContainerRef,
   canvasRef,
   displayCanvasRef,
@@ -146,11 +150,28 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
     );
   }
 
+  // Show checkered background pattern for reposition mode to indicate transparent/dead areas
+  const isRepositionMode = editMode === 'reposition' && isInpaintMode;
+  
   return (
     <div 
       ref={imageContainerRef} 
       className={`relative flex items-center justify-center ${containerClassName}`}
-      style={{ touchAction: 'none' }}
+      style={{ 
+        touchAction: 'none',
+        // Checkered pattern background for reposition mode
+        ...(isRepositionMode ? {
+          backgroundImage: `
+            linear-gradient(45deg, #1a1a2e 25%, transparent 25%),
+            linear-gradient(-45deg, #1a1a2e 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #1a1a2e 75%),
+            linear-gradient(-45deg, transparent 75%, #1a1a2e 75%)
+          `,
+          backgroundSize: '20px 20px',
+          backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+          backgroundColor: '#252540',
+        } : {})
+      }}
     >
       {isVideo ? (
         // Video Player
@@ -174,16 +195,21 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
             alt="Media content"
             draggable={false}
             className={`
-              object-contain transition-opacity duration-300 select-none
+              object-contain select-none
               ${variant === 'regular-centered' ? 'max-w-full max-h-full rounded' : ''}
               ${isFlippedHorizontally ? 'scale-x-[-1]' : ''}
               ${isSaving ? 'opacity-30' : 'opacity-100'}
               ${isInpaintMode ? 'pointer-events-none' : ''}
+              ${editMode === 'reposition' ? 'transition-transform duration-75' : 'transition-opacity duration-300'}
               ${className}
             `.trim()}
             style={{ 
               ...mediaStyle,
-              transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none',
+              ...(editMode === 'reposition' && repositionTransformStyle ? repositionTransformStyle : {}),
+              transform: editMode === 'reposition' && repositionTransformStyle?.transform 
+                ? repositionTransformStyle.transform 
+                : (isFlippedHorizontally ? 'scaleX(-1)' : 'none'),
+              transformOrigin: editMode === 'reposition' ? 'center center' : undefined,
               pointerEvents: isInpaintMode ? 'none' : 'auto'
             }}
             onLoad={(e) => {
@@ -206,6 +232,32 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
               setImageLoadError(true);
             }}
           />
+
+          {/* Original Image Bounds Outline - Shows the canvas boundary in reposition mode */}
+          {isRepositionMode && (
+            <div 
+              className="absolute pointer-events-none z-[45]"
+              style={{
+                // This overlay shows the original image boundary
+                inset: 0,
+                border: '2px dashed rgba(59, 130, 246, 0.7)',
+                borderRadius: variant === 'regular-centered' ? '4px' : undefined,
+                boxShadow: 'inset 0 0 0 2px rgba(59, 130, 246, 0.2)',
+              }}
+            >
+              {/* Corner indicators */}
+              <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-blue-500" />
+              <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-blue-500" />
+              <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-blue-500" />
+              <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-blue-500" />
+              
+              {/* Center crosshair */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="w-6 h-0.5 bg-blue-500/50 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                <div className="w-0.5 h-6 bg-blue-500/50 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+          )}
 
           {/* Saving State Overlay */}
           {isSaving && (

@@ -28,6 +28,8 @@ export interface UseInpaintingProps {
   imageContainerRef: React.RefObject<HTMLDivElement>;
   handleExitInpaintMode: () => void;
   loras?: Array<{ url: string; strength: number }>;
+  // Active variant ID - strokes are stored per-variant, not per-generation
+  activeVariantId?: string | null;
 }
 
 export interface UseInpaintingReturn {
@@ -42,7 +44,7 @@ export interface UseInpaintingReturn {
   isDrawing: boolean;
   currentStroke: Array<{ x: number; y: number }>;
   isAnnotateMode: boolean;
-  editMode: 'text' | 'inpaint' | 'annotate';
+  editMode: 'text' | 'inpaint' | 'annotate' | 'reposition';
   annotationMode: 'rectangle' | null;
   selectedShapeId: string | null;
   showTextModeHint: boolean;
@@ -52,7 +54,7 @@ export interface UseInpaintingReturn {
   setBrushSize: (size: number) => void;
   setIsEraseMode: (isErasing: boolean) => void;
   setIsAnnotateMode: (isAnnotate: boolean | ((prev: boolean) => boolean)) => void;
-  setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | ((prev: 'text' | 'inpaint' | 'annotate') => 'text' | 'inpaint' | 'annotate')) => void;
+  setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition' | ((prev: 'text' | 'inpaint' | 'annotate' | 'reposition') => 'text' | 'inpaint' | 'annotate' | 'reposition')) => void;
   setAnnotationMode: (mode: 'rectangle' | null | ((prev: 'rectangle' | null) => 'rectangle' | null)) => void;
   handleEnterInpaintMode: () => void;
   handlePointerDown: (e: React.PointerEvent<HTMLCanvasElement>) => void;
@@ -84,17 +86,28 @@ export const useInpainting = ({
   imageContainerRef,
   handleExitInpaintMode,
   loras,
+  activeVariantId,
 }: UseInpaintingProps): UseInpaintingReturn => {
   console.log('[InpaintDebug] 🎣 useInpainting hook received props:', {
     shotId: shotId?.substring(0, 8),
     toolTypeOverride,
     selectedProjectId: selectedProjectId?.substring(0, 8),
-    mediaId: media.id.substring(0, 8)
+    mediaId: media.id.substring(0, 8),
+    activeVariantId: activeVariantId?.substring(0, 8),
   });
+  
+  // Storage key uses variant ID if available, otherwise falls back to generation ID
+  // This allows different strokes per variant
+  const storageKey = activeVariantId 
+    ? `inpaint-data-${media.id}-variant-${activeVariantId}`
+    : `inpaint-data-${media.id}`;
+  
+  // Track previous storage key to detect variant changes
+  const prevStorageKeyRef = useRef<string>(storageKey);
   
   // Per-media state storage (persists across media switches)
   const mediaStateRef = useRef<Map<string, {
-    editMode: 'text' | 'inpaint' | 'annotate';
+    editMode: 'text' | 'inpaint' | 'annotate' | 'reposition';
     annotationMode: 'rectangle' | null;
   }>>(new Map());
 
@@ -130,10 +143,10 @@ export const useInpainting = ({
   const hintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track last used edit mode globally (for inheritance when visiting new media)
-  const lastUsedEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>('text');
+  const lastUsedEditModeRef = useRef<'text' | 'inpaint' | 'annotate' | 'reposition'>('text');
   
   // Helper: Load edit mode from database
-  const loadEditModeFromDB = useCallback(async (generationId: string): Promise<'text' | 'inpaint' | 'annotate' | null> => {
+  const loadEditModeFromDB = useCallback(async (generationId: string): Promise<'text' | 'inpaint' | 'annotate' | 'reposition' | null> => {
     try {
       const { data, error } = await supabase
         .from('generations')
@@ -147,9 +160,9 @@ export const useInpainting = ({
       }
       
       const savedMode = (data?.params as any)?.ui?.editMode;
-      if (savedMode && ['text', 'inpaint', 'annotate'].includes(savedMode)) {
+      if (savedMode && ['text', 'inpaint', 'annotate', 'reposition'].includes(savedMode)) {
         console.log('[EditMode] ✅ Loaded from DB:', { generationId: generationId.substring(0, 8), mode: savedMode });
-        return savedMode as 'text' | 'inpaint' | 'annotate';
+        return savedMode as 'text' | 'inpaint' | 'annotate' | 'reposition';
       }
       
       return null;
@@ -160,7 +173,7 @@ export const useInpainting = ({
   }, []);
   
   // Helper: Save edit mode to database
-  const saveEditModeToDB = useCallback(async (generationId: string, mode: 'text' | 'inpaint' | 'annotate') => {
+  const saveEditModeToDB = useCallback(async (generationId: string, mode: 'text' | 'inpaint' | 'annotate' | 'reposition') => {
     try {
       // First, fetch current params to merge
       const { data: current, error: fetchError } = await supabase
@@ -210,7 +223,7 @@ export const useInpainting = ({
   const [inpaintGenerateSuccess, setInpaintGenerateSuccess] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<Array<{ x: number; y: number }>>([]);
-  const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate'>('text');
+  const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate' | 'reposition'>('text');
   const [annotationMode, setAnnotationModeInternal] = useState<'rectangle' | null>(null);
   
   // Debug state for production
@@ -243,13 +256,13 @@ export const useInpainting = ({
   const lastClickPositionRef = useRef<{ x: number; y: number } | null>(null); // Default to adjust
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const selectedShapeRef = useRef<BrushStroke | null>(null);
-  const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>('text');
+  const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate' | 'reposition'>('text');
   const prevMediaIdRef = useRef(media.id); // Track media ID changes
-  const prevModeForSelectionRef = useRef<'text' | 'inpaint' | 'annotate'>(editMode); // Track mode changes for selection
+  const prevModeForSelectionRef = useRef<'text' | 'inpaint' | 'annotate' | 'reposition'>(editMode); // Track mode changes for selection
   const prevCanvasSizeRef = useRef<{ width: number; height: number } | null>(null); // Track canvas size for scaling
 
   // Wrapper setters that persist to mediaStateRef and database
-  const setEditMode = useCallback((value: 'text' | 'inpaint' | 'annotate' | ((prev: 'text' | 'inpaint' | 'annotate') => 'text' | 'inpaint' | 'annotate')) => {
+  const setEditMode = useCallback((value: 'text' | 'inpaint' | 'annotate' | 'reposition' | ((prev: 'text' | 'inpaint' | 'annotate' | 'reposition') => 'text' | 'inpaint' | 'annotate' | 'reposition')) => {
     setEditModeInternal(prev => {
       const newValue = typeof value === 'function' ? value(prev) : value;
       const currentState = mediaStateRef.current.get(media.id) || { editMode: 'text', annotationMode: null };
@@ -357,10 +370,10 @@ export const useInpainting = ({
       setInpaintPrompt(cached.prompt);
       setInpaintNumGenerations(cached.numGenerations);
       setBrushSize(cached.brushSize);
-    } else if (isInpaintMode && !hydratedMediaIdsRef.current.has(newMediaId)) {
-      // 4. Load from localStorage if not in cache (only once per media)
+    } else if (isInpaintMode && !hydratedMediaIdsRef.current.has(storageKey)) {
+      // 4. Load from localStorage if not in cache (only once per media/variant combo)
       try {
-        const savedData = localStorage.getItem(`inpaint-data-${newMediaId}`);
+        const savedData = localStorage.getItem(storageKey);
         if (savedData) {
           const parsed = JSON.parse(savedData);
           const loadedInpaintStrokes = parsed.inpaintStrokes || parsed.strokes || [];
@@ -372,15 +385,15 @@ export const useInpainting = ({
           setInpaintNumGenerations(parsed.numGenerations || 4);
           setBrushSize(parsed.brushSize || 20);
           
-          hydratedMediaIdsRef.current.add(newMediaId);
+          hydratedMediaIdsRef.current.add(storageKey);
           
-          console.log('[Media] ✅ Loaded from localStorage', { 
-            mediaId: newMediaId.substring(0, 8),
+          console.log('[Media] ✅ Loaded from localStorage (variant-aware)', { 
+            storageKey: storageKey.substring(0, 30),
             inpaintCount: loadedInpaintStrokes.length,
             annotationCount: loadedAnnotationStrokes.length
           });
         } else {
-          console.log('[Media] ℹ️ No localStorage data for new media', { mediaId: newMediaId.substring(0, 8) });
+          console.log('[Media] ℹ️ No localStorage data for storage key', { storageKey: storageKey.substring(0, 30) });
         }
       } catch (e) {
         console.warn('[Media] ⚠️ Failed to load from localStorage, starting fresh', e);
@@ -480,14 +493,14 @@ export const useInpainting = ({
   useEffect(() => {
     // Only hydrate if:
     // 1. Just entered inpaint mode
-    // 2. Haven't hydrated this media yet
+    // 2. Haven't hydrated this storage key yet
     // 3. Not already in cache
     if (isInpaintMode && 
-        !hydratedMediaIdsRef.current.has(media.id) && 
-        !mediaStrokeCacheRef.current.has(media.id)) {
+        !hydratedMediaIdsRef.current.has(storageKey) && 
+        !mediaStrokeCacheRef.current.has(storageKey)) {
       
       try {
-        const savedData = localStorage.getItem(`inpaint-data-${media.id}`);
+        const savedData = localStorage.getItem(storageKey);
         if (savedData) {
           const parsed = JSON.parse(savedData);
           const loadedInpaintStrokes = parsed.inpaintStrokes || parsed.strokes || [];
@@ -499,10 +512,10 @@ export const useInpainting = ({
           setInpaintNumGenerations(parsed.numGenerations || 4);
           setBrushSize(parsed.brushSize || 20);
           
-          hydratedMediaIdsRef.current.add(media.id);
+          hydratedMediaIdsRef.current.add(storageKey);
           
-          console.log('[Inpaint] ✅ Hydrated on mode enter', { 
-            mediaId: media.id.substring(0, 8),
+          console.log('[Inpaint] ✅ Hydrated on mode enter (variant-aware)', { 
+            storageKey: storageKey.substring(0, 30),
             inpaintCount: loadedInpaintStrokes.length,
             annotationCount: loadedAnnotationStrokes.length
           });
@@ -515,14 +528,14 @@ export const useInpainting = ({
             }
           }, 50);
         } else {
-          console.log('[Inpaint] ℹ️ No localStorage data on mode enter', { mediaId: media.id.substring(0, 8) });
+          console.log('[Inpaint] ℹ️ No localStorage data on mode enter', { storageKey: storageKey.substring(0, 30) });
         }
       } catch (e) {
         console.warn('[Inpaint] ⚠️ Hydration failed on mode enter, starting fresh', e);
         // Continue with current state (don't crash)
       }
     }
-  }, [isInpaintMode, media.id]); // Only runs when entering inpaint mode or media changes (but gated by refs)
+  }, [isInpaintMode, storageKey]); // Only runs when entering inpaint mode or storage key changes (gated by refs)
 
   // Ref to hold save timeout for debouncing
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -531,8 +544,8 @@ export const useInpainting = ({
   const saveToLocalStorage = useCallback(() => {
     if (!isInpaintMode) return;
     
-    // Capture media ID at the moment of save (prevent race if media changes during timeout)
-    const mediaIdAtSaveTime = media.id;
+    // Capture storage key at the moment of save (prevent race if variant changes during timeout)
+    const storageKeyAtSaveTime = storageKey;
     const inpaintStrokesAtSaveTime = inpaintStrokes;
     const annotationStrokesAtSaveTime = annotationStrokes;
     const promptAtSaveTime = inpaintPrompt;
@@ -546,19 +559,110 @@ export const useInpainting = ({
         prompt: promptAtSaveTime,
         numGenerations: numGenerationsAtSaveTime,
         brushSize: brushSizeAtSaveTime,
-          savedAt: Date.now()
+        savedAt: Date.now()
       };
-      localStorage.setItem(`inpaint-data-${mediaIdAtSaveTime}`, JSON.stringify(data));
-      console.log('[Inpaint] 💾 Saved to localStorage', { 
-        mediaId: mediaIdAtSaveTime.substring(0, 8),
+      localStorage.setItem(storageKeyAtSaveTime, JSON.stringify(data));
+      console.log('[Inpaint] 💾 Saved to localStorage (variant-aware)', { 
+        storageKey: storageKeyAtSaveTime.substring(0, 30),
         inpaintCount: inpaintStrokesAtSaveTime.length,
         annotationCount: annotationStrokesAtSaveTime.length
       });
-      } catch (e) {
+    } catch (e) {
       console.warn('[Inpaint] ⚠️ Save failed (localStorage full or disabled?)', e);
       // Don't crash, just log the error
     }
-  }, [inpaintStrokes, annotationStrokes, inpaintPrompt, inpaintNumGenerations, brushSize, isInpaintMode, media.id]);
+  }, [inpaintStrokes, annotationStrokes, inpaintPrompt, inpaintNumGenerations, brushSize, isInpaintMode, storageKey]);
+
+  // Handle variant switching - reload strokes when variant changes
+  // We use refs to access current values without triggering re-runs
+  const inpaintStrokesRef = useRef(inpaintStrokes);
+  const annotationStrokesRef = useRef(annotationStrokes);
+  const inpaintPromptRef = useRef(inpaintPrompt);
+  const inpaintNumGenerationsRef = useRef(inpaintNumGenerations);
+  const brushSizeRef = useRef(brushSize);
+  const isInpaintModeRef = useRef(isInpaintMode);
+  
+  // Keep refs in sync
+  useEffect(() => {
+    inpaintStrokesRef.current = inpaintStrokes;
+    annotationStrokesRef.current = annotationStrokes;
+    inpaintPromptRef.current = inpaintPrompt;
+    inpaintNumGenerationsRef.current = inpaintNumGenerations;
+    brushSizeRef.current = brushSize;
+    isInpaintModeRef.current = isInpaintMode;
+  }, [inpaintStrokes, annotationStrokes, inpaintPrompt, inpaintNumGenerations, brushSize, isInpaintMode]);
+  
+  useEffect(() => {
+    if (prevStorageKeyRef.current !== storageKey) {
+      console.log('[Inpaint] 🔄 Variant changed, reloading strokes', {
+        oldKey: prevStorageKeyRef.current.substring(0, 30),
+        newKey: storageKey.substring(0, 30)
+      });
+      
+      // Save current strokes to old key before switching (using refs to get current values)
+      if (isInpaintModeRef.current && (inpaintStrokesRef.current.length > 0 || annotationStrokesRef.current.length > 0)) {
+        try {
+          const data = {
+            inpaintStrokes: inpaintStrokesRef.current,
+            annotationStrokes: annotationStrokesRef.current,
+            prompt: inpaintPromptRef.current,
+            numGenerations: inpaintNumGenerationsRef.current,
+            brushSize: brushSizeRef.current,
+            savedAt: Date.now()
+          };
+          localStorage.setItem(prevStorageKeyRef.current, JSON.stringify(data));
+          console.log('[Inpaint] 💾 Saved strokes for previous variant before switching');
+        } catch (e) {
+          console.warn('[Inpaint] ⚠️ Failed to save strokes before variant switch', e);
+        }
+      }
+      
+      // Load strokes from new variant's key
+      try {
+        const savedData = localStorage.getItem(storageKey);
+        if (savedData) {
+          const parsed = JSON.parse(savedData);
+          const loadedInpaintStrokes = parsed.inpaintStrokes || parsed.strokes || [];
+          const loadedAnnotationStrokes = parsed.annotationStrokes || [];
+          
+          setInpaintStrokes(loadedInpaintStrokes);
+          setAnnotationStrokes(loadedAnnotationStrokes);
+          // Keep prompt and settings from current session
+          
+          console.log('[Inpaint] ✅ Loaded strokes for new variant', {
+            storageKey: storageKey.substring(0, 30),
+            inpaintCount: loadedInpaintStrokes.length,
+            annotationCount: loadedAnnotationStrokes.length
+          });
+          
+          // Redraw strokes after variant switch
+          setTimeout(() => {
+            if (redrawStrokesRef.current) {
+              redrawStrokesRef.current(loadedInpaintStrokes);
+            }
+          }, 50);
+        } else {
+          // No saved strokes for this variant - clear canvas
+          setInpaintStrokes([]);
+          setAnnotationStrokes([]);
+          console.log('[Inpaint] ℹ️ No strokes saved for new variant, starting fresh');
+          
+          // Clear the canvas
+          setTimeout(() => {
+            if (redrawStrokesRef.current) {
+              redrawStrokesRef.current([]);
+            }
+          }, 50);
+        }
+      } catch (e) {
+        console.warn('[Inpaint] ⚠️ Failed to load strokes for new variant', e);
+        setInpaintStrokes([]);
+        setAnnotationStrokes([]);
+      }
+      
+      prevStorageKeyRef.current = storageKey;
+    }
+  }, [storageKey]); // Only re-run when storageKey changes
 
   // Debounced auto-save (500ms delay to avoid thrashing)
   useEffect(() => {

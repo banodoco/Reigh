@@ -52,11 +52,13 @@ interface TaskItemProps {
   isActive?: boolean;
   onOpenImageLightbox?: (task: Task, media: GenerationRow) => void;
   onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number) => void;
+  isMobileActive?: boolean; // For mobile two-step tap interaction
+  onMobileActiveChange?: (taskId: string | null) => void;
 }
 
 // Timestamp formatting now handled by useTaskTimestamp hook
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = false, onOpenImageLightbox, onOpenVideoLightbox }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = false, onOpenImageLightbox, onOpenVideoLightbox, isMobileActive = false, onMobileActiveChange }) => {
   const { toast } = useToast();
   
   // Mobile detection hook - declare early for use throughout component
@@ -667,30 +669,60 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     return travelData.videoOutputs || [];
   }, [travelData.videoOutputs]);
 
-  // Handler for mobile tap - open lightbox for completed tasks
+  // Handler for mobile tap - two-step interaction: first tap reveals buttons, second tap uses them
   const handleMobileTap = (e: React.MouseEvent) => {
     if (!isMobile) return; // Only handle on mobile
     
     e.stopPropagation();
     e.preventDefault();
     
-    // For completed video tasks - open video lightbox if video data is available
-    if (taskInfo.isCompletedVideoTask && onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
-      onOpenVideoLightbox(task, travelData.videoOutputs, 0);
-      return;
+    // Check if this task has actionable content (buttons to show)
+    const hasActionableContent = 
+      (taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) ||
+      (taskInfo.isVideoTask && shotId) ||
+      (taskInfo.isImageTask && generationData);
+    
+    // For tasks with actionable content, use two-step flow
+    if (hasActionableContent) {
+      // If this task is already active (buttons revealed), execute the action
+      if (isMobileActive) {
+        // For completed video tasks - open video lightbox if video data is available
+        if (taskInfo.isCompletedVideoTask && onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+          onMobileActiveChange?.(null); // Clear active state
+          onOpenVideoLightbox(task, travelData.videoOutputs, 0);
+          return;
+        }
+        
+        // For video tasks without loaded videos - navigate to shot to see videos
+        if (taskInfo.isVideoTask && shotId) {
+          onMobileActiveChange?.(null); // Clear active state
+          setCurrentShotId(shotId);
+          navigate(`/tools/travel-between-images#${shotId}`, { state: { fromShotClick: true } });
+          return;
+        }
+        
+        // For image generation tasks - open image if available
+        if (taskInfo.isImageTask && generationData && onOpenImageLightbox) {
+          onMobileActiveChange?.(null); // Clear active state
+          onOpenImageLightbox(task, generationData);
+          return;
+        }
+      } else {
+        // First tap: reveal the action buttons by setting this task as active
+        onMobileActiveChange?.(task.id);
+        // Trigger video data fetch for video tasks
+        if (taskInfo.isVideoTask && !shouldFetchVideo) {
+          setShouldFetchVideo(true);
+        }
+        return;
+      }
     }
     
-    // For video tasks without loaded videos - navigate to shot to see videos
-    if (taskInfo.isVideoTask && shotId) {
-      setCurrentShotId(shotId);
-      navigate(`/tools/travel-between-images#${shotId}`, { state: { fromShotClick: true } });
-      return;
-    }
-    
-    // For image generation tasks - open image if available
-    if (taskInfo.isImageTask && generationData && onOpenImageLightbox) {
-      onOpenImageLightbox(task, generationData);
-      return;
+    // For tasks without actionable content (e.g., Queued/In Progress), just toggle active state
+    if (isMobileActive) {
+      onMobileActiveChange?.(null);
+    } else {
+      onMobileActiveChange?.(task.id);
     }
   };
 
@@ -761,9 +793,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
               <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount}</span>
             )}
           </div>
-          {/* Action buttons overlay on hover - desktop only */}
-          {/* Show overlay if: hovering + not mobile + (has shotId OR is completed video task) */}
-          {isHoveringTaskItem && !isMobile && (shotId || taskInfo.isCompletedVideoTask) && (
+          {/* Action buttons overlay on hover (desktop) or when active (mobile) */}
+          {/* Show overlay if: (hovering + not mobile) OR (mobile + active) + (has shotId OR is completed video task) */}
+          {((isHoveringTaskItem && !isMobile) || (isMobile && isMobileActive)) && (shotId || taskInfo.isCompletedVideoTask) && (
             <div 
               className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center gap-2"
               onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
@@ -935,8 +967,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       {/* <pre className="text-xs text-zinc-500 whitespace-pre-wrap break-all">{JSON.stringify(task.params, null, 2)}</pre> */}
       
 
-      {/* Action button overlay for image generation tasks on hover - desktop only */}
-      {isHoveringTaskItem && taskInfo.isImageTask && generationData && !isMobile && (
+      {/* Action button overlay for image generation tasks on hover (desktop) or when active (mobile) */}
+      {((isHoveringTaskItem && !isMobile) || (isMobile && isMobileActive)) && taskInfo.isImageTask && generationData && (
         <div 
           className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
           onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
@@ -952,8 +984,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         </div>
       )}
 
-      {/* Action button overlay for video tasks WITHOUT input images (like Join Clips) on hover - desktop only */}
-      {isHoveringTaskItem && imagesToShow.length === 0 && taskInfo.isCompletedVideoTask && !isMobile && (
+      {/* Action button overlay for video tasks WITHOUT input images (like Join Clips) on hover (desktop) or when active (mobile) */}
+      {((isHoveringTaskItem && !isMobile) || (isMobile && isMobileActive)) && imagesToShow.length === 0 && taskInfo.isCompletedVideoTask && (
         <div 
           className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
           onClick={(e) => e.stopPropagation()}

@@ -87,6 +87,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onCustomHeightChange,
   onGenerateAllSegments,
   availableLoras,
+  selectedLoras: selectedLorasFromProps,
+  onSelectedLorasChange: onSelectedLorasChangeFromProps,
   enhancePrompt,
   onEnhancePromptChange,
   turboMode,
@@ -95,6 +97,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onAmountOfMotionChange,
   motionMode = 'basic',
   onMotionModeChange,
+  generationTypeMode = 'i2v',
+  onGenerationTypeModeChange,
   advancedMode,
   onAdvancedModeChange,
   phaseConfig,
@@ -103,6 +107,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onPhasePresetSelect,
   onPhasePresetRemove,
   onBlurSave,
+  onRestoreDefaults,
   generationMode,
   onGenerationModeChange,
   // selectedMode and onModeChange removed - now hardcoded to use specific model
@@ -251,6 +256,33 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     projectId,
     shotId: selectedShot?.id,
   });
+
+  // Auto-switch generationTypeMode when structure video is added/removed
+  // When structure video is added, switch to VACE; when removed, switch to I2V
+  const prevStructureVideoPath = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    // Skip if handler is not available
+    if (!onGenerationTypeModeChange) return;
+    
+    // Skip on first render (undefined -> initial value)
+    if (prevStructureVideoPath.current === undefined) {
+      prevStructureVideoPath.current = structureVideoPath;
+      return;
+    }
+    
+    const wasAdded = !prevStructureVideoPath.current && structureVideoPath;
+    const wasRemoved = prevStructureVideoPath.current && !structureVideoPath;
+    
+    if (wasAdded && generationTypeMode !== 'vace') {
+      console.log('[GenerationTypeMode] Auto-switching to VACE because structure video was added');
+      onGenerationTypeModeChange('vace');
+    } else if (wasRemoved && generationTypeMode !== 'i2v') {
+      console.log('[GenerationTypeMode] Auto-switching to I2V because structure video was removed');
+      onGenerationTypeModeChange('i2v');
+    }
+    
+    prevStructureVideoPath.current = structureVideoPath;
+  }, [structureVideoPath, generationTypeMode, onGenerationTypeModeChange]);
 
   // PERFORMANCE OPTIMIZATION: Prefetch adjacent shots for faster navigation
   React.useEffect(() => {
@@ -656,12 +688,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // - Element visibility and positioning
   // - Click handlers for floating UI that scroll and trigger actions
 
-  // Use the LoRA sync hook
-  // NOTE: selectedLoras and onSelectedLorasChange should come from props, but if not provided,
-  // use empty defaults to prevent crashes. LoRA state will be local-only in that case.
+  // Use the LoRA sync hook with props from parent
+  // These props connect to VideoTravelSettings for persistence
   const { loraManager } = useLoraSync({
-    selectedLoras: [], // TODO: Add selectedLoras to props if LoRA persistence is needed
-    onSelectedLorasChange: () => {}, // TODO: Add onSelectedLorasChange to props
+    selectedLoras: selectedLorasFromProps || [],
+    onSelectedLorasChange: onSelectedLorasChangeFromProps || (() => {}),
     projectId: selectedProjectId,
     availableLoras,
     batchVideoPrompt,
@@ -1330,6 +1361,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       enhancePrompt,
       amountOfMotion,
       motionMode,
+      generationTypeMode,
       advancedMode,
       phaseConfig,
       selectedPhasePresetId,
@@ -1379,6 +1411,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     enhancePrompt,
     amountOfMotion,
     motionMode,
+    generationTypeMode,
     advancedMode,
     phaseConfig,
     selectedPhasePresetId,
@@ -1791,6 +1824,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         <MotionControl
                             motionMode={motionMode}
                             onMotionModeChange={onMotionModeChange || (() => {})}
+                            generationTypeMode={generationTypeMode}
+                            onGenerationTypeModeChange={onGenerationTypeModeChange}
+                            hasStructureVideo={!!structureVideoPath}
                             amountOfMotion={amountOfMotion || 50}
                             onAmountOfMotionChange={onAmountOfMotionChange || (() => {})}
                             selectedLoras={loraManager.selectedLoras}
@@ -1813,6 +1849,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onRandomSeedChange={handleRandomSeedChange}
                             turboMode={turboMode}
                             settingsLoading={settingsLoading}
+                            onRestoreDefaults={onRestoreDefaults}
                         />
                     </div>
                 </div>

@@ -5,7 +5,7 @@ import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import TaskList from './TaskList';
 import { cn } from '@/shared/lib/utils'; // For conditional classnames
 import { Button } from '@/shared/components/ui/button'; // For the lock button
-import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'; // Example icons
+import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, Loader2, Filter, X } from 'lucide-react'; // Example icons
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
@@ -15,7 +15,7 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { TASK_STATUS, TaskStatus } from '@/types/database';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
-import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
+import { filterVisibleTasks, isTaskVisible, TASK_TYPE_CONFIG, getTaskDisplayName } from '@/shared/lib/taskConfig';
 import { useSimpleRealtime } from '@/shared/providers/SimpleRealtimeProvider';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { GenerationRow } from '@/types/shots';
@@ -25,6 +25,7 @@ import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast as sonnerToast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -36,6 +37,15 @@ const STATUS_GROUPS: Record<FilterGroup, TaskStatus[]> = {
   Succeeded: ['Complete'],
   Failed: ['Failed', 'Cancelled'],
 };
+
+// Get visible task types for the filter dropdown
+const VISIBLE_TASK_TYPES = Object.entries(TASK_TYPE_CONFIG)
+  .filter(([_, config]) => config.isVisible)
+  .map(([taskType, config]) => ({
+    value: taskType,
+    label: config.displayName || taskType,
+  }))
+  .sort((a, b) => a.label.localeCompare(b.label));
 
 // Status indicator component with count and styling
 interface StatusIndicatorProps {
@@ -174,6 +184,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Status filter state - default to Processing
   const [selectedFilter, setSelectedFilter] = useState<FilterGroup>('Processing');
   
+  // Task type filter state - null means "All types"
+  const [selectedTaskType, setSelectedTaskType] = useState<string | null>(null);
+  
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -184,6 +197,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     media: GenerationRow | GenerationRow[];
     videoIndex?: number;
   } | null>(null);
+  
+  // Mobile two-step tap interaction state
+  const [mobileActiveTaskId, setMobileActiveTaskId] = useState<string | null>(null);
   
   // Optimistic updates for "Add to Shot" button states
   const [optimisticPositionedIds, setOptimisticPositionedIds] = useState<Set<string>>(new Set());
@@ -311,11 +327,21 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const handleFilterChange = (filter: FilterGroup) => {
     setSelectedFilter(filter);
     setCurrentPage(1);
+    setMobileActiveTaskId(null); // Clear mobile active state on filter change
+    // Keep the task type filter when switching status filters
+  };
+  
+  // Handle task type filter change
+  const handleTaskTypeChange = (taskType: string | null) => {
+    setSelectedTaskType(taskType);
+    setCurrentPage(1);
+    setMobileActiveTaskId(null);
   };
 
   // Handle page changes
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+    setMobileActiveTaskId(null); // Clear mobile active state on page change
   };
 
   // Lightbox handlers - passed down to TaskItems
@@ -804,6 +830,38 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 })}
               </div>
             </div>
+            
+            {/* Task Type Filter - compact dropdown */}
+            <div className="mt-2 flex items-center gap-2">
+              <Filter className="h-3 w-3 text-zinc-500 flex-shrink-0" />
+              <Select
+                value={selectedTaskType || 'all'}
+                onValueChange={(value) => handleTaskTypeChange(value === 'all' ? null : value)}
+              >
+                <SelectTrigger className="h-7 text-xs bg-zinc-700/50 border-zinc-600 text-zinc-300 flex-1">
+                  <SelectValue placeholder="All task types" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700">
+                  <SelectItem value="all" className="text-xs text-zinc-300">All task types</SelectItem>
+                  {VISIBLE_TASK_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value} className="text-xs text-zinc-300">
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedTaskType && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleTaskTypeChange(null)}
+                  className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-200"
+                  title="Clear filter"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Pagination Controls */}
@@ -833,6 +891,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             activeTaskId={activeTaskId}
             onOpenImageLightbox={handleOpenImageLightbox}
             onOpenVideoLightbox={handleOpenVideoLightbox}
+            mobileActiveTaskId={mobileActiveTaskId}
+            onMobileActiveTaskChange={setMobileActiveTaskId}
+            taskTypeFilter={selectedTaskType}
           />
           </div>
           </div> {/* Close inner wrapper with delayed pointer events */}

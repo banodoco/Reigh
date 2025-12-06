@@ -16,22 +16,34 @@ import { PortionSelection } from '@/shared/components/VideoPortionTimeline';
 function SegmentThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
+  const loadedRef = useRef(false);
+  
+  useEffect(() => {
+    // Reset loaded state when videoUrl or time changes
+    setLoaded(false);
+    loadedRef.current = false;
+  }, [videoUrl, time]);
   
   useEffect(() => {
     if (!videoUrl || time < 0) return;
+    // Skip if already loaded
+    if (loadedRef.current) return;
     
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous';
     video.preload = 'metadata';
     video.muted = true;
+    video.playsInline = true; // Important for iOS
     video.src = videoUrl;
     
     const captureFrame = () => {
+      if (loadedRef.current) return; // Prevent double capture
       if (video.readyState >= 2 && canvasRef.current) {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          loadedRef.current = true;
           setLoaded(true);
         }
       }
@@ -39,18 +51,22 @@ function SegmentThumbnail({ videoUrl, time }: { videoUrl: string; time: number }
     };
     
     video.onseeked = captureFrame;
-    video.currentTime = time;
+    video.onloadeddata = () => {
+      // Seek to time once video data is ready
+      video.currentTime = time;
+    };
     
     const timeout = setTimeout(() => {
-      if (!loaded) captureFrame();
-    }, 500);
+      if (!loadedRef.current) captureFrame();
+    }, 1000); // Increased timeout for slower mobile connections
     
     return () => {
       clearTimeout(timeout);
       video.onseeked = null;
+      video.onloadeddata = null;
       video.remove();
     };
-  }, [videoUrl, time, loaded]);
+  }, [videoUrl, time]);
   
   return (
     <canvas 
@@ -154,10 +170,21 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
         setContextFrames(newContextFrames);
         
         const maxGap = Math.max(1, 81 - (newContextFrames * 2));
+        
+        // Adjust global gap frames if over max
         const quantizedGap = getQuantizedGap(Math.min(gapFrames, maxGap), newContextFrames);
         if (quantizedGap !== gapFrames) {
             setGapFrames(quantizedGap);
         }
+        
+        // Also adjust each selection's gapFrameCount if it exceeds the new max
+        selections.forEach(selection => {
+            const selectionGap = selection.gapFrameCount ?? gapFrames;
+            if (selectionGap > maxGap) {
+                const newQuantizedGap = getQuantizedGap(Math.min(selectionGap, maxGap), newContextFrames);
+                onUpdateSelectionSettings?.(selection.id, { gapFrameCount: newQuantizedGap });
+            }
+        });
     };
 
     return (

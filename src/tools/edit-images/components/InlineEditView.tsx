@@ -13,7 +13,8 @@ import {
   useSourceGeneration,
   useMagicEditMode,
   useGenerationLineage,
-  useStarToggle
+  useStarToggle,
+  useRepositionMode
 } from '@/shared/components/MediaLightbox/hooks';
 
 import {
@@ -30,6 +31,7 @@ import { Square, Trash2, Diamond } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { TooltipProvider } from '@/shared/components/ui/tooltip';
 import { downloadMedia } from '@/shared/components/MediaLightbox/utils';
+import { useVariants } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor';
 
 interface InlineEditViewProps {
   media: GenerationRow;
@@ -84,6 +86,17 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
 
   const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, loraMode, setLoraMode, customLoraUrl, setCustomLoraUrl, editModeLoRAs } = useEditModeLoRAs();
 
+  // Variants hook - moved early so activeVariantId is available for other hooks
+  const actualGenerationId = (media as any).generation_id || media.id;
+  const {
+    activeVariant,
+    setActiveVariantId,
+    refetch: refetchVariants,
+  } = useVariants({
+    generationId: actualGenerationId,
+    enabled: true,
+  });
+
   const inpaintingHook = useInpainting({
     media,
     selectedProjectId,
@@ -95,6 +108,7 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
     handleExitInpaintMode: () => {},
     loras: editModeLoRAs,
     toolTypeOverride: 'edit-images',
+    activeVariantId: activeVariant?.id, // Store strokes per-variant, not per-generation
   });
   const {
     isInpaintMode,
@@ -162,6 +176,38 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
     isSpecialEditMode
   } = magicEditHook;
 
+  const repositionHook = useRepositionMode({
+    media,
+    selectedProjectId,
+    imageDimensions,
+    imageContainerRef,
+    loras: editModeLoRAs,
+    inpaintPrompt,
+    inpaintNumGenerations,
+    handleExitInpaintMode: handleExitMagicEditMode,
+    toolTypeOverride: 'edit-images',
+    onVariantCreated: setActiveVariantId,
+    refetchVariants,
+  });
+  const {
+    transform: repositionTransform,
+    hasTransformChanges,
+    isGeneratingReposition,
+    repositionGenerateSuccess,
+    isSavingAsVariant,
+    saveAsVariantSuccess,
+    setTranslateX,
+    setTranslateY,
+    setScale,
+    setRotation,
+    toggleFlipH,
+    toggleFlipV,
+    resetTransform,
+    handleGenerateReposition,
+    handleSaveAsVariant,
+    getTransformStyle,
+  } = repositionHook;
+
   const { sourceGenerationData } = useSourceGeneration({
     media,
     onOpenExternalGeneration: onNavigateToGeneration ? 
@@ -206,6 +252,7 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
                  isSaving={isSaving}
                  isInpaintMode={isInpaintMode}
                  editMode={editMode}
+                 repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
                  imageContainerRef={imageContainerRef}
                  canvasRef={canvasRef}
                  displayCanvasRef={displayCanvasRef}
@@ -230,6 +277,15 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
                      onSetIsEraseMode={setIsEraseMode}
                      annotationMode={annotationMode}
                      onSetAnnotationMode={setAnnotationMode}
+                     repositionTransform={repositionTransform}
+                     onRepositionTranslateXChange={setTranslateX}
+                     onRepositionTranslateYChange={setTranslateY}
+                     onRepositionScaleChange={setScale}
+                     onRepositionRotationChange={setRotation}
+                     onRepositionFlipH={toggleFlipH}
+                     onRepositionFlipV={toggleFlipV}
+                     onRepositionReset={resetTransform}
+                     imageDimensions={imageDimensions}
                      brushStrokes={brushStrokes}
                      onUndo={handleUndo}
                      onClearMask={handleClearMask}
@@ -327,6 +383,13 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
                    handleExitMagicEditMode={handleExitMagicEditMode}
                    handleUnifiedGenerate={handleUnifiedGenerate}
                    handleGenerateAnnotatedEdit={handleGenerateAnnotatedEdit}
+                   handleGenerateReposition={handleGenerateReposition}
+                   isGeneratingReposition={isGeneratingReposition}
+                   repositionGenerateSuccess={repositionGenerateSuccess}
+                   hasTransformChanges={hasTransformChanges}
+                   handleSaveAsVariant={handleSaveAsVariant}
+                   isSavingAsVariant={isSavingAsVariant}
+                   saveAsVariantSuccess={saveAsVariantSuccess}
                    derivedGenerations={derivedGenerations}
                    paginatedDerived={paginatedDerived}
                    derivedPage={derivedPage}
@@ -376,6 +439,7 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
               isSaving={isSaving}
               isInpaintMode={isInpaintMode}
               editMode={editMode}
+              repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
               imageContainerRef={imageContainerRef}
               canvasRef={canvasRef}
               displayCanvasRef={displayCanvasRef}
@@ -453,6 +517,15 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
                   onSetIsEraseMode={setIsEraseMode}
                   annotationMode={annotationMode}
                   onSetAnnotationMode={setAnnotationMode}
+                  repositionTransform={repositionTransform}
+                  onRepositionTranslateXChange={setTranslateX}
+                  onRepositionTranslateYChange={setTranslateY}
+                  onRepositionScaleChange={setScale}
+                  onRepositionRotationChange={setRotation}
+                  onRepositionFlipH={toggleFlipH}
+                  onRepositionFlipV={toggleFlipV}
+                  onRepositionReset={resetTransform}
+                  imageDimensions={imageDimensions}
                   brushStrokes={brushStrokes}
                   onUndo={handleUndo}
                   onClearMask={handleClearMask}
@@ -536,6 +609,13 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
                   handleExitMagicEditMode={handleExitMagicEditMode}
                   handleUnifiedGenerate={handleUnifiedGenerate}
                   handleGenerateAnnotatedEdit={handleGenerateAnnotatedEdit}
+                  handleGenerateReposition={handleGenerateReposition}
+                  isGeneratingReposition={isGeneratingReposition}
+                  repositionGenerateSuccess={repositionGenerateSuccess}
+                  hasTransformChanges={hasTransformChanges}
+                  handleSaveAsVariant={handleSaveAsVariant}
+                  isSavingAsVariant={isSavingAsVariant}
+                  saveAsVariantSuccess={saveAsVariantSuccess}
                   derivedGenerations={derivedGenerations}
                   paginatedDerived={paginatedDerived}
                   derivedPage={derivedPage}

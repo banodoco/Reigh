@@ -922,15 +922,15 @@ export const useAddImageToShotWithoutPosition = () => {
   });
 };
 
-// Remove image from shot
-// CRITICAL: Now deletes by shot_generations.id (unique entry) instead of generation_id
-// This allows the same generation to appear multiple times on the timeline (duplicates)
+// Remove image from shot's timeline (sets timeline_frame = NULL, keeps image in shot)
+// CRITICAL: This does NOT delete the shot_generations record - it just removes the timeline position
+// The image remains associated with the shot and can be re-added to the timeline later
 export const useRemoveImageFromShot = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ shotId, shotGenerationId, projectId }: { shotId: string; shotGenerationId: string; projectId: string }) => {
-      console.log('[DeleteDebug] 🎯 STEP 4: Mutation function called', {
+      console.log('[DeleteDebug] 🎯 STEP 4: Mutation function called (setting timeline_frame = NULL)', {
         shotId: shotId?.substring(0, 8),
         shotGenerationId: shotGenerationId?.substring(0, 8),
         projectId: projectId?.substring(0, 8),
@@ -948,20 +948,21 @@ export const useRemoveImageFromShot = () => {
         throw new Error(`Missing required parameters: shotId=${shotId}, shotGenerationId=${shotGenerationId}, projectId=${projectId}`);
       }
 
-      console.log('[DeleteDebug] 🗄️ STEP 5: Executing database delete by shot_generations.id', {
+      console.log('[DeleteDebug] 🗄️ STEP 5: Setting timeline_frame = NULL (keeps image in shot)', {
         shotId: shotId.substring(0, 8),
         shotGenerationId: shotGenerationId.substring(0, 8)
       });
 
-      // Delete by the unique shot_generations.id, NOT by generation_id
-      // This ensures only this specific entry is deleted, not all duplicates
+      // Set timeline_frame = NULL instead of deleting
+      // This removes the image from the timeline but keeps it associated with the shot
+      // The image will appear in the "unpositioned" section and can be re-added to timeline
       const { error } = await supabase
         .from('shot_generations')
-        .delete()
+        .update({ timeline_frame: null })
         .eq('id', shotGenerationId);
 
       if (error) {
-        console.error('[DeleteDebug] ❌ Database delete failed', {
+        console.error('[DeleteDebug] ❌ Database update failed', {
           error: error.message,
           errorCode: error.code,
           errorDetails: error.details,
@@ -971,7 +972,7 @@ export const useRemoveImageFromShot = () => {
         throw error;
       }
 
-      console.log('[DeleteDebug] ✅ STEP 6: Database delete successful', {
+      console.log('[DeleteDebug] ✅ STEP 6: Database update successful (timeline_frame = NULL)', {
         shotId: shotId.substring(0, 8),
         shotGenerationId: shotGenerationId.substring(0, 8)
       });
@@ -999,15 +1000,20 @@ export const useRemoveImageFromShot = () => {
         previousFastGensCount: previousFastGens?.length ?? 0
       });
 
-      // Optimistically update fast gens - filter by shot_generations.id (unique entry)
+      // Optimistically update fast gens - set timeline_frame = null instead of removing
+      // This moves the item to "unpositioned" section rather than removing it entirely
       if (previousFastGens) {
         queryClient.setQueryData(
           ['all-shot-generations', shotId],
-          previousFastGens.filter(g => g.id !== shotGenerationId)
+          previousFastGens.map(g => 
+            g.id === shotGenerationId 
+              ? { ...g, timeline_frame: null } 
+              : g
+          )
         );
       }
 
-      // Optimistically update shots list - filter by shot_generations.id
+      // Optimistically update shots list - set timeline_frame = null
       if (previousShots) {
         queryClient.setQueryData(
           ['shots', projectId],
@@ -1015,7 +1021,11 @@ export const useRemoveImageFromShot = () => {
             if (shot.id === shotId) {
               return {
                 ...shot,
-                images: shot.images.filter(img => img.id !== shotGenerationId)
+                images: shot.images.map(img => 
+                  img.id === shotGenerationId 
+                    ? { ...img, timeline_frame: null } 
+                    : img
+                )
               };
             }
             return shot;
@@ -1043,7 +1053,7 @@ export const useRemoveImageFromShot = () => {
       if (context?.previousFastGens) {
         queryClient.setQueryData(['all-shot-generations', context.shotId], context.previousFastGens);
       }
-      toast.error(`Failed to remove image: ${err.message}`);
+      toast.error(`Failed to remove image from timeline: ${err.message}`);
     },
     onSuccess: (data) => {
       console.log('[DeleteDebug] ✅ STEP 7: onSuccess called', {
@@ -1052,9 +1062,10 @@ export const useRemoveImageFromShot = () => {
         projectId: data.projectId?.substring(0, 8)
       });
 
-      // Don't invalidate all-shot-generations - the optimistic update already removed the item
-      // and realtime will confirm. Invalidating here causes flicker.
+      // Invalidate queries to refresh the view
+      // The image is now unpositioned but still in the shot
       queryClient.invalidateQueries({ queryKey: ['shots', data.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });
     },
   });

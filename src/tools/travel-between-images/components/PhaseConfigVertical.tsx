@@ -8,7 +8,8 @@ import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu';
-import { Info, RotateCcw, Trash2, Download, Search, Save, Library, FilePlus } from 'lucide-react';
+import { Info, RotateCcw, Trash2, Download, Search, Save, Library, FilePlus, AlertTriangle } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
@@ -35,6 +36,12 @@ interface PhaseConfigVerticalProps {
     lastGeneratedVideoUrl?: string;
     selectedLoras?: Array<{ id: string; name: string; strength: number }>;
   };
+  // Props for building context-aware defaults (Task 2)
+  generationTypeMode?: 'i2v' | 'vace';
+  onGenerationTypeModeChange?: (mode: 'i2v' | 'vace') => void;
+  hasStructureVideo?: boolean;
+  amountOfMotion?: number;
+  onRestoreDefaults?: () => void; // Custom handler for restoring defaults based on current mode
 }
 
 export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
@@ -47,7 +54,12 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
   selectedPhasePresetId,
   onPhasePresetSelect,
   onPhasePresetRemove,
-  currentSettings
+  currentSettings,
+  generationTypeMode = 'i2v',
+  onGenerationTypeModeChange,
+  hasStructureVideo = false,
+  amountOfMotion = 50,
+  onRestoreDefaults,
 }) => {
   // State for LoRA selector modal for each phase
   const [activePhaseForLoraSelection, setActivePhaseForLoraSelection] = useState<number | null>(null);
@@ -150,7 +162,13 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                 className="w-8 h-8 p-0"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onPhaseConfigChange(DEFAULT_PHASE_CONFIG);
+                  if (onRestoreDefaults) {
+                    // Use custom handler that respects current I2V/VACE mode
+                    onRestoreDefaults();
+                  } else {
+                    // Fallback to static default
+                    onPhaseConfigChange(DEFAULT_PHASE_CONFIG);
+                  }
                 }}
                 type="button"
               >
@@ -163,6 +181,57 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
           </Tooltip>
         </div>
       </div>
+
+      {/* Model Type Toggle (I2V vs VACE) - Also shown in Advanced mode */}
+      {onGenerationTypeModeChange && (
+        <div className="space-y-2 p-3 bg-muted/30 rounded-lg border">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-light">Model Type</Label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                  <Info className="h-4 w-4" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p><strong>I2V (Image-to-Video):</strong> Generate video from images only.<br />
+                <strong>VACE:</strong> Use a structure/guidance video for motion control.</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <ToggleGroup
+            type="single"
+            value={generationTypeMode}
+            onValueChange={(value) => {
+              if (value) {
+                onGenerationTypeModeChange(value as 'i2v' | 'vace');
+              }
+            }}
+            className="h-9 border rounded-md bg-muted/50 w-fit"
+          >
+            <ToggleGroupItem 
+              value="i2v" 
+              className="text-sm px-4 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
+            >
+              I2V
+            </ToggleGroupItem>
+            <ToggleGroupItem 
+              value="vace" 
+              className="text-sm px-4 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
+            >
+              VACE
+            </ToggleGroupItem>
+          </ToggleGroup>
+          
+          {/* Warning when I2V mode is selected but structure video exists */}
+          {generationTypeMode === 'i2v' && hasStructureVideo && (
+            <div className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>Structure video is set but won't be used in I2V mode. Switch to VACE to use it.</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Global Settings Card */}
       <Card className="bg-muted/20 relative">
@@ -593,6 +662,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
         currentSettings={currentSettings}
         intent={modalIntent}
         availableLoras={availableLoras}
+        generationTypeMode={generationTypeMode}
       />
     </div>
   );

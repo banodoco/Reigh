@@ -45,6 +45,8 @@ interface PhaseConfigSelectorModalProps {
   initialTab?: 'browse' | 'add-new'; // Which tab to open with
   intent?: 'load' | 'overwrite'; // Mode of operation
   availableLoras?: LoraModel[]; // Available LoRAs for selection
+  // Current generation type mode (I2V vs VACE)
+  generationTypeMode?: 'i2v' | 'vace';
   // Current settings to pre-populate the form
   currentSettings?: {
     textBeforePrompts?: string;
@@ -595,7 +597,15 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
                     )}
                     
                     {/* Config Preview */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t">
+                      {/* Model Type */}
+                      <div className="flex items-center gap-1.5">
+                        <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Model</p>
+                          <p className="text-sm font-medium uppercase">{metadata.generationTypeMode || 'i2v'}</p>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <Layers className="h-3.5 w-3.5 text-muted-foreground" />
                         <div>
@@ -699,6 +709,7 @@ interface AddNewTabProps {
   onClearEdit: () => void;
   isOverwriting?: boolean;
   availableLoras?: LoraModel[];
+  generationTypeMode?: 'i2v' | 'vace';
   currentSettings?: {
     textBeforePrompts?: string;
     textAfterPrompts?: string;
@@ -762,8 +773,16 @@ const generatePresetName = (
   return parts.join(' - ');
 };
 
-const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings, isOverwriting = false, availableLoras = [] }) => {
+const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings, isOverwriting = false, availableLoras = [], generationTypeMode: initialGenerationTypeMode = 'i2v' }) => {
   const isEditMode = !!editingPreset;
+  
+  // Generation type mode state (I2V vs VACE)
+  const [generationTypeMode, setGenerationTypeMode] = useState<'i2v' | 'vace'>(() => {
+    if (editingPreset?.metadata?.generationTypeMode && !isOverwriting) {
+      return editingPreset.metadata.generationTypeMode;
+    }
+    return initialGenerationTypeMode;
+  });
   
   console.log('[PresetAutoPopulate] AddNewTab received currentSettings:', currentSettings);
   
@@ -824,15 +843,20 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
     if (editingPreset?.metadata?.phaseConfig) {
       if (!isOverwriting) {
         setEditablePhaseConfig(editingPreset.metadata.phaseConfig);
+        // Also restore the generation type mode
+        if (editingPreset.metadata.generationTypeMode) {
+          setGenerationTypeMode(editingPreset.metadata.generationTypeMode);
+        }
       } else {
         setEditablePhaseConfig(currentPhaseConfig || DEFAULT_PHASE_CONFIG);
+        setGenerationTypeMode(initialGenerationTypeMode);
       }
     } else if (currentPhaseConfig) {
       setEditablePhaseConfig(currentPhaseConfig);
     } else {
       setEditablePhaseConfig(DEFAULT_PHASE_CONFIG);
     }
-  }, [editingPreset, isOverwriting, currentPhaseConfig]);
+  }, [editingPreset, isOverwriting, currentPhaseConfig, initialGenerationTypeMode]);
   
   // Update form from current settings when they change (and not editing)
   useEffect(() => {
@@ -938,6 +962,13 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       if (isOverwriting && currentSettings?.lastGeneratedVideoUrl) {
         setInitialVideoSample(currentSettings.lastGeneratedVideoUrl);
         setInitialVideoDeleted(false);
+      } else if (!isOverwriting) {
+        // CRITICAL: When editing normally (not overwriting), clear the initial video sample
+        // to ensure we show the preset's saved samples, NOT the last generated video
+        // This fixes Task 25: Phase Config Editor Pre-Populates Last Generated Video Incorrectly
+        setInitialVideoSample(null);
+        setInitialVideoDeleted(false);
+        console.log('[PhaseConfigPrePopulate] Cleared initialVideoSample for normal edit mode');
       }
     }
   }, [editingPreset, isOverwriting, currentSettings]);
@@ -1071,6 +1102,8 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         enhancePrompt: addForm.enhancePrompt,
         durationFrames: addForm.durationFrames,
         selectedLoras: currentSettings?.selectedLoras,
+        // Generation type mode
+        generationTypeMode: generationTypeMode,
       };
 
       if (isEditMode && editingPreset) {
@@ -1313,6 +1346,40 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                 <RotateCcw className="h-3 w-3 mr-1" />
                 Reset to Default
               </Button>
+            </div>
+            
+            {/* Model Type Toggle (I2V vs VACE) */}
+            <div className="space-y-2 p-3 bg-muted/30 rounded-lg border">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-light">Model Type</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                        <Info className="h-4 w-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p><strong>I2V (Image-to-Video):</strong> Generate video from images only.<br />
+                      <strong>VACE:</strong> Use a structure/guidance video for motion control.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <RadioGroup
+                value={generationTypeMode}
+                onValueChange={(value) => setGenerationTypeMode(value as 'i2v' | 'vace')}
+                className="flex flex-row gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="i2v" id="preset-gen-type-i2v" />
+                  <Label htmlFor="preset-gen-type-i2v" className="text-sm">I2V (Image-to-Video)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="vace" id="preset-gen-type-vace" />
+                  <Label htmlFor="preset-gen-type-vace" className="text-sm">VACE (Structure Video)</Label>
+                </div>
+              </RadioGroup>
             </div>
             
             {/* Global Settings */}
@@ -1920,7 +1987,8 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   initialTab = 'browse',
   currentSettings,
   intent = 'load',
-  availableLoras = []
+  availableLoras = [],
+  generationTypeMode = 'i2v'
 }) => {
   console.log('[PresetAutoPopulate] PhaseConfigSelectorModal rendered:', { isOpen, currentSettings });
   
@@ -2070,6 +2138,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                   currentSettings={currentSettings}
                   isOverwriting={isOverwriting}
                   availableLoras={availableLoras}
+                  generationTypeMode={generationTypeMode}
                 />
               </TabsContent>
             </Tabs>

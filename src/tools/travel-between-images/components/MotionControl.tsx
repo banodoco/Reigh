@@ -4,7 +4,8 @@ import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Info } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
+import { Info, AlertTriangle } from 'lucide-react';
 import { PhaseConfig } from '../settings';
 import { LoraModel, ActiveLora } from '@/shared/components/LoraSelectorModal';
 import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
@@ -15,6 +16,11 @@ export interface MotionControlProps {
   // Motion mode selection
   motionMode: 'basic' | 'presets' | 'advanced';
   onMotionModeChange: (mode: 'basic' | 'presets' | 'advanced') => void;
+  
+  // Generation type mode (I2V vs VACE)
+  generationTypeMode?: 'i2v' | 'vace';
+  onGenerationTypeModeChange?: (mode: 'i2v' | 'vace') => void;
+  hasStructureVideo?: boolean; // Whether a structure video is currently set
   
   // Amount of Motion (for Basic mode)
   amountOfMotion: number;
@@ -58,11 +64,17 @@ export interface MotionControlProps {
   
   // Loading state - prevents sync effects from running during initial load
   settingsLoading?: boolean;
+  
+  // Restore defaults handler (for Advanced mode - respects I2V/VACE mode)
+  onRestoreDefaults?: () => void;
 }
 
 export const MotionControl: React.FC<MotionControlProps> = ({
   motionMode,
   onMotionModeChange,
+  generationTypeMode = 'i2v',
+  onGenerationTypeModeChange,
+  hasStructureVideo = false,
   amountOfMotion,
   onAmountOfMotionChange,
   selectedLoras,
@@ -84,7 +96,8 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   randomSeed,
   onRandomSeedChange,
   turboMode,
-  settingsLoading
+  settingsLoading,
+  onRestoreDefaults,
 }) => {
   // Sync motionMode with advancedMode state
   // When switching to advanced, enable advancedMode; when leaving, disable it
@@ -139,6 +152,55 @@ export const MotionControl: React.FC<MotionControlProps> = ({
 
         {/* Basic Mode: Amount of Motion + LoRAs */}
         <TabsContent value="basic" className="space-y-4 mt-4">
+          {/* Model Type Toggle (I2V vs VACE) */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-light">Model Type</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                    <Info className="h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p><strong>I2V (Image-to-Video):</strong> Generate video from images only.<br />
+                  <strong>VACE:</strong> Use a structure/guidance video for motion control.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <ToggleGroup
+              type="single"
+              value={generationTypeMode}
+              onValueChange={(value) => {
+                if (value && onGenerationTypeModeChange) {
+                  onGenerationTypeModeChange(value as 'i2v' | 'vace');
+                }
+              }}
+              className="h-9 border rounded-md bg-muted/50 w-fit"
+            >
+              <ToggleGroupItem 
+                value="i2v" 
+                className="text-sm px-4 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
+              >
+                I2V
+              </ToggleGroupItem>
+              <ToggleGroupItem 
+                value="vace" 
+                className="text-sm px-4 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
+              >
+                VACE
+              </ToggleGroupItem>
+            </ToggleGroup>
+            
+            {/* Warning when I2V mode is selected but structure video exists */}
+            {generationTypeMode === 'i2v' && hasStructureVideo && (
+              <div className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>Structure video is set but won't be used in I2V mode. Switch to VACE to use it.</span>
+              </div>
+            )}
+          </div>
+
           {/* Amount of Motion Slider */}
           <div className="relative">
             <Label htmlFor="amountOfMotion" className="text-sm font-light block mb-1">
@@ -215,6 +277,11 @@ export const MotionControl: React.FC<MotionControlProps> = ({
               onPhasePresetSelect={onPhasePresetSelect}
               onPhasePresetRemove={onPhasePresetRemove}
               currentSettings={currentSettings}
+              generationTypeMode={generationTypeMode}
+              onGenerationTypeModeChange={onGenerationTypeModeChange}
+              hasStructureVideo={hasStructureVideo}
+              amountOfMotion={amountOfMotion}
+              onRestoreDefaults={onRestoreDefaults}
             />
           ) : (
             <div className="text-sm text-muted-foreground p-4">

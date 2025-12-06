@@ -520,8 +520,9 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     );
   }
 
-  // Determine if dragging should be disabled (when not in 'ordered' mode or during mutation)
-  const isDragDisabled = sortMode !== 'ordered' || reorderShotsMutation.isPending;
+  // TEMPORARILY DISABLED: Dragging is always disabled (Task 20)
+  // To restore: const isDragDisabled = sortMode !== 'ordered' || reorderShotsMutation.isPending;
+  const isDragDisabled = true; // Ordered mode & reordering temporarily disabled
 
   return (
     <DndContext

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -18,9 +18,15 @@ import { generateClientThumbnail, uploadImageWithThumbnail } from '@/shared/lib/
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { deriveInputImages } from '@/shared/components/ImageGallery/utils';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
 
 const TOOL_TYPE = 'edit-images';
 const TOOL_TYPE_NAME = 'Edit Images';
+
+// Settings interface for last edited media persistence
+interface EditImagesUISettings {
+  lastEditedMediaId?: string;
+}
 
 export default function EditImagesPage() {
   const { selectedProjectId } = useProject();
@@ -31,6 +37,52 @@ export default function EditImagesPage() {
   const [showResults, setShowResults] = useState(true);
   const isMobile = useIsMobile();
   const { data: shots } = useListShots(selectedProjectId);
+  
+  // Track if we've already loaded from settings to prevent re-loading
+  const hasLoadedFromSettings = useRef(false);
+  
+  // Project-level UI settings for persisting last edited media (syncs across devices)
+  const { 
+    settings: uiSettings, 
+    update: updateUISettings,
+    isLoading: isUISettingsLoading 
+  } = useToolSettings<EditImagesUISettings>('edit-images-ui', { 
+    projectId: selectedProjectId,
+    enabled: !!selectedProjectId 
+  });
+  
+  // Load last edited image from database settings on mount
+  useEffect(() => {
+    if (!selectedProjectId || isUISettingsLoading || hasLoadedFromSettings.current) return;
+    
+    const storedId = uiSettings?.lastEditedMediaId;
+    if (storedId && !selectedMedia) {
+      hasLoadedFromSettings.current = true;
+      // Fetch the generation from the database
+      supabase
+        .from('generations')
+        .select('*')
+        .eq('id', storedId)
+        .single()
+        .then(({ data, error }) => {
+          if (data && !error) {
+            setSelectedMedia(data as any);
+          } else {
+            // Clear invalid stored ID
+            updateUISettings('project', { lastEditedMediaId: undefined });
+          }
+        });
+    }
+  }, [selectedProjectId, uiSettings?.lastEditedMediaId, isUISettingsLoading, selectedMedia, updateUISettings]);
+  
+  // Persist selected media ID to database settings
+  useEffect(() => {
+    if (!selectedProjectId || isUISettingsLoading) return;
+    
+    if (selectedMedia && selectedMedia.id !== uiSettings?.lastEditedMediaId) {
+      updateUISettings('project', { lastEditedMediaId: selectedMedia.id });
+    }
+  }, [selectedMedia?.id, selectedProjectId, isUISettingsLoading, uiSettings?.lastEditedMediaId, updateUISettings]);
   
   // Fetch edit variants created by this tool
   const {

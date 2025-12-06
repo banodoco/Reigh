@@ -13,6 +13,7 @@ import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import type { VariantSelectorProps, GenerationVariant } from '../types';
 
 const ITEMS_PER_PAGE = 20;
@@ -91,6 +92,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const [isMakingPrimary, setIsMakingPrimary] = useState(false);
   const [relationshipFilter, setRelationshipFilter] = useState<RelationshipFilter>('all');
   const [currentPage, setCurrentPage] = useState(0);
+  const isMobile = useIsMobile();
 
   // Calculate variant relationships based on source_variant_id in params
   const { parentVariants, childVariants, relationshipMap } = useMemo(() => {
@@ -355,69 +357,97 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
             const sourceVariantId = (variant.params as any)?.source_variant_id;
             const parentVariant = sourceVariantId ? variants.find(v => v.id === sourceVariantId) : null;
 
+            // Create the button content separately to avoid duplication
+            const buttonContent = (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log('[VariantTapDebug] Variant button clicked:', {
+                    variantId: variant.id.substring(0, 8),
+                    isMobile,
+                  });
+                  onVariantSelect(variant.id);
+                }}
+                onTouchEnd={(e) => {
+                  // On mobile, handle touch end to ensure tap works
+                  if (isMobile) {
+                    e.stopPropagation();
+                    console.log('[VariantTapDebug] Variant button touchEnd:', {
+                      variantId: variant.id.substring(0, 8),
+                    });
+                    onVariantSelect(variant.id);
+                  }
+                }}
+                className={cn(
+                  'relative flex flex-col items-center p-0.5 rounded transition-all w-full touch-manipulation',
+                  'hover:bg-muted/80',
+                  isActive 
+                    ? 'ring-2 ring-primary bg-primary/10' 
+                    : 'opacity-70 hover:opacity-100',
+                  // Add relationship highlighting
+                  isParent && !isActive && 'ring-1 ring-blue-500/50',
+                  isChild && !isActive && 'ring-1 ring-purple-500/50'
+                )}
+              >
+                {/* Thumbnail */}
+                <div className="relative w-full aspect-video rounded overflow-hidden bg-muted">
+                  {variant.thumbnail_url ? (
+                    <img
+                      src={variant.thumbnail_url}
+                      alt={label}
+                      className="w-full h-full object-cover pointer-events-none"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Icon className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {/* Primary badge */}
+                  {isPrimary && (
+                    <div className="absolute top-0.5 right-0.5 bg-green-500 rounded-full p-0.5 pointer-events-none">
+                      <Check className="w-2 h-2 text-white" />
+                    </div>
+                  )}
+
+                  {/* Relationship badge - parent (this is what current is based on) */}
+                  {isParent && !isActive && (
+                    <div className="absolute top-0.5 left-0.5 bg-blue-500 rounded-full p-0.5 pointer-events-none" title="Current is based on this">
+                      <ArrowUp className="w-2 h-2 text-white" />
+                    </div>
+                  )}
+
+                  {/* Relationship badge - child (based on current) */}
+                  {isChild && !isActive && (
+                    <div className="absolute top-0.5 left-0.5 bg-purple-500 rounded-full p-0.5 pointer-events-none" title="Based on current">
+                      <ArrowDown className="w-2 h-2 text-white" />
+                    </div>
+                  )}
+
+                  {/* NEW badge or time ago for variants */}
+                  {isNewVariant(variant.created_at) ? (
+                    <div className="absolute bottom-0.5 left-0.5 bg-yellow-500 text-black text-[8px] font-bold px-1 rounded pointer-events-none">
+                      NEW
+                    </div>
+                  ) : (
+                    <div className="absolute bottom-0.5 left-0.5 bg-black/70 text-white text-[8px] px-1 rounded pointer-events-none">
+                      {getTimeAgo(variant.created_at)}
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+
+            // On mobile, render without Tooltip wrapper to avoid touch event interference
+            if (isMobile) {
+              return <React.Fragment key={variant.id}>{buttonContent}</React.Fragment>;
+            }
+
+            // On desktop, use Tooltip for hover info
             return (
               <Tooltip key={variant.id}>
                 <TooltipTrigger asChild>
-                  <button
-                    onClick={() => onVariantSelect(variant.id)}
-                    className={cn(
-                      'relative flex flex-col items-center p-0.5 rounded transition-all w-full',
-                      'hover:bg-muted/80',
-                      isActive 
-                        ? 'ring-2 ring-primary bg-primary/10' 
-                        : 'opacity-70 hover:opacity-100',
-                      // Add relationship highlighting
-                      isParent && !isActive && 'ring-1 ring-blue-500/50',
-                      isChild && !isActive && 'ring-1 ring-purple-500/50'
-                    )}
-                  >
-                    {/* Thumbnail */}
-                    <div className="relative w-full aspect-video rounded overflow-hidden bg-muted">
-                      {variant.thumbnail_url ? (
-                        <img
-                          src={variant.thumbnail_url}
-                          alt={label}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Icon className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                      )}
-
-                      {/* Primary badge */}
-                      {isPrimary && (
-                        <div className="absolute top-0.5 right-0.5 bg-green-500 rounded-full p-0.5">
-                          <Check className="w-2 h-2 text-white" />
-                        </div>
-                      )}
-
-                      {/* Relationship badge - parent (this is what current is based on) */}
-                      {isParent && !isActive && (
-                        <div className="absolute top-0.5 left-0.5 bg-blue-500 rounded-full p-0.5" title="Current is based on this">
-                          <ArrowUp className="w-2 h-2 text-white" />
-                        </div>
-                      )}
-
-                      {/* Relationship badge - child (based on current) */}
-                      {isChild && !isActive && (
-                        <div className="absolute top-0.5 left-0.5 bg-purple-500 rounded-full p-0.5" title="Based on current">
-                          <ArrowDown className="w-2 h-2 text-white" />
-                        </div>
-                      )}
-
-                      {/* NEW badge or time ago for variants */}
-                      {isNewVariant(variant.created_at) ? (
-                        <div className="absolute bottom-0.5 left-0.5 bg-yellow-500 text-black text-[8px] font-bold px-1 rounded">
-                          NEW
-                        </div>
-                      ) : (
-                        <div className="absolute bottom-0.5 left-0.5 bg-black/70 text-white text-[8px] px-1 rounded">
-                          {getTimeAgo(variant.created_at)}
-                        </div>
-                      )}
-                    </div>
-                  </button>
+                  {buttonContent}
                 </TooltipTrigger>
                 <TooltipContent side="top" className="z-[100001] max-w-xs">
                   <div className="flex items-center justify-between gap-2">

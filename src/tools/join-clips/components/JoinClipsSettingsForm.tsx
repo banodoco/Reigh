@@ -631,14 +631,14 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                             <div className="flex items-center justify-between h-5">
                                 <Label className="text-sm font-medium">Transition Mode</Label>
                             </div>
-                            <div className="flex items-center justify-between gap-2 border rounded-lg p-2 bg-background/50">
-                                <span className={cn("text-xs transition-colors", !replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Insert</span>
+                            <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
+                                <span className={cn("text-xs transition-colors whitespace-nowrap", !replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Insert</span>
                             <Switch
                                 id="join-replace-mode"
                                     checked={replaceMode}
                                     onCheckedChange={setReplaceMode}
                                 />
-                                <span className={cn("text-xs transition-colors", replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Replace</span>
+                                <span className={cn("text-xs transition-colors whitespace-nowrap", replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Replace</span>
                             </div>
                         </div>
 
@@ -651,10 +651,10 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <div className={cn(
-                                            "flex items-center justify-between gap-2 border rounded-lg p-2 bg-background/50",
+                                            "flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50",
                                             gapFrames <= 8 && "opacity-50 cursor-not-allowed"
                                         )}>
-                                            <span className={cn("text-xs transition-colors", !keepBridgingImagesValue ? "font-medium text-foreground" : "text-muted-foreground")}>Off</span>
+                                            <span className={cn("text-xs transition-colors whitespace-nowrap", !keepBridgingImagesValue ? "font-medium text-foreground" : "text-muted-foreground")}>Off</span>
                                             <Switch
                                                 id="join-keep-bridge"
                                                 checked={gapFrames <= 8 ? false : keepBridgingImagesValue}
@@ -664,7 +664,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                                     setKeepBridgingImages?.(val);
                                                 }}
                                             />
-                                            <span className={cn("text-xs transition-colors", keepBridgingImagesValue && gapFrames > 8 ? "font-medium text-foreground" : "text-muted-foreground")}>On</span>
+                                            <span className={cn("text-xs transition-colors whitespace-nowrap", keepBridgingImagesValue && gapFrames > 8 ? "font-medium text-foreground" : "text-muted-foreground")}>On</span>
                                         </div>
                                     </TooltipTrigger>
                                     {gapFrames <= 8 && (

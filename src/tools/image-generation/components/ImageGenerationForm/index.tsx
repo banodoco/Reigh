@@ -1322,16 +1322,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           inThisSceneStrength: 0,
         }),
         ...(referenceMode === 'subject' && {
-          styleReferenceStrength: 0.3,
-          subjectStrength: 1.0,
+          styleReferenceStrength: 1.1,
+          subjectStrength: 0.4,
           inThisScene: false,
           inThisSceneStrength: 0,
         }),
         ...(referenceMode === 'scene' && {
-          styleReferenceStrength: 0,
+          styleReferenceStrength: 1.1,
           subjectStrength: 0,
           inThisScene: true,
-          inThisSceneStrength: 1.0,
+          inThisSceneStrength: 0.4,
         }),
         ...(referenceMode === 'custom' && {
           styleReferenceStrength: styleReferenceStrength,
@@ -1642,7 +1642,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   const handleReferenceModeChange = useCallback(async (mode: ReferenceMode) => {
     if (!selectedReferenceId) return;
-    console.log('[RefSettings] 🎯 User changed mode to:', mode);
+    console.log('[RefModeDebug] 🎯 User changed mode to:', mode);
     
     // Build update object with mode AND auto-set strength values
     const updates: Partial<ReferenceImage> = {
@@ -1656,20 +1656,20 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       updates.inThisScene = false;
       updates.inThisSceneStrength = 0;
     } else if (mode === 'subject') {
-      updates.styleReferenceStrength = 0.3;
-      updates.subjectStrength = 1.0;
+      updates.styleReferenceStrength = 1.1;
+      updates.subjectStrength = 0.4;
       updates.inThisScene = false;
       updates.inThisSceneStrength = 0;
     } else if (mode === 'scene') {
-      updates.styleReferenceStrength = 0;
+      updates.styleReferenceStrength = 1.1;
       updates.subjectStrength = 0;
       updates.inThisScene = true;
-      updates.inThisSceneStrength = 1.0;
+      updates.inThisSceneStrength = 0.4;
     } else if (mode === 'custom') {
       // Ensure we have valid starting values if coming from a mode with low strength (like scene)
       const currentTotal = styleReferenceStrength + subjectStrength;
       if (currentTotal < 0.5) {
-        console.log('[RefSettings] ⚠️ Custom mode selected but strengths are too low. Resetting to defaults.');
+        console.log('[RefModeDebug] ⚠️ Custom mode selected but strengths are too low. Resetting to defaults.');
         updates.styleReferenceStrength = 0.8;
         updates.subjectStrength = 0.8;
         updates.inThisScene = false;
@@ -1677,25 +1677,34 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
     }
     
-    console.log('[RefSettings] 🎯 Batched update for mode change:', updates);
+    console.log('[RefModeDebug] 🎯 Batched update for mode change:', updates);
+    console.log('[RefModeDebug] updates.styleReferenceStrength:', updates.styleReferenceStrength);
+    console.log('[RefModeDebug] updates.subjectStrength:', updates.subjectStrength);
+    console.log('[RefModeDebug] updates.inThisSceneStrength:', updates.inThisSceneStrength);
     
     // Optimistic local updates
     pendingReferenceModeUpdate.current = mode;
     setReferenceMode(mode);
+    console.log('[RefModeDebug] Setting local state:');
     if (updates.styleReferenceStrength !== undefined) {
+      console.log('[RefModeDebug] → setStyleReferenceStrength:', updates.styleReferenceStrength);
       setStyleReferenceStrength(updates.styleReferenceStrength);
     }
     if (updates.subjectStrength !== undefined) {
+      console.log('[RefModeDebug] → setSubjectStrength:', updates.subjectStrength);
       setSubjectStrength(updates.subjectStrength);
     }
     if (updates.inThisScene !== undefined) {
+      console.log('[RefModeDebug] → setInThisScene:', updates.inThisScene);
       setInThisScene(updates.inThisScene);
     }
     if (updates.inThisSceneStrength !== undefined) {
+      console.log('[RefModeDebug] → setInThisSceneStrength:', updates.inThisSceneStrength);
       setInThisSceneStrength(updates.inThisSceneStrength);
     }
     
     // Single batched update to avoid race conditions
+    console.log('[RefModeDebug] Calling handleUpdateReference with:', { referenceId: selectedReferenceId, updates });
     await handleUpdateReference(selectedReferenceId, updates);
   }, [selectedReferenceId, handleUpdateReference, styleReferenceStrength, subjectStrength]);
 

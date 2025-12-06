@@ -1435,7 +1435,12 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 }
                 : params;
 
-            console.log('[RegenerateSegment] Creating individual_travel_segment task:', {
+            // CRITICAL: Log the exact prompt values being sent from UI state
+            // This ensures the user-input prompts are the ones actually sent
+            const uiBasePrompt = params.base_prompt || params.prompt || '';
+            const uiNegativePrompt = params.negative_prompt || '';
+            
+            console.log('[RegenerateSegment] [SegmentPromptDebug] Creating individual_travel_segment task:', {
                 projectId,
                 parentGenerationId,
                 childGenerationId: child.id,
@@ -1449,10 +1454,14 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 loraCount: lorasForTask.length,
                 projectResolution,
                 usingProjectResolution: !!projectResolution,
+                // Log prompt values explicitly for debugging
+                uiBasePrompt: uiBasePrompt?.substring(0, 100) + (uiBasePrompt?.length > 100 ? '...' : ''),
+                uiNegativePrompt: uiNegativePrompt?.substring(0, 50) + (uiNegativePrompt?.length > 50 ? '...' : ''),
+                promptSource: 'UI params state (user-editable)',
             });
 
             // Pass the full original params so the task structure matches travel_segment exactly
-            // All UI-editable values are passed as overrides
+            // All UI-editable values are passed as EXPLICIT OVERRIDES - these take precedence
             await createIndividualTravelSegmentTask({
                 project_id: projectId,
                 parent_generation_id: parentGenerationId,
@@ -1466,8 +1475,9 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 // Pass the full original params with updated resolution - the function will extract what it needs
                 originalParams: paramsWithResolution,
                 // ALL overrides from UI state (everything editable in SegmentCard)
-                base_prompt: params.base_prompt || params.prompt,
-                negative_prompt: params.negative_prompt,
+                // CRITICAL: These are the user-input values that MUST take precedence
+                base_prompt: uiBasePrompt,
+                negative_prompt: uiNegativePrompt,
                 num_frames: params.num_frames,
                 seed: randomSeed ? undefined : (params.seed_to_use || params.seed), // Use original seed if not random
                 random_seed: randomSeed,

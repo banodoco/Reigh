@@ -25,6 +25,9 @@ interface TaskListProps {
   activeTaskId?: string | null; // Currently active/viewed task ID
   onOpenImageLightbox?: (task: Task, media: GenerationRow) => void; // NEW
   onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number) => void; // NEW
+  mobileActiveTaskId?: string | null; // For mobile two-step tap interaction
+  onMobileActiveTaskChange?: (taskId: string | null) => void;
+  taskTypeFilter?: string | null; // Filter by specific task type
 }
 
 const TaskList: React.FC<TaskListProps> = ({ 
@@ -36,7 +39,10 @@ const TaskList: React.FC<TaskListProps> = ({
   currentPage = 1,
   activeTaskId,
   onOpenImageLightbox,
-  onOpenVideoLightbox
+  onOpenVideoLightbox,
+  mobileActiveTaskId,
+  onMobileActiveTaskChange,
+  taskTypeFilter
 }) => {
   const { selectedProjectId } = useProject();
 
@@ -96,10 +102,16 @@ const TaskList: React.FC<TaskListProps> = ({
   // Note: Processing count for badge is now handled by parent using status counts total
 
   // Filter out travel_segment and travel_stitch tasks so they do not appear in the sidebar
+  // Also apply task type filter if selected
   // NOTE: Sorting is now done at the query level in usePaginatedTasks for better performance
   const filteredTasks = useMemo(() => {
     if (!tasks) return [] as Task[];
-    const visible = filterVisibleTasks(tasks);
+    let visible = filterVisibleTasks(tasks);
+    
+    // Apply task type filter if selected
+    if (taskTypeFilter) {
+      visible = visible.filter(t => t.taskType === taskTypeFilter);
+    }
     
     // [TasksPaneCountMismatch] Log when local filtering hides tasks that might be counted
     try {
@@ -107,6 +119,7 @@ const TaskList: React.FC<TaskListProps> = ({
       console.log('[TaskList] Visible task filtering', {
         context: 'TaskList:filter-visible-tasks',
         activeFilter,
+        taskTypeFilter,
         tasksCount: tasks.length,
         visibleCount: visible.length,
         hiddenCount: hidden.length,
@@ -115,7 +128,7 @@ const TaskList: React.FC<TaskListProps> = ({
       });
     } catch {}
     return visible;
-  }, [tasks, activeFilter]);
+  }, [tasks, activeFilter, taskTypeFilter]);
 
   const summaryMessage = useMemo(() => {
     if (!statusCounts) return null;
@@ -188,6 +201,8 @@ const TaskList: React.FC<TaskListProps> = ({
                       isActive={task.id === activeTaskId}
                       onOpenImageLightbox={onOpenImageLightbox}
                       onOpenVideoLightbox={onOpenVideoLightbox}
+                      isMobileActive={task.id === mobileActiveTaskId}
+                      onMobileActiveChange={onMobileActiveTaskChange}
                     />
                     {idx < filteredTasks.length - 1 && (
                       <div className="h-0 border-b border-zinc-700/40 my-1" />

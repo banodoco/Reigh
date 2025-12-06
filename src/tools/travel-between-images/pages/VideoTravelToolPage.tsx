@@ -24,6 +24,7 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings, PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
+import { buildBasicModePhaseConfig } from '../components/ShotEditor/services/generateVideoService';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -418,9 +419,43 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, []);
 
+  // =============================================================================
+  // PHASE CONFIG SYNC: Keep the phase config in sync based on basic mode settings.
+  // Used by multiple handlers to ensure Advanced mode shows correct defaults:
+  // - I2V vs VACE mode (2 vs 3 phases, different models)
+  // - Amount of motion (motion LoRA strength)
+  // - User-selected LoRAs (added to all phases)
+  //
+  // By default, only rebuilds when in Basic mode (to preserve Advanced customizations).
+  // Pass force: true to always rebuild (for I2V/VACE toggle and Restore Defaults).
+  // =============================================================================
+  const rebuildPhaseConfig = useCallback((options?: {
+    generationTypeMode?: 'i2v' | 'vace';
+    amountOfMotion?: number;
+    selectedLoras?: Array<{ path: string; strength: number }>;
+    force?: boolean;  // Set true to always rebuild (I2V/VACE toggle, Restore Defaults)
+  }) => {
+    const currentSettings = shotSettingsRef.current.settings;
+    
+    // Only rebuild when in Basic mode, unless force is true
+    const isBasicMode = currentSettings?.motionMode === 'basic' || !currentSettings?.motionMode;
+    if (!isBasicMode && !options?.force) return;
+    
+    const useVaceMode = (options?.generationTypeMode ?? currentSettings?.generationTypeMode) === 'vace';
+    const motion = options?.amountOfMotion ?? currentSettings?.amountOfMotion ?? 50;
+    const loras = options?.selectedLoras ?? (currentSettings?.selectedLoras || []).map(l => ({
+      path: l.path,
+      strength: l.strength
+    }));
+    
+    const basicConfig = buildBasicModePhaseConfig(useVaceMode, motion, loras);
+    shotSettingsRef.current.updateField('phaseConfig', basicConfig.phaseConfig);
+  }, []);
+
   const handleAmountOfMotionChange = useCallback((motion: number) => {
     shotSettingsRef.current.updateField('amountOfMotion', motion);
-  }, []);
+    rebuildPhaseConfig({ amountOfMotion: motion });
+  }, [rebuildPhaseConfig]);
 
   const handleMotionModeChange = useCallback((mode: 'basic' | 'presets' | 'advanced') => {
     console.log('[MotionMode] User changing motion mode:', {
@@ -429,15 +464,32 @@ const VideoTravelToolPage: React.FC = () => {
       timestamp: Date.now()
     });
     
-    // When switching to advanced mode, initialize phaseConfig if needed
+    // When switching to advanced mode, initialize phaseConfig from basic mode settings
     if (mode === 'advanced' || mode === 'presets') {
       const currentPhaseConfig = shotSettingsRef.current.settings?.phaseConfig;
       if (!currentPhaseConfig) {
-        console.log('[MotionMode] Initializing phaseConfig for advanced/presets mode');
+        // Build phase config from current basic mode settings (respects I2V/VACE mode)
+        const currentSettings = shotSettingsRef.current.settings;
+        const useVaceMode = currentSettings?.generationTypeMode === 'vace';
+        const currentMotion = currentSettings?.amountOfMotion ?? 50;
+        const currentLoras = (currentSettings?.selectedLoras || []).map(l => ({
+          path: l.path,
+          strength: l.strength
+        }));
+        
+        const basicConfig = buildBasicModePhaseConfig(useVaceMode, currentMotion, currentLoras);
+        
+        console.log('[MotionMode] Initializing phaseConfig from basic mode settings:', {
+          useVaceMode,
+          amountOfMotion: currentMotion,
+          loraCount: currentLoras.length,
+          model: basicConfig.model
+        });
+        
         shotSettingsRef.current.updateFields({
           motionMode: mode,
           advancedMode: true,
-          phaseConfig: DEFAULT_PHASE_CONFIG
+          phaseConfig: basicConfig.phaseConfig
         });
       } else {
         shotSettingsRef.current.updateFields({
@@ -454,6 +506,26 @@ const VideoTravelToolPage: React.FC = () => {
       });
     }
   }, []);
+
+  const handleGenerationTypeModeChange = useCallback((mode: 'i2v' | 'vace') => {
+    console.log('[GenerationTypeMode] Changing generation type mode:', {
+      from: shotSettingsRef.current.settings?.generationTypeMode,
+      to: mode
+    });
+    
+    shotSettingsRef.current.updateField('generationTypeMode', mode);
+    
+    // Always rebuild phase config when mode changes (force: true bypasses Basic mode check)
+    // because I2V vs VACE fundamentally changes the phase structure (2 vs 3 phases)
+    rebuildPhaseConfig({ generationTypeMode: mode, force: true });
+  }, [rebuildPhaseConfig]);
+
+  // Handler for restoring defaults in Advanced mode - respects current I2V/VACE mode
+  const handleRestoreDefaults = useCallback(() => {
+    console.log('[RestoreDefaults] Restoring phase config from basic mode settings');
+    // Force rebuild regardless of current mode (user explicitly clicked "Restore Defaults")
+    rebuildPhaseConfig({ force: true });
+  }, [rebuildPhaseConfig]);
 
   const handleAdvancedModeChange = useCallback((advanced: boolean) => {
     // Prevent enabling advanced mode when turbo mode is on
@@ -515,14 +587,22 @@ const VideoTravelToolPage: React.FC = () => {
   const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, presetMetadata?: any) => {
     console.log('[PhasePreset] User selected preset:', {
       presetId: presetId.substring(0, 8),
+      generationTypeMode: presetMetadata?.generationTypeMode,
       timestamp: Date.now()
     });
     
-    // Update preset ID and phase config
-    shotSettingsRef.current.updateFields({
+    // Update preset ID, phase config, and generation type mode (if preset specifies one)
+    const updates: Record<string, any> = {
       selectedPhasePresetId: presetId,
       phaseConfig: config
-    });
+    };
+    
+    // Also apply the preset's generation type mode if it has one
+    if (presetMetadata?.generationTypeMode) {
+      updates.generationTypeMode = presetMetadata.generationTypeMode;
+    }
+    
+    shotSettingsRef.current.updateFields(updates);
   }, []);
 
   const handlePhasePresetRemove = useCallback(() => {
@@ -551,7 +631,10 @@ const VideoTravelToolPage: React.FC = () => {
   // LoRAs handler - now synced with all other settings
   const handleSelectedLorasChange = useCallback((loras: any[]) => {
     shotSettingsRef.current.updateField('selectedLoras', loras);
-  }, []);
+    rebuildPhaseConfig({
+      selectedLoras: (loras || []).map(l => ({ path: l.path, strength: l.strength }))
+    });
+  }, [rebuildPhaseConfig]);
 
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const [isCreatingShot, setIsCreatingShot] = useState(false);
@@ -796,6 +879,7 @@ const VideoTravelToolPage: React.FC = () => {
     amountOfMotion: rawAmountOfMotion,
     advancedMode = false,
     motionMode = 'basic',
+    generationTypeMode = 'i2v', // I2V by default, switches to VACE when structure video is added
     phaseConfig,
     selectedPhasePresetId,
     pairConfigs = [],
@@ -2095,15 +2179,19 @@ const VideoTravelToolPage: React.FC = () => {
                         />
                       </div>
 
+                      {/* TEMPORARILY DISABLED: Ordered mode and reordering (Task 20)
+                         * To restore: Add <SelectItem value="ordered">Ordered</SelectItem>
+                         * and remove the forced 'newest' fallback below
+                         */}
                       <Select
-                        value={shotSortMode}
-                        onValueChange={(value: 'ordered' | 'newest' | 'oldest') => setShotSortMode(value)}
+                        value={shotSortMode === 'ordered' ? 'newest' : shotSortMode}
+                        onValueChange={(value: 'newest' | 'oldest') => setShotSortMode(value)}
                       >
                         <SelectTrigger className="w-[90px] sm:w-[110px] h-8 text-xs">
                           <SelectValue placeholder="Sort" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="ordered">Ordered</SelectItem>
+                          {/* <SelectItem value="ordered">Ordered</SelectItem> -- TEMPORARILY DISABLED (Task 20) */}
                           <SelectItem value="newest">Newest</SelectItem>
                           <SelectItem value="oldest">Oldest</SelectItem>
                         </SelectContent>
@@ -2361,6 +2449,8 @@ const VideoTravelToolPage: React.FC = () => {
               onAmountOfMotionChange={handleAmountOfMotionChange}
               motionMode={motionMode}
               onMotionModeChange={handleMotionModeChange}
+              generationTypeMode={generationTypeMode}
+              onGenerationTypeModeChange={handleGenerationTypeModeChange}
               advancedMode={advancedMode}
               onAdvancedModeChange={handleAdvancedModeChange}
               phaseConfig={phaseConfig}
@@ -2369,6 +2459,7 @@ const VideoTravelToolPage: React.FC = () => {
               onPhasePresetSelect={handlePhasePresetSelect}
               onPhasePresetRemove={handlePhasePresetRemove}
               onBlurSave={handleBlurSave}
+              onRestoreDefaults={handleRestoreDefaults}
               generationMode={generationMode === 'by-pair' ? 'batch' : generationMode}
               onGenerationModeChange={handleGenerationModeChange}
 

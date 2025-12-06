@@ -534,7 +534,7 @@ export function InlineEditVideoView({
     <TooltipProvider>
       <div className={cn(
         "w-full bg-background",
-        isMobile ? "flex flex-col min-h-full" : "h-full flex flex-col md:flex-row"
+        isMobile ? "flex flex-col" : "h-full flex flex-col md:flex-row"
       )}>
         {/* Header - Mobile only */}
         {isMobile && (
@@ -574,15 +574,18 @@ export function InlineEditVideoView({
               ref={videoRef}
               src={videoUrl}
               controls
+              playsInline // Prevents fullscreen on iOS when video plays
               className="max-w-full max-h-full object-contain rounded-lg"
               onLoadedMetadata={handleVideoLoadedMetadata}
               preload="metadata"
+              // Prevent double-click fullscreen on mobile
+              onDoubleClick={isMobile ? (e) => e.preventDefault() : undefined}
             />
           </div>
           
           {/* Portion Selection Overlay - Desktop only */}
           {!isMobile && videoDuration > 0 && (
-            <div className="absolute left-0 right-0 bottom-0 pb-4 px-4">
+            <div className="absolute left-0 right-0 bottom-0 pb-4 px-4 select-none">
               <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
                 {/* Timeline bar */}
                 <MultiPortionTimeline
@@ -615,7 +618,7 @@ export function InlineEditVideoView({
         
         {/* Timeline Section - Mobile only, below video */}
         {isMobile && videoDuration > 0 && (
-          <div className="bg-zinc-900 px-3 py-3 border-t border-border">
+          <div className="bg-zinc-900 px-3 py-3 border-t border-border select-none touch-manipulation">
             {/* Timeline */}
             <MultiPortionTimeline
               duration={videoDuration}

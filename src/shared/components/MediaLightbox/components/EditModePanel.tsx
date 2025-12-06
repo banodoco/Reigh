@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { CheckCircle, Loader2, Paintbrush, Pencil, Sparkles, Type, X, XCircle } from 'lucide-react';
+import { CheckCircle, Loader2, Move, Paintbrush, Pencil, Save, Sparkles, Type, X, XCircle } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { GenerationRow } from '@/types/shots';
@@ -23,8 +23,8 @@ export interface EditModePanelProps {
   canMakeMainVariant?: boolean;
   
   // Edit mode state
-  editMode: 'text' | 'inpaint' | 'annotate';
-  setEditMode: (mode: 'text' | 'inpaint' | 'annotate') => void;
+  editMode: 'text' | 'inpaint' | 'annotate' | 'reposition';
+  setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition') => void;
   setIsInpaintMode: (value: boolean) => void;
   
   // Prompt state
@@ -57,6 +57,15 @@ export interface EditModePanelProps {
   handleExitMagicEditMode: () => void;
   handleUnifiedGenerate: () => void;
   handleGenerateAnnotatedEdit: () => void;
+  handleGenerateReposition?: () => void;
+  
+  // Reposition state
+  isGeneratingReposition?: boolean;
+  repositionGenerateSuccess?: boolean;
+  hasTransformChanges?: boolean;
+  handleSaveAsVariant?: () => void;
+  isSavingAsVariant?: boolean;
+  saveAsVariantSuccess?: boolean;
   
   // Derived generations (legacy - kept for compatibility)
   derivedGenerations?: GenerationRow[] | null;
@@ -112,6 +121,13 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   handleExitMagicEditMode,
   handleUnifiedGenerate,
   handleGenerateAnnotatedEdit,
+  handleGenerateReposition,
+  isGeneratingReposition = false,
+  repositionGenerateSuccess = false,
+  hasTransformChanges = false,
+  handleSaveAsVariant,
+  isSavingAsVariant = false,
+  saveAsVariantSuccess = false,
   derivedGenerations,
   paginatedDerived,
   derivedPage,
@@ -229,7 +245,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
       <div className={`${isMobile ? 'mb-2' : 'mb-4'} flex items-center gap-3`}>
         <h2 className={`${headerSize} font-light`}>Edit Image</h2>
         
-        {/* Three-way toggle: Text | Inpaint | Annotate - Segmented control style */}
+        {/* Four-way toggle: Text | Inpaint | Annotate | Reposition - Segmented control style */}
         <div className="inline-flex items-center border border-border rounded-lg overflow-hidden bg-muted/30">
             <button
               onClick={() => {
@@ -244,7 +260,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               )}
             >
               <Type className={toggleIconSize} />
-              Text
+              {!isMobile && 'Text'}
             </button>
             <button
               onClick={() => {
@@ -259,7 +275,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               )}
             >
               <Paintbrush className={toggleIconSize} />
-              Inpaint
+              {!isMobile && 'Inpaint'}
             </button>
             <button
               onClick={() => {
@@ -267,14 +283,30 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 setEditMode('annotate');
               }}
               className={cn(
-                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
+                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
                 editMode === 'annotate'
                   ? "bg-background text-foreground font-medium shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               <Pencil className={toggleIconSize} />
-              Annotate
+              {!isMobile && 'Annotate'}
+            </button>
+            <button
+              onClick={() => {
+                setIsInpaintMode(true);
+                setEditMode('reposition');
+              }}
+              className={cn(
+                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
+                editMode === 'reposition'
+                  ? "bg-background text-foreground font-medium shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+              title="Move, scale, or rotate the image to fill edges with AI"
+            >
+              <Move className={toggleIconSize} />
+              {!isMobile && 'Reposition'}
             </button>
           </div>
         </div>
@@ -290,7 +322,9 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 ? (isMobile ? "Describe the text edit..." : "Describe the text-based edit to make...")
                 : editMode === 'annotate'
                   ? (isMobile ? "Describe what to generate..." : "Describe what to generate in the annotated regions...")
-                  : (isMobile ? "Describe what to generate..." : "Describe what to generate in the masked area...")
+                  : editMode === 'reposition'
+                    ? (isMobile ? "Optional: describe how to fill edges..." : "Optional: describe how to fill the exposed edges (default: match existing content)")
+                    : (isMobile ? "Describe what to generate..." : "Describe what to generate in the masked area...")
             }
             className={`w-full ${textareaMinHeight} bg-background border border-input rounded-md ${textareaPadding} ${textareaTextSize} resize-none focus:outline-none focus:ring-2 focus:ring-ring`}
             rows={textareaRows}
@@ -364,52 +398,131 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           </div>
         </div>
         
-        {/* Generate Button - Unified */}
-        <Button
-          variant="default"
-          size={buttonSize}
-          onClick={editMode === 'annotate' ? handleGenerateAnnotatedEdit : handleUnifiedGenerate}
-          disabled={
-            (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
-            (editMode !== 'annotate' && !inpaintPrompt.trim()) || 
-            (editMode === 'inpaint' && brushStrokes.length === 0) ||
-            isGeneratingInpaint || 
-            inpaintGenerateSuccess || 
-            isCreatingMagicEditTasks || 
-            magicEditTasksCreated
-          }
-          className={cn(
-            "w-full",
-            (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
-          )}
-        >
-          {(isGeneratingInpaint || isCreatingMagicEditTasks) ? (
-            <>
-              <Loader2 className={`${iconSize} mr-2 animate-spin`} />
-              Generating...
-            </>
-          ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
-            <>
-              <CheckCircle className={`${iconSize} mr-2`} />
-              {editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below'}
-            </>
-          ) : editMode === 'inpaint' ? (
-            <>
-              <Paintbrush className={`${iconSize} mr-2`} />
-              Generate inpainted image
-            </>
-          ) : editMode === 'annotate' ? (
-            <>
-              <Pencil className={`${iconSize} mr-2`} />
-              Generate based on annotations
-            </>
-          ) : (
-            <>
-              <Sparkles className={`${iconSize} mr-2`} />
-              Generate text edit
-            </>
-          )}
-        </Button>
+        {/* Reposition Mode Buttons - Two options: Save or Generate with AI */}
+        {editMode === 'reposition' ? (
+          <div className={`flex gap-2 ${isMobile ? 'flex-col' : ''}`}>
+            {/* Save as Variant Button */}
+            <Button
+              variant="secondary"
+              size={buttonSize}
+              onClick={handleSaveAsVariant}
+              disabled={
+                !hasTransformChanges ||
+                isSavingAsVariant ||
+                saveAsVariantSuccess ||
+                isGeneratingReposition ||
+                repositionGenerateSuccess
+              }
+              className={cn(
+                isMobile ? "w-full" : "flex-1",
+                saveAsVariantSuccess && "bg-green-600 hover:bg-green-600 text-white"
+              )}
+            >
+              {isSavingAsVariant ? (
+                <>
+                  <Loader2 className={`${iconSize} mr-2 animate-spin`} />
+                  Saving...
+                </>
+              ) : saveAsVariantSuccess ? (
+                <>
+                  <CheckCircle className={`${iconSize} mr-2`} />
+                  Saved!
+                </>
+              ) : (
+                <>
+                  <Save className={`${iconSize} mr-2`} />
+                  {isMobile ? 'Save' : 'Save as Variant'}
+                </>
+              )}
+            </Button>
+            
+            {/* Fill Edges with AI Button */}
+            <Button
+              variant="default"
+              size={buttonSize}
+              onClick={handleGenerateReposition}
+              disabled={
+                !hasTransformChanges ||
+                isGeneratingReposition ||
+                repositionGenerateSuccess ||
+                isSavingAsVariant ||
+                saveAsVariantSuccess
+              }
+              className={cn(
+                isMobile ? "w-full" : "flex-1",
+                repositionGenerateSuccess && "bg-green-600 hover:bg-green-600"
+              )}
+            >
+              {isGeneratingReposition ? (
+                <>
+                  <Loader2 className={`${iconSize} mr-2 animate-spin`} />
+                  Generating...
+                </>
+              ) : repositionGenerateSuccess ? (
+                <>
+                  <CheckCircle className={`${iconSize} mr-2`} />
+                  Success!
+                </>
+              ) : (
+                <>
+                  <Move className={`${iconSize} mr-2`} />
+                  {isMobile ? 'Fill with AI' : 'Fill edges with AI'}
+                </>
+              )}
+            </Button>
+          </div>
+        ) : (
+          /* Generate Button - For other modes */
+          <Button
+            variant="default"
+            size={buttonSize}
+            onClick={
+              editMode === 'annotate' 
+                ? handleGenerateAnnotatedEdit 
+                : handleUnifiedGenerate
+            }
+            disabled={
+              (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
+              (editMode !== 'annotate' && !inpaintPrompt.trim()) || 
+              (editMode === 'inpaint' && brushStrokes.length === 0) ||
+              isGeneratingInpaint || 
+              inpaintGenerateSuccess || 
+              isCreatingMagicEditTasks || 
+              magicEditTasksCreated
+            }
+            className={cn(
+              "w-full",
+              (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
+            )}
+          >
+            {(isGeneratingInpaint || isCreatingMagicEditTasks) ? (
+              <>
+                <Loader2 className={`${iconSize} mr-2 animate-spin`} />
+                Generating...
+              </>
+            ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
+              <>
+                <CheckCircle className={`${iconSize} mr-2`} />
+                {editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below'}
+              </>
+            ) : editMode === 'inpaint' ? (
+              <>
+                <Paintbrush className={`${iconSize} mr-2`} />
+                Generate inpainted image
+              </>
+            ) : editMode === 'annotate' ? (
+              <>
+                <Pencil className={`${iconSize} mr-2`} />
+                Generate based on annotations
+              </>
+            ) : (
+              <>
+                <Sparkles className={`${iconSize} mr-2`} />
+                Generate text edit
+              </>
+            )}
+          </Button>
+        )}
       
       {/* Variants Section */}
       {variants && variants.length >= 1 && onVariantSelect && (

@@ -59,3 +59,10 @@ export type {
   UseVideoEditingProps, 
   UseVideoEditingReturn,
 } from './useVideoEditing';
+
+export { useRepositionMode } from './useRepositionMode';
+export type { 
+  UseRepositionModeProps, 
+  UseRepositionModeReturn,
+  ImageTransform,
+} from './useRepositionMode';

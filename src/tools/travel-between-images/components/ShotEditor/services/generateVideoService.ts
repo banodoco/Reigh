@@ -23,12 +23,12 @@ const MOTION_LORA_URL = 'https://huggingface.co/peteromallet/random_junk/resolve
  * Build phase config for basic mode based on structure video presence, motion amount, and user LoRAs.
  * This allows the backend to use a unified phase-based system for all generation modes.
  * 
- * @param hasStructureVideo - Whether a structure video is being used (determines VACE vs I2V)
+ * @param useVaceMode - Whether to use VACE mode (true) or I2V mode (false)
  * @param amountOfMotion - 0-100 motion slider value
  * @param userLoras - User-selected LoRAs to add to every phase
  * @returns Object with model name and phase config
  */
-function buildBasicModePhaseConfig(
+export function buildBasicModePhaseConfig(
   hasStructureVideo: boolean,
   amountOfMotion: number,
   userLoras: Array<{ path: string; strength: number }>
@@ -171,6 +171,9 @@ export interface GenerateVideoParams {
   amountOfMotion: number;
   motionMode?: 'basic' | 'presets' | 'advanced';
   
+  // Generation type mode (I2V vs VACE)
+  generationTypeMode?: 'i2v' | 'vace';
+  
   // Advanced mode
   advancedMode: boolean;
   phaseConfig?: PhaseConfig;
@@ -230,6 +233,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     enhancePrompt,
     amountOfMotion: rawAmountOfMotion,
     motionMode,
+    generationTypeMode = 'i2v', // Default to I2V if not set
     advancedMode,
     phaseConfig,
     selectedPhasePresetId,
@@ -754,12 +758,25 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   // ============================================================================
   // 
   // We now use phase configs for BOTH basic and advanced mode, unifying the backend.
-  // - Basic mode: Phase config is computed based on structure video presence + motion + user LoRAs
+  // - Basic mode: Phase config is computed based on generationTypeMode (I2V/VACE) + motion + user LoRAs
   // - Advanced mode: User's phase config is used (with LoRA swapping for VACE if needed)
+  // 
+  // Note: generationTypeMode determines whether to use I2V or VACE mode.
+  // If set to 'i2v' but structure video exists, the structure video will NOT be processed.
+  // The UI should show a warning in this case, but we respect the user's choice.
   
   let actualModelName: string;
   let effectivePhaseConfig: PhaseConfig;
   let modelType: 'i2v' | 'vace';
+  
+  // Determine if we're using VACE mode based on generationTypeMode setting
+  // Even if structure video exists, if user explicitly chose I2V mode, we use I2V
+  const useVaceMode = generationTypeMode === 'vace';
+  
+  // Log warning if I2V mode is selected but structure video exists
+  if (generationTypeMode === 'i2v' && structureVideoPath) {
+    console.warn('[Generation] ⚠️ I2V mode selected but structure video exists. Structure video will NOT be used.');
+  }
   
   // Convert user LoRAs to the format needed for phase config
   const userLorasForPhaseConfig = (selectedLoras || []).map(l => ({
@@ -777,7 +794,11 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     advancedMode,
     hasPhaseConfig: !!phaseConfig,
     motionMode,
+    generationTypeMode,
+    useVaceMode,
     useAdvancedMode,
+    hasStructureVideo: !!structureVideoPath,
+    structureVideoWillBeUsed: useVaceMode && !!structureVideoPath,
     amountOfMotion,
     rawAmountOfMotion,
     amountOfMotionDefaultApplied: rawAmountOfMotion == null
@@ -787,15 +808,15 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // ADVANCED MODE: Use user's phase config
     let adjustedPhaseConfig = phaseConfig;
     
-    // Determine model based on structure video
-    if (structureVideoPath) {
+    // Determine model based on generationTypeMode (not just structure video presence)
+    if (useVaceMode) {
       actualModelName = phaseConfig.num_phases === 2 
         ? 'wan_2_2_vace_lightning_baseline_3_3' 
         : 'wan_2_2_vace_lightning_baseline_2_2_2';
       modelType = 'vace';
       
       // Swap I2V LoRAs to VACE LoRAs if needed
-      console.log('[Generation] Advanced mode + Structure video - swapping I2V LoRAs to VACE LoRAs');
+      console.log('[Generation] Advanced mode + VACE - swapping I2V LoRAs to VACE LoRAs');
       adjustedPhaseConfig = {
         ...phaseConfig,
         phases: phaseConfig.phases.map(phase => ({
@@ -828,23 +849,26 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     });
     
   } else {
-    // BASIC MODE: Build phase config automatically based on Amount of Motion
+    // BASIC MODE: Build phase config automatically based on generationTypeMode + Amount of Motion
     console.log('[Generation] Using BASIC MODE - building phase config from Amount of Motion');
     
     const basicConfig = buildBasicModePhaseConfig(
-      !!structureVideoPath,
+      useVaceMode, // Use generationTypeMode instead of structureVideoPath presence
       amountOfMotion,
       userLorasForPhaseConfig
     );
     
     actualModelName = basicConfig.model;
     effectivePhaseConfig = basicConfig.phaseConfig;
-    modelType = structureVideoPath ? 'vace' : 'i2v';
+    modelType = useVaceMode ? 'vace' : 'i2v';
     
     console.log('[Generation] Basic Mode - built phase config:', {
       model: actualModelName,
       modelType,
+      generationTypeMode,
+      useVaceMode,
       hasStructureVideo: !!structureVideoPath,
+      structureVideoWillBeUsed: useVaceMode && !!structureVideoPath,
       amountOfMotion,
       motionLoraApplied: amountOfMotion > 0,
       motionLoraStrength: amountOfMotion > 0 ? (amountOfMotion / 100).toFixed(2) : 'N/A',

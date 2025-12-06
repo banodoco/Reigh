@@ -8,6 +8,8 @@ import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
 import { Info, Plus, Sparkles, Eraser } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from './ShotEditor/state/types';
 import { Project } from '@/types/project';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
@@ -142,6 +144,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
 }) => {
     // Get project context for persistent state
     const { selectedProjectId: contextProjectId } = useProject();
+    // Mobile detection for touch-friendly tooltips
+    const isMobile = useIsMobile();
     // Get generation location settings to conditionally show turbo mode
     const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
     const isCloudGenerationEnabled = generationMethods.inCloud && !generationMethods.onComputer;
@@ -195,21 +199,43 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         : 'Prompt:'
                       }
                     </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                          <Info className="h-4 w-4" />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>
-                          {enhancePrompt
-                            ? 'This text will be appended after AI-generated individual prompts for each pair.'
-                            : 'This prompt guides the style and transition for all video segments.'
-                          } <br /> Small changes can have a big impact.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    {isMobile ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button 
+                            type="button" 
+                            className="absolute top-0 right-0 text-muted-foreground hover:text-foreground transition-colors bg-transparent border-0 p-0"
+                          >
+                            <Info className="h-4 w-4" />
+                            <span className="sr-only">Info</span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 text-sm" side="left" align="start">
+                          <p>
+                            {enhancePrompt
+                              ? 'This text will be appended after AI-generated individual prompts for each pair.'
+                              : 'This prompt guides the style and transition for all video segments.'
+                            } Small changes can have a big impact.
+                          </p>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                            <Info className="h-4 w-4" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            {enhancePrompt
+                              ? 'This text will be appended after AI-generated individual prompts for each pair.'
+                              : 'This prompt guides the style and transition for all video segments.'
+                            } <br /> Small changes can have a big impact.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                     <Textarea 
                       id="batchVideoPrompt"
                       value={batchVideoPrompt}
@@ -230,16 +256,33 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   <Label htmlFor="negative_prompt" className="text-sm font-light block mb-1.5">
                     {isTimelineMode ? 'Default Negative Prompt:' : 'Negative prompt:'}
                   </Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                        <Info className="h-4 w-4" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Specify what you want to avoid in the generated videos, <br /> like 'blurry' or 'distorted'.</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  {isMobile ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button 
+                          type="button" 
+                          className="absolute top-0 right-0 text-muted-foreground hover:text-foreground transition-colors bg-transparent border-0 p-0"
+                        >
+                          <Info className="h-4 w-4" />
+                          <span className="sr-only">Info</span>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 text-sm" side="left" align="start">
+                        <p>Specify what you want to avoid in the generated videos, like 'blurry' or 'distorted'.</p>
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Specify what you want to avoid in the generated videos, <br /> like 'blurry' or 'distorted'.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   <Textarea
                     id="negative_prompt"
                     value={steerableMotionSettings.negative_prompt}
@@ -334,17 +377,33 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
                 {isTimelineMode ? 'Duration per pair' : (imageCount === 1 ? 'Duration to generate' : 'Duration per pair')}: {framesToSeconds(batchVideoFrames)} ({batchVideoFrames} frames)
               </Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                    <Info className="h-4 w-4" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.
-                    </p>
-                </TooltipContent>
-              </Tooltip>
+              {isMobile ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button 
+                      type="button" 
+                      className="absolute top-0 right-0 text-muted-foreground hover:text-foreground transition-colors bg-transparent border-0 p-0"
+                    >
+                      <Info className="h-4 w-4" />
+                      <span className="sr-only">Info</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 text-sm" side="left" align="start">
+                    <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. More frames result in a longer segment.</p>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
               <Slider
                 id="batchVideoFrames"
                 min={9}

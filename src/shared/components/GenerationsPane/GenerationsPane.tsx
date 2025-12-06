@@ -418,10 +418,14 @@ const GenerationsPaneComponent: React.FC = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsGenerationModalOpen(true)}
-                    className="h-7 px-2 text-xs bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-md shadow-sm"
+                    className={cn(
+                      "h-7 text-xs bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-md shadow-sm",
+                      isMobile ? "px-2 w-7" : "px-2"
+                    )}
+                    aria-label="Create new image"
                   >
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    <span>Create</span>
+                    <Sparkles className={cn("h-3 w-3", !isMobile && "mr-1")} />
+                    {!isMobile && <span>Create</span>}
                   </Button>
                 </div>
                 <div className="flex items-center space-x-4 mr-2">

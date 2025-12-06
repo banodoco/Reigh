@@ -30,6 +30,8 @@ export interface PhaseConfigMetadata {
     enhancePrompt?: boolean;
     durationFrames?: number;
     selectedLoras?: Array<{ id: string; name: string; strength: number }>;
+    // Generation type mode (I2V = image-to-video, VACE = structure video guidance)
+    generationTypeMode?: 'i2v' | 'vace';
 }
 
 export interface StyleReferenceMetadata {

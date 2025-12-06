@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -15,9 +15,15 @@ import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
 import MediaLightbox from '@/shared/components/MediaLightbox/MediaLightboxRefactored';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
 
 const TOOL_TYPE = 'edit-video';
 const TOOL_TYPE_NAME = 'Edit Video';
+
+// Settings interface for last edited media persistence
+interface EditVideoUISettings {
+  lastEditedMediaId?: string;
+}
 
 export default function EditVideoPage() {
   const { selectedProjectId } = useProject();
@@ -27,6 +33,52 @@ export default function EditVideoPage() {
   const [showResults, setShowResults] = useState(true);
   const isMobile = useIsMobile();
   const { data: shots } = useListShots(selectedProjectId);
+  
+  // Track if we've already loaded from settings to prevent re-loading
+  const hasLoadedFromSettings = useRef(false);
+  
+  // Project-level UI settings for persisting last edited media (syncs across devices)
+  const { 
+    settings: uiSettings, 
+    update: updateUISettings,
+    isLoading: isUISettingsLoading 
+  } = useToolSettings<EditVideoUISettings>('edit-video-ui', { 
+    projectId: selectedProjectId,
+    enabled: !!selectedProjectId 
+  });
+  
+  // Load last edited video from database settings on mount
+  useEffect(() => {
+    if (!selectedProjectId || isUISettingsLoading || hasLoadedFromSettings.current) return;
+    
+    const storedId = uiSettings?.lastEditedMediaId;
+    if (storedId && !selectedMedia) {
+      hasLoadedFromSettings.current = true;
+      // Fetch the generation from the database
+      supabase
+        .from('generations')
+        .select('*')
+        .eq('id', storedId)
+        .single()
+        .then(({ data, error }) => {
+          if (data && !error) {
+            setSelectedMedia(data as any);
+          } else {
+            // Clear invalid stored ID
+            updateUISettings('project', { lastEditedMediaId: undefined });
+          }
+        });
+    }
+  }, [selectedProjectId, uiSettings?.lastEditedMediaId, isUISettingsLoading, selectedMedia, updateUISettings]);
+  
+  // Persist selected media ID to database settings
+  useEffect(() => {
+    if (!selectedProjectId || isUISettingsLoading) return;
+    
+    if (selectedMedia && selectedMedia.id !== uiSettings?.lastEditedMediaId) {
+      updateUISettings('project', { lastEditedMediaId: selectedMedia.id });
+    }
+  }, [selectedMedia?.id, selectedProjectId, isUISettingsLoading, uiSettings?.lastEditedMediaId, updateUISettings]);
   
   // Lightbox state
   const [isLightboxOpen, setLightboxOpen] = useState(false);
@@ -275,7 +327,7 @@ export default function EditVideoPage() {
           </div>
         </div>
       ) : (
-        <div className="w-full px-4 overflow-y-auto" style={{ height: 'calc(100dvh - 96px)' }}>
+        <div className="w-full px-4 overflow-y-auto" style={{ minHeight: 'calc(100dvh - 96px)' }}>
           <div className="max-w-7xl mx-auto relative">
             <div className={cn(
               isEditingOnMobile ? "flex flex-col min-h-[60vh]" : "h-[70vh]"

@@ -29,6 +29,7 @@ export interface PhaseConfig {
   sample_solver: string;
   model_switch_phase: number;
   phases: PhaseSettings[];
+  mode?: 'i2v' | 'vace'; // Generation mode: I2V (image-to-video) or VACE (structure video guided)
 }
 
 export const DEFAULT_PHASE_CONFIG: PhaseConfig = {
@@ -91,6 +92,7 @@ export interface VideoTravelSettings {
   selectedPhasePresetId?: string | null; // ID of the selected phase config preset (null if manually configured)
   textBeforePrompts?: string; // Text to prepend to all prompts
   textAfterPrompts?: string; // Text to append to all prompts
+  generationTypeMode?: 'i2v' | 'vace'; // Generation type: I2V (image-to-video) or VACE (structure video guided)
   // selectedMode removed - now hardcoded to use specific model
   pairConfigs?: Array<{
     id: string;
@@ -150,5 +152,6 @@ export const videoTravelSettings = {
     steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
     customWidth: undefined,
     customHeight: undefined,
+    generationTypeMode: 'i2v' as const, // Default to I2V (image-to-video) mode
   },
 }; 

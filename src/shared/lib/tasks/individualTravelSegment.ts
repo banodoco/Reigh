@@ -68,6 +68,9 @@ export interface IndividualTravelSegmentParams {
   generation_name?: string;
 }
 
+// Maximum frames allowed per segment (81-frame limit)
+const MAX_SEGMENT_FRAMES = 81;
+
 /**
  * Validates individual travel segment parameters
  */
@@ -92,6 +95,12 @@ function validateIndividualTravelSegmentParams(params: IndividualTravelSegmentPa
   
   if (!params.end_image_url) {
     errors.push("end_image_url is required");
+  }
+  
+  // Enforce 81-frame limit per segment
+  const numFrames = params.num_frames ?? params.originalParams?.num_frames ?? 49;
+  if (numFrames > MAX_SEGMENT_FRAMES) {
+    errors.push(`num_frames (${numFrames}) exceeds maximum of ${MAX_SEGMENT_FRAMES} frames per segment`);
   }
   
   if (errors.length > 0) {
@@ -153,10 +162,27 @@ function buildIndividualTravelSegmentParams(
   const switchThreshold = orig.switch_threshold ?? orchDetails.switch_threshold;
   
   // Segment-specific settings (UI overrides take precedence)
-  const numFrames = params.num_frames ?? orig.num_frames ?? 49;
+  // Clamp to MAX_SEGMENT_FRAMES (81) as a safety measure even if validation passed
+  const rawNumFrames = params.num_frames ?? orig.num_frames ?? 49;
+  const numFrames = Math.min(rawNumFrames, MAX_SEGMENT_FRAMES);
+  
+  // CRITICAL: User-input prompts from UI MUST take precedence
+  // params.base_prompt is the explicit override from the SegmentCard UI
   const basePrompt = params.base_prompt ?? orig.base_prompt ?? orig.prompt ?? "";
   const negativePrompt = params.negative_prompt ?? orig.negative_prompt ?? "";
   const amountOfMotion = params.amount_of_motion ?? orig.amount_of_motion ?? orchDetails.amount_of_motion ?? 0.5;
+  
+  // [SegmentPromptDebug] Log prompt resolution to verify UI values are being used
+  console.log('[IndividualTravelSegment] [SegmentPromptDebug] Prompt resolution:', {
+    hasParamsBasePrompt: params.base_prompt !== undefined && params.base_prompt !== null,
+    paramsBasePrompt: params.base_prompt?.substring(0, 50),
+    origBasePrompt: orig.base_prompt?.substring(0, 50),
+    origPrompt: orig.prompt?.substring(0, 50),
+    finalBasePrompt: basePrompt?.substring(0, 50),
+    hasParamsNegativePrompt: params.negative_prompt !== undefined && params.negative_prompt !== null,
+    finalNegativePrompt: negativePrompt?.substring(0, 50),
+    source: params.base_prompt !== undefined ? 'UI override (user-input)' : 'original params',
+  });
   
   // Build input_image_paths_resolved for orchestrator_details
   // Include all input images from the original orchestrator if available

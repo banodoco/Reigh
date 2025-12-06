@@ -130,6 +130,9 @@ export interface ShotEditorProps {
   // Motion mode
   motionMode?: 'basic' | 'presets' | 'advanced';
   onMotionModeChange?: (mode: 'basic' | 'presets' | 'advanced') => void;
+  // Generation type mode (I2V vs VACE)
+  generationTypeMode?: 'i2v' | 'vace';
+  onGenerationTypeModeChange?: (mode: 'i2v' | 'vace') => void;
   // Advanced mode
   advancedMode?: boolean;
   onAdvancedModeChange?: (advanced: boolean) => void;
@@ -141,6 +144,8 @@ export interface ShotEditorProps {
   onPhasePresetRemove?: () => void;
   // Blur save - triggers immediate save when user clicks away from field
   onBlurSave?: () => void;
+  // Restore defaults - respects current I2V/VACE mode (Task 2)
+  onRestoreDefaults?: () => void;
   // Mode selection removed - now hardcoded to use specific model
   // Navigation props
   onPreviousShot?: () => void;

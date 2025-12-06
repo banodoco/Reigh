@@ -379,8 +379,8 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                       </span>
                                     )}
                                   </div>
-                                  {/* Mobile buttons - top right (keep visible on mobile, including iPad at lg widths) */}
-                                  <div className={`flex gap-2 flex-shrink-0 ${isMobile ? '' : 'hidden'}`}>
+                                  {/* Action buttons - visible on mobile or on smaller desktop viewports */}
+                                  <div className={`flex gap-2 flex-shrink-0 ${isMobile ? '' : 'lg:hidden'}`}>
                                     {isSelectedOnGenerator ? (
                                       <Button
                                         variant="destructive"
@@ -397,8 +397,19 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                         variant="default"
                                         size="sm"
                                         onClick={() => {
+                                          console.log('[LoraAddDebug] Add button clicked (mobile buttons):', {
+                                            loraId: lora["Model ID"],
+                                            loraName: lora.Name,
+                                            hasModelFiles: !!(lora["Model Files"] && lora["Model Files"].length > 0),
+                                            modelFilesCount: lora["Model Files"]?.length || 0,
+                                            isMobile
+                                          });
                                           if (lora["Model Files"] && lora["Model Files"].length > 0) {
+                                            console.log('[LoraAddDebug] Calling onAddLora...');
                                             onAddLora(lora);
+                                            console.log('[LoraAddDebug] onAddLora called successfully');
+                                          } else {
+                                            console.log('[LoraAddDebug] ❌ Cannot add - no Model Files');
                                           }
                                         }}
                                         disabled={!lora["Model Files"] || lora["Model Files"].length === 0}
@@ -449,8 +460,8 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                 </div>
                                 <p className="text-sm text-muted-foreground" title={lora.Author}>By: {lora.Author}</p>
                             </div>
-                            {/* Desktop buttons - right side */}
-                            <div className={`flex flex-col lg:items-end gap-2 flex-shrink-0 ${isMobile ? 'hidden' : 'hidden lg:flex'}`}>
+                            {/* Desktop buttons - right side (hidden on mobile and small screens) */}
+                            <div className={`flex-col lg:items-end gap-2 flex-shrink-0 hidden lg:flex ${isMobile ? '!hidden' : ''}`}>
                               <div className="flex gap-2">
                                 {isSelectedOnGenerator ? (
                                   <Button
@@ -468,8 +479,19 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                     variant="default"
                                     size="sm"
                                     onClick={() => {
+                                      console.log('[LoraAddDebug] Add button clicked (desktop buttons):', {
+                                        loraId: lora["Model ID"],
+                                        loraName: lora.Name,
+                                        hasModelFiles: !!(lora["Model Files"] && lora["Model Files"].length > 0),
+                                        modelFilesCount: lora["Model Files"]?.length || 0,
+                                        isMobile
+                                      });
                                       if (lora["Model Files"] && lora["Model Files"].length > 0) {
+                                        console.log('[LoraAddDebug] Calling onAddLora...');
                                         onAddLora(lora);
+                                        console.log('[LoraAddDebug] onAddLora called successfully');
+                                      } else {
+                                        console.log('[LoraAddDebug] ❌ Cannot add - no Model Files');
                                       }
                                     }}
                                     disabled={!lora["Model Files"] || lora["Model Files"].length === 0}
@@ -1554,10 +1576,9 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     onClick={() => setShowAddedLorasOnly(!showAddedLorasOnly)}
                     className="flex items-center gap-2"
                   >
-                    <Checkbox 
-                      checked={showAddedLorasOnly}
-                      className="pointer-events-none h-4 w-4"
-                    />
+                    <span className={`h-4 w-4 rounded-sm border flex items-center justify-center ${showAddedLorasOnly ? 'bg-primary border-primary' : 'border-input'}`}>
+                      {showAddedLorasOnly && <span className="text-xs text-primary-foreground">✓</span>}
+                    </span>
                     <span className="hidden sm:inline">Show selected LoRAs</span>
                     <span className="sm:hidden">Selected</span>
                   </Button>
@@ -1569,10 +1590,9 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     onClick={() => setShowMyLorasOnly(!showMyLorasOnly)}
                     className="flex items-center gap-2"
                   >
-                    <Checkbox 
-                      checked={showMyLorasOnly}
-                      className="pointer-events-none h-4 w-4"
-                    />
+                    <span className={`h-4 w-4 rounded-sm border flex items-center justify-center ${showMyLorasOnly ? 'bg-primary border-primary' : 'border-input'}`}>
+                      {showMyLorasOnly && <span className="text-xs text-primary-foreground">✓</span>}
+                    </span>
                     <span className="hidden sm:inline">Show my LoRAs</span>
                     <span className="sm:hidden">My LoRAs</span>
                   </Button>

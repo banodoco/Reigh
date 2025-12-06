@@ -108,9 +108,18 @@ export const useLoraSync = ({
   
   // Add lora handler
   const handleAddLora = useCallback((loraToAdd: LoraModel, _isManualAction = true, initialStrength?: number) => {
+    console.log('[LoraAddDebug] handleAddLora called:', {
+      loraId: loraToAdd["Model ID"],
+      loraName: loraToAdd.Name,
+      hasModelFiles: !!(loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0),
+      modelFilesCount: loraToAdd["Model Files"]?.length || 0,
+      currentSelectedLoras: selectedLorasFromProps.map(l => l.id),
+      initialStrength
+    });
+    
     // Check if already exists
     if (selectedLorasFromProps.find(sl => sl.id === loraToAdd["Model ID"])) {
-      console.log(`[LoRA] LoRA ${loraToAdd["Model ID"]} already exists, skipping`);
+      console.log(`[LoraAddDebug] ❌ LoRA ${loraToAdd["Model ID"]} already exists, skipping`);
       return;
     }
 
@@ -126,8 +135,12 @@ export const useLoraSync = ({
           : undefined,
         trigger_word: loraToAdd.trigger_word,
       };
-      console.log(`[LoRA] Adding LoRA ${newLora.id} with strength ${newLora.strength}`);
+      console.log(`[LoraAddDebug] ✅ Adding LoRA:`, newLora);
+      console.log('[LoraAddDebug] New loras array will be:', [...selectedLorasFromProps, newLora]);
       onSelectedLorasChange([...selectedLorasFromProps, newLora]);
+      console.log('[LoraAddDebug] onSelectedLorasChange called');
+    } else {
+      console.log('[LoraAddDebug] ❌ Cannot add - no Model Files found');
     }
   }, [selectedLorasFromProps, onSelectedLorasChange]);
   
