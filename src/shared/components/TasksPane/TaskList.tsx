@@ -149,9 +149,37 @@ const TaskList: React.FC<TaskListProps> = ({
   const prevTaskIdsRef = React.useRef<Set<string>>(new Set());
   const hasInitializedRef = React.useRef(false);
   const prevPageRef = React.useRef<number>(currentPage);
+  
+  // Track filter transitions to show skeleton during switch
+  const [isFilterTransitioning, setIsFilterTransitioning] = useState(false);
+  const prevFilterRef = React.useRef<FilterGroup>(activeFilter);
 
   // Use paginated data instead of fetching tasks directly
   const tasks = paginatedData?.tasks || [];
+  
+  // Detect filter changes and show skeleton during transition
+  useEffect(() => {
+    if (prevFilterRef.current !== activeFilter) {
+      // Filter changed - show skeleton immediately
+      setIsFilterTransitioning(true);
+      prevFilterRef.current = activeFilter;
+    }
+  }, [activeFilter]);
+  
+  // Clear transitioning state when we get data for the new filter
+  useEffect(() => {
+    if (isFilterTransitioning && tasks.length > 0 && !isLoading) {
+      // We have data and we're not loading - transition complete
+      setIsFilterTransitioning(false);
+    } else if (isFilterTransitioning && !isLoading && tasks.length === 0) {
+      // No data but also not loading - this filter is genuinely empty
+      // Use a small delay to ensure we're not in a race condition
+      const timer = setTimeout(() => {
+        setIsFilterTransitioning(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isFilterTransitioning, tasks.length, isLoading]);
 
   useEffect(() => {
     if (!tasks || tasks.length === 0) return;
@@ -261,23 +289,26 @@ const TaskList: React.FC<TaskListProps> = ({
     }
   };
 
+  // Show skeleton during initial load OR during filter transitions
+  const showSkeleton = isLoading || isFilterTransitioning;
+
   return (
     <div className="p-4 h-full flex flex-col text-zinc-200">
-      {summaryMessage && (
+      {summaryMessage && !showSkeleton && (
         <div className="p-3 mb-4 bg-zinc-800/95 rounded-md text-sm text-zinc-300 border border-zinc-700">
           {summaryMessage}
         </div>
       )}
       
-      {isLoading && (
+      {showSkeleton && (
         <TaskListSkeleton activeFilter={activeFilter} />
       )}
       
-      {!isLoading && filteredTasks.length === 0 && !summaryMessage && (
+      {!showSkeleton && filteredTasks.length === 0 && !summaryMessage && (
         <p className="text-zinc-400 text-center">{getEmptyMessage()}</p>
       )}
 
-      {!isLoading && filteredTasks.length > 0 && (
+      {!showSkeleton && filteredTasks.length > 0 && (
         <div className="flex-grow -mr-4">
           <ScrollArea className="h-full pr-4">
               {filteredTasks.map((task: Task, idx: number) => (

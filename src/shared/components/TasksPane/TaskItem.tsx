@@ -144,6 +144,20 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     // Show tooltips for all video and image tasks
     const showsTooltip = (isVideoTask || isImageTask);
     
+    // DEBUG: Log task type detection
+    console.log('[OpenImageButtonDebug] Task type detection:', {
+      taskId: task.id?.substring(0, 8),
+      taskType: task.taskType,
+      dbContentType: dbContentType || 'null',
+      inferredContentType: inferredContentType || 'null',
+      finalContentType: contentType || 'null',
+      isKnownImageType: knownImageTaskTypes.includes(task.taskType),
+      isImageTask,
+      isCompletedImageTask,
+      status: task.status,
+      hasOutputLocation: !!task.outputLocation,
+    });
+    
     return { 
       isVideoTask, 
       isImageTask, 
@@ -165,11 +179,27 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
 
   // Fetch the actual generation record for this task
   // Use the generalized bridge for task-to-generation mapping
-  const { data: actualGeneration } = useTaskGenerationMapping(
+  const { data: actualGeneration, isLoading: isLoadingGeneration, error: generationError } = useTaskGenerationMapping(
     task.id, 
     hasGeneratedImage ? task.outputLocation : null, 
     task.projectId
   );
+  
+  // DEBUG: Log generation fetching for image tasks
+  React.useEffect(() => {
+    if (taskInfo.isImageTask && hasGeneratedImage) {
+      console.log('[OpenImageButtonDebug] Generation fetch status:', {
+        taskId: task.id?.substring(0, 8),
+        taskType: task.taskType,
+        hasGeneratedImage,
+        outputLocation: task.outputLocation?.substring(0, 50) || 'none',
+        isLoadingGeneration,
+        hasActualGeneration: !!actualGeneration,
+        actualGenerationId: actualGeneration?.id?.substring(0, 8) || 'none',
+        generationError: generationError?.message || 'none',
+      });
+    }
+  }, [taskInfo.isImageTask, hasGeneratedImage, task.id, task.taskType, task.outputLocation, isLoadingGeneration, actualGeneration, generationError]);
   
   // Legacy fallback - can be removed once bridge is stable
   const { data: legacyGeneration } = useQuery({
@@ -248,6 +278,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
 
   // Create GenerationRow data for MediaLightbox using the actual generation
   const generationData: GenerationRow | null = React.useMemo(() => {
+    // DEBUG: Log why generationData might be null for image tasks
+    if (taskInfo.isImageTask && (!hasGeneratedImage || !actualGeneration)) {
+      console.log('[OpenImageButtonDebug] generationData is null:', {
+        taskId: task.id?.substring(0, 8),
+        taskType: task.taskType,
+        hasGeneratedImage,
+        hasActualGeneration: !!actualGeneration,
+        taskStatus: task.status,
+        hasOutputLocation: !!task.outputLocation,
+        outputLocation: task.outputLocation?.substring(0, 50) || 'none',
+      });
+    }
+    
     if (!hasGeneratedImage || !actualGeneration) return null;
     
     // The field in the database is 'based_on' - check for it at the top level
@@ -292,6 +335,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     // Database fields: location (full image), thumbnail_url (thumb)
     const imageUrl = actualGeneration.location || (actualGeneration as any).thumbnail_url;
     const thumbUrl = (actualGeneration as any).thumbnail_url || actualGeneration.location;
+    
+    // DEBUG: Log successful generationData creation for image tasks
+    if (taskInfo.isImageTask) {
+      console.log('[OpenImageButtonDebug] generationData created successfully:', {
+        taskId: task.id?.substring(0, 8),
+        taskType: task.taskType,
+        generationId: actualGeneration.id?.substring(0, 8),
+        hasLocation: !!actualGeneration.location,
+        hasImageUrl: !!imageUrl,
+        hasThumbUrl: !!thumbUrl,
+      });
+    }
     
     return {
       id: actualGeneration.id, // Use the real generation ID
@@ -1017,7 +1072,44 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       
 
       {/* Action button overlay for image generation tasks on hover (desktop) or when active (mobile) */}
-      {((isHoveringTaskItem && !isMobile) || (isMobile && isMobileActive)) && taskInfo.isImageTask && generationData && (
+      {(() => {
+        const hoverCondition = isHoveringTaskItem && !isMobile;
+        const mobileActiveCondition = isMobile && isMobileActive;
+        const shouldShowButton = (hoverCondition || mobileActiveCondition) && taskInfo.isImageTask && generationData;
+        
+        // DEBUG: Log button visibility conditions - detailed log when hovering (separate lines to avoid truncation)
+        if (taskInfo.isImageTask && (isHoveringTaskItem || isMobileActive)) {
+          const missingCondition = !shouldShowButton ? (
+            !hoverCondition && !mobileActiveCondition ? 'NOT_HOVERING_OR_MOBILE_ACTIVE' :
+            !taskInfo.isImageTask ? 'NOT_IMAGE_TASK' :
+            !generationData ? 'NO_GENERATION_DATA' :
+            'UNKNOWN'
+          ) : 'ALL_MET';
+          
+          console.log('[OpenImageButtonDebug] ===== FULL DETAILS (hovering/active) =====');
+          console.log('[OpenImageButtonDebug] taskId:', task.id?.substring(0, 8));
+          console.log('[OpenImageButtonDebug] taskType:', task.taskType);
+          console.log('[OpenImageButtonDebug] status:', task.status);
+          console.log('[OpenImageButtonDebug] hasOutputLocation:', !!task.outputLocation);
+          console.log('[OpenImageButtonDebug] outputLocation:', task.outputLocation?.substring(0, 50) || 'none');
+          console.log('[OpenImageButtonDebug] isHoveringTaskItem:', isHoveringTaskItem);
+          console.log('[OpenImageButtonDebug] isMobile:', isMobile);
+          console.log('[OpenImageButtonDebug] isMobileActive:', isMobileActive);
+          console.log('[OpenImageButtonDebug] taskInfoIsImageTask:', taskInfo.isImageTask);
+          console.log('[OpenImageButtonDebug] hasGenerationData:', !!generationData);
+          console.log('[OpenImageButtonDebug] generationDataId:', generationData?.id?.substring(0, 8) || 'none');
+          console.log('[OpenImageButtonDebug] hoverCondition:', hoverCondition);
+          console.log('[OpenImageButtonDebug] mobileActiveCondition:', mobileActiveCondition);
+          console.log('[OpenImageButtonDebug] hoverOrMobile:', hoverCondition || mobileActiveCondition);
+          console.log('[OpenImageButtonDebug] isImageTask:', taskInfo.isImageTask);
+          console.log('[OpenImageButtonDebug] hasGenerationData:', !!generationData);
+          console.log('[OpenImageButtonDebug] shouldShowButton:', shouldShowButton);
+          console.log('[OpenImageButtonDebug] MISSING_CONDITION:', missingCondition);
+          console.log('[OpenImageButtonDebug] ===========================================');
+        }
+        
+        return shouldShowButton;
+      })() && (
         <div 
           className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
           onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
