@@ -139,11 +139,11 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
 
   // Qwen image generation (legacy task type name)
   qwen_image: {
-    isVisible: true,
-    displayName: 'Qwen Image',
+    isVisible: false, // Hidden - legacy task type, superseded by qwen_image_style
+    displayName: 'Qwen Image (Legacy)',
     canCancel: true,
     category: 'generation',
-    description: 'Generate images using Qwen model'
+    description: 'Generate images using Qwen model (legacy)'
   },
 
   // Qwen image style generation (current task type for Qwen model)
@@ -157,7 +157,7 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
 
   // Wan 2.2 text-to-image generation (current task type for non-Qwen models)
   wan_2_2_t2i: {
-    isVisible: true,
+    isVisible: false, // Hidden from filter - uses same UI as Qwen Image
     displayName: 'Image Generation',
     canCancel: true,
     category: 'generation',

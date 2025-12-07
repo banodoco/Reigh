@@ -242,25 +242,25 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
       </div>
       
       <div className={`${padding} ${spacing}`}>
-      <div className={`${isMobile ? 'mb-2' : 'mb-4'} flex items-center gap-3`}>
-        <h2 className={`${headerSize} font-light`}>Edit Image</h2>
+      <div className={isMobile ? 'mb-2' : 'mb-4'}>
+        <h2 className={`${headerSize} font-light mb-3`}>Edit Image</h2>
         
-        {/* Four-way toggle: Text | Inpaint | Annotate | Reposition - Segmented control style */}
-        <div className="inline-flex items-center border border-border rounded-lg overflow-hidden bg-muted/30">
+        {/* Four-way toggle: Text | Inpaint | Annotate | Reposition - 2x2 grid on narrow screens */}
+        <div className="grid grid-cols-2 gap-1 border border-border rounded-lg overflow-hidden bg-muted/30">
             <button
               onClick={() => {
                 setIsInpaintMode(true);
                 setEditMode('text');
               }}
               className={cn(
-                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
+                `flex items-center justify-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
                 editMode === 'text'
                   ? "bg-background text-foreground font-medium shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               <Type className={toggleIconSize} />
-              {!isMobile && 'Text'}
+              Text
             </button>
             <button
               onClick={() => {
@@ -268,14 +268,14 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 setEditMode('inpaint');
               }}
               className={cn(
-                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
+                `flex items-center justify-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
                 editMode === 'inpaint'
                   ? "bg-background text-foreground font-medium shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               <Paintbrush className={toggleIconSize} />
-              {!isMobile && 'Inpaint'}
+              Inpaint
             </button>
             <button
               onClick={() => {
@@ -283,14 +283,14 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 setEditMode('annotate');
               }}
               className={cn(
-                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
+                `flex items-center justify-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
                 editMode === 'annotate'
                   ? "bg-background text-foreground font-medium shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               <Pencil className={toggleIconSize} />
-              {!isMobile && 'Annotate'}
+              Annotate
             </button>
             <button
               onClick={() => {
@@ -298,7 +298,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 setEditMode('reposition');
               }}
               className={cn(
-                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
+                `flex items-center justify-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
                 editMode === 'reposition'
                   ? "bg-background text-foreground font-medium shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -306,7 +306,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               title="Move, scale, or rotate the image to fill edges with AI"
             >
               <Move className={toggleIconSize} />
-              {!isMobile && 'Reposition'}
+              Reposition
             </button>
           </div>
         </div>

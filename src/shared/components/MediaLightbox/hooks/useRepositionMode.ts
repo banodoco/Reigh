@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { GenerationRow } from '@/types/shots';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { createImageInpaintTask } from '@/shared/lib/tasks/imageInpaint';
@@ -83,6 +84,7 @@ export const useRepositionMode = ({
   onVariantCreated,
   refetchVariants,
 }: UseRepositionModeProps): UseRepositionModeReturn => {
+  const queryClient = useQueryClient();
   const [transform, setTransform] = useState<ImageTransform>(DEFAULT_TRANSFORM);
   const [isGeneratingReposition, setIsGeneratingReposition] = useState(false);
   const [repositionGenerateSuccess, setRepositionGenerateSuccess] = useState(false);
@@ -493,6 +495,9 @@ export const useRepositionMode = ({
       }
       
       console.log('[Reposition] ✅ Saved as variant:', insertedVariant?.id);
+      
+      // Invalidate unified-generations cache so results galleries refresh
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       
       // Refetch variants to update the list
       if (refetchVariants) {

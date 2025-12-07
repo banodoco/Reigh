@@ -6,7 +6,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
-import { Loader2, Check, Film, Wand2, AlertTriangle, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Check, Film, Wand2, AlertTriangle, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { LoraManager } from '@/shared/components/LoraManager';
 import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
@@ -203,6 +203,9 @@ export interface VideoPortionEditorProps {
     generateSuccess: boolean;
     isGenerateDisabled?: boolean;
     validationErrors?: string[];
+    
+    // Close
+    onClose?: () => void;
 }
 
 export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
@@ -227,6 +230,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     generateSuccess,
     isGenerateDisabled = false,
     validationErrors = [],
+    onClose,
 }) => {
     const enhancePromptValue = enhancePrompt ?? true;
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -257,12 +261,25 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     return (
         <TooltipProvider>
         <div className="p-6 space-y-6">
-            {/* Header */}
-            <div>
+            {/* Header with close button */}
+            <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium flex items-center gap-2">
                     <Wand2 className="w-5 h-5 text-primary" />
                     {selections.length > 1 ? 'Regenerate Portions' : 'Regenerate Portion'}
                 </h3>
+                {onClose && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                        }}
+                        className="h-8 w-8 p-0 hover:bg-muted"
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                )}
             </div>
             
             {/* Per-Segment Settings - Show first! */}

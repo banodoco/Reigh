@@ -51,8 +51,6 @@ import {
 import {
   MediaDisplay,
   NavigationButtons,
-  InpaintControlsPanel,
-  MagicEditControlsPanel,
   TaskDetailsSection,
   MediaControls,
   WorkflowControls,
