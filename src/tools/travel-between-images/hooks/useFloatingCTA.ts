@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface UseFloatingCTAProps {
   timelineRef: React.RefObject<HTMLDivElement>;
@@ -20,7 +20,7 @@ interface UseFloatingCTAReturn {
 export const useFloatingCTA = ({
   timelineRef,
   ctaRef,
-  hasActiveSelection: _hasActiveSelection, // Unused - selection bar now stacks above CTA
+  hasActiveSelection,
   isMobile,
   enabled = true
 }: UseFloatingCTAProps): UseFloatingCTAReturn => {
@@ -29,8 +29,80 @@ export const useFloatingCTA = ({
   const hasScrolledRef = useRef(false);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMountRef = useRef(true);
+  // Track if CTA was floating before selection started (to restore after deselect)
+  const wasFloatingBeforeSelectionRef = useRef(false);
+  
+  // Configuration constants
+  const TRIGGER_BUFFER = isMobile ? 200 : 100;
+  const TOP_THRESHOLD = 50;
+  const PERSIST_BUFFER = 100;
 
-  // Manage element visibility with animation delay
+  // Memoized check function that can be called immediately or on scroll
+  const checkFloatingState = useCallback(() => {
+    const timelineEl = timelineRef.current;
+    const ctaEl = ctaRef.current;
+    if (!timelineEl || !ctaEl) return;
+    
+    const timelineRect = timelineEl.getBoundingClientRect();
+    const ctaRect = ctaEl.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+    
+    // Visibility conditions
+    const userHasScrolled = hasScrolledRef.current;
+    const notAtTop = scrollY > TOP_THRESHOLD;
+    const timelineHasBeenViewed = timelineRect.top < (viewportHeight - TRIGGER_BUFFER);
+    const ctaNotVisible = ctaRect.top > (viewportHeight - PERSIST_BUFFER);
+    const noActiveSelection = !hasActiveSelection;
+    
+    const shouldFloat = userHasScrolled && notAtTop && timelineHasBeenViewed && ctaNotVisible && noActiveSelection;
+    
+    setIsFloating(shouldFloat);
+  }, [timelineRef, ctaRef, hasActiveSelection, TRIGGER_BUFFER, TOP_THRESHOLD, PERSIST_BUFFER]);
+
+  // INSTANT: Hide immediately when selection becomes active
+  // This runs synchronously before any animation delays
+  useEffect(() => {
+    if (hasActiveSelection) {
+      // Selection started - hide immediately if floating
+      if (isFloating) {
+        wasFloatingBeforeSelectionRef.current = true;
+        setIsFloating(false);
+        setShowElement(false);
+        // Clear any pending timers
+        if (hideTimerRef.current) {
+          clearTimeout(hideTimerRef.current);
+          hideTimerRef.current = null;
+        }
+      }
+    } else if (!hasActiveSelection && enabled) {
+      // Selection ended - check if CTA should float based on CURRENT scroll position
+      // (user may have scrolled during selection)
+      wasFloatingBeforeSelectionRef.current = false;
+      
+      const timelineEl = timelineRef.current;
+      const ctaEl = ctaRef.current;
+      if (timelineEl && ctaEl) {
+        const timelineRect = timelineEl.getBoundingClientRect();
+        const ctaRect = ctaEl.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+        
+        const notAtTop = scrollY > TOP_THRESHOLD;
+        const timelineHasBeenViewed = timelineRect.top < (viewportHeight - TRIGGER_BUFFER);
+        const ctaNotVisible = ctaRect.top > (viewportHeight - PERSIST_BUFFER);
+        
+        // Show instantly if conditions are met (skip hasScrolledRef check since user clearly scrolled if they're here)
+        if (notAtTop && timelineHasBeenViewed && ctaNotVisible) {
+          hasScrolledRef.current = true; // Mark as scrolled since we're in a scrolled position
+          setIsFloating(true);
+          setShowElement(true);
+        }
+      }
+    }
+  }, [hasActiveSelection, enabled, isFloating, timelineRef, ctaRef, TRIGGER_BUFFER, TOP_THRESHOLD, PERSIST_BUFFER]);
+
+  // Manage element visibility with animation delay (for scroll-based changes)
   useEffect(() => {
     // After first render, mark that initial mount is complete
     if (isInitialMountRef.current) {
@@ -45,9 +117,8 @@ export const useFloatingCTA = ({
       }
       // Show immediately when it should float
       setShowElement(true);
-    } else if (showElement && !isInitialMountRef.current) {
-      // When it should hide, wait for animation to complete before removing from DOM
-      // Clear any existing timer first
+    } else if (showElement && !isInitialMountRef.current && !hasActiveSelection) {
+      // When it should hide (not due to selection), wait for animation to complete
       if (hideTimerRef.current) {
         clearTimeout(hideTimerRef.current);
       }
@@ -62,7 +133,7 @@ export const useFloatingCTA = ({
         clearTimeout(hideTimerRef.current);
       }
     };
-  }, [isFloating, showElement]);
+  }, [isFloating, showElement, hasActiveSelection]);
 
   // Scroll-based detection
   useEffect(() => {
@@ -71,52 +142,8 @@ export const useFloatingCTA = ({
     const timelineEl = timelineRef.current;
     const ctaEl = ctaRef.current;
     if (!timelineEl || !ctaEl) {
-      console.log('[FloatingCTA] 🔍 Refs not ready yet, waiting...');
       return;
     }
-    
-    console.log('[FloatingCTA] ✅ Setting up scroll-based floating CTA detection');
-    
-    // Configuration
-    const TRIGGER_BUFFER = isMobile ? 200 : 100; // Delay before showing (px)
-    const TOP_THRESHOLD = 50; // Hide when near top (px)
-    const PERSIST_BUFFER = 100; // Hide when original CTA this far into viewport (px)
-    
-    const checkFloatingState = () => {
-      const timelineRect = timelineEl.getBoundingClientRect();
-      const ctaRect = ctaEl.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-      
-      // Visibility conditions
-      const userHasScrolled = hasScrolledRef.current;
-      const notAtTop = scrollY > TOP_THRESHOLD;
-      const timelineHasBeenViewed = timelineRect.top < (viewportHeight - TRIGGER_BUFFER);
-      const ctaNotVisible = ctaRect.top > (viewportHeight - PERSIST_BUFFER);
-      // Note: We no longer hide when selection is active - selection bar stacks above this
-      
-      const shouldFloat = userHasScrolled && notAtTop && timelineHasBeenViewed && ctaNotVisible;
-      
-      console.log('[FloatingCTA] 📊 Check:', {
-        shouldFloat,
-        conditions: {
-          userHasScrolled,
-          notAtTop,
-          timelineHasBeenViewed,
-          ctaNotVisible
-        },
-        metrics: {
-          scrollY: scrollY.toFixed(0),
-          timelineTop: timelineRect.top.toFixed(0),
-          ctaTop: ctaRect.top.toFixed(0)
-        }
-      });
-      
-      if (shouldFloat !== isFloating) {
-        console.log('[FloatingCTA] 🔄 Changing floating state from', isFloating, 'to', shouldFloat);
-        setIsFloating(shouldFloat);
-      }
-    };
     
     // Check on scroll (throttled)
     let scrollTimeout: NodeJS.Timeout | null = null;
@@ -124,7 +151,6 @@ export const useFloatingCTA = ({
       // Mark that user has scrolled
       if (!hasScrolledRef.current) {
         hasScrolledRef.current = true;
-        console.log('[FloatingCTA] ✅ User has scrolled, enabling floating CTA detection');
       }
       
       if (scrollTimeout) return;
@@ -149,7 +175,7 @@ export const useFloatingCTA = ({
       // Reset scroll tracking when effect re-runs
       hasScrolledRef.current = false;
     };
-  }, [isMobile, isFloating, enabled]);
+  }, [enabled, checkFloatingState]);
 
   return {
     isFloating,

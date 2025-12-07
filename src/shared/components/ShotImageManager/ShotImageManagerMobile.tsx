@@ -634,16 +634,16 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
         
         return (
           <div 
-            className="fixed z-[90] flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-300"
+            className="fixed z-50 flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-300 pointer-events-none"
             style={{
               left: `${leftOffset}px`,
               right: `${rightOffset}px`,
               paddingLeft: '16px',
               paddingRight: '16px',
-              bottom: '205px', // Positioned above floating Generate Video CTA
+              bottom: '64px', // Higher on mobile
             }}
           >
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3 pointer-events-auto">
               <span className="text-sm font-light text-gray-700 dark:text-gray-300">
                 {mobileSelectedIds.length} selected
               </span>
