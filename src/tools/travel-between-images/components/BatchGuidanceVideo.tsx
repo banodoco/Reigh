@@ -3,9 +3,12 @@ import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Slider } from '@/shared/components/ui/slider';
-import { Video, X } from 'lucide-react';
+import { Video, X, Images } from 'lucide-react';
 import { toast } from 'sonner';
 import { uploadVideoToStorage, extractVideoMetadata, VideoMetadata } from '@/shared/lib/videoUploader';
+import { DatasetBrowserModal } from '@/shared/components/DatasetBrowserModal';
+import { useCreateResource, Resource, StructureVideoMetadata } from '@/shared/hooks/useResources';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BatchGuidanceVideoProps {
   shotId: string;
@@ -15,7 +18,7 @@ interface BatchGuidanceVideoProps {
   treatment: 'adjust' | 'clip';
   motionStrength: number;
   structureType?: 'flow' | 'canny' | 'depth';
-  onVideoUploaded: (videoUrl: string | null, metadata: VideoMetadata | null) => void;
+  onVideoUploaded: (videoUrl: string | null, metadata: VideoMetadata | null, resourceId?: string) => void;
   onTreatmentChange: (treatment: 'adjust' | 'clip') => void;
   onMotionStrengthChange: (strength: number) => void;
   onStructureTypeChange?: (type: 'flow' | 'canny' | 'depth') => void;
@@ -43,7 +46,11 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   // ALL HOOKS MUST BE AT THE TOP - before any conditional returns
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showBrowser, setShowBrowser] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
+  // Resource creation hook
+  const createResource = useCreateResource();
   
   // Video scrubbing hooks (always called, even if not used)
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -200,13 +207,37 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
         file,
         projectId,
         shotId,
-        (progress) => setUploadProgress(25 + (progress * 0.75)) // Map 0-100 to 25-100
+        (progress) => setUploadProgress(25 + (progress * 0.65)) // Map 0-100 to 25-90
       );
       console.log('[BatchGuidanceVideo] Upload complete:', uploadedVideoUrl);
+      setUploadProgress(90);
+
+      // Create resource for reuse
+      console.log('[BatchGuidanceVideo] Creating resource...');
+      const { data: { user } } = await supabase.auth.getUser();
+      const now = new Date().toISOString();
+      const resourceMetadata: StructureVideoMetadata = {
+        name: `Guidance Video ${new Date().toLocaleString()}`,
+        videoUrl: uploadedVideoUrl,
+        thumbnailUrl: null, // Could generate a thumbnail later
+        videoMetadata: metadata,
+        created_by: {
+          is_you: true,
+          username: user?.email || 'user',
+        },
+        is_public: false,
+        createdAt: now,
+      };
+      
+      const resource = await createResource.mutateAsync({
+        type: 'structure-video',
+        metadata: resourceMetadata,
+      });
+      console.log('[BatchGuidanceVideo] Resource created:', resource.id);
       setUploadProgress(100);
 
-      // Notify parent
-      onVideoUploaded(uploadedVideoUrl, metadata);
+      // Notify parent with resource ID
+      onVideoUploaded(uploadedVideoUrl, metadata, resource.id);
     } catch (error) {
       console.error('[BatchGuidanceVideo] Upload failed:', error);
       toast.error(`Failed to upload video: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -220,57 +251,93 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   };
 
   const handleRemoveVideo = () => {
-    onVideoUploaded(null, null);
+    onVideoUploaded(null, null, undefined);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
+  // Handle selecting a video from the browser
+  const handleResourceSelect = useCallback((resource: Resource) => {
+    const metadata = resource.metadata as StructureVideoMetadata;
+    console.log('[BatchGuidanceVideo] Resource selected from browser:', {
+      resourceId: resource.id,
+      videoUrl: metadata.videoUrl,
+      metadata: metadata.videoMetadata,
+    });
+    onVideoUploaded(metadata.videoUrl, metadata.videoMetadata, resource.id);
+    setShowBrowser(false);
+  }, [onVideoUploaded]);
+
   if (!videoUrl) {
     // Upload prompt - responsive width
     return (
-      <div className="mb-4">
-        <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <Video className="h-8 w-8 text-muted-foreground" />
-            <p className="text-xs text-muted-foreground">
-              Add a motion guidance video to control the animation
-            </p>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/mp4,video/webm,video/quicktime"
-              onChange={handleFileSelect}
-              disabled={isUploading}
-              className="hidden"
-              id={`batch-video-upload-${shotId}`}
-            />
-            <Label htmlFor={`batch-video-upload-${shotId}`} className="m-0 cursor-pointer w-full">
-              <Button
-                variant="outline"
-                size="sm"
+      <>
+        <div className="mb-4">
+          <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <Video className="h-8 w-8 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">
+                Add a motion guidance video to control the animation
+              </p>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime"
+                onChange={handleFileSelect}
                 disabled={isUploading}
-                className="w-full"
-                asChild
-              >
-                <span>
-                  {isUploading ? `Uploading... ${uploadProgress}%` : 'Upload Video'}
-                </span>
-              </Button>
-            </Label>
-            
-            {isUploading && (
-              <div className="w-full bg-muted rounded-full h-2">
-                <div
-                  className="bg-primary h-2 rounded-full transition-all"
-                  style={{ width: `${uploadProgress}%` }}
-                />
+                className="hidden"
+                id={`batch-video-upload-${shotId}`}
+              />
+              
+              <div className="flex gap-2 w-full">
+                <Label htmlFor={`batch-video-upload-${shotId}`} className="m-0 cursor-pointer flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isUploading}
+                    className="w-full"
+                    asChild
+                  >
+                    <span>
+                      {isUploading ? `Uploading... ${uploadProgress}%` : 'Upload'}
+                    </span>
+                  </Button>
+                </Label>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploading}
+                  onClick={() => setShowBrowser(true)}
+                  className="flex-1"
+                >
+                  <Images className="h-4 w-4 mr-1" />
+                  Browse
+                </Button>
               </div>
-            )}
+              
+              {isUploading && (
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+        
+        <DatasetBrowserModal
+          isOpen={showBrowser}
+          onOpenChange={setShowBrowser}
+          resourceType="structure-video"
+          title="Browse Guidance Videos"
+          onResourceSelect={handleResourceSelect}
+        />
+      </>
     );
   }
 

@@ -445,6 +445,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_public: boolean
           metadata: Json
           type: string
           user_id: string
@@ -452,6 +453,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_public?: boolean
           metadata: Json
           type: string
           user_id: string
@@ -459,6 +461,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_public?: boolean
           metadata?: Json
           type?: string
           user_id?: string

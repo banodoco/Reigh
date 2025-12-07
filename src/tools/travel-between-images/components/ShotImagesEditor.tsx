@@ -106,7 +106,8 @@ interface ShotImagesEditorProps {
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth'
+    structureType: 'flow' | 'canny' | 'depth',
+    resourceId?: string
   ) => void;
   /** Callback when selection state changes */
   onSelectionChange?: (hasSelection: boolean) => void;
@@ -1206,13 +1207,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       structureType={propStructureVideoType}
                       imageCount={images.length}
                       timelineFramePositions={images.map((img, index) => index * batchVideoFrames)}
-                      onVideoUploaded={(videoUrl, metadata) => {
+                      onVideoUploaded={(videoUrl, metadata, resourceId) => {
                         propOnStructureVideoChange(
                           videoUrl,
                           metadata,
                           propStructureVideoTreatment,
                           propStructureVideoMotionStrength,
-                          propStructureVideoType
+                          propStructureVideoType,
+                          resourceId
                         );
                       }}
                       onTreatmentChange={(treatment) => {

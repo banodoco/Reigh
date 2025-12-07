@@ -142,7 +142,8 @@ export interface TimelineProps {
     metadata: import("@/shared/lib/videoUploader").VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth'
+    structureType: 'flow' | 'canny' | 'depth',
+    resourceId?: string
   ) => void;
   // Image upload handler for empty state
   onImageUpload?: (files: File[]) => Promise<void>;

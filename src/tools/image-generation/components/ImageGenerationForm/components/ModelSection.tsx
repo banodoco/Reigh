@@ -4,7 +4,8 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
-import { Trash2, Images, Plus, X, Upload, Search } from "lucide-react";
+import { Trash2, Images, Plus, X, Upload, Search, Globe, Lock } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import FileInput from "@/shared/components/FileInput";
 import { SectionHeader } from "./SectionHeader";
 import { DatasetBrowserModal } from "@/shared/components/DatasetBrowserModal";
@@ -37,6 +38,7 @@ interface ModelSectionProps {
   onDeleteReference?: (id: string) => void;
   onUpdateReferenceName?: (id: string, name: string) => void;
   onResourceSelect?: (resource: Resource) => void;
+  onToggleVisibility?: (resourceId: string, currentIsPublic: boolean) => void;
 }
 
 // ReferenceSelector Component - shows thumbnail gallery of references
@@ -46,6 +48,7 @@ interface ReferenceSelectorProps {
   onSelectReference: (id: string) => void;
   onAddReference: (files: File[]) => void;
   onDeleteReference: (id: string) => void;
+  onToggleVisibility?: (resourceId: string, currentIsPublic: boolean) => void;
   isGenerating: boolean;
   isUploadingStyleReference: boolean;
   onOpenDatasetBrowser: () => void;
@@ -60,6 +63,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   onSelectReference,
   onAddReference,
   onDeleteReference,
+  onToggleVisibility,
   isGenerating,
   isUploadingStyleReference,
   onOpenDatasetBrowser,
@@ -253,31 +257,74 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
                   </div>
                 )}
                 
-                {/* Delete button - show on hover or when touched on mobile */}
+                {/* Action buttons - show on hover or when touched on mobile */}
                 {!isGenerating && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      onDeleteReference(ref.id);
-                    }}
-                    onTouchEnd={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      onDeleteReference(ref.id);
-                    }}
-                    className={cn(
-                      "absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 transition-opacity hover:bg-red-600 z-10",
-                      touchedRef === ref.id || isSelected
-                        ? "opacity-100"
-                        : "opacity-0 group-hover:opacity-100"
+                  <div className={cn(
+                    "absolute top-1 right-1 flex gap-1 transition-opacity z-10",
+                    touchedRef === ref.id || isSelected
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100"
+                  )}>
+                    {/* Visibility toggle - only show for owned references */}
+                    {onToggleVisibility && ref.resourceId && ref.isOwner && (
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onToggleVisibility(ref.resourceId, ref.isPublic);
+                              }}
+                              onTouchEnd={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onToggleVisibility(ref.resourceId, ref.isPublic);
+                              }}
+                              className={cn(
+                                "rounded-full p-1 transition-colors",
+                                ref.isPublic
+                                  ? "bg-green-500 text-white hover:bg-green-600"
+                                  : "bg-gray-500 text-white hover:bg-gray-600"
+                              )}
+                            >
+                              {ref.isPublic ? (
+                                <Globe className="h-3 w-3" />
+                              ) : (
+                                <Lock className="h-3 w-3" />
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">
+                            {ref.isPublic 
+                              ? "Public - visible to others. Click to make private." 
+                              : "Private - only you can see this. Click to make public."}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
-                    title="Delete reference"
-                  >
-                    <X className="h-3 w-3" />
-                </button>
-              )}
+                    
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onDeleteReference(ref.id);
+                      }}
+                      onTouchEnd={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onDeleteReference(ref.id);
+                      }}
+                      className="bg-red-500 text-white rounded-full p-1 transition-colors hover:bg-red-600"
+                      title="Delete reference"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
             </div>
           );
         });
@@ -411,6 +458,7 @@ const StyleReferenceSection: React.FC<{
   onDeleteReference?: (id: string) => void;
   onUpdateReferenceName?: (id: string, name: string) => void;
   onResourceSelect?: (resource: Resource) => void;
+  onToggleVisibility?: (resourceId: string, currentIsPublic: boolean) => void;
   // Loading state props
   isLoadingReferenceData?: boolean;
   referenceCount?: number;
@@ -442,6 +490,7 @@ const StyleReferenceSection: React.FC<{
   onDeleteReference,
   onUpdateReferenceName,
   onResourceSelect,
+  onToggleVisibility,
   isLoadingReferenceData = false,
   referenceCount = 0,
 }) => {
@@ -487,6 +536,7 @@ const StyleReferenceSection: React.FC<{
               onSelectReference={onSelectReference}
               onAddReference={onStyleUpload}
               onDeleteReference={onDeleteReference}
+              onToggleVisibility={onToggleVisibility}
               isGenerating={isGenerating}
               isUploadingStyleReference={isUploadingStyleReference}
               onOpenDatasetBrowser={() => setShowDatasetBrowser(true)}
@@ -691,6 +741,7 @@ const StyleReferenceSection: React.FC<{
         onSelectReference={onSelectReference}
         onAddReference={onStyleUpload}
         onDeleteReference={onDeleteReference}
+        onToggleVisibility={onToggleVisibility}
         isGenerating={isGenerating}
         isUploadingStyleReference={isUploadingStyleReference}
         onOpenDatasetBrowser={() => setShowDatasetBrowser(true)}
@@ -898,6 +949,7 @@ export const ModelSection: React.FC<ModelSectionProps & {
   onDeleteReference,
   onUpdateReferenceName,
   onResourceSelect,
+  onToggleVisibility,
   isLoadingReferenceData,
   referenceCount,
 }) => {
@@ -932,6 +984,7 @@ export const ModelSection: React.FC<ModelSectionProps & {
         onDeleteReference={onDeleteReference}
         onUpdateReferenceName={onUpdateReferenceName}
         onResourceSelect={onResourceSelect}
+        onToggleVisibility={onToggleVisibility}
         isLoadingReferenceData={isLoadingReferenceData}
         referenceCount={referenceCount}
       />

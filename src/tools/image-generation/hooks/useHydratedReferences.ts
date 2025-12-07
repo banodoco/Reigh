@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useSpecificResources } from '@/shared/hooks/useSpecificResources';
 import { useListResources, useListPublicResources, StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
 import { ReferenceImage, HydratedReferenceImage } from '../components/ImageGenerationForm/types';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Hook to hydrate reference pointers with full data from resources table
@@ -15,6 +16,17 @@ export const useHydratedReferences = (
   isLoading: boolean;
   hasLegacyReferences: boolean;
 } => {
+  // Get current user ID for ownership check
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setCurrentUserId(session?.user?.id || null);
+    };
+    getUser();
+  }, []);
+  
   // Extract resource IDs we need to fetch
   const resourceIdsToFetch = useMemo(() => {
     if (!referencePointers) return [];
@@ -77,6 +89,8 @@ export const useHydratedReferences = (
             styleBoostTerms: pointer.styleBoostTerms || '',
             createdAt: pointer.createdAt || new Date().toISOString(),
             updatedAt: pointer.updatedAt || new Date().toISOString(),
+            isPublic: false, // Legacy references default to private
+            isOwner: true, // Legacy references are always owned by current user
           } as HydratedReferenceImage;
         }
         
@@ -93,6 +107,10 @@ export const useHydratedReferences = (
         
         const metadata = resource.metadata as StyleReferenceMetadata;
         
+        // Check ownership - compare resource user_id with current user
+        const resourceOwnerId = (resource as any).userId || (resource as any).user_id;
+        const isOwner = !!(currentUserId && resourceOwnerId === currentUserId);
+        
         // Hydrate: Resource provides image data, pointer provides usage settings
         // Pointer settings override resource defaults (project-specific usage)
         return {
@@ -105,6 +123,9 @@ export const useHydratedReferences = (
           thumbnailUrl: metadata.thumbnailUrl || null,
           createdAt: resource.created_at,
           updatedAt: metadata.updatedAt,
+          // Visibility and ownership settings
+          isPublic: metadata.is_public ?? false,
+          isOwner: isOwner,
           // Project-specific usage settings from pointer (with resource defaults as fallback)
           referenceMode: pointer.referenceMode ?? metadata.referenceMode ?? 'style',
           styleReferenceStrength: pointer.styleReferenceStrength ?? metadata.styleReferenceStrength ?? 1.1,
@@ -122,7 +143,7 @@ export const useHydratedReferences = (
       isLoading,
       hasLegacyReferences
     };
-  }, [referencePointers, allResources, isLoading]);
+  }, [referencePointers, allResources, isLoading, currentUserId]);
   
   return result;
 };

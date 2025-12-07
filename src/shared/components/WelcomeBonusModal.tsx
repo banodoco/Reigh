@@ -96,17 +96,12 @@ const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     </DialogHeader>
     
     <div className="text-center space-y-4">
-
       <p className="text-muted-foreground">
-        We believe that combining image anchoring with additional control mechanisms can allow artists to steer AI video with unparalleled precision.
+        We believe that combining image anchoring with additional control mechanisms can allow artists to steer AI video with unparalleled precision and ease.
       </p>
       <p className="text-muted-foreground">
-        Reigh aims to provide you with the best techniques in the open source AI art ecosystem for both generating anchor images, and travelling between them.
+        Reigh aims to provide you with the best techniques in the open source AI art ecosystem for both generating anchor images, and travelling between them. We want to make the struggle of creating art that feels truly your own as easy as possible.
       </p>
-      <p className="text-muted-foreground">
-        Our goal is to make the beautiful struggle of creating art that feels truly your own as easy as possible.
-      </p>
-
     </div>
     
     <div className="flex justify-center pt-5 pb-2">
@@ -135,15 +130,11 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     
     <div className="text-center space-y-4">
       <p className="text-muted-foreground">
-        If you want to get good at creating art—or doing anything for that matter—the hardest part is not giving up.
+        If you want to get good at creating art, the hardest part is not giving up.
       </p>
       <p className="text-muted-foreground">
         Our community will grow to become a place where artists can learn from, support, and inspire each other.
       </p>
-      <p className="text-muted-foreground">
-        We hope it blossoms into a scene of creative but, most importantly, determined artists who ultimately create remarkable work.
-      </p>
-
     </div>
     
     <div className="flex flex-col space-y-2 pt-5 pb-2">
@@ -462,34 +453,27 @@ const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-
         <Coins className={`w-8 h-8 ${colors.icon}`} />
       </div>
       <DialogTitle className="text-2xl font-bold text-center">
-        We'll give you $5 credit if you promise to make something with Reigh
+        We'll give you $5 credit if you promise to <span className="text-primary underline decoration-2 underline-offset-2">make something bad</span> with Reigh
       </DialogTitle>
     </DialogHeader>
     
     <div className="text-center space-y-4">
       <p className="text-muted-foreground">
-        To understand an art tool, you must try to make art with it.
+        To understand an art tool, you must try to make art with it - but making good stuff is <strong>hard</strong>.
       </p>
       
       <p className="text-muted-foreground">
-        So let's make a deal: if you promise you'll use it to make <strong>a tiny music video (&lt;30 sec)</strong> and share it in our Discord, we'll give you $5 credit.
+        So let's make a deal: if you promise you'll use it to <em>make something bad</em> (e.g. an experimental &lt;30 sec music video) and share it in the #bad_art channel of our Discord, we'll give you $5 credit. 
       </p>
     </div>
     
     <div className="flex flex-col space-y-2 pt-5 pb-2">
       <Button onClick={() => onNext('music-video')} className="w-full">
-        I'll do it! 🎵
-      </Button>
-      <Button variant="outline" onClick={() => onNext('something-else')} className="w-full">
-        Okay...but I'll make something else...
+        I'll do it, gimme the credits 🎵
       </Button>
       <Button variant="ghost" onClick={() => onNext('no-thanks')} className="w-full text-muted-foreground bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700">
-        No thanks...
+        Sorry, I only make good stuff
       </Button>
-    </div>
-
-    <div className="text-xs text-muted-foreground text-center px-4">
-      This will send a message in our #WelcomeGambit channel to act as mild social pressure but we'll never check if you actually made it.
     </div>
   </>
   );
@@ -687,11 +671,7 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       
       <div className="text-center space-y-4">
         <p className="text-muted-foreground">
-          Reigh is an early-stage tool.
-        </p>
-        
-        <p className="text-muted-foreground">
-          If there's anything that isn't working for you or could be better, please drop into our Discord and leave a message in our #support channel or DM POM.
+          Reigh is an early-stage tool. If there's anything that isn't working for you or could be better, please drop into our Discord and leave a message in our #support channel or DM POM.
         </p>
         <p className="text-muted-foreground">
           There's no feedback too big or too small - so please share!
@@ -892,7 +872,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
             display: none !important;
           }
         `}</style>
-        <div className={isShaking ? 'shake-wrapper' : ''}>
+        <div className={`flex flex-col flex-1 min-h-0 ${isShaking ? 'shake-wrapper' : ''}`}>
           <div className={modal.headerClass}></div>
 
         <div ref={scrollRef} className={modal.scrollClass}>

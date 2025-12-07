@@ -243,6 +243,39 @@ export function useGenerationsPageLogic({
     filters
   );
   
+  // Fallback: if filtering by a specific shot returns 0 items, automatically switch to 'all'
+  // This handles cases where shotHasUnpositionedImages check was based on stale data
+  const [hasAutoFallenBack, setHasAutoFallenBack] = useState(false);
+  
+  useEffect(() => {
+    // Only auto-fallback if:
+    // 1. We're filtering by a specific shot (not 'all')
+    // 2. Query has completed (not loading)
+    // 3. Result is 0 items
+    // 4. We haven't already auto-fallen back for this shot (prevent loops)
+    // 5. The user hasn't customized settings (don't override user choice)
+    if (
+      selectedShotFilter !== 'all' &&
+      !isLoading &&
+      generationsResponse?.total === 0 &&
+      !hasAutoFallenBack &&
+      !shotSettings?.userHasCustomized
+    ) {
+      console.log('[ShotFilterLogic] Auto-falling back to "all" because shot filter returned 0 items:', {
+        selectedShotFilter,
+        total: generationsResponse?.total,
+        userHasCustomized: shotSettings?.userHasCustomized
+      });
+      setSelectedShotFilter('all');
+      setHasAutoFallenBack(true);
+    }
+  }, [selectedShotFilter, isLoading, generationsResponse?.total, hasAutoFallenBack, shotSettings?.userHasCustomized]);
+  
+  // Reset the auto-fallback flag when switching shots
+  useEffect(() => {
+    setHasAutoFallenBack(false);
+  }, [currentShotId]);
+
   const addImageToShotMutation = useAddImageToShot();
   const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();

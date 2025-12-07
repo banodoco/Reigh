@@ -13,12 +13,14 @@ export interface UseStructureVideoReturn {
   structureVideoTreatment: 'adjust' | 'clip';
   structureVideoMotionStrength: number;
   structureVideoType: 'flow' | 'canny' | 'depth';
+  structureVideoResourceId: string | null; // Track the resource ID for reference
   handleStructureVideoChange: (
     videoPath: string | null,
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth'
+    structureType: 'flow' | 'canny' | 'depth',
+    resourceId?: string // Optional resource ID
   ) => void;
   isLoading: boolean;
 }
@@ -42,6 +44,7 @@ export function useStructureVideo({
     treatment?: 'adjust' | 'clip';
     motionStrength?: number;
     structureType?: 'flow' | 'canny' | 'depth';
+    resourceId?: string; // Track which resource this video came from
   }>('travel-structure-video', { 
     projectId, 
     shotId: shotId,
@@ -54,6 +57,7 @@ export function useStructureVideo({
   const [structureVideoTreatment, setStructureVideoTreatment] = useState<'adjust' | 'clip'>('adjust');
   const [structureVideoMotionStrength, setStructureVideoMotionStrength] = useState<number>(1.0);
   const [structureVideoType, setStructureVideoType] = useState<'flow' | 'canny' | 'depth'>('flow');
+  const [structureVideoResourceId, setStructureVideoResourceId] = useState<string | null>(null);
   const [hasInitializedStructureVideo, setHasInitializedStructureVideo] = useState<string | null>(null);
 
   // Reset initialization state when shot changes
@@ -73,6 +77,7 @@ export function useStructureVideo({
         setStructureVideoTreatment(structureVideoSettings.treatment || 'adjust');
         setStructureVideoMotionStrength(structureVideoSettings.motionStrength ?? 1.0);
         setStructureVideoType(structureVideoSettings.structureType || 'flow');
+        setStructureVideoResourceId(structureVideoSettings.resourceId || null);
       } else {
         // No saved structure video - initialize with defaults
         setStructureVideoPath(null);
@@ -80,6 +85,7 @@ export function useStructureVideo({
         setStructureVideoTreatment('adjust');
         setStructureVideoMotionStrength(1.0);
         setStructureVideoType('flow');
+        setStructureVideoResourceId(null);
       }
       setHasInitializedStructureVideo(shotId);
     }
@@ -91,7 +97,8 @@ export function useStructureVideo({
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth'
+    structureType: 'flow' | 'canny' | 'depth',
+    resourceId?: string
   ) => {
     console.log('[useStructureVideo] [DEBUG] handleStructureVideoChange called:', {
       videoPath: videoPath ? videoPath.substring(0, 50) + '...' : null,
@@ -100,6 +107,7 @@ export function useStructureVideo({
       treatment,
       motionStrength,
       structureType,
+      resourceId: resourceId?.substring(0, 8),
       previousStructureType: structureVideoType // Show what it was before
     });
     
@@ -108,7 +116,8 @@ export function useStructureVideo({
       hasMetadata: !!metadata,
       treatment,
       motionStrength,
-      structureType
+      structureType,
+      resourceId: resourceId?.substring(0, 8)
     });
     
     setStructureVideoPath(videoPath);
@@ -116,6 +125,7 @@ export function useStructureVideo({
     setStructureVideoTreatment(treatment);
     setStructureVideoMotionStrength(motionStrength);
     setStructureVideoType(structureType);
+    setStructureVideoResourceId(resourceId || null);
     
     console.error('[StructureVideoDebug] ✅ State setters called successfully');
 
@@ -129,6 +139,7 @@ export function useStructureVideo({
         treatment,
         motionStrength,
         structureType,
+        resourceId: resourceId?.substring(0, 8),
         toolId: 'travel-structure-video',
         scope: 'shot',
         shotId: shotId?.substring(0, 8)
@@ -138,7 +149,8 @@ export function useStructureVideo({
         metadata: metadata || null,
         treatment,
         motionStrength,
-        structureType
+        structureType,
+        resourceId: resourceId || null
       });
       console.error('[useStructureVideo] ✅ Structure video save requested');
     } else {
@@ -149,7 +161,8 @@ export function useStructureVideo({
         metadata: null,
         treatment: null,
         motionStrength: null,
-        structureType: null
+        structureType: null,
+        resourceId: null
       });
       console.error('[useStructureVideo] ✅ Structure video clear requested');
     }
@@ -161,6 +174,7 @@ export function useStructureVideo({
     structureVideoTreatment,
     structureVideoMotionStrength,
     structureVideoType,
+    structureVideoResourceId,
     handleStructureVideoChange,
     isLoading: isStructureVideoSettingsLoading,
   };

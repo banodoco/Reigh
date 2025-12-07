@@ -1537,6 +1537,50 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     await handleUpdateReference(referenceId, { name });
   }, [handleUpdateReference]);
   
+  // Handle toggling visibility (is_public) of a reference
+  const handleToggleVisibility = useCallback(async (resourceId: string, currentIsPublic: boolean) => {
+    console.log('[RefSettings] 👁️ Toggling visibility:', { resourceId, currentIsPublic, newValue: !currentIsPublic });
+    
+    // Find the hydrated reference to get the full metadata
+    const hydratedRef = hydratedReferences.find(r => r.resourceId === resourceId);
+    if (!hydratedRef) {
+      console.error('[RefSettings] ❌ Could not find reference with resourceId:', resourceId);
+      return;
+    }
+    
+    try {
+      // Update the resource with the new is_public value
+      const updatedMetadata: StyleReferenceMetadata = {
+        name: hydratedRef.name,
+        styleReferenceImage: hydratedRef.styleReferenceImage,
+        styleReferenceImageOriginal: hydratedRef.styleReferenceImageOriginal,
+        thumbnailUrl: hydratedRef.thumbnailUrl,
+        styleReferenceStrength: hydratedRef.styleReferenceStrength,
+        subjectStrength: hydratedRef.subjectStrength,
+        subjectDescription: hydratedRef.subjectDescription,
+        inThisScene: hydratedRef.inThisScene,
+        inThisSceneStrength: hydratedRef.inThisSceneStrength,
+        referenceMode: hydratedRef.referenceMode,
+        styleBoostTerms: hydratedRef.styleBoostTerms,
+        created_by: { is_you: true },
+        is_public: !currentIsPublic,
+        createdAt: hydratedRef.createdAt,
+        updatedAt: new Date().toISOString(),
+      };
+      
+      await updateStyleReference.mutateAsync({
+        id: resourceId,
+        type: 'style-reference',
+        metadata: updatedMetadata,
+      });
+      
+      console.log('[RefSettings] ✅ Visibility toggled successfully');
+    } catch (error) {
+      console.error('[RefSettings] ❌ Failed to toggle visibility:', error);
+      toast.error('Failed to update visibility');
+    }
+  }, [hydratedReferences, updateStyleReference]);
+  
   // Handle removing style reference image (legacy - now removes selected reference)
   const handleRemoveStyleReference = useCallback(async () => {
     if (!selectedReferenceId) return;
@@ -2538,6 +2582,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             onDeleteReference={handleDeleteReference}
             onUpdateReferenceName={handleUpdateReferenceName}
             onResourceSelect={handleResourceSelect}
+            onToggleVisibility={handleToggleVisibility}
             // Loading state - show placeholders while hydrating
             isLoadingReferenceData={isReferenceDataLoading}
             referenceCount={referenceCount}

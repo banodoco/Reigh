@@ -319,7 +319,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
   return (
     <div className="relative flex flex-col h-full min-h-0 px-0 sm:px-4">
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-3">
         <Input
           type="text"
           placeholder="Search all LoRA fields..."
@@ -342,7 +342,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
       </div>
               {/* Scrollable content area with floating controls */}
         <div className="flex-1 min-h-0 overflow-y-auto relative">
-          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-3 ${isMobile ? 'pb-3' : 'pb-6'}`}>
+          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-2 ${isMobile ? 'pb-2' : 'pb-4'}`}>
           {paginatedLoras.length > 0 ? (
             paginatedLoras.map((lora) => {
               const isSelectedOnGenerator = selectedLoraMap.has(lora["Model ID"]);
@@ -358,348 +358,228 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
               return (
                 <Card 
                   key={lora["Model ID"]} 
-                  className={`w-full transition-all duration-200 shadow-none relative ${
+                  className={`w-full h-full transition-all duration-200 shadow-none ${
                     isSelectedOnGenerator 
                       ? 'border-green-500' 
                       : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
-                  <div className="flex flex-col">
-                    <CardHeader className="pb-2">
-                        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-2">
-                            <div className="flex-grow">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex items-center gap-2 flex-wrap flex-1">
-                                    <CardTitle className="text-xl" title={lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}>
-                                        {lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}
-                                    </CardTitle>
-                                    {isMyLora && (
-                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                        {isLocalLora ? 'Local' : 'Mine'}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {/* Action buttons - visible on mobile or on smaller desktop viewports */}
-                                  <div className={`flex gap-2 flex-shrink-0 ${isMobile ? '' : 'lg:hidden'}`}>
-                                    {isSelectedOnGenerator ? (
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => {
-                                          console.log('[LoraRemovalDebug] Remove button clicked in LoraSelectorModal for LoRA:', { id: lora["Model ID"], name: lora.Name });
-                                          onRemoveLora(lora["Model ID"]);
-                                        }}
-                                      >
-                                        Remove
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        variant="default"
-                                        size="sm"
-                                        onClick={() => {
-                                          console.log('[LoraAddDebug] Add button clicked (mobile buttons):', {
-                                            loraId: lora["Model ID"],
-                                            loraName: lora.Name,
-                                            hasModelFiles: !!(lora["Model Files"] && lora["Model Files"].length > 0),
-                                            modelFilesCount: lora["Model Files"]?.length || 0,
-                                            isMobile
-                                          });
-                                          if (lora["Model Files"] && lora["Model Files"].length > 0) {
-                                            console.log('[LoraAddDebug] Calling onAddLora...');
-                                            onAddLora(lora);
-                                            console.log('[LoraAddDebug] onAddLora called successfully');
-                                          } else {
-                                            console.log('[LoraAddDebug] ❌ Cannot add - no Model Files');
-                                          }
-                                        }}
-                                        disabled={!lora["Model Files"] || lora["Model Files"].length === 0}
-                                        className="bg-green-600 hover:bg-green-700"
-                                      >
-                                        Add
-                                      </Button>
-                                    )}
-                                    {!isMyLora && (
-                                      <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => createResource.mutate({ type: 'lora', metadata: lora })}
-                                          disabled={isInSavedLoras || createResource.isPending}
-                                      >
-                                          {isInSavedLoras ? 'Saved' : 'Save'}
-                                      </Button>
-                                    )}
-                                    {isMyLora && !isLocalLora && resourceId && (
-                                      <>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            onEdit({ id: resourceId, metadata: lora } as Resource & { metadata: LoraModel });
-                                          }}
-                                        >
-                                          <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="destructive"
-                                          size="sm"
-                                          onClick={() => {
-                                            setLoraToDelete({ 
-                                              id: resourceId, 
-                                              name: lora.Name, 
-                                              isAdded: isSelectedOnGenerator 
-                                            });
-                                            setDeleteDialogOpen(true);
-                                          }}
-                                          disabled={deleteResource.isPending}
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                                <p className="text-sm text-muted-foreground" title={lora.Author}>By: {lora.Author}</p>
-                            </div>
-                            {/* Desktop buttons - right side (hidden on mobile and small screens) */}
-                            <div className={`flex-col lg:items-end gap-2 flex-shrink-0 hidden lg:flex ${isMobile ? '!hidden' : ''}`}>
-                              <div className="flex gap-2">
-                                {isSelectedOnGenerator ? (
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => {
-                                      console.log('[LoraRemovalDebug] Remove button clicked in LoraSelectorModal for LoRA:', { id: lora["Model ID"], name: lora.Name });
-                                      onRemoveLora(lora["Model ID"]);
-                                    }}
-                                  >
-                                    Remove
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={() => {
-                                      console.log('[LoraAddDebug] Add button clicked (desktop buttons):', {
-                                        loraId: lora["Model ID"],
-                                        loraName: lora.Name,
-                                        hasModelFiles: !!(lora["Model Files"] && lora["Model Files"].length > 0),
-                                        modelFilesCount: lora["Model Files"]?.length || 0,
-                                        isMobile
-                                      });
-                                      if (lora["Model Files"] && lora["Model Files"].length > 0) {
-                                        console.log('[LoraAddDebug] Calling onAddLora...');
-                                        onAddLora(lora);
-                                        console.log('[LoraAddDebug] onAddLora called successfully');
-                                      } else {
-                                        console.log('[LoraAddDebug] ❌ Cannot add - no Model Files');
-                                      }
-                                    }}
-                                    disabled={!lora["Model Files"] || lora["Model Files"].length === 0}
-                                    className="bg-green-600 hover:bg-green-700"
-                                  >
-                                    Add
-                                  </Button>
-                                )}
-                                {!isMyLora && (
-                                  <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => createResource.mutate({ type: 'lora', metadata: lora })}
-                                      disabled={isInSavedLoras || createResource.isPending}
-                                  >
-                                      {isInSavedLoras ? 'Saved' : 'Save'}
-                                  </Button>
-                                )}
-                                {isMyLora && !isLocalLora && resourceId && (
-                                  <>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        onEdit({ id: resourceId, metadata: lora } as Resource & { metadata: LoraModel });
-                                      }}
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={() => {
-                                        setLoraToDelete({ 
-                                          id: resourceId, 
-                                          name: lora.Name, 
-                                          isAdded: isSelectedOnGenerator 
-                                        });
-                                        setDeleteDialogOpen(true);
-                                      }}
-                                      disabled={deleteResource.isPending}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
+                  <div className="flex flex-row p-2 gap-2 h-full">
+                    {/* Left side: Info and controls */}
+                    <div className="flex-1 min-w-0 flex flex-col min-h-20 h-full">
+                      {/* Top content */}
+                      <div>
+                        {/* Title row */}
+                        <div className="flex items-start gap-1.5 mb-0.5">
+                          <CardTitle className="text-base leading-tight truncate" title={lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}>
+                            {lora.Name !== "N/A" ? lora.Name : lora["Model ID"]}
+                          </CardTitle>
+                          {isMyLora && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 flex-shrink-0">
+                              {isLocalLora ? 'Local' : 'Mine'}
+                            </span>
+                          )}
                         </div>
-                        <div className="text-xs text-muted-foreground pt-1">
-                          {lora.Downloads && <span>Downloads: {lora.Downloads.toLocaleString()}</span>}
-                          {lora.Downloads && lora.Likes && <span> | </span>}
-                          {lora.Likes && <span>Likes: {lora.Likes.toLocaleString()}</span>}
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3 pt-0">
-                      {lora.Description && (
-                        <div className="flex items-center justify-between gap-2">
+                        
+                        {/* Author & stats */}
+                        <p className="text-xs text-muted-foreground truncate" title={lora.Author}>
+                          {lora.Author}
+                          {(lora.Downloads || lora.Likes) && ' · '}
+                          {lora.Downloads && <span>↓{lora.Downloads.toLocaleString()}</span>}
+                          {lora.Downloads && lora.Likes && ' '}
+                          {lora.Likes && <span>♥{lora.Likes.toLocaleString()}</span>}
+                        </p>
+                        
+                        {/* Description */}
+                        {lora.Description && (
                           <p 
-                            className="text-xs text-muted-foreground truncate flex-1" 
+                            className="text-[11px] text-muted-foreground/80 truncate cursor-pointer hover:text-muted-foreground mt-0.5" 
                             title={lora.Description}
+                            onClick={() => handleShowFullDescription(lora.Name, lora.Description)}
                           >
                             {lora.Description}
                           </p>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="p-0 h-auto text-xs flex-shrink-0"
-                            onClick={() => handleShowFullDescription(lora.Name, lora.Description)}
-                          >
-                            Read more
-                          </Button>
-                        </div>
-                      )}
-                      {lora.main_generation ? (
-                        <div className="flex justify-center pb-2 pt-1">
-                          {(() => {
-                            const mainSample = lora.sample_generations?.find(s => s.url === lora.main_generation);
-                            const isVideo = mainSample?.type === 'video';
-                            return isVideo ? (
-                              <div
-                                className="relative h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
-                                onClickCapture={(e) => {
-                                  if (!isMobile) return;
-                                  const container = e.currentTarget as HTMLElement;
-                                  const video = container.querySelector('video') as HTMLVideoElement | null;
-                                  if (!video) return;
-                                  if (video.paused) {
-                                    video.play().catch(() => {});
-                                  } else {
-                                    video.pause();
-                                  }
-                                }}
-                                onTouchEndCapture={(e) => {
-                                  if (!isMobile) return;
-                                  const container = e.currentTarget as HTMLElement;
-                                  const video = container.querySelector('video') as HTMLVideoElement | null;
-                                  if (!video) return;
-                                  if (video.paused) {
-                                    video.play().catch(() => {});
-                                  } else {
-                                    video.pause();
-                                  }
-                                }}
-                              >
-                                <HoverScrubVideo
-                                  src={lora.main_generation}
-                                  className="h-full w-auto"
-                                  videoClassName="object-contain"
-                                  autoplayOnHover={!isMobile}
-                                  preload="metadata"
-                                  loop
-                                  muted
-                                />
-                              </div>
-                            ) : (
-                              <img
-                                src={lora.main_generation}
-                                alt={mainSample?.alt_text || `${lora.Name} main sample`}
-                                className="h-28 w-auto object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
-                                title={mainSample?.alt_text || lora.main_generation}
-                                loading="lazy"
-                              />
-                            );
-                          })()}
-                        </div>
-                      ) : lora.Images && lora.Images.length > 0 ? (
-                        <div className="flex justify-center pb-2 pt-1">
-                          {(() => {
-                            const image = lora.Images[0];
-                            const isVideo = image.type?.startsWith('video');
-                            return isVideo ? (
-                              <div
-                                className="relative h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
-                                onClickCapture={(e) => {
-                                  if (!isMobile) return;
-                                  const container = e.currentTarget as HTMLElement;
-                                  const video = container.querySelector('video') as HTMLVideoElement | null;
-                                  if (!video) return;
-                                  if (video.paused) {
-                                    video.play().catch(() => {});
-                                  } else {
-                                    video.pause();
-                                  }
-                                }}
-                                onTouchEndCapture={(e) => {
-                                  if (!isMobile) return;
-                                  const container = e.currentTarget as HTMLElement;
-                                  const video = container.querySelector('video') as HTMLVideoElement | null;
-                                  if (!video) return;
-                                  if (video.paused) {
-                                    video.play().catch(() => {});
-                                  } else {
-                                    video.pause();
-                                  }
-                                }}
-                              >
-                                <HoverScrubVideo
-                                  src={image.url}
-                                  className="h-full w-auto"
-                                  videoClassName="object-contain"
-                                  autoplayOnHover={!isMobile}
-                                  preload="metadata"
-                                  loop
-                                  muted
-                                />
-                              </div>
-                            ) : (
-                              <img
-                                src={image.url}
-                                alt={image.alt_text || `${lora.Name} sample`}
-                                className="h-28 w-auto object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
-                                title={image.alt_text || image.url}
-                                loading="lazy"
-                              />
-                            );
-                          })()}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">No sample images available.</p>
-                      )}
-                    </CardContent>
-                  </div>
-                  
-                  {/* Strength overlay at bottom */}
-                  {isSelectedOnGenerator && (
-                    <div 
-                      className="absolute bottom-0 left-0 right-0 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border-t rounded-b p-3" 
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-xs">Strength</Label>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-light">{strength?.toFixed(2)}</span>
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                            Added
-                          </span>
-                        </div>
+                        )}
                       </div>
-                      <Slider
-                        id={`lora-strength-${lora['Model ID']}`}
-                        value={[strength ?? 1]}
-                        onValueChange={(value) => onUpdateLoraStrength(lora['Model ID'], value[0])}
-                        min={0} max={2} step={0.05}
-                        className="w-full"
-                      />
+                      
+                      {/* Bottom section - pushed to bottom */}
+                      <div className="mt-auto pt-1.5">
+                        {/* Action buttons */}
+                        <div className="flex gap-1 flex-wrap">
+                          {isSelectedOnGenerator ? (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => {
+                                console.log('[LoraRemovalDebug] Remove button clicked in LoraSelectorModal for LoRA:', { id: lora["Model ID"], name: lora.Name });
+                                onRemoveLora(lora["Model ID"]);
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-6 px-2 text-xs bg-green-600 hover:bg-green-700"
+                              onClick={() => {
+                                if (lora["Model Files"] && lora["Model Files"].length > 0) {
+                                  onAddLora(lora);
+                                }
+                              }}
+                              disabled={!lora["Model Files"] || lora["Model Files"].length === 0}
+                            >
+                              Add
+                            </Button>
+                          )}
+                          {!isMyLora && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => createResource.mutate({ type: 'lora', metadata: lora })}
+                              disabled={isInSavedLoras || createResource.isPending}
+                            >
+                              {isInSavedLoras ? 'Saved' : 'Save'}
+                            </Button>
+                          )}
+                          {isMyLora && !isLocalLora && resourceId && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => {
+                                  onEdit({ id: resourceId, metadata: lora } as Resource & { metadata: LoraModel });
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => {
+                                  setLoraToDelete({ 
+                                    id: resourceId, 
+                                    name: lora.Name, 
+                                    isAdded: isSelectedOnGenerator 
+                                  });
+                                  setDeleteDialogOpen(true);
+                                }}
+                                disabled={deleteResource.isPending}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                        
+                        {/* Strength slider - below buttons when selected */}
+                        {isSelectedOnGenerator && (
+                          <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-green-200 dark:border-green-800">
+                            <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-[11px] flex-shrink-0 text-green-700 dark:text-green-300">Strength</Label>
+                            <Slider
+                              id={`lora-strength-${lora['Model ID']}`}
+                              value={[strength ?? 1]}
+                              onValueChange={(value) => onUpdateLoraStrength(lora['Model ID'], value[0])}
+                              min={0} max={2} step={0.05}
+                              className="flex-1"
+                            />
+                            <span className="text-[11px] font-light w-8 text-right text-green-700 dark:text-green-300">{strength?.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+                    
+                    {/* Right side: Sample thumbnail */}
+                    <div className="flex-shrink-0 flex items-start">
+                      {lora.main_generation ? (
+                        (() => {
+                          const mainSample = lora.sample_generations?.find(s => s.url === lora.main_generation);
+                          const isVideo = mainSample?.type === 'video';
+                          return isVideo ? (
+                            <div
+                              className="relative h-20 w-20 rounded border overflow-hidden hover:opacity-80 transition-opacity cursor-pointer"
+                              onClickCapture={(e) => {
+                                if (!isMobile) return;
+                                const container = e.currentTarget as HTMLElement;
+                                const video = container.querySelector('video') as HTMLVideoElement | null;
+                                if (!video) return;
+                                if (video.paused) {
+                                  video.play().catch(() => {});
+                                } else {
+                                  video.pause();
+                                }
+                              }}
+                            >
+                              <HoverScrubVideo
+                                src={lora.main_generation}
+                                className="h-full w-full"
+                                videoClassName="object-cover"
+                                autoplayOnHover={!isMobile}
+                                preload="metadata"
+                                loop
+                                muted
+                              />
+                            </div>
+                          ) : (
+                            <img
+                              src={lora.main_generation}
+                              alt={mainSample?.alt_text || `${lora.Name} main sample`}
+                              className="h-20 w-20 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
+                              title={mainSample?.alt_text || lora.main_generation}
+                              loading="lazy"
+                            />
+                          );
+                        })()
+                      ) : lora.Images && lora.Images.length > 0 ? (
+                        (() => {
+                          const image = lora.Images[0];
+                          const isVideo = image.type?.startsWith('video');
+                          return isVideo ? (
+                            <div
+                              className="relative h-20 w-20 rounded border overflow-hidden hover:opacity-80 transition-opacity cursor-pointer"
+                              onClickCapture={(e) => {
+                                if (!isMobile) return;
+                                const container = e.currentTarget as HTMLElement;
+                                const video = container.querySelector('video') as HTMLVideoElement | null;
+                                if (!video) return;
+                                if (video.paused) {
+                                  video.play().catch(() => {});
+                                } else {
+                                  video.pause();
+                                }
+                              }}
+                            >
+                              <HoverScrubVideo
+                                src={image.url}
+                                className="h-full w-full"
+                                videoClassName="object-cover"
+                                autoplayOnHover={!isMobile}
+                                preload="metadata"
+                                loop
+                                muted
+                              />
+                            </div>
+                          ) : (
+                            <img
+                              src={image.url}
+                              alt={image.alt_text || `${lora.Name} sample`}
+                              className="h-20 w-20 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
+                              title={image.alt_text || image.url}
+                              loading="lazy"
+                            />
+                          );
+                        })()
+                      ) : (
+                        <div className="h-20 w-20 rounded border bg-muted flex items-center justify-center">
+                          <span className="text-[10px] text-muted-foreground">No image</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </Card>
               );
             })

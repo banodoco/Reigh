@@ -95,6 +95,8 @@ export interface HydratedReferenceImage {
   styleBoostTerms: string;
   createdAt: string;
   updatedAt: string;
+  isPublic: boolean; // Whether this reference is visible to other users
+  isOwner: boolean; // Whether the current user owns this reference
 }
 
 // Project-level settings for model and style reference

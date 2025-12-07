@@ -20,7 +20,10 @@ import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { Plus, Loader2, Upload } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
+import { DatasetBrowserModal } from '@/shared/components/DatasetBrowserModal';
+import { Resource, StructureVideoMetadata, useCreateResource } from '@/shared/hooks/useResources';
+import { supabase } from '@/integrations/supabase/client';
 
 // Skeleton component for uploading images
 const TimelineSkeletonItem: React.FC<{
@@ -126,7 +129,8 @@ interface TimelineContainerProps {
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth'
+    structureType: 'flow' | 'canny' | 'depth',
+    resourceId?: string
   ) => void;
   // Empty state flag for blur effect
   hasNoImages?: boolean;
@@ -196,6 +200,12 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // Local state for reset gap
   const [resetGap, setResetGap] = useState<number>(50);
   const maxGap = 81;
+  
+  // State for video browser modal
+  const [showVideoBrowser, setShowVideoBrowser] = useState(false);
+  
+  // Resource creation hook for video upload
+  const createResource = useCreateResource();
   
   // Track pending drop frame for skeleton
   const [pendingDropFrame, setPendingDropFrame] = useState<number | null>(null);
@@ -935,14 +945,14 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           
           {/* Right side: Structure controls OR Upload button */}
           {structureVideoPath ? (
-            <div className={`flex items-center gap-1.5 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+            <div className={`flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
               {/* Structure type selector */}
               <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
                 onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
               }}>
-                <SelectTrigger className="h-6 w-[90px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                <SelectTrigger className="h-7 w-[100px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
                   <SelectValue>
-                    {structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}
+                    <span className="text-xs">{structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}</span>
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -958,20 +968,18 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 </SelectContent>
               </Select>
 
-              {/* Strength compact display */}
-              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-xs">
-                <span className="text-muted-foreground">Strength:</span>
-                <span className={`font-medium ${
-                  structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
-                  structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
-                  'text-foreground'
-                }`}>
-                  {structureVideoMotionStrength.toFixed(1)}x
-                </span>
-              </div>
+              {/* Strength display and slider */}
+              <span className="text-xs text-muted-foreground">Strength:</span>
+              <span className={`text-xs font-medium ${
+                structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
+                structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
+                'text-foreground'
+              }`}>
+                {structureVideoMotionStrength.toFixed(1)}x
+              </span>
 
               {/* Strength slider (compact) */}
-              <div className="w-16">
+              <div className="w-20">
                 <Slider
                   value={[structureVideoMotionStrength]}
                   onValueChange={([value]) => {
@@ -985,8 +993,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               </div>
             </div>
           ) : (
-            /* Upload Guidance Video button - shown when no video exists */
-            <div className={`pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+            /* Add guidance video controls - styled like zoom controls, on the right */
+            <div className={`flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Add guidance video:</span>
               <input
                 type="file"
                 accept="video/mp4,video/webm,video/quicktime"
@@ -997,6 +1006,21 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                     const { extractVideoMetadata, uploadVideoToStorage } = await import('@/shared/lib/videoUploader');
                     const metadata = await extractVideoMetadata(file);
                     const videoUrl = await uploadVideoToStorage(file, projectId!, shotId);
+                    
+                    // Create resource for reuse
+                    const { data: { user } } = await supabase.auth.getUser();
+                    const now = new Date().toISOString();
+                    const resourceMetadata: StructureVideoMetadata = {
+                      name: `Guidance Video ${new Date().toLocaleString()}`,
+                      videoUrl: videoUrl,
+                      thumbnailUrl: null,
+                      videoMetadata: metadata,
+                      created_by: { is_you: true, username: user?.email || 'user' },
+                      is_public: false,
+                      createdAt: now,
+                    };
+                    await createResource.mutateAsync({ type: 'structure-video', metadata: resourceMetadata });
+                    
                     onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
                     e.target.value = '';
                   } catch (error) {
@@ -1010,15 +1034,20 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs px-3 sm:px-2 lg:px-3"
+                  className="h-7 text-xs px-2"
                   asChild
                 >
-                  <span className="flex items-center gap-1.5">
-                    <Upload className="h-3.5 w-3.5" />
-                    <span className="sm:hidden lg:inline">Upload Guidance Video</span>
-                  </span>
+                  <span>Upload</span>
                 </Button>
               </Label>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={() => setShowVideoBrowser(true)}
+              >
+                Browse
+              </Button>
             </div>
           )}
         </div>
@@ -1074,7 +1103,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               readOnly={readOnly}
             />
           ) : !readOnly ? (
-            // Only show uploader if NOT readOnly and no video exists
+            // Only show uploader placeholder if NOT readOnly and no video exists
             <GuidanceVideoUploader
               shotId={shotId}
               projectId={projectId}
@@ -1596,6 +1625,29 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           )}
         </div>
       </div>
+      
+      {/* Video Browser Modal */}
+      <DatasetBrowserModal
+        isOpen={showVideoBrowser}
+        onOpenChange={setShowVideoBrowser}
+        resourceType="structure-video"
+        title="Browse Guidance Videos"
+        onResourceSelect={(resource: Resource) => {
+          const metadata = resource.metadata as StructureVideoMetadata;
+          console.log('[TimelineContainer] Video selected from browser:', {
+            resourceId: resource.id,
+            videoUrl: metadata.videoUrl,
+          });
+          onStructureVideoChange?.(
+            metadata.videoUrl, 
+            metadata.videoMetadata, 
+            structureVideoTreatment, 
+            structureVideoMotionStrength, 
+            structureVideoType
+          );
+          setShowVideoBrowser(false);
+        }}
+      />
     </div>
   );
 };

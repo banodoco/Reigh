@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { PhaseConfig } from '@/tools/travel-between-images/settings';
 import { supabase } from '@/integrations/supabase/client';
+import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
 export interface PhaseConfigMetadata {
     name: string;
@@ -55,14 +56,28 @@ export interface StyleReferenceMetadata {
     updatedAt: string;
 }
 
-export type ResourceType = 'lora' | 'phase-config' | 'style-reference';
-export type ResourceMetadata = LoraModel | PhaseConfigMetadata | StyleReferenceMetadata;
+export interface StructureVideoMetadata {
+    name: string;
+    videoUrl: string;
+    thumbnailUrl: string | null;
+    videoMetadata: VideoMetadata;
+    created_by: {
+        is_you: boolean;
+        username?: string;
+    };
+    is_public: boolean;
+    createdAt: string;
+}
+
+export type ResourceType = 'lora' | 'phase-config' | 'style-reference' | 'structure-video';
+export type ResourceMetadata = LoraModel | PhaseConfigMetadata | StyleReferenceMetadata | StructureVideoMetadata;
 
 export interface Resource {
     id: string;
     userId: string;
     type: ResourceType;
     metadata: ResourceMetadata;
+    isPublic: boolean;
     createdAt: string;
 }
 
@@ -84,7 +99,7 @@ export const useListPublicResources = (type: ResourceType) => {
                     .from('resources')
                     .select('*')
                     .eq('type', type)
-                    .filter('metadata->is_public', 'eq', true)
+                    .eq('is_public', true)
                     .range(page * pageSize, (page + 1) * pageSize - 1);
                 
                 if (error) {
@@ -181,11 +196,16 @@ export const useCreateResource = () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Not authenticated');
             
+            // Extract is_public from metadata for the column
+            const isPublic = 'is_public' in metadata ? Boolean((metadata as any).is_public) : false;
+            
             const { data, error } = await supabase
                 .from('resources')
                 .insert({
-                    ...{ type, metadata },
-                    user_id: user.id
+                    type,
+                    metadata,
+                    user_id: user.id,
+                    is_public: isPublic
                 })
                 .select()
                 .single();
@@ -269,10 +289,13 @@ export const useUpdateResource = () => {
             
             console.log('[useUpdateResource] Resource verified:', existingResource);
             
+            // Extract is_public from metadata for the column
+            const isPublic = 'is_public' in metadata ? Boolean((metadata as any).is_public) : false;
+            
             // Now perform the update
             const { data, error } = await supabase
                 .from('resources')
-                .update({ metadata })
+                .update({ metadata, is_public: isPublic })
                 .eq('id', id)
                 .eq('user_id', user.id)
                 .select()
@@ -311,9 +334,24 @@ export const useUpdateResource = () => {
             return data;
         },
         onSuccess: (data) => {
-            console.log('[useUpdateResource] onSuccess - invalidating queries for type:', data.type);
+            console.log('[useUpdateResource] onSuccess - invalidating queries for type:', data.type, 'id:', data.id);
+            // Invalidate both v2 query keys to ensure fresh data
+            queryClient.invalidateQueries({ queryKey: ['resources', data.type, 'v2'] });
+            queryClient.invalidateQueries({ queryKey: ['public-resources', data.type, 'v2'] });
+            // Also invalidate without v2 for backwards compatibility
             queryClient.invalidateQueries({ queryKey: ['resources', data.type] });
             queryClient.invalidateQueries({ queryKey: ['public-resources', data.type] });
+            // Invalidate specific-resources queries that include this resource ID
+            // Using predicate to find any query that contains this resource ID
+            queryClient.invalidateQueries({
+                predicate: (query) => {
+                    const key = query.queryKey;
+                    if (key[0] === 'specific-resources' && typeof key[1] === 'string') {
+                        return key[1].includes(data.id);
+                    }
+                    return false;
+                }
+            });
         },
         onError: (error) => {
             console.error('[useUpdateResource] onError:', error);
