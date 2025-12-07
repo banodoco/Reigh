@@ -191,14 +191,15 @@ export const useRepositionMode = ({
       img.src = sourceUrl;
     });
     
-    // Determine output dimensions (maintain original aspect ratio)
-    const outputWidth = Math.round(imageDimensions.width * 1.5);
-    const outputHeight = Math.round(imageDimensions.height * 1.5);
+    // Use actual source image dimensions for output quality
+    // The output canvas matches the source image size to avoid quality loss
+    const sourceWidth = img.naturalWidth;
+    const sourceHeight = img.naturalHeight;
     
-    // Create transformed image canvas
+    // Create transformed image canvas at source resolution
     const transformedCanvas = document.createElement('canvas');
-    transformedCanvas.width = outputWidth;
-    transformedCanvas.height = outputHeight;
+    transformedCanvas.width = sourceWidth;
+    transformedCanvas.height = sourceHeight;
     const transformedCtx = transformedCanvas.getContext('2d');
     
     if (!transformedCtx) {
@@ -206,20 +207,19 @@ export const useRepositionMode = ({
     }
     
     // Clear canvas with transparent background
-    transformedCtx.clearRect(0, 0, outputWidth, outputHeight);
+    transformedCtx.clearRect(0, 0, sourceWidth, sourceHeight);
     
     // Apply transform and draw image
     transformedCtx.save();
     
-    // Move to center
-    transformedCtx.translate(outputWidth / 2, outputHeight / 2);
+    // Move to center of output canvas
+    transformedCtx.translate(sourceWidth / 2, sourceHeight / 2);
     
-    // Apply user transforms (scaled to output size)
-    // translateX/translateY are percentages (0-100), convert to pixels
-    const translateXPx = (transform.translateX / 100) * imageDimensions.width;
-    const translateYPx = (transform.translateY / 100) * imageDimensions.height;
-    const scaleRatio = outputWidth / imageDimensions.width;
-    transformedCtx.translate(translateXPx * scaleRatio, translateYPx * scaleRatio);
+    // Apply user transforms - translateX/translateY are percentages of the displayed dimensions
+    // Convert to pixels in source image space
+    const translateXPx = (transform.translateX / 100) * sourceWidth;
+    const translateYPx = (transform.translateY / 100) * sourceHeight;
+    transformedCtx.translate(translateXPx, translateYPx);
     
     // Apply scale with flip
     const scaleX = transform.flipH ? -transform.scale : transform.scale;
@@ -228,13 +228,13 @@ export const useRepositionMode = ({
     
     transformedCtx.rotate((transform.rotation * Math.PI) / 180);
     
-    // Draw image centered
+    // Draw image centered at source dimensions
     transformedCtx.drawImage(
       img,
-      -outputWidth / 2,
-      -outputHeight / 2,
-      outputWidth,
-      outputHeight
+      -sourceWidth / 2,
+      -sourceHeight / 2,
+      sourceWidth,
+      sourceHeight
     );
     
     transformedCtx.restore();

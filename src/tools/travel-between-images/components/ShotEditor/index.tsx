@@ -646,6 +646,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     tasksPaneWidth
   } = usePanes();
 
+  // Effective generation mode: phones always use batch mode locally (even if saved setting is timeline)
+  // This ensures Duration per Pair slider works on mobile
+  const effectiveGenerationMode = isPhone ? 'batch' : generationMode;
+
   // Use shots.settings to store GenerationsPane settings (shared with useGenerationsPageLogic)
   const { 
     settings: shotGenerationsPaneSettings, 
@@ -1786,7 +1790,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             selectedProjectId={selectedProjectId}
                             selectedLoras={loraManager.selectedLoras}
                             availableLoras={availableLoras}
-                            isTimelineMode={generationMode === 'timeline'}
+                            isTimelineMode={effectiveGenerationMode === 'timeline'}
                             accelerated={accelerated}
                             onAcceleratedChange={handleAcceleratedChange}
                             showStepsNotification={state.showStepsNotification}
