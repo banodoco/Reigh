@@ -36,9 +36,14 @@ const SelectScrollUpButton = React.forwardRef<
   <SelectPrimitive.ScrollUpButton
     ref={ref}
     className={cn(
-      "flex cursor-default items-center justify-center py-1",
+      "flex cursor-default items-center justify-center py-2 touch-none",
       className
     )}
+    // Custom attribute for detection in global click handlers
+    data-select-scroll-button="up"
+    // Prevent tap from passing through to elements behind on mobile
+    onPointerDown={(e) => e.stopPropagation()}
+    onClick={(e) => e.stopPropagation()}
     {...props}
   >
     <ChevronUp className="h-4 w-4" />
@@ -53,9 +58,14 @@ const SelectScrollDownButton = React.forwardRef<
   <SelectPrimitive.ScrollDownButton
     ref={ref}
     className={cn(
-      "flex cursor-default items-center justify-center py-1",
+      "flex cursor-default items-center justify-center py-2 touch-none",
       className
     )}
+    // Custom attribute for detection in global click handlers
+    data-select-scroll-button="down"
+    // Prevent tap from passing through to elements behind on mobile
+    onPointerDown={(e) => e.stopPropagation()}
+    onClick={(e) => e.stopPropagation()}
     {...props}
   >
     <ChevronDown className="h-4 w-4" />
@@ -83,6 +93,9 @@ const SelectContent = React.forwardRef<
       )}
       position={position}
       onPointerDownOutside={onPointerDownOutside}
+      // Prevent all pointer events from passing through to elements behind
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
       {...props}
     >
       {header}
@@ -93,6 +106,9 @@ const SelectContent = React.forwardRef<
           position === "popper" &&
             "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
         )}
+        // Prevent viewport interactions from passing through
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {children}
       </SelectPrimitive.Viewport>
@@ -116,14 +132,35 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName
 
 const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+    onTouchStart?: React.TouchEventHandler;
+    onTouchEnd?: React.TouchEventHandler;
+  }
+>(({ className, children, onPointerDown, onClick, onTouchStart, onTouchEnd, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
       "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
+    // Prevent all events from propagating to elements behind the dropdown
+    // Compose with any passed handlers
+    onPointerDown={(e) => {
+      e.stopPropagation();
+      onPointerDown?.(e);
+    }}
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick?.(e);
+    }}
+    onTouchStart={(e) => {
+      e.stopPropagation();
+      onTouchStart?.(e);
+    }}
+    onTouchEnd={(e) => {
+      e.stopPropagation();
+      onTouchEnd?.(e);
+    }}
     {...props}
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">

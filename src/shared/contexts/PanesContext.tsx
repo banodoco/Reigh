@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
-import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 import { PANE_CONFIG } from '@/shared/config/panes';
 
 interface PanesContextType {
@@ -34,8 +34,13 @@ const PanesContext = createContext<PanesContextType | undefined>(undefined);
 
 export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
   
-  // Load pane locks from user settings (desktop only)
+  // On tablets, allow locking but only one pane at a time
+  // On phones (mobile but not tablet), no locking allowed
+  const isSmallMobile = isMobile && !isTablet;
+  
+  // Load pane locks from user settings (desktop and tablet)
   const { value: paneLocks, update: savePaneLocks, isLoading } = useUserUIState('paneLocks', {
     shots: false,
     tasks: false,
@@ -57,10 +62,10 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Active task tracking (not persisted)
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
-  // Hydrate local state once when settings load (desktop only)
+  // Hydrate local state once when settings load (desktop and tablet)
   useEffect(() => {
-    if (isMobile) {
-      // On mobile, always start with unlocked state
+    if (isSmallMobile) {
+      // On small mobile (phones), always start with unlocked state
       setLocks({
         shots: false,
         tasks: false,
@@ -70,10 +75,26 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     if (!isLoading) {
-      // Hydrating pane locks from server
-      setLocks(paneLocks);
+      // Hydrating pane locks from server (desktop and tablet)
+      // On tablets, only keep one lock if multiple are saved
+      if (isTablet) {
+        const activeLocks = Object.entries(paneLocks).filter(([_, locked]) => locked);
+        if (activeLocks.length > 1) {
+          // Keep only the first locked pane on tablets
+          const firstLocked = activeLocks[0][0] as 'shots' | 'tasks' | 'gens';
+          setLocks({
+            shots: firstLocked === 'shots',
+            tasks: firstLocked === 'tasks',
+            gens: firstLocked === 'gens',
+          });
+        } else {
+          setLocks(paneLocks);
+        }
+      } else {
+        setLocks(paneLocks);
+      }
     }
-  }, [isLoading, paneLocks, isMobile]);
+  }, [isLoading, paneLocks, isSmallMobile, isTablet]);
 
   // Lock toggle functions
   const toggleLock = useCallback((pane: 'shots' | 'tasks' | 'gens') => {
@@ -93,47 +114,60 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, [savePaneLocks, isMobile]);
 
   // Individual setters for backward compatibility
+  // On tablets, locking one pane unlocks all others (only one lock allowed at a time)
   const setIsGenerationsPaneLocked = useCallback((isLocked: boolean) => {
+    if (isSmallMobile) return; // No locking on small phones
+    
     setLocks(prev => {
       if (prev.gens === isLocked) return prev;
-      const newLocks = { ...prev, gens: isLocked };
       
-      // Save to database only on desktop
-      if (!isMobile) {
-        savePaneLocks({ gens: isLocked });
-      }
+      // On tablets, unlock other panes when locking this one
+      const newLocks = isTablet && isLocked
+        ? { shots: false, tasks: false, gens: isLocked }
+        : { ...prev, gens: isLocked };
+      
+      // Save to database (desktop and tablet)
+      savePaneLocks(isTablet && isLocked ? newLocks : { gens: isLocked });
       
       return newLocks;
     });
-  }, [savePaneLocks, isMobile]);
+  }, [savePaneLocks, isSmallMobile, isTablet]);
 
   const setIsShotsPaneLocked = useCallback((isLocked: boolean) => {
+    if (isSmallMobile) return; // No locking on small phones
+    
     setLocks(prev => {
       if (prev.shots === isLocked) return prev;
-      const newLocks = { ...prev, shots: isLocked };
       
-      // Save to database only on desktop
-      if (!isMobile) {
-        savePaneLocks({ shots: isLocked });
-      }
+      // On tablets, unlock other panes when locking this one
+      const newLocks = isTablet && isLocked
+        ? { shots: isLocked, tasks: false, gens: false }
+        : { ...prev, shots: isLocked };
+      
+      // Save to database (desktop and tablet)
+      savePaneLocks(isTablet && isLocked ? newLocks : { shots: isLocked });
       
       return newLocks;
     });
-  }, [savePaneLocks, isMobile]);
+  }, [savePaneLocks, isSmallMobile, isTablet]);
 
   const setIsTasksPaneLocked = useCallback((isLocked: boolean) => {
+    if (isSmallMobile) return; // No locking on small phones
+    
     setLocks(prev => {
       if (prev.tasks === isLocked) return prev;
-      const newLocks = { ...prev, tasks: isLocked };
       
-      // Save to database only on desktop
-      if (!isMobile) {
-        savePaneLocks({ tasks: isLocked });
-      }
+      // On tablets, unlock other panes when locking this one
+      const newLocks = isTablet && isLocked
+        ? { shots: false, tasks: isLocked, gens: false }
+        : { ...prev, tasks: isLocked };
+      
+      // Save to database (desktop and tablet)
+      savePaneLocks(isTablet && isLocked ? newLocks : { tasks: isLocked });
       
       return newLocks;
     });
-  }, [savePaneLocks, isMobile]);
+  }, [savePaneLocks, isSmallMobile, isTablet]);
 
   // Open state setters
   const setIsGenerationsPaneOpen = useCallback((isOpen: boolean) => {
@@ -162,18 +196,19 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const value = useMemo(
     () => ({
-      // On mobile, always return false for locks
-      isGenerationsPaneLocked: isMobile ? false : locks.gens,
+      // On phones (small mobile), always return false for locks
+      // On tablets and desktop, return actual lock state
+      isGenerationsPaneLocked: isSmallMobile ? false : locks.gens,
       setIsGenerationsPaneLocked,
       isGenerationsPaneOpen: isGenerationsPaneOpenState,
       setIsGenerationsPaneOpen,
       generationsPaneHeight,
       setGenerationsPaneHeight,
-      isShotsPaneLocked: isMobile ? false : locks.shots,
+      isShotsPaneLocked: isSmallMobile ? false : locks.shots,
       setIsShotsPaneLocked,
       shotsPaneWidth,
       setShotsPaneWidth,
-      isTasksPaneLocked: isMobile ? false : locks.tasks,
+      isTasksPaneLocked: isSmallMobile ? false : locks.tasks,
       setIsTasksPaneLocked,
       tasksPaneWidth,
       setTasksPaneWidth,
@@ -183,7 +218,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setIsTasksPaneOpen,
     }),
     [
-      isMobile,
+      isSmallMobile,
       locks.gens,
       locks.shots,
       locks.tasks,

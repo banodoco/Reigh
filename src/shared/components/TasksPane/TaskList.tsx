@@ -129,6 +129,10 @@ interface TaskListProps {
   activeTaskId?: string | null; // Currently active/viewed task ID
   onOpenImageLightbox?: (task: Task, media: GenerationRow) => void; // NEW
   onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number) => void; // NEW
+  // Mobile two-step tap interaction state
+  mobileActiveTaskId?: string | null;
+  onMobileActiveTaskChange?: (taskId: string | null) => void;
+  taskTypeFilter?: string; // Optional task type filter
 }
 
 const TaskList: React.FC<TaskListProps> = ({ 
@@ -140,7 +144,10 @@ const TaskList: React.FC<TaskListProps> = ({
   currentPage = 1,
   activeTaskId,
   onOpenImageLightbox,
-  onOpenVideoLightbox
+  onOpenVideoLightbox,
+  mobileActiveTaskId,
+  onMobileActiveTaskChange,
+  taskTypeFilter,
 }) => {
   const { selectedProjectId } = useProject();
 
@@ -197,9 +204,27 @@ const TaskList: React.FC<TaskListProps> = ({
       return;
     }
     
-    // Find truly new tasks (not present in previous load)
+    // Find truly new tasks - must be:
+    // 1. Not present in previous load
+    // 2. Created within the last 15 seconds (truly new, not just newly visible)
+    const now = Date.now();
+    const NEW_TASK_THRESHOLD_MS = 15000; // 15 seconds
+    
     const newlyAddedIds = tasks
-      .filter(t => !prevTaskIdsRef.current.has(t.id))
+      .filter(t => {
+        // Not in previous load
+        if (prevTaskIdsRef.current.has(t.id)) return false;
+        
+        // Check if task was created recently
+        const createdAt = t.createdAt || (t as any).created_at;
+        if (!createdAt) return false;
+        
+        const createdTime = new Date(createdAt).getTime();
+        const ageMs = now - createdTime;
+        
+        // Only flash if created within threshold
+        return ageMs < NEW_TASK_THRESHOLD_MS;
+      })
       .map(t => t.id);
 
     if (newlyAddedIds.length > 0) {
@@ -325,6 +350,8 @@ const TaskList: React.FC<TaskListProps> = ({
                       isActive={task.id === activeTaskId}
                       onOpenImageLightbox={onOpenImageLightbox}
                       onOpenVideoLightbox={onOpenVideoLightbox}
+                      isMobileActive={mobileActiveTaskId === task.id}
+                      onMobileActiveChange={onMobileActiveTaskChange}
                     />
                     {idx < filteredTasks.length - 1 && (
                       <div className="h-0 border-b border-zinc-700/40 my-1" />

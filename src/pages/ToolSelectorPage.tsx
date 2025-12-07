@@ -72,6 +72,8 @@ const processTools = [
 ];
 
 // Define assistant tools
+// Color assignments designed to maximize contrast between adjacent tools in both 2-col (mobile) and 3-col (desktop) layouts
+// Pattern: warm → cool → warm → cool to create visual rhythm
 const assistantTools = [
   {
     id: 'edit-images',
@@ -81,8 +83,8 @@ const assistantTools = [
     subtext: 'Adjust & refine',
     tool: toolsUIManifest.find(t => t.id === 'edit-images'),
     icon: Edit,
-    gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
-    accent: 'wes-yellow',
+    gradient: 'from-wes-mustard via-wes-vintage-gold to-wes-coral', // Warm gold tones
+    accent: 'wes-mustard',
   },
   {
     id: 'edit-video',
@@ -92,8 +94,8 @@ const assistantTools = [
     subtext: 'Regenerate portions',
     tool: toolsUIManifest.find(t => t.id === 'edit-video'),
     icon: Clapperboard,
-    gradient: 'from-wes-coral via-wes-salmon to-wes-pink',
-    accent: 'wes-coral',
+    gradient: 'from-wes-dusty-blue via-wes-lavender to-wes-mint', // Cool blue-lavender (contrasts with warm Edit Images)
+    accent: 'wes-dusty-blue',
   },
   {
     id: 'join-clips',
@@ -103,8 +105,8 @@ const assistantTools = [
     subtext: 'Connect together',
     tool: toolsUIManifest.find(t => t.id === 'join-clips'),
     icon: Link2,
-    gradient: 'from-wes-dusty-blue via-wes-lavender to-wes-pink',
-    accent: 'wes-dusty-blue',
+    gradient: 'from-wes-pink via-wes-salmon to-wes-coral', // Warm pink-coral (contrasts with cool Edit Videos)
+    accent: 'wes-pink',
   },
   {
     id: 'character-animate',
@@ -114,8 +116,8 @@ const assistantTools = [
     subtext: 'Bring them to life',
     tool: toolsUIManifest.find(t => t.id === 'character-animate'),
     icon: Users,
-    gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
-    accent: 'wes-sage',
+    gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue', // Cool green-blue (contrasts with warm Join Clips)
+    accent: 'wes-mint',
   },
   {
     id: 'moon-soon',
@@ -125,8 +127,8 @@ const assistantTools = [
     subtext: "It's on the way!",
     tool: null,
     icon: Sparkles,
-    gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
-    accent: 'wes-dusty-blue',
+    gradient: 'from-wes-lavender via-wes-pink to-wes-salmon', // Warm lavender-pink (contrasts with cool Characters)
+    accent: 'wes-lavender',
     comingSoon: true,
   },
   {

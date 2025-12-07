@@ -107,6 +107,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
         hasRadixContent: !!target.closest('[data-radix-select-content]'),
         hasRadixViewport: !!target.closest('[data-radix-select-viewport]'),
         hasRadixItem: !!target.closest('[data-radix-select-item]'),
+        hasScrollButton: !!target.closest('[data-select-scroll-button]'),
         hasHeader: !!target.closest('[data-shot-selector-header]'),
         hasTrigger: triggerRef.current?.contains(target),
       });
@@ -119,10 +120,12 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
       
       // Don't close if clicking on select content (including portal)
       // Check for data-radix-select attributes to identify select elements
+      // Also check for scroll buttons which have custom data-select-scroll-button attribute
       if (
         target.closest('[data-radix-select-content]') ||
         target.closest('[data-radix-select-viewport]') ||
-        target.closest('[data-radix-select-item]')
+        target.closest('[data-radix-select-item]') ||
+        target.closest('[data-select-scroll-button]')
       ) {
         console.log('[ShotSelectorDebug] Click on select content - not closing');
         return;

@@ -132,6 +132,11 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     window.dispatchEvent(new CustomEvent('mobileSelectionActive', { detail: hasSelection }));
     // Notify parent component of selection change
     onSelectionChange?.(hasSelection);
+    
+    // Cleanup: ensure pane controls are restored when component unmounts
+    return () => {
+      window.dispatchEvent(new CustomEvent('mobileSelectionActive', { detail: false }));
+    };
   }, [mobileSelectedIds.length, onSelectionChange]);
 
   // Reconcile optimistic state with server state when images prop changes

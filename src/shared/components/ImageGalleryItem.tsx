@@ -890,8 +890,16 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Handle click/tap processing with scroll detection
   const handleInteraction = (e: React.TouchEvent | React.MouseEvent) => {
-    // Check if there was significant movement (scrolling/dragging)
-    if (e.type === 'touchend' && touchStartPosRef.current) {
+    // For touchend events, only proceed if touchstart happened on this element
+    // This prevents clicks from firing when a dropdown (like ShotSelector) closes
+    // and the touchend lands on the element behind it
+    if (e.type === 'touchend') {
+      if (!touchStartPosRef.current) {
+        // touchStart didn't happen on this element, ignore the touchend
+        console.log('[MobileDebug] touchend without matching touchstart, ignoring');
+        return;
+      }
+      
       const touch = (e as React.TouchEvent).changedTouches[0];
       const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
       const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);

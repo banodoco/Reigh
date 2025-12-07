@@ -32,8 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/shared/components/ui/select';
-import { Checkbox } from '@/shared/components/ui/checkbox';
-import { Label } from '@/shared/components/ui/label';
 import { PANE_CONFIG } from '@/shared/config/panes';
 const GENERATIONS_PER_PAGE = 18;
 
@@ -429,26 +427,25 @@ const GenerationsPaneComponent: React.FC = () => {
                   </Button>
                 </div>
                 <div className="flex items-center space-x-4 mr-2">
-                    {/* Star Filter */}
+                    {/* Star Filter - Button style matching ImageGalleryFilters */}
                     <div 
                       className={cn(
-                        "flex items-center space-x-2 transition-all duration-200",
+                        "flex items-center transition-all duration-200",
                         isInteractionDisabled && "pointer-events-none opacity-70"
                       )}
                     >
-                      <Checkbox 
-                        id="starred-filter-pane"
-                        checked={starredOnly}
-                        onCheckedChange={(checked) => setStarredOnly(!!checked)}
-                        className="border-zinc-600 data-[state=checked]:bg-zinc-600"
-                      />
-                      <Label 
-                        htmlFor="starred-filter-pane" 
-                        className="text-xs text-zinc-400 cursor-pointer flex items-center space-x-1"
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-1 h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                        onClick={() => setStarredOnly(!starredOnly)}
+                        aria-label={starredOnly ? "Show all items" : "Show only starred items"}
                       >
-                        <Star className="h-3 w-3" />
-                        <span>Starred</span>
-                      </Label>
+                        <Star
+                          className="h-5 w-5"
+                          fill={starredOnly ? 'currentColor' : 'none'}
+                        />
+                      </Button>
                     </div>
 
                     {/* Media Type Filter */}

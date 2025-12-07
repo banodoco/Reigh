@@ -172,7 +172,12 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
       setIsCreateProjectModalOpen(true);
       return;
     }
-    setSelectedProjectId(projectId);
+    // Only navigate if actually switching to a different project
+    if (projectId !== selectedProjectId) {
+      setSelectedProjectId(projectId);
+      // Navigate to /tools when switching projects (consistent with new project creation behavior)
+      navigate('/tools');
+    }
   };
 
   // Generate dynamic referral button text based on stats

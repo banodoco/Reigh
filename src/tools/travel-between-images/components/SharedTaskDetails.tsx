@@ -1030,6 +1030,30 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         
         {/* Technical Settings */}
         <div className="space-y-3">
+          {/* Model Type */}
+          {(() => {
+            const modelName = orchestratorDetails?.model_name || orchestratorPayload?.model_name || task?.params?.model_name;
+            if (modelName) {
+              // Format model name for display (e.g., "wan_2_2_i2v" -> "Wan 2.2 I2V")
+              const formatModelName = (name: string) => {
+                return name
+                  .replace(/wan_2_2_i2v_lightning_baseline_(\d+)_(\d+)_(\d+)/, 'Wan 2.2 I2V Lightning ($1.$2.$3)')
+                  .replace(/wan_2_2_i2v_baseline_(\d+)_(\d+)_(\d+)/, 'Wan 2.2 I2V Baseline ($1.$2.$3)')
+                  .replace(/wan_2_2_i2v_lightning/, 'Wan 2.2 I2V Lightning')
+                  .replace(/wan_2_2_i2v/, 'Wan 2.2 I2V')
+                  .replace(/_/g, ' ');
+              };
+              return (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Model</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {formatModelName(modelName)}
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
           {/* Hide basic Steps when phase_config is present (shown in detail above) */}
           {!phaseConfig?.phases && (
             <div className="space-y-1">

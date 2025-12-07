@@ -1880,6 +1880,214 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     onGenerate
   ]);
 
+  // Handler for "Use Existing Prompts" button in automated mode
+  // Uses the already-inputted prompts directly to generate images
+  const handleUseExistingPrompts = useCallback(async () => {
+    const activePrompts = prompts.filter(p => p.fullPrompt.trim() !== "");
+    if (activePrompts.length === 0) {
+      toast.error("No prompts available. Please add prompts first.");
+      return;
+    }
+
+    if (!styleReferenceImageGeneration) {
+      toast.error("Please upload a style reference image for Qwen.Image model.");
+      return;
+    }
+
+    console.log('[ImageGenerationForm] Use Existing Prompts: Using', activePrompts.length, 'existing prompts');
+
+    const lorasForApi: any[] = [];
+
+    // Append styleBoostTerms to afterEachPromptText if present
+    const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
+      ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+      : afterEachPromptText;
+
+    const batchTaskParams: BatchImageGenerationTaskParams = {
+      project_id: selectedProjectId!,
+      prompts: activePrompts.map(p => {
+        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
+        return {
+          id: p.id,
+          fullPrompt: combinedFull,
+          shortPrompt: p.shortPrompt || (combinedFull.substring(0, 30) + (combinedFull.length > 30 ? "..." : ""))
+        };
+      }), 
+      imagesPerPrompt: 1, // Always 1 image per prompt in automated mode
+      loras: lorasForApi,
+      shot_id: associatedShotId || undefined,
+      model_name: 'qwen-image',
+      steps: isLocalGenerationEnabled ? steps : undefined,
+      style_reference_image: styleReferenceImageGeneration,
+      style_reference_strength: currentStyleStrength,
+      subject_reference_image: styleReferenceImageGeneration,
+      subject_strength: currentSubjectStrength,
+      subject_description: effectiveSubjectDescription,
+      in_this_scene: currentInThisScene,
+      in_this_scene_strength: currentInThisSceneStrength,
+      reference_mode: referenceMode
+    };
+
+    const legacyGenerationData = {
+      prompts: batchTaskParams.prompts,
+      imagesPerPrompt: 1,
+      loras: lorasForApi,
+      fullSelectedLoras: loraManager.selectedLoras,
+      generationMode: selectedModel,
+      associatedShotId,
+      styleReferenceImage: styleReferenceImageGeneration,
+      styleReferenceStrength: currentStyleStrength,
+      subjectStrength: currentSubjectStrength,
+      subjectDescription: effectiveSubjectDescription,
+      selectedModel,
+      batchTaskParams
+    };
+
+    console.log('[ImageGenerationForm] Use Existing Prompts: Queuing', activePrompts.length, 'images (1 per prompt)');
+    onGenerate(legacyGenerationData);
+  }, [
+    prompts,
+    styleReferenceImageGeneration,
+    selectedProjectId,
+    beforeEachPromptText,
+    afterEachPromptText,
+    currentStyleBoostTerms,
+    associatedShotId,
+    isLocalGenerationEnabled,
+    steps,
+    currentStyleStrength,
+    currentSubjectStrength,
+    effectiveSubjectDescription,
+    currentInThisScene,
+    currentInThisSceneStrength,
+    referenceMode,
+    loraManager.selectedLoras,
+    selectedModel,
+    onGenerate
+  ]);
+
+  // Handler for "New Prompts Like Existing" button in automated mode
+  // Uses existing prompts as context to generate similar new prompts, then generates images
+  const handleNewPromptsLikeExisting = useCallback(async () => {
+    const activePrompts = prompts.filter(p => p.fullPrompt.trim() !== "");
+    if (activePrompts.length === 0) {
+      toast.error("No prompts available. Please add prompts first.");
+      return;
+    }
+
+    if (!styleReferenceImageGeneration) {
+      toast.error("Please upload a style reference image for Qwen.Image model.");
+      return;
+    }
+
+    try {
+      setIsGeneratingAutomatedPrompts(true);
+
+      console.log('[ImageGenerationForm] New Prompts Like Existing: Using', activePrompts.length, 'prompts as context');
+
+      // Generate new prompts using existing ones as context (like remix mode)
+      const rawResults = await aiGeneratePrompts({
+        overallPromptText: "Make me more prompts like this.",
+        numberToGenerate: imagesPerPrompt, // Slider value = number of prompts
+        existingPrompts: activePrompts.map(p => ({ id: p.id, text: p.fullPrompt, shortText: p.shortPrompt })),
+        addSummaryForNewPrompts: true,
+        replaceCurrentPrompts: true,
+        temperature: 0.8,
+        rulesToRememberText: '',
+      });
+
+      console.log('[ImageGenerationForm] New Prompts Like Existing: Generated', rawResults.length, 'new prompts');
+
+      // Convert to PromptEntry format
+      const newPrompts: PromptEntry[] = rawResults.map(item => ({
+        id: item.id,
+        fullPrompt: item.text,
+        shortPrompt: item.shortText || item.text.substring(0, 30) + (item.text.length > 30 ? "..." : ""),
+      }));
+
+      // Save generated prompts to state
+      setPrompts(newPrompts);
+
+      // Now generate images with these prompts (1 image per prompt)
+      const lorasForApi: any[] = [];
+
+      // Append styleBoostTerms to afterEachPromptText if present
+      const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
+        ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+        : afterEachPromptText;
+
+      const batchTaskParams: BatchImageGenerationTaskParams = {
+        project_id: selectedProjectId!,
+        prompts: newPrompts.map(p => {
+          const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
+          return {
+            id: p.id,
+            fullPrompt: combinedFull,
+            shortPrompt: p.shortPrompt || (combinedFull.substring(0, 30) + (combinedFull.length > 30 ? "..." : ""))
+          };
+        }), 
+        imagesPerPrompt: 1, // Always 1 image per prompt in automated mode
+        loras: lorasForApi,
+        shot_id: associatedShotId || undefined,
+        model_name: 'qwen-image',
+        steps: isLocalGenerationEnabled ? steps : undefined,
+        style_reference_image: styleReferenceImageGeneration,
+        style_reference_strength: currentStyleStrength,
+        subject_reference_image: styleReferenceImageGeneration,
+        subject_strength: currentSubjectStrength,
+        subject_description: effectiveSubjectDescription,
+        in_this_scene: currentInThisScene,
+        in_this_scene_strength: currentInThisSceneStrength,
+        reference_mode: referenceMode
+      };
+
+      const legacyGenerationData = {
+        prompts: batchTaskParams.prompts,
+        imagesPerPrompt: 1,
+        loras: lorasForApi,
+        fullSelectedLoras: loraManager.selectedLoras,
+        generationMode: selectedModel,
+        associatedShotId,
+        styleReferenceImage: styleReferenceImageGeneration,
+        styleReferenceStrength: currentStyleStrength,
+        subjectStrength: currentSubjectStrength,
+        subjectDescription: effectiveSubjectDescription,
+        selectedModel,
+        batchTaskParams
+      };
+
+      console.log('[ImageGenerationForm] New Prompts Like Existing: Queuing', newPrompts.length, 'images (1 per prompt)');
+      onGenerate(legacyGenerationData);
+    } catch (error) {
+      console.error('[ImageGenerationForm] New Prompts Like Existing: Error generating prompts:', error);
+      toast.error("Failed to generate prompts. Please try again.");
+    } finally {
+      setIsGeneratingAutomatedPrompts(false);
+    }
+  }, [
+    prompts,
+    styleReferenceImageGeneration,
+    selectedProjectId,
+    imagesPerPrompt,
+    beforeEachPromptText,
+    afterEachPromptText,
+    currentStyleBoostTerms,
+    associatedShotId,
+    isLocalGenerationEnabled,
+    steps,
+    currentStyleStrength,
+    currentSubjectStrength,
+    effectiveSubjectDescription,
+    currentInThisScene,
+    currentInThisSceneStrength,
+    referenceMode,
+    loraManager.selectedLoras,
+    selectedModel,
+    onGenerate,
+    aiGeneratePrompts,
+    setPrompts
+  ]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -2347,6 +2555,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           onChangeSteps={setSteps}
           showStepsDropdown={isLocalGenerationEnabled}
           promptMode={promptMode}
+          onUseExistingPrompts={handleUseExistingPrompts}
+          onNewPromptsLikeExisting={handleNewPromptsLikeExisting}
         />
       </form>
 

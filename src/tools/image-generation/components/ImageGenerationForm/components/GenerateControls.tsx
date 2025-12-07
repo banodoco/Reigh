@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
+import { RefreshCw, Sparkles } from "lucide-react";
 import { PromptMode } from "../types";
 
 interface GenerateControlsProps {
@@ -17,6 +18,9 @@ interface GenerateControlsProps {
   showStepsDropdown?: boolean;
   // Prompt mode for slider label
   promptMode: PromptMode;
+  // Automated mode with existing prompts
+  onUseExistingPrompts?: () => void;
+  onNewPromptsLikeExisting?: () => void;
 }
 
 export const GenerateControls: React.FC<GenerateControlsProps> = ({
@@ -30,7 +34,10 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
   onChangeSteps,
   showStepsDropdown = false,
   promptMode,
+  onUseExistingPrompts,
+  onNewPromptsLikeExisting,
 }) => {
+  const showExistingPromptButtons = promptMode === 'automated' && actionablePromptsCount > 0;
   return (
     <div className="mt-8 p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg">
       <div className="flex justify-center">
@@ -100,10 +107,45 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
             : isGenerating
               ? "Creating tasks..."
               : promptMode === 'automated'
-                ? `Generate ${imagesPerPrompt} ${imagesPerPrompt === 1 ? 'Image' : 'Images'}`
+                ? `Generate ${imagesPerPrompt} New Prompts + Images`
                 : `Generate ${imagesPerPrompt * actionablePromptsCount} ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
         </Button>
       </div>
+
+      {/* Existing prompts buttons - only shown in automated mode when there are non-empty prompts */}
+      {showExistingPromptButtons && (
+        <div className="flex justify-center mt-3 gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            disabled={isGenerating || !hasApiKey}
+            onClick={(e) => {
+              e.preventDefault();
+              onUseExistingPrompts?.();
+            }}
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Use Existing {actionablePromptsCount} {actionablePromptsCount === 1 ? 'Prompt' : 'Prompts'}
+          </Button>
+          <span className="text-muted-foreground/50 self-center">|</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            disabled={isGenerating || !hasApiKey}
+            onClick={(e) => {
+              e.preventDefault();
+              onNewPromptsLikeExisting?.();
+            }}
+          >
+            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+            New Prompts Like Existing
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

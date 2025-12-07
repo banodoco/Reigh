@@ -39,10 +39,9 @@ function filterReferenceSettingsByMode(
       break;
 
     case 'subject':
-      // Subject mode: only pass subject strength and description, exclude style and scene
-      if (settings.subject_strength !== undefined) {
-        filtered.subject_strength = settings.subject_strength;
-      }
+      // Subject mode: style at 1.1, subject at 0.5, plus description
+      filtered.style_reference_strength = 1.1;
+      filtered.subject_strength = 0.5;
       if (settings.subject_description !== undefined && settings.subject_description.trim()) {
         filtered.subject_description = settings.subject_description;
       }
@@ -62,13 +61,10 @@ function filterReferenceSettingsByMode(
       break;
 
     case 'scene':
-      // Scene mode: only pass scene settings, exclude style and subject
-      if (settings.in_this_scene !== undefined) {
-        filtered.in_this_scene = settings.in_this_scene;
-      }
-      if (settings.in_this_scene_strength !== undefined) {
-        filtered.in_this_scene_strength = settings.in_this_scene_strength;
-      }
+      // Scene mode: style at 1.1, scene strength at 0.5
+      filtered.style_reference_strength = 1.1;
+      filtered.in_this_scene = true;
+      filtered.in_this_scene_strength = 0.5;
       break;
   }
   

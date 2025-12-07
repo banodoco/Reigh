@@ -113,12 +113,16 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
     // Don't show control when pane is open on mobile
     if (isOpen) return null;
 
+    // On mobile, bottom pane control should be BEHIND side panes (which are z-60)
+    // Use z-[50] for bottom pane controls so they don't overlap open Task/Shot panes
+    const mobileZIndex = side === 'bottom' ? 'z-[50]' : PANE_CONFIG.zIndex.CONTROL_UNLOCKED;
+
     return (
       <div
         data-pane-control
         style={dynamicStyle}
         className={cn(
-          `fixed ${PANE_CONFIG.zIndex.CONTROL_UNLOCKED} flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+          `fixed ${mobileZIndex} flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
           getPositionClasses(),
           'opacity-100'
         )}

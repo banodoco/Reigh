@@ -830,8 +830,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     e.preventDefault();
     
     // Check if this task has actionable content (buttons to show)
+    // Note: For completed video tasks, we consider them actionable even before video data is loaded,
+    // because we'll fetch videos on first tap and show "Loading..." button state
     const hasActionableContent = 
-      (taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) ||
+      taskInfo.isCompletedVideoTask || // Completed video tasks are always actionable (will load videos)
       (taskInfo.isVideoTask && shotId) ||
       (taskInfo.isImageTask && generationData);
     

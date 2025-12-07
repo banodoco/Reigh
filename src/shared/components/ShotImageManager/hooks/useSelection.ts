@@ -51,6 +51,13 @@ export function useSelection({
       const hasSelection = mobileSelectedIds.length > 0;
       window.dispatchEvent(new CustomEvent('mobileSelectionActive', { detail: hasSelection }));
     }
+    
+    // Cleanup: ensure pane controls are restored when component unmounts
+    return () => {
+      if (isMobile) {
+        window.dispatchEvent(new CustomEvent('mobileSelectionActive', { detail: false }));
+      }
+    };
   }, [mobileSelectedIds.length, isMobile]);
   
   // Wrap setSelectedIds to force re-render
