@@ -1005,6 +1005,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Should show side panel (includes video trim mode and video edit mode)
   const shouldShowSidePanelWithTrim = shouldShowSidePanel || isVideoTrimModeActive || isVideoEditModeActive;
 
+  // DEBUG: Log variants state for troubleshooting variant display issues
+  React.useEffect(() => {
+    console.log('[VariantDisplay] 🔍 Variants display debug:', {
+      mediaId: media.id?.substring(0, 8),
+      variantFetchGenerationId: variantFetchGenerationId?.substring(0, 8),
+      variantsCount: variants?.length || 0,
+      variantsArray: variants?.map(v => ({ id: v.id?.substring(0, 8), type: v.variant_type, isPrimary: v.is_primary })),
+      isLoadingVariants,
+      shouldShowVariants: variants && variants.length >= 1,
+      shouldShowSidePanel,
+      shouldShowSidePanelWithTrim,
+      isVideoTrimModeActive,
+      isVideoEditModeActive,
+      isSpecialEditMode,
+      showTaskDetails,
+      isVideo,
+    });
+  }, [media.id, variantFetchGenerationId, variants, isLoadingVariants, shouldShowSidePanel, shouldShowSidePanelWithTrim, isVideoTrimModeActive, isVideoEditModeActive, isSpecialEditMode, showTaskDetails, isVideo]);
+
   // ========================================
   // SIMPLE HANDLERS - Just call props
   // ========================================

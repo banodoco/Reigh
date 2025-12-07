@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { PaletteIcon } from '@/shared/components/PaletteIcon';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { ChevronLeft, ChevronRight, Github, MessageCircle, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Github, MessageCircle, Plus, Download } from 'lucide-react';
 import { PaintParticles } from '@/shared/components/PaintParticles';
+import { usePlatformInstall } from '@/shared/hooks/usePlatformInstall';
+import { InstallInstructionsModal } from './InstallInstructionsModal';
 import type { Session } from '@supabase/supabase-js';
 
 interface ExampleStyle {
@@ -62,6 +64,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [banodocoState, setBanodocoState] = useState<'hidden' | 'animating' | 'visible'>('hidden');
   const [showUnderlineWave, setShowUnderlineWave] = useState(false);
   const [minLoadTimePassed, setMinLoadTimePassed] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  
+  // Platform-aware PWA install detection
+  const platformInstall = usePlatformInstall();
 
   // Enforce minimum loading time
   useEffect(() => {
@@ -284,66 +290,107 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </p>
               </div>
               
-            {/* Sign-in button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
+            {/* CTA button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
             <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-6 overflow-visible">
-              {!session ? (
+              {session ? (
+                // User is logged in - show "Go to Tools"
                 <div className="group">
-                    <button
-                      onClick={handleDiscordSignIn}
-                      className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
-                      style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
-                    >
-                      {/* Pulsing effect on hover */}
-                      <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
-                      
-                      <div className="relative">
-                        {/* Paint particles - behind the brush */}
-                        <PaintParticles />
-                        
-                        {/* Paintbrush Icon - in front */}
-                        <div className="w-5 h-5 relative z-10">
-                          <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
-                            <img 
-                              src="/brush-paintbrush-icon.webp"
-                              alt="Paintbrush"
-                              className="w-full h-full brightness-0 invert" 
-                            />
-                          </div>
+                  <button
+                    onPointerUp={() => navigate('/tools')}
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
+                    style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
+                  >
+                    <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
+                    <div className="relative">
+                      <PaintParticles />
+                      <div className="w-5 h-5 relative z-10">
+                        <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
+                          <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
                         </div>
                       </div>
-                      <span>Sign in with Discord</span>
-                    </button>
-                  </div>
-                ) : (
+                    </div>
+                    <span>Go to Tools</span>
+                  </button>
+                </div>
+              ) : platformInstall.showInstallCTA ? (
+                // Not logged in + PWA install available - show platform-specific install CTA
+                <div className="flex flex-col items-center gap-3">
                   <div className="group">
                     <button
-                      onPointerUp={() => navigate('/tools')}
+                      onClick={async () => {
+                        // If we can trigger the browser's install prompt, do it
+                        if (platformInstall.canInstall) {
+                          const installed = await platformInstall.triggerInstall();
+                          if (!installed) {
+                            // User declined or error - show instructions anyway
+                            setShowInstallModal(true);
+                          }
+                        } else {
+                          // Manual install required - show instructions modal
+                          setShowInstallModal(true);
+                        }
+                      }}
                       className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
                       style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
                     >
-                      {/* Pulsing effect on hover */}
                       <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
-                      
                       <div className="relative">
-                        {/* Paint particles - behind the brush */}
                         <PaintParticles />
-                        
-                        {/* Paintbrush Icon - in front */}
                         <div className="w-5 h-5 relative z-10">
-                          <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
-                            <img 
-                              src="/brush-paintbrush-icon.webp"
-                              alt="Paintbrush"
-                              className="w-full h-full brightness-0 invert" 
-                            />
-                          </div>
+                          {platformInstall.ctaIcon === 'download' ? (
+                            <Download className="w-full h-full text-white" />
+                          ) : platformInstall.ctaIcon === 'plus' ? (
+                            <Plus className="w-full h-full text-white" />
+                          ) : (
+                            <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
+                              <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <span>Go to Tools</span>
+                      <span>{platformInstall.ctaText}</span>
                     </button>
                   </div>
-                )}
-              </div>
+                  <button
+                    onClick={handleDiscordSignIn}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors underline-offset-2 hover:underline"
+                  >
+                    or sign in with Discord
+                  </button>
+                </div>
+              ) : (
+                // Not logged in + no PWA install available - show Discord sign-in
+                <div className="group">
+                  <button
+                    onClick={handleDiscordSignIn}
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
+                    style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
+                  >
+                    <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
+                    <div className="relative">
+                      <PaintParticles />
+                      <div className="w-5 h-5 relative z-10">
+                        <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
+                          <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
+                        </div>
+                      </div>
+                    </div>
+                    <span>Sign in with Discord</span>
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {/* Install Instructions Modal */}
+            <InstallInstructionsModal
+              open={showInstallModal}
+              onOpenChange={setShowInstallModal}
+              installMethod={platformInstall.installMethod}
+              platform={platformInstall.platform}
+              browser={platformInstall.browser}
+              instructions={platformInstall.installInstructions}
+              onFallbackToDiscord={handleDiscordSignIn}
+            />
             </div>
           </div>
 
