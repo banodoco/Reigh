@@ -24,6 +24,7 @@ export const RECONCILIATION_TIMEOUT = 5000; // ms for maximum lock duration
 export const DEFAULT_BATCH_VIDEO_FRAMES = 60;
 
 // Mobile bottom offset for action bars
-export const MOBILE_BOTTOM_OFFSET = 46; // px
-export const DESKTOP_BOTTOM_OFFSET = 80; // px
+// Positioned high enough to stack above floating Generate Video CTA (which sits at ~60px bottom)
+export const MOBILE_BOTTOM_OFFSET = 205; // px - above floating CTA
+export const DESKTOP_BOTTOM_OFFSET = 235; // px - above floating CTA
 

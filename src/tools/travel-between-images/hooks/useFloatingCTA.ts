@@ -20,7 +20,7 @@ interface UseFloatingCTAReturn {
 export const useFloatingCTA = ({
   timelineRef,
   ctaRef,
-  hasActiveSelection,
+  hasActiveSelection: _hasActiveSelection, // Unused - selection bar now stacks above CTA
   isMobile,
   enabled = true
 }: UseFloatingCTAProps): UseFloatingCTAReturn => {
@@ -93,9 +93,9 @@ export const useFloatingCTA = ({
       const notAtTop = scrollY > TOP_THRESHOLD;
       const timelineHasBeenViewed = timelineRect.top < (viewportHeight - TRIGGER_BUFFER);
       const ctaNotVisible = ctaRect.top > (viewportHeight - PERSIST_BUFFER);
-      const noActiveSelection = !hasActiveSelection;
+      // Note: We no longer hide when selection is active - selection bar stacks above this
       
-      const shouldFloat = userHasScrolled && notAtTop && timelineHasBeenViewed && ctaNotVisible && noActiveSelection;
+      const shouldFloat = userHasScrolled && notAtTop && timelineHasBeenViewed && ctaNotVisible;
       
       console.log('[FloatingCTA] 📊 Check:', {
         shouldFloat,
@@ -103,8 +103,7 @@ export const useFloatingCTA = ({
           userHasScrolled,
           notAtTop,
           timelineHasBeenViewed,
-          ctaNotVisible,
-          noActiveSelection
+          ctaNotVisible
         },
         metrics: {
           scrollY: scrollY.toFixed(0),
@@ -150,7 +149,7 @@ export const useFloatingCTA = ({
       // Reset scroll tracking when effect re-runs
       hasScrolledRef.current = false;
     };
-  }, [isMobile, hasActiveSelection, isFloating, enabled]);
+  }, [isMobile, isFloating, enabled]);
 
   return {
     isFloating,

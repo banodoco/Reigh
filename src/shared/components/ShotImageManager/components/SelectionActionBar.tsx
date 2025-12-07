@@ -29,7 +29,7 @@ export const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
   
   return (
     <div
-      className="fixed z-50 flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-300"
+      className="fixed z-[90] flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-300"
       style={{
         left: `${leftOffset}px`,
         right: `${rightOffset}px`,

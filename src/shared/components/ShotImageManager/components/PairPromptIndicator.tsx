@@ -123,7 +123,7 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
                 <div className="pt-1 border-t border-border/50">
                   <div className="flex items-start justify-between gap-2">
                     <span className="font-medium">Enhanced Prompt:</span>
-                    {onClearEnhancedPrompt ? (
+                    {onClearEnhancedPrompt && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -138,8 +138,6 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
                       >
                         <X className="h-3 w-3" />
                       </Button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">(no handler)</span>
                     )}
                   </div>
                   <p className="text-sm">

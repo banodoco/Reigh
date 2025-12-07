@@ -39,6 +39,9 @@ export function useGenerationsPageLogic({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
   
+  // Track if we've auto-fallen back to 'all' for the current shot (to prevent main effect from overriding)
+  const [hasAutoFallenBack, setHasAutoFallenBack] = useState(false);
+  
   const { data: shotsData } = useListShots(shouldLoadData ? selectedProjectId : null);
   const { currentShotId } = useCurrentShot();
   
@@ -60,22 +63,37 @@ export function useGenerationsPageLogic({
   const shotHasImages = (shotId: string): boolean => {
     if (!shotsData) return false;
     const shot = shotsData.find(s => s.id === shotId);
-    return (shot?.images?.length || 0) > 0;
+    const hasImages = (shot?.images?.length || 0) > 0;
+    console.log('[PaneFilterDebug] shotHasImages check:', {
+      shotId: shotId?.substring(0, 8),
+      hasImages,
+      imageCount: shot?.images?.length || 0
+    });
+    return hasImages;
   };
 
   // Helper function to check if a shot has unpositioned images (when excludePositioned matters)
   const shotHasUnpositionedImages = (shotId: string): boolean => {
-    if (!shotsData) return false;
+    if (!shotsData) {
+      console.log('[PaneFilterDebug] shotHasUnpositionedImages: no shotsData yet');
+      return false;
+    }
     const shot = shotsData.find(s => s.id === shotId);
-    if (!shot?.images) return false;
+    if (!shot?.images) {
+      console.log('[PaneFilterDebug] shotHasUnpositionedImages: shot not found or no images array', {
+        shotId: shotId?.substring(0, 8),
+        shotFound: !!shot
+      });
+      return false;
+    }
     
     // Check if any images have timeline_frame === null/undefined (i.e., unpositioned)
     const unpositionedImages = shot.images.filter(img => (img as any).timeline_frame === null || (img as any).timeline_frame === undefined);
-    console.log('[ShotFilterLogic] Shot unpositioned images check:', {
-      shotId,
+    console.log('[PaneFilterDebug] shotHasUnpositionedImages result:', {
+      shotId: shotId?.substring(0, 8),
       totalImages: shot.images.length,
       unpositionedCount: unpositionedImages.length,
-      unpositionedImageIds: unpositionedImages.map(img => img.id).slice(0, 3) // Show first 3 for debugging
+      hasUnpositioned: unpositionedImages.length > 0
     });
     
     return unpositionedImages.length > 0;
@@ -83,29 +101,44 @@ export function useGenerationsPageLogic({
 
   // Function to determine the appropriate shot filter based on current shot and settings
   const getDefaultShotFilter = (shotId: string): string => {
+    console.log('[PaneFilterDebug] getDefaultShotFilter called:', {
+      shotId: shotId?.substring(0, 8),
+      excludePositioned
+    });
+    
     // When excludePositioned is true (default), check for unpositioned images
     if (excludePositioned) {
-      if (!shotHasUnpositionedImages(shotId)) {
-        console.log('[ShotFilterLogic] Shot has no unpositioned images with excludePositioned=true, defaulting to "all":', shotId);
+      const hasUnpositioned = shotHasUnpositionedImages(shotId);
+      if (!hasUnpositioned) {
+        console.log('[PaneFilterDebug] 🔴 getDefaultShotFilter → "all" (no unpositioned images with excludePositioned=true)');
         return 'all';
       }
-      console.log('[ShotFilterLogic] Shot has unpositioned images, defaulting to shot filter:', shotId);
+      console.log('[PaneFilterDebug] 🟢 getDefaultShotFilter → shot (has unpositioned images)');
       return shotId;
     }
     
     // When excludePositioned is false, check for any images
-    if (!shotHasImages(shotId)) {
-      console.log('[ShotFilterLogic] Shot has no images, defaulting to "all":', shotId);
+    const hasImages = shotHasImages(shotId);
+    if (!hasImages) {
+      console.log('[PaneFilterDebug] 🔴 getDefaultShotFilter → "all" (no images at all)');
       return 'all';
     }
     
-    console.log('[ShotFilterLogic] Shot has images with excludePositioned=false, defaulting to shot filter:', shotId);
+    console.log('[PaneFilterDebug] 🟢 getDefaultShotFilter → shot (has images with excludePositioned=false)');
     return shotId;
   };
 
   // Function to get the appropriate settings for the current shot
   const getCurrentShotSettings = (): GenerationsPaneSettings => {
+    console.log('[PaneFilterDebug] getCurrentShotSettings called:', {
+      currentShotId: currentShotId?.substring(0, 8),
+      hasStoredSettings: !!shotSettings,
+      userHasCustomized: shotSettings?.userHasCustomized,
+      storedFilter: shotSettings?.selectedShotFilter?.substring(0, 8)
+    });
+    
     if (!currentShotId) {
+      console.log('[PaneFilterDebug] getCurrentShotSettings → no currentShotId, returning "all"');
       return {
         selectedShotFilter: 'all',
         excludePositioned: true,
@@ -115,12 +148,16 @@ export function useGenerationsPageLogic({
 
     // If user has previously customized settings for this shot, always use them
     if (shotSettings?.userHasCustomized) {
-      console.log('[ShotFilterLogic] Using customized settings for shot:', currentShotId, shotSettings);
+      console.log('[PaneFilterDebug] ⚠️ getCurrentShotSettings → using CUSTOMIZED settings:', {
+        filter: shotSettings.selectedShotFilter?.substring(0, 8),
+        excludePositioned: shotSettings.excludePositioned
+      });
       return shotSettings;
     }
 
     // Otherwise, determine default based on whether shot has images
     const defaultFilter = getDefaultShotFilter(currentShotId);
+    console.log('[PaneFilterDebug] getCurrentShotSettings → using DEFAULT filter:', defaultFilter?.substring(0, 8));
     return {
       selectedShotFilter: defaultFilter,
       excludePositioned: true,
@@ -147,34 +184,44 @@ export function useGenerationsPageLogic({
 
   // Apply shot filter settings when current shot changes or settings are loaded
   useEffect(() => {
-    console.log('[ShotFilterLogic] Effect triggered:', {
-      currentShotId,
-      lastCurrentShotId,
+    console.log('[PaneFilterDebug] 🔄 Main filter effect triggered:', {
+      currentShotId: currentShotId?.substring(0, 8),
+      lastCurrentShotId: lastCurrentShotId?.substring(0, 8),
       shotsDataLength: shotsData?.length,
       isLoadingShotSettings,
-      shotSettings
+      shotSettingsExists: !!shotSettings,
+      userHasCustomized: shotSettings?.userHasCustomized
     });
 
     // Wait for shots data to be available
     if (!shotsData?.length) {
-      console.log('[ShotFilterLogic] Waiting for shots data');
+      console.log('[PaneFilterDebug] ⏳ Waiting for shots data...');
       return;
     }
 
     if (currentShotId && shotsData.some(shot => shot.id === currentShotId)) {
       // We're viewing a specific shot
-      console.log('[ShotFilterLogic] In shot context:', currentShotId);
+      console.log('[PaneFilterDebug] 📍 In shot context:', currentShotId?.substring(0, 8));
+      
+      // If we've already auto-fallen back to 'all' for this shot, don't re-apply stored settings
+      // This prevents the main effect from overriding the fallback
+      if (hasAutoFallenBack) {
+        console.log('[PaneFilterDebug] ⏹ Skipping filter apply - already auto-fallen back to "all"');
+        return;
+      }
       
       // Don't update if we're still loading settings for this shot
       if (isLoadingShotSettings) {
-        console.log('[ShotFilterLogic] Still loading shot settings');
+        console.log('[PaneFilterDebug] ⏳ Still loading shot settings...');
         return;
       }
       
       const settingsToApply = getCurrentShotSettings();
-      console.log('[ShotFilterLogic] Applying settings for shot:', {
-        currentShotId,
-        settingsToApply
+      console.log('[PaneFilterDebug] ✨ APPLYING filter settings:', {
+        shotId: currentShotId?.substring(0, 8),
+        filterToApply: settingsToApply.selectedShotFilter === 'all' ? 'all' : settingsToApply.selectedShotFilter?.substring(0, 8),
+        excludePositioned: settingsToApply.excludePositioned,
+        reason: shotSettings?.userHasCustomized ? 'USER_CUSTOMIZED' : 'AUTO_DEFAULT'
       });
       
       setSelectedShotFilter(settingsToApply.selectedShotFilter);
@@ -187,14 +234,14 @@ export function useGenerationsPageLogic({
       
     } else if (!currentShotId) {
       // When no shot is selected, revert to 'all' shots
-      console.log('[ShotFilterLogic] No current shot, reverting to all shots');
+      console.log('[PaneFilterDebug] No current shot, reverting to "all"');
       setSelectedShotFilter('all');
       setExcludePositioned(true);
       setLastCurrentShotId(null);
     } else {
-      console.log('[ShotFilterLogic] Shot not found in shots data');
+      console.log('[PaneFilterDebug] Shot not found in shots data');
     }
-  }, [currentShotId, shotsData, isLoadingShotSettings, shotSettings, setLastAffectedShotId]);
+  }, [currentShotId, shotsData, isLoadingShotSettings, shotSettings, setLastAffectedShotId, hasAutoFallenBack]);
 
   // Create wrapper functions that save user customizations when called
   const handleShotFilterChange = (newShotFilter: string) => {
@@ -245,31 +292,42 @@ export function useGenerationsPageLogic({
   
   // Fallback: if filtering by a specific shot returns 0 items, automatically switch to 'all'
   // This handles cases where shotHasUnpositionedImages check was based on stale data
-  const [hasAutoFallenBack, setHasAutoFallenBack] = useState(false);
+  
+  // Debug logging for fallback conditions
+  useEffect(() => {
+    if (selectedShotFilter !== 'all') {
+      console.log('[PaneFilterDebug] 🔍 Fallback check:', {
+        filter: selectedShotFilter?.substring(0, 8),
+        isLoading,
+        isFetching,
+        total: generationsResponse?.total,
+        hasAutoFallenBack,
+        page,
+        shouldFallback: !isLoading && !isFetching && generationsResponse?.total === 0 && !hasAutoFallenBack && page === 1
+      });
+    }
+  }, [selectedShotFilter, isLoading, isFetching, generationsResponse?.total, hasAutoFallenBack, page]);
   
   useEffect(() => {
     // Only auto-fallback if:
     // 1. We're filtering by a specific shot (not 'all')
-    // 2. Query has completed (not loading)
+    // 2. Query has completed (not loading AND not fetching)
     // 3. Result is 0 items
     // 4. We haven't already auto-fallen back for this shot (prevent loops)
-    // 5. The user hasn't customized settings (don't override user choice)
+    // 5. We're on page 1 (not a pagination edge case)
     if (
       selectedShotFilter !== 'all' &&
       !isLoading &&
+      !isFetching &&
       generationsResponse?.total === 0 &&
       !hasAutoFallenBack &&
-      !shotSettings?.userHasCustomized
+      page === 1
     ) {
-      console.log('[ShotFilterLogic] Auto-falling back to "all" because shot filter returned 0 items:', {
-        selectedShotFilter,
-        total: generationsResponse?.total,
-        userHasCustomized: shotSettings?.userHasCustomized
-      });
+      console.log('[PaneFilterDebug] ✅ FALLBACK TRIGGERED → switching to "all" (query returned 0 items)');
       setSelectedShotFilter('all');
       setHasAutoFallenBack(true);
     }
-  }, [selectedShotFilter, isLoading, generationsResponse?.total, hasAutoFallenBack, shotSettings?.userHasCustomized]);
+  }, [selectedShotFilter, isLoading, isFetching, generationsResponse?.total, hasAutoFallenBack, page]);
   
   // Reset the auto-fallback flag when switching shots
   useEffect(() => {
