@@ -2584,6 +2584,59 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               </button>
                             </div>
                           )}
+                          {/* Video controls: Trim and Edit (for videos on mobile) */}
+                          {isVideo && !readOnly && (
+                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                              <button
+                                onClick={() => {
+                                  if (isVideoTrimMode) {
+                                    handleExitVideoTrimMode();
+                                  }
+                                  if (isVideoEditMode) {
+                                    handleExitVideoEditMode();
+                                  }
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  !isVideoTrimMode && !isVideoEditMode 
+                                    ? "bg-background text-foreground shadow-sm" 
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
+                                Info
+                              </button>
+                              {showVideoTrimEditor && (
+                                <button
+                                  onClick={() => {
+                                    if (isVideoEditMode) handleExitVideoEditMode();
+                                    handleEnterVideoTrimMode();
+                                  }}
+                                  className={cn(
+                                    "px-3 py-1.5 text-sm rounded transition-colors",
+                                    isVideoTrimMode 
+                                      ? "bg-background text-foreground shadow-sm" 
+                                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                  )}
+                                >
+                                  Clip
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  if (isVideoTrimMode) handleExitVideoTrimMode();
+                                  handleEnterVideoEditMode();
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  isVideoEditMode 
+                                    ? "bg-background text-foreground shadow-sm" 
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"

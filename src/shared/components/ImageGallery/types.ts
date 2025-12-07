@@ -109,5 +109,7 @@ export interface ImageGalleryProps {
   enableSingleClick?: boolean;
   onImageClick?: (image: GeneratedImageWithMetadata) => void;
   hideBottomPagination?: boolean;
+  /** When true, videos are rendered as static thumbnail images instead of HoverScrubVideo for better performance */
+  videosAsThumbnails?: boolean;
 }
 

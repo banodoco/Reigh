@@ -137,13 +137,31 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
     description: 'Inpaint or extend images'
   },
 
-  // Qwen image generation
+  // Qwen image generation (legacy task type name)
   qwen_image: {
     isVisible: true,
     displayName: 'Qwen Image',
     canCancel: true,
     category: 'generation',
     description: 'Generate images using Qwen model'
+  },
+
+  // Qwen image style generation (current task type for Qwen model)
+  qwen_image_style: {
+    isVisible: true,
+    displayName: 'Qwen Image',
+    canCancel: true,
+    category: 'generation',
+    description: 'Generate images with style reference using Qwen model'
+  },
+
+  // Wan 2.2 text-to-image generation (current task type for non-Qwen models)
+  wan_2_2_t2i: {
+    isVisible: true,
+    displayName: 'Image Generation',
+    canCancel: true,
+    category: 'generation',
+    description: 'Generate images using text-to-image models'
   },
 
   // Qwen image editing

@@ -117,6 +117,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     enableSingleClick = false,
     onImageClick,
     hideBottomPagination = false,
+    videosAsThumbnails = false,
   } = props;
 
   // [VideoSkeletonDebug] Mount/props summary for video gallery use
@@ -753,6 +754,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
           enableSingleClick={enableSingleClick}
           onImageClick={onImageClick}
           hideBottomPagination={hideBottomPagination}
+          videosAsThumbnails={videosAsThumbnails}
         />
         
         {/* Bottom Pagination Controls */}

@@ -12,6 +12,17 @@ import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraMana
 import { cn } from '@/shared/lib/utils';
 import { PortionSelection } from '@/shared/components/VideoPortionTimeline';
 
+// Color palette for segments - matches VideoPortionTimeline colors
+const SEGMENT_COLORS = [
+  { bg: 'bg-primary', bgMuted: 'bg-primary/20', text: 'text-primary', border: 'border-primary' },
+  { bg: 'bg-blue-500', bgMuted: 'bg-blue-500/20', text: 'text-blue-500', border: 'border-blue-500' },
+  { bg: 'bg-green-500', bgMuted: 'bg-green-500/20', text: 'text-green-500', border: 'border-green-500' },
+  { bg: 'bg-orange-500', bgMuted: 'bg-orange-500/20', text: 'text-orange-500', border: 'border-orange-500' },
+  { bg: 'bg-purple-500', bgMuted: 'bg-purple-500/20', text: 'text-purple-500', border: 'border-purple-500' },
+];
+
+const getSegmentColor = (index: number) => SEGMENT_COLORS[index % SEGMENT_COLORS.length];
+
 // Tiny thumbnail component for segment preview
 function SegmentThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -260,15 +271,17 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                     <h4 className="text-sm font-medium text-muted-foreground">Segments to Regenerate</h4>
                     
                     <div className="space-y-3">
-                        {selections.sort((a, b) => a.start - b.start).map((selection, index) => (
+                        {selections.sort((a, b) => a.start - b.start).map((selection, index) => {
+                            const segmentColor = getSegmentColor(index);
+                            return (
                             <div 
                                 key={selection.id} 
-                                className="border rounded-lg p-3 bg-muted/20 space-y-2"
+                                className={cn("border rounded-lg p-3 bg-muted/20 space-y-2", segmentColor.border)}
                             >
                                 {/* Segment Header with thumbnails and slider */}
                                 <div className="flex items-center gap-2">
-                                    {/* Segment number */}
-                                    <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium text-primary flex-shrink-0">
+                                    {/* Segment number - color matches timeline */}
+                                    <div className={cn("w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0", segmentColor.bgMuted, segmentColor.text)}>
                                         {index + 1}
                                     </div>
                                     
@@ -327,7 +340,8 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                                     />
                                 </div>
                             </div>
-                        ))}
+                        );
+                        })}
                     </div>
                 </div>
             )}
@@ -374,11 +388,11 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                         {maxContextFrames !== undefined && maxContextFrames < 30 ? (
                             <p className="text-xs text-amber-500 flex items-center gap-1">
                                 <AlertTriangle className="w-3 h-3" />
-                                Limited to {maxContextFrames} based on shortest video segment
+                                Limited to {maxContextFrames} — shortest preserved section is {maxContextFrames + 1} frames. Adjust your edit portions for more context.
                             </p>
                         ) : (
                             <p className="text-xs text-muted-foreground">
-                                Frames from source video used for context on each side
+                                Frames from preserved sections used for context on each side of edits
                             </p>
                         )}
                     </div>

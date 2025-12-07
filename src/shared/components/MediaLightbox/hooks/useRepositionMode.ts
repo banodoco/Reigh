@@ -480,7 +480,8 @@ export const useRepositionMode = ({
           name: 'Repositioned',
           params: {
             transform: transform as any,
-            saved_at: new Date().toISOString()
+            saved_at: new Date().toISOString(),
+            tool_type: toolTypeOverride || 'edit-images',
           }
         })
         .select('id')

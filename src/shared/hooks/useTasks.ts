@@ -363,11 +363,15 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       const shouldSkipCount = false;
       
       // 1. Get total count with lightweight query (skip if fast polling likely)
+      // IMPORTANT: Filter to only visible task types at DB level to match what's displayed
+      const visibleTaskTypes = getVisibleTaskTypes();
+      
       let countQuery = supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
         .eq('project_id', effectiveProjectId)
-        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
+        .is('params->orchestrator_task_id_ref', null) // Only parent tasks
+        .in('task_type', visibleTaskTypes); // Only visible task types
 
       if (status && status.length > 0) {
         countQuery = countQuery.in('status', status);
@@ -386,7 +390,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         .from('tasks')
         .select('*')
         .eq('project_id', effectiveProjectId)
-        .is('params->orchestrator_task_id_ref', null); // Only parent tasks
+        .is('params->orchestrator_task_id_ref', null) // Only parent tasks
+        .in('task_type', visibleTaskTypes); // Only visible task types
 
       // For Succeeded view, order by completion time (most recent first)
       const succeededOnly = status && status.length === 1 && status[0] === TASK_STATUS.COMPLETE;

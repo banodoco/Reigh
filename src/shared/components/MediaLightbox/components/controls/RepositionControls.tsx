@@ -52,9 +52,10 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
   const iconSize = variant === 'tablet' ? 'h-3 w-3' : 'h-2.5 w-2.5';
   const sliderIconSize = variant === 'tablet' ? 'h-3.5 w-3.5' : 'h-3 w-3';
   
-  // Max translate as percentage - at scale 1.0, can move 100% of image dimensions
-  // This scales with the scale factor so larger images can move further proportionally
-  const maxTranslatePercent = Math.round(100 * transform.scale);
+  // Max translate as percentage - limited to ±40% to keep image mostly on screen
+  // At 40%, image center moves 40% of its width, keeping 60%+ visible
+  // Slightly scales with scale factor but capped to prevent image from going off-screen
+  const maxTranslatePercent = Math.round(40 * Math.min(transform.scale, 1.25));
   
   // Check if any transform has been applied
   const hasChanges = 
