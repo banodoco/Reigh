@@ -26,7 +26,7 @@ const ChromeInstallIcon = () => (
         <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
       </div>
       <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
-        <span className="text-gray-400 truncate">reigh.app</span>
+        <span className="text-gray-400 truncate">reigh.art</span>
         <div className="ml-auto flex items-center justify-center w-5 h-5 bg-gray-50 border border-gray-300 rounded animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
           <svg className="w-3 h-3 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -51,7 +51,7 @@ const ChromeMenuIcon = () => (
         <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
       </div>
       <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
-        <span className="text-gray-400 truncate">reigh.app</span>
+        <span className="text-gray-400 truncate">reigh.art</span>
       </div>
       <div className="flex items-center justify-center w-6 h-6 bg-gray-50 border border-gray-300 rounded animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
         <MoreVertical className="w-4 h-4 text-gray-600" />
@@ -70,7 +70,7 @@ const SafariShareIcon = () => (
     </div>
     {/* Page content */}
     <div className="h-16 bg-gray-50 flex items-center justify-center">
-      <span className="text-[10px] text-gray-400">reigh.app</span>
+      <span className="text-[10px] text-gray-400">reigh.art</span>
     </div>
     {/* Safari bottom toolbar */}
     <div className="flex items-center justify-around px-4 py-2 bg-gray-200 border-t border-gray-300">
@@ -121,7 +121,7 @@ const EdgeAppAvailable = () => (
         <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
       </div>
       <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
-        <span className="text-gray-400 truncate">reigh.app</span>
+        <span className="text-gray-400 truncate">reigh.art</span>
         <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-300 rounded-full text-[10px] font-medium text-gray-700 animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
           <Plus className="w-2.5 h-2.5" />
           <span>App available</span>
@@ -145,7 +145,7 @@ const AndroidInstallPrompt = () => (
     {/* Chrome toolbar */}
     <div className="flex items-center gap-2 px-2 py-1.5 bg-white border-b border-gray-200">
       <div className="flex-1 flex items-center px-2 py-1 bg-gray-100 rounded-full text-[10px] text-gray-500">
-        reigh.app
+        reigh.art
       </div>
       <MoreVertical className="w-4 h-4 text-gray-400" />
     </div>
@@ -156,7 +156,7 @@ const AndroidInstallPrompt = () => (
       <img src="/favicon-32x32.png" alt="" className="w-8 h-8 rounded-lg" />
       <div className="flex-1">
         <div className="text-xs font-medium">Reigh</div>
-        <div className="text-[10px] text-gray-500">reigh.app</div>
+        <div className="text-[10px] text-gray-500">reigh.art</div>
       </div>
       <div className="px-3 py-1 bg-blue-500 text-white text-xs font-medium rounded">
         Install
@@ -175,7 +175,7 @@ const OpenInAppBadge = () => (
         <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
       </div>
       <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
-        <span className="text-gray-400 truncate">reigh.app</span>
+        <span className="text-gray-400 truncate">reigh.art</span>
         <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-300 rounded-full text-[10px] font-medium text-gray-700 animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
           <img src="/favicon-32x32.png" alt="" className="w-3 h-3 rounded-sm" />
           <span>Open in app</span>
