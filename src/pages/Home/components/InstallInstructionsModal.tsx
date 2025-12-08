@@ -63,14 +63,38 @@ const EdgeAppAvailable = () => (
 );
 
 // Chrome/Edge "Open in app" button - appears in address bar when PWA is installed
+// Shows a mini browser mockup with the button in the address bar area
 const OpenInAppBadge = () => (
-  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 shadow-sm">
-    <img 
-      src="/favicon-32x32.png" 
-      alt="App icon" 
-      className="w-4 h-4 rounded-sm"
-    />
-    <span>Open in app</span>
+  <div className="flex flex-col items-center gap-2">
+    {/* Mini browser mockup */}
+    <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
+      {/* Browser toolbar */}
+      <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
+        {/* Traffic lights */}
+        <div className="flex gap-1">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+          <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+          <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+        </div>
+        {/* Address bar with "Open in app" button */}
+        <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
+          <span className="text-gray-400 truncate">reigh.app</span>
+          <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-300 rounded-full text-[10px] font-medium text-gray-700 animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
+            <img src="/favicon-32x32.png" alt="" className="w-3 h-3 rounded-sm" />
+            <span>Open in app</span>
+          </div>
+        </div>
+      </div>
+      {/* Page content placeholder */}
+      <div className="h-8 bg-gray-50" />
+    </div>
+    {/* Arrow pointing up */}
+    <div className="flex items-center gap-1 text-wes-vintage-gold">
+      <svg className="w-4 h-4 animate-bounce" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M12 19V5M5 12l7-7 7 7" />
+      </svg>
+      <span className="text-xs font-medium">Click here</span>
+    </div>
   </div>
 );
 
