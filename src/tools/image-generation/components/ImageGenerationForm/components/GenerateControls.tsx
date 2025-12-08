@@ -37,7 +37,11 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
   onUseExistingPrompts,
   onNewPromptsLikeExisting,
 }) => {
-  const showExistingPromptButtons = promptMode === 'automated' && actionablePromptsCount > 0;
+  // Normalize promptMode to handle invalid/empty values from persistence
+  const normalizedPromptMode: PromptMode = 
+    (promptMode === 'automated' || promptMode === 'managed') ? promptMode : 'automated';
+    
+  const showExistingPromptButtons = normalizedPromptMode === 'automated' && actionablePromptsCount > 0;
   return (
     <div className="mt-8 p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg">
       <div className="flex justify-center">
@@ -47,7 +51,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
             <div className="flex gap-6">
               <div className="flex-1">
                 <SliderWithValue
-                  label={promptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
+                  label={normalizedPromptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
                   value={imagesPerPrompt}
                   onChange={onChangeImagesPerPrompt}
                   min={1}
@@ -83,7 +87,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
           ) : (
             // Show only images slider
             <SliderWithValue
-              label={promptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
+              label={normalizedPromptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
               value={imagesPerPrompt}
               onChange={onChangeImagesPerPrompt}
               min={1}
@@ -100,13 +104,13 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
           type="submit"
           className="w-full md:w-1/2 transition-none disabled:opacity-100 disabled:saturate-100 disabled:brightness-100"
           variant={justQueued ? "success" : "default"}
-          disabled={isGenerating || !hasApiKey || (promptMode === 'managed' && actionablePromptsCount === 0)}
+          disabled={isGenerating || !hasApiKey || (normalizedPromptMode === 'managed' && actionablePromptsCount === 0)}
         >
           {justQueued
             ? "Added to queue!"
             : isGenerating
               ? "Creating tasks..."
-              : promptMode === 'automated'
+              : normalizedPromptMode === 'automated'
                 ? `Generate ${imagesPerPrompt} New Prompts + Images`
                 : `Generate ${imagesPerPrompt * actionablePromptsCount} ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
         </Button>
@@ -114,34 +118,34 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
 
       {/* Existing prompts buttons - only shown in automated mode when there are non-empty prompts */}
       {showExistingPromptButtons && (
-        <div className="flex justify-center mt-3 gap-2">
+        <div className="flex flex-col sm:flex-row justify-center items-center mt-3 gap-1 sm:gap-2">
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground text-xs sm:text-sm whitespace-nowrap"
             disabled={isGenerating || !hasApiKey}
             onClick={(e) => {
               e.preventDefault();
               onUseExistingPrompts?.();
             }}
           >
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
             Use Existing {actionablePromptsCount} {actionablePromptsCount === 1 ? 'Prompt' : 'Prompts'}
           </Button>
-          <span className="text-muted-foreground/50 self-center">|</span>
+          <span className="text-muted-foreground/50 self-center hidden sm:inline">|</span>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground text-xs sm:text-sm whitespace-nowrap"
             disabled={isGenerating || !hasApiKey}
             onClick={(e) => {
               e.preventDefault();
               onNewPromptsLikeExisting?.();
             }}
           >
-            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+            <Sparkles className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
             New Prompts Like Existing
           </Button>
         </div>

@@ -76,6 +76,12 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
   onClearMasterPromptText,
 }) => {
   const isMobile = useIsMobile();
+  
+  // Normalize promptMode to handle invalid/empty values from persistence
+  // If promptMode is null, undefined, or empty string, default to 'automated'
+  const normalizedPromptMode: PromptMode = 
+    (promptMode === 'automated' || promptMode === 'managed') ? promptMode : 'automated';
+  
   return (
     <div className="space-y-4">
       {/* Header section - stacks on mobile */}
@@ -90,7 +96,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
               type="button"
               onClick={() => onPromptModeChange('automated')}
               className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
-                promptMode === 'automated'
+                normalizedPromptMode === 'automated'
                   ? 'bg-background shadow-sm'
                   : 'hover:bg-background/50'
               }`}
@@ -101,7 +107,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
               type="button"
               onClick={() => onPromptModeChange('managed')}
               className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
-                promptMode === 'managed'
+                normalizedPromptMode === 'managed'
                   ? 'bg-background shadow-sm'
                   : 'hover:bg-background/50'
               }`}
@@ -113,7 +119,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
       </div>
 
       {/* Prompt display area - differs by mode */}
-      {promptMode === 'automated' ? (
+      {normalizedPromptMode === 'automated' ? (
         // Automated mode: Master prompt field
         <div className="mt-2">
           <div className="relative">
