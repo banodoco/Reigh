@@ -64,12 +64,12 @@ const EdgeAppAvailable = () => (
 
 // Chrome/Edge "Open in app" button - appears in address bar when PWA is installed
 const OpenInAppBadge = () => (
-  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 shadow-sm">
-    <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <path d="M9 3v18" />
-      <path d="M14 9l3 3-3 3" />
-    </svg>
+  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 shadow-sm">
+    <img 
+      src="/favicon-32x32.png" 
+      alt="App icon" 
+      className="w-4 h-4 rounded-sm"
+    />
     <span>Open in app</span>
   </div>
 );
