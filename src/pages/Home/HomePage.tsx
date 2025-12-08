@@ -146,6 +146,18 @@ export default function HomePage() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('[AuthDebug] Initial session check:', !!session?.user?.id);
       setSession(session);
+      
+      // If user is already signed in AND we're in standalone/PWA mode, redirect to tools
+      // PWA users expect to go straight to the app, not the landing page
+      if (session) {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                            window.matchMedia('(display-mode: fullscreen)').matches ||
+                            (navigator as any).standalone === true;
+        if (isStandalone) {
+          console.log('[AuthDebug] Already signed in + PWA mode, redirecting to /tools');
+          navigate('/tools');
+        }
+      }
     });
     
     const authManager = (window as any).__AUTH_MANAGER__;
