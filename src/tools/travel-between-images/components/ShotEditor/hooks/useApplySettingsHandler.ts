@@ -36,6 +36,7 @@ interface ApplySettingsContext {
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   onAdvancedModeChange: (advanced: boolean) => void;
   onMotionModeChange: (mode: 'basic' | 'presets' | 'advanced') => void;
+  onGenerationTypeModeChange: (mode: 'i2v' | 'vace') => void;
   onPhaseConfigChange: (config: PhaseConfig) => void;
   onPhasePresetSelect: (presetId: string, config: PhaseConfig, promptPrefix?: string) => void;
   onPhasePresetRemove: () => void;

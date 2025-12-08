@@ -7,14 +7,7 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
-import { ChevronLeft, ChevronRight, ArrowUp, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Search } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
@@ -2234,23 +2227,17 @@ const VideoTravelToolPage: React.FC = () => {
                         />
                       </div>
 
-                      {/* TEMPORARILY DISABLED: Ordered mode and reordering (Task 20)
-                         * To restore: Add <SelectItem value="ordered">Ordered</SelectItem>
-                         * and remove the forced 'newest' fallback below
-                         */}
-                      <Select
-                        value={shotSortMode === 'ordered' ? 'newest' : shotSortMode}
-                        onValueChange={(value: 'newest' | 'oldest') => setShotSortMode(value)}
+                      {/* TEMPORARILY DISABLED: Ordered mode and reordering (Task 20) */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setShotSortMode(shotSortMode === 'oldest' ? 'newest' : 'oldest')}
+                        title={`Currently showing ${shotSortMode === 'ordered' ? 'newest' : shotSortMode} first. Click to toggle.`}
                       >
-                        <SelectTrigger className="w-[90px] sm:w-[110px] h-8 text-xs">
-                          <SelectValue placeholder="Sort" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {/* <SelectItem value="ordered">Ordered</SelectItem> -- TEMPORARILY DISABLED (Task 20) */}
-                          <SelectItem value="newest">Newest first</SelectItem>
-                          <SelectItem value="oldest">Oldest first</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <ArrowDown className="h-3.5 w-3.5 mr-1" />
+                        {(shotSortMode === 'oldest') ? 'Oldest first' : 'Newest first'}
+                      </Button>
                     </>
                   )}
 
@@ -2272,21 +2259,19 @@ const VideoTravelToolPage: React.FC = () => {
                         />
                       </div>
 
-                      <Select
-                        value={videoSortMode}
-                        onValueChange={(value: 'newest' | 'oldest') => {
-                          setVideoSortMode(value);
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          setVideoSortMode(videoSortMode === 'oldest' ? 'newest' : 'oldest');
                           setVideoPage(1);
                         }}
+                        title={`Currently showing ${videoSortMode} first. Click to toggle.`}
                       >
-                        <SelectTrigger className="w-[90px] sm:w-[110px] h-8 text-xs">
-                          <SelectValue placeholder="Sort" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="newest">Newest first</SelectItem>
-                          <SelectItem value="oldest">Oldest first</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <ArrowDown className="h-3.5 w-3.5 mr-1" />
+                        {videoSortMode === 'oldest' ? 'Oldest first' : 'Newest first'}
+                      </Button>
                     </>
                   )}
                 </div>

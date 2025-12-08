@@ -29,6 +29,7 @@ export interface ExtractedSettings {
   
   // Modes
   generationMode?: 'batch' | 'timeline';
+  generationTypeMode?: 'i2v' | 'vace';  // I2V vs VACE mode
   advancedMode?: boolean;
   motionMode?: 'basic' | 'presets' | 'advanced';
   
@@ -75,6 +76,7 @@ export interface ApplyContext {
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   onAdvancedModeChange: (advanced: boolean) => void;
   onMotionModeChange?: (mode: 'basic' | 'presets' | 'advanced') => void;
+  onGenerationTypeModeChange?: (mode: 'i2v' | 'vace') => void;
   onPhaseConfigChange: (config: any) => void;
   onPhasePresetSelect?: (presetId: string, config: any) => void;
   onPhasePresetRemove?: () => void;
@@ -113,6 +115,7 @@ export interface ApplyContext {
   enhancePrompt?: boolean;
   amountOfMotion?: number;
   motionMode?: 'basic' | 'presets' | 'advanced';
+  generationTypeMode?: 'i2v' | 'vace';
 }
 
 // ==================== Fetch Task ====================
@@ -247,6 +250,7 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     
     // Modes
     generationMode: orchestrator.generation_mode ?? params.generation_mode,
+    generationTypeMode: orchestrator.generation_type_mode ?? params.generation_type_mode,
     advancedMode: orchestrator.advanced_mode ?? params.advanced_mode,
     motionMode: orchestrator.motion_mode ?? params.motion_mode,
     
@@ -531,6 +535,17 @@ export const applyModeSettings = async (
     context.onMotionModeChange(settings.motionMode);
   } else {
     console.log('[ApplySettings] ⏭️  Skipping motion mode (undefined or no handler)');
+  }
+  
+  // Apply generation type mode (I2V vs VACE)
+  if (settings.generationTypeMode !== undefined && context.onGenerationTypeModeChange) {
+    console.log('[ApplySettings] 🎬 Applying generation type mode (I2V/VACE):', {
+      from: context.generationTypeMode,
+      to: settings.generationTypeMode
+    });
+    context.onGenerationTypeModeChange(settings.generationTypeMode);
+  } else {
+    console.log('[ApplySettings] ⏭️  Skipping generation type mode (undefined or no handler)');
   }
   
   return { success: true, settingName: 'modes' };
