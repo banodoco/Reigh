@@ -894,7 +894,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     },
   });
 
-  // For segment videos (showVideoTrimEditor), hide the "Apply These Settings" button
   // For variants, show the variant's params instead of the original task
   const adjustedTaskDetailsData = useMemo(() => {
     // Check if we're viewing a variant that was created by a task (has source_task_id in params)
@@ -932,14 +931,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       };
     }
     
-    // For original variants or when no variant is selected, use the generation's task details
-    if (!taskDetailsData) return undefined;
-    if (!showVideoTrimEditor) return taskDetailsData;
-    
-    // Strip onApplySettingsFromTask for segment videos
-    const { onApplySettingsFromTask, ...rest } = taskDetailsData;
-    return rest;
-  }, [taskDetailsData, showVideoTrimEditor, activeVariant]);
+    // For all other cases (videos and images), use the generation's task details as-is
+    // This ensures the "Apply These Settings" button shows for videos too
+    return taskDetailsData;
+  }, [taskDetailsData, activeVariant]);
 
   // Handle entering/exiting video trim mode
   const handleEnterVideoTrimMode = useCallback(() => {
