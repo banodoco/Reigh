@@ -977,9 +977,9 @@ export const replaceImagesIfRequested = async (
     }
     
     const deletions = imagesToDelete.map(img => removeImageFromShotMutation.mutateAsync({
-      shot_id: selectedShot.id,
-      shotImageEntryId: img.id!, // img.id is shot_generations.id - Safe now, filtered above
-      project_id: projectId,
+      shotId: selectedShot.id,
+      shotGenerationId: img.id!, // img.id is shot_generations.id - Safe now, filtered above
+      projectId: projectId,
     }));
     
     if (deletions.length > 0) {
@@ -1015,6 +1015,32 @@ export const replaceImagesIfRequested = async (
       extractedFrom: hasSegmentGaps ? 'task segment_frames_expanded' : (settings.frames ? 'task frames (uniform)' : 'default fallback')
     });
     
+    // Look up generation IDs for all input image URLs
+    console.log('[ApplySettings] 🔍 Looking up generation IDs for input images...');
+    const { data: generationLookup, error: lookupError } = await supabase
+      .from('generations')
+      .select('id, location, thumbnail_url')
+      .in('location', inputImages);
+    
+    if (lookupError) {
+      console.error('[ApplySettings] ❌ Failed to look up generations by URL:', lookupError);
+    }
+    
+    // Create a map of URL -> generation data for quick lookup
+    const urlToGeneration = new Map<string, { id: string; location: string; thumbnail_url: string | null }>();
+    (generationLookup || []).forEach(gen => {
+      if (gen.location) {
+        urlToGeneration.set(gen.location, gen);
+      }
+    });
+    
+    console.log('[ApplySettings] 📋 Generation lookup results:', {
+      inputImagesCount: inputImages.length,
+      foundGenerationsCount: urlToGeneration.size,
+      missingCount: inputImages.length - urlToGeneration.size,
+      foundUrls: Array.from(urlToGeneration.keys()).map(u => u.substring(u.lastIndexOf('/') + 1, u.lastIndexOf('/') + 30))
+    });
+    
     // Add input images in order with calculated timeline_frame positions
     const additions = (inputImages || []).map((url, index) => {
       // Use cumulative position if available, otherwise fall back to uniform spacing
@@ -1022,8 +1048,20 @@ export const replaceImagesIfRequested = async (
         ? cumulativePositions[index]
         : index * uniformSpacing;
       
+      // Look up the generation for this URL
+      const generation = urlToGeneration.get(url);
+      
+      if (!generation) {
+        console.warn('[ApplySettings] ⚠️ No generation found for URL, skipping:', {
+          index,
+          filename: url.substring(url.lastIndexOf('/') + 1, url.lastIndexOf('/') + 30) + '...',
+        });
+        return Promise.resolve(); // Skip this image
+      }
+      
       console.log('[ApplySettings] ➕ Adding image:', {
         index,
+        generationId: generation.id.substring(0, 8),
         filename: url.substring(url.lastIndexOf('/') + 1, url.lastIndexOf('/') + 20) + '...',
         timelineFrame,
         calculation: hasSegmentGaps 
@@ -1033,10 +1071,10 @@ export const replaceImagesIfRequested = async (
       
       return addImageToShotMutation.mutateAsync({
         shot_id: selectedShot.id,
-        generation_id: '',
+        generation_id: generation.id,
         project_id: projectId,
         imageUrl: url,
-        thumbUrl: url,
+        thumbUrl: generation.thumbnail_url || url,
         timelineFrame: timelineFrame,
       } as any);
     });

@@ -543,15 +543,20 @@ export const useAddImageToShot = () => {
       // CAN appear multiple times (as duplicate instances).
       
       // First, check if this generation is already on the timeline (for debugging)
-      const { data: existingRecords } = await supabase
-        .from('shot_generations')
-        .select('id, timeline_frame')
-        .eq('shot_id', shot_id)
-        .eq('generation_id', generation_id);
+      // Skip this check if generation_id is empty (e.g., when adding URL-only images)
+      let existingRecords: { id: string; timeline_frame: number | null }[] | null = null;
+      if (generation_id) {
+        const { data } = await supabase
+          .from('shot_generations')
+          .select('id, timeline_frame')
+          .eq('shot_id', shot_id)
+          .eq('generation_id', generation_id);
+        existingRecords = data;
+      }
       
       console.log('[DuplicateGenDebug] 📤 Inserting into shot_generations:', {
         shot_id: shot_id.substring(0, 8),
-        generation_id: generation_id.substring(0, 8),
+        generation_id: generation_id ? generation_id.substring(0, 8) : '(empty)',
         timeline_frame: resolvedFrame,
         existingRecordsCount: existingRecords?.length ?? 0,
         existingRecords: existingRecords?.map(r => ({ id: r.id.substring(0, 8), frame: r.timeline_frame })),
@@ -575,23 +580,28 @@ export const useAddImageToShot = () => {
           errorDetails: error.details,
           errorHint: error.hint,
           shot_id: shot_id.substring(0, 8),
-          generation_id: generation_id.substring(0, 8),
+          generation_id: generation_id ? generation_id.substring(0, 8) : '(empty)',
           timestamp: Date.now()
         });
         throw error;
       }
       
       // After insert, verify what records exist now
-      const { data: afterInsertRecords } = await supabase
-        .from('shot_generations')
-        .select('id, timeline_frame')
-        .eq('shot_id', shot_id)
-        .eq('generation_id', generation_id);
+      // Skip this check if generation_id is empty
+      let afterInsertRecords: { id: string; timeline_frame: number | null }[] | null = null;
+      if (generation_id) {
+        const { data: verifyData } = await supabase
+          .from('shot_generations')
+          .select('id, timeline_frame')
+          .eq('shot_id', shot_id)
+          .eq('generation_id', generation_id);
+        afterInsertRecords = verifyData;
+      }
       
       console.log('[DuplicateGenDebug] ✅ Insert succeeded:', {
         newId: data?.id?.substring(0, 8),
         shot_id: shot_id.substring(0, 8),
-        generation_id: generation_id.substring(0, 8),
+        generation_id: generation_id ? generation_id.substring(0, 8) : '(empty)',
         timeline_frame: data?.timeline_frame,
         totalRecordsAfterInsert: afterInsertRecords?.length ?? 0,
         allRecords: afterInsertRecords?.map(r => ({ id: r.id.substring(0, 8), frame: r.timeline_frame })),
