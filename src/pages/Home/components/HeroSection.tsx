@@ -453,7 +453,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       onClick={handleDiscordSignIn}
                       className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
                     >
-                      sign in with Discord instead
+                      or sign in here
                     </button>
                   </div>
                 </div>

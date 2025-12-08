@@ -224,7 +224,7 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
               }}
               className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
             >
-              {isAppInstalled ? 'continue in browser instead' : 'sign in with Discord instead'}
+              {isAppInstalled ? 'continue in browser instead' : 'or sign in here'}
             </button>
           </div>
         </div>
