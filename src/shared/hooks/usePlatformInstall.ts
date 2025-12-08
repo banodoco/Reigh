@@ -41,9 +41,23 @@ export interface PlatformInstallState {
  * - Firefox Android: beforeinstallprompt ✓
  * - Samsung Internet: beforeinstallprompt ✓
  */
+// Helper to check standalone mode synchronously
+const checkIsStandalone = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const displayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const displayModeFullscreen = window.matchMedia('(display-mode: fullscreen)').matches;
+    const iosStandalone = (navigator as any).standalone === true;
+    return displayModeStandalone || displayModeFullscreen || iosStandalone;
+  } catch {
+    return false;
+  }
+};
+
 export function usePlatformInstall(): PlatformInstallState {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isStandalone, setIsStandalone] = useState(false);
+  // Initialize isStandalone synchronously to prevent flash of install UI in PWA
+  const [isStandalone, setIsStandalone] = useState(checkIsStandalone);
   const [promptTimedOut, setPromptTimedOut] = useState(false);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   
@@ -97,24 +111,12 @@ export function usePlatformInstall(): PlatformInstallState {
     return 'unknown';
   }, []);
   
-  // Detect standalone mode
+  // Listen for standalone mode changes (e.g., app installed while page is open)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const checkStandalone = () => {
-      // Multiple ways to detect standalone/installed PWA
-      const displayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      const displayModeFullscreen = window.matchMedia('(display-mode: fullscreen)').matches;
-      const iosStandalone = (navigator as any).standalone === true;
-      
-      setIsStandalone(displayModeStandalone || displayModeFullscreen || iosStandalone);
-    };
-    
-    checkStandalone();
-    
-    // Listen for changes (e.g., app installed while page is open)
     const mq = window.matchMedia('(display-mode: standalone)');
-    const handler = () => checkStandalone();
+    const handler = () => setIsStandalone(checkIsStandalone());
     
     try {
       mq.addEventListener('change', handler);
