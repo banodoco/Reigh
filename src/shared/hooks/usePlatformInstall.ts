@@ -289,7 +289,7 @@ export function usePlatformInstall(): PlatformInstallState {
       case 'safari-dock':
         return [
           'Click "File" in the menu bar',
-          'Select "Add to Dock"',
+          'Select "Add to Dock" (requires macOS Sonoma or later)',
           'Click "Add" to install'
         ];
       case 'safari-home-screen':
