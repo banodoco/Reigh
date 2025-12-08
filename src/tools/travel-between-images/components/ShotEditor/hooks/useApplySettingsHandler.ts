@@ -55,6 +55,7 @@ interface ApplySettingsContext {
   
   // Current values
   generationMode: 'batch' | 'timeline';
+  generationTypeMode: 'i2v' | 'vace';
   advancedMode: boolean;
   motionMode: 'basic' | 'presets' | 'advanced';
   turboMode: boolean;
@@ -162,6 +163,7 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
         onGenerationModeChange: ctx.onGenerationModeChange,
         onAdvancedModeChange: ctx.onAdvancedModeChange,
         onMotionModeChange: ctx.onMotionModeChange,
+        onGenerationTypeModeChange: ctx.onGenerationTypeModeChange,
         onPhaseConfigChange: ctx.onPhaseConfigChange,
         onPhasePresetSelect: ctx.onPhasePresetSelect,
         onPhasePresetRemove: ctx.onPhasePresetRemove,
@@ -185,6 +187,7 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
         enhancePrompt: ctx.enhancePrompt,
         amountOfMotion: ctx.amountOfMotion,
         motionMode: ctx.motionMode,
+        generationTypeMode: ctx.generationTypeMode,
       };
       
       console.log('[ApplySettings] ✅ Apply context built');

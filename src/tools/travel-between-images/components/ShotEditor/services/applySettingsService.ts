@@ -250,7 +250,8 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     
     // Modes
     generationMode: orchestrator.generation_mode ?? params.generation_mode,
-    generationTypeMode: orchestrator.generation_type_mode ?? params.generation_type_mode,
+    // model_type is the existing field that stores I2V vs VACE mode
+    generationTypeMode: orchestrator.model_type ?? params.model_type,
     advancedMode: orchestrator.advanced_mode ?? params.advanced_mode,
     motionMode: orchestrator.motion_mode ?? params.motion_mode,
     
@@ -315,6 +316,7 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     frames: extracted.frames,
     context: extracted.context,
     generationMode: extracted.generationMode,
+    generationTypeMode: extracted.generationTypeMode,
     advancedMode: extracted.advancedMode,
     motionMode: extracted.motionMode,
     turboMode: extracted.turboMode,

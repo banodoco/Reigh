@@ -961,6 +961,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     enhance_prompt: enhancePrompt,
     // Save UI state settings (dimension_source removed - now using aspect ratios only)
     generation_mode: generationMode,
+    // Note: model_type (i2v/vace) is already stored above via modelType variable
     random_seed: randomSeed,
     turbo_mode: turboMode,
     // Amount of motion is now embedded in phase_config LoRAs - store for UI restoration only
