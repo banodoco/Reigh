@@ -98,6 +98,23 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
   onNavigateToShot,
   onClose,
 }) => {
+  // Track if shots loaded after initial render (race condition detection)
+  const prevShotsLengthRef = React.useRef(allShots?.length || 0);
+  const currentShotsLength = allShots?.length || 0;
+  
+  React.useEffect(() => {
+    const prevLength = prevShotsLengthRef.current;
+    if (prevLength === 0 && currentShotsLength > 0) {
+      console.log('[ShotSelectorDebug] ⚠️ WorkflowControlsBar: Shots loaded AFTER initial render (race condition)!', {
+        prevLength,
+        currentShotsLength,
+        willNowShowSelector: !!(onAddToShot && !isVideo),
+        timestamp: Date.now()
+      });
+    }
+    prevShotsLengthRef.current = currentShotsLength;
+  }, [currentShotsLength, onAddToShot, isVideo]);
+  
   // Debug logging
   console.log('[ShotSelectorDebug] WorkflowControlsBar render check', {
     component: 'WorkflowControlsBar',

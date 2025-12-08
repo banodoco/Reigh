@@ -561,8 +561,26 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     });
   }, [handleNavigateToGeneration, handleOpenExternalGeneration, setActiveLightboxIndex, filteredImages.length]);
 
+  // Track previous shots length to detect race condition
+  const prevShotsLengthRef = React.useRef(simplifiedShotOptions?.length || 0);
+  
   // [ShotSelectorDebug] Debug why shot selector might not show
   React.useEffect(() => {
+    const currentShotsLength = simplifiedShotOptions?.length || 0;
+    const prevShotsLength = prevShotsLengthRef.current;
+    
+    // Detect race condition: lightbox was open with 0 shots, now shots have loaded
+    if (enhancedMedia && prevShotsLength === 0 && currentShotsLength > 0) {
+      console.log('[ShotSelectorDebug] ⚠️ RACE CONDITION DETECTED: Shots loaded while lightbox was open!', {
+        prevShotsLength,
+        currentShotsLength,
+        mediaId: enhancedMedia.id?.substring(0, 8),
+        timestamp: Date.now()
+      });
+    }
+    
+    prevShotsLengthRef.current = currentShotsLength;
+    
     if (enhancedMedia) {
       const isVideo = !!(activeLightboxMedia.type || '').includes('video');
       const willShowShotSelector = !!(onAddToShot && simplifiedShotOptions?.length > 0 && !isVideo);

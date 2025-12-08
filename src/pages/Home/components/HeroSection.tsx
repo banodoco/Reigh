@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PaletteIcon } from '@/shared/components/PaletteIcon';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { ChevronLeft, ChevronRight, Github, MessageCircle, Plus, Download, ExternalLink } from 'lucide-react';
@@ -6,6 +6,92 @@ import { PaintParticles } from '@/shared/components/PaintParticles';
 import { usePlatformInstall } from '@/shared/hooks/usePlatformInstall';
 import { InstallInstructionsModal } from './InstallInstructionsModal';
 import type { Session } from '@supabase/supabase-js';
+
+// Animated CTA button content that smoothly transitions between states
+interface CTAContentProps {
+  icon: 'download' | 'plus' | 'external' | 'discord' | 'paintbrush';
+  text: string;
+  isWaiting?: boolean;
+}
+
+const CTAContent: React.FC<CTAContentProps> = ({ icon, text, isWaiting }) => {
+  const [displayedIcon, setDisplayedIcon] = useState(icon);
+  const [displayedText, setDisplayedText] = useState(text);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const prevIconRef = useRef(icon);
+  const prevTextRef = useRef(text);
+
+  useEffect(() => {
+    // Only animate if the content actually changed
+    if (icon !== prevIconRef.current || text !== prevTextRef.current) {
+      setIsTransitioning(true);
+      
+      // After fade out, update content
+      const updateTimer = setTimeout(() => {
+        setDisplayedIcon(icon);
+        setDisplayedText(text);
+      }, 150);
+      
+      // After content update, fade back in
+      const fadeInTimer = setTimeout(() => {
+        setIsTransitioning(false);
+      }, 180);
+      
+      prevIconRef.current = icon;
+      prevTextRef.current = text;
+      
+      return () => {
+        clearTimeout(updateTimer);
+        clearTimeout(fadeInTimer);
+      };
+    }
+  }, [icon, text]);
+
+  const renderIcon = () => {
+    switch (displayedIcon) {
+      case 'download':
+        return <Download className={`w-full h-full text-white ${isWaiting ? 'animate-bounce' : ''}`} />;
+      case 'plus':
+        return <Plus className="w-full h-full text-white" />;
+      case 'external':
+        return <ExternalLink className="w-full h-full text-white" />;
+      case 'paintbrush':
+        return (
+          <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
+            <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
+          </div>
+        );
+      default:
+        return (
+          <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
+            <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
+          </div>
+        );
+    }
+  };
+
+  return (
+    <>
+      <div className="relative">
+        <PaintParticles />
+        <div 
+          className={`w-5 h-5 relative z-10 transition-all duration-150 ${
+            isTransitioning ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
+          }`}
+        >
+          {renderIcon()}
+        </div>
+      </div>
+      <span 
+        className={`transition-all duration-150 ${
+          isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'
+        }`}
+      >
+        {displayedText}
+      </span>
+    </>
+  );
+};
 
 interface ExampleStyle {
   prompt: string;
@@ -320,27 +406,26 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     <span>Go to Tools</span>
                   </button>
                 </div>
-              ) : platformInstall.showInstallCTA ? (
-                // Not logged in + PWA install available - show platform-specific install CTA
+              ) : (
+                // Not logged in - show install CTA or Discord sign-in with smooth transitions
                 <div className="flex flex-col items-center gap-3">
                   <div className="group">
                     <button
                       onClick={async () => {
-                        // If we can trigger the browser's install prompt, do it
-                        if (platformInstall.canInstall) {
-                          const installed = await platformInstall.triggerInstall();
-                          if (!installed) {
-                            // User declined or error - show instructions anyway
+                        if (platformInstall.showInstallCTA) {
+                          // If we can trigger the browser's install prompt, do it
+                          if (platformInstall.canInstall) {
+                            const installed = await platformInstall.triggerInstall();
+                            if (!installed) {
+                              setShowInstallModal(true);
+                            }
+                          } else {
+                            // Manual install or waiting - show instructions modal
                             setShowInstallModal(true);
                           }
-                        } else if (platformInstall.isWaitingForPrompt) {
-                          // Still waiting for browser prompt - show a brief message or just wait
-                          // The button will work once the prompt fires
-                          // For now, show the instructions modal as fallback
-                          setShowInstallModal(true);
                         } else {
-                          // Manual install required - show instructions modal
-                          setShowInstallModal(true);
+                          // No install CTA - do Discord sign-in
+                          handleDiscordSignIn();
                         }
                       }}
                       className={`flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden ${
@@ -349,51 +434,28 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
                     >
                       <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
-                      <div className="relative">
-                        <PaintParticles />
-                        <div className="w-5 h-5 relative z-10">
-                          {platformInstall.ctaIcon === 'download' ? (
-                            <Download className={`w-full h-full text-white ${platformInstall.isWaitingForPrompt ? 'animate-bounce' : ''}`} />
-                          ) : platformInstall.ctaIcon === 'plus' ? (
-                            <Plus className="w-full h-full text-white" />
-                          ) : platformInstall.ctaIcon === 'external' ? (
-                            <ExternalLink className="w-full h-full text-white" />
-                          ) : (
-                            <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
-                              <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <span>{platformInstall.ctaText}</span>
+                      <CTAContent 
+                        icon={platformInstall.showInstallCTA ? platformInstall.ctaIcon : 'paintbrush'}
+                        text={platformInstall.showInstallCTA ? platformInstall.ctaText : 'Sign in with Discord'}
+                        isWaiting={platformInstall.isWaitingForPrompt}
+                      />
                     </button>
                   </div>
-                  <button
-                    onClick={handleDiscordSignIn}
-                    className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  {/* Show secondary Discord option only when install CTA is showing */}
+                  <div 
+                    className={`transition-all duration-300 ${
+                      platformInstall.showInstallCTA 
+                        ? 'opacity-100 translate-y-0' 
+                        : 'opacity-0 -translate-y-2 pointer-events-none h-0'
+                    }`}
                   >
-                    sign in with Discord instead
-                  </button>
-                </div>
-              ) : (
-                // Not logged in + no PWA install available - show Discord sign-in
-                <div className="group">
-                  <button
-                    onClick={handleDiscordSignIn}
-                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
-                    style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
-                  >
-                    <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
-                    <div className="relative">
-                      <PaintParticles />
-                      <div className="w-5 h-5 relative z-10">
-                        <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
-                          <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
-                        </div>
-                      </div>
-                    </div>
-                    <span>Sign in with Discord</span>
-                  </button>
+                    <button
+                      onClick={handleDiscordSignIn}
+                      className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                    >
+                      sign in with Discord instead
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
