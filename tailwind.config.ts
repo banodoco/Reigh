@@ -519,6 +519,10 @@ export default {
           '0%, 100%': { transform: 'scale(1)', opacity: '1' },
           '50%': { transform: 'scale(1.1)', opacity: '0.8' },
         },
+        'subtle-bob': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-2px)' },
+        },
         'gifting-motion': {
           '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
           '25%': { transform: 'translateY(-2px) rotate(-5deg)' },
@@ -675,6 +679,7 @@ export default {
         'paper-plane-zigzag-h': 'paper-plane-zigzag-h 22s ease-in-out infinite',
         'paper-plane-zigzag-v': 'paper-plane-zigzag-v 22s ease-in-out infinite',
         'brain-pulse': 'brain-pulse 2s ease-in-out infinite',
+        'subtle-bob': 'subtle-bob 1.5s ease-in-out infinite',
         'gifting-motion': 'gifting-motion 3s ease-in-out infinite',
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
         'pulse-breathe': 'pulse-breathe 3s ease-in-out infinite',

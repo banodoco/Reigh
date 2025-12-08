@@ -60,6 +60,8 @@ export function usePlatformInstall(): PlatformInstallState {
   const [isStandalone, setIsStandalone] = useState(checkIsStandalone);
   const [promptTimedOut, setPromptTimedOut] = useState(false);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
+  // Track if the install prompt was already shown and dismissed/declined
+  const [promptConsumed, setPromptConsumed] = useState(false);
   
   // Detect platform
   const platform = useMemo<Platform>(() => {
@@ -167,6 +169,9 @@ export function usePlatformInstall(): PlatformInstallState {
       setDeferredPrompt(e);
       // Clear timeout since we got the prompt
       if (timeoutId) clearTimeout(timeoutId);
+      // Reset states in case they were set before this event
+      setPromptTimedOut(false);
+      setPromptConsumed(false);
     };
     
     const handleAppInstalled = () => {
@@ -215,8 +220,9 @@ export function usePlatformInstall(): PlatformInstallState {
     if (deferredPrompt) return false; // Already have it
     if (promptTimedOut) return false; // Timed out waiting
     if (isAppInstalled) return false; // Already installed
+    if (promptConsumed) return false; // User already saw and dismissed the prompt
     return isDesktopChromium;
-  }, [isStandalone, deferredPrompt, promptTimedOut, isAppInstalled, isDesktopChromium]);
+  }, [isStandalone, deferredPrompt, promptTimedOut, isAppInstalled, promptConsumed, isDesktopChromium]);
   
   // Determine install method
   const installMethod = useMemo<InstallMethod>(() => {
@@ -345,9 +351,12 @@ export function usePlatformInstall(): PlatformInstallState {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         setDeferredPrompt(null);
+        // Mark prompt as consumed so we don't show "waiting" state after decline
+        setPromptConsumed(true);
         return outcome === 'accepted';
       } catch (error) {
         console.error('Error installing PWA:', error);
+        setPromptConsumed(true);
         return false;
       }
     }

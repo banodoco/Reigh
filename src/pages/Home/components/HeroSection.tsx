@@ -50,7 +50,7 @@ const CTAContent: React.FC<CTAContentProps> = ({ icon, text, isWaiting }) => {
   const renderIcon = () => {
     switch (displayedIcon) {
       case 'download':
-        return <Download className={`w-full h-full text-white ${isWaiting ? 'animate-bounce' : ''}`} />;
+        return <Download className={`w-full h-full text-white ${isWaiting ? 'animate-subtle-bob' : ''}`} />;
       case 'plus':
         return <Plus className="w-full h-full text-white" />;
       case 'external':
@@ -73,7 +73,7 @@ const CTAContent: React.FC<CTAContentProps> = ({ icon, text, isWaiting }) => {
   return (
     <>
       <div className="relative">
-        <PaintParticles />
+        {icon === 'paintbrush' && <PaintParticles />}
         <div 
           className={`w-5 h-5 relative z-10 transition-all duration-150 ${
             isTransitioning ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
@@ -387,40 +387,53 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             {/* CTA button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
             <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-6 overflow-visible">
               {session ? (
-                // User is logged in - single button with smooth transitions
-                (() => {
-                  const showOpenInApp = !platformInstall.isStandalone && (platformInstall.isAppInstalled || platformInstall.promptTimedOut);
-                  return (
-                    <div className="flex flex-col items-center">
-                      <div className="group">
-                        <button
-                          onClick={() => showOpenInApp ? setShowInstallModal(true) : navigate('/tools')}
-                          className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
-                          style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
-                        >
-                          <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
-                          <CTAContent 
-                            icon={showOpenInApp ? 'external' : 'paintbrush'} 
-                            text={showOpenInApp ? 'Open Reigh App' : 'Go to Tools'} 
-                          />
-                        </button>
-                      </div>
-                      {/* Fixed height container - no layout shift */}
-                      <div className="h-8 flex items-center justify-center">
-                        <button
-                          onClick={() => navigate('/tools')}
-                          className={`text-xs text-muted-foreground/50 hover:text-muted-foreground transition-all duration-500 ease-out ${
-                            showOpenInApp 
-                              ? 'opacity-100 translate-y-0' 
-                              : 'opacity-0 -translate-y-2 pointer-events-none'
-                          }`}
-                        >
-                          or continue in browser
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()
+                // User is logged in - show install CTA if available, otherwise go to tools
+                <div className="flex flex-col items-center gap-3">
+                  <div className="group">
+                    <button
+                      onClick={async () => {
+                        if (platformInstall.showInstallCTA) {
+                          if (platformInstall.canInstall) {
+                            const installed = await platformInstall.triggerInstall();
+                            if (!installed) {
+                              setShowInstallModal(true);
+                            }
+                          } else {
+                            setShowInstallModal(true);
+                          }
+                        } else {
+                          navigate('/tools');
+                        }
+                      }}
+                      className={`flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden ${
+                        platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''
+                      }`}
+                      style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
+                    >
+                      <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
+                      <CTAContent 
+                        icon={platformInstall.showInstallCTA ? platformInstall.ctaIcon : 'paintbrush'}
+                        text={platformInstall.showInstallCTA ? platformInstall.ctaText : 'Go to Tools'}
+                        isWaiting={platformInstall.isWaitingForPrompt}
+                      />
+                    </button>
+                  </div>
+                  {/* Show secondary browser option when install CTA is showing */}
+                  <div 
+                    className={`transition-all duration-300 ${
+                      platformInstall.showInstallCTA 
+                        ? 'opacity-100 translate-y-0' 
+                        : 'opacity-0 -translate-y-2 pointer-events-none h-0'
+                    }`}
+                  >
+                    <button
+                      onClick={() => navigate('/tools')}
+                      className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                    >
+                      or continue in browser
+                    </button>
+                  </div>
+                </div>
               ) : (
                 // Not logged in - show install CTA or Discord sign-in with smooth transitions
                 <div className="flex flex-col items-center gap-3">
@@ -483,7 +496,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               platform={platformInstall.platform}
               browser={platformInstall.browser}
               instructions={platformInstall.installInstructions}
-              isAppInstalled={platformInstall.isAppInstalled || platformInstall.promptTimedOut}
+              isAppInstalled={platformInstall.isAppInstalled}
               isSignedIn={!!session}
               onFallbackToDiscord={session ? () => navigate('/tools') : handleDiscordSignIn}
             />
