@@ -204,19 +204,22 @@ export const useImageGalleryPagination = ({
       console.log(`📡 [PAGELOADINGDEBUG] [NAV:${navId}] Calling server pagination handler`);
       onServerPageChange(newPage, fromBottom); 
       
-      // For server pagination, clear button loading on a shorter timeout to prevent stuck states
-      // The progressive loading will handle the gallery loading state separately
-      const buttonTimeout = setTimeout(() => {
-        console.log(`🔘 [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination button timeout - clearing button loading`);
-        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via timeout - buttons will be re-enabled`, {
+      // NOTE: Don't use a short timeout to clear button loading state.
+      // The effect watching filteredImages changes (see ~line 106) will clear loadingButton
+      // when the new data actually arrives. Using a fixed timeout (like 800ms) causes the
+      // spinner to finish before data is displayed.
+      // Only keep a very long safety timeout as a true fallback for stuck states.
+      const buttonSafetyTimeout = setTimeout(() => {
+        console.log(`🚨 [PAGELOADINGDEBUG] [NAV:${navId}] Button SAFETY TIMEOUT - data never arrived after 8s`);
+        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via safety timeout - buttons will be re-enabled`, {
           navId,
-          reason: 'Server pagination timeout (800ms)',
+          reason: 'Server pagination safety timeout (8000ms)',
           timestamp: Date.now()
         });
         setLoadingButton(null);
-      }, 800); // Shorter timeout for better UX
+      }, 8000); // Safety timeout only - data-arrival effect should clear this first
       
-      console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination initiated - waiting for data...`);
+      console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination initiated - waiting for data arrival to clear loading...`);
     } else {
       // Client-side pagination - show loading longer for bottom buttons
       const loadingDelay = fromBottom ? 300 : 100;
