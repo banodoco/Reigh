@@ -133,9 +133,10 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
       return null;
     }
     
-    // Safari on macOS - File menu
+    // Safari on macOS - File menu (step 0) and Share button (step 1)
     if (installMethod === 'safari-dock') {
       if (stepIndex === 0) return <SafariFileMenu />;
+      if (stepIndex === 1) return <SafariShareIcon />;
       return null;
     }
     

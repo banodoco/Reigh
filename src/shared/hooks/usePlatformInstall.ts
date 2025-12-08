@@ -111,6 +111,27 @@ export function usePlatformInstall(): PlatformInstallState {
     return 'unknown';
   }, []);
   
+  // Detect if Safari supports PWA install (Safari 17+ / macOS Sonoma+)
+  const safariSupportsPWA = useMemo<boolean>(() => {
+    if (typeof navigator === 'undefined') return false;
+    if (browser !== 'safari') return false;
+    if (platform !== 'mac') return false;
+    
+    // Try to detect Safari version from user agent
+    // Safari UA contains "Version/X.Y" where X is the major version
+    const ua = navigator.userAgent || '';
+    const versionMatch = ua.match(/Version\/(\d+)/);
+    if (versionMatch) {
+      const majorVersion = parseInt(versionMatch[1], 10);
+      // Safari 17+ supports "Add to Dock"
+      return majorVersion >= 17;
+    }
+    
+    // If we can't detect version, assume it's supported (better UX than hiding it)
+    // User will see the option doesn't exist and can use Discord instead
+    return true;
+  }, [browser, platform]);
+  
   // Listen for standalone mode changes (e.g., app installed while page is open)
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -204,8 +225,8 @@ export function usePlatformInstall(): PlatformInstallState {
     // If we have the prompt, use it (Chrome/Edge/Samsung/Firefox Android)
     if (deferredPrompt) return 'prompt';
     
-    // Safari on macOS Sonoma+ supports "Add to Dock"
-    if (platform === 'mac' && browser === 'safari') return 'safari-dock';
+    // Safari on macOS Sonoma+ (Safari 17+) supports "Add to Dock"
+    if (platform === 'mac' && browser === 'safari' && safariSupportsPWA) return 'safari-dock';
     
     // Safari on iOS supports "Add to Home Screen"
     if (platform === 'ios' && browser === 'safari') return 'safari-home-screen';
@@ -288,9 +309,9 @@ export function usePlatformInstall(): PlatformInstallState {
         ];
       case 'safari-dock':
         return [
-          'Click "File" in the menu bar',
-          'Select "Add to Dock" (requires macOS Sonoma or later)',
-          'Click "Add" to install'
+          'Click "File" in the menu bar, then select "Add to Dock"',
+          'Or click the Share button (□↑) and choose "Add to Dock"',
+          'Click "Add" to install Reigh to your Dock'
         ];
       case 'safari-home-screen':
         if (browser === 'chrome' || browser === 'edge') {
