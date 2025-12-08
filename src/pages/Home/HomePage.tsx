@@ -179,8 +179,21 @@ export default function HomePage() {
     let unsubscribe: (() => void) | null = null;
     
     const handleAuthChange = (event: string, session: Session | null) => {
-      console.log('[AuthDebug] Auth state change:', event, !!session?.user?.id);
+      // Check standalone mode inside the handler so it's fresh
+      const isStandaloneNow = window.matchMedia('(display-mode: standalone)').matches ||
+                              window.matchMedia('(display-mode: fullscreen)').matches ||
+                              (navigator as any).standalone === true;
+      
+      console.log('[AuthDebug] Auth state change:', event, 'hasSession:', !!session?.user?.id, 'isStandalone:', isStandaloneNow);
       setSession(session);
+      
+      // PWA users should always go to /tools if they have a session
+      // Handle both SIGNED_IN (new login) and INITIAL_SESSION (existing session on app open)
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session && isStandaloneNow) {
+        console.log('[AuthDebug] PWA with session detected, redirecting to /tools');
+        navigate('/tools');
+        return;
+      }
       
       if (event === 'SIGNED_IN' && session) {
         const isHomePath = location.pathname === '/home' || location.pathname === '/';
