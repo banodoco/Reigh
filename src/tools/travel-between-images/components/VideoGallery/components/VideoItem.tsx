@@ -885,6 +885,12 @@ export const VideoItem = React.memo<VideoItemProps>(({
               e.preventDefault();
               if (onViewSegments) onViewSegments(video);
             }}
+            // On mobile/touch devices, use onTouchEnd for immediate response (no double-tap needed)
+            onTouchEnd={isMobile ? (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (onViewSegments) onViewSegments(video);
+            } : undefined}
           >
             {childGenerations.slice(0, 4).map((child, idx) => (
               <div key={child.id || idx} className="relative w-full h-full overflow-hidden bg-black/20">

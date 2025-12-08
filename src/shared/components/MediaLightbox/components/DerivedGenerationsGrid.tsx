@@ -221,6 +221,41 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
           // Get variant icon if it's a variant
           const VariantIcon = isVariant ? getVariantTypeIcon(variantType) : null;
           
+          // Handler for both click and touch
+          const handleItemSelect = async () => {
+            console.log('[VariantClickDebug] 🖼️ Item clicked:', {
+              itemId: itemId.substring(0, 8),
+              isVariant,
+              isGeneration,
+              variantType,
+              isNewFormat,
+              hasOnVariantSelect: !!onVariantSelect,
+              currentMediaId: currentMediaId.substring(0, 8),
+            });
+            
+            if (isVariant && onVariantSelect) {
+              // For variants: switch to that variant (stay on same generation)
+              console.log('[VariantClickDebug] 🎯 Calling onVariantSelect for variant:', itemId.substring(0, 8));
+              onVariantSelect(itemId);
+              console.log('[VariantClickDebug] ✅ onVariantSelect completed');
+            } else if (isVariant && !onVariantSelect) {
+              // Variant but no handler!
+              console.warn('[VariantClickDebug] ⚠️ Variant clicked but onVariantSelect is not provided!');
+              console.log('[VariantClickDebug] 🔄 Falling back to onNavigate for variant');
+              // Fall back to navigating - this won't work ideally but at least logs the issue
+              await onNavigate(itemId, []);
+            } else {
+              // For generations: navigate to that generation
+              console.log('[VariantClickDebug] 🎯 Navigating to generation:', itemId.substring(0, 8));
+              // Only pass generation IDs in the context (not variant IDs)
+              const generationIds = (allDerivedItems || [])
+                .filter(d => isDerivedItem(d) ? d.itemType === 'generation' : true)
+                .map(d => d.id);
+              await onNavigate(itemId, generationIds);
+              console.log('[VariantClickDebug] ✅ onNavigate completed');
+            }
+          };
+          
           return (
           <div
             key={itemId}
@@ -229,38 +264,12 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
                 ? 'border-purple-500/50 hover:border-purple-400' 
                 : 'border-border hover:border-primary'
             }`}
-            onClick={async () => {
-              console.log('[VariantClickDebug] 🖼️ Item clicked:', {
-                itemId: itemId.substring(0, 8),
-                isVariant,
-                isGeneration,
-                variantType,
-                isNewFormat,
-                hasOnVariantSelect: !!onVariantSelect,
-                currentMediaId: currentMediaId.substring(0, 8),
-              });
-              
-              if (isVariant && onVariantSelect) {
-                // For variants: switch to that variant (stay on same generation)
-                console.log('[VariantClickDebug] 🎯 Calling onVariantSelect for variant:', itemId.substring(0, 8));
-                onVariantSelect(itemId);
-                console.log('[VariantClickDebug] ✅ onVariantSelect completed');
-              } else if (isVariant && !onVariantSelect) {
-                // Variant but no handler!
-                console.warn('[VariantClickDebug] ⚠️ Variant clicked but onVariantSelect is not provided!');
-                console.log('[VariantClickDebug] 🔄 Falling back to onNavigate for variant');
-                // Fall back to navigating - this won't work ideally but at least logs the issue
-                await onNavigate(itemId, []);
-              } else {
-                // For generations: navigate to that generation
-                console.log('[VariantClickDebug] 🎯 Navigating to generation:', itemId.substring(0, 8));
-                // Only pass generation IDs in the context (not variant IDs)
-                const generationIds = (allDerivedItems || [])
-                  .filter(d => isDerivedItem(d) ? d.itemType === 'generation' : true)
-                  .map(d => d.id);
-                await onNavigate(itemId, generationIds);
-                console.log('[VariantClickDebug] ✅ onNavigate completed');
-              }
+            onClick={handleItemSelect}
+            // On touch devices, use onTouchEnd for immediate response (single tap)
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleItemSelect();
             }}
           >
             <img

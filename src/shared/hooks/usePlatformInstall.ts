@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 
 export type Platform = 'mac' | 'windows' | 'linux' | 'ios' | 'android' | 'unknown';
 export type Browser = 'chrome' | 'safari' | 'edge' | 'firefox' | 'samsung' | 'unknown';
-export type InstallMethod = 'prompt' | 'safari-dock' | 'safari-home-screen' | 'manual' | 'none';
+export type InstallMethod = 'prompt' | 'safari-dock' | 'safari-home-screen' | 'none';
 
 export interface PlatformInstallState {
   // Platform & Browser
@@ -12,6 +12,7 @@ export interface PlatformInstallState {
   // PWA state
   isStandalone: boolean;  // Running as installed PWA
   canInstall: boolean;    // Can show install prompt (Chrome/Edge beforeinstallprompt)
+  isWaitingForPrompt: boolean; // Chrome/Edge desktop - waiting for beforeinstallprompt
   installMethod: InstallMethod;
   
   // CTA helpers
@@ -151,11 +152,24 @@ export function usePlatformInstall(): PlatformInstallState {
     };
   }, []);
   
+  // Check if this is a browser that supports beforeinstallprompt on desktop
+  const isDesktopChromium = useMemo(() => {
+    return (browser === 'chrome' || browser === 'edge') && 
+           (platform === 'mac' || platform === 'windows' || platform === 'linux');
+  }, [browser, platform]);
+  
+  // Are we waiting for the beforeinstallprompt event? (Chrome/Edge desktop without prompt yet)
+  const isWaitingForPrompt = useMemo(() => {
+    if (isStandalone) return false;
+    if (deferredPrompt) return false; // Already have it
+    return isDesktopChromium;
+  }, [isStandalone, deferredPrompt, isDesktopChromium]);
+  
   // Determine install method
   const installMethod = useMemo<InstallMethod>(() => {
     if (isStandalone) return 'none';
     
-    // If we have the prompt, use it
+    // If we have the prompt, use it (Chrome/Edge/Samsung/Firefox Android)
     if (deferredPrompt) return 'prompt';
     
     // Safari on macOS Sonoma+ supports "Add to Dock"
@@ -164,7 +178,7 @@ export function usePlatformInstall(): PlatformInstallState {
     // Safari on iOS supports "Add to Home Screen"
     if (platform === 'ios' && browser === 'safari') return 'safari-home-screen';
     
-    // Chrome/Edge on iOS can also install via share menu
+    // Chrome/Edge on iOS can also install via share menu (iOS 16.4+)
     if (platform === 'ios' && (browser === 'chrome' || browser === 'edge')) return 'safari-home-screen';
     
     // Firefox desktop doesn't support PWA
@@ -172,20 +186,61 @@ export function usePlatformInstall(): PlatformInstallState {
       return 'none';
     }
     
-    // For Chrome/Edge on desktop without prompt yet, still show manual
-    if ((browser === 'chrome' || browser === 'edge') && (platform === 'mac' || platform === 'windows' || platform === 'linux')) {
-      return 'manual';
+    // Chrome/Edge on desktop waiting for prompt - we'll show the CTA but in waiting state
+    if (isDesktopChromium) {
+      return 'none'; // Method is 'none' until prompt fires, but isWaitingForPrompt handles the UI
     }
     
     return 'none';
-  }, [isStandalone, deferredPrompt, platform, browser]);
+  }, [isStandalone, deferredPrompt, platform, browser, isDesktopChromium]);
   
-  // Generate install instructions
+  // Generate install instructions (used for manual methods or as fallback if user declines prompt)
   const installInstructions = useMemo<string[]>(() => {
+    // If waiting for prompt on Chrome/Edge desktop, show waiting message
+    if (isWaitingForPrompt) {
+      if (browser === 'chrome') {
+        return [
+          'The install option is loading...',
+          'Look for the install icon (⊕) in the address bar',
+          'Or try refreshing the page if it doesn\'t appear'
+        ];
+      }
+      if (browser === 'edge') {
+        return [
+          'The install option is loading...',
+          'Look for "App available" in the address bar',
+          'Or try refreshing the page if it doesn\'t appear'
+        ];
+      }
+    }
+    
     switch (installMethod) {
+      case 'prompt':
+        // Fallback instructions if user declines the browser prompt
+        // These should match the browser they're using
+        if (browser === 'chrome' || browser === 'edge') {
+          return [
+            'Look for the install icon (⊕) in your browser\'s address bar',
+            'Or click the menu (⋮) → "Install Reigh"',
+            'Click "Install" to add the app'
+          ];
+        }
+        if (browser === 'samsung') {
+          return [
+            'Tap the menu button (☰)',
+            'Select "Add page to" → "Home screen"',
+            'Tap "Add" to install'
+          ];
+        }
+        // Firefox Android
+        return [
+          'Tap the menu button (⋮)',
+          'Select "Install"',
+          'Tap "Add" to confirm'
+        ];
       case 'safari-dock':
         return [
-          'Click File in the menu bar',
+          'Click "File" in the menu bar',
           'Select "Add to Dock"',
           'Click "Add" to install'
         ];
@@ -202,23 +257,17 @@ export function usePlatformInstall(): PlatformInstallState {
           'Scroll down and tap "Add to Home Screen"',
           'Tap "Add" to install'
         ];
-      case 'manual':
-        return [
-          'Look for the install icon in your browser\'s address bar',
-          'Or click the menu (⋮) → "Install Reigh"',
-          'Follow the prompts to install'
-        ];
       default:
         return [];
     }
-  }, [installMethod, browser]);
+  }, [installMethod, browser, isWaitingForPrompt]);
   
   // Generate CTA text
   const ctaText = useMemo<string>(() => {
     if (isStandalone) return 'Sign in with Discord';
     
-    // No install available
-    if (installMethod === 'none') return 'Sign in with Discord';
+    // No install available (and not waiting for prompt)
+    if (installMethod === 'none' && !isWaitingForPrompt) return 'Sign in with Discord';
     
     // Platform-specific download text
     switch (platform) {
@@ -235,19 +284,22 @@ export function usePlatformInstall(): PlatformInstallState {
       default:
         return 'Install App';
     }
-  }, [isStandalone, installMethod, platform]);
+  }, [isStandalone, installMethod, isWaitingForPrompt, platform]);
   
   // Determine CTA icon
   const ctaIcon = useMemo<'download' | 'plus' | 'discord'>(() => {
-    if (isStandalone || installMethod === 'none') return 'discord';
+    if (isStandalone) return 'discord';
+    if (installMethod === 'none' && !isWaitingForPrompt) return 'discord';
     if (platform === 'ios') return 'plus';
     return 'download';
-  }, [isStandalone, installMethod, platform]);
+  }, [isStandalone, installMethod, isWaitingForPrompt, platform]);
   
   // Should we show install CTA vs Discord sign-in
   const showInstallCTA = useMemo(() => {
-    return !isStandalone && installMethod !== 'none';
-  }, [isStandalone, installMethod]);
+    if (isStandalone) return false;
+    // Show CTA if we have an install method OR we're waiting for the prompt
+    return installMethod !== 'none' || isWaitingForPrompt;
+  }, [isStandalone, installMethod, isWaitingForPrompt]);
   
   // Trigger install action
   const triggerInstall = useCallback(async (): Promise<boolean> => {
@@ -272,6 +324,7 @@ export function usePlatformInstall(): PlatformInstallState {
     browser,
     isStandalone,
     canInstall: !!deferredPrompt,
+    isWaitingForPrompt,
     installMethod,
     ctaText,
     ctaIcon,
@@ -280,4 +333,5 @@ export function usePlatformInstall(): PlatformInstallState {
     triggerInstall,
   };
 }
+
 

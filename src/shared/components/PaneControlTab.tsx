@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, ChevronUp, Square } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 import { PANE_CONFIG, PaneSide, PanePosition } from '@/shared/config/panes';
 import { usePositionStrategy } from '@/shared/hooks/pane-positioning/usePositionStrategy';
 
@@ -45,6 +45,10 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   horizontalOffset = 0,
 }) => {
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
+  // On tablets, use desktop-like behavior with lock icons
+  // On phones (small mobile), use simplified mobile behavior
+  const useDesktopBehavior = !isMobile || isTablet;
   const [selectionActive, setSelectionActive] = React.useState(false);
 
   // Listen for selection events to hide controls
@@ -107,10 +111,11 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
     }
   };
 
-  // Mobile: Only show button when pane is closed
-  if (isMobile) {
+  // Small phones (not tablets): Only show button when pane is closed
+  // Tablets use desktop behavior with lock/unlock icons
+  if (!useDesktopBehavior) {
     if (selectionActive) return null; // hide when selection active
-    // Don't show control when pane is open on mobile
+    // Don't show control when pane is open on phones
     if (isOpen) return null;
 
     // On mobile, bottom pane control should be BEHIND side panes (which are z-60)

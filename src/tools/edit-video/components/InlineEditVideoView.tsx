@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { GenerationRow } from '@/types/shots';
-import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
 import { ArrowLeft, Loader2, Check, Plus } from 'lucide-react';
@@ -77,6 +77,9 @@ export function InlineEditVideoView({
 }: InlineEditVideoViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
+  // Use stacked layout for both mobile and tablet - video on top, settings below
+  const useStackedLayout = isMobile || isTablet;
   const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
   
@@ -573,10 +576,10 @@ export function InlineEditVideoView({
     <TooltipProvider>
       <div className={cn(
         "w-full bg-background",
-        isMobile ? "flex flex-col" : "h-full flex flex-col md:flex-row"
+        useStackedLayout ? "flex flex-col" : "h-full flex flex-col lg:flex-row"
       )}>
-        {/* Header - Mobile only */}
-        {isMobile && (
+        {/* Header - Mobile and Tablet */}
+        {useStackedLayout && (
           <div className="flex items-center justify-between p-4 border-b">
             <Button variant="ghost" size="sm" onClick={onClose} className="gap-2">
               <ArrowLeft className="w-4 h-4" />
@@ -590,40 +593,40 @@ export function InlineEditVideoView({
         {/* Left side: Video + Timeline (stacked vertically) */}
         <div className={cn(
           "flex flex-col min-h-0",
-          isMobile ? "w-full" : "flex-1 h-full"
+          useStackedLayout ? "w-full" : "flex-1 h-full"
         )}>
           {/* Video Display Area - constrained height on desktop to leave room for timeline */}
           <div className={cn(
             "relative flex items-center justify-center bg-zinc-900 overflow-hidden",
-            isMobile ? "w-full" : "flex-shrink rounded-t-lg"
+            useStackedLayout ? "w-full" : "flex-shrink rounded-t-lg"
           )}>
             {/* Video Player */}
             <div className={cn(
               "w-full flex items-center justify-center",
-              isMobile ? "p-2 pt-20 aspect-video" : "p-4 pt-24"
+              useStackedLayout ? "p-2 pt-20 aspect-video" : "p-4 pt-24"
             )}>
               <video
                 ref={videoRef}
                 src={videoUrl}
-                controls={!isMobile} // Hide controls on mobile to avoid play button overlay
+                controls={!useStackedLayout} // Hide controls on mobile/tablet to avoid play button overlay
                 playsInline // Prevents fullscreen on iOS when video plays
                 poster={(media as any).thumbnail_url || media.thumbUrl || undefined} // Show thumbnail instead of play button
                 className={cn(
                   "max-w-full object-contain rounded-lg",
-                  isMobile 
+                  useStackedLayout 
                     ? "max-h-full cursor-pointer [&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden" 
                     : "max-h-[40vh]" // Slightly smaller than original to accommodate buffer
                 )}
-                style={isMobile ? {
-                  // Additional CSS to hide native controls overlay on mobile
+                style={useStackedLayout ? {
+                  // Additional CSS to hide native controls overlay on mobile/tablet
                   WebkitAppearance: 'none',
                 } : undefined}
                 onLoadedMetadata={handleVideoLoadedMetadata}
                 preload="metadata"
-                // Prevent double-click fullscreen on mobile
-                onDoubleClick={isMobile ? (e) => e.preventDefault() : undefined}
-                // On mobile, tap to play/pause (no autoplay)
-                onClick={isMobile ? (e) => {
+                // Prevent double-click fullscreen on mobile/tablet
+                onDoubleClick={useStackedLayout ? (e) => e.preventDefault() : undefined}
+                // On mobile/tablet, tap to play/pause (no autoplay)
+                onClick={useStackedLayout ? (e) => {
                   e.preventDefault();
                   const video = e.currentTarget;
                   if (video.paused) {
@@ -639,13 +642,13 @@ export function InlineEditVideoView({
           </div>
           
           {/* Spacer between video and timeline on desktop */}
-          {!isMobile && videoDuration > 0 && <div className="h-4 bg-zinc-900" />}
+          {!useStackedLayout && videoDuration > 0 && <div className="h-4 bg-zinc-900" />}
           
           {/* Timeline Section - Below video on both mobile and desktop */}
           {videoDuration > 0 && (
             <div className={cn(
               "bg-zinc-900 select-none touch-manipulation flex-shrink-0",
-              isMobile ? "px-3 py-3" : "px-4 pt-3 pb-4 rounded-b-lg"
+              useStackedLayout ? "px-3 py-3" : "px-4 pt-3 pb-4 rounded-b-lg"
             )}>
               {/* Timeline */}
               <MultiPortionTimeline
@@ -663,7 +666,7 @@ export function InlineEditVideoView({
               {/* Add button */}
               <div className={cn(
                 "flex justify-center",
-                isMobile ? "-mt-1" : "mt-2"
+                useStackedLayout ? "-mt-1" : "mt-2"
               )}>
                 <Button
                   variant="ghost"
@@ -671,11 +674,11 @@ export function InlineEditVideoView({
                   onClick={handleAddSelection}
                   className={cn(
                     "text-white/70 hover:text-white hover:bg-white/10 gap-1",
-                    isMobile ? "text-xs h-7 px-2" : "text-sm h-8"
+                    useStackedLayout ? "text-xs h-7 px-2" : "text-sm h-8"
                   )}
                 >
-                  <Plus className={isMobile ? "w-3 h-3" : "w-4 h-4"} />
-                  {isMobile ? "Add selection" : "Add new selection"}
+                  <Plus className={useStackedLayout ? "w-3 h-3" : "w-4 h-4"} />
+                  {useStackedLayout ? "Add selection" : "Add new selection"}
                 </Button>
               </div>
             </div>
@@ -684,8 +687,8 @@ export function InlineEditVideoView({
         
         {/* Settings Panel */}
         <div className={cn(
-          "bg-background border-l border-border overflow-y-auto",
-          isMobile ? "w-full" : "w-[400px]"
+          "bg-background overflow-y-auto",
+          useStackedLayout ? "w-full border-t border-border" : "w-[400px] border-l border-border"
         )}>
           <VideoPortionEditor
             gapFrames={gapFrameCount}

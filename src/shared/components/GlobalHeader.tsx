@@ -13,7 +13,7 @@ import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 import { toast } from "sonner";
 import { useProjectContextDebug } from '@/shared/hooks/useProjectContextDebug';
 
-import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 
 interface GlobalHeaderProps {
   contentOffsetRight?: number;
@@ -30,6 +30,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const { projects, selectedProjectId, setSelectedProjectId, isLoadingProjects } = useProject();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
+  
+  // Tablets should have sticky header like desktop, only phones have scrolling header
+  const shouldHaveStickyHeader = !isMobile || isTablet;
 
   // [MobileStallFix] Enable debug monitoring
   useProjectContextDebug();
@@ -212,7 +216,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
       <header 
         className={cn(
           "wes-header z-50 w-full relative md:p-0",
-          isMobile ? "" : "sticky top-0"
+          shouldHaveStickyHeader ? "sticky top-0" : ""
         )} 
       >
         {/* Enhanced background patterns */}

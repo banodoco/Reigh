@@ -1,7 +1,7 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
-import { Download, Share, Plus, X } from 'lucide-react';
+import { Download, Share, Plus } from 'lucide-react';
 import type { InstallMethod, Platform, Browser } from '@/shared/hooks/usePlatformInstall';
 
 interface InstallInstructionsModalProps {
@@ -104,4 +104,5 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
     </Dialog>
   );
 };
+
 

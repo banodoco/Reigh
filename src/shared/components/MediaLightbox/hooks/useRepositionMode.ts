@@ -159,20 +159,15 @@ export const useRepositionMode = ({
     const scaleX = transform.flipH ? -transform.scale : transform.scale;
     const scaleY = transform.flipV ? -transform.scale : transform.scale;
     
-    // Convert percentages to pixels for CSS transform
-    let translateXPx = 0;
-    let translateYPx = 0;
-    if (imageDimensions) {
-      // translateX/translateY are percentages (0-100), convert to pixels
-      translateXPx = (transform.translateX / 100) * imageDimensions.width;
-      translateYPx = (transform.translateY / 100) * imageDimensions.height;
-    }
-    
+    // Use percentage-based CSS transforms directly
+    // This ensures the preview matches the saved result regardless of display scaling
+    // translateX/translateY are already percentages (0-100)
+    // CSS translate() with % is relative to the element's own dimensions
     return {
-      transform: `translate(${translateXPx}px, ${translateYPx}px) scale(${scaleX}, ${scaleY}) rotate(${transform.rotation}deg)`,
+      transform: `translate(${transform.translateX}%, ${transform.translateY}%) scale(${scaleX}, ${scaleY}) rotate(${transform.rotation}deg)`,
       transformOrigin: 'center center',
     };
-  }, [transform, imageDimensions]);
+  }, [transform]);
   
   // Helper function to create transformed canvas
   const createTransformedCanvas = useCallback(async (): Promise<HTMLCanvasElement> => {

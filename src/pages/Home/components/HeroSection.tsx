@@ -325,12 +325,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                             // User declined or error - show instructions anyway
                             setShowInstallModal(true);
                           }
+                        } else if (platformInstall.isWaitingForPrompt) {
+                          // Still waiting for browser prompt - show a brief message or just wait
+                          // The button will work once the prompt fires
+                          // For now, show the instructions modal as fallback
+                          setShowInstallModal(true);
                         } else {
                           // Manual install required - show instructions modal
                           setShowInstallModal(true);
                         }
                       }}
-                      className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
+                      className={`flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden ${
+                        platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''
+                      }`}
                       style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
                     >
                       <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
@@ -338,7 +345,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         <PaintParticles />
                         <div className="w-5 h-5 relative z-10">
                           {platformInstall.ctaIcon === 'download' ? (
-                            <Download className="w-full h-full text-white" />
+                            <Download className={`w-full h-full text-white ${platformInstall.isWaitingForPrompt ? 'animate-bounce' : ''}`} />
                           ) : platformInstall.ctaIcon === 'plus' ? (
                             <Plus className="w-full h-full text-white" />
                           ) : (
