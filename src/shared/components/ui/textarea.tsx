@@ -17,6 +17,8 @@ export interface TextareaProps
   voiceTask?: "transcribe_only" | "transcribe_and_write"
   /** Additional context for voice prompt generation */
   voiceContext?: string
+  /** Example prompt to guide AI generation */
+  voiceExample?: string
   /** Callback for voice input errors */
   onVoiceError?: (error: string) => void
 }
@@ -30,6 +32,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     onVoiceResult,
     voiceTask = "transcribe_and_write",
     voiceContext,
+    voiceExample,
     onVoiceError,
     ...props 
   }, ref) => {
@@ -77,6 +80,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
                 onRecordingStateChange={setIsVoiceActive}
                 task={voiceTask}
                 context={voiceContext}
+                example={voiceExample}
                 existingValue={props.value?.toString() || props.defaultValue?.toString() || ""}
                 disabled={props.disabled}
               />
@@ -87,6 +91,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
                 onError={onVoiceError}
                 onActiveStateChange={setIsTextPromptActive}
                 context={voiceContext}
+                example={voiceExample}
                 existingValue={props.value?.toString() || props.defaultValue?.toString() || ""}
                 disabled={props.disabled}
               />

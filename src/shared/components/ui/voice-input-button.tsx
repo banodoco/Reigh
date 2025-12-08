@@ -10,6 +10,7 @@ interface VoiceInputButtonProps {
   onRecordingStateChange?: (isRecording: boolean) => void
   task?: "transcribe_only" | "transcribe_and_write"
   context?: string
+  example?: string
   existingValue?: string
   disabled?: boolean
   className?: string
@@ -18,12 +19,13 @@ interface VoiceInputButtonProps {
 export const VoiceInputButton = React.forwardRef<
   HTMLButtonElement,
   VoiceInputButtonProps
->(({ onResult, onError, onRecordingStateChange, task = "transcribe_and_write", context, existingValue = "", disabled = false, className }, ref) => {
+>(({ onResult, onError, onRecordingStateChange, task = "transcribe_and_write", context, example, existingValue = "", disabled = false, className }, ref) => {
   const { state, audioLevel, remainingSeconds, isActive, toggleRecording, cancelRecording } = useVoiceRecording({
     onResult,
     onError,
     task,
     context,
+    example,
     existingValue,
   })
   

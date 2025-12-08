@@ -34,6 +34,7 @@ serve(async (req) => {
     let textInstructions: string | null = null;
     let task: string = "transcribe_and_write";
     let context: string = "";
+    let example: string = "";
     let existingValue: string = "";
     
     if (contentType.includes("application/json")) {
@@ -42,6 +43,7 @@ serve(async (req) => {
       textInstructions = body.textInstructions || null;
       task = body.task || "transcribe_and_write";
       context = body.context || "";
+      example = body.example || "";
       existingValue = body.existingValue || "";
       
       if (!textInstructions) {
@@ -54,6 +56,7 @@ serve(async (req) => {
       audioFile = formData.get("audio") as File | null;
       task = formData.get("task") as string || "transcribe_and_write";
       context = formData.get("context") as string || "";
+      example = formData.get("example") as string || "";
       existingValue = formData.get("existingValue") as string || "";
 
       if (!audioFile) {
@@ -122,6 +125,9 @@ EXISTING CONTENT IN FIELD: "${existingValue}"
 ${context ? `CONTEXT (important - this tells you what kind of field this is):
 ${context}
 
+` : ""}${example ? `EXAMPLE of what good output looks like for this field:
+"${example}"
+
 ` : ""}INTERPRETATION GUIDELINES:
 - CRITICAL: Interpret the user's INTENT, not just literal words
 - If they say "X, Y, and similar things" or "stuff like X" or "things like X" → Generate an expanded list of similar items
@@ -136,6 +142,10 @@ CRITICAL FORMATTING:
 - NO commentary, explanations, or meta-text
 - NO quotation marks around the output
 - Match the expected format for the context (e.g., comma-separated list for negative prompts)
+- AVOID keyword stuffing like "4k, best quality, masterpiece, highly detailed" unless the user specifically requests quality tags
+- Ignore filler words like "um", "uh", "like", "you know" from the input
+- PRESERVE specific details the user mentions: names, colors, numbers, camera angles, style references
+- Be concise - quality prompts are typically 1-3 sentences, not paragraphs
 
 Output:`;
 

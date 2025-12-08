@@ -12,6 +12,7 @@ interface TextPromptButtonProps {
   onError?: (error: string) => void
   onActiveStateChange?: (isActive: boolean) => void
   context?: string
+  example?: string
   existingValue?: string
   disabled?: boolean
   className?: string
@@ -20,7 +21,7 @@ interface TextPromptButtonProps {
 export const TextPromptButton = React.forwardRef<
   HTMLButtonElement,
   TextPromptButtonProps
->(({ onResult, onError, onActiveStateChange, context, existingValue = "", disabled = false, className }, ref) => {
+>(({ onResult, onError, onActiveStateChange, context, example, existingValue = "", disabled = false, className }, ref) => {
   const [state, setState] = React.useState<ProcessingState>("idle")
   const [inputValue, setInputValue] = React.useState("")
   const [isOpen, setIsOpen] = React.useState(false)
@@ -62,6 +63,7 @@ export const TextPromptButton = React.forwardRef<
           textInstructions: inputValue.trim(),
           task: "transcribe_and_write",
           context: context || "",
+          example: example || "",
           existingValue: existingValue || "",
         },
       })

@@ -8,13 +8,14 @@ interface UseVoiceRecordingOptions {
   onError?: (error: string) => void;
   task?: "transcribe_only" | "transcribe_and_write";
   context?: string;
+  example?: string;
   existingValue?: string;
 }
 
 const MAX_RECORDING_SECONDS = 10;
 
 export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
-  const { onResult, onError, task = "transcribe_and_write", context = "", existingValue = "" } = options;
+  const { onResult, onError, task = "transcribe_and_write", context = "", example = "", existingValue = "" } = options;
   
   const [state, setState] = useState<VoiceRecordingState>("idle");
   const [audioLevel, setAudioLevel] = useState<number>(0);
@@ -126,6 +127,9 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
           formData.append("task", task);
           if (context) {
             formData.append("context", context);
+          }
+          if (example) {
+            formData.append("example", example);
           }
           if (existingValue) {
             formData.append("existingValue", existingValue);

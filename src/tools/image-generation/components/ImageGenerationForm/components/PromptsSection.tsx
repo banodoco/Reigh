@@ -172,6 +172,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             onClear={onClearMasterPromptText}
             voiceInput
             voiceContext="This is a master prompt for AI image generation. The user describes what they want to generate, and AI will create multiple prompt variations from this description. Focus on capturing the visual concept, style, and key elements they want."
+            voiceExample="Different images of a woman going about her day - waking up in the morning light, having coffee at a cafe, walking through a busy city street, reading in a park, cooking dinner at home. Warm, cinematic lighting with a nostalgic film photography aesthetic."
             onVoiceResult={(result) => {
               const text = result.prompt || result.transcription;
               onMasterPromptTextChange({ target: { value: text } } as React.ChangeEvent<HTMLTextAreaElement>);
@@ -283,7 +284,8 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             voiceInput
             voiceContext="This is text that will be prepended to every image generation prompt. Keep it short - things like style prefixes, quality tags, or subject descriptions that apply to all images."
             onVoiceResult={(result) => {
-              onBeforeEachPromptTextChange({ target: { value: result.transcription } } as React.ChangeEvent<HTMLTextAreaElement>);
+              const text = result.prompt || result.transcription;
+              onBeforeEachPromptTextChange({ target: { value: text } } as React.ChangeEvent<HTMLTextAreaElement>);
             }}
           />
         </div>
@@ -304,7 +306,8 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             voiceInput
             voiceContext="This is text that will be appended to every image generation prompt. Keep it short - things like quality suffixes, negative prompts, or technical parameters that apply to all images."
             onVoiceResult={(result) => {
-              onAfterEachPromptTextChange({ target: { value: result.transcription } } as React.ChangeEvent<HTMLTextAreaElement>);
+              const text = result.prompt || result.transcription;
+              onAfterEachPromptTextChange({ target: { value: text } } as React.ChangeEvent<HTMLTextAreaElement>);
             }}
           />
         </div>

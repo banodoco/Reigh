@@ -16,6 +16,8 @@ interface InputProps extends React.ComponentProps<"input"> {
   voiceTask?: "transcribe_only" | "transcribe_and_write"
   /** Additional context for voice prompt generation */
   voiceContext?: string
+  /** Example prompt to guide AI generation */
+  voiceExample?: string
   /** Callback for voice input errors */
   onVoiceError?: (error: string) => void
 }
@@ -30,6 +32,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     onVoiceResult,
     voiceTask = "transcribe_and_write",
     voiceContext,
+    voiceExample,
     onVoiceError,
     ...props 
   }, ref) => {
@@ -78,6 +81,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 onRecordingStateChange={setIsVoiceActive}
                 task={voiceTask}
                 context={voiceContext}
+                example={voiceExample}
                 existingValue={props.value?.toString() || props.defaultValue?.toString() || ""}
                 disabled={props.disabled}
               />
@@ -88,6 +92,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 onError={onVoiceError}
                 onActiveStateChange={setIsTextPromptActive}
                 context={voiceContext}
+                example={voiceExample}
                 existingValue={props.value?.toString() || props.defaultValue?.toString() || ""}
                 disabled={props.disabled}
               />
