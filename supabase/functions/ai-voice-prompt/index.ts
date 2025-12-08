@@ -32,12 +32,16 @@ serve(async (req) => {
     const audioFile = formData.get("audio") as File | null;
     const task = formData.get("task") as string || "transcribe_and_write";
     const context = formData.get("context") as string || "";
+    const existingValue = formData.get("existingValue") as string || "";
 
     if (!audioFile) {
       return jsonResponse({ error: "audio file is required" }, 400);
     }
 
     console.log(`[ai-voice-prompt] Received audio file: ${audioFile.name}, size: ${audioFile.size}, type: ${audioFile.type}`);
+    if (existingValue) {
+      console.log(`[ai-voice-prompt] Existing value provided (${existingValue.length} chars)`);
+    }
 
     // Step 1: Transcribe audio using Whisper
     const transcription = await groq.audio.transcriptions.create({
@@ -71,7 +75,10 @@ Focus on the user's intent and the specific context they're working in.`;
     let userMsg = `Transform this spoken instruction into appropriate text for the given context:
 
 SPOKEN INSTRUCTION: "${transcribedText}"
-
+${existingValue ? `
+EXISTING CONTENT IN FIELD: "${existingValue}"
+(Consider this existing content if relevant - the user may want to modify, extend, or completely replace it based on their spoken instruction)
+` : ""}
 ${context ? `CONTEXT (important - follow this guidance):
 ${context}
 
@@ -81,6 +88,7 @@ ${context}
 - ${context ? "Follow the context guidance above carefully" : "Add visual details only where it enhances the prompt"}
 - If they mention specific subjects simply (like "a man", "a dog"), keep them simple unless the context asks for more detail
 - Only add artistic style if they mention one or if the context calls for it
+${existingValue ? "- If the user seems to be adding to or modifying the existing content, incorporate it appropriately\n- If the user seems to be replacing the content entirely, ignore the existing content" : ""}
 
 CRITICAL FORMATTING:
 - Output ONLY the final text

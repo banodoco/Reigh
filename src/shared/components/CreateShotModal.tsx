@@ -140,15 +140,15 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
         
         <div className={`${modal.scrollClass} ${modal.isMobile ? 'px-4' : 'px-6'}`}>
           <div className="grid gap-3 py-3">
-            <div className={`${modal.isMobile ? 'space-y-2' : 'grid grid-cols-4 items-center gap-4'}`}>
-              <Label htmlFor="shot-name" className={modal.isMobile ? 'text-left' : 'text-right'}>
+            <div className="space-y-2">
+              <Label htmlFor="shot-name">
                 Name
               </Label>
               <Input 
                 id="shot-name" 
                 value={shotName} 
                 onChange={(e) => setShotName(e.target.value)} 
-                className={modal.isMobile ? 'w-full' : 'col-span-3'} 
+                className="w-full" 
                 placeholder={defaultShotName || "e.g., My Awesome Shot"}
                 maxLength={30}
               />

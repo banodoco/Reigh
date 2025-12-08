@@ -297,6 +297,13 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                 className="min-h-[100px] mt-1"
                 disabled={readOnly}
                 readOnly={readOnly}
+                clearable={!readOnly}
+                onClear={() => setPrompt('')}
+                voiceInput={!readOnly}
+                voiceContext="This is a prompt for a video transition between two images. Describe the motion, transformation, or visual effect you want for this specific pair of images."
+                onVoiceResult={(result) => {
+                  setPrompt(result.prompt || result.transcription);
+                }}
               />
             </div>
 
@@ -318,6 +325,14 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                 className="min-h-[100px] mt-1"
                 disabled={readOnly}
                 readOnly={readOnly}
+                clearable={!readOnly}
+                onClear={() => setNegativePrompt('')}
+                voiceInput={!readOnly}
+                voiceTask="transcribe_only"
+                voiceContext="This is a negative prompt - things to AVOID in this video transition. List unwanted qualities as a comma-separated list."
+                onVoiceResult={(result) => {
+                  setNegativePrompt(result.transcription);
+                }}
               />
             </div>
           </div>

@@ -887,6 +887,14 @@ const CharacterAnimatePage: React.FC = () => {
               placeholder="Brief rules, e.g., preserve outfit; natural expression; no background changes"
               rows={2}
               className="resize-none"
+              clearable
+              onClear={() => setPrompt('')}
+              voiceInput
+              voiceTask="transcribe_only"
+              voiceContext="This is a prompt for character animation. Provide brief rules or guidance like 'preserve outfit', 'natural expression', 'no background changes'. Keep it concise."
+              onVoiceResult={(result) => {
+                setPrompt(result.transcription);
+              }}
             />
           </div>
         </div>

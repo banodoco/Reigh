@@ -33,11 +33,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     ...props 
   }, ref) => {
     const [isHovered, setIsHovered] = React.useState(false)
+    const [isRecording, setIsRecording] = React.useState(false)
     
     const hasValue = (props.value?.toString() || props.defaultValue?.toString() || "").length > 0
     const showClear = clearable && onClear && hasValue
     const showVoice = voiceInput && onVoiceResult
     const hasActions = showClear || showVoice
+    
+    // Show buttons when hovered OR when recording is in progress
+    const showButtons = (isHovered || isRecording) && !props.disabled && (showClear || showVoice)
     
     const handleClear = (e: React.MouseEvent) => {
       e.preventDefault()
@@ -63,14 +67,16 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           {...props}
         />
-        {isHovered && !props.disabled && (showClear || showVoice) && (
+        {showButtons && (
           <div className="absolute top-1/2 -translate-y-1/2 right-2 flex items-center gap-1 z-10">
             {showVoice && (
               <VoiceInputButton
                 onResult={onVoiceResult}
                 onError={onVoiceError}
+                onRecordingStateChange={setIsRecording}
                 task={voiceTask}
                 context={voiceContext}
+                existingValue={props.value?.toString() || props.defaultValue?.toString() || ""}
                 disabled={props.disabled}
               />
             )}

@@ -309,6 +309,13 @@ const SortableClip: React.FC<SortableClipProps> = ({
               placeholder="Additional details for this transition (optional)"
               rows={2}
               className="resize-none text-sm"
+              clearable
+              onClear={() => onPromptChange(clips[index + 1].id, '')}
+              voiceInput
+              voiceContext={`This is a prompt for the transition between Clip #${index + 1} and Clip #${index + 2}. Describe the specific motion or visual transformation you want for this particular transition between clips.`}
+              onVoiceResult={(result) => {
+                onPromptChange(clips[index + 1].id, result.prompt || result.transcription);
+              }}
             />
           </div>
         )}
@@ -1164,47 +1171,48 @@ const JoinClipsPage: React.FC = () => {
 
         {/* Global Settings using JoinClipsSettingsForm */}
         <Card className="p-6 sm:p-8 shadow-sm border">
-          <JoinClipsSettingsForm
-            gapFrames={gapFrameCount}
-            setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
-            contextFrames={contextFrameCount}
-            setContextFrames={(val) => {
-              const maxGap = Math.max(1, 81 - (val * 2));
-              const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
-              joinSettings.updateFields({ 
-                contextFrameCount: val, 
-                gapFrameCount: newGapFrames 
-              });
-            }}
-            replaceMode={replaceMode}
-            setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
-            keepBridgingImages={keepBridgingImages}
-            setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
-            prompt={globalPrompt}
-            setPrompt={(val) => joinSettings.updateField('prompt', val)}
-            negativePrompt={negativePrompt}
-            setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
-            useIndividualPrompts={useIndividualPrompts}
-            setUseIndividualPrompts={(val) => joinSettings.updateField('useIndividualPrompts', val)}
-            enhancePrompt={enhancePrompt}
-            setEnhancePrompt={(val) => {
-              console.log('[JoinClipsPage] setEnhancePrompt called with:', val);
-              joinSettings.updateField('enhancePrompt', val);
-            }}
-            availableLoras={availableLoras}
-            projectId={selectedProjectId}
-            loraPersistenceKey="join-clips"
-            loraManager={loraManager}
-            onGenerate={handleGenerate}
-            isGenerating={generateJoinClipsMutation.isPending}
-            generateSuccess={showSuccessState}
-            generateButtonText={(() => {
-              const validClipsCount = clips.filter(c => c.url).length;
-              const transitionCount = Math.max(0, validClipsCount - 1);
-              return `Generate (${transitionCount} transition${transitionCount !== 1 ? 's' : ''})`;
-            })()}
-            isGenerateDisabled={clips.filter(c => c.url).length < 2}
-          />
+                          <JoinClipsSettingsForm
+                            gapFrames={gapFrameCount}
+                            setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
+                            contextFrames={contextFrameCount}
+                            setContextFrames={(val) => {
+                              const maxGap = Math.max(1, 81 - (val * 2));
+                              const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
+                              joinSettings.updateFields({ 
+                                contextFrameCount: val, 
+                                gapFrameCount: newGapFrames 
+                              });
+                            }}
+                            replaceMode={replaceMode}
+                            setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
+                            keepBridgingImages={keepBridgingImages}
+                            setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
+                            prompt={globalPrompt}
+                            setPrompt={(val) => joinSettings.updateField('prompt', val)}
+                            negativePrompt={negativePrompt}
+                            setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
+                            useIndividualPrompts={useIndividualPrompts}
+                            setUseIndividualPrompts={(val) => joinSettings.updateField('useIndividualPrompts', val)}
+                            clipCount={clips.filter(c => c.url).length}
+                            enhancePrompt={enhancePrompt}
+                            setEnhancePrompt={(val) => {
+                              console.log('[JoinClipsPage] setEnhancePrompt called with:', val);
+                              joinSettings.updateField('enhancePrompt', val);
+                            }}
+                            availableLoras={availableLoras}
+                            projectId={selectedProjectId}
+                            loraPersistenceKey="join-clips"
+                            loraManager={loraManager}
+                            onGenerate={handleGenerate}
+                            isGenerating={generateJoinClipsMutation.isPending}
+                            generateSuccess={showSuccessState}
+                            generateButtonText={(() => {
+                              const validClipsCount = clips.filter(c => c.url).length;
+                              const transitionCount = Math.max(0, validClipsCount - 1);
+                              return `Generate (${transitionCount} transition${transitionCount !== 1 ? 's' : ''})`;
+                            })()}
+                            isGenerateDisabled={clips.filter(c => c.url).length < 2}
+                          />
         </Card>
 
         {/* Results Gallery */}

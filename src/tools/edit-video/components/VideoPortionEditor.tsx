@@ -409,16 +409,9 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                             value={[contextFrames]}
                             onValueChange={(values) => handleContextFramesChange(values[0])}
                         />
-                        {maxContextFrames !== undefined && maxContextFrames < 30 ? (
-                            <p className="text-xs text-amber-500 flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3" />
-                                Limited to {maxContextFrames} — shortest preserved section is {maxContextFrames + 1} frames. Adjust your edit portions for more context.
-                            </p>
-                        ) : (
-                            <p className="text-xs text-muted-foreground">
-                                Frames from preserved sections used for context on each side of edits
-                            </p>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                            Frames from preserved sections used for context on each side of edits
+                        </p>
                     </div>
                     
                     {/* Negative Prompt */}

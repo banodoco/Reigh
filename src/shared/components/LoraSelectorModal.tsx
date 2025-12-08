@@ -1026,6 +1026,14 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                             value={addForm.description} 
                             onChange={e => handleFormChange('description', e.target.value)} 
                             rows={2}
+                            clearable
+                            onClear={() => handleFormChange('description', '')}
+                            voiceInput
+                            voiceTask="transcribe_only"
+                            voiceContext="This is a description for a LoRA model. Describe what the LoRA does - what style, character, or effect it adds to AI-generated images or videos. Keep it concise and informative."
+                            onVoiceResult={(result) => {
+                                handleFormChange('description', result.transcription);
+                            }}
                         />
                     </div>
 

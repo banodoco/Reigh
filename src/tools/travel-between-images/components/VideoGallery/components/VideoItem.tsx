@@ -1153,6 +1153,13 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   placeholder="Describe what you want for the transitions between segments"
                   rows={3}
                   className="resize-none"
+                  clearable
+                  onClear={() => setJoinPrompt('')}
+                  voiceInput
+                  voiceContext="This is a prompt for video segment transitions. Describe the motion, style, or visual effect you want when joining video clips together. Focus on how elements should move or transform."
+                  onVoiceResult={(result) => {
+                    setJoinPrompt(result.prompt || result.transcription);
+                  }}
                 />
               </div>
               
@@ -1165,6 +1172,14 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   placeholder="What to avoid in the transitions"
                   rows={2}
                   className="resize-none"
+                  clearable
+                  onClear={() => setJoinNegativePrompt('')}
+                  voiceInput
+                  voiceTask="transcribe_only"
+                  voiceContext="This is a negative prompt - things to AVOID in video transitions. List unwanted qualities like 'jerky, flickering, blurry'. Keep it as a comma-separated list."
+                  onVoiceResult={(result) => {
+                    setJoinNegativePrompt(result.transcription);
+                  }}
                 />
               </div>
             </div>

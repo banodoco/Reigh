@@ -1767,6 +1767,21 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                         }}
                         className="h-20 text-sm resize-none"
                         placeholder="Describe this segment..."
+                        clearable
+                        onClear={() => {
+                            setParams(prev => ({ ...prev, base_prompt: '', prompt: '' }));
+                            setIsDirty(true);
+                        }}
+                        voiceInput
+                        voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
+                        onVoiceResult={(result) => {
+                            setParams(prev => ({
+                                ...prev,
+                                base_prompt: result.prompt || result.transcription,
+                                prompt: result.prompt || result.transcription
+                            }));
+                            setIsDirty(true);
+                        }}
                     />
                 </div>
 
@@ -1812,6 +1827,14 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                                     onChange={(e) => handleChange('negative_prompt', e.target.value)}
                                     className="h-16 text-xs resize-none"
                                     placeholder="Things to avoid..."
+                                    clearable
+                                    onClear={() => handleChange('negative_prompt', '')}
+                                    voiceInput
+                                    voiceTask="transcribe_only"
+                                    voiceContext="This is a negative prompt - things to AVOID in video generation. List unwanted qualities as a comma-separated list."
+                                    onVoiceResult={(result) => {
+                                        handleChange('negative_prompt', result.transcription);
+                                    }}
                                 />
                             </div>
 

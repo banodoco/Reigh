@@ -1219,6 +1219,14 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               value={addForm.description} 
               onChange={e => handleFormChange('description', e.target.value)} 
               rows={3}
+              clearable
+              onClear={() => handleFormChange('description', '')}
+              voiceInput
+              voiceTask="transcribe_only"
+              voiceContext="This is a description for a video preset. Describe what this preset does and when to use it - the style, effect, or purpose."
+              onVoiceResult={(result) => {
+                handleFormChange('description', result.transcription);
+              }}
             />
           </div>
 
@@ -1263,6 +1271,13 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                   value={addForm.basePrompt} 
                   onChange={e => handleFormChange('basePrompt', e.target.value)} 
                   rows={3}
+                  clearable
+                  onClear={() => handleFormChange('basePrompt', '')}
+                  voiceInput
+                  voiceContext="This is a base prompt for video generation preset. Describe the visual style, motion, or effect that should be applied by default when using this preset."
+                  onVoiceResult={(result) => {
+                    handleFormChange('basePrompt', result.prompt || result.transcription);
+                  }}
                 />
               </div>
 
@@ -1274,6 +1289,14 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                   value={addForm.negativePrompt} 
                   onChange={e => handleFormChange('negativePrompt', e.target.value)} 
                   rows={3}
+                  clearable
+                  onClear={() => handleFormChange('negativePrompt', '')}
+                  voiceInput
+                  voiceTask="transcribe_only"
+                  voiceContext="This is a negative prompt for a video preset - things to AVOID. List unwanted qualities as a comma-separated list."
+                  onVoiceResult={(result) => {
+                    handleFormChange('negativePrompt', result.transcription);
+                  }}
                 />
               </div>
             </div>

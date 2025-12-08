@@ -575,7 +575,11 @@ const VideoTravelToolPage: React.FC = () => {
       timestamp: Date.now()
     });
     
-    shotSettingsRef.current.updateField('phaseConfig', adjustedConfig);
+    // Clear preset reference when user manually edits config - the config no longer matches the preset
+    shotSettingsRef.current.updateFields({
+      phaseConfig: adjustedConfig,
+      selectedPhasePresetId: null
+    });
   }, []);
 
   const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, presetMetadata?: any) => {

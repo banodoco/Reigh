@@ -67,6 +67,9 @@ export interface JoinClipsSettingsFormProps {
     useIndividualPrompts?: boolean;
     setUseIndividualPrompts?: (val: boolean) => void;
     
+    /** Number of clips with videos - used to show/hide "Set individually" option */
+    clipCount?: number;
+    
     // Enhance prompt toggle
     enhancePrompt?: boolean;
     setEnhancePrompt?: (val: boolean) => void;
@@ -519,6 +522,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     setNegativePrompt,
     useIndividualPrompts,
     setUseIndividualPrompts,
+    clipCount = 2,
     enhancePrompt,
     setEnhancePrompt,
     availableLoras,
@@ -700,7 +704,8 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <Label htmlFor="join-prompt">Global Prompt</Label>
-                            {setUseIndividualPrompts && (
+                            {/* Only show "Set individually" when there are more than 2 clips */}
+                            {setUseIndividualPrompts && clipCount > 2 && (
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="useIndividualPrompts" className="text-xs text-muted-foreground cursor-pointer">
                                         Set individually
@@ -723,6 +728,13 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                             }
                             rows={3}
                             className="resize-none bg-background/50"
+                            clearable
+                            onClear={() => setPrompt('')}
+                            voiceInput
+                            voiceContext="This is a global prompt for video clip transitions. Describe the motion, style, or visual effect you want for joining video clips together. Focus on transition dynamics like camera movement, morphing effects, or smooth blending between scenes."
+                            onVoiceResult={(result) => {
+                                setPrompt(result.prompt || result.transcription);
+                            }}
                         />
                         {useIndividualPrompts && (
                             <p className="text-xs text-muted-foreground">
@@ -767,6 +779,14 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                             placeholder="What to avoid in all transitions (optional)"
                             rows={3}
                             className="resize-none bg-background/50"
+                            clearable
+                            onClear={() => setNegativePrompt('')}
+                            voiceInput
+                            voiceTask="transcribe_only"
+                            voiceContext="This is a negative prompt - things to AVOID in video transitions. List unwanted qualities like 'jerky, flickering, blurry, distorted, unnatural motion'. Keep it as a comma-separated list of terms to avoid."
+                            onVoiceResult={(result) => {
+                                setNegativePrompt(result.transcription);
+                            }}
                         />
                     </div>
                 </div>

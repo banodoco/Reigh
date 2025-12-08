@@ -260,6 +260,30 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
               rows={2}
             disabled={!hasApiKey || isGenerating}
               className="min-h-[60px] max-h-[60px]"
+            clearable
+            onClear={() => {
+              if (remixMode) {
+                setRemixPromptText('');
+                emitChange({ remixPromptText: '' });
+              } else {
+                setOverallPromptText('');
+                emitChange({ overallPromptText: '' });
+              }
+            }}
+            voiceInput
+            voiceContext={remixMode 
+              ? "This is a remix instruction for AI prompt generation. Describe how you want to transform or remix existing prompts - like 'make them more surreal' or 'transform into horror style'. Be creative and descriptive."
+              : "This is a master prompt for AI image generation. Describe the overall theme, style, or concept you want to generate multiple prompts for. AI will create variations based on this description."}
+            onVoiceResult={(result) => {
+              const text = result.prompt || result.transcription;
+              if (remixMode) {
+                setRemixPromptText(text);
+                emitChange({ remixPromptText: text });
+              } else {
+                setOverallPromptText(text);
+                emitChange({ overallPromptText: text });
+              }
+            }}
           />
         </div>
 
@@ -454,6 +478,23 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             placeholder="e.g., Under 50 words&#10;No modern technology&#10;Include vivid descriptions"
                     rows={3}
             disabled={!hasApiKey || isGenerating}
+            clearable
+            onClear={() => {
+              setRulesToRememberText('');
+              emitChange({ rulesToRememberText: '' });
+            }}
+            voiceInput
+            voiceTask="transcribe_only"
+            voiceContext="These are rules and constraints for AI prompt generation. List requirements like 'keep prompts under 50 words' or 'always include lighting details'. Speak each rule clearly - they will be formatted as bullet points."
+            onVoiceResult={(result) => {
+              // Format voice result as bullet points
+              const text = result.transcription;
+              const formatted = text.startsWith('•') || text.startsWith('-') || text.startsWith('*') 
+                ? text 
+                : `• ${text}`;
+              setRulesToRememberText(formatted);
+              emitChange({ rulesToRememberText: formatted });
+            }}
           />
         </div>
 
@@ -665,6 +706,23 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                   placeholder="e.g., Under 50 words&#10;No modern technology&#10;Include vivid descriptions"
                   rows={3}
                   disabled={!hasApiKey || isGenerating}
+                  clearable
+                  onClear={() => {
+                    setRulesToRememberText('');
+                    emitChange({ rulesToRememberText: '' });
+                  }}
+                  voiceInput
+                  voiceTask="transcribe_only"
+                  voiceContext="These are rules and constraints for AI prompt generation. List requirements like 'keep prompts under 50 words' or 'always include lighting details'. Speak each rule clearly - they will be formatted as bullet points."
+                  onVoiceResult={(result) => {
+                    // Format voice result as bullet points
+                    const text = result.transcription;
+                    const formatted = text.startsWith('•') || text.startsWith('-') || text.startsWith('*') 
+                      ? text 
+                      : `• ${text}`;
+                    setRulesToRememberText(formatted);
+                    emitChange({ rulesToRememberText: formatted });
+                  }}
                 />
               </div>
 

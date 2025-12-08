@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Mic, Square, Loader2 } from "lucide-react"
+import { Mic, Square, Loader2, X } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 import { useVoiceRecording, VoiceRecordingState } from "@/shared/hooks/use-voice-recording"
@@ -7,8 +7,10 @@ import { useVoiceRecording, VoiceRecordingState } from "@/shared/hooks/use-voice
 interface VoiceInputButtonProps {
   onResult: (result: { transcription: string; prompt?: string }) => void
   onError?: (error: string) => void
+  onRecordingStateChange?: (isRecording: boolean) => void
   task?: "transcribe_only" | "transcribe_and_write"
   context?: string
+  existingValue?: string
   disabled?: boolean
   className?: string
 }
@@ -16,13 +18,21 @@ interface VoiceInputButtonProps {
 export const VoiceInputButton = React.forwardRef<
   HTMLButtonElement,
   VoiceInputButtonProps
->(({ onResult, onError, task = "transcribe_and_write", context, disabled = false, className }, ref) => {
-  const { state, toggleRecording } = useVoiceRecording({
+>(({ onResult, onError, onRecordingStateChange, task = "transcribe_and_write", context, existingValue = "", disabled = false, className }, ref) => {
+  const { state, audioLevel, remainingSeconds, toggleRecording, cancelRecording } = useVoiceRecording({
     onResult,
     onError,
     task,
     context,
+    existingValue,
   })
+  
+  // Notify parent about recording state changes
+  React.useEffect(() => {
+    onRecordingStateChange?.(state === "recording")
+  }, [state, onRecordingStateChange])
+  
+  const hasExistingContent = existingValue.trim().length > 0
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -39,7 +49,9 @@ export const VoiceInputButton = React.forwardRef<
       case "processing":
         return "Processing..."
       default:
-        return "Voice input"
+        return hasExistingContent 
+          ? "Voice input to create/edit prompt" 
+          : "Voice input to create prompt"
     }
   }
 
@@ -54,6 +66,12 @@ export const VoiceInputButton = React.forwardRef<
     }
   }
 
+  const handleCancel = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    cancelRecording()
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -63,7 +81,7 @@ export const VoiceInputButton = React.forwardRef<
           onClick={handleClick}
           disabled={disabled || state === "processing"}
           className={cn(
-            "h-6 w-6 rounded-md flex items-center justify-center transition-colors z-10",
+            "relative h-6 w-6 rounded-md flex items-center justify-center transition-colors z-10",
             state === "recording" 
               ? "bg-red-500 text-white hover:bg-red-600" 
               : "bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground",
@@ -72,6 +90,50 @@ export const VoiceInputButton = React.forwardRef<
           )}
           tabIndex={-1}
         >
+          {/* Audio level ring indicator */}
+          {state === "recording" && (
+            <span 
+              className="absolute inset-0 rounded-md border-2 border-white/80 pointer-events-none"
+              style={{
+                transform: `scale(${1 + audioLevel * 0.5})`,
+                opacity: 0.3 + audioLevel * 0.7,
+                transition: 'transform 50ms ease-out, opacity 50ms ease-out',
+              }}
+            />
+          )}
+          {/* Secondary expanding ring for stronger visual feedback */}
+          {state === "recording" && audioLevel > 0.1 && (
+            <span 
+              className="absolute inset-0 rounded-md border border-red-300 pointer-events-none"
+              style={{
+                transform: `scale(${1.2 + audioLevel * 0.6})`,
+                opacity: Math.max(0, audioLevel - 0.1) * 0.5,
+                transition: 'transform 80ms ease-out, opacity 80ms ease-out',
+              }}
+            />
+          )}
+          
+          {/* Countdown timer - bottom left corner */}
+          {state === "recording" && (
+            <span 
+              className="absolute -bottom-0.5 -left-0.5 bg-red-600 text-white text-[8px] font-bold rounded px-0.5 leading-none py-0.5 tabular-nums shadow-sm"
+            >
+              {remainingSeconds}
+            </span>
+          )}
+          
+          {/* Cancel button - top right corner */}
+          {state === "recording" && (
+            <span
+              role="button"
+              onClick={handleCancel}
+              className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-gray-600 hover:bg-gray-700 text-white flex items-center justify-center shadow-sm cursor-pointer"
+              title="Cancel"
+            >
+              <X className="h-2 w-2" />
+            </span>
+          )}
+          
           {getIcon()}
         </button>
       </TooltipTrigger>
