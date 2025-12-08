@@ -248,8 +248,8 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-wes-cream border-wes-vintage-gold/30">
-        <DialogHeader className="text-center space-y-2">
+      <DialogContent className="sm:max-w-md bg-wes-cream border-wes-vintage-gold/30 gap-3">
+        <DialogHeader className="text-center">
           <DialogTitle className="text-xl font-theme font-theme-heading text-center">
             {getTitle()}
           </DialogTitle>
@@ -257,7 +257,7 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
 
         {/* Instructions text BEFORE the visual */}
         {instructions.length > 0 && (
-          <div className="text-center py-2">
+          <div className="text-center">
             {instructions.map((instruction, index) => (
               <p key={index} className="text-sm text-muted-foreground">
                 {instruction}
@@ -268,13 +268,13 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
 
         {/* Visual mockup shows where to click */}
         {mainVisual && (
-          <div className="flex justify-center py-2">
+          <div className="flex justify-center">
             {mainVisual}
           </div>
         )}
 
-        {/* Just the fallback link, no "Got it" button */}
-        <div className="mt-4 flex justify-center">
+        {/* Just the fallback link */}
+        <div className="flex justify-center pt-1">
           <button
             onClick={() => {
               onOpenChange(false);
