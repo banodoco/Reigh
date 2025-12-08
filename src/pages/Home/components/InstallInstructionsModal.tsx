@@ -111,7 +111,7 @@ const SafariFileMenu = () => (
   </div>
 );
 
-// Edge "App available" - browser mockup
+// Edge "App available" - browser mockup (desktop)
 const EdgeAppAvailable = () => (
   <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
     <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
@@ -129,6 +129,39 @@ const EdgeAppAvailable = () => (
       </div>
     </div>
     <div className="h-8 bg-gray-50" />
+  </div>
+);
+
+// Android install prompt - shows phone with bottom install banner
+const AndroidInstallPrompt = () => (
+  <div className="relative w-full max-w-[200px] bg-gray-100 rounded-2xl border border-gray-300 shadow-sm overflow-hidden">
+    {/* Android status bar */}
+    <div className="h-5 bg-gray-800 flex justify-between items-center px-3">
+      <span className="text-[8px] text-gray-400">9:41</span>
+      <div className="flex gap-1">
+        <div className="w-3 h-2 border border-gray-400 rounded-sm" />
+      </div>
+    </div>
+    {/* Chrome toolbar */}
+    <div className="flex items-center gap-2 px-2 py-1.5 bg-white border-b border-gray-200">
+      <div className="flex-1 flex items-center px-2 py-1 bg-gray-100 rounded-full text-[10px] text-gray-500">
+        reigh.app
+      </div>
+      <MoreVertical className="w-4 h-4 text-gray-400" />
+    </div>
+    {/* Page content */}
+    <div className="h-20 bg-gray-50" />
+    {/* Install banner at bottom */}
+    <div className="flex items-center gap-2 px-3 py-2 bg-white border-t border-gray-200 animate-pulse ring-2 ring-wes-vintage-gold ring-inset">
+      <img src="/favicon-32x32.png" alt="" className="w-8 h-8 rounded-lg" />
+      <div className="flex-1">
+        <div className="text-xs font-medium">Reigh</div>
+        <div className="text-[10px] text-gray-500">reigh.app</div>
+      </div>
+      <div className="px-3 py-1 bg-blue-500 text-white text-xs font-medium rounded">
+        Install
+      </div>
+    </div>
   </div>
 );
 
@@ -193,12 +226,17 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
       return <SafariShareIcon />;
     }
     
-    // Chrome - install icon mockup
+    // Android - phone mockup with install banner
+    if (platform === 'android') {
+      return <AndroidInstallPrompt />;
+    }
+    
+    // Chrome desktop - install icon mockup
     if (browser === 'chrome') {
       return <ChromeInstallIcon />;
     }
     
-    // Edge - App available mockup
+    // Edge desktop - App available mockup
     if (browser === 'edge') {
       return <EdgeAppAvailable />;
     }

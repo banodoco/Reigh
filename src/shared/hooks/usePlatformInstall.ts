@@ -267,6 +267,11 @@ export function usePlatformInstall(): PlatformInstallState {
     switch (installMethod) {
       case 'prompt':
         // Fallback if user declines the browser prompt
+        if (platform === 'android') {
+          return [
+            'Tap "Install" on the banner below:'
+          ];
+        }
         return [
           'Click the install icon in the address bar:'
         ];
