@@ -1993,8 +1993,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 <div 
                   data-task-details-panel
                   className={cn(
-                    "bg-background border-l border-border overflow-y-auto relative z-[60]"
-                    // Removed flex centering to prevent top clipping with long content
+                    "bg-background border-l border-border h-full overflow-hidden relative z-[60]"
+                    // h-full constrains height so TaskDetailsPanel's footer stays visible
+                    // overflow-hidden lets child components handle their own scrolling
                   )}
                   style={{ width: '40%' }}
                 >
