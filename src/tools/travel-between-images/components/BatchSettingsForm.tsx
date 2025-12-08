@@ -246,6 +246,11 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       rows={3}
                       clearable
                       onClear={() => onBatchVideoPromptChange('')}
+                      voiceInput
+                      voiceContext="This is a video generation prompt for AI video transitions between images. Describe the motion, transition style, or visual transformation you want. Focus on movement, camera motion, or how elements should animate."
+                      onVoiceResult={(result) => {
+                        onBatchVideoPromptChange(result.prompt || result.transcription);
+                      }}
                     />
                   </div>
                   
@@ -293,6 +298,12 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     rows={3}
                     clearable
                     onClear={() => onSteerableMotionSettingsChange({ negative_prompt: '' })}
+                    voiceInput
+                    voiceTask="transcribe_only"
+                    voiceContext="This is a negative prompt - things to AVOID in the video generation. List unwanted qualities like 'blurry, distorted, low quality, shaky'. Keep it as a comma-separated list of terms to avoid."
+                    onVoiceResult={(result) => {
+                      onSteerableMotionSettingsChange({ negative_prompt: result.transcription });
+                    }}
                   />
                 </div>
             </div>
@@ -326,6 +337,14 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   onBlur={() => onBlurSave?.()}
                   placeholder="Text to prepend to each prompt..."
                   className="w-full"
+                  clearable
+                  onClear={() => onTextBeforePromptsChange?.('')}
+                  voiceInput
+                  voiceTask="transcribe_only"
+                  voiceContext="This is text that will be prepended to every video generation prompt. Keep it short - things like style prefixes or descriptions that apply to all video segments."
+                  onVoiceResult={(result) => {
+                    onTextBeforePromptsChange?.(result.transcription);
+                  }}
                 />
               </div>
               
@@ -340,6 +359,14 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   onBlur={() => onBlurSave?.()}
                   placeholder="Text to append to each prompt..."
                   className="w-full"
+                  clearable
+                  onClear={() => onTextAfterPromptsChange?.('')}
+                  voiceInput
+                  voiceTask="transcribe_only"
+                  voiceContext="This is text that will be appended to every video generation prompt. Keep it short - things like quality suffixes or parameters that apply to all video segments."
+                  onVoiceResult={(result) => {
+                    onTextAfterPromptsChange?.(result.transcription);
+                  }}
                 />
               </div>
             </div>

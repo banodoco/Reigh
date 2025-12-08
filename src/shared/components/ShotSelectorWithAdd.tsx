@@ -92,7 +92,8 @@ export const ShotSelectorWithAdd: React.FC<ShotSelectorWithAddProps> = ({
     isSuccessful: boolean;
     shotId: string | null;
     shotName: string | null;
-  }>({ isSuccessful: false, shotId: null, shotName: null });
+    isLoading?: boolean;
+  }>({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
   
   // Get current target shot name for tooltips
   const currentTargetShotName = useMemo(() => {
@@ -139,16 +140,26 @@ export const ShotSelectorWithAdd: React.FC<ShotSelectorWithAddProps> = ({
       // Select the newly created shot in the dropdown
       onShotChange(result.shotId);
       
-      // Set success state
+      // Set success state with loading=true initially while cache syncs
       setQuickCreateSuccess({
         isSuccessful: true,
         shotId: result.shotId,
-        shotName: result.shotName
+        shotName: result.shotName,
+        isLoading: true
       });
+      
+      // After a brief delay for cache to sync, show the Visit button as ready
+      setTimeout(() => {
+        setQuickCreateSuccess(prev => 
+          prev.shotId === result.shotId 
+            ? { ...prev, isLoading: false } 
+            : prev
+        );
+      }, 600);
       
       // Clear success state after 5 seconds
       setTimeout(() => {
-        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null });
+        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
       }, 5000);
       
     } catch (error) {
@@ -176,7 +187,7 @@ export const ShotSelectorWithAdd: React.FC<ShotSelectorWithAddProps> = ({
           name: shot.name,
           images: [],
           position: 0
-        });
+        }, { isNewlyCreated: true });
       } else {
         // Shot not in list yet, navigate with stored data
         navigateToShot({ 
@@ -184,7 +195,7 @@ export const ShotSelectorWithAdd: React.FC<ShotSelectorWithAddProps> = ({
           name: quickCreateSuccess.shotName || `Shot`,
           images: [],
           position: 0
-        });
+        }, { isNewlyCreated: true });
       }
     }
   }, [quickCreateSuccess, shots, navigateToShot, onClose]);

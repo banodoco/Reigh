@@ -66,7 +66,6 @@ export interface ImageGalleryProps {
   onAddToLastShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   currentToolType?: string;
   initialFilterState?: boolean;
-  onImageSaved?: (imageId: string, newImageUrl: string) => void;
   currentViewingShotId?: string;
   offset?: number;
   totalCount?: number;

@@ -6,7 +6,7 @@
  * Available Hooks (all in ./hooks/):
  * - useUpscale: Image upscaling with localStorage persistence
  * - useInpainting: Canvas-based inpainting with mask generation  
- * - useImageFlip: Image flipping and saving
+ * - useRepositionMode: Image repositioning, scaling, rotation, and flipping
  * - useGenerationName: Generation name editing with database sync
  * - useReferences: Adding images to project references with processing
  * - useGenerationLineage: Fetching source/derived generations
@@ -43,7 +43,6 @@ export type { MediaLightboxProps, ShotOption } from './MediaLightboxRefactored';
 export {
   useUpscale,
   useInpainting,
-  useImageFlip,
   useGenerationName,
   useReferences,
   useGenerationLineage,

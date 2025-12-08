@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Textarea } from '@/shared/components/ui/textarea';
 import { CheckCircle, Loader2, Move, Paintbrush, Pencil, Save, Sparkles, Type, X, XCircle } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
@@ -314,7 +315,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         {/* Prompt Field */}
         <div className={generationsSpacing}>
           <label className={`${labelSize} font-medium`}>Prompt</label>
-          <textarea
+          <Textarea
             value={inpaintPrompt}
             onChange={(e) => setInpaintPrompt(e.target.value)}
             placeholder={
@@ -326,8 +327,15 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                     ? (isMobile ? "Optional: describe how to fill edges..." : "Optional: describe how to fill the exposed edges (default: match existing content)")
                     : (isMobile ? "Describe what to generate..." : "Describe what to generate in the masked area...")
             }
-            className={`w-full ${textareaMinHeight} bg-background border border-input rounded-md ${textareaPadding} ${textareaTextSize} resize-none focus:outline-none focus:ring-2 focus:ring-ring`}
+            className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
             rows={textareaRows}
+            clearable
+            onClear={() => setInpaintPrompt('')}
+            voiceInput
+            voiceContext="This is an image editing prompt. Describe what changes to make to the image - what to add, remove, or modify in the selected/masked area. Be specific about the visual result you want."
+            onVoiceResult={(result) => {
+              setInpaintPrompt(result.prompt || result.transcription);
+            }}
           />
         </div>
         

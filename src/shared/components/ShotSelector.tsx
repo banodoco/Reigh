@@ -37,6 +37,7 @@ export interface ShotSelectorProps {
     isSuccessful: boolean;
     shotId: string | null;
     shotName: string | null;
+    isLoading?: boolean; // True when shot is created but still syncing/loading
   };
   onQuickCreateSuccess?: () => void;
   
@@ -169,6 +170,8 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              // Don't navigate if still loading
+              if (quickCreateSuccess.isLoading) return;
               console.log('[VisitShotDebug] 1. ShotSelector button clicked', {
                 quickCreateSuccess,
                 hasOnQuickCreateSuccess: !!onQuickCreateSuccess,
@@ -180,9 +183,19 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
                 onQuickCreateSuccess();
               }
             }}
+            disabled={quickCreateSuccess.isLoading}
           >
-            <Check className="h-3 w-3 mr-1" />
-            Visit {quickCreateSuccess.shotName}
+            {quickCreateSuccess.isLoading ? (
+              <>
+                <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white mr-1"></div>
+                Preparing {quickCreateSuccess.shotName}...
+              </>
+            ) : (
+              <>
+                <Check className="h-3 w-3 mr-1" />
+                Visit {quickCreateSuccess.shotName}
+              </>
+            )}
           </Button>
         ) : (
           <Button

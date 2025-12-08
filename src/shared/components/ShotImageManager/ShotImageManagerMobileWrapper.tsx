@@ -201,8 +201,6 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
             }}
             onNext={lightbox.handleNext}
             onPrevious={lightbox.handlePrevious}
-            onImageSaved={props.onImageSaved ? async (newImageUrl: string, createNew?: boolean) =>
-              await props.onImageSaved!(lightbox.currentImages[lightbox.lightboxIndex].id, newImageUrl, createNew) : undefined}
             showNavigation={true}
             showImageEditTools={true}
             showDownload={true}

@@ -73,7 +73,6 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     onAddToLastShotWithoutPosition,
     currentToolType, 
     initialFilterState = true, 
-    onImageSaved, 
     currentViewingShotId,
     offset = 0, 
     totalCount, 
@@ -263,7 +262,6 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     onAddToLastShot,
     onAddToLastShotWithoutPosition,
     onToggleStar,
-    onImageSaved,
     activeLightboxMedia: stateHook.state.activeLightboxMedia,
     setActiveLightboxMedia: stateHook.setActiveLightboxMedia,
     setAutoEnterEditMode: stateHook.setAutoEnterEditMode,
@@ -787,7 +785,6 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
         onServerPageChange={onServerPageChange}
         onNext={handleNextImage}
         onPrevious={handlePreviousImage}
-        onImageSaved={actionsHook.handleImageSaved}
         onDelete={actionsHook.handleOptimisticDelete}
         isDeleting={isDeleting}
         onApplySettings={onApplySettings}

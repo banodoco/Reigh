@@ -354,6 +354,13 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                                         onChange={(e) => onUpdateSelectionSettings?.(selection.id, { prompt: e.target.value })}
                                         placeholder="Prompt for this segment (optional)..."
                                         className="h-8 text-xs"
+                                        clearable
+                                        onClear={() => onUpdateSelectionSettings?.(selection.id, { prompt: '' })}
+                                        voiceInput
+                                        voiceContext="This is a video segment regeneration prompt. Describe what should happen in this specific portion of the video - the motion, action, or visual content you want to generate."
+                                        onVoiceResult={(result) => {
+                                            onUpdateSelectionSettings?.(selection.id, { prompt: result.prompt || result.transcription });
+                                        }}
                                     />
                                 </div>
                             </div>
@@ -424,6 +431,14 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                             placeholder="What to avoid (optional)"
                             rows={2}
                             className="resize-none"
+                            clearable
+                            onClear={() => setNegativePrompt('')}
+                            voiceInput
+                            voiceTask="transcribe_only"
+                            voiceContext="This is a negative prompt - things to AVOID in video regeneration. List unwanted qualities like 'blurry, distorted, low quality, flickering'. Keep it as a comma-separated list of terms to avoid."
+                            onVoiceResult={(result) => {
+                                setNegativePrompt(result.transcription);
+                            }}
                         />
                     </div>
 

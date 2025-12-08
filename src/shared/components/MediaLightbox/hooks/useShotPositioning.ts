@@ -15,7 +15,7 @@ export interface UseShotPositioningProps {
   associatedWithoutPositionInSelectedShot?: boolean;
   optimisticPositionedIds?: Set<string>;
   optimisticUnpositionedIds?: Set<string>;
-  onNavigateToShot?: (shot: Shot) => void;
+  onNavigateToShot?: (shot: Shot, options?: { isNewlyCreated?: boolean }) => void;
   onClose: () => void;
   // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
   onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;

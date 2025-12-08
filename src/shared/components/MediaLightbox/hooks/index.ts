@@ -4,9 +4,6 @@ export type { UseUpscaleProps, UseUpscaleReturn } from './useUpscale';
 export { useInpainting } from './useInpainting';
 export type { UseInpaintingProps, UseInpaintingReturn } from './useInpainting';
 
-export { useImageFlip } from './useImageFlip';
-export type { UseImageFlipProps, UseImageFlipReturn } from './useImageFlip';
-
 export { useGenerationName } from './useGenerationName';
 export type { UseGenerationNameProps, UseGenerationNameReturn } from './useGenerationName';
 

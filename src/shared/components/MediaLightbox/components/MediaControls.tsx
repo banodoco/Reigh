@@ -4,8 +4,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/
 import {
   Star,
   Download,
-  FlipHorizontal,
-  Save,
   CheckCircle,
   Loader2,
   ImagePlus,
@@ -58,12 +56,6 @@ export interface MediaControlsProps {
   handleUpscale: () => Promise<void>;
   handleToggleUpscaled: () => void;
   
-  // Image flip functionality
-  hasChanges: boolean;
-  isSaving: boolean;
-  handleFlip: () => void;
-  handleSave: () => Promise<void>;
-  
   // Download functionality
   handleDownload: () => Promise<void>;
   
@@ -108,10 +100,6 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
   showingUpscaled,
   handleUpscale,
   handleToggleUpscaled,
-  hasChanges,
-  isSaving,
-  handleFlip,
-  handleSave,
   handleDownload,
   onDelete,
   handleDelete,
@@ -223,42 +211,6 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
             {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
           </TooltipContent>
         </Tooltip>
-      )}
-
-      {/* Image Edit Tools: Flip and Save */}
-      {!isVideo && showImageEditTools && !readOnly && !isSpecialEditMode && (
-        <>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleFlip}
-                className="bg-black/50 hover:bg-black/70 text-white"
-              >
-                <FlipHorizontal className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
-          </Tooltip>
-
-          {hasChanges && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
-                >
-                  <Save className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="z-[100001]">{isSaving ? 'Saving...' : 'Save changes'}</TooltipContent>
-            </Tooltip>
-          )}
-        </>
       )}
 
       {/* Download Button */}

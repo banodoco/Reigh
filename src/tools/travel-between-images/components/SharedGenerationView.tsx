@@ -450,7 +450,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                   shotName="Shared Generation"
                   batchVideoFrames={taskSettings.frames}
                   onImageReorder={() => {}} // Read-only
-                  onImageSaved={async () => {}} // Read-only
                   onContextFramesChange={() => {}} // Read-only
                   onFramePositionsChange={() => {}} // Read-only
                   onImageDrop={async () => {}} // Read-only

@@ -45,8 +45,6 @@ interface ShotImagesEditorProps {
   batchVideoFrames: number;
   /** Reordering callback – receives ordered ids */
   onImageReorder: (orderedIds: string[]) => void;
-  /** Image saved callback (e.g. after in-place edit) */
-  onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
   /** Timeline frame positions change */
   onFramePositionsChange: (newPositions: Map<string, number>) => void;
   /** Callback when external images are dropped on the timeline */
@@ -134,7 +132,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   shotName,
   batchVideoFrames,
   onImageReorder,
-  onImageSaved,
   onFramePositionsChange,
   onImageDrop,
   onGenerationDrop,
@@ -298,7 +295,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   const prevCallbacksRef = React.useRef<{
     onGenerationModeChange?: any;
     onImageReorder?: any;
-    onImageSaved?: any;
     onFramePositionsChange?: any;
     onImageDrop?: any;
     onGenerationDrop?: any;
@@ -324,7 +320,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     const callbacks = {
       onGenerationModeChange,
       onImageReorder,
-      onImageSaved,
       onFramePositionsChange,
       onImageDrop,
       onGenerationDrop,
@@ -890,7 +885,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 projectId={projectId}
                 frameSpacing={batchVideoFrames}
                 onImageReorder={onImageReorder}
-                onImageSaved={onImageSaved}
                 onFramePositionsChange={onFramePositionsChange}
                 onImageDrop={onImageDrop}
                 onGenerationDrop={onGenerationDrop}
@@ -909,7 +903,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 allGenerations={preloadedImages}
                 images={images}
                 onTimelineChange={async () => {
-                  console.log('[ShotImagesEditor] 🔄 TIMELINE CHANGE - Reloading parent data');
                   await loadPositions({ silent: true });
                 }}
                 // Pass shared hook data to prevent creating duplicate instances
@@ -1034,7 +1027,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   onImageReorder={handleReorder}
                   columns={columns}
                   generationMode={isMobile ? "batch" : generationMode}
-                  onImageSaved={onImageSaved}
                   onMagicEdit={(imageUrl, prompt, numImages) => {
                     // TODO: Wire through real magic-edit handler later.
                     console.log("Magic Edit:", { imageUrl, prompt, numImages });

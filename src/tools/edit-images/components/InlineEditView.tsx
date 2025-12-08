@@ -8,7 +8,6 @@ import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import {
   useUpscale,
   useInpainting,
-  useImageFlip,
   useEditModeLoRAs,
   useSourceGeneration,
   useMagicEditMode,
@@ -36,11 +35,10 @@ import { useVariants } from '@/tools/travel-between-images/components/VideoGalle
 interface InlineEditViewProps {
   media: GenerationRow;
   onClose: () => void;
-  onImageSaved?: (newImageUrl: string, createNew?: boolean) => Promise<void>;
   onNavigateToGeneration?: (generationId: string) => Promise<void>;
 }
 
-export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGeneration }: InlineEditViewProps) {
+export function InlineEditView({ media, onClose, onNavigateToGeneration }: InlineEditViewProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -68,21 +66,13 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
     handleToggleUpscaled,
   } = upscaleHook;
 
-  const imageFlipHook = useImageFlip({ 
-    media, 
-    onImageSaved,
-    onClose: () => {},
-  });
-  const { 
-    isFlippedHorizontally,
-    hasChanges,
-    isSaving,
-    handleFlip,
-    handleSave,
-    imageDimensions,
-    setImageDimensions,
-    canvasRef,
-  } = imageFlipHook;
+  // Image dimensions state (needed by inpainting hook)
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Flip functionality removed - use reposition mode instead
+  const isFlippedHorizontally = false;
+  const isSaving = false;
 
   const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, loraMode, setLoraMode, customLoraUrl, setCustomLoraUrl, editModeLoRAs } = useEditModeLoRAs();
 
@@ -301,10 +291,6 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
                    selectedProjectId={selectedProjectId}
                    isCloudMode={isCloudMode}
                    showImageEditTools={true}
-                   hasChanges={hasChanges}
-                   isSaving={isSaving}
-                   handleFlip={handleFlip}
-                   handleSave={handleSave}
                    effectiveImageUrl={effectiveImageUrl}
                  />
 
@@ -499,10 +485,6 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
                 selectedProjectId={selectedProjectId}
                 isCloudMode={isCloudMode}
                 showImageEditTools={true}
-                hasChanges={hasChanges}
-                isSaving={isSaving}
-                handleFlip={handleFlip}
-                handleSave={handleSave}
                 effectiveImageUrl={effectiveImageUrl}
               />
 

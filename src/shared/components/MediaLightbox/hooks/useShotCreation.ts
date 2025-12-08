@@ -9,7 +9,7 @@ export interface UseShotCreationProps {
   media: GenerationRow;
   selectedProjectId: string | null;
   allShots: ShotOption[];
-  onNavigateToShot?: (shot: any) => void;
+  onNavigateToShot?: (shot: any, options?: { isNewlyCreated?: boolean }) => void;
   onClose: () => void;
   onShotChange?: (shotId: string) => void;
 }
@@ -38,6 +38,7 @@ export const useShotCreation = ({
     isSuccessful: false,
     shotId: null,
     shotName: null,
+    isLoading: false,
   });
   
   const createShotWithImageMutation = useCreateShotWithImage();
@@ -104,16 +105,26 @@ export const useShotCreation = ({
         onShotChange(result.shotId);
       }
       
-      // Set success state with real shot ID
+      // Set success state with loading=true initially while cache syncs
       setQuickCreateSuccess({
         isSuccessful: true,
         shotId: result.shotId,
-        shotName: result.shotName
+        shotName: result.shotName,
+        isLoading: true
       });
+      
+      // After a brief delay for cache to sync, show the Visit button as ready
+      setTimeout(() => {
+        setQuickCreateSuccess(prev => 
+          prev.shotId === result.shotId 
+            ? { ...prev, isLoading: false } 
+            : prev
+        );
+      }, 600);
       
       // Clear success state after 5 seconds
       setTimeout(() => {
-        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null });
+        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
       }, 5000);
       
     } catch (error) {
@@ -156,7 +167,7 @@ export const useShotCreation = ({
           position: 0,
         };
         console.log('[VisitShotDebug] 4a. MediaLightbox calling onNavigateToShot with found shot', minimalShot);
-        onNavigateToShot(minimalShot);
+        onNavigateToShot(minimalShot, { isNewlyCreated: true });
       } else {
         // Fallback when shot not in list yet
         const minimalShot = {
@@ -166,7 +177,7 @@ export const useShotCreation = ({
           position: 0,
         };
         console.log('[VisitShotDebug] 4b. MediaLightbox calling onNavigateToShot with fallback shot', minimalShot);
-        onNavigateToShot(minimalShot);
+        onNavigateToShot(minimalShot, { isNewlyCreated: true });
       }
     } else {
       console.log('[VisitShotDebug] 4c. MediaLightbox not navigating - missing requirements', {
@@ -177,7 +188,7 @@ export const useShotCreation = ({
     
     // Clear the success state
     console.log('[VisitShotDebug] 5. MediaLightbox clearing success state');
-    setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null });
+    setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
   }, [quickCreateSuccess, onNavigateToShot, onClose, allShots]);
 
   return {

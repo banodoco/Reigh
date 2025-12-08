@@ -288,8 +288,6 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
                 const shotImageEntryId = currentImage.shotImageEntryId || currentImage.id;
                 props.onImageDelete(shotImageEntryId);
               } : undefined}
-              onImageSaved={props.onImageSaved ? async (newImageUrl: string, createNew?: boolean) =>
-                await props.onImageSaved!(lightbox.currentImages[lightbox.lightboxIndex].id, newImageUrl, createNew) : undefined}
               showNavigation={true}
               showImageEditTools={true}
               showDownload={true}

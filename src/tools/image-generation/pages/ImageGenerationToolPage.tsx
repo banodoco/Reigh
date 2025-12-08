@@ -592,149 +592,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Remove the old task tracking effect - it's now handled by useTaskQueueNotifier
 
-  const handleImageSaved = useCallback(async (imageId: string, newImageUrl: string, createNew?: boolean) => {
-    console.log('[ImageFlipDebug] [ImageGenerationToolPage] handleImageSaved called', {
-      imageId,
-      newImageUrl,
-      createNew,
-      timestamp: Date.now()
-    });
-    
-    try {
-      if (createNew) {
-        // Create a new generation entry
-        const originalImage = generatedImages.find(img => img.id === imageId);
-        if (!originalImage) {
-          throw new Error('Original image not found');
-        }
-
-        const newGeneration = await createGenerationMutation.mutateAsync({
-          imageUrl: newImageUrl,
-          fileName: `edited_${originalImage.prompt?.substring(0, 20) || 'image'}.png`,
-          fileType: 'image/png',
-          fileSize: 0, // We don't have the file size for uploaded images
-          projectId: selectedProjectId!,
-          prompt: `Edited: ${originalImage.prompt || 'Image edit'}`,
-        });
-
-        // Add the new image to local state
-        const newImageWithMetadata: GeneratedImageWithMetadata = {
-          id: newGeneration.id,
-          url: newImageUrl,
-          prompt: `Edited: ${originalImage.prompt || 'Image edit'}`,
-          metadata: {
-            ...originalImage.metadata,
-            source: 'image_edit',
-            original_image_id: imageId,
-          },
-          createdAt: newGeneration.created_at || new Date().toISOString(),
-          isVideo: false,
-        };
-
-        setGeneratedImages(prevImages => [newImageWithMetadata, ...prevImages]);
-      } else {
-        // Update the existing database record via Supabase
-        console.log('[ImageFlipDebug] [ImageGenerationToolPage] Updating database record', {
-          imageId,
-          newImageUrl,
-          projectId: selectedProjectId,
-          timestamp: Date.now()
-        });
-        
-        await updateGenerationLocationMutation.mutateAsync({
-          id: imageId,
-          location: newImageUrl,
-          thumbUrl: newImageUrl, // Also update thumbnail so progressive loading shows flipped image
-          projectId: selectedProjectId, // Pass projectId so cache invalidation works properly
-        });
-
-        console.log('[ImageFlipDebug] [ImageGenerationToolPage] Database update completed, updating local state', {
-          timestamp: Date.now()
-        });
-
-        // Update local state with cache-busting URL
-        setGeneratedImages(prevImages => {
-          return prevImages.map(img => {
-            if (img.id === imageId) {
-              // Add cache-busting parameter to force browser to reload image
-              const cacheBustedUrl = `${newImageUrl}?t=${Date.now()}`;
-              console.log('[ImageFlipDebug] [ImageGenerationToolPage] Updating local state for image:', {
-                imageId,
-                oldUrl: img.url,
-                newUrl: newImageUrl,
-                cacheBustedUrl,
-                urlChanged: img.url !== newImageUrl
-              });
-              return { 
-                ...img, 
-                url: cacheBustedUrl,
-                thumbUrl: cacheBustedUrl, // Also update thumbUrl so imageIdentifier changes
-                // Force re-render by updating a key that components watch
-                updatedAt: Date.now().toString()
-              };
-            }
-            return img;
-          });
-        });
-        
-        console.log('[ImageFlipDebug] [ImageGenerationToolPage] Local state updated, updating query cache', {
-          timestamp: Date.now()
-        });
-        
-        // Optimistically update all cached generations lists so the gallery updates immediately
-        const generationsQueries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
-        const cacheBustedUrlForCache = `${newImageUrl}?t=${Date.now()}`;
-        generationsQueries.forEach(([qk, data]) => {
-          if (data && typeof data === 'object' && 'items' in data) {
-            const updated = {
-              ...(data as any),
-              items: (data as any).items.map((g: any) => (
-                g.id === imageId ? { ...g, url: cacheBustedUrlForCache, thumbUrl: cacheBustedUrlForCache, updatedAt: Date.now().toString() } : g
-              )),
-            } as any;
-            queryClient.setQueryData(qk, updated);
-          }
-        });
-        
-        console.log('[ImageFlipDebug] [ImageGenerationToolPage] Query cache updated', {
-          queriesUpdated: generationsQueries.length,
-          timestamp: Date.now()
-        });
-      }
-
-      console.log('[ImageFlipDebug] [ImageGenerationToolPage] Invalidating and refetching queries', {
-        timestamp: Date.now()
-      });
-
-      // Aggressively invalidate and refetch the generations query to ensure fresh data
-      await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
-      await queryClient.refetchQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
-      
-      console.log('[ImageFlipDebug] [ImageGenerationToolPage] handleImageSaved completed successfully', {
-        timestamp: Date.now()
-      });
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorDetails = {
-        error,
-        errorMessage,
-        errorStack: error instanceof Error ? error.stack : undefined,
-        imageId,
-        newImageUrl,
-        createNew,
-        timestamp: Date.now()
-      };
-      
-      console.error("[ImageFlipDebug] [ImageGenerationToolPage] Error in handleImageSaved:");
-      console.error("Error message:", errorMessage);
-      console.error("Full error details:", errorDetails);
-      console.error("Raw error:", error);
-      
-      toast.error(createNew ? "Failed to create new image." : `Failed to update image: ${errorMessage}`);
-    }
-  }, [updateGenerationLocationMutation, createGenerationMutation, setGeneratedImages, queryClient, selectedProjectId, generatedImages]);
-
   const falApiKey = getApiKey('fal_api_key');
   const openaiApiKey = getApiKey('openai_api_key');
   const hasValidFalApiKey = true; // Always true - let the task creation handle validation
@@ -1398,7 +1255,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 reducedSpacing={true}
                 images={imagesToShow}
                 onDelete={handleDeleteImage}
-                onImageSaved={handleImageSaved}
                 onAddToLastShot={handleAddImageToTargetShot}
                 onAddToLastShotWithoutPosition={handleAddImageToTargetShotWithoutPosition}
                 isDeleting={isDeleting}
@@ -1433,7 +1289,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 enableAdjacentPagePreloading={!isMobile}
                 onCreateShot={handleCreateShot}
                 onBackfillRequest={handleBackfillRequest}
-                showShare={!isMobile}
+                showShare={false}
                 isLoading={isPlaceholderData}
               />
               </div>

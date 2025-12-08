@@ -331,6 +331,13 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
               setLocalFullPrompt('');
               onUpdate(promptEntry.id, 'fullPrompt', '');
             }}
+            voiceInput
+            voiceContext="This is an individual image generation prompt. Describe a single image with visual details like subject, composition, lighting, colors, and atmosphere. Be specific and descriptive."
+            onVoiceResult={(result) => {
+              const text = result.prompt || result.transcription;
+              setLocalFullPrompt(text);
+              onUpdate(promptEntry.id, 'fullPrompt', text);
+            }}
           />
         ) : (
           // Mobile not in edit mode: use div that looks like textarea

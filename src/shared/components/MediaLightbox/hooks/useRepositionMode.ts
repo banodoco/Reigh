@@ -494,6 +494,23 @@ export const useRepositionMode = ({
       // Invalidate unified-generations cache so results galleries refresh
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       
+      // Also invalidate shot-generations so Timeline/ShotImagesEditor update
+      // Try to get shotId from prop, or from media's shot associations
+      const effectiveShotId = shotId || (media as any).shot_id || 
+        ((media as any).all_shot_associations?.[0]?.shot_id);
+      
+      if (effectiveShotId) {
+        await queryClient.refetchQueries({ queryKey: ['all-shot-generations', effectiveShotId] });
+      }
+      
+      // Also invalidate ALL shot-generations caches since we don't know which shots have this image
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          return key[0] === 'all-shot-generations' || key[0] === 'shot-generations';
+        }
+      });
+      
       // Refetch variants to update the list
       if (refetchVariants) {
         refetchVariants();

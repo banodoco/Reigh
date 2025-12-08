@@ -27,7 +27,6 @@ export interface TimelineProps {
   frameSpacing: number;
   contextFrames: number;
   onImageReorder: (orderedIds: string[]) => void;
-  onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
   onContextFramesChange: (context: number) => void;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
@@ -82,7 +81,6 @@ const Timeline: React.FC<TimelineProps> = ({
   frameSpacing,
   contextFrames,
   onImageReorder,
-  onImageSaved,
   onContextFramesChange,
   onFramePositionsChange,
   onImageDrop,
@@ -336,7 +334,6 @@ const Timeline: React.FC<TimelineProps> = ({
         framePositions={displayPositions}
         setFramePositions={setFramePositions}
         onImageReorder={onImageReorder}
-        onImageSaved={onImageSaved}
         onImageDrop={onImageDrop}
         setIsDragInProgress={setIsDragInProgress}
         onPairClick={onPairClick}
@@ -357,9 +354,6 @@ const Timeline: React.FC<TimelineProps> = ({
           onClose={closeLightbox}
           onNext={images.length > 1 ? wrappedGoNext : undefined}
           onPrevious={images.length > 1 ? wrappedGoPrev : undefined}
-          onImageSaved={async (newUrl: string, createNew?: boolean) => 
-            await onImageSaved(currentLightboxImage.id, newUrl, createNew)
-          }
           showNavigation={showNavigation}
           showMagicEdit={true}
           hasNext={hasNext}

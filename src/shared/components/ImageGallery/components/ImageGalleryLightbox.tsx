@@ -24,7 +24,6 @@ export interface ImageGalleryLightboxProps {
   onPrevious: () => void;
   
   // Actions
-  onImageSaved: (newImageUrl: string, createNew?: boolean) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   isDeleting?: string | null;
   onApplySettings?: (metadata: any) => void;
@@ -85,7 +84,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   onServerPageChange,
   onNext,
   onPrevious,
-  onImageSaved,
   onDelete,
   isDeleting,
   onApplySettings,
@@ -157,35 +155,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
       timestamp: Date.now()
     });
   }, [activeLightboxMedia?.id, selectedShotIdLocal, onAddToShot, onAddToShotWithoutPosition, showTickForImageId, showTickForSecondaryImageId, optimisticPositionedIds, optimisticUnpositionedIds, onNavigateToShot]);
-  
-  // Log the callback we received
-  React.useEffect(() => {
-    console.log('[ImageFlipDebug] [ImageGalleryLightbox] onImageSaved prop', {
-      hasCallback: !!onImageSaved,
-      callbackType: typeof onImageSaved,
-      callbackName: onImageSaved?.name,
-      timestamp: Date.now()
-    });
-  }, [onImageSaved]);
-  
-  // Wrap onImageSaved to add logging
-  const wrappedOnImageSaved = React.useCallback(async (newImageUrl: string, createNew?: boolean) => {
-    console.log('[ImageFlipDebug] [ImageGalleryLightbox] wrappedOnImageSaved called', {
-      newImageUrl,
-      createNew,
-      hasOriginalCallback: !!onImageSaved,
-      timestamp: Date.now()
-    });
-    
-    const result = await onImageSaved(newImageUrl, createNew);
-    
-    console.log('[ImageFlipDebug] [ImageGalleryLightbox] wrappedOnImageSaved completed', {
-      result,
-      timestamp: Date.now()
-    });
-    
-    return result;
-  }, [onImageSaved]);
   
   // Calculate navigation availability for MediaLightbox
   const { hasNext, hasPrevious } = useMemo(() => {
@@ -592,6 +561,29 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     });
   }, [handleNavigateToGeneration, handleOpenExternalGeneration, setActiveLightboxIndex, filteredImages.length]);
 
+  // [ShotSelectorDebug] Debug why shot selector might not show
+  React.useEffect(() => {
+    if (enhancedMedia) {
+      const isVideo = !!(activeLightboxMedia.type || '').includes('video');
+      const willShowShotSelector = !!(onAddToShot && simplifiedShotOptions?.length > 0 && !isVideo);
+      console.log('[ShotSelectorDebug] ImageGalleryLightbox -> MediaLightbox props:', {
+        component: 'ImageGalleryLightbox',
+        mediaId: enhancedMedia.id?.substring(0, 8),
+        // Key conditions for shot selector visibility:
+        allShotsLength: simplifiedShotOptions?.length || 0,
+        hasOnAddToShot: !!onAddToShot,
+        isVideo,
+        willShowShotSelector, // This should match what you see in the UI
+        // Other context:
+        hasOnAddToShotWithoutPosition: !!onAddToShotWithoutPosition,
+        selectedShotIdLocal,
+        lightboxSelectedShotId,
+        mediaType: activeLightboxMedia.type,
+        timestamp: Date.now()
+      });
+    }
+  }, [enhancedMedia, simplifiedShotOptions, onAddToShot, onAddToShotWithoutPosition, selectedShotIdLocal, lightboxSelectedShotId, activeLightboxMedia?.type]);
+
   return (
     <>
       {/* Main Lightbox Modal */}
@@ -606,7 +598,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           }}
           onNext={onNext}
           onPrevious={onPrevious}
-          onImageSaved={wrappedOnImageSaved}
           showNavigation={true}
           showImageEditTools={!(activeLightboxMedia.type || '').includes('video')}
           showDownload={true}

@@ -182,6 +182,7 @@ const VideoTravelToolPage: React.FC = () => {
   const location = useLocation();
   const viaShotClick = location.state?.fromShotClick === true;
   const shotFromState = location.state?.shotData;
+  const isNewlyCreatedShot = location.state?.isNewlyCreated === true;
   const { selectedProjectId, setSelectedProjectId, projects } = useProject();
   
   // Get current project's aspect ratio
@@ -756,6 +757,12 @@ const VideoTravelToolPage: React.FC = () => {
   // Content-responsive breakpoints for dynamic layout
   const { isSm, isLg } = useContentResponsive();
 
+  // Track hash changes for loading grace period
+  // When navigating to a new hash, show loading for a brief period before showing "not found"
+  const lastHashRef = useRef<string>('');
+  const hashChangeTimeRef = useRef<number>(0);
+  const [hashLoadingGrace, setHashLoadingGrace] = useState(false);
+
   // Extract and validate hash shot id once for reuse
   const hashShotId = useMemo(() => {
     const fromLocation = (location.hash?.replace('#', '') || '');
@@ -781,6 +788,44 @@ const VideoTravelToolPage: React.FC = () => {
     }
     return '';
   }, [location.hash]);
+
+  // When hash changes to a new value, set a loading grace period
+  // This handles the case where navigation state hasn't arrived yet
+  useEffect(() => {
+    if (hashShotId && hashShotId !== lastHashRef.current) {
+      lastHashRef.current = hashShotId;
+      hashChangeTimeRef.current = Date.now();
+      setHashLoadingGrace(true);
+    }
+  }, [hashShotId]);
+
+  // Clear grace period only when we have definitive information:
+  // 1. Shot is found in cache, OR
+  // 2. Shots have loaded AND isNewlyCreatedShot is false AND enough time has passed
+  useEffect(() => {
+    if (!hashLoadingGrace) return;
+    
+    // Case 1: Shot found in cache - clear immediately
+    if (shots?.find(s => s.id === hashShotId)) {
+      setHashLoadingGrace(false);
+      return;
+    }
+    
+    // Case 2: Shots have loaded, it's a newly created shot (state arrived), and shotFromState matches
+    // In this case, shotToEdit should be populated via shotFromState
+    if (isNewlyCreatedShot && shotFromState?.id === hashShotId) {
+      setHashLoadingGrace(false);
+      return;
+    }
+    
+    // Case 3: Shots have loaded, NOT a newly created shot, and shot not found - it truly doesn't exist
+    // Add a small delay to ensure we're not in a transient state
+    const timeSinceHashChange = Date.now() - hashChangeTimeRef.current;
+    if (shots && !shotsLoadingRaw && !isNewlyCreatedShot && timeSinceHashChange > 5000) {
+      setHashLoadingGrace(false);
+      return;
+    }
+  }, [hashLoadingGrace, shots, shotsLoadingRaw, hashShotId, isNewlyCreatedShot, shotFromState]);
 
   // Stabilize initial deep-link loading to avoid flicker when project resolves after mount
   const [initializingFromHash, setInitializingFromHash] = useState<boolean>(false);
@@ -1186,22 +1231,31 @@ const VideoTravelToolPage: React.FC = () => {
     const hashShotExists = hashShotId && shots?.find(s => s.id === hashShotId);
     // CRITICAL: Also check shotFromState for newly created shots that aren't in the cache yet
     const shotFromStateExists = viaShotClick && shotFromState && shotFromState.id === currentShotId;
-    const result = !!(shotExists || hashShotExists || shotFromStateExists);
+    // ALSO: Show the section (with loading state) if this is a newly created shot waiting for cache
+    // OR if we're in the hash loading grace period
+    const result = !!(shotExists || hashShotExists || shotFromStateExists || isNewlyCreatedShot || hashLoadingGrace);
     console.log('[ShotNavPerf] 🎯 shouldShowShotEditor computed:', {
       result,
       shotExists: !!shotExists,
       hashShotExists: !!hashShotExists,
       shotFromStateExists: !!shotFromStateExists,
+      isNewlyCreatedShot,
+      hashLoadingGrace,
       selectedShotId: selectedShot?.id?.substring(0, 8) || 'none'
     });
     return result;
-  }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId, shotFromState]);
+  }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId, shotFromState, isNewlyCreatedShot, hashLoadingGrace]);
   
   const shotToEdit = useMemo(() => {
     // Priority 1: Use shotFromState for newly created shots (not in cache yet)
     // This ensures instant display when navigating from ShotsPane after creating a shot
-    if (viaShotClick && shotFromState && shotFromState.id === currentShotId) {
-      console.log('[ShotNavPerf] 📝 shotToEdit: Using shotFromState (optimistic)', shotFromState.name);
+    // Check against both currentShotId AND hashShotId since context might not have updated yet
+    const shotFromStateMatches = shotFromState && (
+      shotFromState.id === currentShotId || 
+      shotFromState.id === hashShotId
+    );
+    
+    if (viaShotClick && shotFromStateMatches) {
       return shotFromState as Shot;
     }
     // Priority 2: Use shot from hash if available in shots array
@@ -1337,11 +1391,12 @@ const VideoTravelToolPage: React.FC = () => {
     // FIX: Don't redirect if we have valid shot data from state, even if not in shots array yet
     const shotFromStateValid = shotFromState && shotFromState.id === hashShotId;
     
-    if (hashShotId && shots && !shots.find(s => s.id === hashShotId) && !shotFromStateValid) {
+    // FIX: Don't redirect if this is a newly created shot or in grace period - wait for cache to sync
+    if (hashShotId && shots && !shots.find(s => s.id === hashShotId) && !shotFromStateValid && !isNewlyCreatedShot && !hashLoadingGrace) {
       console.log(`[VideoTravelToolPage] Hash shot ${hashShotId} not found in loaded shots, redirecting`);
       navigate('/tools/travel-between-images', { replace: true });
     }
-  }, [hashShotId, shots, navigate, shotFromState]);
+  }, [hashShotId, shots, navigate, shotFromState, isNewlyCreatedShot, hashLoadingGrace]);
 
   // [NavPerf] Stop timers once the page mounts
   useEffect(() => {
@@ -2400,6 +2455,7 @@ const VideoTravelToolPage: React.FC = () => {
               <ShotEditor
                 selectedShotId={shotToEdit.id}
                 projectId={selectedProjectId}
+                optimisticShotData={isNewlyCreatedShot ? shotFromState : undefined}
               videoControlMode={videoControlMode}
               batchVideoPrompt={batchVideoPrompt}
               batchVideoFrames={batchVideoFrames}
@@ -2476,6 +2532,14 @@ const VideoTravelToolPage: React.FC = () => {
               // afterEachPromptText props removed - not in ShotEditorProps interface
             />
               </>
+            ) : (isNewlyCreatedShot || hashLoadingGrace) ? (
+              // Show loading state for newly created shots or during hash navigation grace period
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading shot...</p>
+                </div>
+              </div>
             ) : (
               // Show error message when shot is not found
               <div className="flex items-center justify-center h-64">

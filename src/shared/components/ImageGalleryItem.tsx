@@ -308,7 +308,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     isSuccessful: boolean;
     shotId: string | null;
     shotName: string | null;
-  }>({ isSuccessful: false, shotId: null, shotName: null });
+    isLoading?: boolean;
+  }>({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
   // Check if this image was already cached by the preloader using centralized function
   const isPreloadedAndCached = isImageCached(image);
   const [imageLoaded, setImageLoaded] = useState<boolean>(isPreloadedAndCached);
@@ -387,17 +388,26 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       // Select the newly created shot in the dropdown
       setSelectedShotIdLocal(result.shotId);
       
-      // Set success state immediately and let the mutation's onSuccess handle the data refresh
-      // The mutation should have triggered query invalidation, so the shot will be available soon
+      // Set success state with loading=true initially while cache syncs
       setQuickCreateSuccess({
         isSuccessful: true,
         shotId: result.shotId,
-        shotName: result.shotName
+        shotName: result.shotName,
+        isLoading: true
       });
+      
+      // After a brief delay for cache to sync, show the Visit button as ready
+      setTimeout(() => {
+        setQuickCreateSuccess(prev => 
+          prev.shotId === result.shotId 
+            ? { ...prev, isLoading: false } 
+            : prev
+        );
+      }, 600);
       
       // Clear success state after 5 seconds
       setTimeout(() => {
-        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null });
+        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
       }, 5000);
       
     } catch (error) {
@@ -738,13 +748,13 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       // Try to find the shot in the list first
       const shot = simplifiedShotOptions.find(s => s.id === quickCreateSuccess.shotId);
       if (shot) {
-        // Shot found in list, use it
+        // Shot found in list, use it - still pass isNewlyCreated in case cache is stale
         navigateToShot({ 
           id: shot.id, 
           name: shot.name,
           images: [],
           position: 0
-        });
+        }, { isNewlyCreated: true });
       } else {
         // Shot not in list yet, but we have the ID and name, so navigate anyway
         console.log('[QuickCreate] Shot not in list yet, navigating with stored data');
@@ -753,7 +763,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           name: quickCreateSuccess.shotName || `Shot`,
           images: [],
           position: 0
-        });
+        }, { isNewlyCreated: true });
       }
     }
   }, [quickCreateSuccess, simplifiedShotOptions, navigateToShot]);

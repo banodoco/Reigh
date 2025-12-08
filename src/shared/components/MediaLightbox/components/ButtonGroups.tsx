@@ -4,7 +4,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/
 import {
   Star,
   Download,
-  Save,
   CheckCircle,
   Loader2,
   ImagePlus,
@@ -31,16 +30,10 @@ interface BaseButtonGroupProps {
 }
 
 // ============================================================================
-// TOP LEFT CONTROLS - Edit Button (moved from bottom-left)
+// TOP LEFT CONTROLS - Edit Button
 // ============================================================================
 
 interface TopLeftControlsProps extends BaseButtonGroupProps {
-  showImageEditTools: boolean;
-  hasChanges: boolean;
-  isSaving: boolean;
-  handleFlip: () => void;
-  handleSave: (url: string) => Promise<void>;
-  effectiveImageUrl: string;
   handleEnterMagicEditMode?: () => void;
 }
 
@@ -50,54 +43,31 @@ export const TopLeftControls: React.FC<TopLeftControlsProps> = ({
   isSpecialEditMode,
   selectedProjectId,
   isCloudMode,
-  showImageEditTools,
-  hasChanges,
-  isSaving,
-  handleSave,
-  effectiveImageUrl,
   handleEnterMagicEditMode,
 }) => {
   // Show Edit button when: not video, not readOnly, not in special edit mode, has project, is cloud mode
   const showEditButton = !isVideo && !readOnly && !isSpecialEditMode && selectedProjectId && isCloudMode && handleEnterMagicEditMode;
   
-  // Show Save button when: not video, not readOnly, not in special edit mode, has changes, showImageEditTools
-  const showSaveButton = !isVideo && !readOnly && !isSpecialEditMode && showImageEditTools && hasChanges;
-  
-  if (!showEditButton && !showSaveButton) {
+  if (!showEditButton) {
     return null;
   }
 
   return (
     <div className="absolute top-4 left-4 flex items-center space-x-2 z-10">
-      {/* Edit Button - moved from bottom-left */}
-      {showEditButton && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleEnterMagicEditMode}
-              className="bg-black/50 hover:bg-black/70 text-white"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="z-[100001]">Edit image</TooltipContent>
-        </Tooltip>
-      )}
-
-      {/* Save Button - only shown when there are changes */}
-      {showSaveButton && (
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => handleSave(effectiveImageUrl)}
-          disabled={isSaving}
-          className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
-        >
-          <Save className="h-4 w-4" />
-        </Button>
-      )}
+      {/* Edit Button */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleEnterMagicEditMode}
+            className="bg-black/50 hover:bg-black/70 text-white"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent className="z-[100001]">Edit image</TooltipContent>
+      </Tooltip>
     </div>
   );
 };

@@ -104,7 +104,6 @@ interface VideoOutputsGalleryProps {
    * Apply handler that operates using the original task id (server-side extraction).
    */
   onApplySettingsFromTask: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
-  onImageSaved?: (newImageUrl: string, createNew?: boolean) => Promise<void>;
   /**
    * Key to identify which shot/context these videos belong to - used to reset state when shot changes
    */
@@ -149,7 +148,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   onDelete,
   deletingVideoId,
   onApplySettingsFromTask,
-  onImageSaved,
   shotKey,
   getShotVideoCount,
   invalidateVideoCountsCache,
@@ -1105,7 +1103,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           onClose={handleCloseLightbox}
           onNext={handleNext}
           onPrevious={handlePrevious}
-          onImageSaved={onImageSaved}
           showNavigation={true}
           showImageEditTools={false}
           showDownload={true}

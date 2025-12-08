@@ -31,7 +31,6 @@ import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import {
   useUpscale,
   useInpainting,
-  useImageFlip,
   useGenerationName,
   useReferences,
   useGenerationLineage,
@@ -98,7 +97,6 @@ interface MediaLightboxProps {
   onClose: () => void;
   onNext?: () => void;
   onPrevious?: () => void;
-  onImageSaved?: (newImageUrl: string, createNew?: boolean) => Promise<void>;
   // Configuration props to control features
   readOnly?: boolean; // Read-only mode - hides all interactive elements
   showNavigation?: boolean;
@@ -143,7 +141,7 @@ interface MediaLightboxProps {
   // Shot creation functionality
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
   // Shot navigation functionality
-  onNavigateToShot?: (shot: Shot) => void;
+  onNavigateToShot?: (shot: Shot, options?: { isNewlyCreated?: boolean }) => void;
   // Tool type override for magic edit
   toolTypeOverride?: string;
   // Optimistic updates
@@ -176,7 +174,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onClose, 
   onNext, 
   onPrevious, 
-  onImageSaved,
   readOnly = false,
   showNavigation = true,
   showImageEditTools = true,
@@ -333,22 +330,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleToggleUpscaled,
   } = upscaleHook;
 
-  // Image flip hook  
-  const imageFlipHook = useImageFlip({ 
-    media, 
-    onImageSaved,
-    onClose,
-  });
-  const { 
-    isFlippedHorizontally,
-      hasChanges,
-      isSaving,
-    handleFlip,
-    handleSave,
-    imageDimensions,
-    setImageDimensions,
-    canvasRef,
-  } = imageFlipHook;
+  // Image dimensions state (needed by inpainting hook)
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Flip functionality removed - use reposition mode instead
+  const isFlippedHorizontally = false;
+  const isSaving = false;
 
   // Edit Settings Persistence hook - manages LoRA mode, prompt, numGenerations with persistence
   const editSettingsPersistence = useEditSettingsPersistence({
@@ -1891,19 +1879,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     );
                   })()}
 
-                    {/* Top Left Controls - Flip & Save */}
+                    {/* Top Left Controls - Edit button */}
                     <TopLeftControls
                       isVideo={isVideo}
                       readOnly={readOnly}
                       isSpecialEditMode={isSpecialEditMode}
                       selectedProjectId={selectedProjectId}
                       isCloudMode={isCloudMode}
-                      showImageEditTools={showImageEditTools}
-                      hasChanges={hasChanges}
-                      isSaving={isSaving}
-                      handleFlip={handleFlip}
-                      handleSave={handleSave}
-                      effectiveImageUrl={effectiveMediaUrl}
                       handleEnterMagicEditMode={handleEnterMagicEditMode}
                     />
 
@@ -2397,19 +2379,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     )}
 
                     {/* Mobile Stacked Layout - All button groups (matching desktop) */}
-                    {/* Top Left Controls - Flip & Save */}
+                    {/* Top Left Controls - Edit button */}
                     <TopLeftControls
                       isVideo={isVideo}
                       readOnly={readOnly}
                       isSpecialEditMode={isSpecialEditMode}
                       selectedProjectId={selectedProjectId}
                       isCloudMode={isCloudMode}
-                      showImageEditTools={showImageEditTools}
-                      hasChanges={hasChanges}
-                      isSaving={isSaving}
-                      handleFlip={handleFlip}
-                      handleSave={handleSave}
-                      effectiveImageUrl={effectiveMediaUrl}
                       handleEnterMagicEditMode={handleEnterMagicEditMode}
                     />
 
@@ -2949,19 +2925,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
 
                   {/* Regular Mobile Layout - All button groups (matching desktop) */}
-                  {/* Top Left Controls - Flip & Save */}
+                  {/* Top Left Controls - Edit button */}
                   <TopLeftControls
                     isVideo={isVideo}
                     readOnly={readOnly}
                     isSpecialEditMode={isSpecialEditMode}
                     selectedProjectId={selectedProjectId}
                     isCloudMode={isCloudMode}
-                    showImageEditTools={showImageEditTools}
-                    hasChanges={hasChanges}
-                    isSaving={isSaving}
-                    handleFlip={handleFlip}
-                    handleSave={handleSave}
-                    effectiveImageUrl={effectiveMediaUrl}
                     handleEnterMagicEditMode={handleEnterMagicEditMode}
                   />
 

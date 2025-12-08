@@ -81,7 +81,6 @@ export interface TimelineProps {
   projectId?: string;
   frameSpacing: number;
   onImageReorder: (orderedIds: string[]) => void;
-  onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
   onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetFrame?: number) => Promise<void>;
@@ -167,7 +166,6 @@ const Timeline: React.FC<TimelineProps> = ({
   projectId,
   frameSpacing,
   onImageReorder,
-  onImageSaved,
   onFramePositionsChange,
   onImageDrop,
   onGenerationDrop,
@@ -831,7 +829,6 @@ const Timeline: React.FC<TimelineProps> = ({
         onResetFrames={handleResetFrames}
         setFramePositions={setFramePositions}
         onImageReorder={onImageReorder}
-        onImageSaved={onImageSaved}
         onImageDrop={onImageDrop}
         onGenerationDrop={onGenerationDrop}
         setIsDragInProgress={setIsDragInProgress}
@@ -906,28 +903,6 @@ const Timeline: React.FC<TimelineProps> = ({
               // Use id (shot_generations.id) for deletion to target the specific entry
               onImageDelete(currentLightboxImage.id);
             } : undefined}
-            onImageSaved={async (newUrl: string, createNew?: boolean) => {
-              console.log('[ImageFlipDebug] [Timeline] MediaLightbox onImageSaved called', {
-                imageId: currentLightboxImage.id,
-                newUrl,
-                createNew,
-                timestamp: Date.now()
-              });
-              
-              await onImageSaved(currentLightboxImage.id, newUrl, createNew);
-              
-              console.log('[ImageFlipDebug] [Timeline] Parent onImageSaved completed, triggering onTimelineChange', {
-                timestamp: Date.now()
-              });
-              
-              // Trigger reload of timeline data after flip
-              if (onTimelineChange) {
-                await onTimelineChange();
-                console.log('[ImageFlipDebug] [Timeline] onTimelineChange completed', {
-                  timestamp: Date.now()
-                });
-              }
-            }}
             showNavigation={showNavigation}
             showMagicEdit={true}
             hasNext={hasNext}

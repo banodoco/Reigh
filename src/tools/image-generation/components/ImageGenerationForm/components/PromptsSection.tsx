@@ -164,6 +164,12 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             rows={4}
             clearable
             onClear={onClearMasterPromptText}
+            voiceInput
+            voiceContext="This is a master prompt for AI image generation. The user describes what they want to generate, and AI will create multiple prompt variations from this description. Focus on capturing the visual concept, style, and key elements they want."
+            onVoiceResult={(result) => {
+              const text = result.prompt || result.transcription;
+              onMasterPromptTextChange({ target: { value: text } } as React.ChangeEvent<HTMLTextAreaElement>);
+            }}
           />
         </div>
       ) : (
@@ -268,6 +274,12 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             rows={2}
             clearable
             onClear={onClearBeforeEachPromptText}
+            voiceInput
+            voiceTask="transcribe_only"
+            voiceContext="This is text that will be prepended to every image generation prompt. Keep it short - things like style prefixes, quality tags, or subject descriptions that apply to all images."
+            onVoiceResult={(result) => {
+              onBeforeEachPromptTextChange({ target: { value: result.transcription } } as React.ChangeEvent<HTMLTextAreaElement>);
+            }}
           />
         </div>
         <div>
@@ -284,6 +296,12 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             rows={2}
             clearable
             onClear={onClearAfterEachPromptText}
+            voiceInput
+            voiceTask="transcribe_only"
+            voiceContext="This is text that will be appended to every image generation prompt. Keep it short - things like quality suffixes, negative prompts, or technical parameters that apply to all images."
+            onVoiceResult={(result) => {
+              onAfterEachPromptTextChange({ target: { value: result.transcription } } as React.ChangeEvent<HTMLTextAreaElement>);
+            }}
           />
         </div>
       </div>

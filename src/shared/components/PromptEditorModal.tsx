@@ -914,6 +914,12 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                       disabled={isAIEditing}
                       clearable
                       onClear={() => setEditInstructionsValue('', 'clear-button')}
+                      voiceInput
+                      voiceTask="transcribe_only"
+                      voiceContext="This is an instruction to edit or create an image prompt. Tell the AI what changes to make, like 'make it more dramatic' or 'add a sunset background'. Be concise and direct."
+                      onVoiceResult={(result) => {
+                        setEditInstructionsValue(result.transcription, 'voice-input');
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && getEditInstructionsValue().trim() && !isAIEditing) {
                           e.preventDefault();

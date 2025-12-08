@@ -11,7 +11,6 @@ export interface UseImageGalleryActionsProps {
   onAddToLastShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToLastShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onToggleStar?: (id: string, starred: boolean) => void;
-  onImageSaved?: (imageId: string, newImageUrl: string) => void;
   activeLightboxMedia: GenerationRow | null;
   setActiveLightboxMedia: (media: GenerationRow | null) => void;
   setAutoEnterEditMode: (value: boolean) => void;
@@ -37,7 +36,6 @@ export interface UseImageGalleryActionsReturn {
   handleOptimisticDelete: (imageId: string) => Promise<void>;
   handleOpenLightbox: (image: GeneratedImageWithMetadata) => void;
   handleCloseLightbox: () => void;
-  handleImageSaved: (newImageUrl: string, createNew?: boolean) => Promise<void>;
   handleDownloadImage: (rawUrl: string, filename: string, imageId?: string, isVideo?: boolean, originalContentType?: string) => Promise<void>;
   handleDownloadStarred: () => Promise<void>;
   handleShowTick: (imageId: string) => void;
@@ -52,7 +50,6 @@ export const useImageGalleryActions = ({
   onAddToLastShot,
   onAddToLastShotWithoutPosition,
   onToggleStar,
-  onImageSaved,
   activeLightboxMedia,
   setActiveLightboxMedia,
   setAutoEnterEditMode,
@@ -269,39 +266,6 @@ export const useImageGalleryActions = ({
     setActiveLightboxMedia(null);
     setAutoEnterEditMode(false); // Reset edit mode flag when closing lightbox
   }, [setActiveLightboxMedia, setAutoEnterEditMode]);
-
-  // Conform to MediaLightbox signature: returns Promise<void> and accepts optional createNew flag
-  const handleImageSaved = useCallback(async (newImageUrl: string, _createNew?: boolean): Promise<void> => {
-    console.log('[ImageFlipDebug] [ImageGalleryActions] handleImageSaved called', {
-      newImageUrl,
-      createNew: _createNew,
-      activeLightboxMediaId: activeLightboxMedia?.id,
-      hasOnImageSaved: !!onImageSaved,
-      timestamp: Date.now()
-    });
-    
-    if (activeLightboxMedia?.id && onImageSaved) {
-      console.log('[ImageFlipDebug] [ImageGalleryActions] Calling parent onImageSaved', {
-        imageId: activeLightboxMedia.id,
-        newImageUrl,
-        timestamp: Date.now()
-      });
-      
-      // Wrap the potentially synchronous parent handler in Promise.resolve to always return a Promise
-      await Promise.resolve(onImageSaved(activeLightboxMedia.id, newImageUrl));
-      
-      console.log('[ImageFlipDebug] [ImageGalleryActions] Parent onImageSaved completed', {
-        timestamp: Date.now()
-      });
-    } else {
-      console.warn('[ImageFlipDebug] [ImageGalleryActions] Cannot save - missing requirements', {
-        hasActiveLightboxMediaId: !!activeLightboxMedia?.id,
-        hasOnImageSaved: !!onImageSaved,
-        activeLightboxMedia,
-        timestamp: Date.now()
-      });
-    }
-  }, [activeLightboxMedia?.id, onImageSaved]);
 
   const handleDownloadImage = useCallback(async (rawUrl: string, filename: string, imageId?: string, isVideo?: boolean, originalContentType?: string) => {
     const currentDownloadId = imageId || filename;
@@ -549,7 +513,6 @@ export const useImageGalleryActions = ({
     handleOptimisticDelete,
     handleOpenLightbox,
     handleCloseLightbox,
-    handleImageSaved,
     handleDownloadImage,
     handleDownloadStarred,
     handleShowTick,

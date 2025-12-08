@@ -95,7 +95,6 @@ interface TimelineContainerProps {
   framePositions: Map<string, number>;
   setFramePositions: (positions: Map<string, number>) => Promise<void>;
   onImageReorder: (orderedIds: string[]) => void;
-  onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
   onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetFrame?: number) => Promise<void>;
   setIsDragInProgress: (dragging: boolean) => void;
@@ -150,7 +149,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   framePositions,
   setFramePositions,
   onImageReorder,
-  onImageSaved,
   onImageDrop,
   onGenerationDrop,
   setIsDragInProgress,

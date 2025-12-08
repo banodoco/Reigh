@@ -118,7 +118,6 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
 
   const loadPositions = useCallback(async (opts?: { silent?: boolean; reason?: string }) => {
     if (!shotId) {
-      console.warn('[TimelinePositionUtils] No shotId provided');
       return;
     }
 
@@ -128,20 +127,17 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     setError(null);
 
     try {
-      console.log('[TimelinePositionUtils] Refreshing data via cache invalidation', {
-        shotId: shotId.substring(0, 8),
-        reason: opts?.reason || 'manual_refresh'
-      });
-
-      // Invalidate all related caches to trigger refetch
-      await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-      await queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
-      await queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
-      await queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      // Use refetchQueries to WAIT for fresh data (not just invalidate)
+      await queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
       
-      // CRITICAL: Also invalidate shots list so ShotsPane preview updates immediately
+      // Invalidate other related caches (these can be background)
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      
+      // Also invalidate shots list so ShotsPane preview updates
       if (projectId) {
-        await queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
       }
 
       setIsLoading(false);

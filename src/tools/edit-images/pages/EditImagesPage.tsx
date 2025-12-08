@@ -372,9 +372,6 @@ export default function EditImagesPage() {
               <InlineEditView 
                 media={selectedMedia} 
                 onClose={() => setSelectedMedia(null)}
-                onImageSaved={async (newUrl, createNew) => {
-                  console.log("Image saved:", newUrl, createNew);
-                }}
                 onNavigateToGeneration={async (generationId) => {
                   try {
                     const { data, error } = await supabase

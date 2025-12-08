@@ -14,6 +14,8 @@ interface ShotNavigationOptions {
   scrollBehavior?: 'auto' | 'smooth';
   /** Delay before scrolling (useful for waiting for navigation to complete) */
   scrollDelay?: number;
+  /** Whether this shot was just created (show loading instead of "not found" while cache syncs) */
+  isNewlyCreated?: boolean;
 }
 
 interface ShotNavigationResult {
@@ -38,6 +40,7 @@ export const useShotNavigation = (): ShotNavigationResult => {
     replace: false,
     scrollBehavior: 'smooth',
     scrollDelay: 200, // Increased to 200ms to ensure DOM has updated
+    isNewlyCreated: false,
   };
 
   const performScroll = (options: Required<ShotNavigationOptions>) => {
@@ -88,7 +91,11 @@ export const useShotNavigation = (): ShotNavigationResult => {
     console.log('[ShotNavPerf] 🚀 Navigating to:', targetUrl);
     const navStart = Date.now();
     navigate(targetUrl, {
-      state: { fromShotClick: true, shotData: shot },
+      state: { 
+        fromShotClick: true, 
+        shotData: shot,
+        isNewlyCreated: opts.isNewlyCreated 
+      },
       replace: opts.replace,
     });
     console.log('[ShotNavPerf] ✅ Navigation called in', Date.now() - navStart, 'ms');

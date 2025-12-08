@@ -50,6 +50,7 @@ import { GenerateVideoCTA } from '../GenerateVideoCTA';
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
   projectId,
+  optimisticShotData,
   videoPairConfigs,
   videoControlMode,
   batchVideoPrompt,
@@ -219,9 +220,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     lastValidShotRef.current = foundShot;
   }
   
-  // Use found shot if available, otherwise fallback to cached version if shots list is loading/refreshing
-  // Only fallback if shots is undefined/null (loading), not if it's an empty array (loaded but missing)
-  const selectedShot = foundShot || (shots === undefined ? lastValidShotRef.current : undefined);
+  // Use found shot if available, otherwise fallback to:
+  // 1. Optimistic shot data (for newly created shots not in cache yet)
+  // 2. Cached version if shots list is loading/refreshing
+  // Only use cache fallback if shots is undefined/null (loading), not if it's an empty array (loaded but missing)
+  const selectedShot = foundShot || optimisticShotData || (shots === undefined ? lastValidShotRef.current : undefined);
   
   // 🎯 PERF FIX: Create refs for values that are used in callbacks but shouldn't cause callback recreation
   // This prevents the cascade of 22+ callback recreations on every shot/settings change
@@ -350,6 +353,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   const fullShotImages = fullImagesQueryResult.data || [];
   const isLoadingFullImages = fullImagesQueryResult.isLoading;
+  
   console.log('[ShotNavPerf] ✅ ShotEditor useAllShotGenerations result:', {
     imagesCount: fullShotImages.length,
     isLoading: fullImagesQueryResult.isLoading,
@@ -1466,83 +1470,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
       }, [selectedShot, isMobile, updateGenerationsPaneSettings, setIsGenerationsPaneLocked]);
   
-  // 🎯 PERF FIX: Refs for stable callbacks
-  const updateGenerationLocationMutationRef = useRef(updateGenerationLocationMutation);
-  updateGenerationLocationMutationRef.current = updateGenerationLocationMutation;
-  const queryClientRef = useRef(queryClient);
-  queryClientRef.current = queryClient;
+  // 🎯 PERF FIX: Refs for stable callbacks  
   const onShotImagesUpdateRef = useRef(onShotImagesUpdate);
   onShotImagesUpdateRef.current = onShotImagesUpdate;
-  const selectedShotIdRef = useRef(selectedShotId);
-  selectedShotIdRef.current = selectedShotId;
-  
-  // [PERFORMANCE] Stable callbacks for ShotImagesEditor to prevent re-renders
-  const handleImageSaved = useCallback(async (imageId: string, newImageUrl: string, createNew?: boolean) => {
-    console.log('[ImageFlipDebug] [ShotEditor] onImageSaved called', {
-      imageId,
-      newImageUrl,
-      createNew,
-      timestamp: Date.now()
-    });
-    
-    const projId = projectIdRef.current;
-    const shotId = selectedShotIdRef.current;
-    
-    try {
-      if (createNew) {
-        // TODO: Create new generation if needed
-        console.log('[ImageFlipDebug] [ShotEditor] Create new not implemented yet');
-        return;
-      }
-      
-      console.log('[ImageFlipDebug] [ShotEditor] Updating generation location and thumbnail', {
-        imageId,
-        newImageUrl,
-        timestamp: Date.now()
-      });
-      
-      // Update both location and thumbnail_url in the database
-      await updateGenerationLocationMutationRef.current.mutateAsync({
-        id: imageId,
-        location: newImageUrl,
-        thumbUrl: newImageUrl, // Also update thumbnail
-        projectId: projId
-      });
-      
-      console.log('[ImageFlipDebug] [ShotEditor] Generation location updated successfully', {
-        timestamp: Date.now()
-      });
-      
-      // Invalidate queries to refresh the UI
-      await queryClientRef.current.invalidateQueries({ queryKey: ['shot-generations', shotId] });
-      await queryClientRef.current.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
-      await queryClientRef.current.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-      // IMPORTANT: Also invalidate two-phase cache keys
-      await queryClientRef.current.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
-      await queryClientRef.current.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
-      
-      console.log('[ImageFlipDebug] [ShotEditor] Queries invalidated', {
-        timestamp: Date.now()
-      });
-      
-      // Call parent callback to update other related data
-      onShotImagesUpdateRef.current();
-      
-      console.log('[ImageFlipDebug] [ShotEditor] onImageSaved completed successfully', {
-        timestamp: Date.now()
-      });
-    } catch (error) {
-      console.error('[ImageFlipDebug] [ShotEditor] Error in onImageSaved:', {
-        error,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        imageId,
-        newImageUrl,
-        timestamp: Date.now()
-      });
-      toast.error('Failed to save flipped image.');
-    }
-  }, []); // Empty deps - uses refs
 
   const handleSelectionChangeLocal = useCallback((hasSelection: boolean) => {
     // Track selection state - forward to parent for floating CTA control
@@ -1705,7 +1635,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             // batchVideoContext={batchVideoContext} // Removed
             preloadedImages={orderedShotImages}
             onImageReorder={handleReorderImagesInShot}
-            onImageSaved={handleImageSaved}
             onContextFramesChange={() => {}} // No-op as context frames removed
             onFramePositionsChange={undefined}
             onImageDrop={generationActions.handleTimelineImageDrop}

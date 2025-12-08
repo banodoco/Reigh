@@ -79,6 +79,8 @@ export interface ShotSettings {
 export interface ShotEditorProps {
   selectedShotId: string;
   projectId: string;
+  /** Optimistic shot data for newly created shots that aren't in the cache yet */
+  optimisticShotData?: any;
   videoPairConfigs?: VideoPairConfig[]; // DEPRECATED - pair prompts now in shot_generations.metadata.pair_prompt
   
   // NEW: Settings bundle (preferred way)
