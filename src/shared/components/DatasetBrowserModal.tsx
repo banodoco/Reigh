@@ -85,52 +85,52 @@ const VideoResourceItem: React.FC<VideoResourceItemProps> = ({
             <Loader2 className="h-6 w-6 animate-spin text-white" />
           </div>
         )}
-      </div>
-      
-      {/* Info bar below video */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-100 dark:bg-gray-800">
-        {/* Left: Duration badge */}
-        {durationInfo ? (
-          <span className="text-xs text-muted-foreground">
-            {durationInfo}
-          </span>
-        ) : <div />}
         
-        {/* Right: Owner visibility toggle */}
-        {isOwner && onToggleVisibility ? (
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onToggleVisibility(resource.id, isPublic);
-                  }}
-                  className={`rounded-full p-1 transition-colors ${
-                    isPublic
-                      ? "bg-green-500 text-white hover:bg-green-600"
-                      : "bg-gray-400 text-white hover:bg-gray-500"
-                  }`}
-                >
-                  {isPublic ? (
-                    <Globe className="h-3 w-3" />
-                  ) : (
-                    <Lock className="h-3 w-3" />
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                {isPublic 
-                  ? "Public - visible to others. Click to make private." 
-                  : "Private - only you can see this. Click to make public."}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ) : (
-          <div />
-        )}
+        {/* Overlay info bar at bottom of video */}
+        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2 py-1.5 bg-black/60 backdrop-blur-sm z-10">
+          {/* Left: Duration badge */}
+          {durationInfo ? (
+            <span className="text-xs text-white/90">
+              {durationInfo}
+            </span>
+          ) : <div />}
+          
+          {/* Right: Owner visibility toggle */}
+          {isOwner && onToggleVisibility ? (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onToggleVisibility(resource.id, isPublic);
+                    }}
+                    className={`rounded-full p-1 transition-colors ${
+                      isPublic
+                        ? "bg-green-500 text-white hover:bg-green-600"
+                        : "bg-gray-400 text-white hover:bg-gray-500"
+                    }`}
+                  >
+                    {isPublic ? (
+                      <Globe className="h-3 w-3" />
+                    ) : (
+                      <Lock className="h-3 w-3" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  {isPublic 
+                    ? "Public - visible to others. Click to make private." 
+                    : "Private - only you can see this. Click to make public."}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <div />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -527,46 +527,46 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
                         </div>
                       )}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all pointer-events-none" />
+                      
+                      {/* Overlay info bar at bottom of image */}
+                      {isOwner && (
+                        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2 py-1.5 bg-black/60 backdrop-blur-sm z-10">
+                          <span className="text-xs text-white/90">Mine</span>
+                          
+                          {/* Visibility toggle */}
+                          <TooltipProvider delayDuration={300}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    handleToggleVisibility(resource.id, isPublic);
+                                  }}
+                                  className={`rounded-full p-1 transition-colors ${
+                                    isPublic
+                                      ? "bg-green-500 text-white hover:bg-green-600"
+                                      : "bg-gray-400 text-white hover:bg-gray-500"
+                                  }`}
+                                >
+                                  {isPublic ? (
+                                    <Globe className="h-3 w-3" />
+                                  ) : (
+                                    <Lock className="h-3 w-3" />
+                                  )}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                {isPublic 
+                                  ? "Public - visible to others. Click to make private." 
+                                  : "Private - only you can see this. Click to make public."}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      )}
                     </div>
-                    
-                    {/* Info bar below image */}
-                    {isOwner && (
-                      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-100 dark:bg-gray-800">
-                        <span className="text-xs text-muted-foreground">Mine</span>
-                        
-                        {/* Visibility toggle */}
-                        <TooltipProvider delayDuration={300}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  handleToggleVisibility(resource.id, isPublic);
-                                }}
-                                className={`rounded-full p-1 transition-colors ${
-                                  isPublic
-                                    ? "bg-green-500 text-white hover:bg-green-600"
-                                    : "bg-gray-400 text-white hover:bg-gray-500"
-                                }`}
-                              >
-                                {isPublic ? (
-                                  <Globe className="h-3 w-3" />
-                                ) : (
-                                  <Lock className="h-3 w-3" />
-                                )}
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs">
-                              {isPublic 
-                                ? "Public - visible to others. Click to make private." 
-                                : "Private - only you can see this. Click to make public."}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    )}
                   </div>
                 );
               })}
