@@ -248,83 +248,37 @@ export function usePlatformInstall(): PlatformInstallState {
   }, [isStandalone, deferredPrompt, platform, browser, isDesktopChromium]);
   
   // Generate install instructions (used for manual methods or as fallback if user declines prompt)
+  // Keep minimal since visual mockups are self-explanatory
   const installInstructions = useMemo<string[]>(() => {
-    // App appears to be installed - show how to open it
+    // App appears to be installed - just show how to open it
     if (isAppInstalled || (promptTimedOut && isDesktopChromium)) {
-      if (browser === 'chrome' || browser === 'edge') {
-        return [
-          'Reigh is already installed on your device!',
-          'Look for the "Open in app" button in the address bar',
-          'Or find Reigh in your Applications folder (Mac) or Start Menu (Windows)'
-        ];
-      }
       return [
-        'Reigh appears to be installed on your device!',
-        'Look for the "Open in app" button in your browser\'s address bar',
-        'Or find Reigh in your Applications/Start Menu'
+        'Click "Open in app" in the address bar'
       ];
     }
     
-    // If waiting for prompt on Chrome/Edge desktop, show waiting message
+    // If waiting for prompt on Chrome/Edge desktop
     if (isWaitingForPrompt) {
-      if (browser === 'chrome') {
-        return [
-          'The install option is loading...',
-          'Look for the install icon (⊕) in the address bar',
-          'Or try refreshing the page if it doesn\'t appear'
-        ];
-      }
-      if (browser === 'edge') {
-        return [
-          'The install option is loading...',
-          'Look for "App available" in the address bar',
-          'Or try refreshing the page if it doesn\'t appear'
-        ];
-      }
+      return [
+        'Click the install icon in the address bar'
+      ];
     }
     
     switch (installMethod) {
       case 'prompt':
-        // Fallback instructions if user declines the browser prompt
-        // These should match the browser they're using
-        if (browser === 'chrome' || browser === 'edge') {
-          return [
-            'Look for the install icon (⊕) in your browser\'s address bar',
-            'Or click the menu (⋮) → "Install Reigh"',
-            'Click "Install" to add the app'
-          ];
-        }
-        if (browser === 'samsung') {
-          return [
-            'Tap the menu button (☰)',
-            'Select "Add page to" → "Home screen"',
-            'Tap "Add" to install'
-          ];
-        }
-        // Firefox Android
+        // Fallback if user declines the browser prompt
         return [
-          'Tap the menu button (⋮)',
-          'Select "Install"',
-          'Tap "Add" to confirm'
+          'Click the install icon in the address bar',
+          'Or use the browser menu → "Install Reigh"'
         ];
       case 'safari-dock':
         return [
-          'Click "File" in the menu bar, then select "Add to Dock"',
-          'Or click the Share button (□↑) and choose "Add to Dock"',
-          'Click "Add" to install Reigh to your Dock'
+          'File → Add to Dock',
+          'Or Share → Add to Dock'
         ];
       case 'safari-home-screen':
-        if (browser === 'chrome' || browser === 'edge') {
-          return [
-            'Tap the Share button (square with arrow)',
-            'Scroll down and tap "Add to Home Screen"',
-            'Tap "Add" to install'
-          ];
-        }
         return [
-          'Tap the Share button at the bottom of the screen',
-          'Scroll down and tap "Add to Home Screen"',
-          'Tap "Add" to install'
+          'Tap Share, then "Add to Home Screen"'
         ];
       default:
         return [];
