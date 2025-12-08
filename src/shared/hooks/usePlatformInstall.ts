@@ -253,14 +253,14 @@ export function usePlatformInstall(): PlatformInstallState {
     // App appears to be installed - just show how to open it
     if (isAppInstalled || (promptTimedOut && isDesktopChromium)) {
       return [
-        'Click "Open in app" in the address bar:'
+        'Look for this in your address bar:'
       ];
     }
     
     // If waiting for prompt on Chrome/Edge desktop
     if (isWaitingForPrompt) {
       return [
-        'Click the install icon in the address bar:'
+        'Look for this in your address bar:'
       ];
     }
     
@@ -269,19 +269,19 @@ export function usePlatformInstall(): PlatformInstallState {
         // Fallback if user declines the browser prompt
         if (platform === 'android') {
           return [
-            'Tap "Install" on the banner below:'
+            'Tap "Install" when the banner appears:'
           ];
         }
         return [
-          'Click the install icon in the address bar:'
+          'Look for this in your address bar:'
         ];
       case 'safari-dock':
         return [
-          'File → Add to Dock:'
+          'In Safari, go to File → Add to Dock'
         ];
       case 'safari-home-screen':
         return [
-          'Tap Share, then "Add to Home Screen":'
+          'Tap Share, then "Add to Home Screen"'
         ];
       default:
         return [];
