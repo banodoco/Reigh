@@ -1357,8 +1357,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
                         });
                         if (taskMapping.taskId && !settingsApplied) {
                           console.log('[ApplySettings] Calling onApplySettingsFromTask...');
-                          // Call with empty inputImages array - will be populated from task data on server side
-                          onApplySettingsFromTask(taskMapping.taskId, false, []);
+                          // Call with replaceImages=true to include source images, empty array will be populated from task data
+                          onApplySettingsFromTask(taskMapping.taskId, true, []);
                           // Show success state
                           setSettingsApplied(true);
                           // Reset after 2 seconds
@@ -1386,7 +1386,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left">
-                    <p>{settingsApplied ? 'Settings applied!' : 'Apply settings from this video to the current shot'}</p>
+                    <p>{settingsApplied ? 'Settings applied!' : 'Apply settings & images from this video to the current shot'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
