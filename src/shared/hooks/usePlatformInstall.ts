@@ -322,14 +322,14 @@ export function usePlatformInstall(): PlatformInstallState {
     // No install available (and not waiting for prompt)
     if (installMethod === 'none' && !isWaitingForPrompt) return 'Sign in with Discord';
     
-    // Platform-specific download text
+    // Platform-specific install text
     switch (platform) {
       case 'mac':
-        return 'Download for Mac';
+        return 'Install for Mac';
       case 'windows':
-        return 'Download for Windows';
+        return 'Install for Windows';
       case 'linux':
-        return 'Download for Linux';
+        return 'Install for Linux';
       case 'ios':
         return 'Add to Home Screen';
       case 'android':
