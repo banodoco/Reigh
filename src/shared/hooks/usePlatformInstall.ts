@@ -228,23 +228,16 @@ export function usePlatformInstall(): PlatformInstallState {
   const installInstructions = useMemo<string[]>(() => {
     // App appears to be installed - show how to open it
     if (isAppInstalled || (promptTimedOut && isDesktopChromium)) {
-      if (browser === 'chrome') {
+      if (browser === 'chrome' || browser === 'edge') {
         return [
           'Reigh is already installed on your device!',
-          'Look for "Open in Reigh" in the address bar',
-          'Or find Reigh in your Applications/Start Menu'
-        ];
-      }
-      if (browser === 'edge') {
-        return [
-          'Reigh is already installed on your device!',
-          'Look for "Open in app" in the address bar',
-          'Or find Reigh in your Applications/Start Menu'
+          'Look for the "Open in app" button in the address bar',
+          'Or find Reigh in your Applications folder (Mac) or Start Menu (Windows)'
         ];
       }
       return [
         'Reigh appears to be installed on your device!',
-        'Look for the "Open in app" option in your browser',
+        'Look for the "Open in app" button in your browser\'s address bar',
         'Or find Reigh in your Applications/Start Menu'
       ];
     }

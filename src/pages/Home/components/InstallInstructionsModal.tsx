@@ -16,44 +16,61 @@ interface InstallInstructionsModalProps {
 }
 
 // Visual representations of browser UI elements
+
+// Chrome's PWA install icon - computer monitor with down arrow
 const ChromeInstallIcon = () => (
-  <div className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 border border-gray-300 rounded text-xs font-mono">
-    <Download className="w-3.5 h-3.5 text-gray-600" />
-  </div>
-);
-
-const ChromeMenuIcon = () => (
-  <div className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 border border-gray-300 rounded">
-    <MoreVertical className="w-4 h-4 text-gray-600" />
-  </div>
-);
-
-const SafariShareIcon = () => (
-  <div className="inline-flex items-center justify-center w-7 h-7 bg-[#007AFF]/10 border border-[#007AFF]/30 rounded-lg">
-    <svg className="w-4 h-4 text-[#007AFF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 5v14M12 5l-4 4M12 5l4 4" />
-      <rect x="4" y="14" width="16" height="6" rx="1" fill="currentColor" opacity="0.2" />
+  <div className="inline-flex items-center justify-center w-7 h-7 bg-white border border-gray-300 rounded shadow-sm">
+    <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+      <path d="M12 7v6M9 10l3 3 3-3" />
     </svg>
   </div>
 );
 
+// Chrome's three-dot menu
+const ChromeMenuIcon = () => (
+  <div className="inline-flex items-center justify-center w-6 h-6 bg-white border border-gray-300 rounded">
+    <MoreVertical className="w-4 h-4 text-gray-600" />
+  </div>
+);
+
+// Safari share button (iOS style - square with up arrow)
+const SafariShareIcon = () => (
+  <div className="inline-flex items-center justify-center w-8 h-8 bg-white border border-[#007AFF]/40 rounded-lg">
+    <svg className="w-5 h-5 text-[#007AFF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v12" />
+      <path d="M8 7l4-4 4 4" />
+      <path d="M4 14v5a2 2 0 002 2h12a2 2 0 002-2v-5" />
+    </svg>
+  </div>
+);
+
+// Safari File menu (macOS menu bar style)
 const SafariFileMenu = () => (
-  <div className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs font-medium text-gray-700">
+  <div className="inline-flex items-center gap-1 px-3 py-1 bg-white/80 backdrop-blur border border-gray-200 rounded shadow-sm text-sm font-medium text-gray-800">
     File
   </div>
 );
 
+// Edge "App available" chip in address bar
 const EdgeAppAvailable = () => (
-  <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700">
+  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-300 rounded-full text-xs font-medium text-gray-700 shadow-sm">
     <Plus className="w-3 h-3" />
     <span>App available</span>
   </div>
 );
 
-const OpenInAppBadge = ({ browser }: { browser: Browser }) => (
-  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-200 rounded-full text-xs font-medium text-green-700">
-    <ExternalLink className="w-3 h-3" />
-    <span>{browser === 'chrome' ? 'Open in Reigh' : 'Open in app'}</span>
+// Chrome/Edge "Open in app" button - appears in address bar when PWA is installed
+const OpenInAppBadge = () => (
+  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700 shadow-sm">
+    <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <path d="M9 3v18" />
+      <path d="M14 9l3 3-3 3" />
+    </svg>
+    <span>Open in app</span>
   </div>
 );
 
@@ -111,7 +128,7 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
     // App is installed - show "Open in app" badge
     if (isAppInstalled) {
       if (stepIndex === 1) {
-        return <OpenInAppBadge browser={browser} />;
+        return <OpenInAppBadge />;
       }
       return null;
     }
