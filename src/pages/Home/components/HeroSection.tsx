@@ -391,7 +391,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 (() => {
                   const showOpenInApp = !platformInstall.isStandalone && (platformInstall.isAppInstalled || platformInstall.promptTimedOut);
                   return (
-                    <div className="flex flex-col items-center gap-3">
+                    <div className="flex flex-col items-center">
                       <div className="group">
                         <button
                           onClick={() => showOpenInApp ? setShowInstallModal(true) : navigate('/tools')}
@@ -405,13 +405,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           />
                         </button>
                       </div>
-                      {/* Smooth fade-in for the "continue in browser" link */}
-                      <div 
-                        className={`transition-all duration-300 ${showOpenInApp ? 'opacity-100 max-h-8' : 'opacity-0 max-h-0 overflow-hidden'}`}
-                      >
+                      {/* Fixed height container - no layout shift */}
+                      <div className="h-8 flex items-center justify-center">
                         <button
                           onClick={() => navigate('/tools')}
-                          className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                          className={`text-xs text-muted-foreground/50 hover:text-muted-foreground transition-all duration-500 ease-out ${
+                            showOpenInApp 
+                              ? 'opacity-100 translate-y-0' 
+                              : 'opacity-0 -translate-y-2 pointer-events-none'
+                          }`}
                         >
                           or continue in browser
                         </button>
