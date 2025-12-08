@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Mic, Square, Loader2, X } from "lucide-react"
+import { Mic, Square, Loader2, X, Check } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 import { useVoiceRecording, VoiceRecordingState } from "@/shared/hooks/use-voice-recording"
@@ -19,7 +19,7 @@ export const VoiceInputButton = React.forwardRef<
   HTMLButtonElement,
   VoiceInputButtonProps
 >(({ onResult, onError, onRecordingStateChange, task = "transcribe_and_write", context, existingValue = "", disabled = false, className }, ref) => {
-  const { state, audioLevel, remainingSeconds, toggleRecording, cancelRecording } = useVoiceRecording({
+  const { state, audioLevel, remainingSeconds, isActive, toggleRecording, cancelRecording } = useVoiceRecording({
     onResult,
     onError,
     task,
@@ -27,10 +27,10 @@ export const VoiceInputButton = React.forwardRef<
     existingValue,
   })
   
-  // Notify parent about recording state changes
+  // Notify parent about active state changes (recording, processing, or success)
   React.useEffect(() => {
-    onRecordingStateChange?.(state === "recording")
-  }, [state, onRecordingStateChange])
+    onRecordingStateChange?.(isActive)
+  }, [isActive, onRecordingStateChange])
   
   const hasExistingContent = existingValue.trim().length > 0
 
@@ -48,6 +48,8 @@ export const VoiceInputButton = React.forwardRef<
         return "Stop recording"
       case "processing":
         return "Processing..."
+      case "success":
+        return "Voice input applied!"
       default:
         return hasExistingContent 
           ? "Voice input to create/edit prompt" 
@@ -61,6 +63,8 @@ export const VoiceInputButton = React.forwardRef<
         return <Square className="h-3 w-3 fill-current" />
       case "processing":
         return <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      case "success":
+        return <Check className="h-3.5 w-3.5" />
       default:
         return <Mic className="h-3.5 w-3.5" />
     }
@@ -84,6 +88,8 @@ export const VoiceInputButton = React.forwardRef<
             "relative h-6 w-6 rounded-md flex items-center justify-center transition-colors z-10",
             state === "recording" 
               ? "bg-red-500 text-white hover:bg-red-600" 
+              : state === "success"
+              ? "bg-green-500 text-white hover:bg-green-600"
               : "bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground",
             disabled && "opacity-50 cursor-not-allowed",
             className

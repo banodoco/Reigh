@@ -248,6 +248,7 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
     remainingSeconds,
     isRecording: state === "recording",
     isProcessing: state === "processing",
+    isActive: state !== "idle",
     startRecording,
     stopRecording,
     cancelRecording,

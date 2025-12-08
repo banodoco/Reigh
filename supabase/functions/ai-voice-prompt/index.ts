@@ -27,44 +27,78 @@ serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    // Handle multipart form data for audio upload
-    const formData = await req.formData();
-    const audioFile = formData.get("audio") as File | null;
-    const task = formData.get("task") as string || "transcribe_and_write";
-    const context = formData.get("context") as string || "";
-    const existingValue = formData.get("existingValue") as string || "";
+    // Handle multipart form data for audio upload OR JSON for text instructions
+    const contentType = req.headers.get("content-type") || "";
+    
+    let audioFile: File | null = null;
+    let textInstructions: string | null = null;
+    let task: string = "transcribe_and_write";
+    let context: string = "";
+    let existingValue: string = "";
+    
+    if (contentType.includes("application/json")) {
+      // JSON body with text instructions (skip transcription)
+      const body = await req.json();
+      textInstructions = body.textInstructions || null;
+      task = body.task || "transcribe_and_write";
+      context = body.context || "";
+      existingValue = body.existingValue || "";
+      
+      if (!textInstructions) {
+        return jsonResponse({ error: "textInstructions is required for JSON requests" }, 400);
+      }
+      console.log(`[ai-voice-prompt] Text instructions received: "${textInstructions.substring(0, 100)}..."`);
+    } else {
+      // Multipart form data with audio file
+      const formData = await req.formData();
+      audioFile = formData.get("audio") as File | null;
+      task = formData.get("task") as string || "transcribe_and_write";
+      context = formData.get("context") as string || "";
+      existingValue = formData.get("existingValue") as string || "";
 
-    if (!audioFile) {
-      return jsonResponse({ error: "audio file is required" }, 400);
+      if (!audioFile) {
+        return jsonResponse({ error: "audio file is required" }, 400);
+      }
+
+      console.log(`[ai-voice-prompt] Received audio file: ${audioFile.name}, size: ${audioFile.size}, type: ${audioFile.type}`);
     }
-
-    console.log(`[ai-voice-prompt] Received audio file: ${audioFile.name}, size: ${audioFile.size}, type: ${audioFile.type}`);
+    
     if (existingValue) {
       console.log(`[ai-voice-prompt] Existing value provided (${existingValue.length} chars)`);
     }
 
-    // Step 1: Transcribe audio using Whisper
-    const transcription = await groq.audio.transcriptions.create({
-      file: audioFile,
-      model: "whisper-large-v3-turbo",
-      temperature: 0,
-      response_format: "verbose_json",
-    });
-
-    const transcribedText = transcription.text?.trim() || "";
-    console.log(`[ai-voice-prompt] Transcription: "${transcribedText.substring(0, 100)}..."`);
-
-    if (!transcribedText) {
-      return jsonResponse({ error: "No speech detected in audio" }, 400);
-    }
-
-    // If task is just transcribe, return the raw text
-    if (task === "transcribe_only") {
-      return jsonResponse({ 
-        success: true, 
-        transcription: transcribedText,
-        usage: null 
+    // Determine transcribed text - either from audio or use text instructions directly
+    let transcribedText: string;
+    
+    if (textInstructions) {
+      // Skip transcription - use text instructions directly
+      transcribedText = textInstructions;
+    } else if (audioFile) {
+      // Step 1: Transcribe audio using Whisper
+      const transcription = await groq.audio.transcriptions.create({
+        file: audioFile,
+        model: "whisper-large-v3-turbo",
+        temperature: 0,
+        response_format: "verbose_json",
       });
+
+      transcribedText = transcription.text?.trim() || "";
+      console.log(`[ai-voice-prompt] Transcription: "${transcribedText.substring(0, 100)}..."`);
+
+      if (!transcribedText) {
+        return jsonResponse({ error: "No speech detected in audio" }, 400);
+      }
+
+      // If task is just transcribe, return the raw text
+      if (task === "transcribe_only") {
+        return jsonResponse({ 
+          success: true, 
+          transcription: transcribedText,
+          usage: null 
+        });
+      }
+    } else {
+      return jsonResponse({ error: "Either audio file or textInstructions is required" }, 400);
     }
 
     // Step 2: Use the transcription to write a prompt

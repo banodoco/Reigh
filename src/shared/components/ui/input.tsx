@@ -3,6 +3,7 @@ import { X } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 import { VoiceInputButton } from "./voice-input-button"
+import { TextPromptButton } from "./text-prompt-button"
 
 interface InputProps extends React.ComponentProps<"input"> {
   clearable?: boolean
@@ -33,15 +34,16 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     ...props 
   }, ref) => {
     const [isHovered, setIsHovered] = React.useState(false)
-    const [isRecording, setIsRecording] = React.useState(false)
+    const [isVoiceActive, setIsVoiceActive] = React.useState(false)
+    const [isTextPromptActive, setIsTextPromptActive] = React.useState(false)
     
     const hasValue = (props.value?.toString() || props.defaultValue?.toString() || "").length > 0
     const showClear = clearable && onClear && hasValue
     const showVoice = voiceInput && onVoiceResult
     const hasActions = showClear || showVoice
     
-    // Show buttons when hovered OR when recording is in progress
-    const showButtons = (isHovered || isRecording) && !props.disabled && (showClear || showVoice)
+    // Show buttons when hovered OR when either input mode is active
+    const showButtons = (isHovered || isVoiceActive || isTextPromptActive) && !props.disabled && (showClear || showVoice)
     
     const handleClear = (e: React.MouseEvent) => {
       e.preventDefault()
@@ -73,8 +75,18 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               <VoiceInputButton
                 onResult={onVoiceResult}
                 onError={onVoiceError}
-                onRecordingStateChange={setIsRecording}
+                onRecordingStateChange={setIsVoiceActive}
                 task={voiceTask}
+                context={voiceContext}
+                existingValue={props.value?.toString() || props.defaultValue?.toString() || ""}
+                disabled={props.disabled}
+              />
+            )}
+            {showVoice && (
+              <TextPromptButton
+                onResult={onVoiceResult}
+                onError={onVoiceError}
+                onActiveStateChange={setIsTextPromptActive}
                 context={voiceContext}
                 existingValue={props.value?.toString() || props.defaultValue?.toString() || ""}
                 disabled={props.disabled}
