@@ -1,7 +1,6 @@
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/shared/components/ui/dialog';
-import { Button } from '@/shared/components/ui/button';
-import { Download, Share, Plus, ExternalLink, CheckCircle, MoreVertical, Menu } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { Plus, MoreVertical } from 'lucide-react';
 import type { InstallMethod, Platform, Browser } from '@/shared/hooks/usePlatformInstall';
 
 interface InstallInstructionsModalProps {
@@ -219,19 +218,6 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
   isAppInstalled,
   onFallbackToDiscord,
 }) => {
-  const getIcon = () => {
-    if (isAppInstalled) {
-      return <CheckCircle className="w-8 h-8 text-green-500" />;
-    }
-    if (platform === 'ios') {
-      return <Share className="w-8 h-8 text-wes-vintage-gold" />;
-    }
-    if (installMethod === 'safari-dock') {
-      return <Menu className="w-8 h-8 text-wes-vintage-gold" />;
-    }
-    return <Download className="w-8 h-8 text-wes-vintage-gold" />;
-  };
-
   const getTitle = () => {
     if (isAppInstalled) {
       return 'Reigh is Already Installed!';
@@ -243,19 +229,6 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
       return 'Add Reigh to Your Dock';
     }
     return 'Install Reigh';
-  };
-
-  const getDescription = () => {
-    if (isAppInstalled) {
-      return 'You can open Reigh as a standalone app for the best experience.';
-    }
-    if (platform === 'ios') {
-      return 'Get the full app experience with quick access from your home screen.';
-    }
-    if (platform === 'mac' && browser === 'safari') {
-      return 'Install Reigh as a native app on your Mac for the best experience.';
-    }
-    return 'Install Reigh as an app for quick access and a better experience.';
   };
 
   // Get the main visual mockup for this scenario
@@ -293,27 +266,15 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-wes-cream border-wes-vintage-gold/30">
-        <DialogHeader className="text-center space-y-3">
+        <DialogHeader className="text-center space-y-2">
           <DialogTitle className="text-xl font-theme font-theme-heading text-center">
             {getTitle()}
           </DialogTitle>
-          {!mainVisual && (
-            <DialogDescription className="text-center text-muted-foreground text-sm">
-              {getDescription()}
-            </DialogDescription>
-          )}
         </DialogHeader>
 
-        {/* Main visual mockup - this does the heavy lifting */}
-        {mainVisual && (
-          <div className="flex justify-center py-4">
-            {mainVisual}
-          </div>
-        )}
-
-        {/* Minimal text instructions */}
+        {/* Instructions text BEFORE the visual */}
         {instructions.length > 0 && (
-          <div className="text-center space-y-1">
+          <div className="text-center py-2">
             {instructions.map((instruction, index) => (
               <p key={index} className="text-sm text-muted-foreground">
                 {instruction}
@@ -322,24 +283,24 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
           </div>
         )}
 
-        <div className="mt-4 flex flex-col gap-3">
-          <Button
-            onClick={() => onOpenChange(false)}
-            className="w-full bg-gradient-to-r from-wes-vintage-gold to-wes-coral hover:from-wes-vintage-gold/90 hover:to-wes-coral/90 text-white"
-          >
-            Got it!
-          </Button>
-          <div className="flex items-center justify-center">
-            <button
-              onClick={() => {
-                onOpenChange(false);
-                onFallbackToDiscord();
-              }}
-              className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-            >
-              {isAppInstalled ? 'continue in browser instead' : 'or sign in here instead'}
-            </button>
+        {/* Visual mockup shows where to click */}
+        {mainVisual && (
+          <div className="flex justify-center py-2">
+            {mainVisual}
           </div>
+        )}
+
+        {/* Just the fallback link, no "Got it" button */}
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => {
+              onOpenChange(false);
+              onFallbackToDiscord();
+            }}
+            className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+          >
+            {isAppInstalled ? 'continue in browser instead' : 'or sign in here instead'}
+          </button>
         </div>
       </DialogContent>
     </Dialog>
