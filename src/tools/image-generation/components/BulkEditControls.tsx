@@ -106,10 +106,9 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
             emitChange({ editInstructions: '' });
           }}
           voiceInput
-          voiceTask="transcribe_only"
           voiceContext="This is a bulk edit instruction for modifying multiple image prompts at once. Describe what changes to make - like 'make them shorter' or 'add more color descriptions'. Be clear and concise."
           onVoiceResult={(result) => {
-            setEditInstructions(result.transcription);
+            setEditInstructions(result.prompt || result.transcription);
             emitChange({ editInstructions: result.transcription });
           }}
         />

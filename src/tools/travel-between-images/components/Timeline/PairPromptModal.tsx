@@ -328,10 +328,9 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                 clearable={!readOnly}
                 onClear={() => setNegativePrompt('')}
                 voiceInput={!readOnly}
-                voiceTask="transcribe_only"
                 voiceContext="This is a negative prompt - things to AVOID in this video transition. List unwanted qualities as a comma-separated list."
                 onVoiceResult={(result) => {
-                  setNegativePrompt(result.transcription);
+                  setNegativePrompt(result.prompt || result.transcription);
                 }}
               />
             </div>

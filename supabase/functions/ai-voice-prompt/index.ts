@@ -68,45 +68,69 @@ serve(async (req) => {
     }
 
     // Step 2: Use the transcription to write a prompt
-    const systemMsg = `You are a helpful assistant that transforms spoken instructions into prompts for AI generation. You adapt your output based on the context provided - this could be for image generation, video generation, or other creative tasks.
+    const systemMsg = `You are a helpful assistant that transforms spoken instructions into appropriate text for AI generation fields. You interpret the user's INTENT, not just their literal words.
 
-Focus on the user's intent and the specific context they're working in.`;
+Key skill: Recognize when users are giving INSTRUCTIONS vs LITERAL CONTENT:
+- "blur, distortion, and similar quality issues" → User wants a LIST of quality issues, expand it
+- "something like a sunset over mountains" → User is describing what they want, elaborate on it
+- "make it more dramatic" → User wants you to modify existing content
+- "a woman walking through a forest" → This IS the content, transform it into a good prompt
 
-    let userMsg = `Transform this spoken instruction into appropriate text for the given context:
+Always interpret the user's underlying intent and produce useful output.`;
 
-SPOKEN INSTRUCTION: "${transcribedText}"
+    let userMsg = `Transform this spoken input into appropriate text for the given context.
+
+SPOKEN INPUT: "${transcribedText}"
 ${existingValue ? `
 EXISTING CONTENT IN FIELD: "${existingValue}"
-(Consider this existing content if relevant - the user may want to modify, extend, or completely replace it based on their spoken instruction)
+(The user may want to modify, extend, or replace this based on their spoken input)
 ` : ""}
-${context ? `CONTEXT (important - follow this guidance):
+${context ? `CONTEXT (important - this tells you what kind of field this is):
 ${context}
 
-` : ""}GUIDELINES:
-- Transform the spoken instruction into clear, well-structured text appropriate for the context
-- Keep the user's core idea and descriptions intact
-- ${context ? "Follow the context guidance above carefully" : "Add visual details only where it enhances the prompt"}
-- If they mention specific subjects simply (like "a man", "a dog"), keep them simple unless the context asks for more detail
-- Only add artistic style if they mention one or if the context calls for it
-${existingValue ? "- If the user seems to be adding to or modifying the existing content, incorporate it appropriately\n- If the user seems to be replacing the content entirely, ignore the existing content" : ""}
+` : ""}INTERPRETATION GUIDELINES:
+- CRITICAL: Interpret the user's INTENT, not just literal words
+- If they say "X, Y, and similar things" or "stuff like X" or "things like X" → Generate an expanded list of similar items
+- If they say "and so on" or "etc" or "that kind of thing" → Expand with more examples
+- If they give examples followed by ellipsis or trailing off → They want more of the same type
+- If they're describing a scene or subject → Transform into a well-crafted prompt
+- If they're giving modification instructions → Apply those to the existing content
+${existingValue ? "- Consider how their input relates to the existing content - are they adding, modifying, or replacing?" : ""}
 
 CRITICAL FORMATTING:
-- Output ONLY the final text
-- NO commentary, explanations, or formatting
+- Output ONLY the final text, ready to use in the field
+- NO commentary, explanations, or meta-text
 - NO quotation marks around the output
+- Match the expected format for the context (e.g., comma-separated list for negative prompts)
 
 Output:`;
 
-    const resp = await groq.chat.completions.create({
-      model: "moonshotai/kimi-k2-instruct",
-      messages: [
-        { role: "system", content: systemMsg },
-        { role: "user", content: userMsg },
-      ],
-      temperature: 0.6,
-      max_tokens: 2048,
-      top_p: 1,
-    });
+    console.log(`[ai-voice-prompt] Calling Kimi API...`);
+    
+    let resp;
+    try {
+      resp = await groq.chat.completions.create({
+        model: "moonshotai/kimi-k2-instruct",
+        messages: [
+          { role: "system", content: systemMsg },
+          { role: "user", content: userMsg },
+        ],
+        temperature: 0.6,
+        max_tokens: 2048,
+        top_p: 1,
+      });
+      console.log(`[ai-voice-prompt] Kimi API responded successfully`);
+    } catch (kimiError: any) {
+      console.error(`[ai-voice-prompt] Kimi API error:`, kimiError?.message || kimiError);
+      // Fall back to transcription if Kimi fails
+      return jsonResponse({ 
+        success: true, 
+        transcription: transcribedText,
+        prompt: transcribedText,
+        usage: null,
+        warning: "AI enhancement failed, returning raw transcription"
+      });
+    }
 
     const promptText = resp.choices[0]?.message?.content?.trim() || transcribedText;
     console.log(`[ai-voice-prompt] Generated prompt: "${promptText.substring(0, 100)}..."`);

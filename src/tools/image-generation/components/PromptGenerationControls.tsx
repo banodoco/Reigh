@@ -484,11 +484,10 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
               emitChange({ rulesToRememberText: '' });
             }}
             voiceInput
-            voiceTask="transcribe_only"
             voiceContext="These are rules and constraints for AI prompt generation. List requirements like 'keep prompts under 50 words' or 'always include lighting details'. Speak each rule clearly - they will be formatted as bullet points."
             onVoiceResult={(result) => {
               // Format voice result as bullet points
-              const text = result.transcription;
+              const text = result.prompt || result.transcription;
               const formatted = text.startsWith('•') || text.startsWith('-') || text.startsWith('*') 
                 ? text 
                 : `• ${text}`;
@@ -712,7 +711,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                     emitChange({ rulesToRememberText: '' });
                   }}
                   voiceInput
-                  voiceTask="transcribe_only"
                   voiceContext="These are rules and constraints for AI prompt generation. List requirements like 'keep prompts under 50 words' or 'always include lighting details'. Speak each rule clearly - they will be formatted as bullet points."
                   onVoiceResult={(result) => {
                     // Format voice result as bullet points

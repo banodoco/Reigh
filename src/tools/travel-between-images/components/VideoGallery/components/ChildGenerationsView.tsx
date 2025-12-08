@@ -1830,10 +1830,9 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                                     clearable
                                     onClear={() => handleChange('negative_prompt', '')}
                                     voiceInput
-                                    voiceTask="transcribe_only"
                                     voiceContext="This is a negative prompt - things to AVOID in video generation. List unwanted qualities as a comma-separated list."
                                     onVoiceResult={(result) => {
-                                        handleChange('negative_prompt', result.transcription);
+                                        handleChange('negative_prompt', result.prompt || result.transcription);
                                     }}
                                 />
                             </div>

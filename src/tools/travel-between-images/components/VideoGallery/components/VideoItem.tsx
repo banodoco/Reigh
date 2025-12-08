@@ -1175,10 +1175,9 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   clearable
                   onClear={() => setJoinNegativePrompt('')}
                   voiceInput
-                  voiceTask="transcribe_only"
                   voiceContext="This is a negative prompt - things to AVOID in video transitions. List unwanted qualities like 'jerky, flickering, blurry'. Keep it as a comma-separated list."
                   onVoiceResult={(result) => {
-                    setJoinNegativePrompt(result.transcription);
+                    setJoinNegativePrompt(result.prompt || result.transcription);
                   }}
                 />
               </div>

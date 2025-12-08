@@ -299,10 +299,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     clearable
                     onClear={() => onSteerableMotionSettingsChange({ negative_prompt: '' })}
                     voiceInput
-                    voiceTask="transcribe_only"
                     voiceContext="This is a negative prompt - things to AVOID in the video generation. List unwanted qualities like 'blurry, distorted, low quality, shaky'. Keep it as a comma-separated list of terms to avoid."
                     onVoiceResult={(result) => {
-                      onSteerableMotionSettingsChange({ negative_prompt: result.transcription });
+                      onSteerableMotionSettingsChange({ negative_prompt: result.prompt || result.transcription });
                     }}
                   />
                 </div>
@@ -340,10 +339,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   clearable
                   onClear={() => onTextBeforePromptsChange?.('')}
                   voiceInput
-                  voiceTask="transcribe_only"
                   voiceContext="This is text that will be prepended to every video generation prompt. Keep it short - things like style prefixes or descriptions that apply to all video segments."
                   onVoiceResult={(result) => {
-                    onTextBeforePromptsChange?.(result.transcription);
+                    onTextBeforePromptsChange?.(result.prompt || result.transcription);
                   }}
                 />
               </div>
@@ -362,10 +360,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   clearable
                   onClear={() => onTextAfterPromptsChange?.('')}
                   voiceInput
-                  voiceTask="transcribe_only"
                   voiceContext="This is text that will be appended to every video generation prompt. Keep it short - things like quality suffixes or parameters that apply to all video segments."
                   onVoiceResult={(result) => {
-                    onTextAfterPromptsChange?.(result.transcription);
+                    onTextAfterPromptsChange?.(result.prompt || result.transcription);
                   }}
                 />
               </div>

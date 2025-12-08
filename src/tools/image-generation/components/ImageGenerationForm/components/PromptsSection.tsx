@@ -275,7 +275,6 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             clearable
             onClear={onClearBeforeEachPromptText}
             voiceInput
-            voiceTask="transcribe_only"
             voiceContext="This is text that will be prepended to every image generation prompt. Keep it short - things like style prefixes, quality tags, or subject descriptions that apply to all images."
             onVoiceResult={(result) => {
               onBeforeEachPromptTextChange({ target: { value: result.transcription } } as React.ChangeEvent<HTMLTextAreaElement>);
@@ -297,7 +296,6 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             clearable
             onClear={onClearAfterEachPromptText}
             voiceInput
-            voiceTask="transcribe_only"
             voiceContext="This is text that will be appended to every image generation prompt. Keep it short - things like quality suffixes, negative prompts, or technical parameters that apply to all images."
             onVoiceResult={(result) => {
               onAfterEachPromptTextChange({ target: { value: result.transcription } } as React.ChangeEvent<HTMLTextAreaElement>);

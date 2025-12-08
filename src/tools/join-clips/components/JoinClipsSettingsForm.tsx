@@ -782,10 +782,9 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                             clearable
                             onClear={() => setNegativePrompt('')}
                             voiceInput
-                            voiceTask="transcribe_only"
                             voiceContext="This is a negative prompt - things to AVOID in video transitions. List unwanted qualities like 'jerky, flickering, blurry, distorted, unnatural motion'. Keep it as a comma-separated list of terms to avoid."
                             onVoiceResult={(result) => {
-                                setNegativePrompt(result.transcription);
+                                setNegativePrompt(result.prompt || result.transcription);
                             }}
                         />
                     </div>

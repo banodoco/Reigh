@@ -454,10 +454,9 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
             clearable
             onClear={() => setPrompt('')}
             voiceInput
-            voiceTask="transcribe_only"
             voiceContext="This is a prompt for character animation. Provide brief rules or guidance like 'preserve outfit', 'natural expression', 'no background changes'. Keep it concise."
             onVoiceResult={(result) => {
-              setPrompt(result.transcription);
+              setPrompt(result.prompt || result.transcription);
             }}
           />
         </div>

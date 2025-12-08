@@ -1222,10 +1222,9 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               clearable
               onClear={() => handleFormChange('description', '')}
               voiceInput
-              voiceTask="transcribe_only"
               voiceContext="This is a description for a video preset. Describe what this preset does and when to use it - the style, effect, or purpose."
               onVoiceResult={(result) => {
-                handleFormChange('description', result.transcription);
+                handleFormChange('description', result.prompt || result.transcription);
               }}
             />
           </div>
@@ -1292,10 +1291,9 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                   clearable
                   onClear={() => handleFormChange('negativePrompt', '')}
                   voiceInput
-                  voiceTask="transcribe_only"
                   voiceContext="This is a negative prompt for a video preset - things to AVOID. List unwanted qualities as a comma-separated list."
                   onVoiceResult={(result) => {
-                    handleFormChange('negativePrompt', result.transcription);
+                    handleFormChange('negativePrompt', result.prompt || result.transcription);
                   }}
                 />
               </div>
