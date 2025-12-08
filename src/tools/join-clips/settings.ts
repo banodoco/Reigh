@@ -7,7 +7,7 @@ export const joinClipsSettings = {
     gapFrameCount: 12,
     replaceMode: true, // Replace frames (true) or generate new frames (false)
     keepBridgingImages: true,
-    model: 'lightning_baseline_2_2_2' as const,
+    model: 'wan_2_2_vace_lightning_baseline_2_2_2' as const,
     numInferenceSteps: 6,
     guidanceScale: 3.0,
     seed: -1,
