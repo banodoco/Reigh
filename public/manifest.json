@@ -2,7 +2,7 @@
   "name": "Reigh",
   "short_name": "Reigh",
   "description": "A tool for exploring the emerging artform of image-guided video. Create stunning motion by travelling between images with full creative control.",
-  "start_url": "/",
+  "start_url": "/tools",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#d4d4d8",
