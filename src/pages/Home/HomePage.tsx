@@ -143,22 +143,37 @@ export default function HomePage() {
     
     handleHashTokens();
     
+    // Check for standalone/PWA mode once
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                        window.matchMedia('(display-mode: fullscreen)').matches ||
+                        (navigator as any).standalone === true;
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('[AuthDebug] Initial session check:', !!session?.user?.id);
+      console.log('[AuthDebug] Initial session check:', !!session?.user?.id, 'isStandalone:', isStandalone);
       setSession(session);
       
       // If user is already signed in AND we're in standalone/PWA mode, redirect to tools
       // PWA users expect to go straight to the app, not the landing page
-      if (session) {
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                            window.matchMedia('(display-mode: fullscreen)').matches ||
-                            (navigator as any).standalone === true;
-        if (isStandalone) {
-          console.log('[AuthDebug] Already signed in + PWA mode, redirecting to /tools');
-          navigate('/tools');
-        }
+      if (session && isStandalone) {
+        console.log('[AuthDebug] Already signed in + PWA mode, redirecting to /tools');
+        navigate('/tools');
       }
     });
+    
+    // Also redirect if we're in PWA mode and session becomes available later
+    // This handles the case where session takes a moment to load from storage
+    if (isStandalone) {
+      const checkSessionAndRedirect = async () => {
+        // Small delay to allow session to be restored from storage
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { data: { session: delayedSession } } = await supabase.auth.getSession();
+        if (delayedSession) {
+          console.log('[AuthDebug] Delayed session check succeeded, redirecting PWA to /tools');
+          navigate('/tools');
+        }
+      };
+      checkSessionAndRedirect();
+    }
     
     const authManager = (window as any).__AUTH_MANAGER__;
     let unsubscribe: (() => void) | null = null;
