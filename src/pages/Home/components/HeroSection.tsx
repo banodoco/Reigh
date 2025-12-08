@@ -386,8 +386,54 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               
             {/* CTA button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
             <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-6 overflow-visible">
-              {session ? (
-                // User is logged in - show "Go to Tools"
+              {session && platformInstall.isStandalone ? (
+                // User is logged in AND in PWA - show "Go to Tools"
+                <div className="group">
+                  <button
+                    onPointerUp={() => navigate('/tools')}
+                    className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
+                    style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
+                  >
+                    <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
+                    <div className="relative">
+                      <PaintParticles />
+                      <div className="w-5 h-5 relative z-10">
+                        <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
+                          <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
+                        </div>
+                      </div>
+                    </div>
+                    <span>Go to Tools</span>
+                  </button>
+                </div>
+              ) : session && (platformInstall.isAppInstalled || platformInstall.promptTimedOut) ? (
+                // User is logged in AND app is installed (but viewing in browser) - show "Open in app"
+                <div className="flex flex-col items-center gap-3">
+                  <div className="group">
+                    <button
+                      onClick={() => setShowInstallModal(true)}
+                      className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
+                      style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
+                    >
+                      <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
+                      <div className="relative">
+                        <PaintParticles />
+                        <div className="w-5 h-5 relative z-10">
+                          <ExternalLink className="w-full h-full text-white" />
+                        </div>
+                      </div>
+                      <span>Open Reigh App</span>
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => navigate('/tools')}
+                    className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  >
+                    or continue in browser
+                  </button>
+                </div>
+              ) : session ? (
+                // User is logged in but app not installed - show "Go to Tools"
                 <div className="group">
                   <button
                     onPointerUp={() => navigate('/tools')}
@@ -468,8 +514,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               platform={platformInstall.platform}
               browser={platformInstall.browser}
               instructions={platformInstall.installInstructions}
-              isAppInstalled={platformInstall.isAppInstalled}
-              onFallbackToDiscord={handleDiscordSignIn}
+              isAppInstalled={platformInstall.isAppInstalled || platformInstall.promptTimedOut}
+              isSignedIn={!!session}
+              onFallbackToDiscord={session ? () => navigate('/tools') : handleDiscordSignIn}
             />
             </div>
           </div>

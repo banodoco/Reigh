@@ -11,6 +11,7 @@ interface InstallInstructionsModalProps {
   browser: Browser;
   instructions: string[];
   isAppInstalled?: boolean;
+  isSignedIn?: boolean;
   onFallbackToDiscord: () => void;
 }
 
@@ -194,6 +195,7 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
   browser,
   instructions,
   isAppInstalled,
+  isSignedIn,
   onFallbackToDiscord,
 }) => {
   const getTitle = () => {
@@ -282,7 +284,7 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
             }}
             className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
           >
-            {isAppInstalled ? 'continue in browser instead' : 'or sign in here instead'}
+            {isSignedIn ? 'or continue in browser' : isAppInstalled ? 'continue in browser instead' : 'or sign in here instead'}
           </button>
         </div>
       </DialogContent>
