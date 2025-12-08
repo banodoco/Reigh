@@ -103,12 +103,18 @@ export const useImageGalleryPagination = ({
   }, [totalPages, page]);
 
   // Detect when new server data has been applied (includes mobile where prefetch is disabled)
+  // IMPORTANT: Only clear loading when actual IMAGE DATA changes, not when serverPage changes.
+  // The parent may update serverPage optimistically before data arrives.
   useEffect(() => {
-    if (!isServerPagination || !serverPage) return;
+    if (!isServerPagination) return;
+    // Only proceed if we're actually in a loading state
+    if (loadingButton === null && !isGalleryLoading) return;
 
     const firstId = filteredImages[0]?.id ?? 'none';
     const lastId = filteredImages[filteredImages.length - 1]?.id ?? 'none';
-    const signature = `${serverPage}-${filteredImages.length}-${firstId}-${lastId}`;
+    // NOTE: Don't include serverPage in signature - it changes before data arrives.
+    // Only use image data so we detect when actual new images are displayed.
+    const signature = `${filteredImages.length}-${firstId}-${lastId}`;
 
     if (signature === lastServerDataSignatureRef.current) {
       return;
@@ -138,7 +144,7 @@ export const useImageGalleryPagination = ({
       clearTimeout(safetyTimeoutRef.current);
       safetyTimeoutRef.current = null;
     }
-  }, [filteredImages, isServerPagination, serverPage, loadingButton, isGalleryLoading]);
+  }, [filteredImages, isServerPagination, loadingButton, isGalleryLoading]);
   
   // Handle pagination with loading state
   const handlePageChange = useCallback((newPage: number, direction: 'prev' | 'next', fromBottom = false) => {
