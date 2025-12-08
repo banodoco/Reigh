@@ -253,14 +253,14 @@ export function usePlatformInstall(): PlatformInstallState {
     // App appears to be installed - just show how to open it
     if (isAppInstalled || (promptTimedOut && isDesktopChromium)) {
       return [
-        'Click "Open in app" in the address bar'
+        'Click "Open in app" in the address bar:'
       ];
     }
     
     // If waiting for prompt on Chrome/Edge desktop
     if (isWaitingForPrompt) {
       return [
-        'Click the install icon in the address bar'
+        'Click the install icon in the address bar:'
       ];
     }
     
@@ -268,17 +268,15 @@ export function usePlatformInstall(): PlatformInstallState {
       case 'prompt':
         // Fallback if user declines the browser prompt
         return [
-          'Click the install icon in the address bar',
-          'Or use the browser menu → "Install Reigh"'
+          'Click the install icon in the address bar:'
         ];
       case 'safari-dock':
         return [
-          'File → Add to Dock',
-          'Or Share → Add to Dock'
+          'File → Add to Dock:'
         ];
       case 'safari-home-screen':
         return [
-          'Tap Share, then "Add to Home Screen"'
+          'Tap Share, then "Add to Home Screen":'
         ];
       default:
         return [];

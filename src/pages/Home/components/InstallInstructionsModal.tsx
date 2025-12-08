@@ -18,193 +18,138 @@ interface InstallInstructionsModalProps {
 
 // Chrome install - browser mockup with install icon in address bar
 const ChromeInstallIcon = () => (
-  <div className="flex flex-col items-center gap-2">
-    <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
-        <div className="flex gap-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-        </div>
-        <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
-          <span className="text-gray-400 truncate">reigh.app</span>
-          <div className="ml-auto flex items-center justify-center w-5 h-5 bg-gray-50 border border-gray-300 rounded animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
-            <svg className="w-3 h-3 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="3" width="20" height="14" rx="2" />
-              <path d="M8 21h8" />
-              <path d="M12 17v4" />
-              <path d="M12 7v6M9 10l3 3 3-3" />
-            </svg>
-          </div>
+  <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
+    <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
+      <div className="flex gap-1">
+        <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+      </div>
+      <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
+        <span className="text-gray-400 truncate">reigh.app</span>
+        <div className="ml-auto flex items-center justify-center w-5 h-5 bg-gray-50 border border-gray-300 rounded animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
+          <svg className="w-3 h-3 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M8 21h8" />
+            <path d="M12 17v4" />
+            <path d="M12 7v6M9 10l3 3 3-3" />
+          </svg>
         </div>
       </div>
-      <div className="h-8 bg-gray-50" />
     </div>
-    <div className="flex items-center gap-1 text-wes-vintage-gold">
-      <svg className="w-4 h-4 animate-bounce" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 19V5M5 12l7-7 7 7" />
-      </svg>
-      <span className="text-xs font-medium">Click here</span>
-    </div>
+    <div className="h-8 bg-gray-50" />
   </div>
 );
 
 // Chrome's three-dot menu mockup
 const ChromeMenuIcon = () => (
-  <div className="flex flex-col items-center gap-2">
-    <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
-        <div className="flex gap-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-        </div>
-        <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
-          <span className="text-gray-400 truncate">reigh.app</span>
-        </div>
-        <div className="flex items-center justify-center w-6 h-6 bg-gray-50 border border-gray-300 rounded animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
-          <MoreVertical className="w-4 h-4 text-gray-600" />
-        </div>
+  <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
+    <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
+      <div className="flex gap-1">
+        <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
       </div>
-      <div className="h-8 bg-gray-50" />
+      <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
+        <span className="text-gray-400 truncate">reigh.app</span>
+      </div>
+      <div className="flex items-center justify-center w-6 h-6 bg-gray-50 border border-gray-300 rounded animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
+        <MoreVertical className="w-4 h-4 text-gray-600" />
+      </div>
     </div>
-    <div className="flex items-center gap-1 text-wes-vintage-gold">
-      <svg className="w-4 h-4 animate-bounce" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 19V5M5 12l7-7 7 7" />
-      </svg>
-      <span className="text-xs font-medium">Click menu</span>
-    </div>
+    <div className="h-8 bg-gray-50" />
   </div>
 );
 
 // iOS Safari share button mockup - shows bottom toolbar
 const SafariShareIcon = () => (
-  <div className="flex flex-col items-center gap-2">
-    <div className="relative w-full max-w-[200px] bg-gray-100 rounded-2xl border border-gray-300 shadow-sm overflow-hidden">
-      {/* iPhone notch area */}
-      <div className="h-6 bg-gray-200 flex justify-center items-end pb-1">
-        <div className="w-16 h-1 bg-gray-400 rounded-full" />
-      </div>
-      {/* Page content */}
-      <div className="h-16 bg-gray-50 flex items-center justify-center">
-        <span className="text-[10px] text-gray-400">reigh.app</span>
-      </div>
-      {/* Safari bottom toolbar */}
-      <div className="flex items-center justify-around px-4 py-2 bg-gray-200 border-t border-gray-300">
-        <div className="w-5 h-5 text-gray-400">‹</div>
-        <div className="w-5 h-5 text-gray-400">›</div>
-        <div className="flex items-center justify-center w-7 h-7 animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1 rounded">
-          <svg className="w-5 h-5 text-[#007AFF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 3v12M8 7l4-4 4 4" />
-            <path d="M4 14v5a2 2 0 002 2h12a2 2 0 002-2v-5" />
-          </svg>
-        </div>
-        <div className="w-5 h-5 text-gray-400">☐</div>
-        <div className="w-5 h-5 text-gray-400">⊡</div>
-      </div>
+  <div className="relative w-full max-w-[200px] bg-gray-100 rounded-2xl border border-gray-300 shadow-sm overflow-hidden">
+    {/* iPhone notch area */}
+    <div className="h-6 bg-gray-200 flex justify-center items-end pb-1">
+      <div className="w-16 h-1 bg-gray-400 rounded-full" />
     </div>
-    <div className="flex items-center gap-1 text-wes-vintage-gold">
-      <svg className="w-4 h-4 animate-bounce" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 5V19M5 12l7 7 7-7" />
-      </svg>
-      <span className="text-xs font-medium">Tap Share</span>
+    {/* Page content */}
+    <div className="h-16 bg-gray-50 flex items-center justify-center">
+      <span className="text-[10px] text-gray-400">reigh.app</span>
+    </div>
+    {/* Safari bottom toolbar */}
+    <div className="flex items-center justify-around px-4 py-2 bg-gray-200 border-t border-gray-300">
+      <div className="w-5 h-5 text-gray-400">‹</div>
+      <div className="w-5 h-5 text-gray-400">›</div>
+      <div className="flex items-center justify-center w-7 h-7 animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1 rounded">
+        <svg className="w-5 h-5 text-[#007AFF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 3v12M8 7l4-4 4 4" />
+          <path d="M4 14v5a2 2 0 002 2h12a2 2 0 002-2v-5" />
+        </svg>
+      </div>
+      <div className="w-5 h-5 text-gray-400">☐</div>
+      <div className="w-5 h-5 text-gray-400">⊡</div>
     </div>
   </div>
 );
 
 // Safari File menu (macOS) - menu bar mockup
 const SafariFileMenu = () => (
-  <div className="flex flex-col items-center gap-2">
-    <div className="relative w-full max-w-[280px]">
-      {/* Mac menu bar */}
-      <div className="flex items-center gap-4 px-3 py-1 bg-gray-200/80 backdrop-blur border border-gray-300 rounded-t-lg text-xs">
-        <span className="font-bold">&#63743;</span>
-        <span className="px-2 py-0.5 bg-gray-300/50 rounded animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1 font-medium">File</span>
-        <span className="text-gray-600">Edit</span>
-        <span className="text-gray-600">View</span>
-        <span className="text-gray-600">History</span>
-      </div>
-      {/* Dropdown preview */}
-      <div className="absolute top-full left-8 mt-0.5 bg-white border border-gray-300 rounded-lg shadow-lg py-1 text-xs w-40 z-10">
-        <div className="px-3 py-1 text-gray-600">New Window</div>
-        <div className="px-3 py-1 text-gray-600">New Tab</div>
-        <div className="border-t border-gray-200 my-1" />
-        <div className="px-3 py-1 bg-blue-500 text-white rounded mx-1 font-medium">Add to Dock</div>
-      </div>
-      {/* Browser window hint */}
-      <div className="h-12 bg-gray-100 border-x border-b border-gray-300 rounded-b-lg" />
+  <div className="relative w-full max-w-[280px]">
+    {/* Mac menu bar */}
+    <div className="flex items-center gap-4 px-3 py-1 bg-gray-200/80 backdrop-blur border border-gray-300 rounded-t-lg text-xs">
+      <span className="font-bold">&#63743;</span>
+      <span className="px-2 py-0.5 bg-gray-300/50 rounded animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1 font-medium">File</span>
+      <span className="text-gray-600">Edit</span>
+      <span className="text-gray-600">View</span>
+      <span className="text-gray-600">History</span>
     </div>
-    <div className="flex items-center gap-1 text-wes-vintage-gold mt-6">
-      <svg className="w-4 h-4 animate-bounce" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 19V5M5 12l7-7 7 7" />
-      </svg>
-      <span className="text-xs font-medium">Click File menu</span>
+    {/* Dropdown preview */}
+    <div className="absolute top-full left-8 mt-0.5 bg-white border border-gray-300 rounded-lg shadow-lg py-1 text-xs w-40 z-10">
+      <div className="px-3 py-1 text-gray-600">New Window</div>
+      <div className="px-3 py-1 text-gray-600">New Tab</div>
+      <div className="border-t border-gray-200 my-1" />
+      <div className="px-3 py-1 bg-blue-500 text-white rounded mx-1 font-medium">Add to Dock</div>
     </div>
+    {/* Browser window hint */}
+    <div className="h-12 bg-gray-100 border-x border-b border-gray-300 rounded-b-lg" />
   </div>
 );
 
 // Edge "App available" - browser mockup
 const EdgeAppAvailable = () => (
-  <div className="flex flex-col items-center gap-2">
-    <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
-        <div className="flex gap-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-        </div>
-        <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
-          <span className="text-gray-400 truncate">reigh.app</span>
-          <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-300 rounded-full text-[10px] font-medium text-gray-700 animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
-            <Plus className="w-2.5 h-2.5" />
-            <span>App available</span>
-          </div>
+  <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
+    <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
+      <div className="flex gap-1">
+        <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+      </div>
+      <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
+        <span className="text-gray-400 truncate">reigh.app</span>
+        <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-300 rounded-full text-[10px] font-medium text-gray-700 animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
+          <Plus className="w-2.5 h-2.5" />
+          <span>App available</span>
         </div>
       </div>
-      <div className="h-8 bg-gray-50" />
     </div>
-    <div className="flex items-center gap-1 text-wes-vintage-gold">
-      <svg className="w-4 h-4 animate-bounce" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 19V5M5 12l7-7 7 7" />
-      </svg>
-      <span className="text-xs font-medium">Click here</span>
-    </div>
+    <div className="h-8 bg-gray-50" />
   </div>
 );
 
 // Chrome/Edge "Open in app" button - appears in address bar when PWA is installed
-// Shows a mini browser mockup with the button in the address bar area
 const OpenInAppBadge = () => (
-  <div className="flex flex-col items-center gap-2">
-    {/* Mini browser mockup */}
-    <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
-      {/* Browser toolbar */}
-      <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
-        {/* Traffic lights */}
-        <div className="flex gap-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-        </div>
-        {/* Address bar with "Open in app" button */}
-        <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
-          <span className="text-gray-400 truncate">reigh.app</span>
-          <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-300 rounded-full text-[10px] font-medium text-gray-700 animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
-            <img src="/favicon-32x32.png" alt="" className="w-3 h-3 rounded-sm" />
-            <span>Open in app</span>
-          </div>
+  <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
+    <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
+      <div className="flex gap-1">
+        <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+        <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+      </div>
+      <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-white rounded border border-gray-300 text-xs">
+        <span className="text-gray-400 truncate">reigh.app</span>
+        <div className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-300 rounded-full text-[10px] font-medium text-gray-700 animate-pulse ring-2 ring-wes-vintage-gold ring-offset-1">
+          <img src="/favicon-32x32.png" alt="" className="w-3 h-3 rounded-sm" />
+          <span>Open in app</span>
         </div>
       </div>
-      {/* Page content placeholder */}
-      <div className="h-8 bg-gray-50" />
     </div>
-    {/* Arrow pointing up */}
-    <div className="flex items-center gap-1 text-wes-vintage-gold">
-      <svg className="w-4 h-4 animate-bounce" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M12 19V5M5 12l7-7 7 7" />
-      </svg>
-      <span className="text-xs font-medium">Click here</span>
-    </div>
+    <div className="h-8 bg-gray-50" />
   </div>
 );
 
