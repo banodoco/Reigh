@@ -200,13 +200,13 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
 }) => {
   const getTitle = () => {
     if (isAppInstalled) {
-      return 'Reigh is Already Installed!';
+      return 'Reigh is already installed!';
     }
     if (platform === 'ios') {
-      return 'Add Reigh to Home Screen';
+      return 'Add Reigh to home screen';
     }
     if (platform === 'mac' && browser === 'safari') {
-      return 'Add Reigh to Your Dock';
+      return 'Add Reigh to your dock';
     }
     return 'Install Reigh';
   };
