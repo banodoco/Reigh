@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PaletteIcon } from '@/shared/components/PaletteIcon';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { ChevronLeft, ChevronRight, Github, MessageCircle, Plus, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Github, MessageCircle, Plus, Download, ExternalLink } from 'lucide-react';
 import { PaintParticles } from '@/shared/components/PaintParticles';
 import { usePlatformInstall } from '@/shared/hooks/usePlatformInstall';
 import { InstallInstructionsModal } from './InstallInstructionsModal';
@@ -348,6 +348,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                             <Download className={`w-full h-full text-white ${platformInstall.isWaitingForPrompt ? 'animate-bounce' : ''}`} />
                           ) : platformInstall.ctaIcon === 'plus' ? (
                             <Plus className="w-full h-full text-white" />
+                          ) : platformInstall.ctaIcon === 'external' ? (
+                            <ExternalLink className="w-full h-full text-white" />
                           ) : (
                             <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
                               <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
@@ -360,9 +362,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   </div>
                   <button
                     onClick={handleDiscordSignIn}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors underline-offset-2 hover:underline"
+                    className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
                   >
-                    or sign in with Discord
+                    sign in with Discord instead
                   </button>
                 </div>
               ) : (
@@ -396,6 +398,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               platform={platformInstall.platform}
               browser={platformInstall.browser}
               instructions={platformInstall.installInstructions}
+              isAppInstalled={platformInstall.isAppInstalled}
               onFallbackToDiscord={handleDiscordSignIn}
             />
             </div>

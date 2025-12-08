@@ -13,11 +13,12 @@ export interface PlatformInstallState {
   isStandalone: boolean;  // Running as installed PWA
   canInstall: boolean;    // Can show install prompt (Chrome/Edge beforeinstallprompt)
   isWaitingForPrompt: boolean; // Chrome/Edge desktop - waiting for beforeinstallprompt
+  isAppInstalled: boolean; // PWA appears to be installed (prompt timed out or detected)
   installMethod: InstallMethod;
   
   // CTA helpers
   ctaText: string;
-  ctaIcon: 'download' | 'plus' | 'discord';
+  ctaIcon: 'download' | 'plus' | 'discord' | 'external';
   showInstallCTA: boolean;
   
   // Install instructions for manual methods
@@ -43,6 +44,8 @@ export interface PlatformInstallState {
 export function usePlatformInstall(): PlatformInstallState {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [promptTimedOut, setPromptTimedOut] = useState(false);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
   
   // Detect platform
   const platform = useMemo<Platform>(() => {
@@ -133,22 +136,47 @@ export function usePlatformInstall(): PlatformInstallState {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
+    let timeoutId: ReturnType<typeof setTimeout>;
+    
     const handleBeforeInstallPrompt = (e: Event) => {
       // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
       setDeferredPrompt(e);
+      // Clear timeout since we got the prompt
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+    
+    const handleAppInstalled = () => {
+      setDeferredPrompt(null);
+      setIsAppInstalled(true);
+      if (timeoutId) clearTimeout(timeoutId);
     };
     
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
     
-    // Also listen for app installed event
-    window.addEventListener('appinstalled', () => {
-      setDeferredPrompt(null);
-      setIsStandalone(true);
-    });
+    // Set a timeout - if beforeinstallprompt doesn't fire within 3 seconds,
+    // the PWA is likely already installed or not supported
+    timeoutId = setTimeout(() => {
+      setPromptTimedOut(true);
+      
+      // Try to detect if app is installed using getInstalledRelatedApps (Chrome 80+)
+      // This requires the manifest to list related_applications, but worth trying
+      if ('getInstalledRelatedApps' in navigator) {
+        (navigator as any).getInstalledRelatedApps().then((apps: any[]) => {
+          if (apps && apps.length > 0) {
+            setIsAppInstalled(true);
+          }
+        }).catch(() => {
+          // API not available or failed, that's fine
+        });
+      }
+    }, 3000);
     
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, []);
   
@@ -162,8 +190,10 @@ export function usePlatformInstall(): PlatformInstallState {
   const isWaitingForPrompt = useMemo(() => {
     if (isStandalone) return false;
     if (deferredPrompt) return false; // Already have it
+    if (promptTimedOut) return false; // Timed out waiting
+    if (isAppInstalled) return false; // Already installed
     return isDesktopChromium;
-  }, [isStandalone, deferredPrompt, isDesktopChromium]);
+  }, [isStandalone, deferredPrompt, promptTimedOut, isAppInstalled, isDesktopChromium]);
   
   // Determine install method
   const installMethod = useMemo<InstallMethod>(() => {
@@ -196,6 +226,29 @@ export function usePlatformInstall(): PlatformInstallState {
   
   // Generate install instructions (used for manual methods or as fallback if user declines prompt)
   const installInstructions = useMemo<string[]>(() => {
+    // App appears to be installed - show how to open it
+    if (isAppInstalled || (promptTimedOut && isDesktopChromium)) {
+      if (browser === 'chrome') {
+        return [
+          'Reigh is already installed on your device!',
+          'Look for "Open in Reigh" in the address bar',
+          'Or find Reigh in your Applications/Start Menu'
+        ];
+      }
+      if (browser === 'edge') {
+        return [
+          'Reigh is already installed on your device!',
+          'Look for "Open in app" in the address bar',
+          'Or find Reigh in your Applications/Start Menu'
+        ];
+      }
+      return [
+        'Reigh appears to be installed on your device!',
+        'Look for the "Open in app" option in your browser',
+        'Or find Reigh in your Applications/Start Menu'
+      ];
+    }
+    
     // If waiting for prompt on Chrome/Edge desktop, show waiting message
     if (isWaitingForPrompt) {
       if (browser === 'chrome') {
@@ -260,11 +313,16 @@ export function usePlatformInstall(): PlatformInstallState {
       default:
         return [];
     }
-  }, [installMethod, browser, isWaitingForPrompt]);
+  }, [installMethod, browser, isWaitingForPrompt, isAppInstalled, promptTimedOut, isDesktopChromium]);
   
   // Generate CTA text
   const ctaText = useMemo<string>(() => {
     if (isStandalone) return 'Sign in with Discord';
+    
+    // App appears to be installed - nudge to open it
+    if (isAppInstalled || (promptTimedOut && isDesktopChromium)) {
+      return 'Open Reigh App';
+    }
     
     // No install available (and not waiting for prompt)
     if (installMethod === 'none' && !isWaitingForPrompt) return 'Sign in with Discord';
@@ -284,22 +342,28 @@ export function usePlatformInstall(): PlatformInstallState {
       default:
         return 'Install App';
     }
-  }, [isStandalone, installMethod, isWaitingForPrompt, platform]);
+  }, [isStandalone, installMethod, isWaitingForPrompt, isAppInstalled, promptTimedOut, isDesktopChromium, platform]);
   
   // Determine CTA icon
-  const ctaIcon = useMemo<'download' | 'plus' | 'discord'>(() => {
+  const ctaIcon = useMemo<'download' | 'plus' | 'discord' | 'external'>(() => {
     if (isStandalone) return 'discord';
+    
+    // App appears to be installed - show external link icon
+    if (isAppInstalled || (promptTimedOut && isDesktopChromium)) {
+      return 'external';
+    }
+    
     if (installMethod === 'none' && !isWaitingForPrompt) return 'discord';
     if (platform === 'ios') return 'plus';
     return 'download';
-  }, [isStandalone, installMethod, isWaitingForPrompt, platform]);
+  }, [isStandalone, installMethod, isWaitingForPrompt, isAppInstalled, promptTimedOut, isDesktopChromium, platform]);
   
   // Should we show install CTA vs Discord sign-in
   const showInstallCTA = useMemo(() => {
     if (isStandalone) return false;
-    // Show CTA if we have an install method OR we're waiting for the prompt
-    return installMethod !== 'none' || isWaitingForPrompt;
-  }, [isStandalone, installMethod, isWaitingForPrompt]);
+    // Show CTA if we have an install method, we're waiting for the prompt, or app is installed
+    return installMethod !== 'none' || isWaitingForPrompt || isAppInstalled || (promptTimedOut && isDesktopChromium);
+  }, [isStandalone, installMethod, isWaitingForPrompt, isAppInstalled, promptTimedOut, isDesktopChromium]);
   
   // Trigger install action
   const triggerInstall = useCallback(async (): Promise<boolean> => {
@@ -325,6 +389,7 @@ export function usePlatformInstall(): PlatformInstallState {
     isStandalone,
     canInstall: !!deferredPrompt,
     isWaitingForPrompt,
+    isAppInstalled: isAppInstalled || (promptTimedOut && isDesktopChromium),
     installMethod,
     ctaText,
     ctaIcon,
