@@ -52,10 +52,12 @@ const ShotsPaneComponent: React.FC = () => {
     { projectId: selectedProjectId, enabled: !!selectedProjectId }
   );
 
-  // Fetch project-level UI settings for defaults
-  const { settings: projectUISettings } = useToolSettings<{
+  // Fetch project-level UI settings for defaults and sort order
+  // Uses same settings as VideoTravelToolPage for consistency
+  const { settings: projectUISettings, update: updateProjectUISettings } = useToolSettings<{
     acceleratedMode?: boolean;
     randomSeed?: boolean;
+    shotSortMode?: 'ordered' | 'newest' | 'oldest';
   }>('travel-ui-state', { 
     projectId: selectedProjectId, 
     enabled: !!selectedProjectId 
@@ -65,20 +67,13 @@ const ShotsPaneComponent: React.FC = () => {
   // Note: We can't use currentShotId here because ShotsPane doesn't track the "active" shot
   // Instead, we'll read from localStorage which stores the last active shot's settings
 
-  // Fetch and manage shots pane UI settings with sort order
-  const { settings: shotsPaneSettings, update: updateShotsPaneSettings } = useToolSettings<{
-    sortOrder?: 'oldest' | 'newest';
-  }>('shots-pane-ui-state', { 
-    projectId: selectedProjectId, 
-    enabled: !!selectedProjectId 
-  });
-
   // Get sort order from settings, default to 'newest'
-  const sortOrder = shotsPaneSettings?.sortOrder || 'newest';
+  // Note: 'ordered' mode is temporarily disabled, falls back to 'newest'
+  const sortOrder = projectUISettings?.shotSortMode === 'ordered' ? 'newest' : (projectUISettings?.shotSortMode || 'newest');
 
   const handleSortOrderChange = (newSortOrder: 'oldest' | 'newest') => {
     if (!selectedProjectId) return;
-    updateShotsPaneSettings('project', { sortOrder: newSortOrder });
+    updateProjectUISettings('project', { shotSortMode: newSortOrder });
     // Jump to page 1 when sort order changes
     setCurrentPage(1);
   };
@@ -459,7 +454,7 @@ const ShotsPaneComponent: React.FC = () => {
               title={`Currently showing ${sortOrder} first. Click to show ${sortOrder === 'oldest' ? 'newest' : 'oldest'} first.`}
             >
               <ArrowDown className="h-4 w-4" />
-              {sortOrder === 'oldest' ? 'Oldest' : 'Newest'}
+              {sortOrder === 'oldest' ? 'Oldest first' : 'Newest first'}
             </Button>
           </div>
           <div className="flex flex-col gap-4 px-3 py-4 flex-grow overflow-y-auto scrollbar-hide" data-shots-pane-content>

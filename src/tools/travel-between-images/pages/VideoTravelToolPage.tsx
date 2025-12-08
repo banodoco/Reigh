@@ -2247,8 +2247,8 @@ const VideoTravelToolPage: React.FC = () => {
                         </SelectTrigger>
                         <SelectContent>
                           {/* <SelectItem value="ordered">Ordered</SelectItem> -- TEMPORARILY DISABLED (Task 20) */}
-                          <SelectItem value="newest">Newest</SelectItem>
-                          <SelectItem value="oldest">Oldest</SelectItem>
+                          <SelectItem value="newest">Newest first</SelectItem>
+                          <SelectItem value="oldest">Oldest first</SelectItem>
                         </SelectContent>
                       </Select>
                     </>
@@ -2283,8 +2283,8 @@ const VideoTravelToolPage: React.FC = () => {
                           <SelectValue placeholder="Sort" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="newest">Newest</SelectItem>
-                          <SelectItem value="oldest">Oldest</SelectItem>
+                          <SelectItem value="newest">Newest first</SelectItem>
+                          <SelectItem value="oldest">Oldest first</SelectItem>
                         </SelectContent>
                       </Select>
                     </>

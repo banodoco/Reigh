@@ -153,12 +153,14 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
         shot={shot}
         onSelectShot={onSelectShot}
         currentProjectId={currentProjectId}
-        dragHandleProps={{
-          ...attributes,
-          ...listeners,
-          disabled: isDragDisabled,
-        }}
-        dragDisabledReason={disabledReason}
+        // TEMPORARILY DISABLED: Drag handle hidden while reordering is disabled (Task 20)
+        // To restore: uncomment dragHandleProps below
+        // dragHandleProps={{
+        //   ...attributes,
+        //   ...listeners,
+        //   disabled: isDragDisabled,
+        // }}
+        // dragDisabledReason={disabledReason}
         shouldLoadImages={shouldLoadImages}
         shotIndex={shotIndex}
         projectAspectRatio={projectAspectRatio}
