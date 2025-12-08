@@ -895,10 +895,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   });
 
   // For variants, show the variant's params instead of the original task
+  // But ALWAYS preserve onApplySettingsFromTask so the Apply button shows
   const adjustedTaskDetailsData = useMemo(() => {
     // Check if we're viewing a variant that was created by a task (has source_task_id in params)
-    // This applies to BOTH primary and non-primary variants
-    // Primary variants can also be task-created (e.g., upscaled image that became primary)
     const variantParams = activeVariant?.params as Record<string, any> | undefined;
     const isTaskCreatedVariant = activeVariant && variantParams && (
       variantParams.source_task_id || 
@@ -913,6 +912,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         isPrimary: activeVariant.is_primary,
         sourceTaskId: variantParams.source_task_id?.substring(0, 8),
         createdFrom: variantParams.created_from,
+        hasOnApplySettings: !!taskDetailsData?.onApplySettingsFromTask,
       });
       return {
         task: {
@@ -926,13 +926,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         error: null,
         inputImages: variantParams.image ? [variantParams.image] : [],
         taskId: variantParams.source_task_id || activeVariant.id,
-        // Don't allow applying settings from a variant (use original generation's settings)
-        onApplySettingsFromTask: undefined,
+        // ALWAYS preserve onApplySettingsFromTask so Apply button shows for all variants
+        onApplySettingsFromTask: taskDetailsData?.onApplySettingsFromTask,
       };
     }
     
-    // For all other cases (videos and images), use the generation's task details as-is
-    // This ensures the "Apply These Settings" button shows for videos too
+    // For all other cases, use the generation's task details as-is
     return taskDetailsData;
   }, [taskDetailsData, activeVariant]);
 
