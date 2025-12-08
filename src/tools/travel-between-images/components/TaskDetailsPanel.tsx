@@ -8,7 +8,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Label } from '@/shared/components/ui/label';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Task } from '@/types/tasks';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, CornerDownLeft, ImageIcon } from 'lucide-react';
 import { SharedTaskDetails } from './SharedTaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useTaskType } from '@/shared/hooks/useTaskType';
@@ -252,29 +252,44 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
       
       {/* Footer with controls - Sticky to bottom - only show when Apply Settings is available */}
       {onApplySettingsFromTask && task && taskId && (
-        <div className="flex-shrink-0 p-4 border-t bg-background sticky bottom-0">
-          <div className="flex items-center gap-3">
-            {/* Checkbox on the left - only show when there are input images */}
+        <div className="flex-shrink-0 border-t bg-gradient-to-t from-background via-background to-background/95 sticky bottom-0">
+          <div className="p-4 flex items-center gap-3">
+            {/* Checkbox toggle for including images */}
             {inputImages.length > 0 && (
-              <div className="flex items-center space-x-2 flex-shrink-0">
-                <Checkbox 
-                  id="replaceImages"
-                  checked={replaceImages}
-                  onCheckedChange={(checked) => onReplaceImagesChange(checked as boolean)}
-                />
-                <Label htmlFor="replaceImages" className="text-xs sm:text-sm font-light whitespace-nowrap">
-                  Use images
-                </Label>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs text-muted-foreground">Include</span>
+                <label 
+                  htmlFor="replaceImages"
+                  className={`
+                    flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all
+                    border
+                    ${replaceImages 
+                      ? 'bg-primary/10 border-primary/30 text-foreground' 
+                      : 'bg-muted/50 border-transparent text-muted-foreground hover:bg-muted'
+                    }
+                  `}
+                >
+                  <Checkbox 
+                    id="replaceImages"
+                    checked={replaceImages}
+                    onCheckedChange={(checked) => onReplaceImagesChange(checked as boolean)}
+                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                  />
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  <span className="text-xs font-medium whitespace-nowrap">
+                    {inputImages.length} image{inputImages.length !== 1 ? 's' : ''}
+                  </span>
+                </label>
               </div>
             )}
             
-            {/* Button on the right - always show */}
+            {/* Apply button */}
             <Button 
-              variant="default" 
               onClick={handleApplySettingsFromTask}
-              className="text-sm flex-1"
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium gap-2"
             >
-              Apply These Settings
+              <CornerDownLeft className="h-4 w-4" />
+              Apply Settings
             </Button>
           </div>
         </div>

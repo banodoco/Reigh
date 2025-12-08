@@ -27,6 +27,9 @@ export interface ExtractedSettings {
   context?: number;
   model?: string;
   
+  // Input images (for image replacement)
+  inputImages?: string[];
+  
   // Modes
   generationMode?: 'batch' | 'timeline';
   generationTypeMode?: 'i2v' | 'vace';  // I2V vs VACE mode
@@ -121,106 +124,30 @@ export interface ApplyContext {
 // ==================== Fetch Task ====================
 
 export const fetchTask = async (taskId: string): Promise<TaskData | null> => {
-  // AGGRESSIVE DEBUG: Store progress globally so we can inspect in console
-  (window as any).__applySettingsDebug = { step: 'START', taskId, timestamp: Date.now() };
+  console.log('[ApplySettings] Fetching task:', taskId.substring(0, 8));
   
-  console.error('[ApplySettings:fetchTask] 🚨 START - Fetching task from database');
-  console.error('[ApplySettings:fetchTask] TaskId:', taskId);
-  console.error('[ApplySettings:fetchTask] Full taskId:', taskId);
-  console.error('[ApplySettings:fetchTask] Supabase client exists:', !!supabase);
-  console.error('[ApplySettings:fetchTask] Type of supabase:', typeof supabase);
-  console.error('[ApplySettings:fetchTask] Supabase.from type:', typeof supabase?.from);
-  console.error('[ApplySettings:fetchTask] About to call supabase.from()...');
-  
-  (window as any).__applySettingsDebug.step = 'BEFORE_FROM';
-  
-  let data, error;
   try {
-    (window as any).__applySettingsDebug.step = 'CALLING_FROM';
-    console.error('[ApplySettings:fetchTask] Line 138 - calling supabase.from(tasks)...');
-    const fromTasks = supabase.from('tasks');
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', taskId)
+      .single();
     
-    (window as any).__applySettingsDebug.step = 'CALLING_SELECT';
-    console.error('[ApplySettings:fetchTask] Line 142 - from(tasks) returned, calling .select()...');
-    const selectQuery = fromTasks.select('*');
-    
-    (window as any).__applySettingsDebug.step = 'CALLING_EQ';
-    console.error('[ApplySettings:fetchTask] Line 146 - .select() returned, calling .eq()...');
-    const eqQuery = selectQuery.eq('id', taskId);
-    
-    (window as any).__applySettingsDebug.step = 'CALLING_SINGLE';
-    console.error('[ApplySettings:fetchTask] Line 150 - .eq() returned, calling .single()...');
-    const singleQuery = eqQuery.single();
-    
-    (window as any).__applySettingsDebug.step = 'SETTING_UP_TIMEOUT';
-    console.error('[ApplySettings:fetchTask] Line 154 - .single() returned, setting up timeout race...');
-    
-    // Add timeout to prevent infinite hang
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        (window as any).__applySettingsDebug.step = 'TIMEOUT_FIRED';
-        console.error('[ApplySettings:fetchTask] ⏰ TIMEOUT TRIGGERED - query took >10s');
-        reject(new Error('Task fetch timed out after 10 seconds'));
-      }, 10000);
-    });
-    
-    (window as any).__applySettingsDebug.step = 'AWAITING_RACE';
-    console.error('[ApplySettings:fetchTask] Line 165 - awaiting Promise.race()...');
-    const result = await Promise.race([singleQuery, timeoutPromise]);
-    
-    (window as any).__applySettingsDebug.step = 'RACE_RESOLVED';
-    console.error('[ApplySettings:fetchTask] Line 168 - Promise.race() resolved!');
-    
-    data = result.data;
-    error = result.error;
-    
-    (window as any).__applySettingsDebug.step = 'RESULT_EXTRACTED';
-    console.error('[ApplySettings:fetchTask] Result extracted:', { hasData: !!data, hasError: !!error });
-  } catch (queryError) {
-    console.error('[ApplySettings:fetchTask] ❌ EXCEPTION CAUGHT:', queryError);
-    console.error('[ApplySettings:fetchTask] ❌ Exception type:', queryError instanceof Error ? 'Error' : typeof queryError);
-    console.error('[ApplySettings:fetchTask] ❌ Exception message:', queryError instanceof Error ? queryError.message : String(queryError));
-    console.error('[ApplySettings:fetchTask] ❌ Exception stack:', queryError instanceof Error ? queryError.stack : 'no stack');
-    return null;
-  }
-  
-  if (error || !data) {
-    console.error('[ApplySettings] ❌ Failed to fetch task:', error);
-    return null;
-  }
-  
-  console.log('[ApplySettings] ✅ Task fetched successfully');
-  
-  const taskRow = data;
-  
-  const params: any = taskRow.params || {};
-  // FIX: Structure video is stored in orchestrator_details (new format), 
-  // fallback to full_orchestrator_payload (old format)
-  const orchestrator: any = params.orchestrator_details || params.full_orchestrator_payload || {};
-  
-  // USE console.error so this shows in production logs
-  console.error('[ApplySettings] 🔍 TASK DATA STRUCTURE:', {
-    hasParams: !!params,
-    hasOrchestratorDetails: !!params.orchestrator_details,
-    hasFullOrchestratorPayload: !!params.full_orchestrator_payload,
-    usingOrchestrator: params.orchestrator_details ? 'orchestrator_details' : (params.full_orchestrator_payload ? 'full_orchestrator_payload' : 'none'),
-    paramsKeys: Object.keys(params).slice(0, 15),
-    orchestratorKeys: Object.keys(orchestrator).slice(0, 15),
-    structureVideoPath: orchestrator.structure_video_path || 'NOT FOUND',
-    basePromptsInOrchestratorDetails: params.orchestrator_details?.base_prompts_expanded,
-    basePromptsInFullPayload: params.full_orchestrator_payload?.base_prompts_expanded,
-    basePromptsInSelectedOrchestrator: orchestrator.base_prompts_expanded,
-    // MOST SUSPECT: Show actual orchestrator content for structure video fields
-    orchestrator_structure_fields: {
-      structure_video_path: orchestrator.structure_video_path,
-      structure_video_treatment: orchestrator.structure_video_treatment,
-      structure_video_motion_strength: orchestrator.structure_video_motion_strength,
-      structure_video_type: orchestrator.structure_video_type,
-      structure_type: orchestrator.structure_type,  // Alternative field name
+    if (error || !data) {
+      console.error('[ApplySettings] ❌ Failed to fetch task:', error);
+      return null;
     }
-  });
-  
-  return { params, orchestrator };
+    
+    console.log('[ApplySettings] ✅ Task fetched successfully');
+    
+    const params: any = data.params || {};
+    const orchestrator: any = params.orchestrator_details || params.full_orchestrator_payload || {};
+    
+    return { params, orchestrator };
+  } catch (queryError) {
+    console.error('[ApplySettings] ❌ Exception fetching task:', queryError);
+    return null;
+  }
 };
 
 // ==================== Extract Settings ====================
@@ -290,50 +217,34 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     structureVideoMotionStrength: orchestrator.structure_video_motion_strength ?? params.structure_video_motion_strength,
     // Note: Backend uses both "structure_type" and "structure_video_type" - check both
     structureVideoType: orchestrator.structure_video_type ?? orchestrator.structure_type ?? params.structure_video_type ?? params.structure_type,
+    
+    // Input images - extract from multiple possible locations
+    inputImages: (() => {
+      const cleanUrl = (url: string): string => {
+        if (typeof url !== 'string') return url;
+        return url.replace(/^["']|["']$/g, '');
+      };
+      
+      if (Array.isArray(params.input_images) && params.input_images.length > 0) {
+        return params.input_images.map(cleanUrl);
+      }
+      if (orchestrator.input_image_paths_resolved && Array.isArray(orchestrator.input_image_paths_resolved)) {
+        return orchestrator.input_image_paths_resolved.map(cleanUrl);
+      }
+      if (Array.isArray(params.input_image_paths_resolved)) {
+        return params.input_image_paths_resolved.map(cleanUrl);
+      }
+      return undefined;
+    })(),
   };
   
-  // USE console.error for structure video fields so they show in production
-  console.error('[ApplySettings] 📋 EXTRACTED SETTINGS (STRUCTURE VIDEO):', {
-    structureVideo: {
-      path: extracted.structureVideoPath || 'NOT SET',
-      type: extracted.structureVideoType,
-      treatment: extracted.structureVideoTreatment,
-      motionStrength: extracted.structureVideoMotionStrength,
-      pathLength: extracted.structureVideoPath?.length || 0,
-      pathPreview: extracted.structureVideoPath ? extracted.structureVideoPath.substring(0, 80) + '...' : 'NULL'
-    },
-    segmentFramesExpanded: extracted.segmentFramesExpanded,
-    hasPhaseConfig: !!extracted.phaseConfig,
-  });
-  
-  console.error('[ApplySettings] 📋 EXTRACTED SETTINGS (PROMPTS):', {
-    prompt: extracted.prompt ? `"${extracted.prompt.substring(0, 50)}..."` : undefined,
-    prompts: extracted.prompts ? `${extracted.prompts.length} prompts` : undefined,
-    promptsArray: extracted.prompts?.map((p, i) => `[${i}] "${p?.substring(0, 30)}..."`),
-    negativePrompt: extracted.negativePrompt ? `"${extracted.negativePrompt.substring(0, 30)}..."` : undefined,
+  console.log('[ApplySettings] 📋 Extracted settings:', {
     model: extracted.model,
-    steps: extracted.steps,
-    frames: extracted.frames,
-    context: extracted.context,
-    generationMode: extracted.generationMode,
-    generationTypeMode: extracted.generationTypeMode,
-    advancedMode: extracted.advancedMode,
-    motionMode: extracted.motionMode,
-    turboMode: extracted.turboMode,
-    enhancePrompt: extracted.enhancePrompt,
-    amountOfMotion: extracted.amountOfMotion,
+    promptsCount: extracted.prompts?.length || 0,
+    inputImagesCount: extracted.inputImages?.length || 0,
+    hasStructureVideo: !!extracted.structureVideoPath,
     hasLoras: !!(extracted.loras && extracted.loras.length > 0),
-    lorasCount: extracted.loras?.length,
   });
-  
-  // Log warning if structure video appears to exist but wasn't extracted
-  if ((taskData.orchestrator.structure_video_path || taskData.params.structure_video_path) && !extracted.structureVideoPath) {
-    console.error('[ApplySettings] ⚠️  Structure video in task params but extraction failed:', {
-      orchestratorValue: taskData.orchestrator.structure_video_path,
-      paramsValue: taskData.params.structure_video_path,
-      extractedValue: extracted.structureVideoPath,
-    });
-  }
   
   return extracted;
 };
@@ -365,89 +276,33 @@ export const applyPromptSettings = async (
 ): Promise<ApplyResult> => {
   // Apply main prompt
   if (typeof settings.prompt === 'string' && settings.prompt.trim()) {
-    console.error('[ApplySettings] 💬 Applying main prompt:', {
-      prompt: `"${settings.prompt.substring(0, 60)}..."`,
-      length: settings.prompt.length
-    });
+    console.log('[ApplySettings] 💬 Applying main prompt');
     context.onBatchVideoPromptChange(settings.prompt);
-  } else {
-    console.error('[ApplySettings] ⏭️  Skipping main prompt (undefined, empty, or not string)');
   }
   
   // Apply individual prompts to pair configs (regardless of current mode)
-  // These prompts populate the pair fields whether you're in batch or timeline mode
   if (settings.prompts && settings.prompts.length > 1 && context.updatePairPromptsByIndex) {
-    console.error('[ApplySettings] 📝 === APPLYING INDIVIDUAL PROMPTS TO PAIR CONFIGS ===');
-    console.error('[ApplySettings] 📝 Prompt application details:', {
-      promptCount: settings.prompts.length,
-      hasNegativePrompts: !!(settings.negativePrompts && settings.negativePrompts.length > 0),
-      currentMode: context.currentGenerationMode,
-      hasCallback: !!context.updatePairPromptsByIndex,
-      prompts: settings.prompts.map((p, i) => `[${i}] "${p?.substring(0, 30)}..."`),
-      promptsRaw: settings.prompts, // Show the actual raw values
-      note: 'Prompts applied regardless of current mode'
-    });
+    console.log('[ApplySettings] 📝 Applying', settings.prompts.length, 'individual prompts');
     
     const errors: string[] = [];
-    const successes: number[] = [];
     
     for (let i = 0; i < settings.prompts.length; i++) {
-      const rawPrompt = settings.prompts[i];
-      console.error(`[ApplySettings] 🔍 Processing pair ${i}:`, {
-        rawValue: rawPrompt,
-        typeOf: typeof rawPrompt,
-        isString: typeof rawPrompt === 'string',
-        isNull: rawPrompt === null,
-        isUndefined: rawPrompt === undefined,
-        length: rawPrompt?.length,
-        afterTrim: rawPrompt?.trim?.(),
-        afterTrimLength: rawPrompt?.trim?.().length
-      });
       const pairPrompt = settings.prompts[i]?.trim();
       const pairNegativePrompt = settings.negativePrompts?.[i]?.trim() || '';
       
       if (pairPrompt) {
-        console.error(`[ApplySettings] 📝 Applying prompt for pair ${i}:`, {
-          prompt: `"${pairPrompt.substring(0, 40)}..."`,
-          promptLength: pairPrompt.length,
-          hasNegativePrompt: !!pairNegativePrompt
-        });
-        
         try {
           await context.updatePairPromptsByIndex(i, pairPrompt, pairNegativePrompt);
-          successes.push(i);
-          console.error(`[ApplySettings] ✅ Successfully saved prompt for pair ${i}`);
         } catch (e) {
-          const error = `Failed to apply prompt for pair ${i}: ${e}`;
-          console.error(`[ApplySettings] ❌ ${error}`, e);
-          errors.push(error);
+          console.error(`[ApplySettings] ❌ Failed to apply prompt for pair ${i}:`, e);
+          errors.push(`Pair ${i}: ${e}`);
         }
-      } else {
-        console.error(`[ApplySettings] ⏭️ Skipping pair ${i} - empty prompt`);
       }
     }
-    
-    console.error('[ApplySettings] 📊 PAIR PROMPTS APPLICATION SUMMARY:', {
-      totalPrompts: settings.prompts.length,
-      successCount: successes.length,
-      errorCount: errors.length,
-      skippedCount: settings.prompts.length - successes.length - errors.length,
-      successIndexes: successes,
-      errors: errors
-    });
     
     if (errors.length > 0) {
       return { success: false, settingName: 'prompts', error: errors.join('; ') };
     }
-  } else {
-    console.error('[ApplySettings] ⏭️ SKIPPING INDIVIDUAL PROMPTS:', {
-      hasPrompts: !!settings.prompts,
-      promptsLength: settings.prompts?.length,
-      hasCallback: !!context.updatePairPromptsByIndex,
-      reason: !settings.prompts ? 'no prompts' : 
-              settings.prompts.length <= 1 ? 'only 1 or fewer prompts' : 
-              !context.updatePairPromptsByIndex ? 'callback not available' : 'unknown'
-    });
   }
   
   // Apply negative prompt
@@ -744,60 +599,27 @@ export const applyStructureVideo = async (
   context: ApplyContext,
   taskData: TaskData
 ): Promise<ApplyResult> => {
-  const orchestratorHasField = 'structure_video_path' in taskData.orchestrator;
-  const paramsHasField = 'structure_video_path' in taskData.params;
-  const hasStructureVideoInTask = orchestratorHasField || paramsHasField;
-  
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - orchestratorHasField:', orchestratorHasField);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - paramsHasField:', paramsHasField);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - orchestratorValue:', taskData.orchestrator.structure_video_path);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - paramsValue:', taskData.params.structure_video_path);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - extractedValue:', settings.structureVideoPath);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - hasStructureVideoInTask:', hasStructureVideoInTask);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - willApply:', !!settings.structureVideoPath);
+  const hasStructureVideoInTask = 'structure_video_path' in taskData.orchestrator || 'structure_video_path' in taskData.params;
   
   if (!hasStructureVideoInTask) {
-    console.log('[ApplySettings] ⏭️  Skipping structure video (field not present in task)');
     return { success: true, settingName: 'structureVideo', details: 'skipped - not in task' };
   }
   
   if (settings.structureVideoPath) {
-    console.error('[ApplySettings] 🎥 === APPLYING STRUCTURE VIDEO ===');
-    console.error('[ApplySettings] 🎥 Structure video path:', settings.structureVideoPath);
-    console.error('[ApplySettings] 🎥 Structure video pathFilename:', settings.structureVideoPath.substring(settings.structureVideoPath.lastIndexOf('/') + 1));
-    console.error('[ApplySettings] 🎥 Structure video treatment:', settings.structureVideoTreatment);
-    console.error('[ApplySettings] 🎥 Structure video motionStrength:', settings.structureVideoMotionStrength);
-    console.error('[ApplySettings] 🎥 Structure video type:', settings.structureVideoType);
-    console.error('[ApplySettings] 🎥 Structure video hasHandler:', !!context.handleStructureVideoChange);
-    console.error('[ApplySettings] 🎥 Structure video handlerType:', typeof context.handleStructureVideoChange);
+    console.log('[ApplySettings] 🎥 Applying structure video');
     
     if (!context.handleStructureVideoChange) {
-      console.error('[ApplySettings] ❌ handleStructureVideoChange is not defined in context!');
-      return {
-        success: false,
-        settingName: 'structureVideo',
-        error: 'handleStructureVideoChange not defined in context'
-      };
+      console.error('[ApplySettings] ❌ handleStructureVideoChange is not defined!');
+      return { success: false, settingName: 'structureVideo', error: 'handler not defined' };
     }
     
     try {
-      console.error('[ApplySettings] 🎥 Extracting metadata from video URL...');
       let metadata = null;
       try {
         metadata = await extractVideoMetadataFromUrl(settings.structureVideoPath);
-        console.error('[ApplySettings] ✅ Metadata duration:', metadata.duration_seconds);
-        console.error('[ApplySettings] ✅ Metadata frameRate:', metadata.frame_rate);
-        console.error('[ApplySettings] ✅ Metadata totalFrames:', metadata.total_frames);
-        console.error('[ApplySettings] ✅ Metadata dimensions:', `${metadata.width}x${metadata.height}`);
       } catch (metadataError) {
-        console.error('[ApplySettings] ⚠️  Failed to extract metadata, proceeding without it:', metadataError);
+        console.warn('[ApplySettings] ⚠️ Failed to extract metadata, proceeding without it');
       }
-      
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - videoPath:', settings.structureVideoPath);
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - hasMetadata:', !!metadata);
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - treatment:', settings.structureVideoTreatment || 'adjust');
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - motionStrength:', settings.structureVideoMotionStrength ?? 1.0);
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - structureType:', settings.structureVideoType || 'flow');
       
       context.handleStructureVideoChange(
         settings.structureVideoPath,
@@ -807,27 +629,14 @@ export const applyStructureVideo = async (
         settings.structureVideoType || 'flow'
       );
       
-      console.error('[ApplySettings] ✅ Structure video change handler completed successfully');
-      console.error('[ApplySettings] 🎥 === STRUCTURE VIDEO APPLICATION COMPLETE ===');
       return { success: true, settingName: 'structureVideo' };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      console.error('[ApplySettings] ❌ ERROR applying structure video - error:', error);
-      console.error('[ApplySettings] ❌ ERROR applying structure video - errorMessage:', errorMessage);
-      console.error('[ApplySettings] ❌ ERROR applying structure video - errorStack:', errorStack);
-      console.error('[ApplySettings] ❌ ERROR applying structure video - path:', settings.structureVideoPath);
-      console.error('[ApplySettings] ❌ ERROR applying structure video - treatment:', settings.structureVideoTreatment);
-      console.error('[ApplySettings] ❌ ERROR applying structure video - motionStrength:', settings.structureVideoMotionStrength);
-      console.error('[ApplySettings] ❌ ERROR applying structure video - type:', settings.structureVideoType);
-      return {
-        success: false,
-        settingName: 'structureVideo',
-        error: errorMessage
-      };
+      console.error('[ApplySettings] ❌ Error applying structure video:', error);
+      return { success: false, settingName: 'structureVideo', error: errorMessage };
     }
   } else {
-    console.log('[ApplySettings] 🗑️  Clearing structure video (was null/undefined in task)');
+    console.log('[ApplySettings] 🗑️ Clearing structure video');
     if (context.handleStructureVideoChange) {
       context.handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
     }
@@ -957,11 +766,25 @@ export const replaceImagesIfRequested = async (
     return { success: true, settingName: 'images', details: 'skipped - missing context' };
   }
   
+  // Use inputImages from params if passed array is empty but settings has them
+  const effectiveInputImages = (inputImages && inputImages.length > 0) 
+    ? inputImages 
+    : (settings.inputImages || []);
+  
   console.log('[ApplySettings] 🖼️  === REPLACING IMAGES ===', {
     shotId: selectedShot.id.substring(0, 8),
     existingImagesCount: simpleFilteredImages.length,
-    newImagesCount: inputImages.length
+    passedImagesCount: inputImages.length,
+    settingsImagesCount: settings.inputImages?.length || 0,
+    effectiveImagesCount: effectiveInputImages.length,
+    usingSource: inputImages.length > 0 ? 'passed array' : 'settings.inputImages',
+    effectiveImageUrls: effectiveInputImages.map((u: string) => u.substring(u.lastIndexOf('/') + 1).substring(0, 30)),
   });
+  
+  if (effectiveInputImages.length === 0) {
+    console.warn('[ApplySettings] ⚠️ No input images to add! Both passed array and settings.inputImages are empty');
+    return { success: false, settingName: 'images', error: 'No input images available' };
+  }
   
   try {
     // Remove existing non-video images (only those with id)
@@ -1011,7 +834,7 @@ export const replaceImagesIfRequested = async (
       segmentGaps,
       cumulativePositions,
       uniformSpacingFallback: !hasSegmentGaps ? uniformSpacing : 'not used',
-      imageCount: inputImages.length,
+      imageCount: effectiveInputImages.length,
       extractedFrom: hasSegmentGaps ? 'task segment_frames_expanded' : (settings.frames ? 'task frames (uniform)' : 'default fallback')
     });
     
@@ -1020,7 +843,7 @@ export const replaceImagesIfRequested = async (
     const { data: generationLookup, error: lookupError } = await supabase
       .from('generations')
       .select('id, location, thumbnail_url')
-      .in('location', inputImages);
+      .in('location', effectiveInputImages);
     
     if (lookupError) {
       console.error('[ApplySettings] ❌ Failed to look up generations by URL:', lookupError);
@@ -1035,14 +858,15 @@ export const replaceImagesIfRequested = async (
     });
     
     console.log('[ApplySettings] 📋 Generation lookup results:', {
-      inputImagesCount: inputImages.length,
+      inputImagesCount: effectiveInputImages.length,
       foundGenerationsCount: urlToGeneration.size,
-      missingCount: inputImages.length - urlToGeneration.size,
-      foundUrls: Array.from(urlToGeneration.keys()).map(u => u.substring(u.lastIndexOf('/') + 1, u.lastIndexOf('/') + 30))
+      missingCount: effectiveInputImages.length - urlToGeneration.size,
+      foundUrls: Array.from(urlToGeneration.keys()).map(u => u.substring(u.lastIndexOf('/') + 1, u.lastIndexOf('/') + 30)),
+      missingUrls: effectiveInputImages.filter((u: string) => !urlToGeneration.has(u)).map((u: string) => u.substring(u.lastIndexOf('/') + 1, u.lastIndexOf('/') + 30)),
     });
     
     // Add input images in order with calculated timeline_frame positions
-    const additions = (inputImages || []).map((url, index) => {
+    const additions = effectiveInputImages.map((url: string, index: number) => {
       // Use cumulative position if available, otherwise fall back to uniform spacing
       const timelineFrame = hasSegmentGaps && index < cumulativePositions.length
         ? cumulativePositions[index]
@@ -1087,7 +911,7 @@ export const replaceImagesIfRequested = async (
     return {
       success: true,
       settingName: 'images',
-      details: { removed: imagesToDelete.length, added: inputImages.length }
+      details: { removed: imagesToDelete.length, added: effectiveInputImages.length }
     };
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
