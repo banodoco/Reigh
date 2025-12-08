@@ -69,6 +69,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   // Platform-aware PWA install detection
   const platformInstall = usePlatformInstall();
 
+  // Close install modal if we're in standalone mode (PWA)
+  // This handles the case where Chrome transfers page state when clicking "Open in app"
+  useEffect(() => {
+    if (platformInstall.isStandalone && showInstallModal) {
+      setShowInstallModal(false);
+    }
+  }, [platformInstall.isStandalone, showInstallModal]);
+
   // Enforce minimum loading time
   useEffect(() => {
     const timer = setTimeout(() => setMinLoadTimePassed(true), 800);
