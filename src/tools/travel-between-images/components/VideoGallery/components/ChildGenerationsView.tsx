@@ -712,7 +712,21 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         setIsJoiningClips(true);
 
         try {
-            const clips = sortedChildren.map((child, index) => ({
+            // Filter out previous join outputs - only include actual travel segments
+            // Join outputs have URLs containing "joined_" in their filename
+            const segmentsOnly = sortedChildren.filter(child => {
+                const url = child.location || '';
+                const isJoinOutput = url.includes('/joined_');
+                if (isJoinOutput) {
+                    console.log('[JoinClips] Filtering out join output:', {
+                        childId: child.id?.substring(0, 8),
+                        url: url.substring(url.lastIndexOf('/') + 1),
+                    });
+                }
+                return !isJoinOutput;
+            });
+
+            const clips = segmentsOnly.map((child, index) => ({
                 url: child.location || '',
                 name: `Segment ${index + 1}`,
             })).filter(c => c.url);
@@ -733,7 +747,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             }
 
             console.log('[JoinClips] Creating join task for segments:', {
+                totalChildrenBeforeFilter: sortedChildren.length,
+                segmentsAfterFilter: segmentsOnly.length,
                 clipCount: clips.length,
+                clipUrls: clips.map(c => c.url.substring(c.url.lastIndexOf('/') + 1)),
                 prompt: joinPrompt,
                 contextFrames: joinContextFrames,
                 gapFrames: joinGapFrames,

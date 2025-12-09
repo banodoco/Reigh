@@ -16,12 +16,10 @@ import { supabase } from '@/integrations/supabase/client';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 
 // =============================================================================
-// BUILT-IN DEFAULT PRESETS
+// BUILT-IN DEFAULT PRESETS (always shown, no DB lookup)
 // =============================================================================
-// These reference DEFAULT_PHASE_CONFIG and DEFAULT_VACE_PHASE_CONFIG from settings.ts
-// settings.ts is the single source of truth for phase configs
 
-// Special ID for the built-in default (not a database ID)
+// Special IDs for built-in presets (not database IDs)
 export const BUILTIN_DEFAULT_I2V_ID = '__builtin_default_i2v__';
 export const BUILTIN_DEFAULT_VACE_ID = '__builtin_default_vace__';
 
@@ -30,7 +28,7 @@ export const BUILTIN_I2V_PRESET = {
   id: BUILTIN_DEFAULT_I2V_ID,
   metadata: {
     name: 'Basic',
-    description: 'Standard I2V generation with balanced motion',
+    description: 'Standard I2V generation',
     phaseConfig: DEFAULT_PHASE_CONFIG,
   }
 };
@@ -40,24 +38,18 @@ export const BUILTIN_VACE_PRESET = {
   id: BUILTIN_DEFAULT_VACE_ID,
   metadata: {
     name: 'Basic',
-    description: 'Standard VACE generation with structure video guidance',
+    description: 'Standard VACE generation with structure video',
     phaseConfig: DEFAULT_VACE_PHASE_CONFIG,
   }
 };
 
 // =============================================================================
-// ADDITIONAL FEATURED PRESETS (from database)
+// ADDITIONAL FEATURED PRESETS (optional, from database)
 // =============================================================================
-// Add database preset IDs here to show them as quick-select chips after the default
 
-// I2V Mode - additional presets (optional)
-export const FEATURED_I2V_PRESET_IDS: string[] = [
-  // Add database preset IDs here
-];
-
-// VACE Mode - additional presets (optional)
-export const FEATURED_VACE_PRESET_IDS: string[] = [
-  // Add database preset IDs here
+// Featured preset IDs from database - shown after built-in default
+export const FEATURED_PRESET_IDS: string[] = [
+  // Add database preset IDs here if desired
 ];
 
 export interface MotionControlProps {
@@ -94,9 +86,8 @@ export interface MotionControlProps {
     selectedLoras?: Array<{ id: string; name: string; strength: number }>;
   };
   
-  // Additional featured preset IDs from database (shown after the built-in default)
-  featuredI2VPresetIds?: string[];
-  featuredVACEPresetIds?: string[];
+  // Featured preset IDs for quick-select chips (provided by parent)
+  featuredPresetIds?: string[];
   
   // Advanced mode props
   advancedMode: boolean;
@@ -134,8 +125,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   onPhasePresetSelect,
   onPhasePresetRemove,
   currentSettings,
-  featuredI2VPresetIds = FEATURED_I2V_PRESET_IDS,
-  featuredVACEPresetIds = FEATURED_VACE_PRESET_IDS,
+  featuredPresetIds = FEATURED_PRESET_IDS,
   advancedMode,
   onAdvancedModeChange,
   phaseConfig,
@@ -150,16 +140,23 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   // State for preset modal
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   
-  // Track when user has made custom edits (survives tab switches)
-  const [isIntentionallyCustom, setIsIntentionallyCustom] = useState(false);
-  
   // Track previous structure video state for auto-switching presets
   const prevHasStructureVideoRef = useRef<boolean | undefined>(undefined);
-  
-  // Track phaseConfig to detect actual edits in Advanced mode
-  const prevPhaseConfigRef = useRef<string | undefined>(undefined);
 
-  // Get the built-in default preset for the current mode
+  // Custom mode = no preset selected (selectedPhasePresetId is null/undefined)
+  const isCustomConfig = !selectedPhasePresetId;
+
+  // [PresetDebug] Log every render with key state
+  console.log('[PresetDebug] Render:', {
+    selectedPhasePresetId,
+    isCustomConfig,
+    motionMode,
+    advancedMode,
+    settingsLoading,
+    hasStructureVideo,
+  });
+
+  // Get the built-in default preset for the current mode (I2V vs VACE)
   const builtinDefaultPreset = useMemo(() => {
     return hasStructureVideo ? BUILTIN_VACE_PRESET : BUILTIN_I2V_PRESET;
   }, [hasStructureVideo]);
@@ -168,39 +165,35 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     return hasStructureVideo ? BUILTIN_DEFAULT_VACE_ID : BUILTIN_DEFAULT_I2V_ID;
   }, [hasStructureVideo]);
 
-  // Get additional featured preset IDs (from database)
-  const additionalPresetIds = useMemo(() => {
-    return hasStructureVideo ? featuredVACEPresetIds : featuredI2VPresetIds;
-  }, [hasStructureVideo, featuredI2VPresetIds, featuredVACEPresetIds]);
-
-  // Fetch additional featured presets from database
+  // Fetch additional featured presets from database (optional)
   const { data: additionalPresets } = useQuery({
-    queryKey: ['featured-presets', additionalPresetIds],
+    queryKey: ['featured-presets', featuredPresetIds],
     queryFn: async () => {
-      if (!additionalPresetIds || additionalPresetIds.length === 0) return [];
+      if (!featuredPresetIds || featuredPresetIds.length === 0) return [];
       
       const { data, error } = await supabase
         .from('resources')
         .select('*')
-        .in('id', additionalPresetIds);
+        .in('id', featuredPresetIds);
       
       if (error) {
         console.error('[MotionControl] Error fetching featured presets:', error);
         return [];
       }
       
-      // Sort by the order in additionalPresetIds
-      const sorted = additionalPresetIds
+      // Sort by the order in featuredPresetIds
+      const sorted = featuredPresetIds
         .map(id => data?.find(p => p.id === id))
         .filter(Boolean);
       
       return sorted;
     },
-    enabled: additionalPresetIds.length > 0,
+    enabled: featuredPresetIds.length > 0,
     staleTime: 60000, // Cache for 1 minute
+    placeholderData: (prev) => prev, // Keep previous data during refetches to prevent flicker
   });
 
-  // Combine built-in default (first) with additional presets from database
+  // Combine built-in default (first) + additional presets from database
   const allPresets = useMemo(() => {
     const presets: any[] = [builtinDefaultPreset];
     if (additionalPresets && additionalPresets.length > 0) {
@@ -209,45 +202,23 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     return presets;
   }, [builtinDefaultPreset, additionalPresets]);
 
-  // All preset IDs (built-in + additional)
-  const allPresetIds = useMemo(() => {
-    return [builtinDefaultId, ...additionalPresetIds];
-  }, [builtinDefaultId, additionalPresetIds]);
+  // All known preset IDs (for determining if we show chips or SelectedPresetCard)
+  const allKnownPresetIds = useMemo(() => {
+    return [builtinDefaultId, ...featuredPresetIds];
+  }, [builtinDefaultId, featuredPresetIds]);
 
-  // Check if selected preset is one of the featured ones (including built-in)
-  const isSelectedPresetFeatured = useMemo(() => {
-    if (!selectedPhasePresetId) return true; // No selection = show chips (will auto-select default)
-    return allPresetIds.includes(selectedPhasePresetId);
-  }, [selectedPhasePresetId, allPresetIds]);
+  // Check if selected preset is one of the known ones (built-in or featured)
+  const isSelectedPresetKnown = useMemo(() => {
+    if (!selectedPhasePresetId) return true; // No selection = show chips
+    return allKnownPresetIds.includes(selectedPhasePresetId);
+  }, [selectedPhasePresetId, allKnownPresetIds]);
 
-  // Check if config is "custom" (user has made edits)
-  const isCustomConfig = isIntentionallyCustom;
-
-  // Detect actual config changes while in Advanced mode → mark as custom
-  useEffect(() => {
-    if (!advancedMode || settingsLoading) {
-      // Just update the ref when not in advanced mode
-      prevPhaseConfigRef.current = phaseConfig ? JSON.stringify(phaseConfig) : undefined;
-      return;
-    }
-    
-    const currentConfigStr = phaseConfig ? JSON.stringify(phaseConfig) : undefined;
-    
-    // If config changed while in advanced mode, mark as custom
-    if (prevPhaseConfigRef.current !== undefined && 
-        currentConfigStr !== undefined && 
-        prevPhaseConfigRef.current !== currentConfigStr) {
-      console.log('[MotionControl] Config changed in Advanced mode, marking as custom');
-      setIsIntentionallyCustom(true);
-      onPhasePresetRemove(); // Clear preset since config no longer matches
-    }
-    
-    prevPhaseConfigRef.current = currentConfigStr;
-  }, [phaseConfig, advancedMode, settingsLoading, onPhasePresetRemove]);
+  // Track if we've done initial auto-select
+  const hasAutoSelectedRef = useRef(false);
 
   // Auto-select the built-in default preset when:
-  // 1. No preset is currently selected AND not intentionally custom
-  // 2. Structure video is added/removed (switch to appropriate default, also clears custom)
+  // 1. Initial mount with no preset selected
+  // 2. Structure video changes (switch to appropriate default)
   useEffect(() => {
     // Skip if settings are still loading
     if (settingsLoading) {
@@ -257,9 +228,8 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     const structureVideoChanged = prevHasStructureVideoRef.current !== undefined && 
                                    prevHasStructureVideoRef.current !== hasStructureVideo;
     
-    // When structure video changes, clear custom state and select appropriate default
+    // When structure video changes, select appropriate default
     if (structureVideoChanged) {
-      setIsIntentionallyCustom(false);
       console.log('[MotionControl] Structure video changed, auto-selecting default:', {
         wasStructureVideo: prevHasStructureVideoRef.current,
         nowStructureVideo: hasStructureVideo,
@@ -274,13 +244,12 @@ export const MotionControl: React.FC<MotionControlProps> = ({
       return;
     }
     
-    // Auto-select if no preset and not intentionally custom
-    const noPresetSelected = !selectedPhasePresetId && !isIntentionallyCustom;
-    if (noPresetSelected) {
-      console.log('[MotionControl] No preset selected, auto-selecting default:', {
+    // Initial auto-select: only if no preset selected and we haven't auto-selected yet
+    if (!selectedPhasePresetId && !hasAutoSelectedRef.current) {
+      console.log('[MotionControl] Initial load, auto-selecting default:', {
         builtinDefaultId,
-        isIntentionallyCustom
       });
+      hasAutoSelectedRef.current = true;
       onPhasePresetSelect(
         builtinDefaultPreset.id, 
         builtinDefaultPreset.metadata.phaseConfig, 
@@ -289,7 +258,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     }
     
     prevHasStructureVideoRef.current = hasStructureVideo;
-  }, [hasStructureVideo, builtinDefaultId, builtinDefaultPreset, selectedPhasePresetId, onPhasePresetSelect, settingsLoading, isIntentionallyCustom]);
+  }, [hasStructureVideo, builtinDefaultId, builtinDefaultPreset, selectedPhasePresetId, onPhasePresetSelect, settingsLoading]);
 
   // Sync motionMode with advancedMode state
   // When switching to advanced, enable advancedMode; when leaving, disable it
@@ -297,41 +266,64 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   // default 'basic' motionMode triggers onAdvancedModeChange(false) before
   // the actual settings are loaded from the database
   useEffect(() => {
+    console.log('[PresetDebug] Sync effect running:', {
+      settingsLoading,
+      motionMode,
+      advancedMode,
+      selectedPhasePresetId,
+    });
+    
     if (settingsLoading) {
-      console.log('[MotionControl] Skipping sync - settings still loading');
+      console.log('[PresetDebug] Skipping sync - settings still loading');
       return;
     }
     
     if (motionMode === 'advanced') {
       if (!advancedMode) {
+        console.log('[PresetDebug] Sync: setting advancedMode to true');
         onAdvancedModeChange(true);
       }
     } else if (motionMode === 'basic') {
       if (advancedMode) {
+        console.log('[PresetDebug] Sync: setting advancedMode to false');
         onAdvancedModeChange(false);
       }
     }
-  }, [motionMode, advancedMode, onAdvancedModeChange, settingsLoading]);
+  }, [motionMode, advancedMode, onAdvancedModeChange, settingsLoading, selectedPhasePresetId]);
 
   // Handle mode change with validation
   const handleModeChange = useCallback((newMode: string) => {
+    console.log('[PresetDebug] handleModeChange called:', {
+      newMode,
+      currentSelectedPresetId: selectedPhasePresetId,
+    });
+    
     // Prevent switching to advanced when turbo mode is active
     if (turboMode && newMode === 'advanced') {
-      console.log('[MotionControl] Cannot switch to advanced mode while turbo mode is active');
+      console.log('[PresetDebug] Cannot switch to advanced mode while turbo mode is active');
       return;
     }
     
     onMotionModeChange(newMode as 'basic' | 'advanced');
-  }, [turboMode, onMotionModeChange]);
+  }, [turboMode, onMotionModeChange, selectedPhasePresetId]);
 
-  // Handle switch to advanced for editing/custom config
+  // Handle switch to advanced for editing preset
   const handleSwitchToAdvanced = useCallback(() => {
     onMotionModeChange('advanced');
   }, [onMotionModeChange]);
 
+  // Handle clicking Custom chip - clears preset and goes to advanced
+  const handleCustomClick = useCallback(() => {
+    onPhasePresetRemove(); // Clear preset → isCustomConfig becomes true
+    onMotionModeChange('advanced');
+  }, [onPhasePresetRemove, onMotionModeChange]);
+
   // Handle preset selection from chips or modal
   const handlePresetSelect = useCallback((preset: any) => {
-    setIsIntentionallyCustom(false); // Clear custom flag when selecting a preset
+    console.log('[PresetDebug] handlePresetSelect called:', {
+      presetId: preset.id,
+      presetName: preset.metadata?.name,
+    });
     if (preset.metadata?.phaseConfig) {
       onPhasePresetSelect(preset.id, preset.metadata.phaseConfig, preset.metadata);
     }
@@ -352,75 +344,78 @@ export const MotionControl: React.FC<MotionControlProps> = ({
         <TabsContent value="basic" className="space-y-4 mt-4">
           {/* Preset Selection Section */}
           <div className="space-y-3">
-            {/* Header row with label and Browse button */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label className="text-sm font-light">Motion Preset</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                      <Info className="h-4 w-4" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Select a motion preset to control how your video moves.<br />
-                    Model type (I2V/VACE) is auto-determined by structure video.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsPresetModalOpen(true)}
-                className="gap-1 text-xs h-7"
-              >
-                <Library className="h-3.5 w-3.5" />
-                Browse Presets
-              </Button>
-            </div>
-
-            {/* Show featured preset chips OR selected non-featured preset */}
-            {isSelectedPresetFeatured ? (
-              // Featured Preset Chips (including built-in default) + Custom chip
-              <div className="flex flex-wrap gap-2">
-                {allPresets.map((preset: any, index: number) => {
-                  // When in custom mode (advancedMode), no preset chip is selected
-                  const isSelected = !isCustomConfig && selectedPhasePresetId === preset.id;
-                  const isBuiltinDefault = preset.id === builtinDefaultId;
-                  const metadata = preset.metadata as any;
-                  const sampleVideo = metadata?.sample_generations?.find((g: any) => g.type === 'video');
-                  
-                  return (
-                    <button
-                      key={preset.id}
-                      onClick={() => handlePresetSelect(preset)}
-                      className={`
-                        relative group flex items-center gap-2 px-3 py-2 rounded-lg border transition-all
-                        ${isSelected 
-                          ? 'bg-blue-500/20 border-blue-500 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/30' 
-                          : isBuiltinDefault
-                            ? 'bg-muted border-primary/30 hover:border-primary/50 hover:bg-muted/80'
-                            : 'bg-muted/50 border-border hover:border-primary/50 hover:bg-muted'
-                        }
-                      `}
-                    >
-                      {/* Thumbnail */}
-                      {sampleVideo && (
-                        <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                          <HoverScrubVideo
-                            src={sampleVideo.url}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                      <div className="flex flex-col items-start">
-                        <span className="text-sm font-medium">
-                          {metadata?.name || 'Preset'}
+            {/* Show preset chips OR selected non-known preset card */}
+            {isSelectedPresetKnown ? (
+              // Preset Chips: Built-in + Featured + Custom
+              <div className="space-y-3">
+                {/* Header with label, tooltip, and Browse button */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm font-medium">Motion Preset</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
                         </span>
-                        {isBuiltinDefault && !isSelected && (
-                          <span className="text-xs text-muted-foreground">Default</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Select a motion preset to control how your video moves.<br />
+                        Model type (I2V/VACE) is auto-determined by structure video.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsPresetModalOpen(true)}
+                    className="gap-1 text-xs h-7"
+                  >
+                    <Library className="h-3.5 w-3.5" />
+                    Browse Presets
+                  </Button>
+                </div>
+
+                {/* Preset chips */}
+                <div className="flex flex-wrap gap-2">
+                  {/* Built-in + additional presets */}
+                  {allPresets.map((preset: any) => {
+                    // When custom mode, no preset is selected
+                    const isSelected = !isCustomConfig && selectedPhasePresetId === preset.id;
+                    const isBuiltinDefault = preset.id === builtinDefaultId;
+                    const metadata = preset.metadata as any;
+                    const sampleVideo = metadata?.sample_generations?.find((g: any) => g.type === 'video');
+                    
+                    return (
+                      <button
+                        key={preset.id}
+                        onClick={() => handlePresetSelect(preset)}
+                        className={`
+                          relative group flex items-center gap-2 px-3 py-2 rounded-lg border
+                          ${isSelected 
+                            ? 'bg-blue-500/20 border-blue-500 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/30' 
+                            : isBuiltinDefault
+                              ? 'bg-muted border-primary/30 hover:border-primary/50 hover:bg-muted/80'
+                              : 'bg-muted/50 border-border hover:border-primary/50 hover:bg-muted'
+                          }
+                        `}
+                      >
+                        {/* Thumbnail */}
+                        {sampleVideo && (
+                          <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                            <HoverScrubVideo
+                              src={sampleVideo.url}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
                         )}
-                      </div>
+                        <div className="flex flex-col items-start">
+                          <span className="text-sm font-medium">
+                            {metadata?.name || 'Preset'}
+                          </span>
+                          {isBuiltinDefault && !isSelected && (
+                            <span className="text-xs text-muted-foreground">Default</span>
+                          )}
+                        </div>
                         {isSelected && (
                           <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300">
                             Active
@@ -429,33 +424,35 @@ export const MotionControl: React.FC<MotionControlProps> = ({
                       </button>
                     );
                   })}
-                
-                {/* Custom chip - shown at end, selected when advancedMode is true */}
-                <button
-                  onClick={handleSwitchToAdvanced}
-                  className={`
-                    relative group flex items-center gap-2 px-3 py-2 rounded-lg border transition-all
-                    ${isCustomConfig
-                      ? 'bg-blue-500/20 border-blue-500 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/30' 
-                      : 'bg-muted/50 border-border hover:border-primary/50 hover:bg-muted'
-                    }
-                  `}
-                >
-                  <Settings className="h-4 w-4" />
-                  <span className="text-sm font-medium">Custom</span>
-                  {isCustomConfig && (
-                    <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300">
-                      Active
-                    </Badge>
-                  )}
-                </button>
+                  
+                  {/* Custom chip - explicitly goes to custom mode (clears preset) */}
+                  <button
+                    onClick={handleCustomClick}
+                    className={`
+                      relative group flex items-center gap-2 px-3 py-2 rounded-lg border
+                      ${isCustomConfig
+                        ? 'bg-blue-500/20 border-blue-500 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/30' 
+                        : 'bg-muted/50 border-border hover:border-primary/50 hover:bg-muted'
+                      }
+                    `}
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="text-sm font-medium">Custom</span>
+                    {isCustomConfig && (
+                      <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300">
+                        Active
+                      </Badge>
+                    )}
+                  </button>
+                </div>
               </div>
             ) : (
-              // Non-featured preset selected - show selected preset card
+              // Non-known preset selected (from Browse) - show selected preset card
               <SelectedPresetCard
                 presetId={selectedPhasePresetId!}
                 phaseConfig={phaseConfig}
                 onSwitchToAdvanced={handleSwitchToAdvanced}
+                onChangePreset={() => setIsPresetModalOpen(true)}
                 onRemovePreset={onPhasePresetRemove}
               />
             )}
@@ -530,6 +527,7 @@ interface SelectedPresetCardProps {
   presetId: string;
   phaseConfig?: PhaseConfig;
   onSwitchToAdvanced?: () => void;
+  onChangePreset?: () => void;
   onRemovePreset?: () => void;
 }
 
@@ -537,6 +535,7 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
   presetId, 
   phaseConfig,
   onSwitchToAdvanced,
+  onChangePreset,
   onRemovePreset
 }) => {
   // Fetch preset details from database
@@ -606,10 +605,20 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
             </div>
           )}
           
-          {/* Phase Info */}
-          <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
-            {phaseConfig?.num_phases || 2} phases
-          </Badge>
+          {/* Phase Info and Change button */}
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
+              {phaseConfig?.num_phases || 2} phases
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onChangePreset}
+              className="text-xs h-6"
+            >
+              Change
+            </Button>
+          </div>
         </div>
         
         {/* Right side - Video Preview */}
