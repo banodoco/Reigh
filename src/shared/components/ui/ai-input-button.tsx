@@ -347,7 +347,7 @@ export const AIInputButton = React.forwardRef<
 
   // On mobile, skip the tooltip wrapper entirely
   if (isMobile) {
-    return mode === "voice" ? voiceButtonContent : textButtonContent
+    return mode === "voice" ? voiceButtonContent : textButtonTrigger
   }
 
   // Voice mode: standard tooltip wrapper
