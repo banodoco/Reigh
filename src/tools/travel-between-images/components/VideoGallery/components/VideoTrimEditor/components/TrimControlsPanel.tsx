@@ -27,9 +27,12 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
   onClose,
   variant,
   videoUrl,
+  currentTime: externalCurrentTime,
+  videoRef: externalVideoRef,
 }) => {
   const isMobile = variant === 'mobile';
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  // Internal video ref for frame extraction (hidden video element)
+  const frameExtractionVideoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   
   // Frame preview state
@@ -37,6 +40,10 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
   const [endFrame, setEndFrame] = useState<string | null>(null);
   const [isExtractingFrames, setIsExtractingFrames] = useState(false);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  
+  // Queue for sequential frame extraction (prevents race conditions)
+  const extractionQueueRef = useRef<Array<{ time: number; callback: (frame: string | null) => void }>>([]);
+  const isExtractingRef = useRef(false);
 
   // Handle video metadata loaded
   const handleVideoLoaded = useCallback(() => {
@@ -49,21 +56,37 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
     setIsVideoReady(false);
     setStartFrame(null);
     setEndFrame(null);
+    // Clear any pending extractions
+    extractionQueueRef.current = [];
+    isExtractingRef.current = false;
   }, [videoUrl]);
 
-  // Extract a frame at a specific time (sequential - must be called one at a time)
-  const extractFrame = useCallback(async (time: number): Promise<string | null> => {
-    if (!videoRef.current || !canvasRef.current) return null;
+  // Process extraction queue sequentially
+  const processExtractionQueue = useCallback(async () => {
+    if (isExtractingRef.current || extractionQueueRef.current.length === 0) return;
+    if (!frameExtractionVideoRef.current || !canvasRef.current) return;
     
-    const video = videoRef.current;
+    isExtractingRef.current = true;
+    const { time, callback } = extractionQueueRef.current.shift()!;
+    
+    const video = frameExtractionVideoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    
+    if (!ctx) {
+      callback(null);
+      isExtractingRef.current = false;
+      processExtractionQueue();
+      return;
+    }
 
     // Validate time is finite and within video duration
     if (!Number.isFinite(time) || time < 0) {
       console.warn('[TrimControlsPanel] Invalid time for frame extraction:', time);
-      return null;
+      callback(null);
+      isExtractingRef.current = false;
+      processExtractionQueue();
+      return;
     }
 
     // Clamp time to video duration
@@ -71,31 +94,44 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
     
     if (!Number.isFinite(clampedTime)) {
       console.warn('[TrimControlsPanel] Clamped time is not finite:', clampedTime);
-      return null;
+      callback(null);
+      isExtractingRef.current = false;
+      processExtractionQueue();
+      return;
     }
 
-    return new Promise((resolve) => {
-      const handleSeeked = () => {
-        video.removeEventListener('seeked', handleSeeked);
-        
-        // Set canvas size to match video aspect ratio
-        const aspectRatio = video.videoWidth / video.videoHeight;
-        if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
-          resolve(null);
-          return;
-        }
-        
-        canvas.width = 160;
-        canvas.height = Math.round(160 / aspectRatio);
-        
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
-      };
+    const handleSeeked = () => {
+      video.removeEventListener('seeked', handleSeeked);
+      
+      // Set canvas size to match video aspect ratio
+      const aspectRatio = video.videoWidth / video.videoHeight;
+      if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+        callback(null);
+        isExtractingRef.current = false;
+        processExtractionQueue();
+        return;
+      }
+      
+      canvas.width = 160;
+      canvas.height = Math.round(160 / aspectRatio);
+      
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frame = canvas.toDataURL('image/jpeg', 0.8);
+      callback(frame);
+      isExtractingRef.current = false;
+      // Process next in queue
+      processExtractionQueue();
+    };
 
-      video.addEventListener('seeked', handleSeeked);
-      video.currentTime = clampedTime;
-    });
+    video.addEventListener('seeked', handleSeeked);
+    video.currentTime = clampedTime;
   }, []);
+
+  // Queue a frame extraction (returns via callback to ensure sequential processing)
+  const queueFrameExtraction = useCallback((time: number, callback: (frame: string | null) => void) => {
+    extractionQueueRef.current.push({ time, callback });
+    processExtractionQueue();
+  }, [processExtractionQueue]);
 
   // Throttle refs for live updates while dragging
   const lastStartUpdateRef = useRef<number>(0);
@@ -104,23 +140,57 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
   const pendingEndUpdateRef = useRef<NodeJS.Timeout | null>(null);
   const prevStartTrimRef = useRef<number>(trimState.startTrim);
   const prevEndTrimRef = useRef<number>(trimState.endTrim);
+  const initialExtractionDoneRef = useRef(false);
 
-  // Update START frame when startTrim changes
+  // Initial extraction - extract both frames sequentially when video becomes ready
   useEffect(() => {
     if (!videoUrl || !isVideoReady || trimState.videoDuration === 0) return;
+    if (initialExtractionDoneRef.current) return;
+    
+    initialExtractionDoneRef.current = true;
+    
+    // Queue start frame first, then end frame (sequential processing)
+    const startTime = trimState.startTrim;
+    const endTime = Math.max(0.001, trimState.videoDuration - trimState.endTrim - 0.1);
+    
+    if (Number.isFinite(startTime)) {
+      queueFrameExtraction(startTime, (frame) => {
+        setStartFrame(frame);
+        lastStartUpdateRef.current = Date.now();
+      });
+    }
+    
+    if (Number.isFinite(endTime)) {
+      queueFrameExtraction(endTime, (frame) => {
+        setEndFrame(frame);
+        lastEndUpdateRef.current = Date.now();
+      });
+    }
+  }, [videoUrl, isVideoReady, trimState.videoDuration, trimState.startTrim, trimState.endTrim, queueFrameExtraction]);
+
+  // Reset initial extraction flag when URL changes
+  useEffect(() => {
+    initialExtractionDoneRef.current = false;
+  }, [videoUrl]);
+
+  // Update START frame when startTrim changes (after initial extraction)
+  useEffect(() => {
+    if (!videoUrl || !isVideoReady || trimState.videoDuration === 0) return;
+    if (!initialExtractionDoneRef.current) return; // Wait for initial extraction
     
     // Skip if startTrim hasn't actually changed
-    if (prevStartTrimRef.current === trimState.startTrim && startFrame !== null) return;
+    if (prevStartTrimRef.current === trimState.startTrim) return;
     prevStartTrimRef.current = trimState.startTrim;
 
-    const updateStartFrame = async () => {
+    const updateStartFrame = () => {
       const keepStartTime = trimState.startTrim;
       
       if (!Number.isFinite(keepStartTime)) return;
       
-      const frame = await extractFrame(keepStartTime);
-      setStartFrame(frame);
-      lastStartUpdateRef.current = Date.now();
+      queueFrameExtraction(keepStartTime, (frame) => {
+        setStartFrame(frame);
+        lastStartUpdateRef.current = Date.now();
+      });
     };
 
     // Clear any pending update
@@ -145,24 +215,26 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
         pendingStartUpdateRef.current = null;
       }
     };
-  }, [videoUrl, isVideoReady, trimState.startTrim, trimState.videoDuration, extractFrame, startFrame]);
+  }, [videoUrl, isVideoReady, trimState.startTrim, trimState.videoDuration, queueFrameExtraction]);
 
-  // Update END frame when endTrim changes
+  // Update END frame when endTrim changes (after initial extraction)
   useEffect(() => {
     if (!videoUrl || !isVideoReady || trimState.videoDuration === 0) return;
+    if (!initialExtractionDoneRef.current) return; // Wait for initial extraction
     
     // Skip if endTrim hasn't actually changed
-    if (prevEndTrimRef.current === trimState.endTrim && endFrame !== null) return;
+    if (prevEndTrimRef.current === trimState.endTrim) return;
     prevEndTrimRef.current = trimState.endTrim;
 
-    const updateEndFrame = async () => {
+    const updateEndFrame = () => {
       const keepEndTime = trimState.videoDuration - trimState.endTrim;
       
       if (!Number.isFinite(keepEndTime)) return;
       
-      const frame = await extractFrame(Math.max(0.001, keepEndTime - 0.1));
-      setEndFrame(frame);
-      lastEndUpdateRef.current = Date.now();
+      queueFrameExtraction(Math.max(0.001, keepEndTime - 0.1), (frame) => {
+        setEndFrame(frame);
+        lastEndUpdateRef.current = Date.now();
+      });
     };
 
     // Clear any pending update
@@ -187,7 +259,7 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
         pendingEndUpdateRef.current = null;
       }
     };
-  }, [videoUrl, isVideoReady, trimState.endTrim, trimState.videoDuration, extractFrame, endFrame]);
+  }, [videoUrl, isVideoReady, trimState.endTrim, trimState.videoDuration, queueFrameExtraction]);
 
   // Format seconds to mm:ss.s
   const formatTime = (seconds: number): string => {
@@ -210,7 +282,7 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
       {/* Hidden video element for frame extraction */}
       {videoUrl && (
         <video
-          ref={videoRef}
+          ref={frameExtractionVideoRef}
           src={videoUrl}
           crossOrigin="anonymous"
           preload="auto"
@@ -262,6 +334,8 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
           endTrim={trimState.endTrim}
           onStartTrimChange={onStartTrimChange}
           onEndTrimChange={onEndTrimChange}
+          currentTime={externalCurrentTime}
+          videoRef={externalVideoRef}
           disabled={isSaving}
         />
 

@@ -79,6 +79,7 @@ import {
   useVideoTrimming,
   useTrimSave,
   TrimControlsPanel,
+  TrimTimelineBar,
   VariantSelector,
 } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor';
 
@@ -165,6 +166,8 @@ interface MediaLightboxProps {
   // Video trim functionality (optional, only for segment videos)
   showVideoTrimEditor?: boolean;
   onTrimModeChange?: (isTrimMode: boolean) => void;
+  // Initial video trim mode (opens lightbox directly in trim mode)
+  initialVideoTrimMode?: boolean;
   // Initial variant to display (when opening lightbox from a variant click)
   initialVariantId?: string;
 }
@@ -229,6 +232,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Video trim functionality
   showVideoTrimEditor = false,
   onTrimModeChange,
+  // Initial video trim mode
+  initialVideoTrimMode = false,
   // Initial variant to display
   initialVariantId,
 }) => {
@@ -266,7 +271,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const isCloudMode = generationMethods.inCloud;
 
   // Video trim mode state (only used when showVideoTrimEditor is true)
-  const [isVideoTrimMode, setIsVideoTrimMode] = useState(false);
+  const [isVideoTrimMode, setIsVideoTrimMode] = useState(initialVideoTrimMode);
+  
+  // Video ref and currentTime for trim mode (similar to videoEditing pattern)
+  const trimVideoRef = useRef<HTMLVideoElement>(null);
+  const [trimCurrentTime, setTrimCurrentTime] = useState(0);
 
   // Track component lifecycle and media changes - ALL TOP LEVEL
   useEffect(() => {
@@ -819,6 +828,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     trimmedDuration,
     hasTrimChanges,
   } = trimmingHook;
+
+  // Keep video playing within constrained region when trim values change
+  useEffect(() => {
+    const video = trimVideoRef.current;
+    if (!video || !isVideoTrimMode) return;
+    
+    const keepStart = trimState.startTrim;
+    const keepEnd = trimState.videoDuration - trimState.endTrim;
+    
+    // If video is outside the new keep region, seek to start
+    if (video.currentTime < keepStart || video.currentTime >= keepEnd) {
+      video.currentTime = keepStart;
+    }
+    
+    // Ensure video keeps playing
+    if (video.paused) {
+      video.play().catch(() => {
+        // Ignore play errors (e.g., user interaction required)
+      });
+    }
+  }, [isVideoTrimMode, trimState.startTrim, trimState.endTrim, trimState.videoDuration]);
 
   // Get the effective media URL (active variant or current media)
   // For videos with trim editor, use active variant
@@ -1799,6 +1829,57 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </div>
                       )}
                     </div>
+                  ) : isVideo && isVideoTrimModeActive ? (
+                    // Video trim mode: Video plays within trimmed region and loops (DESKTOP)
+                    // Controls are in the TrimControlsPanel on the side
+                    <video
+                      ref={trimVideoRef}
+                      src={effectiveVideoUrl}
+                      poster={activeVariant?.thumbnail_url || media.thumbUrl}
+                      muted
+                      playsInline
+                      controls
+                      autoPlay
+                      loop={false}
+                      preload="auto"
+                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
+                      onLoadedMetadata={(e) => {
+                        const video = e.currentTarget;
+                        if (Number.isFinite(video.duration) && video.duration > 0) {
+                          setVideoDuration(video.duration);
+                          // Seek to start of keep region when video loads
+                          video.currentTime = trimState.startTrim;
+                        }
+                      }}
+                      onTimeUpdate={(e) => {
+                        const video = e.currentTarget;
+                        setTrimCurrentTime(video.currentTime);
+                        
+                        // Constrain playback to keep region (startTrim to duration - endTrim)
+                        const keepStart = trimState.startTrim;
+                        const keepEnd = trimState.videoDuration - trimState.endTrim;
+                        
+                        if (video.currentTime >= keepEnd) {
+                          // Loop back to start of keep region and ensure playing
+                          video.currentTime = keepStart;
+                          if (video.paused) {
+                            video.play().catch(() => {});
+                          }
+                        } else if (video.currentTime < keepStart) {
+                          // Jump to start of keep region if before it
+                          video.currentTime = keepStart;
+                          if (video.paused) {
+                            video.play().catch(() => {});
+                          }
+                        }
+                      }}
+                      onEnded={(e) => {
+                        // If video reaches the actual end, loop back to keep region start
+                        const video = e.currentTarget;
+                        video.currentTime = trimState.startTrim;
+                        video.play().catch(() => {});
+                      }}
+                    />
                   ) : (
                     <MediaDisplayWithCanvas
                       effectiveImageUrl={isVideo ? effectiveVideoUrl : effectiveMediaUrl}
@@ -2015,6 +2096,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onClose={handleExitVideoTrimMode}
                       variant="desktop"
                       videoUrl={effectiveVideoUrl}
+                      currentTime={trimCurrentTime}
+                      videoRef={trimVideoRef}
                     />
                   ) : isVideoEditModeActive ? (
                     <div className="h-full flex flex-col">
@@ -2765,6 +2848,57 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </div>
                       )}
                     </div>
+                  ) : isVideoTrimModeActive ? (
+                    // Video trim mode: Video plays within trimmed region and loops
+                    // Controls are in the TrimControlsPanel on the side
+                    <video
+                      ref={trimVideoRef}
+                      src={effectiveVideoUrl}
+                      poster={activeVariant?.thumbnail_url || media.thumbUrl}
+                      muted
+                      playsInline
+                      controls
+                      autoPlay
+                      loop={false}
+                      preload="auto"
+                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
+                      onLoadedMetadata={(e) => {
+                        const video = e.currentTarget;
+                        if (Number.isFinite(video.duration) && video.duration > 0) {
+                          setVideoDuration(video.duration);
+                          // Seek to start of keep region when video loads
+                          video.currentTime = trimState.startTrim;
+                        }
+                      }}
+                      onTimeUpdate={(e) => {
+                        const video = e.currentTarget;
+                        setTrimCurrentTime(video.currentTime);
+                        
+                        // Constrain playback to keep region (startTrim to duration - endTrim)
+                        const keepStart = trimState.startTrim;
+                        const keepEnd = trimState.videoDuration - trimState.endTrim;
+                        
+                        if (video.currentTime >= keepEnd) {
+                          // Loop back to start of keep region and ensure playing
+                          video.currentTime = keepStart;
+                          if (video.paused) {
+                            video.play().catch(() => {});
+                          }
+                        } else if (video.currentTime < keepStart) {
+                          // Jump to start of keep region if before it
+                          video.currentTime = keepStart;
+                          if (video.paused) {
+                            video.play().catch(() => {});
+                          }
+                        }
+                      }}
+                      onEnded={(e) => {
+                        // If video reaches the actual end, loop back to keep region start
+                        const video = e.currentTarget;
+                        video.currentTime = trimState.startTrim;
+                        video.play().catch(() => {});
+                      }}
+                    />
                   ) : (
                     // Normal video display with StyledVideoPlayer
                     <StyledVideoPlayer

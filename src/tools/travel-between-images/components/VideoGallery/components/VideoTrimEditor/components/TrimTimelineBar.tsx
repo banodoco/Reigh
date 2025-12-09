@@ -17,6 +17,8 @@ export const TrimTimelineBar: React.FC<TrimTimelineBarProps> = ({
   onEndTrimChange,
   currentTime,
   disabled = false,
+  videoRef,
+  onSeek,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState<'start' | 'end' | null>(null);
@@ -39,6 +41,32 @@ export const TrimTimelineBar: React.FC<TrimTimelineBarProps> = ({
       return percent * duration;
     },
     [duration]
+  );
+
+  // Handle click on the keep region to seek video
+  const handleTimelineClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (disabled || isDragging) return;
+      
+      // Don't seek if click was on a handle (they have z-10, so check target classes)
+      const target = e.target as HTMLElement;
+      if (target.closest('.cursor-ew-resize')) return;
+      
+      const clickedTime = clientXToTime(e.clientX);
+      const keepStart = startTrim;
+      const keepEnd = duration - endTrim;
+      
+      // Only seek if clicked within the keep region
+      if (clickedTime >= keepStart && clickedTime <= keepEnd) {
+        // Seek using videoRef if available
+        if (videoRef?.current) {
+          videoRef.current.currentTime = clickedTime;
+        }
+        // Also notify via callback
+        onSeek?.(clickedTime);
+      }
+    },
+    [disabled, isDragging, clientXToTime, startTrim, endTrim, duration, videoRef, onSeek]
   );
 
   // Handle pointer down on handles
@@ -113,6 +141,7 @@ export const TrimTimelineBar: React.FC<TrimTimelineBarProps> = ({
           'relative h-12 rounded-lg overflow-hidden select-none',
           disabled ? 'opacity-50 pointer-events-none' : 'cursor-pointer'
         )}
+        onClick={handleTimelineClick}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}

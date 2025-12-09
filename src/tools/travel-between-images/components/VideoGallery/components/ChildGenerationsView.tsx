@@ -10,7 +10,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { Switch } from '@/shared/components/ui/switch';
 import { Slider } from '@/shared/components/ui/slider';
-import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers, RotateCcw, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers, RotateCcw, Clock, Scissors } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -56,6 +56,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const { toast } = useToast();
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
+    // State for opening lightbox in trim mode
+    const [openInTrimMode, setOpenInTrimMode] = useState(false);
     // State for segment input image lightbox (lifted from SegmentCard for proper z-index)
     const [segmentImageLightbox, setSegmentImageLightbox] = useState<{
         segmentIndex: number;
@@ -466,7 +468,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     }, [segmentSlots]);
 
     // Lightbox handlers (must be after segmentSlots is defined)
-    const handleLightboxClose = () => setLightboxIndex(null);
+    const handleLightboxClose = () => {
+        setLightboxIndex(null);
+        setOpenInTrimMode(false);
+    };
     
     // Get only the child slots for navigation (skip placeholders)
     const childSlotIndices = React.useMemo(() => 
@@ -952,6 +957,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 projectId={projectId}
                                                 parentGenerationId={parentGenerationId}
                                                 onLightboxOpen={() => setLightboxIndex(slot.index)}
+                                                onLightboxOpenWithTrim={() => {
+                                                    setOpenInTrimMode(true);
+                                                    setLightboxIndex(slot.index);
+                                                }}
                                                 onMobileTap={handleMobileTap}
                                                 onUpdate={refetch}
                                                 availableLoras={availableLoras}
@@ -1087,6 +1096,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         shotId={undefined}
                         showTaskDetails={true}
                         showVideoTrimEditor={true}
+                        initialVideoTrimMode={openInTrimMode}
                         taskDetailsData={{
                             task: segmentTask,
                             isLoading: isLoadingSegmentTask,
@@ -1226,6 +1236,7 @@ interface SegmentCardProps {
     projectId: string | null;
     parentGenerationId: string;
     onLightboxOpen: () => void;
+    onLightboxOpenWithTrim: () => void;
     onMobileTap: (index: number) => void;
     onUpdate: () => void;
     availableLoras: LoraModel[];
@@ -1233,7 +1244,7 @@ interface SegmentCardProps {
     projectResolution?: string; // Resolution derived from project's aspect ratio
 }
 
-const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution }) => {
+const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution }) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [params, setParams] = useState<any>(child.params || {});
@@ -1711,6 +1722,19 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
             <div 
                 className="relative aspect-video bg-black group"
             >
+                    {/* Trim button - bottom right overlay, appears on hover */}
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        className="absolute bottom-2 right-2 z-10 h-7 px-2 gap-1 bg-black/60 hover:bg-black/80 text-white border-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onLightboxOpenWithTrim();
+                        }}
+                    >
+                        <Scissors className="h-3.5 w-3.5" />
+                        <span className="text-xs">Trim</span>
+                    </Button>
                     <VideoItem
                         video={child}
                         index={index}

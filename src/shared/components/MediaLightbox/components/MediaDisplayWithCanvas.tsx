@@ -37,6 +37,10 @@ interface MediaDisplayWithCanvasProps {
   // Layout adjustments
   tasksPaneWidth?: number; // Width of tasks pane to adjust for (desktop only)
   
+  // Playback constraints (for trim preview)
+  playbackStart?: number;
+  playbackEnd?: number;
+  
   // Debug
   debugContext?: string;
 }
@@ -63,6 +67,8 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   className = '',
   containerClassName = '',
   tasksPaneWidth = 0,
+  playbackStart,
+  playbackEnd,
   debugContext = 'MediaDisplay'
 }) => {
   const [imageLoadError, setImageLoadError] = React.useState(false);
@@ -186,6 +192,8 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
           className={`shadow-wes border border-border/20 ${variant === 'regular-centered' ? 'rounded' : ''}`}
           style={mediaStyle}
           onLoadedMetadata={onVideoLoadedMetadata}
+          playbackStart={playbackStart}
+          playbackEnd={playbackEnd}
         />
       ) : (
         // Image with Canvas Overlays

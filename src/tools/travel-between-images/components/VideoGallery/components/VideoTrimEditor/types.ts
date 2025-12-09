@@ -113,6 +113,10 @@ export interface TrimControlsPanelProps {
   variant: 'desktop' | 'mobile';
   /** Video URL for frame extraction */
   videoUrl?: string;
+  /** Current playback time for timeline indicator */
+  currentTime?: number;
+  /** Video ref for scrubbing/seeking */
+  videoRef?: React.RefObject<HTMLVideoElement>;
 }
 
 /**
@@ -133,6 +137,10 @@ export interface TrimTimelineBarProps {
   currentTime?: number;
   /** Whether the component is disabled */
   disabled?: boolean;
+  /** Video ref for scrubbing/seeking (optional, enables click-to-seek) */
+  videoRef?: React.RefObject<HTMLVideoElement>;
+  /** Handler when user seeks by clicking on timeline */
+  onSeek?: (time: number) => void;
 }
 
 /**

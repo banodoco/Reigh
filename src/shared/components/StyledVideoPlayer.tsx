@@ -16,6 +16,10 @@ interface StyledVideoPlayerProps {
   preload?: 'auto' | 'metadata' | 'none';
   /** Callback when video metadata loads */
   onLoadedMetadata?: (e: React.SyntheticEvent<HTMLVideoElement>) => void;
+  /** Optional playback start time in seconds (for trim preview) */
+  playbackStart?: number;
+  /** Optional playback end time in seconds (for trim preview) */
+  playbackEnd?: number;
 }
 
 export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
@@ -29,6 +33,8 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   playsInline = true,
   preload = 'auto',
   onLoadedMetadata,
+  playbackStart,
+  playbackEnd,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isMobile = useIsMobile();
@@ -92,14 +98,37 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
     }
   }, [isMobile]);
 
+  // Constrained playback mode (for trim preview)
+  const hasPlaybackConstraints = playbackStart !== undefined && playbackEnd !== undefined;
+  const effectiveStart = playbackStart ?? 0;
+  const effectiveEnd = playbackEnd ?? duration;
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    const updateTime = () => setCurrentTime(video.currentTime);
+    const updateTime = () => {
+      setCurrentTime(video.currentTime);
+      
+      // Constrain playback to trim range
+      if (hasPlaybackConstraints && !video.paused) {
+        if (video.currentTime >= effectiveEnd) {
+          // Loop back to start of trim range
+          video.currentTime = effectiveStart;
+        } else if (video.currentTime < effectiveStart) {
+          // If somehow before start, jump to start
+          video.currentTime = effectiveStart;
+        }
+      }
+    };
     const updateDuration = () => {
       if (Number.isFinite(video.duration) && video.duration > 0) {
         setDuration(video.duration);
+        
+        // Seek to playbackStart when video loads (if constrained)
+        if (hasPlaybackConstraints && effectiveStart > 0) {
+          video.currentTime = effectiveStart;
+        }
       }
     };
     const handlePlay = () => setIsPlaying(true);
@@ -172,7 +201,18 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
       video.removeEventListener('stalled', handleStalled);
       video.removeEventListener('waiting', handleWaiting);
     };
-  }, [src]);
+  }, [src, hasPlaybackConstraints, effectiveStart, effectiveEnd]);
+
+  // Seek to start when playback constraints change
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !hasPlaybackConstraints || duration === 0) return;
+    
+    // Seek to the start of the constrained range
+    if (video.currentTime < effectiveStart || video.currentTime > effectiveEnd) {
+      video.currentTime = effectiveStart;
+    }
+  }, [hasPlaybackConstraints, effectiveStart, effectiveEnd, duration]);
 
   useEffect(() => {
     let timeout: NodeJS.Timeout;
