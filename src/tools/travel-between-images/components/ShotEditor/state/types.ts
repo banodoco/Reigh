@@ -135,9 +135,7 @@ export interface ShotEditorProps {
   // Generation type mode (I2V vs VACE)
   generationTypeMode?: 'i2v' | 'vace';
   onGenerationTypeModeChange?: (mode: 'i2v' | 'vace') => void;
-  // Advanced mode
-  advancedMode?: boolean;
-  onAdvancedModeChange?: (advanced: boolean) => void;
+  // Advanced mode (derived from motionMode, no longer passed as prop)
   phaseConfig?: any; // PhaseConfig type from settings
   onPhaseConfigChange?: (config: any) => void;
   // Phase preset props

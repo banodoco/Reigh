@@ -524,7 +524,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                     amountOfMotion={taskSettings.motion}
                     onAmountOfMotionChange={() => {}} // No-op
                     advancedMode={taskSettings.advancedMode}
-                    onAdvancedModeChange={() => {}} // No-op
                     phaseConfig={taskSettings.phaseConfig}
                     onPhaseConfigChange={() => {}} // No-op
                     selectedPhasePresetId={null}
@@ -544,7 +543,7 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                 </div>
                 <div className="pointer-events-none opacity-75">
                   <MotionControl
-                    motionMode={taskSettings.motionMode === 'presets' ? 'basic' : (taskSettings.motionMode || 'basic')}
+                    motionMode={taskSettings.advancedMode ? 'advanced' : (taskSettings.motionMode === 'presets' ? 'basic' : (taskSettings.motionMode || 'basic'))}
                     onMotionModeChange={() => {}} // No-op
                     selectedLoras={[]}
                     availableLoras={[]}
@@ -560,8 +559,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                       enhancePrompt: taskSettings.enhancePrompt,
                       durationFrames: taskSettings.frames,
                     }}
-                    advancedMode={taskSettings.advancedMode}
-                    onAdvancedModeChange={() => {}} // No-op
                     phaseConfig={taskSettings.phaseConfig || undefined}
                     onPhaseConfigChange={() => {}} // No-op
                     randomSeed={false}

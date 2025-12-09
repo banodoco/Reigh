@@ -10,10 +10,12 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Video } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import { isVideoGeneration } from '@/shared/lib/typeGuards';
+import { VideoGenerationModal } from '@/shared/components/VideoGenerationModal';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 
 interface ShotGroupProps {
   shot: Shot;
@@ -46,6 +48,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
   // COMMENTED OUT: Drag functionality temporarily disabled
   // const [isFileOver, setIsFileOver] = useState(false);
   const [isFileOver] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   const IMAGES_PER_ROW = 4;
   const allImages = (shot.images || []).filter(img => !isVideoGeneration(img));
@@ -198,10 +201,26 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
   // };
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent navigation when interacting with editable elements
-    if (isEditing || (e.target as HTMLElement).closest('input, button, a')) {
+    const target = e.target as HTMLElement;
+    
+    // Prevent navigation when interacting with editable elements or modal dialogs
+    // Also check for Radix dialog overlay (backdrop) - it has z-index classes and bg-black/80
+    // The overlay doesn't have role="dialog" but we can detect it by its attributes
+    const isDialogOverlay = target.hasAttribute('data-radix-dialog-overlay') || 
+                            target.className.includes('bg-black/80') ||
+                            target.closest('[data-radix-dialog-overlay]');
+    
+    if (isEditing || 
+        isDialogOverlay ||
+        target.closest('input, button, a, textarea, select, [role="dialog"], [role="menu"], [role="listbox"], [data-radix-portal], [data-radix-dialog-overlay]')) {
       return;
     }
+    
+    // Don't navigate if the video modal is open - any click should stay in context
+    if (isVideoModalOpen) {
+      return;
+    }
+    
     navigateToShot(shot);
   };
 
@@ -310,9 +329,34 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
         )}
       </div>
 
-      <div className="text-xs text-zinc-400 pt-1 border-t border-zinc-700/50">
-        Total: {allImages.length} image(s)
+      <div className="flex items-center justify-between text-xs text-zinc-400 pt-1 border-t border-zinc-700/50">
+        <span>Total: {allImages.length} image(s)</span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="flex items-center justify-center w-6 h-6 rounded bg-violet-600/80 hover:bg-violet-500 text-white transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsVideoModalOpen(true);
+                }}
+              >
+                <Video className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Generate Video</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
+      
+      {/* Video Generation Modal */}
+      <VideoGenerationModal
+        isOpen={isVideoModalOpen}
+        onClose={() => setIsVideoModalOpen(false)}
+        shot={shot}
+      />
     </div>
   );
 };

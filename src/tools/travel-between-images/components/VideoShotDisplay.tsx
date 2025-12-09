@@ -4,7 +4,7 @@ import { useUpdateShotName, useDeleteShot, useDuplicateShot } from '../../../sha
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2 } from 'lucide-react'; // Icons
+import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2, Video } from 'lucide-react'; // Icons
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
@@ -16,6 +16,7 @@ import { cn } from '@/shared/lib/utils';
 import { isImageCached, setImageCacheStatus } from '@/shared/lib/imageCacheManager';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { isVideoGeneration, isPositioned } from '@/shared/lib/typeGuards';
+import { VideoGenerationModal } from '@/shared/components/VideoGenerationModal';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -252,6 +253,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   const [isEditingName, setIsEditingName] = useState(false);
   const [editableName, setEditableName] = useState(shot.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   const updateShotNameMutation = useUpdateShotName();
   const deleteShotMutation = useDeleteShot();
@@ -430,6 +432,26 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             </h3>
           )}
           <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsVideoModalOpen(true);
+                    }}
+                    className="h-8 w-8 text-violet-600 hover:text-violet-500 hover:bg-violet-100 dark:hover:bg-violet-950"
+                  >
+                    <Video className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Generate Video</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {/* Drag Handle Button */}
             {dragHandleProps && (
               dragHandleProps.disabled && dragDisabledReason ? (
@@ -453,40 +475,74 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                   </Tooltip>
                 </TooltipProvider>
               ) : (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 cursor-grab active:cursor-grabbing"
-                  disabled={dragHandleProps.disabled}
-                  title="Drag to reorder"
-                  {...dragHandleProps}
-                >
-                  <GripVertical className="h-4 w-4" />
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 cursor-grab active:cursor-grabbing"
+                        disabled={dragHandleProps.disabled}
+                        {...dragHandleProps}
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Drag to reorder</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )
             )}
             {!isEditingName && (
-               <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8">
-                  <Pencil className="h-4 w-4" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Edit shot name</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={handleDuplicateShot} 
-              className="h-8 w-8" 
-              disabled={duplicateShotMutation.isPending}
-              title={duplicateShotMutation.isPending ? "Duplicating..." : "Duplicate shot"}
-            >
-              {duplicateShotMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-              <Copy className="h-4 w-4" />
-              )}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleDeleteShot} className="text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8">
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={handleDuplicateShot} 
+                    className="h-8 w-8" 
+                    disabled={duplicateShotMutation.isPending}
+                  >
+                    {duplicateShotMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                    <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{duplicateShotMutation.isPending ? "Duplicating..." : "Duplicate shot"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={handleDeleteShot} className="text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Delete shot</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
         
@@ -578,6 +634,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Video Generation Modal */}
+      <VideoGenerationModal
+        isOpen={isVideoModalOpen}
+        onClose={() => setIsVideoModalOpen(false)}
+        shot={shot}
+      />
     </>
   );
 };

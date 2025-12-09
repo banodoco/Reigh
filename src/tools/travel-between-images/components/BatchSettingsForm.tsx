@@ -68,12 +68,11 @@ interface BatchSettingsFormProps {
   enhancePrompt: boolean;
   onEnhancePromptChange: (value: boolean) => void;
   
-  // Advanced mode props
+  // Advanced mode (derived from motionMode in parent)
   advancedMode: boolean;
   
   // Blur save - triggers immediate save when user clicks away from field
   onBlurSave?: () => void;
-  onAdvancedModeChange: (value: boolean) => void;
   phaseConfig?: PhaseConfig;
   onPhaseConfigChange: (config: PhaseConfig) => void;
   
@@ -128,7 +127,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   enhancePrompt,
   onEnhancePromptChange,
   advancedMode,
-  onAdvancedModeChange,
   phaseConfig = DEFAULT_PHASE_CONFIG,
   onPhaseConfigChange,
   selectedPhasePresetId,

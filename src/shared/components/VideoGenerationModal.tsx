@@ -1,0 +1,461 @@
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
+import { Button } from '@/shared/components/ui/button';
+import { useExtraLargeModal } from '@/shared/hooks/useModal';
+import { useProject } from '@/shared/contexts/ProjectContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Shot } from '@/types/shots';
+import { ExternalLink } from 'lucide-react';
+import { getDisplayUrl } from '@/shared/lib/utils';
+import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
+import { useShotSettings } from '@/tools/travel-between-images/hooks/useShotSettings';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '@/tools/travel-between-images/components/ShotEditor/state/types';
+import BatchSettingsForm from '@/tools/travel-between-images/components/BatchSettingsForm';
+import { MotionControl } from '@/tools/travel-between-images/components/MotionControl';
+import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
+import { generateVideo, buildBasicModePhaseConfig } from '@/tools/travel-between-images/components/ShotEditor/services/generateVideoService';
+import { useListPublicResources } from '@/shared/hooks/useResources';
+import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
+import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
+import { isPositioned, isVideoGeneration } from '@/shared/lib/typeGuards';
+import { findClosestAspectRatio } from '@/shared/lib/aspectRatios';
+import { DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
+import { BUILTIN_DEFAULT_I2V_ID, BUILTIN_DEFAULT_VACE_ID, FEATURED_PRESET_IDS } from '@/tools/travel-between-images/components/MotionControl';
+
+interface VideoGenerationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  shot: Shot;
+}
+
+/**
+ * Video Generation Modal - Opens a simplified video generation form for a shot
+ * Always operates in Batch mode (not timeline mode)
+ * Changes update the actual shot settings
+ */
+export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
+  isOpen,
+  onClose,
+  shot,
+}) => {
+  const modal = useExtraLargeModal();
+  const { selectedProjectId, projects } = useProject();
+  const queryClient = useQueryClient();
+  const { navigateToShot } = useShotNavigation();
+  
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [justQueued, setJustQueued] = useState(false);
+  const justQueuedTimeoutRef = useRef<number | null>(null);
+  const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
+  
+  // UI settings (accelerated mode, random seed) - same pattern as ShotEditor
+  const { settings: shotUISettings, update: updateShotUISettings } = useToolSettings<{
+    acceleratedMode?: boolean;
+    randomSeed?: boolean;
+  }>('travel-ui-state', {
+    shotId: isOpen ? shot.id : null,
+    enabled: isOpen && !!shot.id
+  });
+  
+  const accelerated = shotUISettings?.acceleratedMode ?? false;
+  const randomSeed = shotUISettings?.randomSeed ?? false;
+  
+  const setAccelerated = useCallback((value: boolean) => {
+    updateShotUISettings('shot', { acceleratedMode: value });
+  }, [updateShotUISettings]);
+  
+  const setRandomSeed = useCallback((value: boolean) => {
+    updateShotUISettings('shot', { randomSeed: value });
+  }, [updateShotUISettings]);
+  
+  // Use useShotSettings for all state management
+  const {
+    settings,
+    status,
+    updateField,
+  } = useShotSettings(isOpen ? shot.id : null, selectedProjectId);
+  
+  // Available LoRAs
+  const publicLorasQuery = useListPublicResources('lora');
+  const availableLoras = useMemo(() => 
+    ((publicLorasQuery.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[],
+    [publicLorasQuery.data]
+  );
+  
+  // Shot generations for positioned images
+  const { data: shotGenerations, isLoading: generationsLoading } = useAllShotGenerations(
+    isOpen ? shot.id : null,
+    { disableRefetch: false }
+  );
+  
+  const positionedImages = useMemo(() => {
+    if (!shotGenerations) return [];
+    return shotGenerations
+      .filter(g => !isVideoGeneration(g) && isPositioned(g))
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+  }, [shotGenerations]);
+  
+  // Project aspect ratio
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio || '16:9';
+  
+  const effectiveAspectRatio = useMemo(() => {
+    if (positionedImages.length > 0) {
+      const firstImage = positionedImages[0];
+      const metadata = (firstImage as any).metadata || {};
+      if (metadata.width && metadata.height) {
+        const ratio = metadata.width / metadata.height;
+        return findClosestAspectRatio(ratio);
+      }
+    }
+    return projectAspectRatio;
+  }, [positionedImages, projectAspectRatio]);
+  
+  // Selected LoRAs as ActiveLora[]
+  const selectedLoras = useMemo(() => {
+    return (settings.selectedLoras || []).map(lora => ({
+      id: lora.id,
+      name: lora.name,
+      path: lora.path,
+      strength: lora.strength,
+      previewImageUrl: lora.previewImageUrl,
+      trigger_word: lora.trigger_word,
+    }));
+  }, [settings.selectedLoras]);
+  
+  // Validate preset ID - only pass known preset IDs to prevent "not found" errors
+  // Known presets are: builtin defaults + featured presets from the constant
+  const validPresetId = useMemo(() => {
+    const presetId = settings.selectedPhasePresetId;
+    if (!presetId) return undefined;
+    
+    // Known preset IDs that won't cause "not found" errors
+    const knownIds = [
+      BUILTIN_DEFAULT_I2V_ID,
+      BUILTIN_DEFAULT_VACE_ID,
+      ...FEATURED_PRESET_IDS,
+    ];
+    
+    if (knownIds.includes(presetId)) {
+      return presetId;
+    }
+    
+    // Unknown preset ID - clear it to show chip selector instead of "not found"
+    return undefined;
+  }, [settings.selectedPhasePresetId]);
+  
+  // LoRA handlers
+  const handleAddLora = useCallback((lora: LoraModel) => {
+    const newLora = {
+      id: (lora['Model ID'] || '') as string,
+      name: (lora.Name || '') as string,
+      path: (lora.link || '') as string,
+      strength: 1.0,
+      previewImageUrl: lora['Preview Image URL'] as string | undefined,
+      trigger_word: lora['Trigger Word'] as string | undefined,
+    };
+    const currentLoras = settings.selectedLoras || [];
+    if (!currentLoras.some(l => l.id === newLora.id)) {
+      updateField('selectedLoras', [...currentLoras, newLora]);
+    }
+    setIsLoraModalOpen(false);
+  }, [settings.selectedLoras, updateField]);
+  
+  const handleRemoveLora = useCallback((loraId: string) => {
+    updateField('selectedLoras', (settings.selectedLoras || []).filter(l => l.id !== loraId));
+  }, [settings.selectedLoras, updateField]);
+  
+  const handleLoraStrengthChange = useCallback((loraId: string, strength: number) => {
+    updateField('selectedLoras', (settings.selectedLoras || []).map(l => 
+      l.id === loraId ? { ...l, strength } : l
+    ));
+  }, [settings.selectedLoras, updateField]);
+  
+  const handleAddTriggerWord = useCallback((loraId: string, word: string) => {
+    const currentPrompt = settings.batchVideoPrompt || '';
+    if (!currentPrompt.includes(word)) {
+      updateField('batchVideoPrompt', currentPrompt ? `${currentPrompt}, ${word}` : word);
+    }
+  }, [settings.batchVideoPrompt, updateField]);
+  
+  // Model name helper
+  const getModelName = useCallback(() => {
+    const motionMode = settings.motionMode || 'basic';
+    if (motionMode === 'basic') {
+      return settings.structureVideo?.path 
+        ? 'wan_2_2_vace_lightning_baseline_2_2_2'
+        : 'wan_2_2_i2v_lightning_baseline_2_2_2';
+    }
+    const phaseConfig = settings.phaseConfig || DEFAULT_PHASE_CONFIG;
+    return phaseConfig.num_phases === 3
+      ? 'wan_2_2_i2v_lightning_baseline_2_2_2'
+      : 'wan_2_2_i2v_lightning_baseline_3_3';
+  }, [settings.motionMode, settings.phaseConfig, settings.structureVideo?.path]);
+  
+  // Handle generate
+  const handleGenerate = useCallback(async () => {
+    if (!selectedProjectId || !shot.id) {
+      toast.error("No project or shot selected.");
+      return;
+    }
+    if (positionedImages.length < 2) {
+      toast.error("At least 2 positioned images are required.");
+      return;
+    }
+    
+    setIsGenerating(true);
+    try {
+      // Save generationMode as 'batch' when actually generating
+      updateField('generationMode', 'batch');
+      
+      const userLoras = selectedLoras.map(l => ({ path: l.path, strength: l.strength }));
+      const hasStructureVideo = !!settings.structureVideo?.path;
+      const { phaseConfig: basicPhaseConfig } = buildBasicModePhaseConfig(
+        hasStructureVideo, settings.amountOfMotion || 50, userLoras
+      );
+      
+      const motionMode = settings.motionMode || 'basic';
+      const advancedMode = motionMode === 'advanced';
+      const finalPhaseConfig = advancedMode ? (settings.phaseConfig || DEFAULT_PHASE_CONFIG) : basicPhaseConfig;
+      
+      const result = await generateVideo({
+        projectId: selectedProjectId,
+        selectedShotId: shot.id,
+        selectedShot: shot,
+        queryClient,
+        effectiveAspectRatio,
+        generationMode: 'batch',
+        batchVideoPrompt: settings.batchVideoPrompt || '',
+        textBeforePrompts: settings.textBeforePrompts,
+        textAfterPrompts: settings.textAfterPrompts,
+        batchVideoFrames: settings.batchVideoFrames || 61,
+        batchVideoSteps: settings.batchVideoSteps || 6,
+        steerableMotionSettings: { ...DEFAULT_STEERABLE_MOTION_SETTINGS, ...(settings.steerableMotionSettings || {}) },
+        getModelName,
+        randomSeed,
+        turboMode: settings.turboMode || false,
+        enhancePrompt: settings.enhancePrompt || false,
+        amountOfMotion: settings.amountOfMotion || 50,
+        motionMode,
+        generationTypeMode: settings.generationTypeMode || 'i2v',
+        advancedMode,
+        phaseConfig: finalPhaseConfig,
+        selectedPhasePresetId: settings.selectedPhasePresetId || undefined,
+        selectedLoras: selectedLoras.map(l => ({ id: l.id, path: l.path, strength: l.strength, name: l.name })),
+        structureVideoPath: settings.structureVideo?.path || null,
+        structureVideoType: 'flow',
+        structureVideoTreatment: settings.structureVideo?.treatment || 'adjust',
+        structureVideoMotionStrength: settings.structureVideo?.motionStrength || 1.0,
+        variantNameParam: '',
+        clearAllEnhancedPrompts: async () => {},
+      });
+      
+      if (result.success) {
+        setJustQueued(true);
+        if (justQueuedTimeoutRef.current) clearTimeout(justQueuedTimeoutRef.current);
+        justQueuedTimeoutRef.current = window.setTimeout(() => {
+          setJustQueued(false);
+          justQueuedTimeoutRef.current = null;
+        }, 3000);
+        queryClient.invalidateQueries({ queryKey: ['shot-generations', shot.id] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+      } else {
+        toast.error(result.error || 'Failed to generate video');
+      }
+    } catch (error) {
+      console.error('[VideoGenerationModal] Error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to generate video');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [selectedProjectId, shot, positionedImages, selectedLoras, settings, queryClient, effectiveAspectRatio, getModelName, randomSeed, updateField]);
+  
+  const handleNavigateToShot = useCallback(() => {
+    onClose();
+    navigateToShot(shot);
+  }, [onClose, navigateToShot, shot]);
+  
+  useEffect(() => {
+    return () => {
+      if (justQueuedTimeoutRef.current) clearTimeout(justQueuedTimeoutRef.current);
+    };
+  }, []);
+  
+  const isLoading = (status !== 'ready' && status !== 'saving' && status !== 'error') || generationsLoading;
+  const isDisabled = isGenerating || isLoading || positionedImages.length < 2;
+
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent
+          className={`${modal.className} gap-2 overflow-hidden flex flex-col`}
+          style={{ ...modal.style, maxWidth: '1000px', width: 'calc(100vw - 2rem)' }}
+          {...modal.props}
+        >
+          <DialogHeader className={modal.headerClass}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <DialogTitle className="text-xl font-light">
+                  Generate Video - {shot.name || 'Unnamed Shot'}
+                </DialogTitle>
+                
+                {/* Input images preview - next to title */}
+                <div className="flex items-center gap-1">
+                  {positionedImages.slice(0, 6).map((img, idx) => (
+                    <img
+                      key={img.id || idx}
+                      src={getDisplayUrl(img.thumbUrl || img.imageUrl || img.location)}
+                      alt={`Image ${idx + 1}`}
+                      className="w-7 h-7 object-cover rounded border border-zinc-600"
+                    />
+                  ))}
+                  {positionedImages.length > 6 && (
+                    <div className="w-7 h-7 rounded border border-zinc-600 bg-zinc-700 flex items-center justify-center text-[10px] text-zinc-400">
+                      +{positionedImages.length - 6}
+                    </div>
+                  )}
+                </div>
+                {positionedImages.length < 2 && (
+                  <span className="text-xs text-amber-500">(need 2+ images)</span>
+                )}
+              </div>
+              
+              <Button variant="ghost" size="sm" onClick={handleNavigateToShot} className="text-zinc-400 hover:text-white hover:bg-zinc-700 gap-1 flex-shrink-0">
+                <ExternalLink className="h-4 w-4" />
+                Open Shot Editor
+              </Button>
+            </div>
+          </DialogHeader>
+          
+          <div className={`${modal.scrollClass} -mx-6 px-6 flex-1 min-h-0`}>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin h-8 w-8 border-2 border-zinc-500 border-t-transparent rounded-full" />
+              </div>
+            ) : (
+              <div className="space-y-6 pb-4">
+                <div className="flex flex-col lg:flex-row gap-6">
+                  <div className="lg:w-1/2">
+                    <div className="mb-4"><SectionHeader title="Settings" theme="orange" /></div>
+                    <BatchSettingsForm
+                      batchVideoPrompt={settings.batchVideoPrompt || ''}
+                      onBatchVideoPromptChange={(v) => updateField('batchVideoPrompt', v)}
+                      batchVideoFrames={settings.batchVideoFrames || 61}
+                      onBatchVideoFramesChange={(v) => updateField('batchVideoFrames', v)}
+                      batchVideoSteps={settings.batchVideoSteps || 6}
+                      onBatchVideoStepsChange={(v) => updateField('batchVideoSteps', v)}
+                      dimensionSource={settings.dimensionSource || 'firstImage'}
+                      onDimensionSourceChange={(v) => updateField('dimensionSource', v)}
+                      customWidth={settings.customWidth}
+                      onCustomWidthChange={(v) => updateField('customWidth', v)}
+                      customHeight={settings.customHeight}
+                      onCustomHeightChange={(v) => updateField('customHeight', v)}
+                      steerableMotionSettings={settings.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS}
+                      onSteerableMotionSettingsChange={(v) => updateField('steerableMotionSettings', { ...(settings.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS), ...v })}
+                      projects={projects}
+                      selectedProjectId={selectedProjectId}
+                      selectedLoras={selectedLoras}
+                      availableLoras={availableLoras}
+                      isTimelineMode={false}
+                      accelerated={accelerated}
+                      onAcceleratedChange={setAccelerated}
+                      randomSeed={randomSeed}
+                      onRandomSeedChange={setRandomSeed}
+                      turboMode={settings.turboMode || false}
+                      onTurboModeChange={(v) => updateField('turboMode', v)}
+                      amountOfMotion={settings.amountOfMotion || 50}
+                      onAmountOfMotionChange={(v) => updateField('amountOfMotion', v)}
+                      imageCount={positionedImages.length}
+                      enhancePrompt={settings.enhancePrompt || false}
+                      onEnhancePromptChange={(v) => updateField('enhancePrompt', v)}
+                      advancedMode={(settings.motionMode || 'basic') === 'advanced'}
+                      phaseConfig={settings.phaseConfig || DEFAULT_PHASE_CONFIG}
+                      onPhaseConfigChange={(v) => updateField('phaseConfig', v)}
+                      selectedPhasePresetId={validPresetId}
+                      onPhasePresetSelect={(id, config) => { updateField('selectedPhasePresetId', id); updateField('phaseConfig', config); }}
+                      onPhasePresetRemove={() => updateField('selectedPhasePresetId', undefined)}
+                      videoControlMode="batch"
+                      textBeforePrompts={settings.textBeforePrompts || ''}
+                      onTextBeforePromptsChange={(v) => updateField('textBeforePrompts', v)}
+                      textAfterPrompts={settings.textAfterPrompts || ''}
+                      onTextAfterPromptsChange={(v) => updateField('textAfterPrompts', v)}
+                    />
+                  </div>
+                  
+                  <div className="lg:w-1/2">
+                    <div className="mb-4"><SectionHeader title="Motion" theme="purple" /></div>
+                    <MotionControl
+                      motionMode={(settings.motionMode || 'basic') as 'basic' | 'advanced'}
+                      onMotionModeChange={(v) => { updateField('motionMode', v); updateField('advancedMode', v === 'advanced'); }}
+                      generationTypeMode={settings.generationTypeMode || 'i2v'}
+                      onGenerationTypeModeChange={(v) => updateField('generationTypeMode', v)}
+                      hasStructureVideo={!!settings.structureVideo?.path}
+                      selectedLoras={selectedLoras}
+                      availableLoras={availableLoras}
+                      onAddLoraClick={() => setIsLoraModalOpen(true)}
+                      onRemoveLora={handleRemoveLora}
+                      onLoraStrengthChange={handleLoraStrengthChange}
+                      onAddTriggerWord={(word) => handleAddTriggerWord('', word)}
+                      selectedPhasePresetId={validPresetId}
+                      onPhasePresetSelect={(id, config) => { updateField('selectedPhasePresetId', id); updateField('phaseConfig', config); }}
+                      onPhasePresetRemove={() => updateField('selectedPhasePresetId', undefined)}
+                      currentSettings={{}}
+                      phaseConfig={settings.phaseConfig || DEFAULT_PHASE_CONFIG}
+                      onPhaseConfigChange={(v) => updateField('phaseConfig', v)}
+                      randomSeed={randomSeed}
+                      onRandomSeedChange={setRandomSeed}
+                      turboMode={settings.turboMode || false}
+                      settingsLoading={status !== 'ready' && status !== 'saving'}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Sticky footer with Generate button */}
+          {!isLoading && (
+            <div className="flex-shrink-0 border-t border-zinc-700 bg-background px-6 py-4 -mx-6 -mb-6 flex justify-center">
+              <Button 
+                size="lg" 
+                className="w-full max-w-md" 
+                variant={justQueued ? "success" : "default"}
+                onClick={handleGenerate}
+                disabled={isDisabled}
+              >
+                {justQueued
+                  ? "Added to queue!"
+                  : isGenerating 
+                    ? 'Creating Tasks...' 
+                    : 'Generate Video'}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      
+      <LoraSelectorModal
+        isOpen={isLoraModalOpen}
+        onClose={() => setIsLoraModalOpen(false)}
+        loras={availableLoras}
+        onAddLora={handleAddLora}
+        onRemoveLora={handleRemoveLora}
+        onUpdateLoraStrength={handleLoraStrengthChange}
+        selectedLoras={selectedLoras.map(lora => {
+          const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
+          return { ...fullLora, "Model ID": lora.id, Name: lora.name, strength: lora.strength } as any;
+        })}
+        lora_type="Wan 2.1 14b"
+      />
+    </>
+  );
+};
+
+export default VideoGenerationModal;

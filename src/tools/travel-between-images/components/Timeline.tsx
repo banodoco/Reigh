@@ -337,6 +337,13 @@ const Timeline: React.FC<TimelineProps> = ({
     // CRITICAL: Filter out videos - they should never appear on timeline
     // Uses canonical isVideoGeneration from typeGuards
     result = result.filter(img => !isVideoGeneration(img));
+    
+    // CRITICAL: Filter out unpositioned items (timeline_frame = null, undefined, or negative)
+    // These should NOT be included in timeline drag calculations
+    // Without this filter, unpositioned items get assigned frame 0 via ?? fallback
+    // and incorrectly get batch-updated when other items are dragged
+    // NOTE: -1 is used as a sentinel value in useTimelinePositionUtils for unpositioned items
+    result = result.filter(img => img.timeline_frame !== null && img.timeline_frame !== undefined && img.timeline_frame >= 0);
 
     // [TimelineVisibility] Log images array changes
     console.log(`[TimelineVisibility] 📸 IMAGES ARRAY COMPUTED:`, {

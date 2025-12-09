@@ -726,8 +726,31 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 return !isJoinOutput;
             });
 
+            // CRITICAL: Fetch fresh URLs from database to ensure we get current main variants
+            // The cached sortedChildren may have stale URLs if user recently changed a variant
+            const segmentIds = segmentsOnly.map(c => c.id).filter(Boolean);
+            const { data: freshSegments, error: fetchError } = await supabase
+                .from('generations')
+                .select('id, location')
+                .in('id', segmentIds);
+            
+            if (fetchError) {
+                console.error('[JoinClips] Error fetching fresh segment URLs:', fetchError);
+                throw new Error('Failed to fetch segment URLs');
+            }
+
+            // Build a map of id -> fresh location
+            const freshUrlMap = new Map(freshSegments?.map(s => [s.id, s.location]) || []);
+            
+            console.log('[JoinClips] Fresh URL fetch:', {
+                requestedIds: segmentIds.length,
+                receivedIds: freshSegments?.length || 0,
+                urlsChanged: segmentsOnly.filter(c => c.location !== freshUrlMap.get(c.id)).length,
+            });
+
             const clips = segmentsOnly.map((child, index) => ({
-                url: child.location || '',
+                // Use fresh URL from database, fallback to cached URL
+                url: freshUrlMap.get(child.id) || child.location || '',
                 name: `Segment ${index + 1}`,
             })).filter(c => c.url);
 
@@ -746,11 +769,15 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 }
             }
 
-            console.log('[JoinClips] Creating join task for segments:', {
+            console.log('[JoinClips] Creating join task with fresh URLs:', {
                 totalChildrenBeforeFilter: sortedChildren.length,
                 segmentsAfterFilter: segmentsOnly.length,
                 clipCount: clips.length,
                 clipUrls: clips.map(c => c.url.substring(c.url.lastIndexOf('/') + 1)),
+                usedFreshUrls: clips.map(c => {
+                    const segment = segmentsOnly.find(s => c.url === (freshUrlMap.get(s.id) || s.location));
+                    return segment ? freshUrlMap.has(segment.id) : false;
+                }),
                 prompt: joinPrompt,
                 contextFrames: joinContextFrames,
                 gapFrames: joinGapFrames,
@@ -1298,10 +1325,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         if (orchestrator.advanced_mode || params.advanced_mode) return 'advanced';
         return 'basic';
     });
-    const [advancedMode, setAdvancedMode] = useState(() => {
-        const orchestrator = params.orchestrator_details || {};
-        return orchestrator.advanced_mode || params.advanced_mode || false;
-    });
+    // Derive advancedMode from motionMode - single source of truth
+    const advancedMode = motionMode === 'advanced';
     const [amountOfMotion, setAmountOfMotion] = useState(() => {
         const orchestrator = params.orchestrator_details || {};
         const rawValue = params.amount_of_motion ?? orchestrator.amount_of_motion ?? 0.5;
@@ -1335,23 +1360,14 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
     const handleMotionModeChange = useCallback((mode: 'basic' | 'advanced') => {
         setMotionMode(mode);
         setIsDirty(true);
-        if (mode === 'advanced' || mode === 'presets') {
-            setAdvancedMode(true);
-            if (!phaseConfig) {
-                setPhaseConfig(DEFAULT_PHASE_CONFIG);
-            }
-        } else {
-            setAdvancedMode(false);
+        // Initialize phaseConfig when switching to advanced
+        if (mode === 'advanced' && !phaseConfig) {
+            setPhaseConfig(DEFAULT_PHASE_CONFIG);
         }
     }, [phaseConfig]);
     
     const handleAmountOfMotionChange = useCallback((value: number) => {
         setAmountOfMotion(value);
-        setIsDirty(true);
-    }, []);
-    
-    const handleAdvancedModeChange = useCallback((value: boolean) => {
-        setAdvancedMode(value);
         setIsDirty(true);
     }, []);
     
@@ -1892,8 +1908,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                             onPhasePresetSelect={handlePhasePresetSelect}
                             onPhasePresetRemove={handlePhasePresetRemove}
                             currentSettings={currentMotionSettings}
-                            advancedMode={advancedMode}
-                            onAdvancedModeChange={handleAdvancedModeChange}
                             phaseConfig={phaseConfig}
                             onPhaseConfigChange={handlePhaseConfigChange}
                             randomSeed={randomSeed}

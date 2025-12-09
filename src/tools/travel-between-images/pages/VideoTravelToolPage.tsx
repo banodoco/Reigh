@@ -400,13 +400,13 @@ const VideoTravelToolPage: React.FC = () => {
   }, []);
 
   const handleTurboModeChange = useCallback((turbo: boolean) => {
-    // When enabling turbo mode, automatically disable advanced mode
+    // When enabling turbo mode, automatically disable advanced mode but keep preset
     if (turbo && shotSettingsRef.current.settings?.advancedMode) {
-      console.log('[TurboMode] Turbo mode enabled - auto-disabling advanced mode and clearing preset');
+      console.log('[TurboMode] Turbo mode enabled - auto-disabling advanced mode');
       shotSettingsRef.current.updateFields({
         turboMode: turbo,
         advancedMode: false,
-        selectedPhasePresetId: null  // Clear preset reference when disabling advanced mode
+        motionMode: 'basic'
       });
     } else {
       shotSettingsRef.current.updateField('turboMode', turbo);
@@ -452,6 +452,12 @@ const VideoTravelToolPage: React.FC = () => {
   }, [rebuildPhaseConfig]);
 
   const handleMotionModeChange = useCallback((mode: 'basic' | 'advanced') => {
+    // Prevent switching to advanced mode when turbo mode is on
+    if (mode === 'advanced' && shotSettingsRef.current.settings?.turboMode) {
+      console.log('[MotionMode] ⚠️ Cannot switch to advanced mode while turbo mode is active');
+      return;
+    }
+    
     console.log('[MotionMode] User changing motion mode:', {
       from: shotSettingsRef.current.settings?.motionMode,
       to: mode,
@@ -492,11 +498,10 @@ const VideoTravelToolPage: React.FC = () => {
         });
       }
     } else {
-      // Basic mode - disable advanced mode
+      // Basic mode - disable advanced mode but keep selected preset
       shotSettingsRef.current.updateFields({
         motionMode: mode,
-        advancedMode: false,
-        selectedPhasePresetId: null  // Clear preset when going to basic mode
+        advancedMode: false
       });
     }
   }, []);
@@ -520,38 +525,6 @@ const VideoTravelToolPage: React.FC = () => {
     // Force rebuild regardless of current mode (user explicitly clicked "Restore Defaults")
     rebuildPhaseConfig({ force: true });
   }, [rebuildPhaseConfig]);
-
-  const handleAdvancedModeChange = useCallback((advanced: boolean) => {
-    // Prevent enabling advanced mode when turbo mode is on
-    if (advanced && shotSettingsRef.current.settings?.turboMode) {
-      console.log('[PhaseConfigTrack] ⚠️ Cannot enable advanced mode while turbo mode is active');
-      return;
-    }
-    
-    console.log('[PhaseConfigTrack] 🎚️ User toggling advancedMode:', {
-      to: advanced,
-      timestamp: Date.now()
-    });
-    
-    // When turning on advanced mode, initialize phaseConfig if needed
-    const currentPhaseConfig = shotSettingsRef.current.settings?.phaseConfig;
-    if (advanced && !currentPhaseConfig) {
-      console.log('[PhaseConfigTrack] Initializing phaseConfig to DEFAULT_PHASE_CONFIG');
-      shotSettingsRef.current.updateFields({
-        advancedMode: advanced,
-        phaseConfig: DEFAULT_PHASE_CONFIG
-      });
-    } else if (!advanced) {
-      // When turning OFF advanced mode, clear the preset reference
-      console.log('[PhaseConfigTrack] Disabling advanced mode and clearing preset reference');
-      shotSettingsRef.current.updateFields({
-        advancedMode: advanced,
-        selectedPhasePresetId: null
-      });
-    } else {
-      shotSettingsRef.current.updateField('advancedMode', advanced);
-    }
-  }, []);
 
   const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
     // Auto-set model_switch_phase to 1 when num_phases is 2
@@ -1446,7 +1419,7 @@ const VideoTravelToolPage: React.FC = () => {
       console.log('[VideoTravelToolPage] Auto-disabling advanced mode - turbo mode is active');
       shotSettingsRef.current.updateFields({
         advancedMode: false,
-        selectedPhasePresetId: null  // Clear preset reference when disabling advanced mode
+        motionMode: 'basic'
       });
     }
   }, [turboMode, advancedMode, shotSettings.status]);
@@ -2496,8 +2469,6 @@ const VideoTravelToolPage: React.FC = () => {
               onMotionModeChange={handleMotionModeChange}
               generationTypeMode={generationTypeMode}
               onGenerationTypeModeChange={handleGenerationTypeModeChange}
-              advancedMode={advancedMode}
-              onAdvancedModeChange={handleAdvancedModeChange}
               phaseConfig={phaseConfig}
               onPhaseConfigChange={handlePhaseConfigChange}
               selectedPhasePresetId={selectedPhasePresetId}

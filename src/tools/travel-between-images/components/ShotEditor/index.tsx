@@ -100,8 +100,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onMotionModeChange,
   generationTypeMode = 'i2v',
   onGenerationTypeModeChange,
-  advancedMode,
-  onAdvancedModeChange,
   phaseConfig,
   onPhaseConfigChange,
   selectedPhasePresetId,
@@ -127,6 +125,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   getShotVideoCount,
   invalidateVideoCountsCache,
 }) => {
+  // Derive advancedMode from motionMode - single source of truth
+  const advancedMode = motionMode === 'advanced';
+  
   // [ShotNavPerf] TEST LOG - Component is rendering
   const renderStartTime = performance.now();
   const renderCount = useRef(0);
@@ -164,7 +165,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // if (prevPropsRef.current.onBatchVideoContextChange !== onBatchVideoContextChange) changedCallbacks.push('onBatchVideoContextChange'); // Removed
       if (prevPropsRef.current.onEnhancePromptChange !== onEnhancePromptChange) changedCallbacks.push('onEnhancePromptChange');
       if (prevPropsRef.current.onTurboModeChange !== onTurboModeChange) changedCallbacks.push('onTurboModeChange');
-      if (prevPropsRef.current.onAdvancedModeChange !== onAdvancedModeChange) changedCallbacks.push('onAdvancedModeChange');
+      // onAdvancedModeChange removed - advancedMode now derived from motionMode
       if (prevPropsRef.current.onGenerateAllSegments !== onGenerateAllSegments) changedCallbacks.push('onGenerateAllSegments');
       if (prevPropsRef.current.onPreviousShot !== onPreviousShot) changedCallbacks.push('onPreviousShot');
       if (prevPropsRef.current.onNextShot !== onNextShot) changedCallbacks.push('onNextShot');
@@ -196,7 +197,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       onShotImagesUpdate, onBack, onGenerationModeChange, onBatchVideoFramesChange,
       // onBatchVideoContextChange, // Removed
       onEnhancePromptChange, onTurboModeChange,
-      onAdvancedModeChange, onGenerateAllSegments, onPreviousShot, onNextShot,
+      // onAdvancedModeChange, // Removed - advancedMode now derived from motionMode
+      onGenerateAllSegments, onPreviousShot, onNextShot,
       onUpdateShotName, getShotVideoCount, invalidateVideoCountsCache
     };
   });
@@ -1255,7 +1257,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     onCustomWidthChange,
     onCustomHeightChange,
     onGenerationModeChange,
-    onAdvancedModeChange,
+    // onAdvancedModeChange now derived - convert to motionMode change
+    onAdvancedModeChange: (advanced: boolean) => onMotionModeChange?.(advanced ? 'advanced' : 'basic'),
     onMotionModeChange,
     onGenerationTypeModeChange: onGenerationTypeModeChange || (() => {}),
     onPhaseConfigChange,
@@ -1735,7 +1738,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             enhancePrompt={enhancePrompt}
                             onEnhancePromptChange={onEnhancePromptChange}
                             advancedMode={advancedMode}
-                            onAdvancedModeChange={onAdvancedModeChange}
                             phaseConfig={phaseConfig}
                             onPhaseConfigChange={onPhaseConfigChange}
                             selectedPhasePresetId={selectedPhasePresetId}
@@ -1773,8 +1775,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onPhasePresetSelect={onPhasePresetSelect || (() => {})}
                             onPhasePresetRemove={onPhasePresetRemove || (() => {})}
                             currentSettings={currentMotionSettings}
-                            advancedMode={advancedMode || false}
-                            onAdvancedModeChange={onAdvancedModeChange || (() => {})}
                             phaseConfig={phaseConfig}
                             onPhaseConfigChange={onPhaseConfigChange || (() => {})}
                             onBlurSave={onBlurSave}

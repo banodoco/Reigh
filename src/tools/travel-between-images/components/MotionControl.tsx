@@ -89,9 +89,7 @@ export interface MotionControlProps {
   // Featured preset IDs for quick-select chips (provided by parent)
   featuredPresetIds?: string[];
   
-  // Advanced mode props
-  advancedMode: boolean;
-  onAdvancedModeChange: (value: boolean) => void;
+  // Advanced mode props (advancedMode is derived from motionMode)
   phaseConfig?: PhaseConfig;
   onPhaseConfigChange: (config: PhaseConfig) => void;
   onBlurSave?: () => void;
@@ -126,8 +124,6 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   onPhasePresetRemove,
   currentSettings,
   featuredPresetIds = FEATURED_PRESET_IDS,
-  advancedMode,
-  onAdvancedModeChange,
   phaseConfig,
   onPhaseConfigChange,
   onBlurSave,
@@ -137,6 +133,9 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   settingsLoading,
   onRestoreDefaults,
 }) => {
+  // Derive advancedMode from motionMode - single source of truth
+  const advancedMode = motionMode === 'advanced';
+  
   // State for preset modal
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   
@@ -145,16 +144,6 @@ export const MotionControl: React.FC<MotionControlProps> = ({
 
   // Custom mode = no preset selected (selectedPhasePresetId is null/undefined)
   const isCustomConfig = !selectedPhasePresetId;
-
-  // [PresetDebug] Log every render with key state
-  console.log('[PresetDebug] Render:', {
-    selectedPhasePresetId,
-    isCustomConfig,
-    motionMode,
-    advancedMode,
-    settingsLoading,
-    hasStructureVideo,
-  });
 
   // Get the built-in default preset for the current mode (I2V vs VACE)
   const builtinDefaultPreset = useMemo(() => {
@@ -203,9 +192,10 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   }, [builtinDefaultPreset, additionalPresets]);
 
   // All known preset IDs (for determining if we show chips or SelectedPresetCard)
+  // Include BOTH builtin IDs to handle race conditions when hasStructureVideo changes
   const allKnownPresetIds = useMemo(() => {
-    return [builtinDefaultId, ...featuredPresetIds];
-  }, [builtinDefaultId, featuredPresetIds]);
+    return [BUILTIN_DEFAULT_I2V_ID, BUILTIN_DEFAULT_VACE_ID, ...featuredPresetIds];
+  }, [featuredPresetIds]);
 
   // Check if selected preset is one of the known ones (built-in or featured)
   const isSelectedPresetKnown = useMemo(() => {
@@ -230,11 +220,6 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     
     // When structure video changes, select appropriate default
     if (structureVideoChanged) {
-      console.log('[MotionControl] Structure video changed, auto-selecting default:', {
-        wasStructureVideo: prevHasStructureVideoRef.current,
-        nowStructureVideo: hasStructureVideo,
-        builtinDefaultId,
-      });
       onPhasePresetSelect(
         builtinDefaultPreset.id, 
         builtinDefaultPreset.metadata.phaseConfig, 
@@ -246,9 +231,6 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     
     // Initial auto-select: only if no preset selected and we haven't auto-selected yet
     if (!selectedPhasePresetId && !hasAutoSelectedRef.current) {
-      console.log('[MotionControl] Initial load, auto-selecting default:', {
-        builtinDefaultId,
-      });
       hasAutoSelectedRef.current = true;
       onPhasePresetSelect(
         builtinDefaultPreset.id, 
@@ -260,52 +242,16 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     prevHasStructureVideoRef.current = hasStructureVideo;
   }, [hasStructureVideo, builtinDefaultId, builtinDefaultPreset, selectedPhasePresetId, onPhasePresetSelect, settingsLoading]);
 
-  // Sync motionMode with advancedMode state
-  // When switching to advanced, enable advancedMode; when leaving, disable it
-  // CRITICAL: Skip sync during initial load to prevent race condition where
-  // default 'basic' motionMode triggers onAdvancedModeChange(false) before
-  // the actual settings are loaded from the database
-  useEffect(() => {
-    console.log('[PresetDebug] Sync effect running:', {
-      settingsLoading,
-      motionMode,
-      advancedMode,
-      selectedPhasePresetId,
-    });
-    
-    if (settingsLoading) {
-      console.log('[PresetDebug] Skipping sync - settings still loading');
-      return;
-    }
-    
-    if (motionMode === 'advanced') {
-      if (!advancedMode) {
-        console.log('[PresetDebug] Sync: setting advancedMode to true');
-        onAdvancedModeChange(true);
-      }
-    } else if (motionMode === 'basic') {
-      if (advancedMode) {
-        console.log('[PresetDebug] Sync: setting advancedMode to false');
-        onAdvancedModeChange(false);
-      }
-    }
-  }, [motionMode, advancedMode, onAdvancedModeChange, settingsLoading, selectedPhasePresetId]);
-
   // Handle mode change with validation
+  // Parent keeps motionMode and advancedMode in sync, so we just call onMotionModeChange
   const handleModeChange = useCallback((newMode: string) => {
-    console.log('[PresetDebug] handleModeChange called:', {
-      newMode,
-      currentSelectedPresetId: selectedPhasePresetId,
-    });
-    
     // Prevent switching to advanced when turbo mode is active
     if (turboMode && newMode === 'advanced') {
-      console.log('[PresetDebug] Cannot switch to advanced mode while turbo mode is active');
       return;
     }
     
     onMotionModeChange(newMode as 'basic' | 'advanced');
-  }, [turboMode, onMotionModeChange, selectedPhasePresetId]);
+  }, [turboMode, onMotionModeChange]);
 
   // Handle switch to advanced for editing preset
   const handleSwitchToAdvanced = useCallback(() => {
@@ -320,10 +266,6 @@ export const MotionControl: React.FC<MotionControlProps> = ({
 
   // Handle preset selection from chips or modal
   const handlePresetSelect = useCallback((preset: any) => {
-    console.log('[PresetDebug] handlePresetSelect called:', {
-      presetId: preset.id,
-      presetName: preset.metadata?.name,
-    });
     if (preset.metadata?.phaseConfig) {
       onPhasePresetSelect(preset.id, preset.metadata.phaseConfig, preset.metadata);
     }
@@ -539,7 +481,7 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
   onRemovePreset
 }) => {
   // Fetch preset details from database
-  const { data: preset, isLoading } = useQuery({
+  const { data: preset, isLoading, isError } = useQuery({
     queryKey: ['preset-details', presetId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -551,13 +493,34 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
       if (error) throw error;
       return data;
     },
-    enabled: !!presetId
+    enabled: !!presetId,
+    retry: false // Don't retry if preset doesn't exist
   });
 
-  if (isLoading || !preset) {
+  // Show loading state only while actively loading
+  if (isLoading) {
     return (
       <Card className="p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
         <p className="text-sm text-blue-700 dark:text-blue-300">Loading preset...</p>
+      </Card>
+    );
+  }
+
+  // If preset not found or error, show a fallback with option to remove
+  if (isError || !preset) {
+    return (
+      <Card className="p-4 bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Custom preset (not found)</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRemovePreset}
+            className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            Remove
+          </Button>
+        </div>
       </Card>
     );
   }

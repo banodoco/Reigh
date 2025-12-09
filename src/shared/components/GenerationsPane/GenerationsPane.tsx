@@ -15,6 +15,7 @@ import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { ShotFilter } from '@/shared/components/ShotFilter';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
@@ -412,19 +413,23 @@ const GenerationsPaneComponent: React.FC = () => {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-light text-zinc-200 ml-2">Generations</h2>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsGenerationModalOpen(true)}
-                    className={cn(
-                      "h-7 text-xs bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-md shadow-sm",
-                      isMobile ? "px-2 w-7" : "px-2"
-                    )}
-                    aria-label="Create new image"
-                  >
-                    <Sparkles className={cn("h-3 w-3", !isMobile && "mr-1")} />
-                    {!isMobile && <span>Create</span>}
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          onClick={() => setIsGenerationModalOpen(true)}
+                          className="flex items-center justify-center w-6 h-6 rounded bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white transition-colors p-0"
+                          aria-label="Create new image"
+                        >
+                          <Sparkles className="!w-3.5 !h-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Create new image</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 <div className="flex items-center space-x-4 mr-2">
                     {/* Star Filter - Button style matching ImageGalleryFilters */}

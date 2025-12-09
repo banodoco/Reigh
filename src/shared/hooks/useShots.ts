@@ -748,6 +748,17 @@ export const useAddImageToShot = () => {
     onError: (error: Error, variables, context) => {
       console.error('Error adding image to shot:', error);
       
+      // Check for duplicate key constraint violation - this shouldn't happen anymore
+      // since we allow the same generation to appear multiple times in a shot
+      const isDuplicateError = error.message?.includes('unique_shot_generation_pair') || 
+                               error.message?.includes('duplicate key value');
+      
+      if (isDuplicateError) {
+        console.error('[AddToShot:onError] Unexpected duplicate key error - duplicates should be allowed:', error.message);
+        toast.error('Database error: unexpected constraint. Please try again.');
+        return;
+      }
+      
       // Rollback ALL cache variants
       if (context?.previousShots && context.project_id) {
         const shotsCacheKeys = [
@@ -928,6 +939,19 @@ export const useAddImageToShotWithoutPosition = () => {
       console.error('[AddWithoutPosDebug] 💥 onError callback fired');
       console.error('[AddWithoutPosDebug] Error:', error);
       console.error('[AddWithoutPosDebug] Variables:', variables);
+      
+      // Check for duplicate key constraint violation - this shouldn't happen anymore
+      // since we allow the same generation to appear multiple times in a shot
+      const isDuplicateError = error.message?.includes('unique_shot_generation_pair') || 
+                               error.message?.includes('duplicate key value');
+      
+      if (isDuplicateError) {
+        console.error('[AddWithoutPos:onError] Unexpected duplicate key error - duplicates should be allowed:', error.message);
+        toast.error('Database error: unexpected constraint. Please try again.');
+        return;
+      }
+      
+      toast.error(`Failed to add image to shot: ${error.message}`);
     }
   });
 };

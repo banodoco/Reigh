@@ -448,7 +448,8 @@ export function useGenerationsPageLogic({
         // Calculate the target frame BEFORE calling mutation (same as drag path)
         // This lets us show the skeleton immediately
         const currentCache = queryClient.getQueryData<any[]>(['all-shot-generations', targetShotId]) || [];
-        const positionedImages = currentCache.filter((img: any) => img.timeline_frame !== null && img.timeline_frame !== undefined);
+        // NOTE: -1 is used as sentinel for unpositioned items in useTimelinePositionUtils
+        const positionedImages = currentCache.filter((img: any) => img.timeline_frame !== null && img.timeline_frame !== undefined && img.timeline_frame >= 0);
         const maxFrame = positionedImages.length > 0 
           ? Math.max(...positionedImages.map((g: any) => g.timeline_frame || 0)) 
           : -60;

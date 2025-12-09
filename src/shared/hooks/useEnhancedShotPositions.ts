@@ -235,9 +235,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
     if (mode === 'timeline') {
       // CRITICAL FIX: For timeline mode, only include items with valid timeline_frame
-      // This prevents unpositioned items (timeline_frame = NULL) from appearing on timeline
+      // This prevents unpositioned items (timeline_frame = NULL or -1) from appearing on timeline
+      // NOTE: -1 is used as sentinel value in useTimelinePositionUtils
       const positionedImages = images.filter(img => {
-        const hasTimelineFrame = img.timeline_frame !== null && img.timeline_frame !== undefined;
+        const hasTimelineFrame = img.timeline_frame !== null && img.timeline_frame !== undefined && img.timeline_frame >= 0;
         
         // [MagicEditTaskDebug] Log filtering decisions for magic edit generations
         if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
@@ -263,8 +264,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     } else {
       // Batch mode also filters out unpositioned items for normal display
       // Unpositioned items should only appear in the dedicated unpositioned filter
+      // NOTE: -1 is used as sentinel value in useTimelinePositionUtils
       const positionedImages = images.filter(img => {
-        const hasTimelineFrame = img.timeline_frame !== null && img.timeline_frame !== undefined;
+        const hasTimelineFrame = img.timeline_frame !== null && img.timeline_frame !== undefined && img.timeline_frame >= 0;
         
         // [MagicEditTaskDebug] Log filtering decisions for magic edit generations in batch mode
         if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {

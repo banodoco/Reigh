@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings, DEFAULT_PHASE_CONFIG } from '../settings';
 import { STORAGE_KEYS } from '../storageKeys';
@@ -55,6 +56,9 @@ export const useShotSettings = (
   shotId: string | null | undefined,
   projectId: string | null | undefined
 ): UseShotSettingsReturn => {
+  // Query client for cache invalidation
+  const queryClient = useQueryClient();
+  
   // Local state - single source of truth
   const [settings, setSettings] = useState<VideoTravelSettings>(DEFAULT_SETTINGS);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'saving' | 'error'>('idle');
@@ -117,7 +121,73 @@ export const useShotSettings = (
   // Flush pending saves when shot changes - runs BEFORE settings load
   useEffect(() => {
     if (!shotId) {
+      // When shotId becomes null (e.g., modal closes), flush any pending saves first
+      const previousShotId = currentShotIdRef.current;
+      
+      if (previousShotId && pendingSettingsRef.current) {
+        // Clear the timeout if exists
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
+        
+        const settingsToFlush = pendingSettingsRef.current;
+        const oldLoadedSettings = loadedSettingsRef.current;
+        
+        // Only save if there are actual changes
+        if (!deepEqual(settingsToFlush, oldLoadedSettings)) {
+          // Save directly to Supabase
+          (async () => {
+            try {
+              const { data: currentShot, error: fetchError } = await supabase
+                .from('shots')
+                .select('settings')
+                .eq('id', previousShotId)
+                .single();
+              
+              if (fetchError) {
+                console.error('[useShotSettings] Failed to fetch shot settings for flush:', fetchError);
+                return;
+              }
+              
+              const currentSettings = (currentShot?.settings as any) ?? {};
+              const updatedSettings = {
+                ...currentSettings,
+                'travel-between-images': settingsToFlush
+              };
+              
+              const { error: updateError } = await supabase
+                .from('shots')
+                .update({ settings: updatedSettings })
+                .eq('id', previousShotId);
+              
+              if (updateError) {
+                console.error('[useShotSettings] Failed to flush save on modal close:', updateError);
+              } else {
+                // CRITICAL: Invalidate the React Query cache so ShotEditor loads fresh data
+                queryClient.invalidateQueries({ 
+                  queryKey: ['toolSettings', 'travel-between-images'],
+                  refetchType: 'all'
+                });
+              }
+            } catch (err) {
+              console.error('[useShotSettings] Failed to flush save on modal close:', err);
+            }
+          })();
+        }
+      }
+      
+      // Reset all refs when shotId becomes null
+      // This ensures proper re-initialization when shotId becomes valid again
       setStatus('idle');
+      currentShotIdRef.current = null;
+      isUserEditingRef.current = false;
+      pendingSettingsRef.current = null;
+      justAppliedInheritedSettingsRef.current = false;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
       return;
     }
     
@@ -179,6 +249,11 @@ export const useShotSettings = (
                 console.error('[useShotSettings] Failed to flush save:', updateError);
               } else {
                 console.log('[useShotSettings] ✅ Flush successful for previous shot');
+                // Invalidate cache so if user navigates back, they get fresh data
+                queryClient.invalidateQueries({ 
+                  queryKey: ['toolSettings', 'travel-between-images'],
+                  refetchType: 'all'
+                });
               }
             } catch (err) {
               console.error('[useShotSettings] Failed to flush save:', err);
@@ -358,6 +433,14 @@ export const useShotSettings = (
     // Deep clone to prevent React Query cache reference sharing
     const deepClonedSettings = JSON.parse(JSON.stringify(loadedSettings));
     
+    // Migration: ensure motionMode and advancedMode are in sync
+    // advancedMode is now derived from motionMode, but old data may have them out of sync
+    if (deepClonedSettings.advancedMode && deepClonedSettings.motionMode !== 'advanced') {
+      deepClonedSettings.motionMode = 'advanced';
+    } else if (!deepClonedSettings.advancedMode && deepClonedSettings.motionMode === 'advanced') {
+      deepClonedSettings.advancedMode = true;
+    }
+    
     console.log('[EnhancePromptDebug] [useShotSettings] 📥 Loading settings from database:', {
       shotId: shotId.substring(0, 8),
       enhancePrompt: deepClonedSettings.enhancePrompt,
@@ -439,11 +522,13 @@ export const useShotSettings = (
     key: K,
     value: VideoTravelSettings[K]
   ) => {
-    console.log('[EnhancePromptDebug] [useShotSettings] 📝 Field updated:', { 
-      key, 
-      value: key === 'batchVideoPrompt' && typeof value === 'string' ? value.substring(0, 50) : value,
-      isEnhancePrompt: key === 'enhancePrompt'
-    });
+    // CRITICAL: Don't allow saves until we've loaded initial settings from DB
+    // Otherwise we might overwrite good data with default/empty settings
+    if (status !== 'ready' && status !== 'saving') {
+      // Still update local state for UI, but don't trigger save
+      setSettings(prev => ({ ...prev, [key]: value }));
+      return;
+    }
     
     // Mark that user is actively editing
     isUserEditingRef.current = true;
@@ -451,8 +536,12 @@ export const useShotSettings = (
     setSettings(prev => {
       const updated = { ...prev, [key]: value };
       
-      // Handle special case: when turning on advancedMode, initialize phaseConfig
+      // Handle special case: when switching to advanced mode, initialize phaseConfig
+      // Support both direct advancedMode change and motionMode change
       if (key === 'advancedMode' && value === true && !updated.phaseConfig) {
+        updated.phaseConfig = DEFAULT_PHASE_CONFIG;
+      }
+      if (key === 'motionMode' && value === 'advanced' && !updated.phaseConfig) {
         updated.phaseConfig = DEFAULT_PHASE_CONFIG;
       }
       
@@ -464,14 +553,21 @@ export const useShotSettings = (
         clearTimeout(saveTimeoutRef.current);
       }
       
-      saveTimeoutRef.current = setTimeout(() => {
-        saveImmediate(updated);
-        pendingSettingsRef.current = null; // Clear after save
+      saveTimeoutRef.current = setTimeout(async () => {
+        try {
+          await saveImmediate(updated);
+          // Only clear pendingSettingsRef AFTER save succeeds
+          pendingSettingsRef.current = null;
+          saveTimeoutRef.current = null;
+        } catch (err) {
+          // Don't clear on error - keep pending so flush can retry
+          console.error('[useShotSettings] Save failed, keeping pendingSettingsRef:', err);
+        }
       }, 300);
       
       return updated;
     });
-  }, [saveImmediate]);
+  }, [saveImmediate, shotId, status]);
   
   // Update multiple fields at once
   const updateFields = useCallback((updates: Partial<VideoTravelSettings>) => {
@@ -480,6 +576,14 @@ export const useShotSettings = (
       enhancePrompt: updates.enhancePrompt,
       batchVideoPrompt: updates.batchVideoPrompt ? (typeof updates.batchVideoPrompt === 'string' ? updates.batchVideoPrompt.substring(0, 50) : updates.batchVideoPrompt) : undefined
     });
+    
+    // CRITICAL: Don't allow saves until we've loaded initial settings from DB
+    // Otherwise we might overwrite good data with default/empty settings
+    if (status !== 'ready' && status !== 'saving') {
+      // Still update local state for UI, but don't trigger save
+      setSettings(prev => ({ ...prev, ...updates }));
+      return;
+    }
     
     // Mark that user is actively editing
     isUserEditingRef.current = true;
@@ -495,14 +599,21 @@ export const useShotSettings = (
         clearTimeout(saveTimeoutRef.current);
       }
       
-      saveTimeoutRef.current = setTimeout(() => {
-        saveImmediate(updated);
-        pendingSettingsRef.current = null; // Clear after save
+      saveTimeoutRef.current = setTimeout(async () => {
+        try {
+          await saveImmediate(updated);
+          // Only clear pendingSettingsRef AFTER save succeeds
+          pendingSettingsRef.current = null;
+          saveTimeoutRef.current = null;
+        } catch (err) {
+          // Don't clear on error - keep pending so flush can retry
+          console.error('[useShotSettings] Save failed, keeping pendingSettingsRef:', err);
+        }
       }, 300);
       
       return updated;
     });
-  }, [saveImmediate]);
+  }, [saveImmediate, status]);
   
   // Public debounced save
   const save = useCallback(async () => {
