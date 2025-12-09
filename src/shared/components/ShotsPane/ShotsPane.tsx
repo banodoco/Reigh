@@ -11,11 +11,11 @@ import { VideoTravelSettings } from '@/tools/travel-between-images/settings';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { ArrowDown, Search, X } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import CreateShotModal from '@/shared/components/CreateShotModal';
-import { useCreateShot, useHandleExternalImageDrop } from '@/shared/hooks/useShots';
-import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { useCreateShot, useHandleExternalImageDrop, useCreateShotWithImage } from '@/shared/hooks/useShots';
+import { type GenerationDropData } from '@/shared/lib/dragDrop';
 import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -230,10 +230,55 @@ const ShotsPaneComponent: React.FC = () => {
   
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
-  const navigate = useNavigate();
-  const { setCurrentShotId } = useCurrentShot();
+  const createShotWithImageMutation = useCreateShotWithImage();
   const isMobile = useIsMobile();
   const { navigateToShotEditor, navigateToShot } = useShotNavigation();
+
+  // Handler for when a generation is dropped on the NewGroupDropZone
+  const handleGenerationDropForNewShot = async (data: GenerationDropData) => {
+    if (!selectedProjectId) {
+      throw new Error("Please select a project first.");
+    }
+
+    const shotName = `Shot ${(shots?.length ?? 0) + 1}`;
+    
+    const result = await createShotWithImageMutation.mutateAsync({
+      projectId: selectedProjectId,
+      shotName,
+      generationId: data.generationId,
+    });
+
+    // Apply settings inheritance
+    if (result.shot_id) {
+      await inheritSettingsForNewShot({
+        newShotId: result.shot_id,
+        projectId: selectedProjectId,
+        shots: shots || []
+      });
+    }
+
+    // Refetch and navigate to new shot
+    await refetchShots();
+    
+    // Switch to newest first and page 1
+    if (sortOrder !== 'newest') {
+      handleSortOrderChange('newest');
+    }
+    setCurrentPage(1);
+    
+    // Scroll to top
+    setTimeout(() => {
+      const shotsPane = document.querySelector('[data-shots-pane-content]');
+      if (shotsPane) {
+        shotsPane.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 100);
+
+    // Visual feedback
+    window.dispatchEvent(new CustomEvent('shot-created', {
+      detail: { shotId: result.shot_id, shotName: result.shot_name }
+    }));
+  };
 
   // Check if we're currently on the travel-between-images page
   const isOnTravelBetweenImagesPage = location.pathname === '/tools/travel-between-images';
@@ -362,10 +407,11 @@ const ShotsPaneComponent: React.FC = () => {
         await refetchShots();
         console.warn('[ShotSettingsInherit] ✅ Refetched shots - list should update now');
         
-        // Switch sort order to newest first
+        // Switch sort order to newest first and go to page 1
         if (sortOrder !== 'newest') {
           handleSortOrderChange('newest');
         }
+        setCurrentPage(1);
         
         // Scroll to top of the pane
         setTimeout(() => {
@@ -459,8 +505,15 @@ const ShotsPaneComponent: React.FC = () => {
               {sortOrder === 'oldest' ? 'Oldest first' : 'Newest first'}
             </Button>
           </div>
+          {/* Pinned drop zone below header */}
+          <div className="px-3 py-2 border-b border-zinc-800 flex-shrink-0">
+            <NewGroupDropZone 
+              onZoneClick={() => setIsCreateModalOpen(true)} 
+              onGenerationDrop={handleGenerationDropForNewShot}
+            />
+          </div>
           <div className="flex flex-col gap-4 px-3 py-4 flex-grow overflow-y-auto scrollbar-hide" data-shots-pane-content>
-            {isSearchOpen ? (
+            {isSearchOpen && (
               <div className="relative">
                 <Input
                   type="text"
@@ -480,8 +533,6 @@ const ShotsPaneComponent: React.FC = () => {
                   <X className="h-3 w-3" />
                 </Button>
               </div>
-            ) : (
-              <NewGroupDropZone onZoneClick={() => setIsCreateModalOpen(true)} />
             )}
             {isLoading && (
               Array.from({ length: pageSize }).map((_, idx) => (

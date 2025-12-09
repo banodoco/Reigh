@@ -866,10 +866,47 @@ export const useAddImageToShot = () => {
           hasRealId: afterUpdate?.some((g: any) => g.id === data.id),
           timestamp: Date.now()
         });
+        
+        // Also update the shots cache to replace temp ID with real ID
+        // This prevents flicker in ShotGroup where image.id is used as React key
+        const shotsCacheKeys = [
+          ['shots', project_id],
+          ['shots', project_id, 0],
+          ['shots', project_id, 2],
+          ['shots', project_id, 5],
+        ];
+        shotsCacheKeys.forEach(cacheKey => {
+          const cachedShots = queryClient.getQueryData<Shot[]>(cacheKey);
+          if (cachedShots) {
+            const updatedShots = cachedShots.map(shot => {
+              if (shot.id === shot_id && shot.images) {
+                return {
+                  ...shot,
+                  images: shot.images.map(img => {
+                    if (img.id === context.tempId) {
+                      return {
+                        ...img,
+                        id: data.id,
+                        generation_id: data.generation_id,
+                        shotImageEntryId: data.id,
+                        shot_generation_id: data.id,
+                        timeline_frame: data.timeline_frame,
+                        _optimistic: undefined
+                      };
+                    }
+                    return img;
+                  })
+                };
+              }
+              return shot;
+            });
+            queryClient.setQueryData(cacheKey, updatedShots);
+          }
+        });
       }
 
-      // Only invalidate shots list (for sidebar) - this doesn't cause flicker
-      // because it's a different cache key with different timing
+      // Invalidate shots list to get fully populated data from server
+      // The temp ID has already been replaced above, so this won't cause flicker
       queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
       
       // Also invalidate metadata for pair prompts (different data, won't cause flicker)

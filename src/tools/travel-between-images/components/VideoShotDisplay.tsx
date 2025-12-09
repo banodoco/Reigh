@@ -1,19 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Shot, GenerationRow } from '../../../types/shots'; // Corrected import path
-import { useUpdateShotName, useDeleteShot, useDuplicateShot } from '../../../shared/hooks/useShots'; // Import new hooks
+import { Shot } from '../../../types/shots';
+import { useUpdateShotName, useDeleteShot, useDuplicateShot } from '../../../shared/hooks/useShots';
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
-import { Skeleton } from '@/shared/components/ui/skeleton';
-import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2, Video } from 'lucide-react'; // Icons
+import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2, Video, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
-import { parseRatio } from '@/shared/lib/aspectRatios';
-import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
-import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
-import { cn } from '@/shared/lib/utils';
-import { isImageCached, setImageCacheStatus } from '@/shared/lib/imageCacheManager';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { isVideoGeneration, isPositioned } from '@/shared/lib/typeGuards';
 import { VideoGenerationModal } from '@/shared/components/VideoGenerationModal';
@@ -32,207 +26,6 @@ interface VideoShotDisplayProps {
   projectAspectRatio?: string;
   isHighlighted?: boolean;
 }
-
-// Component for individual shot image with loading state
-interface ShotImageProps {
-  image: GenerationRow;
-  index: number;
-  onSelectShot: () => void;
-  shotName: string;
-  shouldLoad?: boolean;
-  shotIndex?: number;
-  projectAspectRatio?: string;
-}
-
-const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotName, shouldLoad = true, shotIndex = 0, projectAspectRatio }) => {
-  // Handle both old and new field naming conventions
-  const imageUrl = image.imageUrl || image.location;
-  const thumbUrl = image.thumbUrl || image.location;
-  
-  // Progressive loading for video shot display
-  const progressiveEnabled = isProgressiveLoadingEnabled();
-  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage(
-    progressiveEnabled ? thumbUrl : null,
-    imageUrl,
-    {
-      priority: false, // Not high priority in video shot display
-      lazy: true,
-      enabled: progressiveEnabled && shouldLoad,
-      crossfadeMs: 200
-    }
-  );
-
-  // Use progressive src if available, otherwise fallback to display URL
-  // Normalize progressive src through getDisplayUrl to prevent format inconsistency
-  const displayUrl = progressiveEnabled && progressiveSrc ? getDisplayUrl(progressiveSrc) : getDisplayUrl(thumbUrl || imageUrl);
-  
-  // Use centralized cache to check if image is already loaded
-  const [imageLoaded, setImageLoaded] = useState(isImageCached(image));
-  const [imageLoadError, setImageLoadError] = useState(false);
-
-  // [Performance] Disabled excessive logging
-  // console.log(`[ShotImage-${index}] Rendering image:`, {
-  //   imageUrl, thumbUrl, displayUrl, hasImageUrl: !!imageUrl,
-  //   hasThumbUrl: !!thumbUrl, hasDisplayUrl: !!displayUrl,
-  //   isImageCached, imageLoaded, shouldLoad
-  // });
-
-  const handleImageLoad = () => {
-    // [Performance] Only log errors, not successful loads
-    // console.log(`[ShotImage-${index}] Image loaded successfully`);
-    setImageLoaded(true);
-    // Mark image as cached in centralized cache to prevent future skeletons
-    setImageCacheStatus(image, true);
-  };
-
-  const handleImageError = () => {
-    console.error(`[ShotImageDebug] Image failed to load:`, { displayUrl, index, id: image.id });
-    setImageLoadError(true);
-  };
-
-  // Don't render anything if we don't have a valid URL
-  if (!displayUrl) {
-    console.warn(`[ShotImageDebug] No valid URL found for image:`, { 
-      image: {
-        id: image.id, // shot_generations.id
-        imageUrl: image.imageUrl,
-        thumbUrl: image.thumbUrl, 
-        location: image.location,
-        type: image.type,
-        timeline_frame: (image as any).timeline_frame
-      },
-      shotName,
-      displayUrl,
-      imageUrl,
-      thumbUrl
-    });
-    return null;
-  }
-
-  // Calculate final height based on aspect ratio and min/max constraints
-  const imageWidth = 128; // from w-32 class
-  let desiredHeight = imageWidth; // Default to 1:1
-
-  // Try to get dimensions from image metadata first
-  let width = (image as any).metadata?.width;
-  let height = (image as any).metadata?.height;
-
-  // If not found, try to extract from resolution string
-  if (!width || !height) {
-    const resolution = (image as any).metadata?.originalParams?.orchestrator_details?.resolution;
-    if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
-      const [w, h] = resolution.split('x').map(Number);
-      if (!isNaN(w) && !isNaN(h)) {
-        width = w;
-        height = h;
-      }
-    }
-  }
-
-  if (width && height && width > 0) {
-    desiredHeight = (imageWidth / width) * height;
-  } else if (projectAspectRatio) {
-    const ratio = parseRatio(projectAspectRatio); // This is width/height
-    if (!isNaN(ratio) && ratio > 0) {
-      desiredHeight = imageWidth / ratio;
-    }
-  }
-
-  const minHeight = 120; // Sensible min-height to fill the card vertically
-  const maxHeight = imageWidth * 2; // Max height of 2:1 portrait to prevent layout breaking
-  const finalHeight = Math.min(Math.max(desiredHeight, minHeight), maxHeight);
-
-  return (
-    <div
-      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-200 group-hover:scale-105 transition-transform duration-700"
-      style={{
-        animationDelay: `${index * 0.1}s`,
-        height: `${finalHeight}px`,
-      }}
-    >
-      {imageLoadError ? (
-        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
-          <div className="text-center">
-            <div className="h-4 w-4 mx-auto mb-1 opacity-50">⚠️</div>
-            <p className="text-xs">Failed to load</p>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Show image once it's loaded */}
-          {imageLoaded && (
-            <img
-              ref={progressiveRef}
-              src={displayUrl}
-              alt={`Shot image ${index + 1} for ${shotName}`}
-              className={cn(
-                "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-200",
-                // Progressive loading visual states
-                progressiveEnabled && isThumbShowing && "opacity-95",
-                progressiveEnabled && isFullLoaded && "opacity-100"
-              )}
-            />
-          )}
-          
-          {/* Hidden image for background loading - only start loading when shouldLoad is true OR image is cached */}
-          {!imageLoaded && (shouldLoad || isImageCached(image)) && (
-            <img
-              src={displayUrl}
-              alt={`Shot image ${index + 1} for ${shotName}`}
-              style={{ display: 'none' }}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-            />
-          )}
-          
-          {/* Show skeleton only while the image is still loading */}
-          {!imageLoaded && (
-            <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
-              <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-};
-
-// Component for empty placeholder blocks to maintain consistent layout
-interface PlaceholderBlockProps {
-  index: number;
-  projectAspectRatio?: string;
-}
-
-const PlaceholderBlock: React.FC<PlaceholderBlockProps> = ({ index, projectAspectRatio }) => {
-  // Calculate final height using the same logic as ShotImage
-  const imageWidth = 128; // from w-32 class
-  let desiredHeight = imageWidth; // Default to 1:1
-
-  if (projectAspectRatio) {
-    const ratio = parseRatio(projectAspectRatio); // This is width/height
-    if (!isNaN(ratio) && ratio > 0) {
-      desiredHeight = imageWidth / ratio;
-    }
-  }
-
-  const minHeight = 120; // Sensible min-height to fill the card vertically
-  const maxHeight = imageWidth * 2; // Max height of 2:1 portrait to prevent layout breaking
-  const finalHeight = Math.min(Math.max(desiredHeight, minHeight), maxHeight);
-
-  return (
-    <div
-      className="flex-shrink-0 w-32 rounded overflow-hidden border relative bg-gray-100 opacity-30 group-hover:scale-105 transition-transform duration-700"
-      style={{
-        animationDelay: `${index * 0.1}s`,
-        height: `${finalHeight}px`,
-      }}
-    >
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 rounded border-2 border-dashed border-gray-300"></div>
-      </div>
-    </div>
-  );
-};
 
 const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false }) => {
   // Click ripple effect
@@ -254,6 +47,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   const [editableName, setEditableName] = useState(shot.name);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [isImagesExpanded, setIsImagesExpanded] = useState(false);
 
   const updateShotNameMutation = useUpdateShotName();
   const deleteShotMutation = useDeleteShot();
@@ -373,22 +167,9 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     .filter(img => isPositioned(img) && !isVideoGeneration(img))
     .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
 
-  const imagesToShow: GenerationRow[] = positionedImages.slice(0, 5);
-  
-  // Calculate how many placeholder blocks we need to fill to 5 total slots
-  const maxSlots = 5;
-  const actualImageCount = Math.min(imagesToShow.length, maxSlots);
-  const hasMoreIndicator = positionedImages.length > 5;
-  const placeholderCount = hasMoreIndicator ? 0 : Math.max(0, maxSlots - actualImageCount);
-
-  // [Performance] Disabled excessive logging that was causing render cascades
-  // Debug logging
-  // console.log(`[VideoShotDisplay] Shot "${shot.name}" (index ${shotIndex}):`, {
-  //   totalImages: shot.images?.length || 0, imagesOnly: imagesOnly.length,
-  //   imagesToShow: imagesToShow.length, shouldLoadImages, isPriority: shotIndex < 3,
-  //   shotImages: shot.images?.map(img => ({ id: img.id, type: img.type,
-  //     hasImageUrl: !!(img.imageUrl || img.location), hasThumbUrl: !!(img.thumbUrl || img.location) }))
-  // });
+  // Grid layout: 3 images per row, show first row by default, expand to show all
+  const IMAGES_PER_ROW = 3;
+  const hasMultipleRows = positionedImages.length > IMAGES_PER_ROW;
 
   return (
     <>
@@ -435,20 +216,27 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setIsVideoModalOpen(true);
+                      if (positionedImages.length > 0) {
+                        setIsVideoModalOpen(true);
+                      }
                     }}
-                    className="h-8 w-8 text-violet-600 hover:text-violet-500 hover:bg-violet-100 dark:hover:bg-violet-950"
+                    disabled={positionedImages.length === 0}
+                    className={`h-8 w-8 ${
+                      positionedImages.length === 0 
+                        ? 'text-zinc-400 cursor-not-allowed opacity-50' 
+                        : 'text-violet-600 hover:text-violet-500 hover:bg-violet-100 dark:hover:bg-violet-950'
+                    }`}
                   >
                     <Video className="h-5 w-5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Generate Video</p>
+                  <p>{positionedImages.length === 0 ? 'Add images to generate video' : 'Generate Video'}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -546,70 +334,52 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           </div>
         </div>
         
-        <div className="flex space-x-2 overflow-hidden flex-1 items-start">
-          {imagesToShow.length > 0 ? (
+        {/* Thumbnail mosaic area - matches ShotGroup style */}
+        <div className="flex-grow min-h-[60px]">
+          {positionedImages.length > 0 ? (
             <>
-              {imagesToShow.map((image, index) => (
-                <ShotImage
-                  key={image.id || `img-${index}`} // image.id is shot_generations.id
-                  image={image}
-                  index={index}
-                  onSelectShot={onSelectShot}
-                  shotName={shot.name}
-                  shouldLoad={shouldLoadImages}
-                  shotIndex={shotIndex}
-                  projectAspectRatio={projectAspectRatio}
-                />
-              ))}
-              {/* Add placeholder blocks to fill remaining slots */}
-              {Array.from({ length: placeholderCount }).map((_, index) => (
-                <PlaceholderBlock
-                  key={`placeholder-${index}`}
-                  index={actualImageCount + index}
-                  projectAspectRatio={projectAspectRatio}
-                />
-              ))}
+              <div className="grid grid-cols-3 gap-2 relative">
+                {/* Only show first row when collapsed, all images when expanded */}
+                {(isImagesExpanded ? positionedImages : positionedImages.slice(0, IMAGES_PER_ROW)).map((image, index) => (
+                  <img
+                    key={`${image.thumbUrl || image.imageUrl || image.location || 'img'}-${index}`}
+                    src={getDisplayUrl(image.thumbUrl || image.imageUrl || image.location)}
+                    alt={`Shot image ${index + 1}`}
+                    className="w-full aspect-square object-cover rounded border border-border bg-muted shadow-sm"
+                    title={`Image ${index + 1}`}
+                  />
+                ))}
+
+                {hasMultipleRows && !isImagesExpanded && (
+                  <button
+                    className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1 z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsImagesExpanded(true);
+                    }}
+                  >
+                    Show All ({positionedImages.length}) <ChevronDown className="w-3 h-3" />
+                  </button>
+                )}
+
+                {isImagesExpanded && hasMultipleRows && (
+                  <button
+                    className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1 z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsImagesExpanded(false);
+                    }}
+                  >
+                    Hide <ChevronUp className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </>
           ) : (
-            /* Show placeholder blocks when no images exist */
-            Array.from({ length: maxSlots }).map((_, index) => (
-              <PlaceholderBlock
-                key={`empty-placeholder-${index}`}
-                index={index}
-                projectAspectRatio={projectAspectRatio}
-              />
-            ))
+            <div className="flex items-center justify-center h-20 text-sm text-muted-foreground border-2 border-dashed border-border rounded">
+              No images yet
+            </div>
           )}
-          {positionedImages.length > 5 && (() => {
-            // Calculate aspect ratio padding for the "more" indicator to match other images
-            const imageWidth = 128;
-            let desiredHeight = imageWidth;
-
-            if (projectAspectRatio) {
-              const ratio = parseRatio(projectAspectRatio);
-              if (!isNaN(ratio) && ratio > 0) {
-                desiredHeight = imageWidth / ratio;
-              }
-            }
-            
-            const minHeight = 120;
-            const maxHeight = imageWidth * 2;
-            const finalHeight = Math.min(Math.max(desiredHeight, minHeight), maxHeight);
-            
-            return (
-              <div 
-                className="flex-shrink-0 w-32 rounded border bg-muted animate-in fade-in-up relative group-hover:scale-105 transition-transform duration-700"
-                style={{
-                  animationDelay: `${imagesToShow.length * 0.1}s`,
-                  height: `${finalHeight}px`,
-                }}
-              >
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground text-center pointer-events-none">+{positionedImages.length - 5} more</p>
-                </div>
-              </div>
-            );
-          })()}
         </div>
       </div>
 

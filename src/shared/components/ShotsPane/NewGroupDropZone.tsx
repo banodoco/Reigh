@@ -1,133 +1,115 @@
-import React, { useState } from 'react';
-// COMMENTED OUT: Drag functionality temporarily disabled
-// import { useDroppable } from '@dnd-kit/core';
+import React, { useState, useCallback } from 'react';
 import { useHandleExternalImageDrop } from '@/shared/hooks/useShots';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useToast } from '@/shared/hooks/use-toast';
 import { useListShots } from '@/shared/hooks/useShots';
+import { toast } from 'sonner';
+import { isValidDropTarget, getGenerationDropData, isFileDrag, type GenerationDropData } from '@/shared/lib/dragDrop';
 
 const NEW_GROUP_DROPPABLE_ID = 'new-shot-group-dropzone';
 
 interface NewGroupDropZoneProps {
   onZoneClick: () => void;
+  onGenerationDrop?: (data: GenerationDropData) => Promise<void>;
 }
 
-const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick }) => {
+const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick, onGenerationDrop }) => {
   const { selectedProjectId } = useProject();
   const { data: shots } = useListShots(selectedProjectId);
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
-  const { toast } = useToast();
-  // COMMENTED OUT: Drag functionality temporarily disabled
-  // const [isFileOver, setIsFileOver] = useState(false);
-  const [isFileOver] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  // COMMENTED OUT: Drag functionality temporarily disabled
-  // const { isOver: isDndKitOver, setNodeRef } = useDroppable({
-  //   id: NEW_GROUP_DROPPABLE_ID,
-  //   data: {
-  //     type: 'new-group-zone',
-  //   }
-  // });
-  const isDndKitOver = false;
-  const setNodeRef = () => {};
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isValidDropTarget(e)) {
+      setIsDragOver(true);
+    }
+  }, []);
 
-  // COMMENTED OUT: Drag functionality temporarily disabled
-  // const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   if (e.dataTransfer.types.includes('Files')) {
-  //     setIsFileOver(true);
-  //   }
-  // };
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isValidDropTarget(e)) {
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDragOver(true);
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+    }
+  }, []);
 
-  // const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   if (e.dataTransfer.types.includes('Files')) {
-  //     e.dataTransfer.dropEffect = 'copy';
-  //     setIsFileOver(true);
-  //   } else {
-  //     e.dataTransfer.dropEffect = 'none';
-  //   }
-  // };
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    setIsDragOver(false);
+  }, []);
 
-  // const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   if (e.currentTarget.contains(e.relatedTarget as Node)) {
-  //       return;
-  //   }
-  //   setIsFileOver(false);
-  // };
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
 
-  // const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   setIsFileOver(false);
+    // Check for generation drop first
+    const generationData = getGenerationDropData(e);
+    if (generationData && onGenerationDrop) {
+      try {
+        await onGenerationDrop(generationData);
+      } catch (error) {
+        console.error('[NewGroupDropZone] Error creating shot from generation:', error);
+        toast.error(`Failed to create shot: ${(error as Error).message}`);
+      }
+      return;
+    }
 
-  //   const files = Array.from(e.dataTransfer.files);
-  //   if (files.length === 0) return;
+    // Check for file drop
+    if (isFileDrag(e)) {
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length === 0) return;
 
-  //   const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-  //   const shotCount = shots?.length ?? 0;
-    
-  //   const validFiles = files.filter(f => validImageTypes.includes(f.type));
-    
-  //   if (validFiles.length === 0) {
-  //     toast({
-  //       title: "No Valid Files Found",
-  //       description: `Only JPEG, PNG, WEBP files can be used to create a new shot.`,
-  //       variant: "destructive",
-  //     });
-  //     return;
-  //   }
-
-  //   try {
-  //     if (!selectedProjectId) throw new Error("A project must be selected.");
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const shotCount = shots?.length ?? 0;
       
-  //     await handleExternalImageDropMutation.mutateAsync({
-  //       imageFiles: validFiles,
-  //       targetShotId: null, // Passing null to indicate a new shot should be created
-  //       currentProjectQueryKey: selectedProjectId,
-  //       currentShotCount: shotCount
-  //     });
+      const validFiles = files.filter(f => validImageTypes.includes(f.type));
+      
+      if (validFiles.length === 0) {
+        toast.error('Only JPEG, PNG, WEBP files can be used to create a new shot.');
+        return;
+      }
 
-  //     toast({
-  //       title: "New Shot Created",
-  //       description: `Successfully created a new shot with ${validFiles.length} image(s).`,
-  //     });
-  //   } catch (error) {
-  //     console.error(`Error creating new shot with ${validFiles.length} file(s):`, error);
-  //     toast({
-  //       title: "Error Creating Shot",
-  //       description: `Could not create a new shot: ${(error as Error).message}`,
-  //       variant: "destructive",
-  //     });
-  //   }
-  // };
+      try {
+        if (!selectedProjectId) throw new Error("A project must be selected.");
+        
+        await handleExternalImageDropMutation.mutateAsync({
+          imageFiles: validFiles,
+          targetShotId: null,
+          currentProjectQueryKey: selectedProjectId,
+          currentShotCount: shotCount
+        });
+      } catch (error) {
+        console.error('[NewGroupDropZone] Error creating shot from files:', error);
+        toast.error(`Could not create a new shot: ${(error as Error).message}`);
+      }
+    }
+  }, [selectedProjectId, shots?.length, handleExternalImageDropMutation, onGenerationDrop]);
 
-  const isDropTarget = isDndKitOver || isFileOver;
-  const style = {
-    borderColor: isDropTarget ? '#22c55e' : '#4B5563', // gray-600
-    backgroundColor: isDropTarget ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
-  };
-
+  const isDropTarget = isDragOver;
   return (
     <div 
-      ref={setNodeRef} 
-      style={style}
-      className="new-group-drop-zone p-4 border-2 border-dashed rounded flex items-center justify-center min-w-[200px] transition-colors"
-      // COMMENTED OUT: Drag functionality temporarily disabled
-      // onDragEnter={handleDragEnter}
-      // onDragOver={handleDragOver}
-      // onDragLeave={handleDragLeave}
-      // onDrop={handleDrop}
+      className={`new-group-drop-zone p-4 border-2 border-dashed rounded flex items-center justify-center min-w-[200px] transition-all cursor-pointer ${
+        isDropTarget 
+          ? 'border-green-500 bg-green-500/10 scale-105' 
+          : 'border-zinc-600 hover:border-zinc-500 hover:bg-zinc-800/50'
+      }`}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       onClick={onZoneClick}
     >
-      <p className="text-gray-400 text-center">
-        {/* COMMENTED OUT: Drag functionality temporarily disabled */}
-        {/* {isDropTarget ? 'Release to create a new shot' : 'Drop image(s) here to create a new shot'} */}
-        Click to create a new shot
+      <p className="text-zinc-400 text-center text-sm">
+        {isDropTarget ? 'Release to create new shot' : 'Drop or click to create new shot'}
       </p>
     </div>
   );

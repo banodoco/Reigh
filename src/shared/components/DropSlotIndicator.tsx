@@ -1,5 +1,5 @@
 import React from "react";
-import type { DragType } from "@/tools/travel-between-images/components/Timeline/hooks/useUnifiedDrop";
+import type { DragType } from "@/shared/lib/dragDrop";
 
 interface DropSlotIndicatorProps {
   isVisible: boolean;

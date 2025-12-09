@@ -20,6 +20,7 @@ import { GeneratedImageWithMetadata, DisplayableMetadata } from "./ImageGallery"
 import SharedMetadataDetails from "./SharedMetadataDetails";
 import { SharedTaskDetails } from "@/tools/travel-between-images/components/SharedTaskDetails";
 import { log } from '@/shared/lib/logger';
+import { setGenerationDragData, createDragPreview } from '@/shared/lib/dragDrop';
 import { cn } from "@/shared/lib/utils";
 import CreateShotModal from "@/shared/components/CreateShotModal";
 import { useAddImageToShot, useCreateShotWithImage } from "@/shared/hooks/useShots";
@@ -837,46 +838,18 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     
     setIsDragging(true);
     
-    e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('application/x-generation', JSON.stringify({
+    // Use shared utility to set drag data
+    setGenerationDragData(e, {
       generationId: image.id,
       imageUrl: image.url,
       thumbUrl: image.thumbUrl,
       metadata: image.metadata
-    }));
+    });
     
-    // Create a small drag preview element
-    if (e.dataTransfer.setDragImage && e.currentTarget instanceof HTMLElement) {
-      const preview = document.createElement('div');
-      preview.style.position = 'absolute';
-      preview.style.top = '-1000px'; // Position off-screen
-      preview.style.width = '80px';
-      preview.style.height = '80px';
-      preview.style.opacity = '0.7';
-      preview.style.borderRadius = '8px';
-      preview.style.overflow = 'hidden';
-      preview.style.border = '2px solid #fff';
-      preview.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
-      
-      // Clone the image element
-      const imgElement = e.currentTarget.querySelector('img');
-      if (imgElement) {
-        const imgClone = imgElement.cloneNode(true) as HTMLImageElement;
-        imgClone.style.width = '100%';
-        imgClone.style.height = '100%';
-        imgClone.style.objectFit = 'cover';
-        preview.appendChild(imgClone);
-      }
-      
-      document.body.appendChild(preview);
-      e.dataTransfer.setDragImage(preview, 40, 40);
-      
-      // Clean up after a brief moment
-      setTimeout(() => {
-        if (document.body.contains(preview)) {
-          document.body.removeChild(preview);
-        }
-      }, 0);
+    // Create drag preview and clean up after brief moment
+    const cleanup = createDragPreview(e);
+    if (cleanup) {
+      setTimeout(cleanup, 0);
     }
     
     console.log('[GenerationDrag] Drag started:', {

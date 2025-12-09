@@ -2,15 +2,15 @@ import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { pixelToFrame } from "../utils/timeline-utils";
 import { TIMELINE_PADDING_OFFSET } from "../constants";
+import { 
+  getDragType as sharedGetDragType, 
+  getGenerationDropData, 
+  type DragType, 
+  type GenerationDropData
+} from "@/shared/lib/dragDrop";
 
-export type DragType = 'file' | 'generation' | 'none';
-
-export interface GenerationDropData {
-  generationId: string;
-  imageUrl: string;
-  thumbUrl?: string;
-  metadata?: any;
-}
+// Re-export for backward compatibility
+export type { DragType, GenerationDropData };
 
 interface UseUnifiedDropProps {
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
@@ -34,32 +34,17 @@ export const useUnifiedDrop = ({
   const [dropTargetFrame, setDropTargetFrame] = useState<number | null>(null);
 
   /**
-   * Detect the type of item being dragged
+   * Detect the type of item being dragged (wrapper around shared utility for logging)
    */
   const getDragType = useCallback((e: React.DragEvent<HTMLDivElement>): DragType => {
-    const types = Array.from(e.dataTransfer.types);
+    const dragType = sharedGetDragType(e);
     
-    console.log('[BatchDropPositionIssue] 🔍 getDragType - dataTransfer.types:', {
-      types,
-      hasFiles: types.includes('Files'),
-      hasGeneration: types.includes('application/x-generation'),
+    console.log('[BatchDropPositionIssue] 🔍 getDragType:', {
+      dragType,
       timestamp: Date.now()
     });
     
-    // Check for generation data first (more specific)
-    if (types.includes('application/x-generation')) {
-      console.log('[BatchDropPositionIssue] ✅ DETECTED: generation');
-      return 'generation';
-    }
-    
-    // Check for files
-    if (types.includes('Files')) {
-      console.log('[BatchDropPositionIssue] ✅ DETECTED: file');
-      return 'file';
-    }
-    
-    console.log('[BatchDropPositionIssue] ❌ DETECTED: none');
-    return 'none';
+    return dragType;
   }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -225,22 +210,20 @@ export const useUnifiedDrop = ({
     else if (dragType === 'generation' && onGenerationDrop) {
       console.log('[BatchDropPositionIssue] 🖼️ GENERATION DROP - Starting...');
       
+      const data = getGenerationDropData(e);
+      
+      console.log('[BatchDropPositionIssue] 🖼️ GENERATION DROP - parsed data:', {
+        hasData: !!data,
+        generationId: data?.generationId?.substring(0, 8),
+        timestamp: Date.now()
+      });
+      
+      if (!data) {
+        console.error('[BatchDropPositionIssue] ❌ GENERATION DROP - No valid data found');
+        return;
+      }
+      
       try {
-        const dataString = e.dataTransfer.getData('application/x-generation');
-        
-        console.log('[BatchDropPositionIssue] 🖼️ GENERATION DROP - dataString:', {
-          hasData: !!dataString,
-          dataLength: dataString?.length,
-          timestamp: Date.now()
-        });
-        
-        if (!dataString) {
-          console.error('[BatchDropPositionIssue] ❌ GENERATION DROP - No data found');
-          return;
-        }
-        
-        const data: GenerationDropData = JSON.parse(dataString);
-        
         console.log('[BatchDropPositionIssue] 🖼️ GENERATION DROP - CALLING onGenerationDrop:', {
           generationId: data.generationId?.substring(0, 8),
           targetFrame,

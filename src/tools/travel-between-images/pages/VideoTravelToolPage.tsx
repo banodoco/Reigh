@@ -7,7 +7,7 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowDown, Search } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
@@ -698,26 +698,6 @@ const VideoTravelToolPage: React.FC = () => {
         nameClickRef.current();
       }
     }, 300);
-  }, []);
-  
-  // ============================================================================
-  // BACK TO TOP BUTTON (Page-level navigation)
-  // ============================================================================
-  const [showBackToTop, setShowBackToTop] = useState(false);
-  
-  const scrollToTop = useCallback(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-  
-  // Show back-to-top button when user scrolls down
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollThreshold = 400; // Show button after scrolling 400px
-      setShowBackToTop(window.scrollY > scrollThreshold);
-    };
-    
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
   
@@ -2625,18 +2605,6 @@ const VideoTravelToolPage: React.FC = () => {
         </div>
       )}
       
-      {/* Back to Top Button - appears when scrolled down (only in shot list view) */}
-      {showBackToTop && !shouldShowShotEditor && (
-        <Button
-          variant="theme-soft"
-          size="icon"
-          className="fixed bottom-6 right-6 z-50 rounded-full shadow-lg"
-          onClick={scrollToTop}
-          title="Back to top"
-        >
-          <ArrowUp className="h-4 w-4" />
-        </Button>
-      )}
     </div>
   );
 };

@@ -1,14 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-// COMMENTED OUT: Drag functionality temporarily disabled
-// import { useDroppable } from '@dnd-kit/core';
-// import { useSortable } from '@dnd-kit/sortable';
-// import { CSS } from '@dnd-kit/utilities';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Shot } from '@/types/shots';
-import type { GenerationRow } from '@/types/shots';
-import { useUpdateShotName, useHandleExternalImageDrop, useDeleteShot } from '@/shared/hooks/useShots';
-import { useToast } from '@/shared/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
-import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { useUpdateShotName, useHandleExternalImageDrop, useAddImageToShot } from '@/shared/hooks/useShots';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { ChevronDown, ChevronUp, Video } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -16,6 +8,8 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import { isVideoGeneration } from '@/shared/lib/typeGuards';
 import { VideoGenerationModal } from '@/shared/components/VideoGenerationModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { toast } from 'sonner';
+import { isValidDropTarget, getGenerationDropData, isFileDrag, type GenerationDropData } from '@/shared/lib/dragDrop';
 
 interface ShotGroupProps {
   shot: Shot;
@@ -23,31 +17,16 @@ interface ShotGroupProps {
 }
 
 const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
-  // COMMENTED OUT: Drag functionality temporarily disabled
-  // const { isOver: isDndKitOver, setNodeRef } = useDroppable({
-  //   id: shot.id,
-  //   data: {
-  //     type: 'shot-group',
-  //     shotId: shot.id,
-  //   }
-  // });
-  const isDndKitOver = false;
-  const setNodeRef = () => {};
-
-  const navigate = useNavigate();
-  const { setCurrentShotId } = useCurrentShot();
   const { navigateToShot } = useShotNavigation();
-  const { toast } = useToast();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
+  const addImageToShotMutation = useAddImageToShot();
   const updateShotNameMutation = useUpdateShotName();
   const isMobile = useIsMobile();
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentName, setCurrentName] = useState(shot.name || 'Unnamed Shot');
   const inputRef = useRef<HTMLInputElement>(null);
-  // COMMENTED OUT: Drag functionality temporarily disabled
-  // const [isFileOver, setIsFileOver] = useState(false);
-  const [isFileOver] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   const IMAGES_PER_ROW = 4;
@@ -102,103 +81,99 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
     }
   };
 
-  // COMMENTED OUT: Drag functionality temporarily disabled
-  // const droppableStyle: React.CSSProperties = {
-  //   border: isDndKitOver ? '2px dashed #22c55e' : (isFileOver ? '2px dashed #0ea5e9' : '2px solid transparent'),
-  //   transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-  //   position: 'relative',
-  // };
-  const droppableStyle: React.CSSProperties = {
-    border: '2px solid transparent',
-    transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-    position: 'relative',
-  };
+  // Drag and drop handlers for generations from ImageGallery and files
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isValidDropTarget(e)) {
+      setIsDragOver(true);
+    }
+  }, []);
 
-  // COMMENTED OUT: Drag functionality temporarily disabled
-  // const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   console.log(`[ShotGroup:${shot.id}] handleDragEnter: File entered. Items:`, e.dataTransfer.items.length, e.dataTransfer.types);
-  //   if (e.dataTransfer.types.includes('Files')) {
-  //     setIsFileOver(true);
-  //   }
-  // };
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isValidDropTarget(e)) {
+      setIsDragOver(true);
+      e.dataTransfer.dropEffect = 'copy';
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+    }
+  }, []);
 
-  // const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   if (e.dataTransfer.types.includes('Files')) {
-  //     setIsFileOver(true);
-  //     e.dataTransfer.dropEffect = 'copy';
-  //   } else {
-  //     e.dataTransfer.dropEffect = 'none';
-  //   }
-  // };
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only clear if we're leaving the element entirely (not entering a child)
+    if (e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    setIsDragOver(false);
+  }, []);
 
-  // const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   console.log(`[ShotGroup:${shot.id}] handleDragLeave: File left.`);
-  //   if (e.currentTarget.contains(e.relatedTarget as Node)) {
-  //       return;
-  //   }
-  //   setIsFileOver(false);
-  // };
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
 
-  // const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   setIsFileOver(false);
-  //   console.log(`[ShotGroup:${shot.id}] handleDrop: File dropped. Items:`, e.dataTransfer.files.length);
+    // Check for generation drop (from ImageGallery) using shared utility
+    const generationData = getGenerationDropData(e);
+    if (generationData) {
+      console.log('[ShotGroup] Generation dropped:', {
+        shotId: shot.id.substring(0, 8),
+        shotName: shot.name,
+        generationId: generationData.generationId?.substring(0, 8),
+      });
 
-  //   const files = Array.from(e.dataTransfer.files);
-  //   if (files.length === 0) {
-  //     console.log(`[ShotGroup:${shot.id}] handleDrop: No files found in drop event.`);
-  //     return;
-  //   }
+      if (!shot.project_id) {
+        toast.error('Shot has no associated project');
+        return;
+      }
 
-  //   const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-  //   const validFiles = files.filter(file => {
-  //     if (validImageTypes.includes(file.type)) {
-  //       return true;
-  //     }
-  //     console.warn(`[ShotGroup:${shot.id}] handleDrop: Invalid file type for ${file.name}: ${file.type}. Skipping.`);
-  //     toast({
-  //       title: "Invalid File Type",
-  //       description: `Skipped '${file.name}'. Only JPEG, PNG, WEBP are allowed. `,
-  //       variant: "destructive",
-  //     });
-  //     return false;
-  //   });
+      try {
+        await addImageToShotMutation.mutateAsync({
+          shot_id: shot.id,
+          generation_id: generationData.generationId,
+          project_id: shot.project_id,
+          imageUrl: generationData.imageUrl,
+          thumbUrl: generationData.thumbUrl,
+        });
+      } catch (error) {
+        console.error('[ShotGroup] Failed to add generation to shot:', error);
+        toast.error(`Failed to add to shot: ${(error as Error).message}`);
+      }
+      return;
+    }
 
-  //   if (validFiles.length === 0) {
-  //     return;
-  //   }
+    // Check for file drop
+    if (isFileDrag(e)) {
+      const files = Array.from(e.dataTransfer.files);
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const validFiles = files.filter(file => {
+        if (validImageTypes.includes(file.type)) {
+          return true;
+        }
+        toast.error(`Skipped '${file.name}'. Only JPEG, PNG, WEBP are allowed.`);
+        return false;
+      });
 
-  //   try {
-  //     if (!shot.project_id) throw new Error("This shot has no associated project.");
-      
-  //     await handleExternalImageDropMutation.mutateAsync({
-  //       imageFiles: validFiles, 
-  //       targetShotId: shot.id, 
-  //       currentProjectQueryKey: shot.project_id, 
-  //       currentShotCount: 0 /* Not needed when adding to existing shot */
-  //     });
+      if (validFiles.length === 0) return;
 
-  //     toast({
-  //         title: "Images Added",
-  //         description: `${validFiles.length} image(s) successfully added to shot '${currentName}'.`,
-  //     });
-
-  //   } catch (error) {
-  //     console.error(`[ShotGroup:${shot.id}] handleDrop: Error processing files:`, error);
-  //     toast({
-  //       title: "Upload Error",
-  //       description: `Could not add images: ${(error as Error).message}`,
-  //       variant: "destructive",
-  //     });
-  //   }
-  // };
+      try {
+        if (!shot.project_id) throw new Error("This shot has no associated project.");
+        
+        await handleExternalImageDropMutation.mutateAsync({
+          imageFiles: validFiles, 
+          targetShotId: shot.id, 
+          currentProjectQueryKey: shot.project_id, 
+          currentShotCount: 0
+        });
+      } catch (error) {
+        console.error('[ShotGroup] handleDrop: Error processing files:', error);
+        toast.error(`Could not add images: ${(error as Error).message}`);
+      }
+    }
+  }, [shot.id, shot.name, shot.project_id, addImageToShotMutation, handleExternalImageDropMutation]);
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
@@ -226,29 +201,28 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
 
   return (
     <div 
-      ref={setNodeRef} 
-      style={droppableStyle} 
-      className={`shot-group p-3 border rounded-lg min-w-[200px] max-w-[300px] shadow-lg flex flex-col space-y-2 transition-all duration-300 ease-in-out relative cursor-pointer ${
-        highlighted 
-          ? 'border-sky-400 bg-sky-900/20 hover:bg-sky-800/30 ring-2 ring-sky-400/50 ring-offset-2 ring-offset-zinc-900' 
-          : 'border-zinc-700 bg-zinc-800/90 hover:bg-zinc-700/50 hover:border-zinc-600'
+      className={`shot-group p-3 border-2 rounded-lg min-w-[200px] max-w-[300px] shadow-lg flex flex-col space-y-2 transition-all duration-300 ease-in-out relative cursor-pointer ${
+        isDragOver
+          ? 'border-green-400 bg-green-900/30 scale-105'
+          : highlighted 
+            ? 'border-sky-400 bg-sky-900/20 hover:bg-sky-800/30 ring-2 ring-sky-400/50 ring-offset-2 ring-offset-zinc-900' 
+            : 'border-zinc-700 bg-zinc-800/90 hover:bg-zinc-700/50 hover:border-zinc-600'
       }`}
-      // COMMENTED OUT: Drag functionality temporarily disabled
-      // onDragEnter={handleDragEnter}
-      // onDragOver={handleDragOver}
-      // onDragLeave={handleDragLeave}
-      // onDrop={handleDrop}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       onClick={handleClick}
     >
-      {/* COMMENTED OUT: Drag functionality temporarily disabled */}
-      {/* {isFileOver && (
+      {/* Drag overlay */}
+      {isDragOver && (
         <div 
-          className="absolute inset-0 bg-sky-500 bg-opacity-30 flex items-center justify-center rounded-lg pointer-events-none z-10"
+          className="absolute inset-0 bg-green-500/20 flex items-center justify-center rounded-lg pointer-events-none z-10"
           style={{ backdropFilter: 'blur(2px)' }}
         >
-          <p className="text-white text-sm font-light p-2 bg-black/50 rounded">Add to shot</p>
+          <p className="text-white text-sm font-medium p-2 bg-black/60 rounded">Drop to add</p>
         </div>
-      )} */}
+      )}
       {isEditing ? (
         <input
           ref={inputRef}
@@ -287,7 +261,9 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
             >
               {allImages.map((image, index) => (
                 <img
-                  key={image.id || `image-${index}`} // image.id is shot_generations.id (unique per entry)
+                  // Use URL + index as key: URL provides stability (no remount when temp ID → real ID),
+                  // index provides uniqueness (handles duplicate images with same URL)
+                  key={`${image.thumbUrl || image.imageUrl || 'img'}-${index}`}
                   src={getDisplayUrl(image.thumbUrl || image.imageUrl)} // Keep thumbnail-only for small cells
                   alt={`Shot image ${index + 1}`}
                   className="w-12 h-12 object-cover rounded border border-zinc-700 bg-zinc-600 shadow"
@@ -322,9 +298,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
           </>
         ) : (
           <div className="flex items-center justify-center h-full text-xs text-zinc-500">
-            {/* COMMENTED OUT: Drag functionality temporarily disabled */}
-            {/* Drop images here */}
-            No images
+            Drop images here
           </div>
         )}
       </div>
@@ -335,17 +309,24 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                className="flex items-center justify-center w-6 h-6 rounded bg-violet-600/80 hover:bg-violet-500 text-white transition-colors"
+                className={`flex items-center justify-center w-6 h-6 rounded text-white transition-colors ${
+                  allImages.length === 0 
+                    ? 'bg-zinc-600 cursor-not-allowed opacity-50' 
+                    : 'bg-violet-600/80 hover:bg-violet-500'
+                }`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsVideoModalOpen(true);
+                  if (allImages.length > 0) {
+                    setIsVideoModalOpen(true);
+                  }
                 }}
+                disabled={allImages.length === 0}
               >
                 <Video className="w-3.5 h-3.5" />
               </button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Generate Video</p>
+              <p>{allImages.length === 0 ? 'Add images to generate video' : 'Generate Video'}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

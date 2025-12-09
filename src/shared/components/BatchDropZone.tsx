@@ -1,7 +1,6 @@
 import React, { useRef, useCallback, useState } from "react";
 import { toast } from "sonner";
-
-export type DragType = 'file' | 'generation' | 'none';
+import { getDragType, getGenerationDropData, type DragType } from "@/shared/lib/dragDrop";
 
 
 interface BatchDropZoneProps {
@@ -72,25 +71,6 @@ function calculateDropIndex(
   
   // Clamp to valid range (can insert at end, which is itemCount)
   return Math.max(0, Math.min(targetIndex, itemCount));
-}
-
-/**
- * Detect the type of item being dragged
- */
-function getDragType(e: React.DragEvent): DragType {
-  const types = Array.from(e.dataTransfer.types);
-  
-  // Check for generation data first (more specific)
-  if (types.includes('application/x-generation')) {
-    return 'generation';
-  }
-  
-  // Check for files
-  if (types.includes('Files')) {
-    return 'file';
-  }
-  
-  return 'none';
 }
 
 /**
@@ -207,11 +187,10 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
     
     // Handle generation drops
     else if (type === 'generation' && onGenerationDrop) {
+      const data = getGenerationDropData(e);
+      if (!data) return;
+      
       try {
-        const dataString = e.dataTransfer.getData('application/x-generation');
-        if (!dataString) return;
-        
-        const data = JSON.parse(dataString);
         await onGenerationDrop(data.generationId, data.imageUrl, data.thumbUrl, targetPosition ?? undefined, framePosition);
       } catch (error) {
         console.error('[BatchDropZone] Generation drop error:', error);

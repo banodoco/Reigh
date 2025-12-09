@@ -205,8 +205,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
       toast.error("No project or shot selected.");
       return;
     }
-    if (positionedImages.length < 2) {
-      toast.error("At least 2 positioned images are required.");
+    if (positionedImages.length < 1) {
+      toast.error("At least 1 positioned image is required.");
       return;
     }
     
@@ -289,7 +289,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
   }, []);
   
   const isLoading = (status !== 'ready' && status !== 'saving' && status !== 'error') || generationsLoading;
-  const isDisabled = isGenerating || isLoading || positionedImages.length < 2;
+  const isDisabled = isGenerating || isLoading || positionedImages.length < 1;
 
   return (
     <>
@@ -322,8 +322,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
                     </div>
                   )}
                 </div>
-                {positionedImages.length < 2 && (
-                  <span className="text-xs text-amber-500">(need 2+ images)</span>
+                {positionedImages.length < 1 && (
+                  <span className="text-xs text-amber-500">(need 1+ images)</span>
                 )}
               </div>
               

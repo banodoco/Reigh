@@ -26,13 +26,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
 import { Plus, Upload } from 'lucide-react';
-
-interface GenerationDropData {
-  generationId: string;
-  imageUrl: string;
-  thumbUrl?: string;
-  metadata?: any;
-}
+import { getDragType, getGenerationDropData, isFileDrag, type GenerationDropData, type DragType } from '@/shared/lib/dragDrop';
 
 interface ShotListDisplayProps {
   onSelectShot: (shot: Shot) => void;
@@ -393,47 +387,36 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
 
   // Drop state for "New Shot" drop zone
   const [isNewShotDropTarget, setIsNewShotDropTarget] = useState(false);
-  const [newShotDropType, setNewShotDropType] = useState<'generation' | 'file' | null>(null);
-
-  // Detect drag type
-  const getDragType = useCallback((e: React.DragEvent): 'generation' | 'file' | null => {
-    if (e.dataTransfer.types.includes('application/x-generation')) {
-      return 'generation';
-    }
-    if (e.dataTransfer.types.includes('Files')) {
-      return 'file';
-    }
-    return null;
-  }, []);
+  const [newShotDropType, setNewShotDropType] = useState<DragType>('none');
 
   // Handle drag enter for new shot drop zone
   const handleNewShotDragEnter = useCallback((e: React.DragEvent) => {
     const dragType = getDragType(e);
-    if (dragType && (onGenerationDropForNewShot || onFilesDropForNewShot)) {
+    if (dragType !== 'none' && (onGenerationDropForNewShot || onFilesDropForNewShot)) {
       e.preventDefault();
       e.stopPropagation();
       setIsNewShotDropTarget(true);
       setNewShotDropType(dragType);
     }
-  }, [getDragType, onGenerationDropForNewShot, onFilesDropForNewShot]);
+  }, [onGenerationDropForNewShot, onFilesDropForNewShot]);
 
   // Handle drag over for new shot drop zone
   const handleNewShotDragOver = useCallback((e: React.DragEvent) => {
     const dragType = getDragType(e);
-    if (dragType && (onGenerationDropForNewShot || onFilesDropForNewShot)) {
+    if (dragType !== 'none' && (onGenerationDropForNewShot || onFilesDropForNewShot)) {
       e.preventDefault();
       e.stopPropagation();
       e.dataTransfer.dropEffect = 'copy';
       setIsNewShotDropTarget(true);
       setNewShotDropType(dragType);
     }
-  }, [getDragType, onGenerationDropForNewShot, onFilesDropForNewShot]);
+  }, [onGenerationDropForNewShot, onFilesDropForNewShot]);
 
   // Handle drag leave for new shot drop zone
   const handleNewShotDragLeave = useCallback((e: React.DragEvent) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsNewShotDropTarget(false);
-      setNewShotDropType(null);
+      setNewShotDropType('none');
     }
   }, []);
 
@@ -442,48 +425,49 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsNewShotDropTarget(false);
-    setNewShotDropType(null);
+    setNewShotDropType('none');
 
-    const dragType = getDragType(e);
-    if (!dragType) return;
+    // Try generation drop first
+    const generationData = getGenerationDropData(e);
+    if (generationData && onGenerationDropForNewShot) {
+      console.log('[ShotDrop] Dropping generation to create new shot:', {
+        generationId: generationData.generationId?.substring(0, 8),
+        timestamp: Date.now()
+      });
 
-    try {
-      if (dragType === 'generation' && onGenerationDropForNewShot) {
-        const dataString = e.dataTransfer.getData('application/x-generation');
-        if (!dataString) return;
-
-        const data: GenerationDropData = JSON.parse(dataString);
-        
-        console.log('[ShotDrop] Dropping generation to create new shot:', {
-          generationId: data.generationId?.substring(0, 8),
-          timestamp: Date.now()
-        });
-
-        // Don't set processing state - let mutation handle its own loading states
-        await onGenerationDropForNewShot(data);
-      } else if (dragType === 'file' && onFilesDropForNewShot) {
-        const files = Array.from(e.dataTransfer.files);
-        const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-        const validFiles = files.filter(file => validImageTypes.includes(file.type));
-        
-        if (validFiles.length === 0) {
-          toast.error('No valid image files. Only JPEG, PNG, and WebP are supported.');
-          return;
-        }
-
-        console.log('[ShotDrop] Dropping files to create new shot:', {
-          fileCount: validFiles.length,
-          timestamp: Date.now()
-        });
-
-        // Don't set processing state - let mutation handle its own loading states
-        await onFilesDropForNewShot(validFiles);
+      try {
+        await onGenerationDropForNewShot(generationData);
+      } catch (error) {
+        console.error('[ShotDrop] Error creating new shot from generation:', error);
+        toast.error(`Failed to create shot: ${(error as Error).message}`);
       }
-    } catch (error) {
-      console.error('[ShotDrop] Error creating new shot from drop:', error);
-      toast.error(`Failed to create shot: ${(error as Error).message}`);
+      return;
     }
-  }, [getDragType, onGenerationDropForNewShot, onFilesDropForNewShot]);
+
+    // Try file drop
+    if (isFileDrag(e) && onFilesDropForNewShot) {
+      const files = Array.from(e.dataTransfer.files);
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      const validFiles = files.filter(file => validImageTypes.includes(file.type));
+      
+      if (validFiles.length === 0) {
+        toast.error('No valid image files. Only JPEG, PNG, and WebP are supported.');
+        return;
+      }
+
+      console.log('[ShotDrop] Dropping files to create new shot:', {
+        fileCount: validFiles.length,
+        timestamp: Date.now()
+      });
+
+      try {
+        await onFilesDropForNewShot(validFiles);
+      } catch (error) {
+        console.error('[ShotDrop] Error creating new shot from files:', error);
+        toast.error(`Failed to create shot: ${(error as Error).message}`);
+      }
+    }
+  }, [onGenerationDropForNewShot, onFilesDropForNewShot]);
 
   // Show loading skeleton while data is being fetched
   if (shotsLoading || shots === undefined) {

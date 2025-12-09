@@ -1,6 +1,6 @@
 import React from "react";
 import { TIMELINE_PADDING_OFFSET } from "./constants";
-import type { DragType } from "./hooks/useUnifiedDrop";
+import type { DragType } from "@/shared/lib/dragDrop";
 
 interface DropIndicatorProps {
   isVisible: boolean;

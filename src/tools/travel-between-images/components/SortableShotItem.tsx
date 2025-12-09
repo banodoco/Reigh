@@ -4,13 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Shot } from '@/types/shots';
 import VideoShotDisplay from './VideoShotDisplay';
 import { cn } from '@/shared/lib/utils';
-
-interface GenerationDropData {
-  generationId: string;
-  imageUrl: string;
-  thumbUrl?: string;
-  metadata?: any;
-}
+import { isGenerationDrag, getGenerationDropData, type GenerationDropData } from '@/shared/lib/dragDrop';
 
 interface SortableShotItemProps {
   shot: Shot;
@@ -56,11 +50,6 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   // Drop state for visual feedback
   const [isDropTarget, setIsDropTarget] = useState(false);
 
-  // Detect if this is a generation drag from GenerationsPane
-  const isGenerationDrag = useCallback((e: React.DragEvent): boolean => {
-    return e.dataTransfer.types.includes('application/x-generation');
-  }, []);
-
   // Handle drag enter for drop feedback
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     if (isGenerationDrag(e) && onGenerationDrop) {
@@ -68,7 +57,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
       e.stopPropagation();
       setIsDropTarget(true);
     }
-  }, [isGenerationDrag, onGenerationDrop]);
+  }, [onGenerationDrop]);
 
   // Handle drag over to allow drop
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -78,7 +67,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
       e.dataTransfer.dropEffect = 'copy';
       setIsDropTarget(true);
     }
-  }, [isGenerationDrag, onGenerationDrop]);
+  }, [onGenerationDrop]);
 
   // Handle drag leave
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -94,27 +83,24 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
     e.stopPropagation();
     setIsDropTarget(false);
 
-    if (!onGenerationDrop || !isGenerationDrag(e)) return;
+    if (!onGenerationDrop) return;
+
+    const data = getGenerationDropData(e);
+    if (!data) return;
+    
+    console.log('[ShotDrop] Dropping generation onto shot:', {
+      shotId: shot.id.substring(0, 8),
+      shotName: shot.name,
+      generationId: data.generationId?.substring(0, 8),
+      timestamp: Date.now()
+    });
 
     try {
-      const dataString = e.dataTransfer.getData('application/x-generation');
-      if (!dataString) return;
-
-      const data: GenerationDropData = JSON.parse(dataString);
-      
-      console.log('[ShotDrop] Dropping generation onto shot:', {
-        shotId: shot.id.substring(0, 8),
-        shotName: shot.name,
-        generationId: data.generationId?.substring(0, 8),
-        timestamp: Date.now()
-      });
-
-      // Don't set processing state - let mutation handle its own loading states
       await onGenerationDrop(shot.id, data);
     } catch (error) {
       console.error('[ShotDrop] Error handling drop:', error);
     }
-  }, [onGenerationDrop, isGenerationDrag, shot.id, shot.name]);
+  }, [onGenerationDrop, shot.id, shot.name]);
 
   // [ShotReorderDebug] Log dragging state changes (only when actually dragging to reduce noise)
   React.useEffect(() => {
