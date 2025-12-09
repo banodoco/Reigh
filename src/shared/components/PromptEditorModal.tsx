@@ -1,9 +1,8 @@
 import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
-import { Input } from '@/shared/components/ui/input';
 import { PromptEntry, PromptInputRow, PromptInputRowProps } from '@/tools/image-generation/components/ImageGenerationForm';
-import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronLeft, ChevronRight, Sparkles, X, Loader2, Shuffle } from 'lucide-react';
+import { Wand2Icon, Edit, PackagePlus, Trash2, ChevronDown, ChevronLeft, Sparkles, Shuffle } from 'lucide-react';
 import { PromptGenerationControls, GenerationControlValues as PGC_GenerationControlValues } from '@/tools/image-generation/components/PromptGenerationControls';
 import { BulkEditControls, BulkEditParams as BEC_BulkEditParams, BulkEditControlValues as BEC_BulkEditControlValues } from '@/tools/image-generation/components/BulkEditControls';
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
@@ -26,13 +25,6 @@ interface PersistedEditorControlsSettings {
   generationSettings?: GenerationControlValues;
   bulkEditSettings?: BulkEditControlValues;
   activeTab?: EditorMode;
-}
-
-interface PromptToEditState {
-  id: string;
-  originalText: string;
-  instructions: string;
-  modelType: AIModelType;
 }
 
 export interface PromptEditorModalProps {
@@ -83,16 +75,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     console.log(`[PromptEditorModal:STATE_CHANGE] internalPrompts changed. Count: ${internalPrompts.length}`, 
       internalPrompts.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'})));
   }, [internalPrompts]);
-  const [promptToEdit, setPromptToEdit] = useState<PromptToEditState | null>(null);
-  
-  // Debug: Track promptToEdit changes
-  useEffect(() => {
-    console.log(`[EDIT_DEBUG:STATE] promptToEdit changed:`, promptToEdit);
-  }, [promptToEdit]);
-  
-  // Use completely uncontrolled approach for edit instructions to eliminate all reset issues
-  const editInstructionsTextRef = useRef<string>('');
-  const [editInstructionsHasText, setEditInstructionsHasText] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<EditorMode>('generate');
   
   // Debug: Track activeTab changes
@@ -105,55 +87,9 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     console.log(`[EDIT_DEBUG:RENDER_CAUSE] Component re-rendered`);
   });
   
-  // Direct DOM manipulation functions with extensive logging
-  const getEditInstructionsValue = useCallback(() => {
-    const value = editInstructionsRef.current?.value || '';
-    console.log(`[EDIT_DEBUG:GET] Getting value: "${value}"`);
-    return value;
-  }, []);
-  
-  const setEditInstructionsValue = useCallback((value: string, reason: string = 'unknown') => {
-    console.log(`[EDIT_DEBUG:SET] Setting value to: "${value}" (reason: ${reason})`);
-    if (editInstructionsRef.current) {
-      const oldValue = editInstructionsRef.current.value;
-      editInstructionsRef.current.value = value;
-      editInstructionsTextRef.current = value;
-      setEditInstructionsHasText(value.trim().length > 0);
-      console.log(`[EDIT_DEBUG:SET] Changed from "${oldValue}" to "${value}" (reason: ${reason})`);
-    } else {
-      console.log(`[EDIT_DEBUG:SET] ERROR: editInstructionsRef.current is null`);
-    }
-  }, []);
-  
-  const clearEditInstructions = useCallback((reason: string = 'unknown') => {
-    console.log(`[EDIT_DEBUG:CLEAR] Clearing instructions (reason: ${reason})`);
-    setEditInstructionsValue('', `clear-${reason}`);
-    setEditInstructionsHasText(false); // Reset button state
-  }, [setEditInstructionsValue]);
-  
-  const updateEditInstructionsHasText = useCallback((value: string) => {
-    console.log(`[EDIT_DEBUG:CHANGE] User input changed to: "${value}"`);
-    const oldRefValue = editInstructionsTextRef.current;
-    editInstructionsTextRef.current = value;
-    
-    // Update button state based on whether there's text
-    const hasText = value.trim().length > 0;
-    setEditInstructionsHasText(prev => {
-      if (prev !== hasText) {
-        console.log(`[EDIT_DEBUG:CHANGE] Button state changing from ${prev} to ${hasText}`);
-        return hasText;
-      }
-      return prev; // No change needed, prevent re-render
-    });
-    
-    console.log(`[EDIT_DEBUG:CHANGE] Ref updated from "${oldRefValue}" to "${value}"`);
-  }, []);
   const [activePromptIdForFullView, setActivePromptIdForFullView] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [isAIPromptSectionExpanded, setIsAIPromptSectionExpanded] = useState(false);
-  const editInstructionsRef = useRef<HTMLInputElement>(null);
-  const shouldFocusAITextareaRef = useRef(false);
-  const tempFocusInputRef = useRef<HTMLInputElement>(null);
   // Track signatures for auto-save throttling
   const currentPromptsSignature = useMemo(() => JSON.stringify(internalPrompts), [internalPrompts]);
   const currentSignatureRef = useRef<string>(currentPromptsSignature);
@@ -184,32 +120,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     footerContainerClassName: modal.footerClass
   });
   
-  const attemptFocusAITextarea = useCallback(() => {
-    const start = Date.now();
-    const tryFocus = () => {
-      if (!shouldFocusAITextareaRef.current) return;
-      if (editInstructionsRef.current) {
-        const el = editInstructionsRef.current;
-        el.focus();
-        try {
-          const len = el.value?.length ?? 0;
-          el.setSelectionRange?.(len, len);
-        } catch {}
-        // Nudge into view similar to native tap behavior
-        setTimeout(() => {
-          try { el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }); } catch {}
-        }, 50);
-        shouldFocusAITextareaRef.current = false;
-        return;
-      }
-      if (Date.now() - start < 800) {
-        setTimeout(tryFocus, 16);
-      } else {
-        shouldFocusAITextareaRef.current = false;
-      }
-    };
-    tryFocus();
-  }, []);
   
   // Scroll state, ref, and fade effect
   const { showFade, scrollRef } = useScrollFade({ 
@@ -280,9 +190,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
       setShowScrollToTop(false);
       if (scrollRef.current) {
         scrollRef.current.scrollTop = 0;
-      }      
-      setPromptToEdit(null);
-      clearEditInstructions('modal-open'); // Reset edit instructions text
+      }
       // Sync prompts from prop (handles case where modal was previously opened and closed)
       setInternalPrompts(initialPrompts.map(p => ({ ...p })));
       setActivePromptIdForFullView(null);
@@ -513,71 +421,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     console.log(`[PromptEditorModal] AI Bulk Edit: Finished. ${successCount} / ${promptsToUpdate.length} prompts processed successfully.`);
   };
 
-  const openEditWithAIForm = (promptId: string, currentText: string) => {
-    console.log(`[EDIT_DEBUG:OPEN] Opening edit form for prompt: ${promptId}`);
-    shouldFocusAITextareaRef.current = true;
-    // iOS: prime the keyboard by focusing a temporary input in the same gesture
-    if (isMobile && tempFocusInputRef.current) {
-      try { tempFocusInputRef.current.focus({ preventScroll: true } as any); } catch {}
-    }
-    setPromptToEdit({ id: promptId, originalText: currentText, instructions: '', modelType: 'smart' });
-    console.log(`[EDIT_DEBUG:OPEN] promptToEdit set, current input value: "${getEditInstructionsValue()}"`);
-    // Don't reset editInstructionsText here - let it persist until user cancels or confirms
-    setTimeout(() => {
-      attemptFocusAITextarea();
-    }, 0);
-  };
-
-  // Stable callback no longer needed for inline instructions; using local state instead
-
-  const handleConfirmEditWithAI = async () => {
-    if (!promptToEdit) {
-      toast.error("Cannot perform AI edit. Missing data.");
-      return;
-    }
-    
-    const isEmptyPrompt = promptToEdit.originalText.trim() === '';
-    const currentInstructions = getEditInstructionsValue();
-    const actualInstructions = isEmptyPrompt 
-      ? `Write a new detailed image generation prompt based on this request: ${currentInstructions}`
-      : currentInstructions;
-    const actualOriginalText = isEmptyPrompt 
-      ? "Write a new prompt" 
-      : promptToEdit.originalText;
-    
-    console.log(`[PromptEditorModal] AI Individual Edit: Attempting to ${isEmptyPrompt ? 'create new prompt' : 'edit prompt'} for ID: ${promptToEdit.id}. Instructions: "${actualInstructions}"`);
-    
-    try {
-      const result = await aiEditPrompt({
-        originalPromptText: actualOriginalText,
-        editInstructions: actualInstructions,
-        modelType: promptToEdit.modelType,
-      });
-
-      if (result.success && result.newText) {
-        console.log(`[PromptEditorModal:AI_EDIT_SUCCESS] Successfully edited prompt ID: ${promptToEdit.id}. New text (start): "${result.newText.substring(0,50)}..."`);
-        console.log(`[PromptEditorModal:AI_EDIT_SUCCESS] About to update internal prompts with AI result`);
-        setInternalPrompts(currentPrompts => {
-          console.log(`[PromptEditorModal:AI_EDIT_SUCCESS] Current prompts before update:`, currentPrompts.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'})));
-          const updatedPrompts = currentPrompts.map(p =>
-            p.id === promptToEdit.id ? { ...p, fullPrompt: result.newText!, shortPrompt: result.newShortText || '' } : p
-          );
-          console.log(`[PromptEditorModal:AI_EDIT_SUCCESS] Updated prompts after AI edit:`, updatedPrompts.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'})));
-          return updatedPrompts;
-        });
-
-      } else {
-        console.warn(`[PromptEditorModal] AI Individual Edit: Edit returned no result or failed for prompt ID: ${promptToEdit.id}. Success: ${result.success}`);
-        toast.info("AI edit did not return a result or failed.");
-      }
-    } catch (error) {
-      console.error(`[PromptEditorModal] AI Individual Edit: Error editing prompt ID: ${promptToEdit.id}:`, error);
-      toast.error("Error editing prompt with AI.");
-    } finally {
-      setPromptToEdit(null); // Close the individual edit form
-      clearEditInstructions('ai-edit-complete');
-    }
-  };
 
   // Keep hook order stable - don't return early
 
@@ -657,15 +500,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
       document.removeEventListener('touchend', handleGlobalTouchEnd);
     };
   }, [isOpen]);
-
-  // Focus the inline AI edit input on open (desktop and mobile)
-  useEffect(() => {
-    if (promptToEdit) {
-      setTimeout(() => {
-        editInstructionsRef.current?.focus();
-      }, 0);
-    }
-  }, [promptToEdit]);
 
   // Handle inside interactions to collapse active field without closing modal
   const handleInsideInteraction = useCallback((event: React.MouseEvent | React.TouchEvent) => {
@@ -767,9 +601,6 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
           }
         }}
       >
-        {isMobile && (
-          <input ref={tempFocusInputRef} type="text" className="sr-only" aria-hidden="true" />
-        )}
         <div className={modal.headerClass}>
           <DialogHeader className={`${modal.isMobile ? 'px-2 pt-2 pb-2' : 'px-6 pt-4 pb-2'} flex-shrink-0`}>
             <DialogTitle>Prompt Editor</DialogTitle>
@@ -887,73 +718,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                   No prompts yet. Add one manually or use AI generation.
                 </div>
               )}
-              {internalPrompts.map((prompt, index) => {
-                const isInlineEditing = promptToEdit?.id === prompt.id;
-                
-                // Create the AI editor as rightHeaderAddon to replace the edit button
-                const rightHeaderAddon = isInlineEditing ? (
-                  <div
-                    data-role="inline-ai-editor"
-                    className="flex items-center gap-2 bg-accent/30 border border-accent-foreground/10 rounded-lg p-2"
-                  >
-                    <Input
-                      ref={(el) => {
-                        if (el) {
-                          console.log(`[EDIT_DEBUG:REF] Input element CREATED, current value: "${el.value}"`);
-                        } else {
-                          console.log(`[EDIT_DEBUG:REF] Input element DESTROYED`);
-                        }
-                        editInstructionsRef.current = el;
-                      }}
-                      defaultValue=""
-                      onChange={(e) => updateEditInstructionsHasText(e.target.value)}
-                      onFocus={() => console.log(`[EDIT_DEBUG:FOCUS] Input focused, value: "${editInstructionsRef.current?.value}"`)}
-                      onBlur={() => console.log(`[EDIT_DEBUG:BLUR] Input blurred, value: "${editInstructionsRef.current?.value}"`)}
-                      placeholder={promptToEdit.originalText.trim() === '' ? 'Describe what you want' : 'Edit instructions'}
-                      className={`${isMobile ? 'h-10 flex-1 min-w-0' : 'h-7 w-72'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
-                      disabled={isAIEditing}
-                      clearable
-                      onClear={() => setEditInstructionsValue('', 'clear-button')}
-                      voiceInput
-                      voiceContext="This is an instruction to edit or create an image prompt. Tell the AI what changes to make, like 'make it more dramatic' or 'add a sunset background'. Be concise and direct."
-                      onVoiceResult={(result) => {
-                        setEditInstructionsValue(result.prompt || result.transcription, 'voice-input');
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && getEditInstructionsValue().trim() && !isAIEditing) {
-                          e.preventDefault();
-                          handleConfirmEditWithAI();
-                        }
-                      }}
-                    />
-                    <Button
-                      size="icon"
-                      className={`${isMobile ? 'h-10 w-10' : 'h-7 w-7'} p-0`}
-                      onClick={handleConfirmEditWithAI}
-                      disabled={!editInstructionsHasText || isAIEditing}
-                      aria-label={promptToEdit.originalText.trim() === '' ? 'Create prompt' : 'Edit prompt'}
-                    >
-                      {isAIEditing ? (
-                        <Loader2 className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'} animate-spin`} />
-                      ) : (
-                        <Edit className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
-                      )}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className={`${isMobile ? 'h-10 w-10' : 'h-7 w-7'} p-0`}
-                      onClick={() => { setPromptToEdit(null); clearEditInstructions('user-cancel'); }}
-                      disabled={isAIEditing}
-                      aria-label="Cancel edit"
-                    >
-                      <X className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
-                    </Button>
-                  </div>
-                ) : undefined;
-
-                return (
+              {internalPrompts.map((prompt, index) => (
                   <div 
                     key={prompt.id} 
                     className="mb-4"
@@ -969,19 +734,12 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                       canRemove={internalPrompts.length > 1}
                       isGenerating={isAILoading}
                       hasApiKey={true}
-                      onEditWithAI={() => openEditWithAIForm(prompt.id, prompt.fullPrompt)}
-                      aiEditButtonIcon={<Edit className="h-4 w-4" />}
                       onSetActiveForFullView={setActivePromptIdForFullView}
                       isActiveForFullView={activePromptIdForFullView === prompt.id}
-                      autoEnterEditWhenActive={isMobile && !isInlineEditing}
-                      forceExpanded={isInlineEditing}
-                      rightHeaderAddon={rightHeaderAddon}
-                      mobileInlineEditing={isMobile && isInlineEditing}
-                      hideRemoveButton={isInlineEditing}
+                      autoEnterEditWhenActive={isMobile}
                     />
                   </div>
-                );
-              })}
+                ))}
             </div>
           </div>
         </div>
