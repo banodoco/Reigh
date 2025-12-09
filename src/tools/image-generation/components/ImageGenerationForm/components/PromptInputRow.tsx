@@ -248,13 +248,36 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   return (
     <div 
       ref={promptContainerRef}
-      className={`p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-colors ${forceExpanded ? 'mt-0' : ''}`}
+      className={`group pt-2 px-4 pb-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-colors ${forceExpanded ? 'mt-0' : ''}`}
     >
       <div className="flex justify-between items-center mb-2">
         {!isMobile || !mobileInlineEditing ? (
-          <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-xs font-medium text-muted-foreground">
-            {totalPrompts === 1 ? 'Prompt' : `Prompt #${index + 1}`}
-          </Label>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-xs font-medium text-muted-foreground">
+              {totalPrompts === 1 ? 'Prompt' : `Prompt #${index + 1}`}
+            </Label>
+            {canRemove && !hideRemoveButton && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onRemove(promptEntry.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/60 hover:text-destructive hover:bg-destructive/5 h-4 w-4 p-0"
+                      disabled={!hasApiKey || isGenerating}
+                      aria-label="Remove prompt"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>Remove Prompt</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         ) : (
           <div className="h-5" />
         )}
@@ -283,27 +306,6 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
                 </Tooltip>
               </TooltipProvider>
             )
-          )}
-          {canRemove && !hideRemoveButton && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onRemove(promptEntry.id)}
-                    className="text-destructive hover:bg-destructive/10 h-7 w-7"
-                    disabled={!hasApiKey || isGenerating}
-                    aria-label="Remove prompt"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>Remove Prompt</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           )}
         </div>
       </div>

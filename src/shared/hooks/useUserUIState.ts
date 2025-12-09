@@ -24,6 +24,9 @@ interface UISettings {
     onComputer: boolean;
     inCloud: boolean;
   };
+  aiInputMode: {
+    mode: 'voice' | 'text';
+  };
 }
 
 // Cached settings loader to prevent duplicate database calls  

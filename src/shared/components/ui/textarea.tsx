@@ -2,8 +2,7 @@ import * as React from "react"
 import { X } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
-import { VoiceInputButton } from "./voice-input-button"
-import { TextPromptButton } from "./text-prompt-button"
+import { AIInputButton } from "./ai-input-button"
 import { useIsMobile } from "@/shared/hooks/use-mobile"
 
 export interface TextareaProps
@@ -38,8 +37,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     ...props 
   }, ref) => {
     const [isHovered, setIsHovered] = React.useState(false)
-    const [isVoiceActive, setIsVoiceActive] = React.useState(false)
-    const [isTextPromptActive, setIsTextPromptActive] = React.useState(false)
+    const [isAIInputActive, setIsAIInputActive] = React.useState(false)
     const isMobile = useIsMobile()
     
     const hasValue = (props.value?.toString() || props.defaultValue?.toString() || "").length > 0
@@ -48,7 +46,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     const hasActions = showClear || showVoice
     
     // Show buttons when hovered, input mode is active, OR always on mobile
-    const showButtons = (isMobile || isHovered || isVoiceActive || isTextPromptActive) && !props.disabled && (showClear || showVoice)
+    const showButtons = (isMobile || isHovered || isAIInputActive) && !props.disabled && (showClear || showVoice)
     
     const handleClear = (e: React.MouseEvent) => {
       e.preventDefault()
@@ -76,22 +74,11 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         {showButtons && (
           <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
             {showVoice && (
-              <VoiceInputButton
+              <AIInputButton
                 onResult={onVoiceResult}
                 onError={onVoiceError}
-                onRecordingStateChange={setIsVoiceActive}
+                onActiveStateChange={setIsAIInputActive}
                 task={voiceTask}
-                context={voiceContext}
-                example={voiceExample}
-                existingValue={props.value?.toString() || props.defaultValue?.toString() || ""}
-                disabled={props.disabled}
-              />
-            )}
-            {showVoice && (
-              <TextPromptButton
-                onResult={onVoiceResult}
-                onError={onVoiceError}
-                onActiveStateChange={setIsTextPromptActive}
                 context={voiceContext}
                 example={voiceExample}
                 existingValue={props.value?.toString() || props.defaultValue?.toString() || ""}

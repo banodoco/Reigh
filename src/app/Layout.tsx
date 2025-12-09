@@ -20,6 +20,7 @@ import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { usePageVisibility } from '@/shared/hooks/usePageVisibility';
 import '@/shared/lib/debugPolling';
 import { SocialIcons } from '@/shared/components/SocialIcons';
+import { AIInputModeProvider } from '@/shared/contexts/AIInputModeContext';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -181,55 +182,57 @@ const Layout: React.FC = () => {
   const containerSpacing = isLg ? 'py-1' : 'py-1';
 
   return (
-    <div className="flex flex-col">
-      <ScrollToTop />
-      {/* Theme-adaptive background gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-[hsl(var(--color-surface))] via-[hsl(var(--color-surface-bright))] to-[hsl(var(--color-tertiary)_/_0.1)] opacity-60 pointer-events-none"></div>
-      
-      <GlobalHeader 
-        contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 16} 
-        contentOffsetLeft={isShotsPaneLocked ? shotsPaneWidth : 0}
-        onOpenSettings={handleOpenSettings}
-      />
-      
-      <div
-        className="relative z-10 transition-[margin,padding] duration-300 ease-smooth content-container"
-        style={mainContentStyle}
-      >
-        <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
+    <AIInputModeProvider>
+      <div className="flex flex-col">
+        <ScrollToTop />
+        {/* Theme-adaptive background gradient */}
+        <div className="fixed inset-0 bg-gradient-to-br from-[hsl(var(--color-surface))] via-[hsl(var(--color-surface-bright))] to-[hsl(var(--color-tertiary)_/_0.1)] opacity-60 pointer-events-none"></div>
+        
+        <GlobalHeader 
+          contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 16} 
+          contentOffsetLeft={isShotsPaneLocked ? shotsPaneWidth : 0}
+          onOpenSettings={handleOpenSettings}
+        />
+        
+        <div
+          className="relative z-10 transition-[margin,padding] duration-300 ease-smooth content-container"
+          style={mainContentStyle}
+        >
+          <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
 
-        <main className={cn("container mx-auto", containerPadding, containerSpacing)}>
-          {header}
-          <Outlet /> 
-        </main>
+          <main className={cn("container mx-auto", containerPadding, containerSpacing)}>
+            {header}
+            <Outlet /> 
+          </main>
+        </div>
+        
+        <TasksPane onOpenSettings={handleOpenSettings} />
+        <ShotsPane />
+        <GenerationsPane />
+        
+        {/* Social Icons Footer */}
+        <div 
+          className="relative z-10 transition-[margin] duration-300 ease-smooth"
+          style={footerStyle}
+        >
+          <SocialIcons />
+        </div>
+        
+        <SettingsModal
+          isOpen={isSettingsModalOpen}
+          onOpenChange={setIsSettingsModalOpen}
+          initialTab={settingsInitialTab}
+          creditsTab={settingsCreditsTab}
+        />
+
+
+        {/* Welcome Bonus Modal */}
+        <WelcomeBonusModal
+          isOpen={showWelcomeModal}
+          onClose={closeWelcomeModal}
+        />
       </div>
-      
-      <TasksPane onOpenSettings={handleOpenSettings} />
-      <ShotsPane />
-      <GenerationsPane />
-      
-      {/* Social Icons Footer */}
-      <div 
-        className="relative z-10 transition-[margin] duration-300 ease-smooth"
-        style={footerStyle}
-      >
-        <SocialIcons />
-      </div>
-      
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onOpenChange={setIsSettingsModalOpen}
-        initialTab={settingsInitialTab}
-        creditsTab={settingsCreditsTab}
-      />
-
-
-      {/* Welcome Bonus Modal */}
-      <WelcomeBonusModal
-        isOpen={showWelcomeModal}
-        onClose={closeWelcomeModal}
-      />
-    </div>
+    </AIInputModeProvider>
   );
 };
 
