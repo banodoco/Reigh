@@ -26,11 +26,13 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
     
     // Single pass through the array for efficiency
     // Uses canonical isVideoGeneration from typeGuards
+    // NOTE: -1 is used as sentinel for unpositioned items in useTimelinePositionUtils
     shotImages.forEach(img => {
       if (isVideoGeneration(img)) {
         videosFiltered++;
       } else {
-        const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+        const frame = (img as any).timeline_frame;
+        const hasTimelineFrame = frame !== null && frame !== undefined && frame >= 0;
         if (hasTimelineFrame) {
           positionedNonVideoCount++;
         } else {

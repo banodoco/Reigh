@@ -116,8 +116,10 @@ const ShotsPaneComponent: React.FC = () => {
       // Filter to show only positioned images in the intended sequence
       const filteredImages = (shot.images || [])
         // Keep only images that have a valid timeline_frame value (replaces position check)
+        // NOTE: -1 is used as sentinel for unpositioned items in useTimelinePositionUtils
         .filter(img => {
-          const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+          const frame = (img as any).timeline_frame;
+          const hasTimelineFrame = frame !== null && frame !== undefined && frame >= 0;
           return hasTimelineFrame;
         })
         // Order the images by their timeline_frame so they appear in the intended sequence

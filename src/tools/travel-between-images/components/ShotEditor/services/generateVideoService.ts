@@ -393,8 +393,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
 
         // Build sorted positions ONLY from items with valid timeline_frame
         // (needed for calculating frame gaps)
+        // NOTE: -1 is used as sentinel for unpositioned items in useTimelinePositionUtils
         sortedPositions = filteredShotGenerations
-          .filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined)
+          .filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined && sg.timeline_frame >= 0)
           .map(sg => ({
             id: sg.generation_id || sg.id,
             pos: sg.timeline_frame!

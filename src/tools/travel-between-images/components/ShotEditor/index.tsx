@@ -1132,14 +1132,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // 3. Sort by position
     const filtered = sourceImages
       .filter(img => {
-        const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+        // NOTE: -1 is used as sentinel for unpositioned items in useTimelinePositionUtils
+        const frame = (img as any).timeline_frame;
+        const hasTimelineFrame = frame !== null && frame !== undefined && frame >= 0;
         
         // [MagicEditTaskDebug] Log magic edit generations to see their timeline_frame values
         if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
           console.log('[MagicEditTaskDebug] Magic edit generation filtering:', {
             id: img.id.substring(0, 8), // shot_generations.id
             generation_id: img.generation_id?.substring(0, 8),
-            timeline_frame: (img as any).timeline_frame,
+            timeline_frame: frame,
             hasTimelineFrame,
             willBeIncludedInTimeline: hasTimelineFrame,
             type: img.type,
