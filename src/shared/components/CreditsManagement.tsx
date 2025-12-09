@@ -530,25 +530,24 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
         {/* Transaction History Section */}
         {(mode === 'all' || mode === 'transactions') && (
         <div className={`px-1 ${mode === 'all' ? 'mt-6' : ''}`}>
-          <div className="flex items-center gap-4 mb-3">
-            <h3 className="text-lg font-light text-gray-900">Transaction History</h3>
-            <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5 shadow-inner">
+          <div className="flex justify-center mb-3">
+            <div className="grid grid-cols-2 bg-gray-100 border border-gray-200 rounded-md h-9 p-1 w-full max-w-xs">
               <button
                 onClick={() => setActiveTab('history')}
-                className={`px-3 py-1 text-xs font-medium rounded-full transition-all focus:outline-none ${
+                className={`text-sm rounded-sm h-full flex items-center justify-center transition-all ${
                   activeTab === 'history'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-white shadow-sm text-gray-900'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Transaction History
+                Transactions
               </button>
               <button
                 onClick={() => setActiveTab('task-log')}
-                className={`px-3 py-1 text-xs font-medium rounded-full transition-all focus:outline-none ${
+                className={`text-sm rounded-sm h-full flex items-center justify-center transition-all ${
                   activeTab === 'task-log'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-white shadow-sm text-gray-900'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 Task Log

@@ -527,12 +527,6 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
           {/* User Settings Section */}
           {settingsSection === 'user' && (
             <div className="space-y-6">
-              <div className="text-center mb-6">
-                <p className="text-sm text-muted-foreground">
-                  Configure your default privacy settings for resources and generations.
-                </p>
-              </div>
-
               {/* Privacy Defaults */}
               {isLoadingPrivacyDefaults ? (
                 <div className="flex justify-center py-8">
