@@ -145,7 +145,7 @@ const EdgeIOSShareIcon = () => (
 );
 
 // iPad Safari - desktop-like top toolbar with share button
-const iPadSafariShareIcon = () => (
+const IPadSafariShareIcon = () => (
   <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
     {/* Safari top toolbar */}
     <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
@@ -178,7 +178,7 @@ const iPadSafariShareIcon = () => (
 );
 
 // iPad Chrome - tablet toolbar with Share icon at top-right
-const iPadChromeShareIcon = () => (
+const IPadChromeShareIcon = () => (
   <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
     {/* Chrome top toolbar with tabs */}
     <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
@@ -212,7 +212,7 @@ const iPadChromeShareIcon = () => (
 );
 
 // iPad Edge - tablet toolbar with three-dot menu
-const iPadEdgeShareIcon = () => (
+const IPadEdgeShareIcon = () => (
   <div className="relative w-full max-w-[280px]">
     <div className="bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
       {/* Edge top toolbar */}
@@ -392,14 +392,14 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
       if (deviceType === 'tablet') {
         if (browser === 'chrome') {
           // Chrome iPad: Share icon at top-right
-          return <iPadChromeShareIcon />;
+          return <IPadChromeShareIcon />;
         }
         if (browser === 'edge') {
           // Edge iPad: Three-dot menu
-          return <iPadEdgeShareIcon />;
+          return <IPadEdgeShareIcon />;
         }
         // Safari iPad: Share button in top toolbar
-        return <iPadSafariShareIcon />;
+        return <IPadSafariShareIcon />;
       }
       
       // iPhone - each browser has different UI
