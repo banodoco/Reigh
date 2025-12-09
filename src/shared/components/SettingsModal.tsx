@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, Globe, Lock } from "lucide-react";
+import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, Globe, Lock, ChevronDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -147,6 +147,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Show / hide full command previews
   const [showFullInstallCommand, setShowFullInstallCommand] = useState(false);
   const [showFullRunCommand, setShowFullRunCommand] = useState(false);
+  const [showPrerequisites, setShowPrerequisites] = useState(false);
   
   // Refs for scrolling to commands
   const installCommandRef = React.useRef<HTMLDivElement>(null);
@@ -753,9 +754,9 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
                       {/* Computer Type */}
                       <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">Computer</Label>
+                        <Label className="text-xs text-blue-600 mb-1 block">Computer</Label>
                         <Select value={computerType} onValueChange={setComputerType}>
-                          <SelectTrigger className="w-full bg-white h-9">
+                          <SelectTrigger className="w-full bg-blue-50/50 border-blue-200 h-9 text-blue-700">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -768,9 +769,9 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                       {/* GPU Type */}
                       <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">GPU</Label>
+                        <Label className="text-xs text-violet-600 mb-1 block">GPU</Label>
                         <Select value={gpuType} onValueChange={setGpuType} disabled={computerType === "mac"}>
-                          <SelectTrigger className="w-full bg-white h-9">
+                          <SelectTrigger className="w-full bg-violet-50/50 border-violet-200 h-9 text-violet-700 disabled:opacity-50">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -783,9 +784,9 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                       {/* Memory Profile */}
                       <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">Memory</Label>
+                        <Label className="text-xs text-emerald-600 mb-1 block">Memory</Label>
                         <Select value={memoryProfile} onValueChange={setMemoryProfile}>
-                          <SelectTrigger className="w-full bg-white h-9">
+                          <SelectTrigger className="w-full bg-emerald-50/50 border-emerald-200 h-9 text-emerald-700">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -837,13 +838,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                       {/* Debug Logs Toggle */}
                       <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">Debug</Label>
+                        <Label className="text-xs text-amber-600 mb-1 block">Debug</Label>
                         <button
                           onClick={() => setShowDebugLogs(!showDebugLogs)}
                           className={`w-full h-9 px-3 text-sm rounded-md border transition-colors flex items-center justify-between ${
-                            showDebugLogs 
-                              ? 'bg-blue-50 border-blue-300 text-blue-700' 
-                              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                            showDebugLogs
+                              ? 'bg-amber-50 border-amber-300 text-amber-700'
+                              : 'bg-amber-50/50 border-amber-200 text-amber-700 hover:bg-amber-50'
                           }`}
                         >
                           <span className="flex items-center gap-1.5">
@@ -890,15 +891,15 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     {computerType !== "mac" && gpuType !== "non-nvidia" && (
                       <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
                         <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200 mb-3 h-9 p-1">
-                          <TabsTrigger 
+                          <TabsTrigger
                             value="need-install"
-                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm h-full rounded-sm"
+                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm py-0 h-full leading-none"
                           >
                             Install
                           </TabsTrigger>
-                          <TabsTrigger 
+                          <TabsTrigger
                             value="already-installed"
-                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm h-full rounded-sm"
+                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm py-0 h-full leading-none"
                           >
                             Run
                           </TabsTrigger>
@@ -908,165 +909,49 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                         <div className="space-y-4">
                           {/* Windows Prerequisites */}
                           {computerType === "windows" && (
-                            <Alert>
-                              <AlertDescription>
-                                <p className="text-sm">
+                            <div className="border border-gray-200 rounded-lg">
+                              <button
+                                onClick={() => setShowPrerequisites(!showPrerequisites)}
+                                className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 transition-colors"
+                              >
+                                <span className="text-sm text-gray-700">
                                   Prerequisites (install manually if not already installed):
-                                </p>
-                                                          <ul className="list-disc pl-5 mt-2 text-sm space-y-3">
-                            <li className="flex items-center gap-2">
-                              <span>
-                                <strong>NVIDIA GPU with CUDA 6.0+</strong> (8GB+ VRAM required)
-                              </span>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-sm mx-2">
-                                    <div className="py-2 space-y-2">
-                                      <p className="font-medium">GPU Requirements:</p>
-                                      <ul className="text-sm space-y-1 list-disc list-inside">
-                                        <li>NVIDIA GPU with CUDA Compute Capability 6.0+</li>
-                                        <li>Minimum 8GB VRAM for AI video generation</li>
-                                        <li>Check your GPU: nvidia-smi in terminal</li>
-                                        <li>AMD/Intel GPUs will NOT work for local processing</li>
-                                      </ul>
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <span>
-                                <strong>Latest NVIDIA drivers</strong> from {""}
-                                <a
-                                  href="https://nvidia.com/drivers"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="underline text-blue-600 hover:text-blue-800"
-                                >
-                                  nvidia.com/drivers
-                                </a>
-                              </span>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-sm mx-2">
-                                    <div className="py-2 space-y-2">
-                                      <p className="font-medium">NVIDIA Driver Installation:</p>
-                                      <ol className="text-sm space-y-1 list-decimal list-inside">
-                                        <li>Download latest drivers from nvidia.com</li>
-                                        <li>Run installer with default settings</li>
-                                        <li>Restart computer after installation</li>
-                                        <li>Verify with "nvidia-smi" command</li>
-                                      </ol>
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <span>
-                                Python 3.10+ from {""}
-                                <a
-                                  href="https://python.org"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="underline text-blue-600 hover:text-blue-800"
-                                >
-                                  python.org
-                                </a>
-                              </span>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-sm mx-2">
-                                    <div className="py-2 space-y-2">
-                                      <p className="font-medium">Python Installation:</p>
-                                      <ol className="text-sm space-y-1 list-decimal list-inside">
-                                        <li>Download from python.org (not Microsoft Store)</li>
-                                        <li>During install, check "Add Python to PATH"</li>
-                                        <li>Verify by typing "python --version" in terminal</li>
-                                      </ol>
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </li>
-                                  <li className="flex items-center gap-2">
-                                    <span>
-                                      Git from {""}
-                                      <a
-                                        href="https://git-scm.com/download/win"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="underline text-blue-600 hover:text-blue-800"
-                                      >
-                                        git-scm.com/download/win
-                                      </a>
-                                    </span>
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-sm">
-                                          <div className="py-2 space-y-2">
-                                            <p className="font-medium">Git Installation:</p>
-                                            <ol className="text-sm space-y-1 list-decimal list-inside">
-                                              <li>Download Git for Windows installer</li>
-                                              <li>Use default settings during installation</li>
-                                              <li>Verify by typing "git --version" in terminal</li>
-                                              <li>Restart terminal/computer if command not found</li>
-                                            </ol>
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
+                                </span>
+                                <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showPrerequisites ? 'rotate-180' : ''}`} />
+                              </button>
+                              {showPrerequisites && (
+                                <ul className="list-disc pl-8 pr-4 pb-3 text-sm space-y-1.5 text-gray-600">
+                                  <li>
+                                    NVIDIA GPU with CUDA 6.0+ (8GB+ VRAM required)
                                   </li>
-                                  <li className="flex items-center gap-2">
-                                    <span>
-                                      FFmpeg from {""}
-                                      <a
-                                        href="https://ffmpeg.org/download.html"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="underline text-blue-600 hover:text-blue-800"
-                                      >
-                                        ffmpeg.org/download.html
-                                      </a>{" "}
-                                      (add to PATH)
-                                    </span>
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-sm">
-                                          <div className="py-2 space-y-2">
-                                            <p className="font-medium">FFmpeg Installation:</p>
-                                            <ol className="text-sm space-y-1 list-decimal list-inside">
-                                              <li>Download "Windows builds by BtbN" (recommended)</li>
-                                              <li>Extract to C:\ffmpeg</li>
-                                              <li>Add C:\ffmpeg\bin to system PATH</li>
-                                              <li>Restart terminal and verify with "ffmpeg -version"</li>
-                                            </ol>
-                                            <p className="text-xs text-gray-600 mt-2">
-                                              Need PATH help? Search "Windows add to PATH" on YouTube
-                                            </p>
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
+                                  <li>
+                                    Latest NVIDIA drivers from{" "}
+                                    <a href="https://nvidia.com/drivers" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
+                                      nvidia.com/drivers
+                                    </a>
+                                  </li>
+                                  <li>
+                                    Python 3.10+ from{" "}
+                                    <a href="https://python.org" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
+                                      python.org
+                                    </a>
+                                  </li>
+                                  <li>
+                                    Git from{" "}
+                                    <a href="https://git-scm.com/download/win" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
+                                      git-scm.com/download/win
+                                    </a>
+                                  </li>
+                                  <li>
+                                    FFmpeg from{" "}
+                                    <a href="https://ffmpeg.org/download.html" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
+                                      ffmpeg.org/download.html
+                                    </a>
+                                    {" "}(add to PATH)
                                   </li>
                                 </ul>
-                              </AlertDescription>
-                            </Alert>
+                              )}
+                            </div>
                           )}
                           
                           <div>

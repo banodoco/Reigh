@@ -439,10 +439,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
         {(mode === 'all' || mode === 'add-credits') && (
         <div className="space-y-3">
           {/* Current Balance Container */}
-          <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+          <div className="p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
             <div className="flex items-center gap-2">
-              <Coins className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-600">Current balance</span>
+              <Coins className="h-4 w-4 text-emerald-500" />
+              <span className="text-sm font-medium text-emerald-700">Current balance</span>
               <span className="text-lg font-semibold text-gray-900 ml-auto">
                 {isLoadingBalance ? (
                   <span className="animate-pulse bg-gray-200 rounded w-16 h-5 inline-block"></span>
@@ -454,10 +454,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
           </div>
 
           {/* Add Credits Container */}
-          <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-3">
+          <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100 space-y-3">
             <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-600">Add credits</span>
+              <CreditCard className="h-4 w-4 text-blue-500" />
+              <span className="text-sm font-medium text-blue-700">Add credits</span>
               <span className="text-lg font-semibold text-gray-900 ml-auto">{formatDollarAmount(purchaseAmount)}</span>
             </div>
             
@@ -476,7 +476,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
             </div>
 
             {/* Auto top-up */}
-            <div className="flex items-center text-sm pt-2 border-t border-gray-200">
+            <div className="flex items-center text-sm pt-2 border-t border-blue-100">
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="auto-topup"
