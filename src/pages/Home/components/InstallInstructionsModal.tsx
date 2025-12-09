@@ -469,7 +469,7 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
               onOpenChange(false);
               onFallbackToDiscord();
             }}
-            className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+            className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors focus:outline-none"
           >
             {isSignedIn ? 'or continue in browser' : isAppInstalled ? 'continue in browser instead' : 'or sign in here instead'}
           </button>

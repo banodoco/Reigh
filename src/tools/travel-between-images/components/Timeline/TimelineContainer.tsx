@@ -24,6 +24,7 @@ import { Plus, Loader2 } from 'lucide-react';
 import { DatasetBrowserModal } from '@/shared/components/DatasetBrowserModal';
 import { Resource, StructureVideoMetadata, useCreateResource } from '@/shared/hooks/useResources';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 // Skeleton component for uploading images
 const TimelineSkeletonItem: React.FC<{
@@ -204,6 +205,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   
   // Resource creation hook for video upload
   const createResource = useCreateResource();
+  
+  // Privacy defaults for new resources
+  const { value: privacyDefaults } = useUserUIState('privacyDefaults', { resourcesPublic: true, generationsPublic: false });
   
   // Track pending drop frame for skeleton
   const [pendingDropFrame, setPendingDropFrame] = useState<number | null>(null);
@@ -1014,7 +1018,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                       thumbnailUrl: null,
                       videoMetadata: metadata,
                       created_by: { is_you: true, username: user?.email || 'user' },
-                      is_public: false,
+                      is_public: privacyDefaults.resourcesPublic,
                       createdAt: now,
                     };
                     await createResource.mutateAsync({ type: 'structure-video', metadata: resourceMetadata });

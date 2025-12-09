@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, MoreHorizontal } from "lucide-react";
+import { Settings, Key, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, MoreHorizontal, Play, ImageIcon, ExternalLink } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -893,30 +893,84 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
           <span className="text-sm font-light text-zinc-200 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
             {abbreviatedTaskType}
           </span>
-          {task.status !== 'Complete' && isHoveringTaskItem && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(task.id);
-                setIdCopied(true);
-                setTimeout(() => setIdCopied(false), 2000);
-                toast({
-                  title: 'ID Copied',
-                  description: 'Task ID copied to clipboard',
-                  variant: 'default',
-                });
-              }}
-              className={cn(
-                "flex-shrink-0 px-1.5 py-0.5 text-[10px] rounded transition-colors border",
-                idCopied 
-                  ? "text-green-400 bg-green-900/20 border-green-500" 
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 border-zinc-600 hover:border-zinc-400"
-              )}
-              title="Copy task ID"
-            >
-              {idCopied ? 'copied' : 'id'}
-            </button>
-          )}
+          {/* Always-visible action buttons - pushed to right */}
+          <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
+            {/* ID copy button - always visible */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(task.id);
+                    setIdCopied(true);
+                    setTimeout(() => setIdCopied(false), 2000);
+                  }}
+                  className={cn(
+                    "px-1 py-0.5 text-xs rounded transition-colors",
+                    idCopied 
+                      ? "text-green-400" 
+                      : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                  )}
+                >
+                  {idCopied ? 'copied' : 'id'}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {idCopied ? 'Copied!' : 'Copy task ID'}
+              </TooltipContent>
+            </Tooltip>
+            
+            {/* Open Video button - only when video output has actual videoUrl */}
+            {taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0 && travelData.videoOutputs[0]?.videoUrl && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleViewVideo}
+                    className="p-1 rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                  >
+                    <Play className="w-3 h-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Open Video
+                </TooltipContent>
+              </Tooltip>
+            )}
+            
+            {/* Open Image button - for completed image tasks */}
+            {taskInfo.isImageTask && generationData && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleViewImage}
+                    className="p-1 rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                  >
+                    <ImageIcon className="w-3 h-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Open Image
+                </TooltipContent>
+              </Tooltip>
+            )}
+            
+            {/* Visit Shot button - when task has associated shot */}
+            {shotId && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleVisitShot}
+                    className="p-1 rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Visit Shot
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
         <span
           className={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${
@@ -933,7 +987,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       {/* Image previews for Travel Between Images task */}
       {imagesToShow.length > 0 && (
         <div 
-          className="relative flex items-center overflow-x-auto mb-1 mt-2"
+          className="flex items-center overflow-x-auto mb-1 mt-2"
         >
           <div className="flex items-center">
             {imagesToShow.map((url, idx) => (
@@ -948,38 +1002,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
               <span className="text-xs text-zinc-400 ml-1">+ {extraImageCount}</span>
             )}
           </div>
-          {/* Action buttons overlay on hover (desktop) or when active (mobile) */}
-          {/* Show overlay if: (hovering + not mobile) OR (mobile + active) + (has shotId OR is completed video task) */}
-          {((isHoveringTaskItem && !isMobile) || (isMobile && isMobileActive)) && (shotId || taskInfo.isCompletedVideoTask) && (
-            <div 
-              className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center gap-2"
-              onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
-            >
-              {/* Only show Visit Shot button if we have a shotId */}
-              {shotId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleVisitShot}
-                  className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
-                >
-                  Visit Shot
-                </Button>
-              )}
-              {/* Show Open Video button - loading state while fetching, enabled when data ready */}
-              {taskInfo.isCompletedVideoTask && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleViewVideo}
-                  disabled={isLoadingVideoGen || !travelData.videoOutputs || travelData.videoOutputs.length === 0}
-                  className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all disabled:opacity-50"
-                >
-                  {isLoadingVideoGen ? 'Loading...' : 'Open Video'}
-                </Button>
-              )}
-            </div>
-          )}
         </div>
       )}
       {/* Show prompt for Image Generation tasks (not video tasks like travel) */}
@@ -1122,77 +1144,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       {/* <pre className="text-xs text-zinc-500 whitespace-pre-wrap break-all">{JSON.stringify(task.params, null, 2)}</pre> */}
       
 
-      {/* Action button overlay for image generation tasks on hover (desktop) or when active (mobile) */}
-      {(() => {
-        const hoverCondition = isHoveringTaskItem && !isMobile;
-        const mobileActiveCondition = isMobile && isMobileActive;
-        const shouldShowButton = (hoverCondition || mobileActiveCondition) && taskInfo.isImageTask && generationData;
-        
-        // DEBUG: Log button visibility conditions - detailed log when hovering (separate lines to avoid truncation)
-        if (taskInfo.isImageTask && (isHoveringTaskItem || isMobileActive)) {
-          const missingCondition = !shouldShowButton ? (
-            !hoverCondition && !mobileActiveCondition ? 'NOT_HOVERING_OR_MOBILE_ACTIVE' :
-            !taskInfo.isImageTask ? 'NOT_IMAGE_TASK' :
-            !generationData ? 'NO_GENERATION_DATA' :
-            'UNKNOWN'
-          ) : 'ALL_MET';
-          
-          console.log('[OpenImageButtonDebug] ===== FULL DETAILS (hovering/active) =====');
-          console.log('[OpenImageButtonDebug] taskId:', task.id?.substring(0, 8));
-          console.log('[OpenImageButtonDebug] taskType:', task.taskType);
-          console.log('[OpenImageButtonDebug] status:', task.status);
-          console.log('[OpenImageButtonDebug] hasOutputLocation:', !!task.outputLocation);
-          console.log('[OpenImageButtonDebug] outputLocation:', task.outputLocation?.substring(0, 50) || 'none');
-          console.log('[OpenImageButtonDebug] isHoveringTaskItem:', isHoveringTaskItem);
-          console.log('[OpenImageButtonDebug] isMobile:', isMobile);
-          console.log('[OpenImageButtonDebug] isMobileActive:', isMobileActive);
-          console.log('[OpenImageButtonDebug] taskInfoIsImageTask:', taskInfo.isImageTask);
-          console.log('[OpenImageButtonDebug] hasGenerationData:', !!generationData);
-          console.log('[OpenImageButtonDebug] generationDataId:', generationData?.id?.substring(0, 8) || 'none');
-          console.log('[OpenImageButtonDebug] hoverCondition:', hoverCondition);
-          console.log('[OpenImageButtonDebug] mobileActiveCondition:', mobileActiveCondition);
-          console.log('[OpenImageButtonDebug] hoverOrMobile:', hoverCondition || mobileActiveCondition);
-          console.log('[OpenImageButtonDebug] isImageTask:', taskInfo.isImageTask);
-          console.log('[OpenImageButtonDebug] hasGenerationData:', !!generationData);
-          console.log('[OpenImageButtonDebug] shouldShowButton:', shouldShowButton);
-          console.log('[OpenImageButtonDebug] MISSING_CONDITION:', missingCondition);
-          console.log('[OpenImageButtonDebug] ===========================================');
-        }
-        
-        return shouldShowButton;
-      })() && (
-        <div 
-          className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
-          onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleViewImage}
-            className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
-          >
-            Open Image
-          </Button>
-        </div>
-      )}
-
-      {/* Action button overlay for video tasks WITHOUT input images (like Join Clips) on hover (desktop) or when active (mobile) */}
-      {((isHoveringTaskItem && !isMobile) || (isMobile && isMobileActive)) && imagesToShow.length === 0 && taskInfo.isCompletedVideoTask && (
-        <div 
-          className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleViewVideo}
-            disabled={isLoadingVideoGen || !travelData.videoOutputs || travelData.videoOutputs.length === 0}
-            className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all disabled:opacity-50"
-          >
-            {isLoadingVideoGen ? 'Loading...' : 'Open Video'}
-          </Button>
-        </div>
-      )}
     </div>
   );
 

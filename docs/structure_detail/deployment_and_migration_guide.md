@@ -14,7 +14,7 @@ npx supabase db reset --linked
 ### 2. NEVER DEPLOY ALL FUNCTIONS AT ONCE
 ```bash
 # ❌ DANGEROUS: RISKS SYSTEM-WIDE OUTAGE
-npx supabase functions deploy --project-ref ...
+npx supabase functions deploy --project-ref wczysqzxlwdndgxitrvc
 ```
 **Why**: Deploying all functions simultaneously makes it impossible to isolate failure causes and can bring down multiple services if a shared dependency is broken.
 
@@ -115,18 +115,18 @@ ON CONFLICT (name) DO UPDATE SET cost = EXCLUDED.cost;
 **Always deploy functions individually.**
 
 ```bash
-npx supabase functions deploy function-name --project-ref <PROJECT_REF>
+npx supabase functions deploy function-name --project-ref wczysqzxlwdndgxitrvc
 ```
 
 ### Deployment Workflow
 
 1.  **Deploy One Function**:
     ```bash
-    npx supabase functions deploy complete-task --project-ref ...
+    npx supabase functions deploy complete_task --project-ref wczysqzxlwdndgxitrvc
     ```
 2.  **Verify**: Check logs and test functionality immediately.
     ```bash
-    npx supabase functions logs complete-task --project-ref ...
+    npx supabase functions logs complete_task --project-ref wczysqzxlwdndgxitrvc
     ```
 3.  **Repeat**: Move to the next function only after verifying the previous one.
 

@@ -107,7 +107,7 @@ const VideoResourceItem: React.FC<VideoResourceItemProps> = ({
                       e.preventDefault();
                       onToggleVisibility(resource.id, isPublic);
                     }}
-                    className={`rounded-full p-1 transition-colors ${
+                    className={`rounded-full p-1 transition-colors focus:outline-none ${
                       isPublic
                         ? "bg-green-500 text-white hover:bg-green-600"
                         : "bg-gray-400 text-white hover:bg-gray-500"
@@ -544,7 +544,7 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
                                     e.preventDefault();
                                     handleToggleVisibility(resource.id, isPublic);
                                   }}
-                                  className={`rounded-full p-1 transition-colors ${
+                                  className={`rounded-full p-1 transition-colors focus:outline-none ${
                                     isPublic
                                       ? "bg-green-500 text-white hover:bg-green-600"
                                       : "bg-gray-400 text-white hover:bg-gray-500"

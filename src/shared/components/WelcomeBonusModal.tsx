@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Gift, Sparkles, Smartphone, Download, ChevronRight, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart } from 'lucide-react';
+import { Gift, Sparkles, ChevronRight, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart, Globe, Lock, HelpCircle } from 'lucide-react';
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -36,49 +36,6 @@ const getStepColors = (stepIndex: number) => {
   ];
   
   return colors[(stepIndex - 1) % colors.length];
-};
-
-// PWA Installation Hook
-const usePWAInstall = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [canInstall, setCanInstall] = useState(false);
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent the mini-infobar from appearing on mobile
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setCanInstall(true);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setCanInstall(false);
-    }
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
-
-  const installPWA = async () => {
-    if (!deferredPrompt) return false;
-
-    try {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      setDeferredPrompt(null);
-      setCanInstall(false);
-      return outcome === 'accepted';
-    } catch (error) {
-      console.error('Error installing PWA:', error);
-      return false;
-    }
-  };
-
-  return { canInstall, installPWA };
 };
 
 // Step 1: Introduction to Reigh
@@ -153,107 +110,7 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 );
 };
 
-// Step 3: PWA Installation (existing logic)
-const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
-  const { canInstall, installPWA } = usePWAInstall();
-  const colors = getStepColors(3);
-
-  const handleInstall = async () => {
-    const installed = await installPWA();
-    if (installed) {
-      onNext();
-    }
-  };
-
-  // Detect platform for better messaging
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const isAndroid = /Android/.test(navigator.userAgent);
-  const isChromeOnIOS = isIOS && /CriOS/.test(navigator.userAgent);
-
-  return (
-    <>
-      <DialogHeader className="text-center space-y-4 mb-6">
-        <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
-          <Smartphone className={`w-8 h-8 ${colors.icon}`} />
-        </div>
-        <DialogTitle className="text-2xl font-bold text-center">
-          Install Reigh App
-        </DialogTitle>
-      </DialogHeader>
-      
-      <div className="text-center space-y-4">
-        <p className="text-lg font-light">
-          Get the best experience by installing Reigh as an app!
-        </p>
-
-        {/* Platform-specific instructions - always shown */}
-        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-sm">
-          {isChromeOnIOS && (
-            <>
-              <p className="font-light mb-2">📱 On iPhone Chrome:</p>
-              <p className="text-muted-foreground">
-                1. <strong>Switch to Safari</strong> - copy this URL and open in Safari<br/>
-                2. Tap the <strong>Share</strong> button (square with arrow) at the bottom<br/>
-                3. Scroll down and select <strong>"Add to Home Screen"</strong><br/>
-                4. Tap <strong>"Add"</strong> to install
-              </p>
-            </>
-          )}
-          {isIOS && !isChromeOnIOS && (
-            <>
-              <p className="font-light mb-2">📱 On iOS Safari:</p>
-              <p className="text-muted-foreground">
-                1. Tap the <strong>Share</strong> button (square with arrow) at the bottom<br/>
-                2. Scroll down and select <strong>"Add to Home Screen"</strong><br/>
-                3. Tap <strong>"Add"</strong> to install
-              </p>
-            </>
-          )}
-          {isAndroid && (
-            <>
-              <p className="font-light mb-2">🤖 On Android:</p>
-              <p className="text-muted-foreground">
-                1. Look for <strong>"Install"</strong> button in the address bar<br/>
-                2. Or tap the three-dot menu (⋮) → <strong>"Add to Home screen"</strong><br/>
-                3. Tap <strong>"Add"</strong> to confirm installation
-              </p>
-            </>
-          )}
-          {!isIOS && !isAndroid && (
-            <>
-              <p className="font-light mb-2">💻 On Desktop (Chrome/Edge):</p>
-              <p className="text-muted-foreground">
-                1. Look for install icon in your browser's address bar<br/>
-                2. Or check browser menu → <strong>"Install Reigh"</strong><br/>
-                3. Follow the prompts to install
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-      
-      <div className="flex flex-col space-y-2 pt-5 pb-2">
-        {canInstall ? (
-          <>
-            <Button onClick={handleInstall} className="w-full">
-              <Download className="w-4 h-4 mr-2" />
-              Install App
-            </Button>
-            <Button variant="outline" onClick={onNext} className="w-full">
-              Continue Without Installing
-            </Button>
-          </>
-        ) : (
-          <Button onClick={onNext} className="w-full">
-            Continue
-          </Button>
-        )}
-      </div>
-    </>
-  );
-};
-
-// Step 4: Generation Method Selection (Lazy-loaded to improve modal performance)
+// Step 3: Generation Method Selection (Lazy-loaded to improve modal performance)
 const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   // Use database-backed generation preferences (same as SettingsModal)
   // Only loads when this step is actually rendered, improving initial modal performance
@@ -263,7 +120,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     isLoading: isLoadingGenerationMethods
   } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   
-  const colors = getStepColors(4);
+  const colors = getStepColors(3);
   
   const onComputerChecked = generationMethods.onComputer;
   const inCloudChecked = generationMethods.inCloud;
@@ -371,7 +228,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
               {/* In the cloud button */}
               <button
                 onClick={() => updateGenerationMethods({ inCloud: true, onComputer: false })}
-                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm ${
+                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                   inCloudChecked && !onComputerChecked
                     ? 'bg-white text-blue-600 shadow-sm'
                     : 'text-gray-600 hover:text-gray-800'
@@ -383,7 +240,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
               {/* On my computer button */}
               <button
                 onClick={() => updateGenerationMethods({ onComputer: true, inCloud: false })}
-                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm ${
+                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                   onComputerChecked && !inCloudChecked
                     ? 'bg-white text-green-600 shadow-sm'
                     : 'text-gray-600 hover:text-gray-800'
@@ -443,9 +300,9 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   );
 };
 
-// Step 5: Welcome Gambit (Promise Step)
+// Step 4: Welcome Gambit (Promise Step)
 const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-else' | 'no-thanks') => void }> = ({ onNext }) => {
-  const colors = getStepColors(5);
+  const colors = getStepColors(4);
   return (
   <>
     <DialogHeader className="text-center space-y-4 mb-6">
@@ -486,9 +343,9 @@ const ProcessingCreditsStep: React.FC = () => (
   </div>
 );
 
-// Step 6: Credits Result
+// Step 5: Credits Result
 const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | 'no-thanks', onNext: () => void, shouldShowConfetti?: boolean, onConfettiConsumed?: () => void }> = ({ choice, onNext, shouldShowConfetti = false, onConfettiConsumed }) => {
-  const colors = getStepColors(6);
+  const colors = getStepColors(5);
   // Trigger confetti when component mounts (only if first time this session)
   useEffect(() => {
     // Only run confetti if parent indicates it should run
@@ -645,6 +502,153 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
 );
 };
 
+// Step 6: Privacy Defaults
+const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const colors = getStepColors(6);
+  
+  // Privacy defaults state using database-backed preferences
+  const { 
+    value: privacyDefaults, 
+    update: updatePrivacyDefaults,
+    isLoading: isLoadingPrivacyDefaults
+  } = useUserUIState('privacyDefaults', { resourcesPublic: true, generationsPublic: false });
+
+  if (isLoadingPrivacyDefaults) {
+    return (
+      <>
+        <DialogHeader className="text-center space-y-4 mb-6">
+          <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+            <Globe className={`w-8 h-8 ${colors.icon}`} />
+          </div>
+          <DialogTitle className="text-2xl font-bold text-center">
+            Privacy Defaults
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <DialogHeader className="text-center space-y-4 mb-6">
+        <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+          <Globe className={`w-8 h-8 ${colors.icon}`} />
+        </div>
+        <DialogTitle className="text-2xl font-bold text-center">
+          Are you okay with your creations being public?
+        </DialogTitle>
+      </DialogHeader>
+      
+      <div className="space-y-4">
+        <p className="text-center text-muted-foreground text-sm">
+          These are just defaults - you can change visibility for individual items later.
+        </p>
+
+        {/* Side by side toggles */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Resources Toggle */}
+          <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2">
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium text-sm">Resources</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-sm">Like LoRAs, presets, and references you share. This will allow others to use them. This is just a default, you can update individual resources.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <div className="flex items-center gap-0">
+              <button
+                onClick={() => updatePrivacyDefaults({ resourcesPublic: true })}
+                className={`px-2.5 py-1 text-xs rounded-l-full transition-all focus:outline-none ${
+                  privacyDefaults.resourcesPublic
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                <Globe className="h-3 w-3 inline mr-0.5" />
+                Public
+              </button>
+              <button
+                onClick={() => updatePrivacyDefaults({ resourcesPublic: false })}
+                className={`px-2.5 py-1 text-xs rounded-r-full transition-all focus:outline-none ${
+                  !privacyDefaults.resourcesPublic
+                    ? 'bg-gray-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                <Lock className="h-3 w-3 inline mr-0.5" />
+                Private
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              LoRAs, presets, references
+            </p>
+          </div>
+
+          {/* Generations Toggle */}
+          <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2">
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium text-sm">Generations</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-sm">This will allow others to view and use your generated images/videos, or train LoRAs on them.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <div className="flex items-center gap-0">
+              <button
+                onClick={() => updatePrivacyDefaults({ generationsPublic: true })}
+                className={`px-2.5 py-1 text-xs rounded-l-full transition-all focus:outline-none ${
+                  privacyDefaults.generationsPublic
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                <Globe className="h-3 w-3 inline mr-0.5" />
+                Public
+              </button>
+              <button
+                onClick={() => updatePrivacyDefaults({ generationsPublic: false })}
+                className={`px-2.5 py-1 text-xs rounded-r-full transition-all focus:outline-none ${
+                  !privacyDefaults.generationsPublic
+                    ? 'bg-gray-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                <Lock className="h-3 w-3 inline mr-0.5" />
+                Private
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Images and videos
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex justify-center pt-5 pb-2">
+        <Button onClick={onNext} className="w-full sm:w-auto">
+          Continue
+          <ChevronRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+    </>
+  );
+};
+
 // Step 7: Setup Complete
 const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const colors = getStepColors(7);
@@ -735,7 +739,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
       
       if (!user) {
         console.log('[GambitChoice] No user found');
-        setCurrentStep(6);
+        setCurrentStep(5);
         return;
       }
 
@@ -749,7 +753,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
       
       if (error || !userData) {
         console.log('[GambitChoice] Error fetching user data, skipping to result');
-        setCurrentStep(6);
+        setCurrentStep(5);
         return;
       }
 
@@ -792,16 +796,16 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
         setTimeout(() => {
           console.log('[GambitChoice] Timeout completed - transitioning to credits result with confetti');
           setIsProcessingCredits(false);
-          setCurrentStep(6); // Go to credits result step - confetti will show if shouldShowConfetti
+          setCurrentStep(5); // Go to credits result step - confetti will show if shouldShowConfetti
         }, 1500);
       } else {
         console.log('[GambitChoice] User already has credits - skipping directly to result without confetti');
         // User already has credits - skip directly to result (no loading, no confetti)
-        setCurrentStep(6);
+        setCurrentStep(5);
       }
     } catch (error) {
       console.error('[GambitChoice] Error in handleGambitChoice:', error);
-      setCurrentStep(6);
+      setCurrentStep(5);
     }
   };
 
@@ -831,13 +835,13 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
       case 2:
         return <CommunityStep onNext={handleNext} />;
       case 3:
-        return <PWAInstallStep onNext={handleNext} />;
-      case 4:
         return <GenerationMethodStep onNext={handleNext} />;
-      case 5:
+      case 4:
         return <WelcomeGambitStep onNext={handleGambitChoice} />;
-      case 6:
+      case 5:
         return <CreditsResultStep choice={userChoice!} onNext={handleNext} shouldShowConfetti={shouldShowConfetti} onConfettiConsumed={() => setShouldShowConfetti(false)} />;
+      case 6:
+        return <PrivacyDefaultsStep onNext={handleNext} />;
       case 7:
         return <SetupCompleteStep onClose={handleClose} />;
       default:
@@ -845,7 +849,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
     }
   };
 
-  const stepTitles = ["Welcome", "Community", "Install App", "Generation", "Promise", "Credits", "Complete"];
+  const stepTitles = ["Welcome", "Community", "Generation", "Promise", "Credits", "Privacy", "Complete"];
   
   return (
     <Dialog open={isOpen} onOpenChange={handleShake}>

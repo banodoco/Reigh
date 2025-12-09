@@ -9,6 +9,7 @@ import { uploadVideoToStorage, extractVideoMetadata, VideoMetadata } from '@/sha
 import { DatasetBrowserModal } from '@/shared/components/DatasetBrowserModal';
 import { useCreateResource, Resource, StructureVideoMetadata } from '@/shared/hooks/useResources';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 interface BatchGuidanceVideoProps {
   shotId: string;
@@ -51,6 +52,9 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   
   // Resource creation hook
   const createResource = useCreateResource();
+  
+  // Privacy defaults for new resources
+  const { value: privacyDefaults } = useUserUIState('privacyDefaults', { resourcesPublic: true, generationsPublic: false });
   
   // Video scrubbing hooks (always called, even if not used)
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -225,7 +229,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
           is_you: true,
           username: user?.email || 'user',
         },
-        is_public: false,
+        is_public: privacyDefaults.resourcesPublic,
         createdAt: now,
       };
       

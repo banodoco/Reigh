@@ -24,6 +24,7 @@ import { Info, X, Pencil, Trash2 } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { Slider } from "@/shared/components/ui/slider";
 import { supabase } from '@/integrations/supabase/client';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 // Description Modal Component
 const DescriptionModal: React.FC<{
@@ -650,9 +651,11 @@ interface MyLorasTabProps {
   editingLora?: (Resource & { metadata: LoraModel }) | null;
   /** Callback to clear edit state */
   onClearEdit: () => void;
+  /** Default is_public value from user privacy settings */
+  defaultIsPublic: boolean;
 }
 
-const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onRemoveLora, selectedLoraIds, deleteResource, createResource, updateResource, lora_type, onSwitchToBrowse, editingLora, onClearEdit }) => {
+const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onRemoveLora, selectedLoraIds, deleteResource, createResource, updateResource, lora_type, onSwitchToBrowse, editingLora, onClearEdit, defaultIsPublic }) => {
     const isEditMode = !!editingLora;
     const [addForm, setAddForm] = useState({
         name: '',
@@ -661,7 +664,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
         created_by_username: '',
         huggingface_url: '',
         base_model: 'Wan 2.1 T2V',
-        is_public: true,
+        is_public: defaultIsPublic,
         trigger_word: '', // Add trigger word to form state
     });
     
@@ -933,7 +936,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 created_by_username: '',
                 huggingface_url: '',
                 base_model: 'Wan 2.1 T2V',
-                is_public: true,
+                is_public: defaultIsPublic,
                 trigger_word: '',
             });
             setSampleFiles([]);
@@ -973,7 +976,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         created_by_username: '',
                         huggingface_url: '',
                         base_model: 'Wan 2.1 T2V',
-                        is_public: true,
+                        is_public: defaultIsPublic,
                         trigger_word: '',
                       });
                       setSampleFiles([]);
@@ -1321,6 +1324,9 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   const updateResource = useUpdateResource();
   const deleteResource = useDeleteResource();
   
+  // Privacy defaults for new LoRAs
+  const { value: privacyDefaults } = useUserUIState('privacyDefaults', { resourcesPublic: true, generationsPublic: false });
+  
   // Tab state management
   const [activeTab, setActiveTab] = useState<string>('browse');
   
@@ -1433,6 +1439,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                       }}
                       editingLora={editingLora}
                       onClearEdit={handleClearEdit}
+                      defaultIsPublic={privacyDefaults.resourcesPublic}
                   />
                 </TabsContent>
             </Tabs>

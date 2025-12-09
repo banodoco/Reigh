@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle } from "lucide-react";
+import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, Globe, Lock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -107,12 +107,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Memory profile preference (persistent)
   const [memoryProfile, setMemoryProfile] = usePersistentState<string>("memory-profile", "4");
   
+  // Settings section toggle (App Settings vs User Settings)
+  const [settingsSection, setSettingsSection] = useState<'app' | 'user'>('app');
+
   // Generation method preferences (database-backed)
   const { 
     value: generationMethods, 
     update: updateGenerationMethods, 
     isLoading: isLoadingGenerationMethods 
   } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+
+  // Privacy defaults preferences (database-backed)
+  const { 
+    value: privacyDefaults, 
+    update: updatePrivacyDefaults, 
+    isLoading: isLoadingPrivacyDefaults 
+  } = useUserUIState('privacyDefaults', { resourcesPublic: true, generationsPublic: false });
 
   // Enhanced update function that notifies other components
   const updateGenerationMethodsWithNotification = (patch: Partial<typeof generationMethods>) => {
@@ -461,7 +471,33 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
         
         <div className={modal.headerClass}>
           <DialogHeader className={`${modal.isMobile ? 'px-2 pt-1 pb-1' : 'px-2 pt-1 pb-1'} flex-shrink-0 relative`}>
-            <DialogTitle className="text-2xl md:mt-[11px]">App Settings</DialogTitle>
+            <div className="flex items-center gap-4">
+              <DialogTitle className="text-2xl md:mt-[11px]">
+                App Settings
+              </DialogTitle>
+              <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5 shadow-inner md:mt-[11px]">
+                <button
+                  onClick={() => setSettingsSection('app')}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 focus:outline-none ${
+                    settingsSection === 'app'
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                  }`}
+                >
+                  Generation
+                </button>
+                <button
+                  onClick={() => setSettingsSection('user')}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 focus:outline-none ${
+                    settingsSection === 'user'
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                  }`}
+                >
+                  Privacy
+                </button>
+              </div>
+            </div>
           </DialogHeader>
         </div>
         
@@ -470,6 +506,121 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
           ref={scrollRef}
           className={`${modal.scrollClass} ${modal.isMobile ? 'px-2' : 'px-2'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}
         >
+          {/* User Settings Section */}
+          {settingsSection === 'user' && (
+            <div className="space-y-6">
+              <div className="text-center mb-6">
+                <p className="text-sm text-muted-foreground">
+                  Configure your default privacy settings for resources and generations.
+                </p>
+              </div>
+
+              {/* Privacy Defaults */}
+              {isLoadingPrivacyDefaults ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Resources Toggle */}
+                  <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Resources</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p className="text-sm">Like LoRAs, presets, and references you share. This will allow others to use them. This is just a default, you can update individual resources.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="flex items-center gap-0">
+                        <button
+                          onClick={() => updatePrivacyDefaults({ resourcesPublic: true })}
+                          className={`px-3 py-1.5 text-sm rounded-l-full transition-all ${
+                            privacyDefaults.resourcesPublic
+                              ? 'bg-green-500 text-white'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          <Globe className="h-3.5 w-3.5 inline mr-1" />
+                          Public
+                        </button>
+                        <button
+                          onClick={() => updatePrivacyDefaults({ resourcesPublic: false })}
+                          className={`px-3 py-1.5 text-sm rounded-r-full transition-all ${
+                            !privacyDefaults.resourcesPublic
+                              ? 'bg-gray-600 text-white'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          <Lock className="h-3.5 w-3.5 inline mr-1" />
+                          Private
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      LoRAs, presets, and reference images you create
+                    </p>
+                  </div>
+
+                  {/* Generations Toggle */}
+                  <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Generations</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <p className="text-sm">This will allow others to view and use your generated images/videos, or train LoRAs on them.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <div className="flex items-center gap-0">
+                        <button
+                          onClick={() => updatePrivacyDefaults({ generationsPublic: true })}
+                          className={`px-3 py-1.5 text-sm rounded-l-full transition-all ${
+                            privacyDefaults.generationsPublic
+                              ? 'bg-green-500 text-white'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          <Globe className="h-3.5 w-3.5 inline mr-1" />
+                          Public
+                        </button>
+                        <button
+                          onClick={() => updatePrivacyDefaults({ generationsPublic: false })}
+                          className={`px-3 py-1.5 text-sm rounded-r-full transition-all ${
+                            !privacyDefaults.generationsPublic
+                              ? 'bg-gray-600 text-white'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          <Lock className="h-3.5 w-3.5 inline mr-1" />
+                          Private
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Images and videos you generate
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* App Settings Section */}
+          {settingsSection === 'app' && (
+          <>
           {/* Generation Method Selection */}
           <div className={`${isMobile ? 'mb-3' : 'mb-5'}`}>
           {/* Mobile header */}
@@ -501,7 +652,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                       {/* In the cloud button */}
                       <button
                         onClick={() => updateGenerationMethodsWithNotification({ inCloud: true, onComputer: false })}
-                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm ${
+                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                           inCloudChecked && !onComputerChecked
                             ? 'bg-white text-blue-600 shadow-sm'
                             : 'text-gray-600 hover:text-gray-800'
@@ -513,7 +664,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                       {/* On my computer button */}
                       <button
                         onClick={() => updateGenerationMethodsWithNotification({ onComputer: true, inCloud: false })}
-                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm ${
+                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                           onComputerChecked && !inCloudChecked
                             ? 'bg-white text-green-600 shadow-sm'
                             : 'text-gray-600 hover:text-gray-800'
@@ -663,7 +814,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                             <p className="text-sm text-amber-800 leading-relaxed">
                               You can't process tasks locally on a Mac yet.{" "}
                               <button
-                                className="text-blue-600 hover:text-blue-700 underline font-light transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded"
+                                className="text-blue-600 hover:text-blue-700 underline font-light transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded focus:outline-none"
                                 onClick={() => {
                                   updateGenerationMethodsWithNotification({ onComputer: false, inCloud: true });
                                 }}
@@ -687,7 +838,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                             <p className="text-sm text-amber-800 leading-relaxed">
                               Non-NVIDIA GPUs are not supported for local AI processing.{" "}
                               <button
-                                className="text-blue-600 hover:text-blue-700 underline font-light transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded"
+                                className="text-blue-600 hover:text-blue-700 underline font-light transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded focus:outline-none"
                                 onClick={() => {
                                   updateGenerationMethodsWithNotification({ onComputer: false, inCloud: true });
                                 }}
@@ -1235,6 +1386,8 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
             </div>
           )}
           </div>
+          </>
+          )}
         </div>
         
         {/* Footer */}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, ChevronLeft, ChevronRight, Download, Settings } from 'lucide-react';
+import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, ChevronLeft, ChevronRight, Download, Settings, Copy, Check } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -62,8 +62,16 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     projectIds: [] as string[],
   });
   const [isDownloading, setIsDownloading] = useState(false);
+  const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null);
 
   const { data: taskLogData, isLoading: isLoadingTaskLog } = useTaskLog(20, taskLogPage, taskLogFilters);
+
+  // Copy task ID to clipboard
+  const handleCopyTaskId = (taskId: string) => {
+    navigator.clipboard.writeText(taskId);
+    setCopiedTaskId(taskId);
+    setTimeout(() => setCopiedTaskId(null), 2000);
+  };
 
   // Local formatter for transaction type labels
   const formatTransactionType = (type: string) => {
@@ -356,6 +364,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
         }
 
         return {
+          id: task.id,
           date: new Date(task.created_at).toLocaleDateString(),
           taskType: formatTaskType(task.task_type),
           project: projectLookup[task.project_id] || 'Unknown Project',
@@ -373,10 +382,11 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
       }
 
       // Convert to CSV
-      const headers = ['Date', 'Task Type', 'Project', 'Status', 'Duration', 'Cost'];
+      const headers = ['ID', 'Date', 'Task Type', 'Project', 'Status', 'Duration', 'Cost'];
       const csvContent = [
         headers.join(','),
         ...tasks.map(task => [
+          task.id,
           task.date,
           `"${task.taskType}"`,
           `"${task.project}"`,
@@ -1003,6 +1013,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-16 sm:w-20">ID</TableHead>
                         <TableHead className="w-20 sm:w-auto">Date</TableHead>
                         <TableHead className="w-24 sm:w-auto">Task Type</TableHead>
                         <TableHead className="hidden sm:table-cell">Project</TableHead>
@@ -1014,6 +1025,29 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                     <TableBody>
                       {taskLogData?.tasks?.map((task) => (
                         <TableRow key={task.id}>
+                          <TableCell className="w-16 sm:w-20">
+                            <button
+                              onClick={() => handleCopyTaskId(task.id)}
+                              className={`flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded transition-colors border ${
+                                copiedTaskId === task.id
+                                  ? 'text-green-600 bg-green-50 border-green-300'
+                                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-gray-300 hover:border-gray-400'
+                              }`}
+                              title={`Copy task ID: ${task.id}`}
+                            >
+                              {copiedTaskId === task.id ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  <span className="hidden sm:inline">copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span className="hidden sm:inline">id</span>
+                                </>
+                              )}
+                            </button>
+                          </TableCell>
                           <TableCell className="text-xs sm:text-sm w-20 sm:w-auto">
                             <UpdatingTimeCell date={task.createdAt} />
                           </TableCell>

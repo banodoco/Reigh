@@ -23,6 +23,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Info, X, Layers, Zap, Settings2, Trash2, Pencil, RotateCcw, Search, Download } from 'lucide-react';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/shared/components/ui/dropdown-menu";
 import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { PREDEFINED_LORAS, getDisplayNameFromUrl } from '@/tools/travel-between-images/utils/loraDisplayUtils';
@@ -720,6 +721,8 @@ interface AddNewTabProps {
     lastGeneratedVideoUrl?: string;
     selectedLoras?: Array<{ id: string; name: string; strength: number }>;
   };
+  /** Default is_public value from user privacy settings */
+  defaultIsPublic: boolean;
 }
 
 // Generate a preset name based on current settings
@@ -773,7 +776,7 @@ const generatePresetName = (
   return parts.join(' - ');
 };
 
-const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings, isOverwriting = false, availableLoras = [], generationTypeMode: initialGenerationTypeMode = 'i2v' }) => {
+const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings, isOverwriting = false, availableLoras = [], generationTypeMode: initialGenerationTypeMode = 'i2v', defaultIsPublic }) => {
   const isEditMode = !!editingPreset;
   
   // Generation type mode state (I2V vs VACE)
@@ -798,7 +801,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       description: '',
       created_by_is_you: true,
       created_by_username: '',
-      is_public: true,
+      is_public: defaultIsPublic,
       basePrompt: currentSettings?.basePrompt || '',
       negativePrompt: currentSettings?.negativePrompt || '',
       textBeforePrompts: currentSettings?.textBeforePrompts || '',
@@ -1123,7 +1126,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         description: '',
         created_by_is_you: true,
         created_by_username: '',
-        is_public: true,
+        is_public: defaultIsPublic,
         basePrompt: '',
         negativePrompt: '',
         textBeforePrompts: '',
@@ -1171,7 +1174,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                 description: '',
                 created_by_is_you: true,
                 created_by_username: '',
-                is_public: true,
+                is_public: defaultIsPublic,
                 basePrompt: '',
                 negativePrompt: '',
                 textBeforePrompts: '',
@@ -1708,7 +1711,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                             phases: newPhases
                           });
                         }}
-                        className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
+                        className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer focus:outline-none"
                         type="button"
                       >
                         + Add LoRA
@@ -2020,6 +2023,9 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   const updateResource = useUpdateResource();
   const deleteResource = useDeleteResource();
   
+  // Privacy defaults for new presets
+  const { value: privacyDefaults } = useUserUIState('privacyDefaults', { resourcesPublic: true, generationsPublic: false });
+  
   // Tab state management - initialize with initialTab prop
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   
@@ -2160,6 +2166,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                   isOverwriting={isOverwriting}
                   availableLoras={availableLoras}
                   generationTypeMode={generationTypeMode}
+                  defaultIsPublic={privacyDefaults.resourcesPublic}
                 />
               </TabsContent>
             </Tabs>

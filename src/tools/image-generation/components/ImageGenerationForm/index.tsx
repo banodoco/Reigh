@@ -168,6 +168,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     isLoading: isLoadingGenerationMethods
   } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   
+  // Privacy defaults for new resources
+  const { value: privacyDefaults } = useUserUIState('privacyDefaults', { resourcesPublic: true, generationsPublic: false });
+  
   const isLocalGenerationEnabled = generationMethods.onComputer && !generationMethods.inCloud;
   
   // Project-level settings for model and style reference (shared across tools)
@@ -690,7 +693,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             inThisSceneStrength: pointer.inThisSceneStrength ?? 1.0,
             referenceMode: pointer.referenceMode || 'style',
             styleBoostTerms: pointer.styleBoostTerms || '',
-            is_public: false,
+            is_public: privacyDefaults.resourcesPublic,
             created_by: {
               is_you: true,
               username: user.email || 'user',
@@ -1183,7 +1186,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         inThisSceneStrength: 1.0,
         referenceMode: 'style',
         styleBoostTerms: '',
-        is_public: false, // Always private for user uploads
+        is_public: privacyDefaults.resourcesPublic,
         created_by: {
           is_you: true,
           username: user.email || 'user',

@@ -27,6 +27,10 @@ interface UISettings {
   aiInputMode: {
     mode: 'voice' | 'text';
   };
+  privacyDefaults: {
+    resourcesPublic: boolean;
+    generationsPublic: boolean;
+  };
 }
 
 // Cached settings loader to prevent duplicate database calls  

@@ -1127,6 +1127,35 @@ serve(async (req) => {
                 } else {
                   console.log(`[OrchestratorComplete] Successfully marked orchestrator ${orchestratorTaskId} as Complete`);
                   
+                  // Trigger billing for the orchestrator task (sub-tasks skip billing expecting the orchestrator to be billed)
+                  try {
+                    console.log(`[OrchestratorComplete] Triggering cost calculation for orchestrator ${orchestratorTaskId}...`);
+                    const orchestratorCostResp = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
+                      method: "POST",
+                      headers: {
+                        "Authorization": `Bearer ${serviceKey}`,
+                        "Content-Type": "application/json"
+                      },
+                      body: JSON.stringify({
+                        task_id: orchestratorTaskId
+                      })
+                    });
+                    if (orchestratorCostResp.ok) {
+                      const costData = await orchestratorCostResp.json();
+                      if (costData && typeof costData.cost === 'number') {
+                        console.log(`[OrchestratorComplete] Cost calculation successful: $${costData.cost.toFixed(3)} for ${costData.duration_seconds}s`);
+                      } else {
+                        console.log(`[OrchestratorComplete] Cost calculation returned unexpected data:`, costData);
+                      }
+                    } else {
+                      const errTxt = await orchestratorCostResp.text();
+                      console.error(`[OrchestratorComplete] Cost calculation failed: ${errTxt}`);
+                    }
+                  } catch (costErr) {
+                    console.error(`[OrchestratorComplete] Error triggering cost calculation for orchestrator:`, costErr);
+                    // Don't fail the main request because of cost calc issues
+                  }
+                  
                   // Update parent_generation_id if present
                   // ONLY for join_clips_segment - the final segment IS the combined video
                   // For travel_segment, the travel_stitch task produces the final video and handles this update
