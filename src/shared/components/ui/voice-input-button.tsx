@@ -3,6 +3,7 @@ import { Mic, Square, Loader2, X, Check } from "lucide-react"
 import { cn } from "@/shared/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 import { useVoiceRecording, VoiceRecordingState } from "@/shared/hooks/use-voice-recording"
+import { useIsMobile } from "@/shared/hooks/use-mobile"
 
 interface VoiceInputButtonProps {
   onResult: (result: { transcription: string; prompt?: string }) => void
@@ -20,6 +21,7 @@ export const VoiceInputButton = React.forwardRef<
   HTMLButtonElement,
   VoiceInputButtonProps
 >(({ onResult, onError, onRecordingStateChange, task = "transcribe_and_write", context, example, existingValue = "", disabled = false, className }, ref) => {
+  const isMobile = useIsMobile()
   const { state, audioLevel, remainingSeconds, isActive, toggleRecording, cancelRecording } = useVoiceRecording({
     onResult,
     onError,
@@ -36,19 +38,12 @@ export const VoiceInputButton = React.forwardRef<
   
   const hasExistingContent = existingValue.trim().length > 0
 
-  const handleClick = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleInteraction = (e: React.MouseEvent | React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!disabled) {
-      toggleRecording()
-    }
-  }
-
-  // Handle touch start to respond immediately on mobile (before focus changes)
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+    console.log('[VoiceInputButton] Interaction! type:', e.type, 'state:', state, 'disabled:', disabled)
     if (!disabled && state !== "processing") {
+      console.log('[VoiceInputButton] Calling toggleRecording')
       toggleRecording()
     }
   }
@@ -87,27 +82,39 @@ export const VoiceInputButton = React.forwardRef<
     cancelRecording()
   }
 
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          ref={ref}
-          type="button"
-          onClick={handleClick}
-          onTouchEnd={handleTouchEnd}
-          disabled={disabled || state === "processing"}
+  // Track if we already handled this interaction to prevent double-firing
+  const handledRef = React.useRef(false)
+  
+  const safeHandleInteraction = (e: React.MouseEvent | React.PointerEvent) => {
+    // Prevent double-firing from both pointerdown and click
+    if (handledRef.current) {
+      console.log('[VoiceInputButton] Skipping duplicate event:', e.type)
+      return
+    }
+    handledRef.current = true
+    setTimeout(() => { handledRef.current = false }, 300)
+    handleInteraction(e)
+  }
+
+  const buttonElement = (
+    <button
+      ref={ref}
+      type="button"
+      onClick={safeHandleInteraction}
+      onPointerDown={isMobile ? safeHandleInteraction : undefined}
+      disabled={disabled || state === "processing"}
           className={cn(
             "relative h-6 w-6 rounded-md flex items-center justify-center transition-colors z-10",
-            state === "recording" 
-              ? "bg-red-500 text-white hover:bg-red-600" 
-              : state === "success"
-              ? "bg-green-500 text-white hover:bg-green-600"
-              : "bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground",
-            disabled && "opacity-50 cursor-not-allowed",
-            className
-          )}
-          tabIndex={-1}
-        >
+        state === "recording" 
+          ? "bg-red-500 text-white hover:bg-red-600" 
+          : state === "success"
+          ? "bg-green-500 text-white hover:bg-green-600"
+          : "bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground",
+        disabled && "opacity-50 cursor-not-allowed",
+        className
+      )}
+      tabIndex={-1}
+    >
           {/* Audio level ring indicator */}
           {state === "recording" && (
             <span 
@@ -154,6 +161,17 @@ export const VoiceInputButton = React.forwardRef<
           
           {getIcon()}
         </button>
+  )
+
+  // On mobile, skip the tooltip wrapper entirely to avoid touch interference
+  if (isMobile) {
+    return buttonElement
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {buttonElement}
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={5}>
         {getTooltipText()}

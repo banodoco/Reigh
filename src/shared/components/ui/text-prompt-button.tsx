@@ -19,9 +19,6 @@ interface TextPromptButtonProps {
   className?: string
 }
 
-// Generate unique ID for each instance
-let instanceCounter = 0
-
 export const TextPromptButton = React.forwardRef<
   HTMLButtonElement,
   TextPromptButtonProps
@@ -31,7 +28,6 @@ export const TextPromptButton = React.forwardRef<
   const [isOpen, setIsOpen] = React.useState(false)
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const isMobile = useIsMobile()
-  const instanceId = React.useRef(`text-prompt-${++instanceCounter}`).current
 
   const isActive = state === "open" || state === "processing" || state === "success"
   
@@ -39,18 +35,6 @@ export const TextPromptButton = React.forwardRef<
   React.useEffect(() => {
     onActiveStateChange?.(isActive)
   }, [isActive, onActiveStateChange])
-
-  // Listen for other popovers opening and close this one
-  React.useEffect(() => {
-    const handleOtherPopoverOpen = (e: CustomEvent) => {
-      if (e.detail !== instanceId && isOpen && state !== "processing") {
-        setIsOpen(false)
-        setState("idle")
-      }
-    }
-    window.addEventListener('text-prompt-popover-open' as any, handleOtherPopoverOpen)
-    return () => window.removeEventListener('text-prompt-popover-open' as any, handleOtherPopoverOpen)
-  }, [instanceId, isOpen, state])
 
   // Focus input when popover opens
   React.useEffect(() => {
@@ -65,8 +49,6 @@ export const TextPromptButton = React.forwardRef<
     if (open) {
       setState("open")
       setInputValue("")
-      // Notify other popovers to close
-      window.dispatchEvent(new CustomEvent('text-prompt-popover-open', { detail: instanceId }))
     } else {
       setState("idle")
     }
@@ -146,48 +128,44 @@ export const TextPromptButton = React.forwardRef<
 
   const hasExistingContent = existingValue.trim().length > 0
 
-  // Handle touch to open popover immediately on mobile
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (disabled || state === "processing") return
-    e.preventDefault()
-    e.stopPropagation()
-    if (!isOpen) {
-      handleOpenChange(true)
-    }
-  }
+  const triggerButton = (
+    <PopoverTrigger asChild>
+      <button
+        ref={ref}
+        type="button"
+        disabled={disabled || state === "processing"}
+          className={cn(
+            "relative h-6 w-6 rounded-md flex items-center justify-center transition-colors z-10",
+          state === "open" || state === "processing"
+            ? "bg-purple-500 text-white hover:bg-purple-600" 
+            : state === "success"
+            ? "bg-green-500 text-white hover:bg-green-600"
+            : "bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground",
+          disabled && "opacity-50 cursor-not-allowed",
+          className
+        )}
+        tabIndex={-1}
+      >
+        {getIcon()}
+      </button>
+    </PopoverTrigger>
+  )
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <button
-              ref={ref}
-              type="button"
-              onTouchEnd={handleTouchEnd}
-              disabled={disabled || state === "processing"}
-              className={cn(
-                "relative h-6 w-6 rounded-md flex items-center justify-center transition-colors z-10",
-                state === "open" || state === "processing"
-                  ? "bg-purple-500 text-white hover:bg-purple-600" 
-                  : state === "success"
-                  ? "bg-green-500 text-white hover:bg-green-600"
-                  : "bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground",
-                disabled && "opacity-50 cursor-not-allowed",
-                className
-              )}
-              tabIndex={-1}
-            >
-              {getIcon()}
-            </button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={5}>
-          {hasExistingContent 
-            ? "Type instructions to create/edit prompt" 
-            : "Type instructions to create prompt"}
-        </TooltipContent>
-      </Tooltip>
+      {/* On mobile, skip tooltip to avoid touch interference */}
+      {isMobile ? triggerButton : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {triggerButton}
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={5}>
+            {hasExistingContent 
+              ? "Type instructions to create/edit prompt" 
+              : "Type instructions to create prompt"}
+          </TooltipContent>
+        </Tooltip>
+      )}
       <PopoverContent 
         side="top" 
         align="end" 
