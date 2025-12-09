@@ -104,33 +104,31 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
         
         <div className={`flex-shrink-0 ${modal.isMobile ? 'px-4' : 'px-6'}`}>
           <div className="grid gap-4 py-3">
-            <div className="grid grid-cols-3 items-center gap-6">
-              <Label htmlFor="project-name" className="text-left">
+            <div className="space-y-1.5">
+              <Label htmlFor="project-name">
                 Name
               </Label>
               <Input
                 id="project-name"
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                className="col-span-2"
+                className="w-full"
                 disabled={isCreatingProject}
                 maxLength={30}
                 placeholder="Enter project name..."
               />
             </div>
-            <div className="grid grid-cols-3 items-center gap-6">
-              <Label htmlFor="aspect-ratio" className="text-left">
+            <div className="space-y-1.5">
+              <Label htmlFor="aspect-ratio">
                 Aspect Ratio
               </Label>
-              <div className="col-span-2">
-                <AspectRatioSelector
-                  value={aspectRatio}
-                  onValueChange={setAspectRatio}
-                  disabled={isCreatingProject}
-                  id="aspect-ratio"
-                  showVisualizer={true}
-                />
-              </div>
+              <AspectRatioSelector
+                value={aspectRatio}
+                onValueChange={setAspectRatio}
+                disabled={isCreatingProject}
+                id="aspect-ratio"
+                showVisualizer={true}
+              />
             </div>
           </div>
         </div>

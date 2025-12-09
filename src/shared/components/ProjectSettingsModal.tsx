@@ -188,53 +188,41 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
         </div>
         <div className={`${modal.isMobile ? 'px-4' : 'px-6'} flex-1 overflow-y-auto min-h-0`}>
           <div className="grid gap-4 py-3">
-            <div className="grid grid-cols-3 items-center gap-6">
-              <Label htmlFor="project-name-settings" className="text-left">
+            <div className="space-y-1.5">
+              <Label htmlFor="project-name-settings">
                 Name
               </Label>
               <Input
                 id="project-name-settings"
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                className="col-span-2"
+                className="w-full"
                 disabled={isUpdatingProject}
                 maxLength={30}
               />
             </div>
-            <div className="grid grid-cols-3 items-center gap-6">
-              <Label htmlFor="aspect-ratio-settings" className="text-left">
+            <div className="space-y-1.5">
+              <Label htmlFor="aspect-ratio-settings">
                 Aspect Ratio
               </Label>
-              <div className="col-span-2">
-                <AspectRatioSelector
-                  value={aspectRatio}
-                  onValueChange={setAspectRatio}
-                  disabled={isUpdatingProject}
-                  id="aspect-ratio-settings"
-                  showVisualizer={true}
-                />
-              </div>
+              <AspectRatioSelector
+                value={aspectRatio}
+                onValueChange={setAspectRatio}
+                disabled={isUpdatingProject}
+                id="aspect-ratio-settings"
+                showVisualizer={true}
+              />
             </div>
-            <div className="grid grid-cols-3 items-center gap-6">
-              <Label className="text-left">
-                Image Upload
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox 
+                id="crop-to-project-size-settings"
+                checked={cropToProjectSize}
+                onCheckedChange={(checked) => handleCropToProjectSizeChange(checked === true)}
+                disabled={isUpdatingProject}
+              />
+              <Label htmlFor="crop-to-project-size-settings" className="text-sm">
+                Crop uploaded images to project size
               </Label>
-              <div className="col-span-2 flex items-center gap-3">
-                <div className="w-2/3 flex items-center space-x-2">
-                  <Checkbox 
-                    id="crop-to-project-size-settings"
-                    checked={cropToProjectSize}
-                    onCheckedChange={(checked) => handleCropToProjectSizeChange(checked === true)}
-                    disabled={isUpdatingProject}
-                  />
-                  <Label htmlFor="crop-to-project-size-settings" className="text-sm">
-                    Crop uploaded images to project size
-                  </Label>
-                </div>
-                <div className="flex-1">
-                  {/* Empty space to maintain layout consistency */}
-                </div>
-              </div>
             </div>
             {/* Danger Zone */}
             <Collapsible open={isDangerZoneOpen} onOpenChange={setIsDangerZoneOpen}>

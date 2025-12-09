@@ -472,14 +472,14 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
         
         <div className={modal.headerClass}>
           <DialogHeader className={`${modal.isMobile ? 'px-2 pt-1 pb-1' : 'px-2 pt-1 pb-1'} flex-shrink-0 relative`}>
-            <div className="flex items-center gap-4">
-              <DialogTitle className="text-2xl md:mt-[11px]">
+            <div className={`flex ${isMobile ? 'flex-col items-center gap-3' : 'items-center gap-4'}`}>
+              <DialogTitle className={`text-2xl ${isMobile ? 'mb-1' : 'md:mt-[11px]'}`}>
                 App Settings
               </DialogTitle>
-              <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5 shadow-inner md:mt-[11px]">
+              <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5 shadow-inner md:mt-[11px] w-fit">
                 <button
                   onClick={() => setSettingsSection('app')}
-                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 focus:outline-none ${
+                  className={`${isMobile ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'} font-medium rounded-full transition-all duration-200 focus:outline-none ${
                     settingsSection === 'app'
                       ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
@@ -489,7 +489,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                 </button>
                 <button
                   onClick={() => setSettingsSection('user')}
-                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 focus:outline-none ${
+                  className={`${isMobile ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'} font-medium rounded-full transition-all duration-200 focus:outline-none ${
                     settingsSection === 'user'
                       ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
@@ -499,7 +499,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                 </button>
                 <button
                   onClick={() => setSettingsSection('transactions')}
-                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 focus:outline-none ${
+                  className={`${isMobile ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'} font-medium rounded-full transition-all duration-200 focus:outline-none ${
                     settingsSection === 'transactions'
                       ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
@@ -541,42 +541,30 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
               ) : (
                 <div className="space-y-4">
                   {/* Resources Toggle */}
-                  <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Resources</span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs">
-                              <p className="text-sm">Like LoRAs, presets, and references you share. This will allow others to use them. This is just a default, you can update individual resources.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
+                  <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
+                    <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                      <span className="font-medium">Resources</span>
                       <div className="flex items-center gap-0">
                         <button
                           onClick={() => updatePrivacyDefaults({ resourcesPublic: true })}
-                          className={`px-3 py-1.5 text-sm rounded-l-full transition-all ${
+                          className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
                             privacyDefaults.resourcesPublic
                               ? 'bg-green-500 text-white'
                               : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                           }`}
                         >
-                          <Globe className="h-3.5 w-3.5 inline mr-1" />
+                          <Globe className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
                           Public
                         </button>
                         <button
                           onClick={() => updatePrivacyDefaults({ resourcesPublic: false })}
-                          className={`px-3 py-1.5 text-sm rounded-r-full transition-all ${
+                          className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
                             !privacyDefaults.resourcesPublic
                               ? 'bg-gray-600 text-white'
                               : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                           }`}
                         >
-                          <Lock className="h-3.5 w-3.5 inline mr-1" />
+                          <Lock className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
                           Private
                         </button>
                       </div>
@@ -587,42 +575,30 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                   </div>
 
                   {/* Generations Toggle */}
-                  <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Generations</span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs">
-                              <p className="text-sm">This will allow others to view and use your generated images/videos, or train LoRAs on them.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
+                  <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
+                    <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                      <span className="font-medium">Generations</span>
                       <div className="flex items-center gap-0">
                         <button
                           onClick={() => updatePrivacyDefaults({ generationsPublic: true })}
-                          className={`px-3 py-1.5 text-sm rounded-l-full transition-all ${
+                          className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
                             privacyDefaults.generationsPublic
                               ? 'bg-green-500 text-white'
                               : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                           }`}
                         >
-                          <Globe className="h-3.5 w-3.5 inline mr-1" />
+                          <Globe className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
                           Public
                         </button>
                         <button
                           onClick={() => updatePrivacyDefaults({ generationsPublic: false })}
-                          className={`px-3 py-1.5 text-sm rounded-r-full transition-all ${
+                          className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
                             !privacyDefaults.generationsPublic
                               ? 'bg-gray-600 text-white'
                               : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                           }`}
                         >
-                          <Lock className="h-3.5 w-3.5 inline mr-1" />
+                          <Lock className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
                           Private
                         </button>
                       </div>
@@ -643,14 +619,14 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
           <div className={`${isMobile ? 'mb-3' : 'mb-5'}`}>
           {/* Mobile header */}
           {isMobile && (
-            <div className="mb-4">
+            <div className="mb-2">
               <h3 className="font-light">How would you like to generate?</h3>
             </div>
           )}
           
-          <div className={`${isMobile ? 'flex flex-col gap-4' : 'grid grid-cols-2 gap-6'} items-start`}>
+          <div className={`${isMobile ? 'flex flex-col gap-2' : 'grid grid-cols-2 gap-6'} items-start`}>
             {/* Left column: options */}
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-2 sm:space-y-4">
               {!isMobile && (
                 <h3 className="font-light">How would you like to generate?</h3>
               )}

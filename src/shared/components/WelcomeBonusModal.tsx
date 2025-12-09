@@ -618,7 +618,7 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         </Button>
       </div>
     </>
-  );
+);
 };
 
 // Step 7: Setup Complete
