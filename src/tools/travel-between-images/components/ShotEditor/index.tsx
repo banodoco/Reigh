@@ -1757,13 +1757,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             <SectionHeader title="Motion" theme="purple" />
                         </div>
                         <MotionControl
-                            motionMode={motionMode}
+                            motionMode={motionMode === 'presets' ? 'basic' : motionMode || 'basic'}
                             onMotionModeChange={onMotionModeChange || (() => {})}
                             generationTypeMode={generationTypeMode}
                             onGenerationTypeModeChange={onGenerationTypeModeChange}
                             hasStructureVideo={!!structureVideoPath}
-                            amountOfMotion={amountOfMotion || 50}
-                            onAmountOfMotionChange={onAmountOfMotionChange || (() => {})}
                             selectedLoras={loraManager.selectedLoras}
                             availableLoras={availableLoras}
                             onAddLoraClick={() => loraManager.setIsLoraModalOpen(true)}

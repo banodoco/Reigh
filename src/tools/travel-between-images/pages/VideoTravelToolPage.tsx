@@ -451,7 +451,7 @@ const VideoTravelToolPage: React.FC = () => {
     rebuildPhaseConfig({ amountOfMotion: motion });
   }, [rebuildPhaseConfig]);
 
-  const handleMotionModeChange = useCallback((mode: 'basic' | 'presets' | 'advanced') => {
+  const handleMotionModeChange = useCallback((mode: 'basic' | 'advanced') => {
     console.log('[MotionMode] User changing motion mode:', {
       from: shotSettingsRef.current.settings?.motionMode,
       to: mode,

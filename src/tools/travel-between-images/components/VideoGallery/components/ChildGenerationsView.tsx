@@ -1276,7 +1276,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
     }, [segmentGenerationIds, freshGenerationUrls, index]);
     
     // Motion control state - derived from params
-    const [motionMode, setMotionMode] = useState<'basic' | 'presets' | 'advanced'>(() => {
+    const [motionMode, setMotionMode] = useState<'basic' | 'advanced'>(() => {
         const orchestrator = params.orchestrator_details || {};
         if (orchestrator.advanced_mode || params.advanced_mode) return 'advanced';
         return 'basic';
@@ -1315,7 +1315,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
     });
     
     // Handlers for motion control
-    const handleMotionModeChange = useCallback((mode: 'basic' | 'presets' | 'advanced') => {
+    const handleMotionModeChange = useCallback((mode: 'basic' | 'advanced') => {
         setMotionMode(mode);
         setIsDirty(true);
         if (mode === 'advanced' || mode === 'presets') {
@@ -1864,10 +1864,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
 
                         {/* Motion Control - Same component as main page */}
                         <MotionControl
-                            motionMode={motionMode}
+                            motionMode={motionMode === 'presets' ? 'basic' : motionMode}
                             onMotionModeChange={handleMotionModeChange}
-                            amountOfMotion={amountOfMotion}
-                            onAmountOfMotionChange={handleAmountOfMotionChange}
                             selectedLoras={selectedLoras}
                             availableLoras={availableLoras}
                             onAddLoraClick={handleAddLoraClick}

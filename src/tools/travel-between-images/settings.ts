@@ -32,19 +32,56 @@ export interface PhaseConfig {
   mode?: 'i2v' | 'vace'; // Generation mode: I2V (image-to-video) or VACE (structure video guided)
 }
 
+// =============================================================================
+// DEFAULT PHASE CONFIGS - Single source of truth
+// =============================================================================
+
+// Default phase config for I2V mode (2 phases, Comfy-Org LoRAs)
 export const DEFAULT_PHASE_CONFIG: PhaseConfig = {
+  num_phases: 2,
+  steps_per_phase: [3, 3],
+  flow_shift: 5.0,
+  sample_solver: "euler",
+  model_switch_phase: 1,
+  phases: [
+    {
+      phase: 1,
+      guidance_scale: 1.0,
+      loras: [
+        {
+          url: "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+          multiplier: "1.2"
+        }
+      ]
+    },
+    {
+      phase: 2,
+      guidance_scale: 1.0,
+      loras: [
+        {
+          url: "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+          multiplier: "1.0"
+        }
+      ]
+    }
+  ]
+};
+
+// Default phase config for VACE mode (3 phases, lightx2v T2V LoRAs)
+export const DEFAULT_VACE_PHASE_CONFIG: PhaseConfig = {
   num_phases: 3,
   steps_per_phase: [2, 2, 2],
   flow_shift: 5.0,
   sample_solver: "euler",
   model_switch_phase: 2,
+  mode: 'vace',
   phases: [
     {
       phase: 1,
       guidance_scale: 3.0,
       loras: [
         {
-          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors",
+          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors",
           multiplier: "0.75"
         }
       ]
@@ -54,7 +91,7 @@ export const DEFAULT_PHASE_CONFIG: PhaseConfig = {
       guidance_scale: 1.0,
       loras: [
         {
-          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors",
+          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors",
           multiplier: "1.0"
         }
       ]
@@ -64,7 +101,7 @@ export const DEFAULT_PHASE_CONFIG: PhaseConfig = {
       guidance_scale: 1.0,
       loras: [
         {
-          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/low_noise_model.safetensors",
+          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors",
           multiplier: "1.0"
         }
       ]
@@ -85,8 +122,8 @@ export interface VideoTravelSettings {
   generationMode: 'batch' | 'by-pair' | 'timeline';
   selectedModel?: 'wan-2.1' | 'wan-2.2';
   turboMode: boolean;
-  amountOfMotion: number; // 0-100 range for UI
-  motionMode?: 'basic' | 'presets' | 'advanced'; // Motion control mode
+  amountOfMotion: number; // 0-100 range for UI (kept for backward compatibility)
+  motionMode?: 'basic' | 'advanced'; // Motion control mode (Presets tab merged into Basic)
   advancedMode: boolean; // Toggle for showing phase_config settings
   phaseConfig?: PhaseConfig; // Advanced phase configuration
   selectedPhasePresetId?: string | null; // ID of the selected phase config preset (null if manually configured)

@@ -7,7 +7,7 @@ import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } fro
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { DEFAULT_RESOLUTION } from '../utils/dimension-utils';
 import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../state/types';
-import { PhaseConfig, PhaseLoraConfig } from '../../../settings';
+import { PhaseConfig, PhaseLoraConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '../../../settings';
 import { isVideoShotGenerations, type ShotGenerationsLike } from '@/shared/lib/typeGuards';
 
 // ============================================================================
@@ -21,9 +21,9 @@ const MOTION_LORA_URL = 'https://huggingface.co/peteromallet/random_junk/resolve
 
 /**
  * Build phase config for basic mode based on structure video presence, motion amount, and user LoRAs.
- * This allows the backend to use a unified phase-based system for all generation modes.
+ * Uses DEFAULT_PHASE_CONFIG and DEFAULT_VACE_PHASE_CONFIG from settings.ts as the base configs.
  * 
- * @param useVaceMode - Whether to use VACE mode (true) or I2V mode (false)
+ * @param hasStructureVideo - Whether to use VACE mode (true) or I2V mode (false)
  * @param amountOfMotion - 0-100 motion slider value
  * @param userLoras - User-selected LoRAs to add to every phase
  * @returns Object with model name and phase config
@@ -55,75 +55,25 @@ export function buildBasicModePhaseConfig(
     }
   });
 
-  if (hasStructureVideo) {
-    // WITH structure video - 3 phases, VACE model
-    return {
-      model: 'wan_2_2_vace_lightning_baseline_2_2_2',
-      phaseConfig: {
-        num_phases: 3,
-        steps_per_phase: [2, 2, 2],
-        flow_shift: 5.0,
-        sample_solver: "euler",
-        model_switch_phase: 2,
-        phases: [
-          {
-            phase: 1,
-            guidance_scale: 3.0,
-            loras: [
-              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "0.75" },
-              ...additionalLoras
-            ]
-          },
-          {
-            phase: 2,
-            guidance_scale: 1.0,
-            loras: [
-              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "1.0" },
-              ...additionalLoras
-            ]
-          },
-          {
-            phase: 3,
-            guidance_scale: 1.0,
-            loras: [
-              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors", multiplier: "1.0" },
-              ...additionalLoras
-            ]
-          }
-        ]
-      }
-    };
-  } else {
-    // WITHOUT structure video - 2 phases, I2V model
-    return {
-      model: 'wan_2_2_i2v_lightning_baseline_2_2_2',
-      phaseConfig: {
-        num_phases: 2,
-        steps_per_phase: [3, 3],
-        flow_shift: 5.0,
-        sample_solver: "euler",
-        model_switch_phase: 1,
-        phases: [
-          {
-            phase: 1,
-            guidance_scale: 1.0,
-            loras: [
-              { url: "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors", multiplier: "1.2" },
-              ...additionalLoras
-            ]
-          },
-          {
-            phase: 2,
-            guidance_scale: 1.0,
-            loras: [
-              { url: "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors", multiplier: "1.0" },
-              ...additionalLoras
-            ]
-          }
-        ]
-      }
-    };
-  }
+  // Get base config from settings.ts (single source of truth)
+  const baseConfig = hasStructureVideo ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
+  const model = hasStructureVideo 
+    ? 'wan_2_2_vace_lightning_baseline_2_2_2' 
+    : 'wan_2_2_i2v_lightning_baseline_2_2_2';
+
+  // Deep clone and add additional LoRAs to each phase
+  const phaseConfig: PhaseConfig = {
+    ...baseConfig,
+    phases: baseConfig.phases.map(phase => ({
+      ...phase,
+      loras: [
+        ...phase.loras,
+        ...additionalLoras
+      ]
+    }))
+  };
+
+  return { model, phaseConfig };
 }
 
 // ============================================================================
@@ -169,7 +119,7 @@ export interface GenerateVideoParams {
   
   // Motion settings
   amountOfMotion: number;
-  motionMode?: 'basic' | 'presets' | 'advanced';
+  motionMode?: 'basic' | 'advanced';
   
   // Generation type mode (I2V vs VACE)
   generationTypeMode?: 'i2v' | 'vace';

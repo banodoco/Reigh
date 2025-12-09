@@ -34,7 +34,7 @@ export interface ExtractedSettings {
   generationMode?: 'batch' | 'timeline';
   generationTypeMode?: 'i2v' | 'vace';  // I2V vs VACE mode
   advancedMode?: boolean;
-  motionMode?: 'basic' | 'presets' | 'advanced';
+  motionMode?: 'basic' | 'advanced';
   
   // Advanced mode settings
   phaseConfig?: any;
@@ -78,7 +78,7 @@ export interface ApplyContext {
   onBatchVideoStepsChange: (steps: number) => void;
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   onAdvancedModeChange: (advanced: boolean) => void;
-  onMotionModeChange?: (mode: 'basic' | 'presets' | 'advanced') => void;
+  onMotionModeChange?: (mode: 'basic' | 'advanced') => void;
   onGenerationTypeModeChange?: (mode: 'i2v' | 'vace') => void;
   onPhaseConfigChange: (config: any) => void;
   onPhasePresetSelect?: (presetId: string, config: any) => void;
@@ -117,7 +117,7 @@ export interface ApplyContext {
   turboMode?: boolean;
   enhancePrompt?: boolean;
   amountOfMotion?: number;
-  motionMode?: 'basic' | 'presets' | 'advanced';
+  motionMode?: 'basic' | 'advanced';
   generationTypeMode?: 'i2v' | 'vace';
 }
 

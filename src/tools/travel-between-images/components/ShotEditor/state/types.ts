@@ -69,7 +69,7 @@ export interface ShotSettings {
   turboMode: boolean;
   amountOfMotion: number;
   advancedMode: boolean;
-  motionMode?: 'basic' | 'presets' | 'advanced'; // Motion control mode
+  motionMode?: 'basic' | 'advanced'; // Motion control mode (Presets tab merged into Basic)
   phaseConfig?: any;
   pairConfigs?: any[];
   textBeforePrompts?: string;
@@ -130,8 +130,8 @@ export interface ShotEditorProps {
   amountOfMotion?: number;
   onAmountOfMotionChange?: (motion: number) => void;
   // Motion mode
-  motionMode?: 'basic' | 'presets' | 'advanced';
-  onMotionModeChange?: (mode: 'basic' | 'presets' | 'advanced') => void;
+  motionMode?: 'basic' | 'advanced';
+  onMotionModeChange?: (mode: 'basic' | 'advanced') => void;
   // Generation type mode (I2V vs VACE)
   generationTypeMode?: 'i2v' | 'vace';
   onGenerationTypeModeChange?: (mode: 'i2v' | 'vace') => void;

@@ -35,7 +35,7 @@ interface ApplySettingsContext {
   onCustomHeightChange: (height?: number) => void;
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   onAdvancedModeChange: (advanced: boolean) => void;
-  onMotionModeChange: (mode: 'basic' | 'presets' | 'advanced') => void;
+  onMotionModeChange: (mode: 'basic' | 'advanced') => void;
   onGenerationTypeModeChange: (mode: 'i2v' | 'vace') => void;
   onPhaseConfigChange: (config: PhaseConfig) => void;
   onPhasePresetSelect: (presetId: string, config: PhaseConfig, promptPrefix?: string) => void;
@@ -57,7 +57,7 @@ interface ApplySettingsContext {
   generationMode: 'batch' | 'timeline';
   generationTypeMode: 'i2v' | 'vace';
   advancedMode: boolean;
-  motionMode: 'basic' | 'presets' | 'advanced';
+  motionMode: 'basic' | 'advanced';
   turboMode: boolean;
   enhancePrompt: boolean;
   amountOfMotion: number;

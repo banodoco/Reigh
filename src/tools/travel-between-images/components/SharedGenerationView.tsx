@@ -544,10 +544,8 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                 </div>
                 <div className="pointer-events-none opacity-75">
                   <MotionControl
-                    motionMode={taskSettings.motionMode}
+                    motionMode={taskSettings.motionMode === 'presets' ? 'basic' : (taskSettings.motionMode || 'basic')}
                     onMotionModeChange={() => {}} // No-op
-                    amountOfMotion={taskSettings.motion}
-                    onAmountOfMotionChange={() => {}} // No-op
                     selectedLoras={[]}
                     availableLoras={[]}
                     onAddLoraClick={() => {}} // No-op
