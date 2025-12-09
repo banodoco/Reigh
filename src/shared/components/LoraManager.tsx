@@ -18,7 +18,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
   availableLoras,
   className = "",
   title = "LoRA Models",
-  addButtonText = "Add or Manage LoRAs",
+  addButtonText = "Add or manage LoRAs",
   fullWidth = true,
   externalLoraManager,
   ...options

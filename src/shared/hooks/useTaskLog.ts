@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getVisibleTaskTypes, getHiddenTaskTypes } from '@/shared/lib/taskConfig';
 
 interface TaskWithCost {
   id: string;
@@ -82,13 +83,20 @@ export function useTaskLog(
       const projectIds = projects.map(p => p.id);
       const projectLookup = Object.fromEntries(projects.map(p => [p.id, p.name]));
 
+      // Get hidden task types from centralized config (same as TasksPane uses)
+      const hiddenTaskTypes = getHiddenTaskTypes();
+
       // Build query with filters
+      // Only show visible task types (uses same centralized config as TasksPane)
       let query = supabase
         .from('tasks')
         .select('*', { count: 'exact' })
-        .in('project_id', projectIds)
-        // Only show parent orchestrator tasks, not sub-tasks
-        .is('params->orchestrator_task_id_ref', null);
+        .in('project_id', projectIds);
+
+      // Exclude hidden task types if there are any defined
+      if (hiddenTaskTypes.length > 0) {
+        query = query.not('task_type', 'in', `(${hiddenTaskTypes.join(',')})`);
+      }
 
       // Apply status filter
       if (filters.status && filters.status.length > 0) {
@@ -160,14 +168,26 @@ export function useTaskLog(
         tasks = tasks.filter(task => task.cost && task.cost > 0);
       }
 
-      // Get available filter options (for all user tasks, not just current page)
-      const { data: allTasks } = await supabase
+      // Get available filter options
+      // Use visible task types from centralized config (same as TasksPane dropdown)
+      // Show ALL visible types, not just ones user has used (matches TasksPane behavior)
+      const visibleTaskTypes = getVisibleTaskTypes();
+      
+      // Query for unique statuses from user's visible tasks
+      let allTasksQuery = supabase
         .from('tasks')
         .select('task_type, status, project_id')
         .in('project_id', projectIds);
+      
+      if (hiddenTaskTypes.length > 0) {
+        allTasksQuery = allTasksQuery.not('task_type', 'in', `(${hiddenTaskTypes.join(',')})`);
+      }
+      
+      const { data: allTasks } = await allTasksQuery;
 
       const availableFilters = {
-        taskTypes: [...new Set((allTasks || []).map(t => t.task_type))].sort(),
+        // Show all visible task types (same as TasksPane dropdown)
+        taskTypes: visibleTaskTypes.sort(),
         projects: projects,
         statuses: [...new Set((allTasks || []).map(t => t.status))].sort()
       };

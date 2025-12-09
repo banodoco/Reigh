@@ -408,7 +408,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
               className="w-full" 
               onClick={onAddLoraClick}
             >
-              Add or Manage LoRAs
+              Add or manage LoRAs
             </Button>
             
             <ActiveLoRAsDisplay

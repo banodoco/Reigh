@@ -107,8 +107,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Memory profile preference (persistent)
   const [memoryProfile, setMemoryProfile] = usePersistentState<string>("memory-profile", "4");
   
-  // Settings section toggle (App Settings vs User Settings)
-  const [settingsSection, setSettingsSection] = useState<'app' | 'user'>('app');
+  // Settings section toggle (Generation vs Privacy vs Transactions)
+  const [settingsSection, setSettingsSection] = useState<'app' | 'user' | 'transactions'>('app');
 
   // Generation method preferences (database-backed)
   const { 
@@ -496,6 +496,16 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                 >
                   Privacy
                 </button>
+                <button
+                  onClick={() => setSettingsSection('transactions')}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 focus:outline-none ${
+                    settingsSection === 'transactions'
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                  }`}
+                >
+                  Transactions
+                </button>
               </div>
             </div>
           </DialogHeader>
@@ -506,6 +516,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
           ref={scrollRef}
           className={`${modal.scrollClass} ${modal.isMobile ? 'px-2' : 'px-2'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}
         >
+          {/* Transactions Section */}
+          {settingsSection === 'transactions' && (
+            <div className="space-y-4">
+              <CreditsManagement mode="transactions" />
+            </div>
+          )}
+
           {/* User Settings Section */}
           {settingsSection === 'user' && (
             <div className="space-y-6">
@@ -703,7 +720,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
           {/* Credits Management Section */}
           {!isLoadingGenerationMethods && inCloudChecked && (
             <div className="space-y-3 sm:space-y-4">
-              <CreditsManagement initialTab={creditsTab} />
+              <CreditsManagement initialTab={creditsTab} mode="add-credits" />
             </div>
           )}
 
@@ -731,236 +748,161 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
 
                   {/* Installation section */}
-                  <div className="space-y-4">
-                    {/* Computer Type Selection and GPU Selection */}
-                    <div className={`grid ${isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-1 md:grid-cols-2 gap-4 md:gap-6'} items-start`}>
-                      {/* Left Column: Computer Type Selection */}
-                      <div className="space-y-2 sm:space-y-3">
-                        <p className="text-sm font-light">What kind of computer do you have?</p>
-                        <div className={`flex ${isMobile ? 'flex-col gap-2' : 'gap-4 flex-wrap'}`}>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              id="linux"
-                              name="computer-type"
-                              value="linux"
-                              checked={computerType === "linux"}
-                              onChange={(e) => setComputerType(e.target.value)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                            />
-                            <label htmlFor="linux" className="text-sm font-light">
-                              Linux
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              id="windows"
-                              name="computer-type"
-                              value="windows"
-                              checked={computerType === "windows"}
-                              onChange={(e) => setComputerType(e.target.value)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                            />
-                            <label htmlFor="windows" className="text-sm font-light">
-                              Windows
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              id="mac"
-                              name="computer-type"
-                              value="mac"
-                              checked={computerType === "mac"}
-                              onChange={(e) => setComputerType(e.target.value)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                            />
-                            <label htmlFor="mac" className="text-sm font-light">
-                              Mac
-                            </label>
-                          </div>
-                        </div>
+                  <div className="space-y-3">
+                    {/* System Configuration Row */}
+                    <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
+                      {/* Computer Type */}
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">Computer</Label>
+                        <Select value={computerType} onValueChange={setComputerType}>
+                          <SelectTrigger className="w-full bg-white h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="linux">Linux</SelectItem>
+                            <SelectItem value="windows">Windows</SelectItem>
+                            <SelectItem value="mac">Mac</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
-                      {/* Right Column: GPU Type Selection (Windows/Linux only) or API Token Display */}
-                      {(computerType === "windows" || computerType === "linux") && (
-                        <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                          <Label className="text-sm font-light mb-2 block text-gray-700">
-                            What GPU do you have?
-                          </Label>
-                          <Select value={gpuType} onValueChange={setGpuType}>
-                            <SelectTrigger className="w-full bg-white">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="nvidia-30-40">NVIDIA RTX 40-series or older</SelectItem>
-                              <SelectItem value="nvidia-50">NVIDIA RTX 50-series</SelectItem>
-                              <SelectItem value="non-nvidia">Non-NVIDIA (AMD, Intel, etc.)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
+                      {/* GPU Type */}
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">GPU</Label>
+                        <Select value={gpuType} onValueChange={setGpuType} disabled={computerType === "mac"}>
+                          <SelectTrigger className="w-full bg-white h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="nvidia-30-40">NVIDIA ≤40 series</SelectItem>
+                            <SelectItem value="nvidia-50">NVIDIA 50 series</SelectItem>
+                            <SelectItem value="non-nvidia">Non-NVIDIA</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Memory Profile */}
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">Memory</Label>
+                        <Select value={memoryProfile} onValueChange={setMemoryProfile}>
+                          <SelectTrigger className="w-full bg-white h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <TooltipProvider>
+                              <Tooltip delayDuration={0}>
+                                <TooltipTrigger asChild>
+                                  <SelectItem value="1" className="cursor-pointer">Max Performance</SelectItem>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="max-w-md" sideOffset={5}>
+                                  <p className="text-sm">64GB+ RAM, 24GB VRAM. Fastest.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip delayDuration={0}>
+                                <TooltipTrigger asChild>
+                                  <SelectItem value="2" className="cursor-pointer">High RAM</SelectItem>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="max-w-md" sideOffset={5}>
+                                  <p className="text-sm">64GB+ RAM, 12GB VRAM. Long videos.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip delayDuration={0}>
+                                <TooltipTrigger asChild>
+                                  <SelectItem value="3" className="cursor-pointer">Balanced</SelectItem>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="max-w-md" sideOffset={5}>
+                                  <p className="text-sm">32GB RAM, 24GB VRAM. Recommended for 3090/4090.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip delayDuration={0}>
+                                <TooltipTrigger asChild>
+                                  <SelectItem value="4" className="cursor-pointer">Conservative</SelectItem>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="max-w-md" sideOffset={5}>
+                                  <p className="text-sm">32GB RAM, 12GB VRAM. Works everywhere.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip delayDuration={0}>
+                                <TooltipTrigger asChild>
+                                  <SelectItem value="5" className="cursor-pointer">Minimum</SelectItem>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="max-w-md" sideOffset={5}>
+                                  <p className="text-sm">24GB RAM, 10GB VRAM. Slowest.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Debug Logs Toggle */}
+                      <div>
+                        <Label className="text-xs text-gray-500 mb-1 block">Debug</Label>
+                        <button
+                          onClick={() => setShowDebugLogs(!showDebugLogs)}
+                          className={`w-full h-9 px-3 text-sm rounded-md border transition-colors flex items-center justify-between ${
+                            showDebugLogs 
+                              ? 'bg-blue-50 border-blue-300 text-blue-700' 
+                              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Terminal className="h-3.5 w-3.5" />
+                            Logs
+                          </span>
+                          <span className={`text-xs ${showDebugLogs ? 'text-blue-600' : 'text-gray-400'}`}>
+                            {showDebugLogs ? 'ON' : 'OFF'}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                     
-                    {/* Mac Notice - Full Width */}
+                    {/* Mac Notice */}
                     {computerType === "mac" && (
-                      <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl shadow-sm">
-                        <div className="flex items-start space-x-3">
-                          <div className="flex-shrink-0">
-                            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm text-amber-800 leading-relaxed">
-                              You can't process tasks locally on a Mac yet.{" "}
-                              <button
-                                className="text-blue-600 hover:text-blue-700 underline font-light transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded focus:outline-none"
-                                onClick={() => {
-                                  updateGenerationMethodsWithNotification({ onComputer: false, inCloud: true });
-                                }}
-                              >
-                                Process in the cloud
-                              </button>
-                            </p>
-                          </div>
-                        </div>
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-sm text-amber-800">
+                          Mac isn't supported yet.{" "}
+                          <button
+                            className="text-blue-600 hover:text-blue-700 underline"
+                            onClick={() => updateGenerationMethodsWithNotification({ onComputer: false, inCloud: true })}
+                          >
+                            Process in the cloud
+                          </button>
+                        </p>
                       </div>
                     )}
                     
-                    {/* Non-NVIDIA GPU Notice - Full Width */}
+                    {/* Non-NVIDIA GPU Notice */}
                     {(computerType === "windows" || computerType === "linux") && gpuType === "non-nvidia" && (
-                      <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl shadow-sm">
-                        <div className="flex items-start space-x-3">
-                          <div className="flex-shrink-0">
-                            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm text-amber-800 leading-relaxed">
-                              Non-NVIDIA GPUs are not supported for local AI processing.{" "}
-                              <button
-                                className="text-blue-600 hover:text-blue-700 underline font-light transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded focus:outline-none"
-                                onClick={() => {
-                                  updateGenerationMethodsWithNotification({ onComputer: false, inCloud: true });
-                                }}
-                              >
-                                Process in the cloud instead
-                              </button>
-                            </p>
-                          </div>
-                        </div>
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-sm text-amber-800">
+                          Non-NVIDIA GPUs aren't supported.{" "}
+                          <button
+                            className="text-blue-600 hover:text-blue-700 underline"
+                            onClick={() => updateGenerationMethodsWithNotification({ onComputer: false, inCloud: true })}
+                          >
+                            Process in the cloud
+                          </button>
+                        </p>
                       </div>
                     )}
 
                     {computerType !== "mac" && gpuType !== "non-nvidia" && (
                       <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200 mb-4">
+                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200 mb-3 h-9 p-1">
                           <TabsTrigger 
                             value="need-install"
-                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm h-full rounded-sm"
                           >
-                            I need to install
+                            Install
                           </TabsTrigger>
                           <TabsTrigger 
                             value="already-installed"
-                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm h-full rounded-sm"
                           >
-                            I've already installed
+                            Run
                           </TabsTrigger>
                         </TabsList>
-
-                        {/* Debug Logs Toggle and Memory Profile - Side by Side */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          {/* Debug Logs Toggle */}
-                          <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                            <div className="flex items-center space-x-2">
-                              <Terminal className="h-4 w-4 text-gray-600" />
-                              <span className="text-sm font-light text-gray-700">Show Debug Logs</span>
-                            </div>
-                            <button
-                              onClick={() => setShowDebugLogs(!showDebugLogs)}
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                                showDebugLogs ? 'bg-blue-600' : 'bg-gray-200'
-                              }`}
-                            >
-                              <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                  showDebugLogs ? 'translate-x-6' : 'translate-x-1'
-                                }`}
-                              />
-                            </button>
-                          </div>
-
-                          {/* Memory Profile Dropdown */}
-                          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <Monitor className="h-4 w-4 text-gray-600" />
-                              <span className="text-sm font-light text-gray-700">Memory Profile</span>
-                            </div>
-                            <Select value={memoryProfile} onValueChange={setMemoryProfile}>
-                              <SelectTrigger className="w-full bg-white">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <TooltipProvider>
-                                  <Tooltip delayDuration={0}>
-                                    <TooltipTrigger asChild>
-                                      <SelectItem value="1" className="cursor-pointer">
-                                        Maximum Performance
-                                      </SelectItem>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
-                                      <p className="text-sm">Preloads entire model + LoRAs into VRAM. Fastest inference but requires 64GB+ RAM and 24GB VRAM. Best for RTX 3090/4090 with high RAM.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                  
-                                  <Tooltip delayDuration={0}>
-                                    <TooltipTrigger asChild>
-                                      <SelectItem value="2" className="cursor-pointer">
-                                        Long Videos, High RAM
-                                      </SelectItem>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
-                                      <p className="text-sm">Streams model parts to VRAM as needed. Requires 64GB+ RAM but only 12GB VRAM. Best for RTX 3070/3080 or 4090 doing long videos.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                  
-                                  <Tooltip delayDuration={0}>
-                                    <TooltipTrigger asChild>
-                                      <SelectItem value="3" className="cursor-pointer">
-                                        Balanced High-End
-                                      </SelectItem>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
-                                      <p className="text-sm">Loads full model in VRAM, minimal RAM usage. Requires 32GB RAM + 24GB VRAM. Recommended for RTX 3090/4090 with 32-64GB RAM.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                  
-                                  <Tooltip delayDuration={0}>
-                                    <TooltipTrigger asChild>
-                                      <SelectItem value="4" className="cursor-pointer">
-                                        Conservative Default
-                                      </SelectItem>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
-                                      <p className="text-sm">Keeps models in RAM, shuttles to VRAM during inference. Requires 32GB RAM + 12GB VRAM. Works everywhere but slower due to RAM↔VRAM transfers.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                  
-                                  <Tooltip delayDuration={0}>
-                                    <TooltipTrigger asChild>
-                                      <SelectItem value="5" className="cursor-pointer">
-                                        Minimum Spec Failsafe
-                                      </SelectItem>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
-                                      <p className="text-sm">Maximum memory conservation at cost of speed. Requires only 24GB RAM + 10GB VRAM. Use only if other profiles OOM.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
 
                       <TabsContent value="need-install" className="space-y-4">
                         <div className="space-y-4">
@@ -1149,14 +1091,27 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                             
                             {!showFullInstallCommand && (
                               <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
-                                <div className="absolute bottom-2 left-4 right-4 flex justify-center">
+                                <div className="absolute bottom-4 left-4 right-4 flex justify-center gap-2">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleCopyInstallCommand}
+                                    className="pointer-events-auto text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white border-blue-500"
+                                  >
+                                    {copiedInstallCommand ? "Copied!" : (
+                                      <>
+                                        <Copy className="h-3 w-3 mr-1" />
+                                        Copy
+                                      </>
+                                    )}
+                                  </Button>
                                   <Button
                                     variant="secondary"
                                     size="sm"
                                     onClick={handleRevealInstallCommand}
                                     className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
                                   >
-                                    Reveal full command
+                                    Reveal
                                   </Button>
                                 </div>
                               </div>
@@ -1164,44 +1119,41 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                           </div>
 
                           {showFullInstallCommand && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              onClick={() => setShowFullInstallCommand(false)}
-                              className="px-0"
-                            >
-                              Hide command
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleCopyInstallCommand}
+                                className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white"
+                              >
+                                {copiedInstallCommand ? "Copied!" : (
+                                  <>
+                                    <Copy className="h-3 w-3 mr-1" />
+                                    Copy
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setShowFullInstallCommand(false)}
+                                className="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200"
+                              >
+                                Hide
+                              </Button>
+                            </div>
                           )}
-
-
-
-                                                     <Button 
-                             onClick={handleCopyInstallCommand}
-                             variant="outline"
-                             size="default"
-                             className="w-full border border-current min-h-[44px] touch-manipulation text-sm sm:text-base"
-                           >
-                            {copiedInstallCommand ? (
-                              "Copied!"
-                            ) : (
-                              <>
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy Installation Command
-                              </>
-                            )}
-                                                     </Button>
                            
-                           <div className="flex justify-center">
+                           <div className="flex justify-center mt-1">
                              {isMobile ? (
                                <Popover>
                                  <PopoverTrigger asChild>
-                                   <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-2 h-auto min-h-[44px] touch-manipulation">
-                                     <HelpCircle className="h-4 w-4 mr-1" />
+                                   <Button variant="link" className="text-xs text-blue-600 hover:text-blue-800 p-1 h-auto touch-manipulation">
+                                     <HelpCircle className="h-3 w-3 mr-1" />
                                      Need help?
                                    </Button>
                                  </PopoverTrigger>
-                                 <PopoverContent className="max-w-sm z-50">
+                                 <PopoverContent className="max-w-sm">
                                    <div className="py-3 space-y-3">
                                      <p className="font-light">Troubleshooting steps:</p>
                                      <ol className="text-sm space-y-2 list-decimal list-inside">
@@ -1230,43 +1182,39 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                                  </PopoverContent>
                                </Popover>
                              ) : (
-                               <TooltipProvider>
-                                 <Tooltip>
-                                   <TooltipTrigger asChild>
-                                     <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-2 h-auto min-h-[44px] touch-manipulation">
-                                       <HelpCircle className="h-4 w-4 mr-1" />
-                                       Need help?
-                                     </Button>
-                                   </TooltipTrigger>
-                                   <TooltipContent className="max-w-sm z-50">
-                                     <div className="py-3 space-y-3">
-                                       <p className="font-light">Troubleshooting steps:</p>
-                                       <ol className="text-sm space-y-2 list-decimal list-inside">
-                                         <li>Try running each line of the commands one-at-a-time</li>
-                                         <li>Feed the command-line log into ChatGPT or your LLM of choice</li>
-                                         <li>Drop into the <a href="https://discord.gg/WXrdkbkj" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">help channel</a> of the Reigh discord</li>
-                                       </ol>
-                                       <div className="flex justify-center pt-2">
-                                         <Button
-                                           variant="outline"
-                                           size="sm"
-                                           onClick={handleCopyAIInstructions}
-                                           className="text-xs min-h-[40px] touch-manipulation"
-                                         >
-                                           {copiedAIInstructions ? (
-                                             "Copied!"
-                                           ) : (
-                                             <>
-                                               <Copy className="h-3 w-3 mr-1" />
-                                               Copy instructions to get help from AI
-                                             </>
-                                           )}
-                                         </Button>
-                                       </div>
+                               <Popover>
+                                 <PopoverTrigger asChild>
+                                   <Button variant="link" className="text-xs text-blue-600 hover:text-blue-800 p-1 h-auto touch-manipulation">
+                                     <HelpCircle className="h-3 w-3 mr-1" />
+                                     Need help?
+                                   </Button>
+                                 </PopoverTrigger>
+                                 <PopoverContent className="max-w-sm">
+                                   <div className="py-2 space-y-2">
+                                     <p className="font-light text-sm">Troubleshooting steps:</p>
+                                     <ol className="text-xs space-y-1 list-decimal list-inside">
+                                       <li>Try running each line one-at-a-time</li>
+                                       <li>Feed errors into ChatGPT or your LLM</li>
+                                       <li>Join the <a href="https://discord.gg/WXrdkbkj" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">Reigh discord</a></li>
+                                     </ol>
+                                     <div className="flex justify-center pt-2">
+                                       <Button
+                                         variant="outline"
+                                         size="sm"
+                                         onClick={handleCopyAIInstructions}
+                                         className="text-xs"
+                                       >
+                                         {copiedAIInstructions ? "Copied!" : (
+                                           <>
+                                             <Copy className="h-3 w-3 mr-1" />
+                                             Copy prompt for AI help
+                                           </>
+                                         )}
+                                       </Button>
                                      </div>
-                                   </TooltipContent>
-                                 </Tooltip>
-                               </TooltipProvider>
+                                   </div>
+                                 </PopoverContent>
+                               </Popover>
                              )}
                            </div>
                         </div>
@@ -1296,14 +1244,27 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                             
                             {!showFullRunCommand && (
                               <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
-                                <div className="absolute bottom-2 left-4 right-4 flex justify-center">
+                                <div className="absolute bottom-4 left-4 right-4 flex justify-center gap-2">
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleCopyRunCommand}
+                                    className="pointer-events-auto text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white border-blue-500"
+                                  >
+                                    {copiedRunCommand ? "Copied!" : (
+                                      <>
+                                        <Copy className="h-3 w-3 mr-1" />
+                                        Copy
+                                      </>
+                                    )}
+                                  </Button>
                                   <Button
                                     variant="secondary"
                                     size="sm"
                                     onClick={handleRevealRunCommand}
                                     className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
                                   >
-                                    Reveal full command
+                                    Reveal
                                   </Button>
                                 </div>
                               </div>
@@ -1311,70 +1272,65 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                           </div>
 
                           {showFullRunCommand && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              onClick={() => setShowFullRunCommand(false)}
-                              className="px-0"
-                            >
-                              Hide command
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleCopyRunCommand}
+                                className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white"
+                              >
+                                {copiedRunCommand ? "Copied!" : (
+                                  <>
+                                    <Copy className="h-3 w-3 mr-1" />
+                                    Copy
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setShowFullRunCommand(false)}
+                                className="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200"
+                              >
+                                Hide
+                              </Button>
+                            </div>
                           )}
-
-                          <Button 
-                            onClick={handleCopyRunCommand}
-                            variant="outline"
-                            size="default"
-                            className="w-full border border-current min-h-[44px] touch-manipulation text-sm sm:text-base"
-                          >
-                            {copiedRunCommand ? (
-                              "Copied!"
-                            ) : (
-                              <>
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy Run Command
-                              </>
-                            )}
-                                                     </Button>
                            
-                           <div className="flex justify-center">
-                             <TooltipProvider>
-                               <Tooltip>
-                                 <TooltipTrigger asChild>
-                                   <Button variant="link" className="text-sm text-blue-600 hover:text-blue-800 p-2 h-auto min-h-[44px] touch-manipulation">
-                                     <HelpCircle className="h-4 w-4 mr-1" />
-                                     Need help?
-                                   </Button>
-                                 </TooltipTrigger>
-                                 <TooltipContent className="max-w-sm z-50">
-                                   <div className="py-3 space-y-3">
-                                     <p className="font-light">Troubleshooting steps:</p>
-                                     <ol className="text-sm space-y-2 list-decimal list-inside">
-                                       <li>Try running each line of the commands one-at-a-time</li>
-                                       <li>Feed the command-line log into ChatGPT or your LLM of choice</li>
-                                       <li>Drop into the <a href="https://discord.gg/WXrdkbkj" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">help channel</a> of the Reigh discord</li>
-                                     </ol>
-                                     <div className="flex justify-center pt-2">
-                                       <Button
-                                         variant="outline"
-                                         size="sm"
-                                         onClick={handleCopyAIInstructions}
-                                         className="text-xs min-h-[40px] touch-manipulation"
-                                       >
-                                         {copiedAIInstructions ? (
-                                           "Copied!"
-                                         ) : (
-                                           <>
-                                             <Copy className="h-3 w-3 mr-1" />
-                                             Copy instructions to get help from AI
-                                           </>
-                                         )}
-                                       </Button>
-                                     </div>
+                           <div className="flex justify-center mt-1">
+                             <Popover>
+                               <PopoverTrigger asChild>
+                                 <Button variant="link" className="text-xs text-blue-600 hover:text-blue-800 p-1 h-auto touch-manipulation">
+                                   <HelpCircle className="h-3 w-3 mr-1" />
+                                   Need help?
+                                 </Button>
+                               </PopoverTrigger>
+                               <PopoverContent className="max-w-sm">
+                                 <div className="py-2 space-y-2">
+                                   <p className="font-light text-sm">Troubleshooting steps:</p>
+                                   <ol className="text-xs space-y-1 list-decimal list-inside">
+                                     <li>Try running each line one-at-a-time</li>
+                                     <li>Feed errors into ChatGPT or your LLM</li>
+                                     <li>Join the <a href="https://discord.gg/WXrdkbkj" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">Reigh discord</a></li>
+                                   </ol>
+                                   <div className="flex justify-center pt-2">
+                                     <Button
+                                       variant="outline"
+                                       size="sm"
+                                       onClick={handleCopyAIInstructions}
+                                       className="text-xs"
+                                     >
+                                       {copiedAIInstructions ? "Copied!" : (
+                                         <>
+                                           <Copy className="h-3 w-3 mr-1" />
+                                           Copy prompt for AI help
+                                         </>
+                                       )}
+                                     </Button>
                                    </div>
-                                 </TooltipContent>
-                               </Tooltip>
-                             </TooltipProvider>
+                                 </div>
+                               </PopoverContent>
+                             </Popover>
                            </div>
                         </div>
                       </TabsContent>

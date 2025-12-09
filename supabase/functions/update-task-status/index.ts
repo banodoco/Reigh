@@ -50,7 +50,8 @@ async function handleCascadingTaskFailure(
       status: failureStatus 
     });
     
-    // Extract orchestrator_task_id_ref from the failed task's params
+    // Extract orchestrator reference from the failed task's params
+    // Must check all possible paths where orchestrator_task_id might be stored
     let orchestratorTaskId: string | null = null;
     let isOrchestratorTask = false;
     
@@ -59,9 +60,13 @@ async function handleCascadingTaskFailure(
         ? JSON.parse(failedTaskData.params) 
         : failedTaskData.params;
       
-      orchestratorTaskId = params.orchestrator_task_id_ref || params.orchestrator_task_id;
+      // Check all paths (matching extractOrchestratorTaskId in complete_task)
+      orchestratorTaskId = params.orchestrator_task_id_ref || 
+                           params.orchestrator_details?.orchestrator_task_id ||
+                           params.originalParams?.orchestrator_details?.orchestrator_task_id ||
+                           params.orchestrator_task_id;
       
-      // Check if this task IS the orchestrator (has orchestrator_details)
+      // Check if this task IS the orchestrator (has orchestrator_details but no orchestrator reference)
       if (!orchestratorTaskId && params.orchestrator_details) {
         orchestratorTaskId = failedTaskId;
         isOrchestratorTask = true;
@@ -80,6 +85,7 @@ async function handleCascadingTaskFailure(
     });
     
     // Find all tasks that reference this orchestrator (including the orchestrator itself)
+    // Must check all paths where orchestrator reference might be stored
     let query;
     
     if (isOrchestratorTask) {
@@ -87,7 +93,7 @@ async function handleCascadingTaskFailure(
       query = supabaseAdmin
         .from("tasks")
         .select("id, task_type, status, params")
-        .or(`params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->>orchestrator_task_id.eq.${orchestratorTaskId}`)
+        .or(`params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->orchestrator_details->>orchestrator_task_id.eq.${orchestratorTaskId},params->originalParams->orchestrator_details->>orchestrator_task_id.eq.${orchestratorTaskId},params->>orchestrator_task_id.eq.${orchestratorTaskId}`)
         .neq("id", failedTaskId)
         .neq("status", "Failed")
         .neq("status", "Cancelled")
@@ -97,7 +103,7 @@ async function handleCascadingTaskFailure(
       query = supabaseAdmin
         .from("tasks")
         .select("id, task_type, status, params")
-        .or(`id.eq.${orchestratorTaskId},params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->>orchestrator_task_id.eq.${orchestratorTaskId}`)
+        .or(`id.eq.${orchestratorTaskId},params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->orchestrator_details->>orchestrator_task_id.eq.${orchestratorTaskId},params->originalParams->orchestrator_details->>orchestrator_task_id.eq.${orchestratorTaskId},params->>orchestrator_task_id.eq.${orchestratorTaskId}`)
         .neq("status", "Failed")
         .neq("status", "Cancelled")
         .neq("status", "Complete");

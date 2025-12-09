@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, ChevronLeft, ChevronRight, Download, Settings, Copy, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, ChevronLeft, ChevronRight, Download, Copy, Check } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Slider } from '@/shared/components/ui/slider';
 import {
   Table,
@@ -28,15 +27,16 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useCredits } from '@/shared/hooks/useCredits';
 import { useAutoTopup } from '@/shared/hooks/useAutoTopup';
 import { useTaskLog } from '@/shared/hooks/useTaskLog';
+import { getTaskDisplayName } from '@/shared/lib/taskConfig';
 import { formatDistanceToNow } from 'date-fns';
 import { UpdatingTimeCell } from '@/shared/components/UpdatingTimeCell';
-import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 
 interface CreditsManagementProps {
   initialTab?: 'purchase' | 'history' | 'task-log';
+  mode?: 'add-credits' | 'transactions' | 'all';
 }
 
-const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'purchase' }) => {
+const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'history', mode = 'all' }) => {
   const {
     balance,
     isLoadingBalance,
@@ -148,16 +148,8 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     return count;
   };
 
-  const formatTaskType = (taskType: string) => {
-    // Special case for travel_orchestrator
-    if (taskType === 'travel_orchestrator') {
-      return 'Travel Between Images';
-    }
-    
-    return taskType.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    ).join(' ');
-  };
+  // Use centralized task config for display names (same as TasksPane)
+  const formatTaskType = getTaskDisplayName;
 
   // Update auto-top-up threshold when purchase amount changes (only for truly new users, not when restoring saved preferences)
   React.useEffect(() => {
@@ -187,15 +179,33 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     updateAutoTopup(saveData);
   };
 
+  // Debounce timer for threshold changes
+  const thresholdDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleAutoTopupThresholdChange = (threshold: number) => {
     setLocalAutoTopupThreshold(threshold);
-    // Save immediately
-    updateAutoTopup({
-      enabled: localAutoTopupEnabled,
-      amount: purchaseAmount, // Use the purchase amount from the slider above
-      threshold,
-    });
+    
+    // Debounce the save - only save after user stops changing for 500ms
+    if (thresholdDebounceRef.current) {
+      clearTimeout(thresholdDebounceRef.current);
+    }
+    thresholdDebounceRef.current = setTimeout(() => {
+      updateAutoTopup({
+        enabled: localAutoTopupEnabled,
+        amount: purchaseAmount,
+        threshold,
+      });
+    }, 500);
   };
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (thresholdDebounceRef.current) {
+        clearTimeout(thresholdDebounceRef.current);
+      }
+    };
+  }, []);
 
   // Handle purchase amount changes - update auto-top-up amount if enabled
   const handlePurchaseAmountChange = (amount: number) => {
@@ -424,203 +434,129 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   };
 
   return (
-    <div className="space-y-4">
-        {/* Balance Overview - Simplified */}
-        <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-          <div className="flex items-center gap-3">
-            <Coins className="h-6 w-6 text-gray-600" />
-            <div className="flex items-baseline gap-3">
-              <h3 className="text-lg font-light text-gray-900">Remaining Credit</h3>
-              <div className="text-2xl font-bold text-gray-900">
+    <div className="space-y-3">
+        {/* Add Credits Section */}
+        {(mode === 'all' || mode === 'add-credits') && (
+        <div className="space-y-3">
+          {/* Current Balance Container */}
+          <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <div className="flex items-center gap-2">
+              <Coins className="h-4 w-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-600">Current balance</span>
+              <span className="text-lg font-semibold text-gray-900 ml-auto">
                 {isLoadingBalance ? (
-                  <div className="animate-pulse">
-                    <div className="h-8 w-16 bg-gray-200 rounded"></div>
-                  </div>
+                  <span className="animate-pulse bg-gray-200 rounded w-16 h-5 inline-block"></span>
                 ) : (
                   formatCurrency(balance?.balance || 0)
                 )}
+              </span>
+            </div>
+          </div>
+
+          {/* Add Credits Container */}
+          <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-3">
+            <div className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-600">Add credits</span>
+              <span className="text-lg font-semibold text-gray-900 ml-auto">{formatDollarAmount(purchaseAmount)}</span>
+            </div>
+            
+            <div className="px-1">
+              <Slider
+                value={[purchaseAmount]}
+                onValueChange={(value) => handlePurchaseAmountChange(value[0])}
+                min={0}
+                max={100}
+                step={5}
+              />
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>$0</span>
+                <span>$100</span>
               </div>
             </div>
+
+            {/* Auto top-up */}
+            <div className="flex items-center text-sm pt-2 border-t border-gray-200">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="auto-topup"
+                  checked={localAutoTopupEnabled}
+                  onCheckedChange={(checked) => handleAutoTopupToggle(checked === true)}
+                  disabled={isUpdatingAutoTopup}
+                />
+                <label htmlFor="auto-topup" className="text-gray-500 cursor-pointer">
+                  Auto top-up when below
+                </label>
+                <div className="flex items-center">
+                  <span className="text-gray-500">$</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={Math.max(1, purchaseAmount - 1)}
+                    value={localAutoTopupThreshold}
+                    onChange={(e) => {
+                      const val = Math.min(Math.max(1, Number(e.target.value)), purchaseAmount - 1);
+                      handleAutoTopupThresholdChange(val);
+                    }}
+                    disabled={!localAutoTopupEnabled || isUpdatingAutoTopup}
+                    className="w-12 px-1 py-0.5 text-sm text-center border border-gray-300 rounded disabled:opacity-50 disabled:bg-gray-100"
+                  />
+                </div>
+              </div>
+              {localAutoTopupEnabled && autoTopupState === 'active' && (
+                <span className="text-xs text-green-600 ml-auto">✓ Active</span>
+              )}
+            </div>
+
+            <Button
+              onClick={handlePurchase}
+              disabled={isCreatingCheckout || purchaseAmount === 0}
+              className="w-full"
+            >
+              {isCreatingCheckout ? (
+                <DollarSign className="w-4 h-4 animate-spin" />
+              ) : purchaseAmount === 0 ? (
+                "Select an amount"
+              ) : localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup' ? (
+                <>Add {formatDollarAmount(purchaseAmount)} and set up auto-top-up</>
+              ) : (
+                <>Add {formatDollarAmount(purchaseAmount)}</>
+              )}
+            </Button>
           </div>
         </div>
+        )}
 
-        <div className="px-1">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <div className="-mx-1 sm:mx-0">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-100 border border-gray-200 h-auto p-3 sm:h-10 sm:p-1 mb-3 px-1 rounded-none sm:px-1 sm:rounded-md">
-            <TabsTrigger 
-              value="purchase"
-              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-0.5 py-2 sm:py-1.5 px-2 sm:px-3 text-xs sm:text-sm"
-            >
-              <CreditCard className="w-4 h-4" />
-              <span className="text-center leading-tight">
-                <span className="sm:hidden">Add<br />Credits</span>
-                <span className="hidden sm:inline">Add Credits</span>
-              </span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="history"
-              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-0.5 py-2 sm:py-1.5 px-2 sm:px-3 text-xs sm:text-sm"
-            >
-              <History className="w-4 h-4" />
-              <span className="text-center leading-tight">
-                <span className="sm:hidden">Transaction<br />History</span>
-                <span className="hidden sm:inline">Transaction History</span>
-              </span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="task-log"
-              className="data-[state=active]:bg-white data-[state=active]:shadow-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-0.5 py-2 sm:py-1.5 px-2 sm:px-3 text-xs sm:text-sm"
-            >
-              <Activity className="w-4 h-4" />
-              <span className="text-center leading-tight">
-                <span className="sm:hidden">Task<br />Log</span>
-                <span className="hidden sm:inline">Task Log</span>
-              </span>
-            </TabsTrigger>
-          </TabsList>
+        {/* Transaction History Section */}
+        {(mode === 'all' || mode === 'transactions') && (
+        <div className={`px-1 ${mode === 'all' ? 'mt-6' : ''}`}>
+          <div className="flex items-center gap-4 mb-3">
+            <h3 className="text-lg font-light text-gray-900">Transaction History</h3>
+            <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5 shadow-inner">
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`px-3 py-1 text-xs font-medium rounded-full transition-all focus:outline-none ${
+                  activeTab === 'history'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Transaction History
+              </button>
+              <button
+                onClick={() => setActiveTab('task-log')}
+                className={`px-3 py-1 text-xs font-medium rounded-full transition-all focus:outline-none ${
+                  activeTab === 'task-log'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Task Log
+              </button>
+            </div>
           </div>
 
-          <TabsContent value="purchase" className="flex-1 pb-2 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto]">
-            <div className="space-y-4 px-1">
-              {/* Main content area with 3/5 - 2/5 split on desktop, stacked on mobile */}
-              <div className="flex flex-col md:flex-row md:items-center gap-6">
-                {/* Left column: Top-up amount (3/5 width on desktop) */}
-                <div className="w-full md:w-3/5 space-y-1.5">
-                  <div className="text-left mt-2">
-                    <label className="text-lg font-light text-gray-900">
-                      Top-up amount:
-                    </label>
-                  </div>
-                
-                  <div className="space-y-4">
-                    <div className="text-left">
-                      <div className="text-3xl font-bold text-gray-900">
-                        {formatDollarAmount(purchaseAmount)}
-                      </div>
-                    </div>
-                    
-                    <div className="-mx-1 px-0">
-                      <Slider
-                        value={[purchaseAmount]}
-                        onValueChange={(value) => handlePurchaseAmountChange(value[0])}
-                        min={0}
-                        max={100}
-                        step={5}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-sm text-gray-500 mt-2 px-1">
-                        <span>$0</span>
-                        <span>$100</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right column: Auto-top-up section (2/5 width on desktop) */}
-                <div className="w-full md:w-2/5 space-y-4 md:pt-0 md:border-t-0 border-t border-gray-200 pt-4 md:border-l md:border-gray-200 md:pl-6">
-                  <div>
-                    {/* Auto-top-up toggle */}
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="auto-topup"
-                        checked={localAutoTopupEnabled}
-                        onCheckedChange={(checked) => handleAutoTopupToggle(checked === true)}
-                        disabled={isUpdatingAutoTopup}
-                      />
-                      <label htmlFor="auto-topup" className="text-sm font-light cursor-pointer flex items-center space-x-2">
-                        <Settings className="w-4 h-4 text-gray-500" />
-                        <span>Enable auto-top-up</span>
-                      </label>
-                    </div>
-
-                    {/* Auto-top-up threshold setting - show when enabled or when setup is complete */}
-                    {(localAutoTopupEnabled || autoTopupPreferences?.setupCompleted) && (
-                      <div className="space-y-3 mt-4 mb-4">
-                        <SliderWithValue
-                          label="Trigger when balance drops below:"
-                          value={localAutoTopupThreshold}
-                          onChange={handleAutoTopupThresholdChange}
-                          min={1}
-                          max={Math.max(1, purchaseAmount - 1)}
-                          step={1}
-                          variant="secondary"
-                          formatValue={(value) => `$${value}`}
-                          disabled={isUpdatingAutoTopup}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Auto-top-up info section - below both columns */}
-              {localAutoTopupEnabled && (
-                <div className={`rounded-lg p-3 w-full ${
-                  autoTopupState === 'active' ? 'bg-green-50 border border-green-200' :
-                  autoTopupState === 'setup-but-disabled' ? 'bg-yellow-50 border border-yellow-200' :
-                  autoTopupState === 'enabled-but-not-setup' ? 'bg-blue-50 border border-blue-200' :
-                  'bg-gray-50 border border-gray-200'
-                }`}>
-                  <p className={`text-sm ${
-                    autoTopupState === 'active' ? 'text-green-800' :
-                    autoTopupState === 'setup-but-disabled' ? 'text-yellow-800' :
-                    autoTopupState === 'enabled-but-not-setup' ? 'text-blue-800' :
-                    'text-gray-700'
-                  }`}>
-                    {autoTopupState === 'enabled-but-not-setup' ? (
-                      <>
-                        You've enabled auto-top-up, but it's not set up. To auto-top-up <strong>{formatDollarAmount(purchaseAmount)}</strong> when the balance drops below <strong>{formatDollarAmount(localAutoTopupThreshold)}</strong>, click the button below.
-                      </>
-                    ) : (
-                      getAutoTopupSummary()
-                    )}
-                  </p>
-                </div>
-              )}
-
-              <Button
-                onClick={handlePurchase}
-                disabled={isCreatingCheckout || purchaseAmount === 0}
-                className="w-full"
-              >
-                {(() => {
-                  // Show set-up button when enabled but not setup
-                  const showSetupButton = localAutoTopupEnabled && autoTopupState === 'enabled-but-not-setup';
-                  
-                  if (isCreatingCheckout) {
-                    return (
-                      <div className="animate-spin">
-                        <DollarSign className="w-4 h-4" />
-                      </div>
-                    );
-                  }
-                  
-                  if (purchaseAmount === 0) {
-                    return "Select an amount to add";
-                  }
-                  
-                  if (showSetupButton) {
-                    return (
-                      <>
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Add {formatDollarAmount(purchaseAmount)} and set-up auto-top-up
-                      </>
-                    );
-                  }
-                  
-                  return (
-                    <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Add {formatDollarAmount(purchaseAmount)}
-                    </>
-                  );
-                })()}
-              </Button>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="history" className="flex-1 pb-2 pt-0 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] px-1">
+          {activeTab === 'history' && (
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               {isLoadingLedger ? (
                 <div className="p-8 text-center">
@@ -675,9 +611,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 </div>
               )}
             </div>
-          </TabsContent>
+          )}
 
-          <TabsContent value="task-log" className="flex-1 pb-2 pt-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] px-1">
+          {activeTab === 'task-log' && (
+            <div>
             {/* Mobile notice */}
             <div className="sm:hidden p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
               <p className="text-sm text-blue-700">More details are available on desktop</p>
@@ -1010,25 +947,25 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-16 sm:w-20">ID</TableHead>
-                        <TableHead className="w-20 sm:w-auto">Date</TableHead>
-                        <TableHead className="w-24 sm:w-auto">Task Type</TableHead>
-                        <TableHead className="hidden sm:table-cell">Project</TableHead>
-                        <TableHead className="hidden sm:table-cell">Status</TableHead>
-                        <TableHead className="hidden sm:table-cell">Duration</TableHead>
-                        <TableHead className="w-16 sm:w-auto">Cost</TableHead>
+                        <TableHead className="w-14">ID</TableHead>
+                        <TableHead className="w-20">Date</TableHead>
+                        <TableHead className="w-28">Task Type</TableHead>
+                        <TableHead className="hidden sm:table-cell w-28">Project</TableHead>
+                        <TableHead className="hidden sm:table-cell w-20">Status</TableHead>
+                        <TableHead className="hidden sm:table-cell w-16">Duration</TableHead>
+                        <TableHead className="w-16">Cost</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {taskLogData?.tasks?.map((task) => (
                         <TableRow key={task.id}>
-                          <TableCell className="w-16 sm:w-20">
+                          <TableCell className="p-2">
                             <button
                               onClick={() => handleCopyTaskId(task.id)}
-                              className={`flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded transition-colors border ${
+                              className={`flex items-center gap-1 px-1 py-0.5 text-[10px] rounded transition-colors border ${
                                 copiedTaskId === task.id
                                   ? 'text-green-600 bg-green-50 border-green-300'
                                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-gray-300 hover:border-gray-400'
@@ -1036,45 +973,40 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                               title={`Copy task ID: ${task.id}`}
                             >
                               {copiedTaskId === task.id ? (
-                                <>
-                                  <Check className="w-3 h-3" />
-                                  <span className="hidden sm:inline">copied</span>
-                                </>
+                                <Check className="w-3 h-3" />
                               ) : (
-                                <>
-                                  <Copy className="w-3 h-3" />
-                                  <span className="hidden sm:inline">id</span>
-                                </>
+                                <Copy className="w-3 h-3" />
                               )}
                             </button>
                           </TableCell>
-                          <TableCell className="text-xs sm:text-sm w-20 sm:w-auto">
+                          <TableCell className="text-xs p-2">
                             <UpdatingTimeCell date={task.createdAt} />
                           </TableCell>
-                          <TableCell className="w-24 sm:w-auto">
-                            <Badge variant="outline" className="capitalize py-1 px-2 text-xs whitespace-nowrap">
+                          <TableCell className="p-2">
+                            <Badge variant="outline" className="capitalize py-0.5 px-1.5 text-[10px] whitespace-nowrap">
                               {formatTaskType(task.taskType)}
                             </Badge>
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell text-sm text-gray-600 max-w-[120px] truncate">
-                            {task.projectName || 'Unknown Project'}
+                          <TableCell className="hidden sm:table-cell text-xs text-gray-600 truncate p-2">
+                            {task.projectName || 'Unknown'}
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell">
+                          <TableCell className="hidden sm:table-cell p-2">
                             <Badge
                               variant={
                                 task.status === 'Complete' ? 'default' : 
                                 task.status === 'Failed' ? 'destructive' : 
                                 'secondary'
                               }
+                              className="text-[10px] px-1.5 py-0.5"
                             >
                               {task.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="hidden sm:table-cell text-sm text-gray-600">
+                          <TableCell className="hidden sm:table-cell text-xs text-gray-600 p-2">
                             {task.duration ? `${task.duration}s` : '-'}
                           </TableCell>
                           <TableCell 
-                            className={`font-light text-xs sm:text-sm w-16 sm:w-auto ${
+                            className={`font-light text-xs p-2 ${
                               task.cost ? 'text-red-600' : 'text-gray-400'
                             }`}
                           >
@@ -1119,9 +1051,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                 </>
               )}
             </div>
-          </TabsContent>
-        </Tabs>
+            </div>
+          )}
         </div>
+        )}
     </div>
   );
 };

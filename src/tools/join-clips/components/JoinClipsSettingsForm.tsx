@@ -800,7 +800,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                         persistenceKey={loraPersistenceKey}
                         externalLoraManager={loraManager}
                         title="LoRA Models (Optional)"
-                        addButtonText="Add or Manage LoRAs"
+                        addButtonText="Add or manage LoRAs"
                     />
                 </div>
             </div>

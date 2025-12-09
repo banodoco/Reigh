@@ -140,22 +140,33 @@ serve(async (req) => {
       }, 400);
     }
 
-    // Check if task has orchestrator_task_id_ref - skip billing if present (sub-task of parent)
-    if (task.params?.orchestrator_task_id_ref) {
+    // Check if task is a sub-task of an orchestrator - skip billing if so (parent will be billed)
+    // Check multiple possible paths where orchestrator reference might be stored
+    // Must match the paths checked by extractOrchestratorTaskId in complete_task
+    const orchestratorRef = task.params?.orchestrator_task_id_ref || 
+                            task.params?.orchestrator_details?.orchestrator_task_id ||
+                            task.params?.originalParams?.orchestrator_details?.orchestrator_task_id ||
+                            task.params?.orchestrator_task_id;
+    if (orchestratorRef) {
       logger.info("Skipping cost calculation (sub-task)", { 
-        orchestrator_task_id: task.params.orchestrator_task_id_ref 
+        orchestrator_task_id: orchestratorRef 
       });
       await logger.flush();
       return jsonResponse({
         success: true,
         skipped: true,
         reason: 'Task is sub-task of orchestrator, parent task will be billed',
-        orchestrator_task_id: task.params.orchestrator_task_id_ref,
+        orchestrator_task_id: orchestratorRef,
         task_id: task.id
       });
     }
 
     // Check if this is an orchestrator task - calculate cost based on sub-task durations
+    // Sub-tasks can reference their orchestrator via multiple param paths:
+    // - params.orchestrator_task_id_ref (travel_segment)
+    // - params.orchestrator_details.orchestrator_task_id (join_clips_segment)
+    // - params.originalParams.orchestrator_details.orchestrator_task_id (individual_travel_segment legacy)
+    // - params.orchestrator_task_id (some legacy tasks)
     const { data: subTasks, error: subTasksError } = await supabaseAdmin
       .from('tasks')
       .select(`
@@ -164,7 +175,7 @@ serve(async (req) => {
         generation_processed_at,
         status
       `)
-      .eq('params->>orchestrator_task_id_ref', task_id)
+      .or(`params->>orchestrator_task_id_ref.eq.${task_id},params->orchestrator_details->>orchestrator_task_id.eq.${task_id},params->originalParams->orchestrator_details->>orchestrator_task_id.eq.${task_id},params->>orchestrator_task_id.eq.${task_id}`)
       .eq('status', 'Complete');
 
     let durationSeconds;

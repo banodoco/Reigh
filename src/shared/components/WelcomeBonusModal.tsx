@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Gift, Sparkles, ChevronRight, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart, Globe, Lock, HelpCircle } from 'lucide-react';
+import { Gift, Sparkles, ChevronRight, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart, Globe, Lock } from 'lucide-react';
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -543,31 +543,18 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       </DialogHeader>
       
       <div className="space-y-4">
-        <p className="text-center text-muted-foreground text-sm">
-          These are just defaults - you can change visibility for individual items later.
-        </p>
-
         {/* Side by side toggles */}
         <div className="grid grid-cols-2 gap-3">
           {/* Resources Toggle */}
           <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2">
-            <div className="flex items-center gap-1.5">
-              <span className="font-medium text-sm">Resources</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    <p className="text-sm">Like LoRAs, presets, and references you share. This will allow others to use them. This is just a default, you can update individual resources.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <div className="flex items-center gap-0">
+            <span className="font-medium text-sm">Resources</span>
+            <p className="text-xs text-muted-foreground leading-snug">
+              This will allow others to use them. You can update this for individual resources.
+            </p>
+            <div className="flex w-full">
               <button
                 onClick={() => updatePrivacyDefaults({ resourcesPublic: true })}
-                className={`px-2.5 py-1 text-xs rounded-l-full transition-all focus:outline-none ${
+                className={`flex-1 px-2.5 py-1.5 text-xs rounded-l-full transition-all focus:outline-none ${
                   privacyDefaults.resourcesPublic
                     ? 'bg-green-500 text-white'
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
@@ -578,7 +565,7 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
               </button>
               <button
                 onClick={() => updatePrivacyDefaults({ resourcesPublic: false })}
-                className={`px-2.5 py-1 text-xs rounded-r-full transition-all focus:outline-none ${
+                className={`flex-1 px-2.5 py-1.5 text-xs rounded-r-full transition-all focus:outline-none ${
                   !privacyDefaults.resourcesPublic
                     ? 'bg-gray-600 text-white'
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
@@ -588,30 +575,18 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                 Private
               </button>
             </div>
-            <p className="text-[10px] text-muted-foreground leading-tight">
-              LoRAs, presets, references
-            </p>
           </div>
 
           {/* Generations Toggle */}
           <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2">
-            <div className="flex items-center gap-1.5">
-              <span className="font-medium text-sm">Generations</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    <p className="text-sm">This will allow others to view and use your generated images/videos, or train LoRAs on them.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <div className="flex items-center gap-0">
+            <span className="font-medium text-sm">Generations</span>
+            <p className="text-xs text-muted-foreground leading-snug">
+              This will allow others to view your generations, and train LoRAs on them.
+            </p>
+            <div className="flex w-full">
               <button
                 onClick={() => updatePrivacyDefaults({ generationsPublic: true })}
-                className={`px-2.5 py-1 text-xs rounded-l-full transition-all focus:outline-none ${
+                className={`flex-1 px-2.5 py-1.5 text-xs rounded-l-full transition-all focus:outline-none ${
                   privacyDefaults.generationsPublic
                     ? 'bg-green-500 text-white'
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
@@ -622,7 +597,7 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
               </button>
               <button
                 onClick={() => updatePrivacyDefaults({ generationsPublic: false })}
-                className={`px-2.5 py-1 text-xs rounded-r-full transition-all focus:outline-none ${
+                className={`flex-1 px-2.5 py-1.5 text-xs rounded-r-full transition-all focus:outline-none ${
                   !privacyDefaults.generationsPublic
                     ? 'bg-gray-600 text-white'
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
@@ -632,9 +607,6 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                 Private
               </button>
             </div>
-            <p className="text-[10px] text-muted-foreground leading-tight">
-              Images and videos
-            </p>
           </div>
         </div>
       </div>

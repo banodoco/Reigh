@@ -189,8 +189,18 @@ function buildIndividualTravelSegmentParams(
   const allInputImages = orchDetails.input_image_paths_resolved || [params.start_image_url, params.end_image_url];
   
   // Build orchestrator_details to match travel_segment structure exactly
+  // IMPORTANT: Remove orchestrator references so this task is billed as a standalone task
+  // (otherwise complete_task thinks it's a sub-task and skips billing)
+  const { 
+    orchestrator_task_id: _removedOrchTaskId, 
+    orchestrator_task_id_ref: _removedOrchTaskIdRef,
+    run_id: _removedRunId,
+    orchestrator_run_id: _removedOrchRunId,
+    ...orchDetailsWithoutOrchestratorRefs 
+  } = orchDetails;
+  
   const orchestratorDetails: Record<string, any> = {
-    ...orchDetails,
+    ...orchDetailsWithoutOrchestratorRefs,
     // Ensure key fields are set
     parsed_resolution_wh: finalResolution,
     input_image_paths_resolved: allInputImages,
