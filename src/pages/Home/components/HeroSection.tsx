@@ -300,8 +300,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           >
             <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
               {/* Subtitle - Start -60px (UP) to simulate coming from bar */}
-              <div className="mt-8" style={getFadeStyle(4.5, -60, false)}>
-                <p className="font-theme text-xl md:text-2xl font-theme-body text-muted-foreground leading-relaxed tracking-wide mb-8">
+              <div className="mt-6 md:mt-8" style={getFadeStyle(4.5, -60, false)}>
+                <p className="font-theme text-xl md:text-2xl font-theme-body text-muted-foreground leading-relaxed tracking-wide mb-6 md:mb-8">
                   An{' '}
                   <TooltipProvider>
                     <Tooltip open={openTipOpen} onOpenChange={(o)=>{ if(!openTipDisabled) setOpenTipOpen(o); }}>
@@ -385,10 +385,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
               
             {/* CTA button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
-            <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-6 overflow-visible">
+            <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-4 md:pb-6 overflow-visible">
               {session ? (
                 // User is logged in - show install CTA if available, otherwise go to tools
-                <div className="flex flex-col items-center gap-3">
+                <div className="flex flex-col items-center gap-2 md:gap-3">
                   <div className="group">
                     <button
                       onClick={async () => {
@@ -436,7 +436,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </div>
               ) : (
                 // Not logged in - show install CTA or Discord sign-in with smooth transitions
-                <div className="flex flex-col items-center gap-3">
+                <div className="flex flex-col items-center gap-2 md:gap-3">
                   <div className="group">
                     <button
                       onClick={async () => {
@@ -495,6 +495,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               installMethod={platformInstall.installMethod}
               platform={platformInstall.platform}
               browser={platformInstall.browser}
+              deviceType={platformInstall.deviceType}
               instructions={platformInstall.installInstructions}
               isAppInstalled={platformInstall.isAppInstalled}
               isSignedIn={!!session}
@@ -509,8 +510,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             style={{ gridTemplateRows: phase === 'content-revealing' || phase === 'complete' ? '1fr' : '0fr' }}
           >
             <div className="overflow-hidden">
-              <div className="mt-8 flex justify-center pt-2 pb-4">
-                <div className="flex flex-col items-center space-y-3">
+              <div className="mt-4 md:mt-8 flex justify-center pt-2 pb-4">
+                <div className="flex flex-col items-center space-y-2 md:space-y-3">
                   {/* GitHub and Discord icons side by side */}
                   <div className="flex items-center space-x-3">
                     <div style={getPopStyle(0.8, false)}>

@@ -112,8 +112,9 @@ Key skill: Recognize when users are giving INSTRUCTIONS vs LITERAL CONTENT:
 - "something like a sunset over mountains" → User is describing what they want, elaborate on it
 - "make it more dramatic" → User wants you to modify existing content
 - "a woman walking through a forest" → This IS the content, transform it into a good prompt
+- "just write: a cat sitting on a windowsill" → User wants EXACT text, transcribe literally
 
-Always interpret the user's underlying intent and produce useful output.`;
+Sometimes users want direct transcription without enhancement. If they say "just", "exactly", "literally", or similar, output their words verbatim.`;
 
     let userMsg = `Transform this spoken input into appropriate text for the given context.
 

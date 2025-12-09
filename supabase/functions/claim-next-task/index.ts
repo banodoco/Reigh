@@ -1,5 +1,10 @@
+// deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { SystemLogger } from "../_shared/systemLogger.ts";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Deno: any;
 
 /**
  * Edge function: claim-next-task
@@ -32,25 +37,36 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
  * - 500 Internal Server Error
  */
 serve(async (req) => {
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+  if (!serviceKey || !supabaseUrl) {
+    console.error("[CLAIM-NEXT-TASK] Missing required environment variables");
+    return new Response("Server configuration error", { status: 500 });
+  }
+
+  // Create admin client for database operations
+  const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+  
+  // Create logger
+  const logger = new SystemLogger(supabaseAdmin, 'claim-next-task');
+
   // Only accept POST requests
   if (req.method !== "POST") {
+    logger.warn("Method not allowed", { method: req.method });
+    await logger.flush();
     return new Response("Method not allowed", { status: 405 });
   }
 
   // Extract authorization header
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
+    logger.error("Missing or invalid Authorization header");
+    await logger.flush();
     return new Response("Missing or invalid Authorization header", { status: 401 });
   }
 
   const token = authHeader.slice(7); // Remove "Bearer " prefix
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-
-  if (!serviceKey || !supabaseUrl) {
-    console.error("Missing required environment variables");
-    return new Response("Server configuration error", { status: 500 });
-  }
 
   // Parse request body
   let requestBody: any = {};
@@ -60,28 +76,19 @@ serve(async (req) => {
       requestBody = JSON.parse(bodyText);
     }
   } catch (e) {
-    console.log("No valid JSON body provided, using defaults");
+    logger.debug("No valid JSON body provided, using defaults");
   }
 
   const workerId = requestBody.worker_id || `edge_${crypto.randomUUID()}`;
   const runType = requestBody.run_type || null; // 'gpu', 'api', or null (no filtering)
 
-  // Create admin client for database operations
-  const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-
   let callerId: string | null = null;
   let isServiceRole = false;
 
   // 1) Check if token matches service-role key directly
-  console.log(`🔍 DEBUG: Comparing tokens...`);
-  console.log(`🔍 DEBUG: Received token: ${token.substring(0, 10)}... (length: ${token.length})`);
-  console.log(`🔍 DEBUG: Service key exists: ${!!serviceKey}`);
-  console.log(`🔍 DEBUG: Service key length: ${serviceKey?.length || 0}`);
-  console.log(`🔍 DEBUG: Tokens match: ${token === serviceKey}`);
-  
   if (token === serviceKey) {
     isServiceRole = true;
-    console.log("[SERVICE_ROLE] Direct service-role key match");
+    logger.info("Authenticated via service-role key", { worker_id: workerId, run_type: runType });
   }
 
   // 2) If not service key, try to decode as JWT and check role
@@ -98,18 +105,18 @@ serve(async (req) => {
         const role = payload.role || payload.app_metadata?.role;
         if (["service_role", "supabase_admin"].includes(role)) {
           isServiceRole = true;
-          console.log("[SERVICE_ROLE] JWT has service-role/admin role");
+          logger.info("Authenticated via JWT service-role", { worker_id: workerId, run_type: runType });
         }
       }
     } catch (e) {
       // Not a valid JWT - will be treated as PAT
-      console.log("[PERSONAL_ACCESS_TOKEN] Token is not a valid JWT, treating as PAT");
+      logger.debug("Token is not a valid JWT, treating as PAT");
     }
   }
 
   // 3) USER TOKEN PATH - resolve callerId via user_api_token table
   if (!isServiceRole) {
-    console.log("[PERSONAL_ACCESS_TOKEN] Looking up token in user_api_token table...");
+    logger.debug("Looking up token in user_api_token table");
     
     try {
       // Query user_api_tokens table to find user
@@ -120,14 +127,16 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        console.error("Token lookup failed:", error);
+        logger.error("Token lookup failed", { error: error?.message });
+        await logger.flush();
         return new Response("Invalid or expired token", { status: 403 });
       }
 
       callerId = data.user_id;
-      console.log(`[PERSONAL_ACCESS_TOKEN] Token resolved to user ID: ${callerId}`);
-    } catch (e) {
-      console.error("Error querying user_api_token:", e);
+      logger.info("Authenticated via PAT", { user_id: callerId });
+    } catch (e: any) {
+      logger.error("Error querying user_api_token", { error: e?.message });
+      await logger.flush();
       return new Response("Token validation failed", { status: 403 });
     }
   }
@@ -137,38 +146,14 @@ serve(async (req) => {
       // ═══════════════════════════════════════════════════════════════
       // SERVICE ROLE PATH: Use optimized PostgreSQL function
       // ═══════════════════════════════════════════════════════════════
-      const pathTag = runType === 'api' ? '[SERVICE_ROLE] [API_PATH]' : '[SERVICE_ROLE] [GPU_PATH]';
-      console.log(`${pathTag} Using optimized PostgreSQL function`);
-      
-      // First, test if the function exists
-      try {
-        console.log(`${pathTag} [DIAGNOSTIC] Testing function existence...`);
-        const { data: functionTest, error: functionError } = await supabaseAdmin
-          .from('information_schema.routines')
-          .select('routine_name, routine_type, data_type')
-          .eq('routine_name', 'claim_next_task_service_role')
-          .eq('routine_schema', 'public');
-        
-        console.log(`${pathTag} [DIAGNOSTIC] Function existence check:`, {
-          found: functionTest?.length > 0,
-          details: functionTest,
-          error: functionError
-        });
-      } catch (e) {
-        console.log(`${pathTag} [DIAGNOSTIC] Could not check function existence:`, e);
-      }
-      
-      // Claim next eligible task
-      console.log(`${pathTag} Attempting to claim task for worker: ${workerId}`);
-      console.log(`${pathTag} [DIAGNOSTIC] RPC parameters:`, {
-        p_worker_id: workerId,
-        p_include_active: false,
-        p_run_type: runType
+      const pathType = runType === 'api' ? 'API' : 'GPU';
+      logger.info(`Claiming task (service-role, ${pathType} path)`, { 
+        worker_id: workerId, 
+        run_type: runType 
       });
       
       let claimResult, claimError;
       try {
-        console.log(`${pathTag} [DIAGNOSTIC] Calling claim_next_task_service_role...`);
         const rpcResponse = await supabaseAdmin
           .rpc('claim_next_task_service_role', {
             p_worker_id: workerId,
@@ -179,27 +164,24 @@ serve(async (req) => {
         claimResult = rpcResponse.data;
         claimError = rpcResponse.error;
         
-        console.log(`${pathTag} [DIAGNOSTIC] RPC response received:`, {
-          hasData: !!claimResult,
-          dataLength: claimResult ? claimResult.length : 'null',
-          hasError: !!claimError,
-          errorCode: claimError?.code,
-          errorMessage: claimError?.message
-        });
-        
-      } catch (e) {
-        console.error(`${pathTag} [DIAGNOSTIC] Exception during RPC call:`, e);
+      } catch (e: any) {
+        logger.error("Exception during RPC call", { error: e?.message });
         throw e;
       }
 
       if (claimError) {
-        console.error(`${pathTag} Claim error:`, claimError);
-        console.error(`${pathTag} [DIAGNOSTIC] Full error details:`, JSON.stringify(claimError, null, 2));
+        logger.error("Claim RPC error", { 
+          error: claimError.message,
+          code: claimError.code 
+        });
         throw claimError;
       }
 
       if (!claimResult || claimResult.length === 0) {
-        console.log(`${pathTag} No eligible tasks available`);
+        logger.info("No eligible tasks available", { 
+          worker_id: workerId, 
+          run_type: runType 
+        });
         
         // Add detailed debugging analysis
         try {
@@ -209,38 +191,37 @@ serve(async (req) => {
               p_run_type: runType
             });
           
-          if (analysis) {
-            console.log('\n🔍 DETAILED ANALYSIS:');
-            console.log(`Total queued tasks: ${analysis.total_tasks}`);
-            console.log(`Eligible tasks: ${analysis.eligible_tasks}`);
-            
-            if (analysis.total_tasks > 0 && analysis.eligible_tasks === 0) {
-              console.log('\n❌ WHY NO TASKS ARE READY:');
-              const reasons = analysis.rejection_reasons || {};
-              if (reasons.no_credits) console.log(`     • No credits: ${reasons.no_credits} tasks`);
-              if (reasons.cloud_disabled) console.log(`     • Cloud disabled: ${reasons.cloud_disabled} tasks`);
-              if (reasons.concurrency_limit) console.log(`     • Concurrency limit (≥5 tasks): ${reasons.concurrency_limit} tasks`);
-              if (reasons.dependency_blocked) console.log(`     • Dependency not complete: ${reasons.dependency_blocked} tasks`);
-              if (reasons.unknown) console.log(`     • Unknown reasons: ${reasons.unknown} tasks`);
-              
-              console.log('\n  👥 User breakdown:');
-              const userStats = analysis.user_stats || [];
-              userStats.slice(0, 5).forEach((user: any) => {
-                const status = user.at_limit ? '❌ AT LIMIT' : '✅ Under limit';
-                console.log(`     • User ${user.user_id}: ${user.in_progress_tasks} In Progress, ${user.queued_tasks} Queued, ${user.credits} credits ${status}`);
-              });
-            }
+          if (analysis && analysis.total_tasks > 0 && analysis.eligible_tasks === 0) {
+            const reasons = analysis.rejection_reasons || {};
+            logger.debug("Task availability analysis", {
+              total_tasks: analysis.total_tasks,
+              eligible_tasks: analysis.eligible_tasks,
+              no_credits: reasons.no_credits,
+              cloud_disabled: reasons.cloud_disabled,
+              concurrency_limit: reasons.concurrency_limit,
+              dependency_blocked: reasons.dependency_blocked
+            });
           }
-        } catch (debugError) {
-          console.log('Debug analysis failed:', debugError.message);
+        } catch (debugError: any) {
+          logger.debug("Debug analysis failed", { error: debugError?.message });
         }
         
+        await logger.flush();
         return new Response(null, { status: 204 });
       }
       
       const task = claimResult[0];
-      console.log(`${pathTag} Successfully claimed task ${task.task_id}, task_type: ${task.task_type}, worker: ${workerId}`);
       
+      // Now we have a task_id - set it for this log entry
+      logger.setDefaultTaskId(task.task_id);
+      logger.info("Task claimed successfully", {
+        task_id: task.task_id,
+        task_type: task.task_type,
+        worker_id: workerId,
+        project_id: task.project_id
+      });
+      
+      await logger.flush();
       return new Response(JSON.stringify({
         task_id: task.task_id,
         params: task.params,
@@ -254,8 +235,7 @@ serve(async (req) => {
       // ═══════════════════════════════════════════════════════════════
       // USER TOKEN PATH: Use optimized PostgreSQL function for specific user
       // ═══════════════════════════════════════════════════════════════
-      const pathTag = runType === 'api' ? '[PERSONAL_ACCESS_TOKEN] [API_PATH]' : '[PERSONAL_ACCESS_TOKEN] [GPU_PATH]';
-      console.log(`${pathTag} Using optimized PostgreSQL function for user ${callerId}`);
+      logger.info("Claiming task (user PAT path)", { user_id: callerId });
       
       // Claim next eligible task for this user using PAT-friendly function
       const { data: claimResult, error: claimError } = await supabaseAdmin
@@ -265,14 +245,17 @@ serve(async (req) => {
         });
 
       if (claimError) {
-        console.error(`${pathTag} Claim error:`, claimError);
+        logger.error("Claim RPC error (user path)", { 
+          user_id: callerId,
+          error: claimError.message 
+        });
         throw claimError;
       }
 
       if (!claimResult || claimResult.length === 0) {
-        console.log(`${pathTag} No eligible tasks available for user ${callerId}`);
+        logger.info("No eligible tasks for user", { user_id: callerId });
         
-        // Add detailed debugging analysis for user using PAT-friendly function
+        // Add detailed debugging analysis for user
         try {
           const { data: analysis } = await supabaseAdmin
             .rpc('analyze_task_availability_user_pat', {
@@ -281,32 +264,36 @@ serve(async (req) => {
             });
           
           if (analysis) {
-            console.log(`\n🔍 USER ANALYSIS for ${callerId}:`);
             const userInfo = analysis.user_info || {};
-            console.log(`  Credits: ${userInfo.credits}`);
-            console.log(`  Allows local: ${userInfo.allows_local}`);
-            console.log(`  Projects: ${(analysis.projects || []).length}`);
-            console.log(`  Recent tasks: ${(analysis.recent_tasks || []).length}`);
-            console.log(`  Eligible tasks: ${analysis.eligible_count}`);
-            
-            if (analysis.recent_tasks && analysis.recent_tasks.length > 0) {
-              console.log(`\n  📋 Recent tasks:`);
-              analysis.recent_tasks.slice(0, 3).forEach((task: any) => {
-                const depInfo = task.dependency_blocking ? ' (blocked by dependency)' : '';
-                console.log(`     • ${task.task_type} - ${task.status}${depInfo}`);
-              });
-            }
+            logger.debug("User task availability analysis", {
+              user_id: callerId,
+              credits: userInfo.credits,
+              allows_local: userInfo.allows_local,
+              projects_count: (analysis.projects || []).length,
+              recent_tasks_count: (analysis.recent_tasks || []).length,
+              eligible_count: analysis.eligible_count
+            });
           }
-        } catch (debugError) {
-          console.log('User debug analysis failed:', debugError.message);
+        } catch (debugError: any) {
+          logger.debug("User debug analysis failed", { error: debugError?.message });
         }
         
+        await logger.flush();
         return new Response(null, { status: 204 });
       }
       
       const task = claimResult[0];
-      console.log(`${pathTag} Successfully claimed task ${task.task_id}, task_type: ${task.task_type}, user: ${callerId}`);
       
+      // Now we have a task_id - set it for this log entry
+      logger.setDefaultTaskId(task.task_id);
+      logger.info("Task claimed successfully (user)", {
+        task_id: task.task_id,
+        task_type: task.task_type,
+        user_id: callerId,
+        project_id: task.project_id
+      });
+      
+      await logger.flush();
       return new Response(JSON.stringify({
         task_id: task.task_id,
         params: task.params,
@@ -317,8 +304,9 @@ serve(async (req) => {
         headers: { "Content-Type": "application/json" }
       });
     }
-  } catch (error) {
-    console.error("Unexpected error:", error);
-    return new Response(`Internal server error: ${error.message}`, { status: 500 });
+  } catch (error: any) {
+    logger.critical("Unexpected error", { error: error?.message });
+    await logger.flush();
+    return new Response(`Internal server error: ${error?.message}`, { status: 500 });
   }
 });

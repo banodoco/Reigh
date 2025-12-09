@@ -1,5 +1,10 @@
+// deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { SystemLogger } from "../_shared/systemLogger.ts";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Deno: any;
 
 /**
  * Edge function: update-task-status
@@ -34,12 +39,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
  */
 async function handleCascadingTaskFailure(
   supabaseAdmin: any,
+  logger: SystemLogger,
   failedTaskId: string,
   failureStatus: string,
   failedTaskData: any
 ) {
   try {
-    console.log(`[CascadeFailure] Processing cascading failure for task ${failedTaskId} with status ${failureStatus}`);
+    logger.info("Processing cascading failure", { 
+      task_id: failedTaskId, 
+      status: failureStatus 
+    });
     
     // Extract orchestrator_task_id_ref from the failed task's params
     let orchestratorTaskId: string | null = null;
@@ -56,34 +65,35 @@ async function handleCascadingTaskFailure(
       if (!orchestratorTaskId && params.orchestrator_details) {
         orchestratorTaskId = failedTaskId;
         isOrchestratorTask = true;
-        console.log(`[CascadeFailure] Task ${failedTaskId} appears to be the orchestrator task itself`);
+        logger.debug("Task is the orchestrator itself", { task_id: failedTaskId });
       }
     }
     
     if (!orchestratorTaskId) {
-      console.log(`[CascadeFailure] No orchestrator_task_id_ref found and not an orchestrator task for ${failedTaskId}, skipping cascade`);
+      logger.debug("No orchestrator reference found, skipping cascade", { task_id: failedTaskId });
       return;
     }
     
-    console.log(`[CascadeFailure] Found orchestrator task ID: ${orchestratorTaskId}`);
+    logger.info("Found orchestrator task", { 
+      orchestrator_task_id: orchestratorTaskId,
+      is_orchestrator_task: isOrchestratorTask
+    });
     
     // Find all tasks that reference this orchestrator (including the orchestrator itself)
     let query;
     
     if (isOrchestratorTask) {
       // If the failed task IS the orchestrator, find all children that reference it
-      console.log(`[CascadeFailure] Finding children tasks that reference orchestrator ${orchestratorTaskId}`);
       query = supabaseAdmin
         .from("tasks")
         .select("id, task_type, status, params")
         .or(`params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->>orchestrator_task_id.eq.${orchestratorTaskId}`)
-        .neq("id", failedTaskId) // Don't include the orchestrator itself
+        .neq("id", failedTaskId)
         .neq("status", "Failed")
         .neq("status", "Cancelled")
         .neq("status", "Complete");
     } else {
       // If a child task failed, find orchestrator + all siblings
-      console.log(`[CascadeFailure] Finding orchestrator and sibling tasks for orchestrator ${orchestratorTaskId}`);
       query = supabaseAdmin
         .from("tasks")
         .select("id, task_type, status, params")
@@ -96,29 +106,30 @@ async function handleCascadingTaskFailure(
     const { data: relatedTasks, error: fetchError } = await query;
     
     if (fetchError) {
-      console.error(`[CascadeFailure] Error fetching related tasks:`, fetchError);
+      logger.error("Error fetching related tasks for cascade", { error: fetchError.message });
       return;
     }
     
     if (!relatedTasks || relatedTasks.length === 0) {
-      console.log(`[CascadeFailure] No related tasks found to cascade failure to`);
+      logger.debug("No related tasks found for cascade");
       return;
     }
-    
-    console.log(`[CascadeFailure] Found ${relatedTasks.length} related tasks to update:`, 
-      relatedTasks.map(t => `${t.id} (${t.task_type}, ${t.status})`));
     
     // Update all related tasks to Failed/Cancelled
-    const tasksToUpdate = relatedTasks.filter(task => task.id !== failedTaskId);
+    const tasksToUpdate = relatedTasks.filter((task: any) => task.id !== failedTaskId);
     
     if (tasksToUpdate.length === 0) {
-      console.log(`[CascadeFailure] No additional tasks to update after filtering`);
+      logger.debug("No additional tasks to cascade to after filtering");
       return;
     }
     
-    const updatePromises = tasksToUpdate.map(async (task) => {
-      console.log(`[CascadeFailure] Updating task ${task.id} (${task.task_type}) to ${failureStatus}`);
-      
+    logger.info("Cascading failure to related tasks", {
+      task_id: failedTaskId,
+      related_task_count: tasksToUpdate.length,
+      related_task_ids: tasksToUpdate.map((t: any) => t.id.substring(0, 8))
+    });
+    
+    const updatePromises = tasksToUpdate.map(async (task: any) => {
       const updatePayload = {
         status: failureStatus,
         updated_at: new Date().toISOString(),
@@ -131,9 +142,10 @@ async function handleCascadingTaskFailure(
         .eq("id", task.id);
       
       if (error) {
-        console.error(`[CascadeFailure] Failed to update task ${task.id}:`, error);
-      } else {
-        console.log(`[CascadeFailure] Successfully updated task ${task.id} to ${failureStatus}`);
+        logger.error("Failed to cascade to task", { 
+          cascaded_task_id: task.id, 
+          error: error.message 
+        });
       }
       
       return { taskId: task.id, error };
@@ -143,36 +155,53 @@ async function handleCascadingTaskFailure(
     const failedUpdates = results.filter(r => r.error);
     
     if (failedUpdates.length > 0) {
-      console.error(`[CascadeFailure] ${failedUpdates.length} tasks failed to update:`, failedUpdates);
+      logger.warn("Some cascade updates failed", { 
+        failed_count: failedUpdates.length,
+        total_count: tasksToUpdate.length
+      });
     } else {
-      console.log(`[CascadeFailure] Successfully cascaded ${failureStatus} to ${tasksToUpdate.length} related tasks`);
+      logger.info("Cascade complete", { 
+        cascaded_count: tasksToUpdate.length,
+        status: failureStatus
+      });
     }
     
-  } catch (error) {
-    console.error(`[CascadeFailure] Unexpected error in handleCascadingTaskFailure:`, error);
+  } catch (error: any) {
+    logger.error("Unexpected error in cascade handler", { error: error?.message });
   }
 }
 
 serve(async (req) => {
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+  if (!serviceKey || !supabaseUrl) {
+    console.error("[UPDATE-TASK-STATUS] Missing required environment variables");
+    return new Response("Server configuration error", { status: 500 });
+  }
+
+  // Create admin client for database operations
+  const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+  
+  // Create logger (task_id will be set after parsing body)
+  const logger = new SystemLogger(supabaseAdmin, 'update-task-status');
+
   // Only accept POST requests
   if (req.method !== "POST") {
+    logger.warn("Method not allowed", { method: req.method });
+    await logger.flush();
     return new Response("Method not allowed", { status: 405 });
   }
 
   // Extract authorization header
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
+    logger.error("Missing or invalid Authorization header");
+    await logger.flush();
     return new Response("Missing or invalid Authorization header", { status: 401 });
   }
 
   const token = authHeader.slice(7); // Remove "Bearer " prefix
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-
-  if (!serviceKey || !supabaseUrl) {
-    console.error("Missing required environment variables");
-    return new Response("Server configuration error", { status: 500 });
-  }
 
   // Parse request body
   let requestBody: any = {};
@@ -182,23 +211,34 @@ serve(async (req) => {
       requestBody = JSON.parse(bodyText);
     }
   } catch (e) {
+    logger.error("Invalid JSON body");
+    await logger.flush();
     return new Response("Invalid JSON body", { status: 400 });
   }
 
   // Validate required fields
   const { task_id, status } = requestBody;
+  
+  // Set task_id for all subsequent logs
+  if (task_id) {
+    logger.setDefaultTaskId(task_id);
+  }
+  
   if (!task_id || !status) {
+    logger.error("Missing required fields", { has_task_id: !!task_id, has_status: !!status });
+    await logger.flush();
     return new Response("Missing required fields: task_id and status", { status: 400 });
   }
 
   // Validate status values
   const validStatuses = ["Queued", "In Progress", "Complete", "Failed"];
   if (!validStatuses.includes(status)) {
+    logger.error("Invalid status value", { status, valid_statuses: validStatuses });
+    await logger.flush();
     return new Response(`Invalid status. Must be one of: ${validStatuses.join(", ")}`, { status: 400 });
   }
 
-  // Create admin client for database operations
-  const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+  logger.info("Processing status update", { task_id, status });
 
   let callerId: string | null = null;
   let isServiceRole = false;
@@ -206,7 +246,7 @@ serve(async (req) => {
   // 1) Check if token matches service-role key directly
   if (token === serviceKey) {
     isServiceRole = true;
-    console.log("Direct service-role key match");
+    logger.debug("Authenticated via service-role key");
   }
 
   // 2) If not service key, try to decode as JWT and check role
@@ -214,31 +254,24 @@ serve(async (req) => {
     try {
       const parts = token.split(".");
       if (parts.length === 3) {
-        // It's a JWT - decode and check role
         const payloadB64 = parts[1];
         const padded = payloadB64 + "=".repeat((4 - (payloadB64.length % 4)) % 4);
         const payload = JSON.parse(atob(padded));
 
-        // Check for service role in various claim locations
         const role = payload.role || payload.app_metadata?.role;
         if (["service_role", "supabase_admin"].includes(role)) {
           isServiceRole = true;
-          console.log("JWT has service-role/admin role");
+          logger.debug("Authenticated via JWT service-role");
         }
-        // Don't extract user ID from JWT - always look it up in user_api_token table
       }
     } catch (e) {
       // Not a valid JWT - will be treated as PAT
-      console.log("Token is not a valid JWT, treating as PAT");
     }
   }
 
-  // 3) USER TOKEN PATH - ALWAYS resolve callerId via user_api_token table
+  // 3) USER TOKEN PATH - resolve callerId via user_api_token table
   if (!isServiceRole) {
-    console.log("Looking up token in user_api_token table...");
-    
     try {
-      // Query user_api_tokens table to find user
       const { data, error } = await supabaseAdmin
         .from("user_api_tokens")
         .select("user_id")
@@ -246,21 +279,22 @@ serve(async (req) => {
         .single();
 
       if (error || !data) {
-        console.error("Token lookup failed:", error);
+        logger.error("Token lookup failed", { error: error?.message });
+        await logger.flush();
         return new Response("Invalid or expired token", { status: 403 });
       }
 
       callerId = data.user_id;
-      console.log(`Token resolved to user ID: ${callerId}`);
-    } catch (e) {
-      console.error("Error querying user_api_token:", e);
+      logger.debug("Authenticated via PAT", { user_id: callerId });
+    } catch (e: any) {
+      logger.error("Error querying user_api_token", { error: e?.message });
+      await logger.flush();
       return new Response("Token validation failed", { status: 403 });
     }
   }
 
   try {
     // SAFETY CHECK: Prevent overwriting Complete tasks with Failed status
-    // First check the current status of the task
     const { data: currentTask, error: currentTaskError } = await supabaseAdmin
       .from("tasks")
       .select("status")
@@ -268,13 +302,18 @@ serve(async (req) => {
       .single();
 
     if (currentTaskError) {
-      console.error("Error checking current task status:", currentTaskError);
+      logger.error("Error checking current task status", { error: currentTaskError.message });
+      await logger.flush();
       return new Response(`Failed to check current task status: ${currentTaskError.message}`, { status: 500 });
     }
 
     // Don't overwrite Complete tasks with Failed status
     if (currentTask?.status === "Complete" && status === "Failed") {
-      console.log(`Refusing to mark completed task ${task_id} as Failed`);
+      logger.warn("Refusing to mark completed task as Failed", { 
+        task_id, 
+        current_status: currentTask.status 
+      });
+      await logger.flush();
       return new Response(JSON.stringify({
         success: false,
         task_id: task_id,
@@ -293,7 +332,6 @@ serve(async (req) => {
       updated_at: new Date().toISOString()
     };
 
-    // Add optional fields based on status
     if (status === "In Progress") {
       updatePayload.generation_started_at = new Date().toISOString();
     }
@@ -308,19 +346,8 @@ serve(async (req) => {
 
     let updateResult;
 
-    console.log(`[UPDATE-TASK-DEBUG] About to update task:`, {
-      task_id,
-      status,
-      isServiceRole,
-      callerId,
-      updatePayload,
-      timestamp: Date.now()
-    });
-
     if (isServiceRole) {
       // Service role: can update any task
-      console.log(`Service role: Updating task ${task_id} to status '${status}'`);
-      
       updateResult = await supabaseAdmin
         .from("tasks")
         .update(updatePayload)
@@ -330,23 +357,19 @@ serve(async (req) => {
 
     } else {
       // User token: can only update tasks in their projects
-      console.log(`User ${callerId}: Updating task ${task_id} to status '${status}'`);
-      
-      // First get user's project IDs
       const { data: userProjects } = await supabaseAdmin
         .from("projects")
         .select("id")
         .eq("user_id", callerId);
 
       if (!userProjects || userProjects.length === 0) {
+        logger.error("User has no projects", { user_id: callerId });
+        await logger.flush();
         return new Response("User has no projects", { status: 403 });
       }
 
-      const projectIds = userProjects.map(p => p.id);
+      const projectIds = userProjects.map((p: any) => p.id);
       
-      console.log(`[UPDATE-TASK-DEBUG] User ${callerId} has projects:`, projectIds);
-      
-      // Update task only if it belongs to user's projects
       updateResult = await supabaseAdmin
         .from("tasks")
         .update(updatePayload)
@@ -356,45 +379,39 @@ serve(async (req) => {
         .single();
     }
 
-    console.log(`[UPDATE-TASK-DEBUG] Update result:`, {
-      hasData: !!updateResult.data,
-      hasError: !!updateResult.error,
-      errorCode: updateResult.error?.code,
-      errorMessage: updateResult.error?.message,
-      timestamp: Date.now()
-    });
-
     if (updateResult.error) {
       if (updateResult.error.code === "PGRST116") {
-        console.log(`Task ${task_id} not found or not accessible`);
+        logger.warn("Task not found or not accessible", { task_id });
+        await logger.flush();
         return new Response("Task not found or not accessible", { status: 404 });
       }
-      console.error("Update error details:", {
-        error: updateResult.error,
-        code: updateResult.error.code,
-        message: updateResult.error.message,
-        details: updateResult.error.details,
-        hint: updateResult.error.hint,
-        task_id: task_id,
-        status: status,
-        isServiceRole: isServiceRole,
-        callerId: callerId
+      logger.error("Database update error", { 
+        task_id,
+        error: updateResult.error.message,
+        code: updateResult.error.code
       });
+      await logger.flush();
       return new Response(`Database error: ${updateResult.error.message}`, { status: 500 });
     }
 
     if (!updateResult.data) {
-      console.log(`Task ${task_id} not found or not accessible`);
+      logger.warn("Task not found or not accessible (no data)", { task_id });
+      await logger.flush();
       return new Response("Task not found or not accessible", { status: 404 });
     }
 
-    console.log(`Successfully updated task ${task_id} to status '${status}'`);
+    logger.info("Task status updated successfully", { 
+      task_id, 
+      old_status: currentTask?.status,
+      new_status: status 
+    });
 
     // Handle cascading failures/cancellations for orchestrated tasks
     if (status === "Failed" || status === "Cancelled") {
-      await handleCascadingTaskFailure(supabaseAdmin, task_id, status, updateResult.data);
+      await handleCascadingTaskFailure(supabaseAdmin, logger, task_id, status, updateResult.data);
     }
     
+    await logger.flush();
     return new Response(JSON.stringify({
       success: true,
       task_id: task_id,
@@ -405,8 +422,9 @@ serve(async (req) => {
       headers: { "Content-Type": "application/json" }
     });
 
-  } catch (error) {
-    console.error("Unexpected error:", error);
-    return new Response(`Internal server error: ${error.message}`, { status: 500 });
+  } catch (error: any) {
+    logger.critical("Unexpected error", { task_id, error: error?.message });
+    await logger.flush();
+    return new Response(`Internal server error: ${error?.message}`, { status: 500 });
   }
-}); 
+});

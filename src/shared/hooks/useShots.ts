@@ -204,7 +204,7 @@ export const useDeleteShot = () => {
       return { shotId, projectId };
     },
     onSuccess: ({ projectId }) => {
-      toast.success('Shot deleted successfully');
+      // Note: Success toast removed per project convention (only show error toasts)
       // Invalidate queries to refresh list
       queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
       // Also invalidate shot-specific queries

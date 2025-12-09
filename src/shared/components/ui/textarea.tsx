@@ -4,6 +4,7 @@ import { cn } from "@/shared/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 import { VoiceInputButton } from "./voice-input-button"
 import { TextPromptButton } from "./text-prompt-button"
+import { useIsMobile } from "@/shared/hooks/use-mobile"
 
 export interface TextareaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -39,14 +40,15 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     const [isHovered, setIsHovered] = React.useState(false)
     const [isVoiceActive, setIsVoiceActive] = React.useState(false)
     const [isTextPromptActive, setIsTextPromptActive] = React.useState(false)
+    const isMobile = useIsMobile()
     
     const hasValue = (props.value?.toString() || props.defaultValue?.toString() || "").length > 0
     const showClear = clearable && onClear && hasValue
     const showVoice = voiceInput && onVoiceResult
     const hasActions = showClear || showVoice
     
-    // Show buttons when hovered OR when either input mode is active
-    const showButtons = (isHovered || isVoiceActive || isTextPromptActive) && !props.disabled && (showClear || showVoice)
+    // Show buttons when hovered, input mode is active, OR always on mobile
+    const showButtons = (isMobile || isHovered || isVoiceActive || isTextPromptActive) && !props.disabled && (showClear || showVoice)
     
     const handleClear = (e: React.MouseEvent) => {
       e.preventDefault()

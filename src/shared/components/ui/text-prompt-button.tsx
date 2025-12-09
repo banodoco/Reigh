@@ -4,6 +4,7 @@ import { cn } from "@/shared/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "./popover"
 import { supabase } from "@/integrations/supabase/client"
+import { useIsMobile } from "@/shared/hooks/use-mobile"
 
 type ProcessingState = "idle" | "open" | "processing" | "success"
 
@@ -18,6 +19,9 @@ interface TextPromptButtonProps {
   className?: string
 }
 
+// Generate unique ID for each instance
+let instanceCounter = 0
+
 export const TextPromptButton = React.forwardRef<
   HTMLButtonElement,
   TextPromptButtonProps
@@ -26,6 +30,8 @@ export const TextPromptButton = React.forwardRef<
   const [inputValue, setInputValue] = React.useState("")
   const [isOpen, setIsOpen] = React.useState(false)
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
+  const isMobile = useIsMobile()
+  const instanceId = React.useRef(`text-prompt-${++instanceCounter}`).current
 
   const isActive = state === "open" || state === "processing" || state === "success"
   
@@ -33,6 +39,18 @@ export const TextPromptButton = React.forwardRef<
   React.useEffect(() => {
     onActiveStateChange?.(isActive)
   }, [isActive, onActiveStateChange])
+
+  // Listen for other popovers opening and close this one
+  React.useEffect(() => {
+    const handleOtherPopoverOpen = (e: CustomEvent) => {
+      if (e.detail !== instanceId && isOpen && state !== "processing") {
+        setIsOpen(false)
+        setState("idle")
+      }
+    }
+    window.addEventListener('text-prompt-popover-open' as any, handleOtherPopoverOpen)
+    return () => window.removeEventListener('text-prompt-popover-open' as any, handleOtherPopoverOpen)
+  }, [instanceId, isOpen, state])
 
   // Focus input when popover opens
   React.useEffect(() => {
@@ -47,6 +65,8 @@ export const TextPromptButton = React.forwardRef<
     if (open) {
       setState("open")
       setInputValue("")
+      // Notify other popovers to close
+      window.dispatchEvent(new CustomEvent('text-prompt-popover-open', { detail: instanceId }))
     } else {
       setState("idle")
     }
@@ -126,6 +146,16 @@ export const TextPromptButton = React.forwardRef<
 
   const hasExistingContent = existingValue.trim().length > 0
 
+  // Handle touch to open popover immediately on mobile
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (disabled || state === "processing") return
+    e.preventDefault()
+    e.stopPropagation()
+    if (!isOpen) {
+      handleOpenChange(true)
+    }
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <Tooltip>
@@ -134,6 +164,7 @@ export const TextPromptButton = React.forwardRef<
             <button
               ref={ref}
               type="button"
+              onTouchEnd={handleTouchEnd}
               disabled={disabled || state === "processing"}
               className={cn(
                 "relative h-6 w-6 rounded-md flex items-center justify-center transition-colors z-10",
@@ -163,6 +194,8 @@ export const TextPromptButton = React.forwardRef<
         sideOffset={8}
         className="w-72 p-2"
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onPointerDownOutside={() => state !== "processing" && setIsOpen(false)}
+        onInteractOutside={() => state !== "processing" && setIsOpen(false)}
       >
         <div className="flex flex-col gap-1.5">
           <div className="text-xs text-muted-foreground">
@@ -177,7 +210,7 @@ export const TextPromptButton = React.forwardRef<
               placeholder="Your prompt creation/edit instructions..."
               disabled={state === "processing"}
               className={cn(
-                "w-full min-h-[60px] max-h-[120px] rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm",
+                "w-full min-h-[60px] max-h-[120px] rounded-md border border-input bg-background px-3 py-2 pr-8 text-base lg:text-sm",
                 "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 "resize-none",
                 state === "processing" && "opacity-50"
@@ -202,9 +235,11 @@ export const TextPromptButton = React.forwardRef<
               )}
             </button>
           </div>
-          <div className="text-[10px] text-muted-foreground/70">
-            Press Enter to submit, Shift+Enter for new line
-          </div>
+          {!isMobile && (
+            <div className="text-[10px] text-muted-foreground/70">
+              Press Enter to submit, Shift+Enter for new line
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>

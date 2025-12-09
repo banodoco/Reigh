@@ -1,9 +1,13 @@
-/* eslint-disable */ // @ts-nocheck
 // deno-lint-ignore-file
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { SystemLogger } from "../_shared/systemLogger.ts";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Deno: any;
+
 // Helper for standard JSON responses with CORS headers
-function jsonResponse(body, status = 200) {
+function jsonResponse(body: any, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -14,24 +18,29 @@ function jsonResponse(body, status = 200) {
     }
   });
 }
+
 // Calculate cost based on billing type and task configuration
-function calculateTaskCost(billingType, baseCostPerSecond, unitCost, durationSeconds, costFactors, taskParams) {
+function calculateTaskCost(
+  billingType: string,
+  baseCostPerSecond: number,
+  unitCost: number,
+  durationSeconds: number,
+  costFactors: any,
+  taskParams: any
+): number {
   let totalCost;
   if (billingType === 'per_unit') {
-    // For per_unit billing, use the fixed unit_cost
     totalCost = unitCost || 0;
   } else {
-    // For per_second billing, multiply time by base_cost_per_second
     totalCost = baseCostPerSecond * durationSeconds;
   }
+
   // Apply cost factors regardless of billing type
   if (costFactors) {
-    // Resolution-based cost multiplier
     if (costFactors.resolution && taskParams.resolution) {
       const resolutionMultiplier = costFactors.resolution[taskParams.resolution] || 1;
       totalCost *= resolutionMultiplier;
     }
-    // Frame count-based additional cost
     if (costFactors.frameCount && taskParams.frame_count) {
       if (billingType === 'per_unit') {
         totalCost += costFactors.frameCount * taskParams.frame_count;
@@ -39,46 +48,62 @@ function calculateTaskCost(billingType, baseCostPerSecond, unitCost, durationSec
         totalCost += costFactors.frameCount * taskParams.frame_count * durationSeconds;
       }
     }
-    // Model type-based cost multiplier
     if (costFactors.modelType && taskParams.model_type) {
       const modelMultiplier = costFactors.modelType[taskParams.model_type] || 1;
       totalCost *= modelMultiplier;
     }
   }
-  // Round to 3 decimal places (fractional cents)
+
   return Math.round(totalCost * 1000) / 1000;
 }
-serve(async (req)=>{
+
+serve(async (req) => {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !serviceKey) {
+    console.error("[CALCULATE-TASK-COST] Missing required environment variables");
+    return jsonResponse({ error: 'Server configuration error' }, 500);
+  }
+
+  const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+
+  // Create logger (task_id will be set after parsing body)
+  const logger = new SystemLogger(supabaseAdmin, 'calculate-task-cost');
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return jsonResponse({
-      ok: true
-    });
+    return jsonResponse({ ok: true });
   }
+
   if (req.method !== 'POST') {
-    return jsonResponse({
-      error: 'Method not allowed'
-    }, 405);
+    logger.warn("Method not allowed", { method: req.method });
+    await logger.flush();
+    return jsonResponse({ error: 'Method not allowed' }, 405);
   }
+
   try {
-    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
     const { task_id } = await req.json();
-    console.log(`[CALC-COST-DEBUG] Request received for task_id: ${task_id}`);
-    
+
     if (!task_id) {
-      console.error('[CALC-COST-DEBUG] Missing task_id in request');
-      return jsonResponse({
-        error: 'task_id is required'
-      }, 400);
+      logger.error("Missing task_id in request");
+      await logger.flush();
+      return jsonResponse({ error: 'task_id is required' }, 400);
     }
+
+    // Set task_id for all subsequent logs
+    logger.setDefaultTaskId(task_id);
+    logger.info("Calculating task cost", { task_id });
+
     // Get task details
-    console.log(`[CALC-COST-DEBUG] Fetching task details from database...`);
-    const { data: task, error: taskError } = await supabaseAdmin.from('tasks').select(`
+    const { data: task, error: taskError } = await supabaseAdmin
+      .from('tasks')
+      .select(`
         id,
         task_type,
         params,
@@ -87,26 +112,40 @@ serve(async (req)=>{
         generation_processed_at,
         project_id,
         projects(user_id)
-      `).eq('id', task_id).single();
-    
+      `)
+      .eq('id', task_id)
+      .single();
+
     if (taskError || !task) {
-      console.error('[CALC-COST-DEBUG] Error fetching task:', taskError);
-      return jsonResponse({
-        error: 'Task not found'
-      }, 404);
+      logger.error("Task not found", { error: taskError?.message });
+      await logger.flush();
+      return jsonResponse({ error: 'Task not found' }, 404);
     }
-    
-    console.log(`[CALC-COST-DEBUG] Task found: type=${task.task_type}, status=${task.status}, started=${task.generation_started_at}, processed=${task.generation_processed_at}`);
+
+    logger.debug("Task found", { 
+      task_type: task.task_type, 
+      status: task.status,
+      has_timestamps: !!(task.generation_started_at && task.generation_processed_at)
+    });
+
     // Check if task has both start and end times
     if (!task.generation_started_at || !task.generation_processed_at) {
-      console.error('[CALC-COST-DEBUG] Missing timestamps - started:', task.generation_started_at, 'processed:', task.generation_processed_at);
+      logger.error("Missing timestamps", { 
+        has_started_at: !!task.generation_started_at, 
+        has_processed_at: !!task.generation_processed_at 
+      });
+      await logger.flush();
       return jsonResponse({
         error: 'Task must have both generation_started_at and generation_processed_at timestamps'
       }, 400);
     }
+
     // Check if task has orchestrator_task_id_ref - skip billing if present (sub-task of parent)
     if (task.params?.orchestrator_task_id_ref) {
-      console.log(`[CALC-COST-DEBUG] Task ${task_id} has orchestrator_task_id_ref ${task.params.orchestrator_task_id_ref}, skipping credit ledger entry (sub-task)`);
+      logger.info("Skipping cost calculation (sub-task)", { 
+        orchestrator_task_id: task.params.orchestrator_task_id_ref 
+      });
+      await logger.flush();
       return jsonResponse({
         success: true,
         skipped: true,
@@ -131,8 +170,8 @@ serve(async (req)=>{
     let durationSeconds;
     if (subTasks && subTasks.length > 0) {
       // This is an orchestrator task with sub-tasks - sum their durations
-      console.log(`Task ${task_id} is orchestrator with ${subTasks.length} sub-tasks, calculating cost from sub-task durations`);
-      
+      logger.info("Orchestrator task detected", { sub_task_count: subTasks.length });
+
       let totalSubTaskDuration = 0;
       for (const subTask of subTasks) {
         if (subTask.generation_started_at && subTask.generation_processed_at) {
@@ -140,33 +179,38 @@ serve(async (req)=>{
           const subEndTime = new Date(subTask.generation_processed_at);
           const subDuration = Math.max(1, Math.ceil((subEndTime.getTime() - subStartTime.getTime()) / 1000));
           totalSubTaskDuration += subDuration;
-          console.log(`Sub-task ${subTask.id}: ${subDuration}s`);
         }
       }
-      
+
       durationSeconds = totalSubTaskDuration;
-      console.log(`Total orchestrator duration from ${subTasks.length} sub-tasks: ${durationSeconds}s`);
+      logger.debug("Orchestrator duration calculated", { 
+        sub_task_count: subTasks.length, 
+        total_duration_seconds: durationSeconds 
+      });
     } else {
       // Regular task - use its own duration
       const startTime = new Date(task.generation_started_at);
       const endTime = new Date(task.generation_processed_at);
       durationSeconds = Math.max(1, Math.ceil((endTime.getTime() - startTime.getTime()) / 1000));
     }
+
     // Get task type configuration
-    console.log(`[CALC-COST-DEBUG] Fetching task type configuration for: ${task.task_type}`);
-    const { data: taskType, error: taskTypeError } = await supabaseAdmin.from('task_types').select('*').eq('name', task.task_type).eq('is_active', true).single();
+    const { data: taskType, error: taskTypeError } = await supabaseAdmin
+      .from('task_types')
+      .select('*')
+      .eq('name', task.task_type)
+      .eq('is_active', true)
+      .single();
+
     if (taskTypeError || !taskType) {
-      console.error('[CALC-COST-DEBUG] Error fetching task type config:', taskTypeError);
-      console.log('[CALC-COST-DEBUG] Using default cost configuration');
+      logger.warn("No task type config found, using defaults", { task_type: task.task_type });
+
       // Use default cost if no config found
-      const defaultCostPerSecond = 0.01; // 1 cent per second (in dollars)
-      const startTime = new Date(task.generation_started_at);
-      const endTime = new Date(task.generation_processed_at);
-      const durationSeconds = Math.max(1, Math.ceil((endTime.getTime() - startTime.getTime()) / 1000));
+      const defaultCostPerSecond = 0.01;
       const cost = defaultCostPerSecond * durationSeconds;
-      // Insert cost into credit ledger
+
       const { error: ledgerError } = await supabaseAdmin.from('credits_ledger').insert({
-        user_id: task.projects.user_id,
+        user_id: (task as any).projects.user_id,
         task_id: task.id,
         amount: -cost,
         type: 'spend',
@@ -179,12 +223,20 @@ serve(async (req)=>{
           note: 'Default cost used - no task type configuration found'
         }
       });
+
       if (ledgerError) {
-        console.error('Error inserting into credit ledger:', ledgerError);
-        return jsonResponse({
-          error: 'Failed to record cost in ledger'
-        }, 500);
+        logger.error("Failed to insert into credit ledger (default)", { error: ledgerError.message });
+        await logger.flush();
+        return jsonResponse({ error: 'Failed to record cost in ledger' }, 500);
       }
+
+      logger.info("Cost calculated (default rates)", { 
+        cost,
+        duration_seconds: durationSeconds,
+        billing_type: 'per_second'
+      });
+      await logger.flush();
+
       return jsonResponse({
         success: true,
         cost: cost,
@@ -194,39 +246,49 @@ serve(async (req)=>{
         note: 'Default cost used - no task type configuration found'
       });
     }
+
     // Calculate cost based on task type configuration
-    console.log(`[CALC-COST-DEBUG] Calculating cost with: billing_type=${taskType.billing_type}, base_cost=${taskType.base_cost_per_second}, unit_cost=${taskType.unit_cost}, duration=${durationSeconds}s`);
-    const cost = calculateTaskCost(taskType.billing_type, taskType.base_cost_per_second, taskType.unit_cost, durationSeconds, taskType.cost_factors, task.params);
-    console.log(`[CALC-COST-DEBUG] Calculated cost: $${cost}`);
-    
+    const cost = calculateTaskCost(
+      taskType.billing_type,
+      taskType.base_cost_per_second,
+      taskType.unit_cost,
+      durationSeconds,
+      taskType.cost_factors,
+      task.params
+    );
+
     // Validate cost calculation
     if (isNaN(cost) || cost < 0) {
-      console.error('[CALC-COST-DEBUG] Invalid cost calculated:', {
+      logger.error("Invalid cost calculated", {
         cost,
         billing_type: taskType.billing_type,
         base_cost_per_second: taskType.base_cost_per_second,
         unit_cost: taskType.unit_cost,
         duration: durationSeconds
       });
-      return jsonResponse({
-        error: 'Invalid cost calculation'
-      }, 500);
+      await logger.flush();
+      return jsonResponse({ error: 'Invalid cost calculation' }, 500);
     }
+
     // Ensure user exists before inserting credit ledger entry
-    const { data: user, error: userError } = await supabaseAdmin.from('users').select('id').eq('id', task.projects.user_id).single();
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('id', (task as any).projects.user_id)
+      .single();
+
     if (userError || !user) {
-      console.error('User not found for credit ledger:', {
-        user_id: task.projects.user_id,
-        error: userError
+      logger.error("User not found for credit ledger", { 
+        user_id: (task as any).projects.user_id, 
+        error: userError?.message 
       });
-      return jsonResponse({
-        error: 'User not found for credit calculation'
-      }, 400);
+      await logger.flush();
+      return jsonResponse({ error: 'User not found for credit calculation' }, 400);
     }
+
     // Insert cost into credit ledger
-    console.log(`[CALC-COST-DEBUG] Inserting into credit ledger: user_id=${task.projects.user_id}, amount=-${cost}`);
     const { error: ledgerError } = await supabaseAdmin.from('credits_ledger').insert({
-      user_id: task.projects.user_id,
+      user_id: (task as any).projects.user_id,
       task_id: task.id,
       amount: -cost,
       type: 'spend',
@@ -242,25 +304,25 @@ serve(async (req)=>{
         task_type_id: taskType.id
       }
     });
+
     if (ledgerError) {
-      console.error('[CALC-COST-DEBUG] Error inserting into credit ledger:', {
-        error: ledgerError,
-        user_id: task.projects.user_id,
-        task_id: task.id,
-        amount: -cost,
-        cost_details: {
-          cost,
-          billing_type: taskType.billing_type,
-          base_cost_per_second: taskType.base_cost_per_second,
-          unit_cost: taskType.unit_cost,
-          duration: durationSeconds
-        }
+      logger.error("Failed to insert into credit ledger", { 
+        error: ledgerError.message,
+        user_id: (task as any).projects.user_id,
+        cost
       });
-      return jsonResponse({
-        error: `Failed to record cost in ledger: ${ledgerError.message}`
-      }, 500);
+      await logger.flush();
+      return jsonResponse({ error: `Failed to record cost in ledger: ${ledgerError.message}` }, 500);
     }
-    console.log(`[CALC-COST-DEBUG] Successfully recorded cost: $${cost} for task ${task.id}`);
+
+    logger.info("Cost calculated and recorded", {
+      cost,
+      billing_type: taskType.billing_type,
+      duration_seconds: durationSeconds,
+      user_id: (task as any).projects.user_id
+    });
+    await logger.flush();
+
     return jsonResponse({
       success: true,
       cost: cost,
@@ -272,11 +334,10 @@ serve(async (req)=>{
       task_type: task.task_type,
       task_id: task.id
     });
-  } catch (error) {
-    console.error('[CALC-COST-DEBUG] Unhandled error in calculate-task-cost function:', error);
-    console.error('[CALC-COST-DEBUG] Error stack:', error.stack);
-    return jsonResponse({
-      error: error.message || 'Unknown error occurred'
-    }, 500);
+
+  } catch (error: any) {
+    logger.critical("Unexpected error", { error: error?.message, stack: error?.stack?.substring(0, 500) });
+    await logger.flush();
+    return jsonResponse({ error: error?.message || 'Unknown error occurred' }, 500);
   }
 });

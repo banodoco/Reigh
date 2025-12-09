@@ -345,7 +345,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
             onTouchStart={handleTouchStart}
             onPointerDown={handlePointerDown}
             onClick={handleClick}
-            className={`mt-1 resize-none border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`mt-1 resize-none border border-input bg-background px-3 py-2 text-base lg:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
               isActiveForFullView || forceExpanded
                 ? `overflow-y-auto ${isMobile ? 'min-h-[96px]' : 'min-h-[72px]'}`
                 : `overflow-hidden ${isMobile ? 'h-[56px]' : 'h-[32px]'} cursor-pointer`

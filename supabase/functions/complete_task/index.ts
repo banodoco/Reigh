@@ -7,6 +7,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 // @ts-ignore
 import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
 import { authenticateRequest, verifyTaskOwnership, getTaskUserId } from "../_shared/auth.ts";
+import { SystemLogger } from "../_shared/systemLogger.ts";
 // Provide a loose Deno type for local tooling; real type comes at runtime in Edge Functions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const Deno: any;
@@ -353,6 +354,14 @@ serve(async (req) => {
     return new Response("Server configuration error", { status: 500 });
   }
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+  
+  // Create logger with task_id
+  const logger = new SystemLogger(supabaseAdmin, 'complete-task', taskIdString);
+  logger.info("Processing task", { 
+    task_id: taskIdString, 
+    mode: parsedRequest.mode,
+    filename: parsedRequest.filename
+  });
 
   // 3) Security check: Validate storage path for orchestrator references (MODE 3 with mismatched task_id)
   if (parsedRequest.requiresOrchestratorCheck && parsedRequest.storagePath) {
@@ -363,6 +372,8 @@ serve(async (req) => {
       parsedRequest.storagePathTaskId
     );
     if (!securityResult.allowed) {
+      logger.error("Storage path security check failed", { error: securityResult.error });
+      await logger.flush();
       return new Response(securityResult.error || "Access denied", { status: 403 });
     }
   }
@@ -371,6 +382,8 @@ serve(async (req) => {
   const auth = await authenticateRequest(req, supabaseAdmin, "[COMPLETE-TASK-DEBUG]");
 
   if (!auth.success) {
+    logger.error("Authentication failed", { error: auth.error });
+    await logger.flush();
     return new Response(auth.error || "Authentication failed", {
       status: auth.statusCode || 403
     });
@@ -1245,18 +1258,30 @@ serve(async (req) => {
       thumbnail_url: thumbnailUrl,
       message: "Task completed and file uploaded successfully"
     };
+    logger.info("Task completed successfully", { 
+      task_id: taskIdString,
+      output_location: publicUrl,
+      has_thumbnail: !!thumbnailUrl
+    });
     console.log(`[COMPLETE-TASK-DEBUG] Returning success response: ${JSON.stringify(responseData)}`);
+    await logger.flush();
     return new Response(JSON.stringify(responseData), {
       status: 200,
       headers: {
         "Content-Type": "application/json"
       }
     });
-  } catch (error) {
+  } catch (error: any) {
+    logger.critical("Unexpected error", { 
+      task_id: taskIdString, 
+      error: error?.message,
+      stack: error?.stack?.substring(0, 500)
+    });
     console.error("[COMPLETE-TASK-DEBUG] Edge function error:", error);
     console.error("[COMPLETE-TASK-DEBUG] Error stack:", error.stack);
     console.error("[COMPLETE-TASK-DEBUG] Error details:", JSON.stringify(error, null, 2));
-    return new Response(`Internal error: ${error.message}`, {
+    await logger.flush();
+    return new Response(`Internal error: ${error?.message}`, {
       status: 500
     });
   }

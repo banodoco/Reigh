@@ -910,7 +910,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                       onFocus={() => console.log(`[EDIT_DEBUG:FOCUS] Input focused, value: "${editInstructionsRef.current?.value}"`)}
                       onBlur={() => console.log(`[EDIT_DEBUG:BLUR] Input blurred, value: "${editInstructionsRef.current?.value}"`)}
                       placeholder={promptToEdit.originalText.trim() === '' ? 'Describe what you want' : 'Edit instructions'}
-                      className={`h-7 ${isMobile ? 'flex-1 min-w-0' : 'w-72'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
+                      className={`${isMobile ? 'h-10 flex-1 min-w-0' : 'h-7 w-72'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
                       disabled={isAIEditing}
                       clearable
                       onClear={() => setEditInstructionsValue('', 'clear-button')}
@@ -928,27 +928,27 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                     />
                     <Button
                       size="icon"
-                      className="h-7 w-7 p-0"
+                      className={`${isMobile ? 'h-10 w-10' : 'h-7 w-7'} p-0`}
                       onClick={handleConfirmEditWithAI}
                       disabled={!editInstructionsHasText || isAIEditing}
                       aria-label={promptToEdit.originalText.trim() === '' ? 'Create prompt' : 'Edit prompt'}
                     >
                       {isAIEditing ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Loader2 className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'} animate-spin`} />
                       ) : (
-                        <Edit className="h-3 w-3" />
+                        <Edit className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
                       )}
                     </Button>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 p-0"
+                      className={`${isMobile ? 'h-10 w-10' : 'h-7 w-7'} p-0`}
                       onClick={() => { setPromptToEdit(null); clearEditInstructions('user-cancel'); }}
                       disabled={isAIEditing}
                       aria-label="Cancel edit"
                     >
-                      <X className="h-3 w-3" />
+                      <X className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
                     </Button>
                   </div>
                 ) : undefined;

@@ -36,10 +36,19 @@ export const VoiceInputButton = React.forwardRef<
   
   const hasExistingContent = existingValue.trim().length > 0
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault()
     e.stopPropagation()
     if (!disabled) {
+      toggleRecording()
+    }
+  }
+
+  // Handle touch start to respond immediately on mobile (before focus changes)
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!disabled && state !== "processing") {
       toggleRecording()
     }
   }
@@ -85,6 +94,7 @@ export const VoiceInputButton = React.forwardRef<
           ref={ref}
           type="button"
           onClick={handleClick}
+          onTouchEnd={handleTouchEnd}
           disabled={disabled || state === "processing"}
           className={cn(
             "relative h-6 w-6 rounded-md flex items-center justify-center transition-colors z-10",

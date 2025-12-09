@@ -3,11 +3,13 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 export type Platform = 'mac' | 'windows' | 'linux' | 'ios' | 'android' | 'unknown';
 export type Browser = 'chrome' | 'safari' | 'edge' | 'firefox' | 'samsung' | 'unknown';
 export type InstallMethod = 'prompt' | 'safari-dock' | 'safari-home-screen' | 'none';
+export type DeviceType = 'phone' | 'tablet' | 'desktop';
 
 export interface PlatformInstallState {
   // Platform & Browser
   platform: Platform;
   browser: Browser;
+  deviceType: DeviceType; // phone, tablet, or desktop
   
   // PWA state
   isStandalone: boolean;  // Running as installed PWA
@@ -112,6 +114,32 @@ export function usePlatformInstall(): PlatformInstallState {
     
     return 'unknown';
   }, []);
+  
+  // Detect device type (phone, tablet, desktop)
+  const deviceType = useMemo<DeviceType>(() => {
+    if (typeof navigator === 'undefined') return 'desktop';
+    
+    const ua = navigator.userAgent || '';
+    const navPlatform = (navigator as any).platform || '';
+    
+    // iPad detection (explicit iPad in UA, or iPadOS 13+ which reports as Mac with touch)
+    if (/iPad/i.test(ua)) return 'tablet';
+    if (navPlatform === 'MacIntel' && (navigator as any).maxTouchPoints > 1) return 'tablet';
+    
+    // Android tablet detection (Android without "Mobile" usually means tablet)
+    if (/Android/i.test(ua) && !/Mobile/i.test(ua)) return 'tablet';
+    
+    // iPhone/iPod are phones
+    if (/iPhone|iPod/i.test(ua)) return 'phone';
+    
+    // Android with "Mobile" is a phone
+    if (/Android/i.test(ua) && /Mobile/i.test(ua)) return 'phone';
+    
+    // Desktop platforms
+    if (platform === 'mac' || platform === 'windows' || platform === 'linux') return 'desktop';
+    
+    return 'desktop';
+  }, [platform]);
   
   // Detect if Safari supports PWA install (Safari 17+ / macOS Sonoma+)
   const safariSupportsPWA = useMemo<boolean>(() => {
@@ -237,8 +265,11 @@ export function usePlatformInstall(): PlatformInstallState {
     // Safari on iOS supports "Add to Home Screen"
     if (platform === 'ios' && browser === 'safari') return 'safari-home-screen';
     
-    // Chrome/Edge on iOS can also install via share menu (iOS 16.4+)
-    if (platform === 'ios' && (browser === 'chrome' || browser === 'edge')) return 'safari-home-screen';
+    // Chrome on iOS (iPhone & iPad) can install via share menu (iOS 16.4+)
+    if (platform === 'ios' && browser === 'chrome') return 'safari-home-screen';
+    
+    // Edge on iOS can install via share menu
+    if (platform === 'ios' && browser === 'edge') return 'safari-home-screen';
     
     // Firefox desktop doesn't support PWA
     if (browser === 'firefox' && (platform === 'mac' || platform === 'windows' || platform === 'linux')) {
@@ -286,6 +317,40 @@ export function usePlatformInstall(): PlatformInstallState {
           'In Safari, go to File → Add to Dock'
         ];
       case 'safari-home-screen':
+        // iPad (tablet)
+        if (deviceType === 'tablet') {
+          if (browser === 'chrome') {
+            // Chrome iPad: Share icon at top-right (same as iPhone)
+            return [
+              'Tap Share icon at top-right, then "Add to Home Screen"'
+            ];
+          }
+          if (browser === 'edge') {
+            // Edge iPad: Three-dot menu, then Share
+            return [
+              'Tap ⋮ menu, then Share, then "Add to Home Screen"'
+            ];
+          }
+          // Safari iPad: Share button in top toolbar
+          return [
+            'Tap Share in the toolbar, then "Add to Home Screen"'
+          ];
+        }
+        
+        // iPhone - each browser has different UI
+        if (browser === 'chrome') {
+          // Chrome iPhone: Share icon at top-right
+          return [
+            'Tap Share icon at top-right, then "Add to Home Screen"'
+          ];
+        }
+        if (browser === 'edge') {
+          // Edge iPhone: Three-dot menu at bottom center
+          return [
+            'Tap ⋮ at bottom, then Share, then "Add to Home Screen"'
+          ];
+        }
+        // Safari iPhone: Share button at bottom
         return [
           'Tap Share, then "Add to Home Screen"'
         ];
@@ -368,6 +433,7 @@ export function usePlatformInstall(): PlatformInstallState {
   return {
     platform,
     browser,
+    deviceType,
     isStandalone,
     canInstall: !!deferredPrompt,
     isWaitingForPrompt,
