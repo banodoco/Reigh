@@ -335,10 +335,10 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         </div>
         
         {/* Thumbnail mosaic area - matches ShotGroup style */}
-        <div className="flex-grow min-h-[60px]">
-          {positionedImages.length > 0 ? (
-            <>
-              <div className="grid grid-cols-3 gap-2 relative">
+        <div className="flex-grow">
+          <div className="grid grid-cols-3 gap-2 relative">
+            {positionedImages.length > 0 ? (
+              <>
                 {/* Only show first row when collapsed, all images when expanded */}
                 {(isImagesExpanded ? positionedImages : positionedImages.slice(0, IMAGES_PER_ROW)).map((image, index) => (
                   <img
@@ -373,13 +373,14 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                     Hide <ChevronUp className="w-3 h-3" />
                   </button>
                 )}
+              </>
+            ) : (
+              /* Empty placeholder spans all 3 columns with same aspect ratio as one row of images */
+              <div className="col-span-3 aspect-[3/1] flex items-center justify-center text-sm text-muted-foreground border-2 border-dashed border-border rounded">
+                No images yet
               </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-20 text-sm text-muted-foreground border-2 border-dashed border-border rounded">
-              No images yet
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

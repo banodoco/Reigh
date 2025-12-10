@@ -249,7 +249,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
       )}
       
       {/* Thumbnail mosaic area */}
-      <div className="flex-grow min-h-[60px] relative">
+      <div className={`relative ${isExpanded ? '' : 'h-14'}`}>
         {allImages.length > 0 ? (
           <>
             <div
