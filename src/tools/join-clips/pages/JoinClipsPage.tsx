@@ -361,11 +361,11 @@ const JoinClipsPage: React.FC = () => {
   // Track whether settings have completed their initial load
   const settingsLoaded = joinSettings.status !== 'idle' && joinSettings.status !== 'loading';
   
-  // Initialize keepBridgingImages to true if undefined (new field for existing projects)
+  // Initialize keepBridgingImages to false if undefined (new field for existing projects)
   useEffect(() => {
     if (keepBridgingImages === undefined && settingsLoaded) {
-      console.log('[JoinClips] Initializing keepBridgingImages to true');
-      joinSettings.updateField('keepBridgingImages', true);
+      console.log('[JoinClips] Initializing keepBridgingImages to false');
+      joinSettings.updateField('keepBridgingImages', false);
     }
   }, [keepBridgingImages, settingsLoaded, joinSettings]);
   
@@ -957,7 +957,7 @@ const JoinClipsPage: React.FC = () => {
         context_frame_count: contextFrameCount,
         gap_frame_count: gapFrameCount,
         replace_mode: replaceMode,
-        keep_bridging_images: keepBridgingImages ?? true,
+        keep_bridging_images: keepBridgingImages ?? false,
         enhance_prompt: enhancePrompt,
         model: joinSettings.settings.model || 'wan_2_2_vace_lightning_baseline_2_2_2',
         num_inference_steps: joinSettings.settings.numInferenceSteps || 6,

@@ -472,9 +472,9 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   // Show loading skeleton while data is being fetched
   if (shotsLoading || shots === undefined) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
         {Array.from({ length: 6 }).map((_, idx) => (
-          <div key={idx} className="h-40 rounded-lg bg-muted animate-pulse" />
+          <div key={idx} className="h-32 rounded-lg bg-muted animate-pulse" />
         ))}
       </div>
     );
@@ -521,7 +521,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         items={sortableItems}
         strategy={rectSortingStrategy}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
           {/* New Shot Drop Zone - appears at start of grid */}
           {(onGenerationDropForNewShot || onFilesDropForNewShot) && (
             <div
@@ -531,7 +531,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
               onDrop={handleNewShotDrop}
               onClick={onCreateNewShot}
               className={cn(
-                'min-h-48 p-4 border-2 border-dashed rounded-lg bg-card/30 hover:bg-card/50 hover:border-primary/50 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-3',
+                'min-h-32 p-4 border-2 border-dashed rounded-lg bg-card/30 hover:bg-card/50 hover:border-primary/50 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-3',
                 isNewShotDropTarget && 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]'
               )}
             >

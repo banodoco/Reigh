@@ -161,7 +161,7 @@ function buildJoinClipsPhaseConfig(
 
   return {
     num_phases: 3,
-    steps_per_phase: [2, 2, 2],
+    steps_per_phase: [2, 2, 4],
     flow_shift: 5.0,
     sample_solver: "euler",
     model_switch_phase: 2,

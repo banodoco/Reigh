@@ -120,7 +120,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   const [joinContextFrames, setJoinContextFrames] = useState(8);
   const [joinGapFrames, setJoinGapFrames] = useState(12);
   const [joinReplaceMode, setJoinReplaceMode] = useState(true);
-  const [keepBridgingImages, setKeepBridgingImages] = useState(true);
+  const [keepBridgingImages, setKeepBridgingImages] = useState(false);
 
   // Initialize share slug from prop (batch fetched by parent)
   useEffect(() => {

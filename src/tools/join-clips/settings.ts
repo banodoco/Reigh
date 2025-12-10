@@ -6,7 +6,7 @@ export const joinClipsSettings = {
     contextFrameCount: 8,
     gapFrameCount: 12,
     replaceMode: true, // Replace frames (true) or generate new frames (false)
-    keepBridgingImages: true,
+    keepBridgingImages: false,
     model: 'wan_2_2_vace_lightning_baseline_2_2_2' as const,
     numInferenceSteps: 6,
     guidanceScale: 3.0,
