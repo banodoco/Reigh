@@ -239,8 +239,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const {
         prompt: joinPrompt = '',
         negativePrompt: joinNegativePrompt = '',
-        contextFrameCount: joinContextFrames = 8,
-        gapFrameCount: joinGapFrames = 12,
+        contextFrameCount: joinContextFrames = 15,
+        gapFrameCount: joinGapFrames = 23,
         replaceMode: joinReplaceMode = true,
         keepBridgingImages = false,
         useIndividualPrompts = false,
@@ -696,10 +696,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const handleRestoreDefaults = () => {
         // Reset to defaults using the settings hook (including loras)
         joinSettings.updateFields({
-            contextFrameCount: 8,
-            gapFrameCount: 12,
+            contextFrameCount: 15,
+            gapFrameCount: 23,
             replaceMode: true,
-            keepBridgingImages: true,
+            keepBridgingImages: false,
             prompt: '',
             negativePrompt: '',
             loras: [],

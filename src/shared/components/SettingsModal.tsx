@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, Globe, Lock, ChevronDown } from "lucide-react";
+import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -529,8 +530,23 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
             <div className="space-y-6">
               {/* Privacy Defaults */}
               {isLoadingPrivacyDefaults ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="space-y-4">
+                  {/* Resources Toggle skeleton */}
+                  <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
+                    <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                      <Skeleton className="h-5 w-20" />
+                      <Skeleton className="h-8 w-40 rounded-full" />
+                    </div>
+                    <Skeleton className="h-4 w-64" />
+                  </div>
+                  {/* Generations Toggle skeleton */}
+                  <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
+                    <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                      <Skeleton className="h-5 w-24" />
+                      <Skeleton className="h-8 w-40 rounded-full" />
+                    </div>
+                    <Skeleton className="h-4 w-72" />
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -627,10 +643,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
               
               {isLoadingGenerationMethods ? (
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-2 opacity-50">
-                    <div className="w-4 h-4 border-2 border-gray-300 rounded"></div>
-                    <span className="text-sm text-muted-foreground">Loading preferences...</span>
-                  </div>
+                  <Skeleton className="h-10 w-64 rounded-full" />
                 </div>
               ) : (
                 <div className="flex items-center justify-start">
@@ -682,9 +695,29 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
         <div className={`space-y-6 sm:space-y-8 ${isMobile ? 'pb-2' : 'pb-2'}`}>
           {/* Loading state for generation sections */}
           {isLoadingGenerationMethods && (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading your generation preferences...</p>
+            <div className="space-y-6">
+              {/* Credits section skeleton */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-6 w-32" />
+                  <Skeleton className="h-8 w-24 rounded-md" />
+                </div>
+                <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-5 w-28" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                  <Skeleton className="h-4 w-48" />
+                </div>
+              </div>
+              {/* Settings section skeleton */}
+              <div className="space-y-4">
+                <Skeleton className="h-6 w-40" />
+                <div className="space-y-3">
+                  <Skeleton className="h-10 w-full rounded-md" />
+                  <Skeleton className="h-10 w-full rounded-md" />
+                </div>
+              </div>
             </div>
           )}
 

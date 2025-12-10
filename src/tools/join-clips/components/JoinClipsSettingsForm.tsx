@@ -654,13 +654,13 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                 <Label className="text-sm font-medium">Transition Mode</Label>
                             </div>
                             <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
-                                <span className={cn("text-xs transition-colors whitespace-nowrap", !replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Insert</span>
+                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Insert</span>
                             <Switch
                                 id="join-replace-mode"
                                     checked={replaceMode}
                                     onCheckedChange={setReplaceMode}
                                 />
-                                <span className={cn("text-xs transition-colors whitespace-nowrap", replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Replace</span>
+                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Replace</span>
                             </div>
                         </div>
 
@@ -676,7 +676,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                             "flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50",
                                             gapFrames <= 8 && "opacity-50 cursor-not-allowed"
                                         )}>
-                                            <span className={cn("text-xs transition-colors whitespace-nowrap", !keepBridgingImagesValue ? "font-medium text-foreground" : "text-muted-foreground")}>Off</span>
+                                            <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !keepBridgingImagesValue ? "font-medium text-foreground" : "text-muted-foreground")}>Off</span>
                                             <Switch
                                                 id="join-keep-bridge"
                                                 checked={gapFrames <= 8 ? false : keepBridgingImagesValue}
@@ -686,7 +686,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                                     setKeepBridgingImages?.(val);
                                                 }}
                                             />
-                                            <span className={cn("text-xs transition-colors whitespace-nowrap", keepBridgingImagesValue && gapFrames > 8 ? "font-medium text-foreground" : "text-muted-foreground")}>On</span>
+                                            <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", keepBridgingImagesValue && gapFrames > 8 ? "font-medium text-foreground" : "text-muted-foreground")}>On</span>
                                         </div>
                                     </TooltipTrigger>
                                     {gapFrames <= 8 && (
@@ -713,7 +713,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
-                                                <span className={cn("text-xs transition-colors whitespace-nowrap", !useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Project Resolution</span>
+                                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
                                                 <Switch
                                                     id="join-resolution-source"
                                                     checked={useInputVideoResolution ?? false}
@@ -722,7 +722,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                                         setUseInputVideoResolution?.(val);
                                                     }}
                                                 />
-                                                        <span className={cn("text-xs transition-colors whitespace-nowrap", useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Input Video</span>
+                                                        <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
                                             </div>
                                         </TooltipTrigger>
                                         <TooltipContent>
@@ -745,7 +745,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
-                                                        <span className={cn("text-xs transition-colors whitespace-nowrap", !useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Project FPS</span>
+                                                        <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
                                                         <Switch
                                                             id="join-fps-source"
                                                             checked={useInputVideoFps ?? false}
@@ -754,7 +754,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                                                 setUseInputVideoFps?.(val);
                                                             }}
                                                         />
-                                                        <span className={cn("text-xs transition-colors whitespace-nowrap", useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Input Video</span>
+                                                        <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
                                                     </div>
                                                 </TooltipTrigger>
                                                 <TooltipContent>

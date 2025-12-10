@@ -3,8 +3,8 @@ export const joinClipsSettings = {
   id: 'join-clips',
   scope: ['project', 'shot'] as const,
   defaults: {
-    contextFrameCount: 8,
-    gapFrameCount: 12,
+    contextFrameCount: 15,
+    gapFrameCount: 23,
     replaceMode: true, // Replace frames (true) or generate new frames (false)
     keepBridgingImages: false,
     model: 'wan_2_2_vace_lightning_baseline_2_2_2' as const,
