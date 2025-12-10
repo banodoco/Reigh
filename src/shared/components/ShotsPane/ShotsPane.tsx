@@ -505,15 +505,14 @@ const ShotsPaneComponent: React.FC = () => {
               {sortOrder === 'oldest' ? 'Oldest first' : 'Newest first'}
             </Button>
           </div>
-          {/* Pinned drop zone below header */}
-          <div className="px-3 py-2 border-b border-zinc-800 flex-shrink-0">
-            <NewGroupDropZone 
-              onZoneClick={() => setIsCreateModalOpen(true)} 
-              onGenerationDrop={handleGenerationDropForNewShot}
-            />
-          </div>
-          <div className="flex flex-col gap-4 px-3 py-4 flex-grow overflow-y-auto scrollbar-hide" data-shots-pane-content>
-            {isSearchOpen && (
+          {/* Search box - sticky above drop zone with smooth animation */}
+          <div 
+            className={cn(
+              "overflow-hidden transition-all duration-200 ease-out flex-shrink-0",
+              isSearchOpen ? "max-h-14 opacity-100" : "max-h-0 opacity-0"
+            )}
+          >
+            <div className="px-3 py-2 border-b border-zinc-800">
               <div className="relative">
                 <Input
                   type="text"
@@ -521,7 +520,7 @@ const ShotsPaneComponent: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-zinc-800 border-zinc-600 text-zinc-200 placeholder-zinc-400 pr-8 !text-zinc-200 !placeholder-zinc-400"
-                  autoFocus
+                  autoFocus={isSearchOpen}
                 />
                 <Button
                   variant="ghost"
@@ -533,7 +532,16 @@ const ShotsPaneComponent: React.FC = () => {
                   <X className="h-3 w-3" />
                 </Button>
               </div>
-            )}
+            </div>
+          </div>
+          {/* Pinned drop zone below header */}
+          <div className="px-3 py-2 border-b border-zinc-800 flex-shrink-0">
+            <NewGroupDropZone 
+              onZoneClick={() => setIsCreateModalOpen(true)} 
+              onGenerationDrop={handleGenerationDropForNewShot}
+            />
+          </div>
+          <div className="flex flex-col gap-4 px-3 py-4 flex-grow overflow-y-auto scrollbar-hide" data-shots-pane-content>
             {isLoading && (
               Array.from({ length: pageSize }).map((_, idx) => (
                 <Skeleton key={idx} className="h-24 rounded-lg bg-zinc-700/60" />

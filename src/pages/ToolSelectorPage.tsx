@@ -353,7 +353,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
 
   return (
     <div
-      className="relative group cursor-pointer w-full h-full hover:shadow-wes-hover transition-all duration-700"
+      className="relative group cursor-pointer w-full h-full hover:shadow-wes-hover transition-all duration-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-lg"
       role="button"
       tabIndex={0}
       onPointerDown={handlePointerDown}
