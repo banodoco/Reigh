@@ -576,7 +576,7 @@ export function InlineEditVideoView({
     <TooltipProvider>
       <div className={cn(
         "w-full bg-background",
-        useStackedLayout ? "flex flex-col" : "h-full flex flex-col lg:flex-row"
+        useStackedLayout ? "flex flex-col" : "h-full flex flex-row"
       )}>
         {/* Header - Mobile and Tablet */}
         {useStackedLayout && (
