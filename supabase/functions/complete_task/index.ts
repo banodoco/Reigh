@@ -1029,7 +1029,7 @@ serve(async (req) => {
               // Build query with multiple JSONB path checks for run_id
               const runIdQuery = supabaseAdmin
                 .from("tasks")
-                .select("id, status, params")
+                .select("id, status, params, generation_started_at")
                 .eq("task_type", config.segmentType)
                 .eq("project_id", completedTask.project_id)
                 .or(`params->>orchestrator_run_id.eq.${orchestratorRunId},params->>run_id.eq.${orchestratorRunId},params->orchestrator_details->>run_id.eq.${orchestratorRunId}`);
@@ -1049,7 +1049,7 @@ serve(async (req) => {
               
               const orchIdQuery = supabaseAdmin
                 .from("tasks")
-                .select("id, status, params")
+                .select("id, status, params, generation_started_at")
                 .eq("task_type", config.segmentType)
                 .eq("project_id", completedTask.project_id)
                 .or(`params->>orchestrator_task_id.eq.${orchestratorTaskId},params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->orchestrator_details->>orchestrator_task_id.eq.${orchestratorTaskId}`);
@@ -1112,11 +1112,23 @@ serve(async (req) => {
                 // All segments complete! Mark orchestrator as Complete
                 console.log(`[OrchestratorComplete] All ${foundSegments} segments complete! Marking orchestrator ${orchestratorTaskId} as Complete`);
 
+                // Find the earliest sub-task start time for orchestrator billing
+                // This is needed because calculate-task-cost requires both timestamps
+                let earliestStartTime: string | null = null;
+                for (const segment of allSegments!) {
+                  if (segment.generation_started_at) {
+                    if (!earliestStartTime || segment.generation_started_at < earliestStartTime) {
+                      earliestStartTime = segment.generation_started_at;
+                    }
+                  }
+                }
+
                 const { error: updateOrchError } = await supabaseAdmin
                   .from("tasks")
                   .update({
                     status: "Complete",
                     output_location: publicUrl, // Use the final segment's video URL as the orchestrator's output
+                    generation_started_at: earliestStartTime || new Date().toISOString(), // Use earliest sub-task start or now
                     generation_processed_at: new Date().toISOString()
                   })
                   .eq("id", orchestratorTaskId)
