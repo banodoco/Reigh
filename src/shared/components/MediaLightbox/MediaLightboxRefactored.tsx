@@ -44,6 +44,7 @@ import {
   useMagicEditMode,
   useEditSettingsPersistence,
   useRepositionMode,
+  useSwipeNavigation,
 } from './hooks';
 
 // Import all extracted components
@@ -1035,6 +1036,33 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       isVideo,
     });
   }, [media.id, variantFetchGenerationId, variants, isLoadingVariants, shouldShowSidePanel, shouldShowSidePanelWithTrim, isVideoTrimModeActive, isVideoEditModeActive, isSpecialEditMode, showTaskDetails, isVideo]);
+
+  // ========================================
+  // SWIPE NAVIGATION - Mobile/iPad gesture support
+  // ========================================
+  
+  const swipeNavigation = useSwipeNavigation({
+    onSwipeLeft: () => {
+      if (hasNext && onNext) {
+        console.log('[SwipeNav] Executing onNext');
+        onNext();
+      }
+    },
+    onSwipeRight: () => {
+      if (hasPrevious && onPrevious) {
+        console.log('[SwipeNav] Executing onPrevious');
+        onPrevious();
+      }
+    },
+    disabled: 
+      isAnySpecialEditMode || 
+      readOnly || 
+      !showNavigation,
+    hasNext: hasNext && !!onNext,
+    hasPrevious: hasPrevious && !!onPrevious,
+    threshold: 50,
+    velocityThreshold: 0.3,
+  });
 
   // ========================================
   // SIMPLE HANDLERS - Just call props
@@ -2370,10 +2398,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             ) : (showTaskDetails || isSpecialEditMode) && isMobile ? (
               // Mobile layout with task details or special edit modes - stacked
               <div className="w-full h-full flex flex-col bg-black/90">
-                {/* Media section - Top (50% height) */}
+                {/* Media section - Top (50% height) with swipe navigation */}
                 <div 
-                  className="flex-1 flex items-center justify-center relative"
-                  style={{ height: '50%' }}
+                  className="flex-1 flex items-center justify-center relative touch-pan-y"
+                  style={{ 
+                    height: '50%',
+                    transform: swipeNavigation.isSwiping ? `translateX(${swipeNavigation.swipeOffset}px)` : undefined,
+                    transition: swipeNavigation.isSwiping ? 'none' : 'transform 0.2s ease-out',
+                  }}
                   onClick={(e) => {
                     // Single clicks don't close - only double-clicks
                     e.stopPropagation();
@@ -2384,6 +2416,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onClose();
                     }
                   }}
+                  {...swipeNavigation.swipeHandlers}
                 >
                   {/* Media Content - same as above but adapted for mobile */}
                     {isVideo ? (
@@ -2786,10 +2819,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               >
                 {/* Close Button - REMOVED */}
 
-                {/* Media Container with Controls */}
+                {/* Media Container with Controls - includes swipe navigation */}
                 <MediaWrapper 
                   onClick={(e) => e.stopPropagation()}
-                  className={cn(isMobile && isInpaintMode && "pointer-events-auto")}
+                  className={cn(
+                    isMobile && isInpaintMode && "pointer-events-auto",
+                    "touch-pan-y" // Allow vertical scrolling, capture horizontal
+                  )}
+                  {...swipeNavigation.swipeHandlers}
+                  style={{
+                    transform: swipeNavigation.isSwiping ? `translateX(${swipeNavigation.swipeOffset}px)` : undefined,
+                    transition: swipeNavigation.isSwiping ? 'none' : 'transform 0.2s ease-out',
+                  }}
                 >
                   {/* Based On display removed from overlay - now shows in sidebar above task details */}
                   

@@ -273,15 +273,14 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
                 if (setBackfillSkeletonCount) setBackfillSkeletonCount(0);
               }
 
-              // Only clear button loading for server pagination - client pagination handles this separately
-              if (isServerPagination) {
-                console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Server pagination - also clearing button loading`);
-                console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton - buttons will be re-enabled`, {
-                  reason: 'Server pagination images ready',
-                  timestamp: Date.now()
-                });
-                setLoadingButton(null);
-              }
+              // Clear button loading when images are ready - this syncs animation timing with gallery update
+              // Works for both server and client pagination to ensure proper sync
+              console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing button loading (${isServerPagination ? 'server' : 'client'} pagination)`);
+              console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton - buttons will be re-enabled`, {
+                reason: `${isServerPagination ? 'Server' : 'Client'} pagination images ready`,
+                timestamp: Date.now()
+              });
+              setLoadingButton(null);
               
               // Clear the gallery safety timeout since loading completed successfully
               if (safetyTimeoutRef.current) {

@@ -351,6 +351,7 @@ const JoinClipsPage: React.FC = () => {
     useIndividualPrompts = false,
     enhancePrompt = true,
     useInputVideoResolution = false,
+    useInputVideoFps = false,
   } = joinSettings.settings;
   
   // Debug: Log enhancePrompt value
@@ -405,6 +406,22 @@ const JoinClipsPage: React.FC = () => {
     persistenceKey: 'join-clips',
   });
   
+  // Sync loraManager.selectedLoras → joinSettings.loras for persistence
+  // This ensures LoRA selections are saved to the database
+  const lorasSyncStateRef = useRef<{ lastSyncedKey: string }>({ lastSyncedKey: '' });
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    
+    const lorasKey = loraManager.selectedLoras.map(l => `${l.id}:${l.strength}`).sort().join(',');
+    if (lorasKey === lorasSyncStateRef.current.lastSyncedKey) return;
+    
+    lorasSyncStateRef.current.lastSyncedKey = lorasKey;
+    joinSettings.updateField('loras', loraManager.selectedLoras.map(l => ({
+      id: l.id,
+      strength: l.strength,
+    })));
+  }, [loraManager.selectedLoras, joinSettings, settingsLoaded]);
+  
   // Fetch all videos
   const generationsQuery = useGenerations(
     selectedProjectId, 
@@ -413,7 +430,8 @@ const JoinClipsPage: React.FC = () => {
     !!selectedProjectId,
     {
       toolType: 'join-clips',
-      mediaType: 'video'
+      mediaType: 'video',
+      includeChildren: true  // Include child generations (e.g., when join-clips outputs are linked to source clips)
     },
     {
       disablePolling: true
@@ -966,6 +984,7 @@ const JoinClipsPage: React.FC = () => {
         negative_prompt: negativePrompt,
         priority: joinSettings.settings.priority || 0,
         use_input_video_resolution: useInputVideoResolution,
+        use_input_video_fps: useInputVideoFps,
         ...(lorasForTask.length > 0 && { loras: lorasForTask }),
         ...(resolutionTuple && { resolution: resolutionTuple }),
       };
@@ -1204,6 +1223,9 @@ const JoinClipsPage: React.FC = () => {
                             useInputVideoResolution={useInputVideoResolution}
                             setUseInputVideoResolution={(val) => joinSettings.updateField('useInputVideoResolution', val)}
                             showResolutionToggle={true}
+                            useInputVideoFps={useInputVideoFps}
+                            setUseInputVideoFps={(val) => joinSettings.updateField('useInputVideoFps', val)}
+                            showFpsToggle={true}
                             availableLoras={availableLoras}
                             projectId={selectedProjectId}
                             loraPersistenceKey="join-clips"

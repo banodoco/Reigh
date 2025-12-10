@@ -920,19 +920,20 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
               </TooltipContent>
             </Tooltip>
             
-            {/* Open Video button - only when video output has actual videoUrl */}
-            {taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0 && travelData.videoOutputs[0]?.videoUrl && (
+            {/* Open Video button - show immediately for completed video tasks, fetch data on click if needed */}
+            {taskInfo.isCompletedVideoTask && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleViewVideo}
                     className="p-1 rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                    disabled={isLoadingVideoGen && waitingForVideoToOpen}
                   >
-                    <Play className="w-3 h-3" />
+                    <Play className={cn("w-3 h-3", isLoadingVideoGen && waitingForVideoToOpen && "animate-pulse")} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">
-                  Open Video
+                  {isLoadingVideoGen && waitingForVideoToOpen ? 'Loading...' : 'Open Video'}
                 </TooltipContent>
               </Tooltip>
             )}

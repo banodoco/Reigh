@@ -94,6 +94,11 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           ...modal.style,
           maxWidth: '900px',
           width: 'calc(100vw - 2rem)',
+          // On mobile, position modal higher to avoid overlapping with displayed images
+          ...(modal.isMobile ? {
+            top: '10%',
+            transform: 'translateX(-50%) translateY(0)',
+          } : {})
         }}
         {...modal.props}
       >

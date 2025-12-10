@@ -63,3 +63,9 @@ export type {
   UseRepositionModeReturn,
   ImageTransform,
 } from './useRepositionMode';
+
+export { useSwipeNavigation } from './useSwipeNavigation';
+export type { 
+  UseSwipeNavigationProps, 
+  UseSwipeNavigationReturn,
+} from './useSwipeNavigation';

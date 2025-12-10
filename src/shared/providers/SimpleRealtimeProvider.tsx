@@ -281,6 +281,15 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       // Invalidate queries for all affected shots in batch
       // This prevents multiple invalidations during rapid timeline drag operations
       if (affectedShotIds && affectedShotIds.length > 0) {
+        // For UPDATE events (including deletions), also invalidate project-level queries
+        // This ensures Generations pane updates when images are deleted from shots
+        if (!hasOnlyInserts) {
+          console.log('[AddFlicker] 4️⃣ Invalidating project-level unified-generations (UPDATE/deletion detected)');
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === 'unified-generations' && query.queryKey[1] === 'project'
+          });
+        }
+        
         affectedShotIds.forEach((shotId: string) => {
           console.log('[AddFlicker] 4️⃣ Invalidating for shot:', shotId.substring(0, 8), {
             willInvalidateAllShotGens: !hasOnlyInserts,

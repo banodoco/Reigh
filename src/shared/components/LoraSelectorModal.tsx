@@ -827,12 +827,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             return;
         }
         
-        // When editing, samples are optional (keep existing if none provided)
-        // When creating, at least one sample is required
-        if (!isEditMode && sampleFiles.length === 0) {
-            toast.error("At least one sample image or video is required");
-            return;
-        }
+        // Samples are optional - users may not have any to upload
         
         const urlValidation = validateHuggingFaceUrl(addForm.huggingface_url);
         if (!urlValidation.isValid) {
@@ -1196,13 +1191,8 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                             }}
                             acceptTypes={['image', 'video']}
                             multiple={true}
-                            label={isEditMode ? "Add more sample images/videos (optional)" : "Upload sample images/videos *"}
+                            label={isEditMode ? "Add more sample images/videos (optional)" : "Upload sample images/videos (optional)"}
                         />
-                        {!isEditMode && sampleFiles.length === 0 && (
-                            <p className="text-xs text-red-600">
-                                At least one sample image or video is required
-                            </p>
-                        )}
                         
                         {/* Display uploaded files */}
                         {sampleFiles.length > 0 && (
@@ -1292,7 +1282,6 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         disabled={
                             isSubmitting || 
                             !addForm.name.trim() || 
-                            sampleFiles.length === 0 ||
                             !validateHuggingFaceUrl(addForm.huggingface_url).isValid
                         }
                     >

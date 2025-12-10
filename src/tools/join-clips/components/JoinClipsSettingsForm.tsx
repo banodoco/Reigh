@@ -80,6 +80,12 @@ export interface JoinClipsSettingsFormProps {
     /** Whether to show the resolution source toggle (project vs first input video) */
     showResolutionToggle?: boolean;
     
+    // FPS source toggle (only shown when showFpsToggle is true)
+    useInputVideoFps?: boolean;
+    setUseInputVideoFps?: (val: boolean) => void;
+    /** Whether to show the FPS toggle (16fps vs input video fps) */
+    showFpsToggle?: boolean;
+    
     // LoRA props
     availableLoras: LoraModel[];
     projectId: string | null;
@@ -534,6 +540,9 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     useInputVideoResolution,
     setUseInputVideoResolution,
     showResolutionToggle = false,
+    useInputVideoFps,
+    setUseInputVideoFps,
+    showFpsToggle = false,
     availableLoras,
     projectId,
     loraPersistenceKey,
@@ -691,35 +700,72 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                             </TooltipProvider>
                         </div>
 
-                        {/* Row 3: Resolution Source (only shown when showResolutionToggle is true) */}
-                        {showResolutionToggle && (
-                            <div className="space-y-3 col-span-2">
-                                <div className="flex items-center justify-between h-5">
-                                    <Label className="text-sm font-medium">Output Resolution</Label>
-                                </div>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
-                                                <span className={cn("text-xs transition-colors whitespace-nowrap", !useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Project Resolution</span>
-                                                <Switch
-                                                    id="join-resolution-source"
-                                                    checked={useInputVideoResolution ?? false}
-                                                    onCheckedChange={(val) => {
-                                                        console.log('[JoinClips] Toggle useInputVideoResolution:', val);
-                                                        setUseInputVideoResolution?.(val);
-                                                    }}
-                                                />
-                                                <span className={cn("text-xs transition-colors whitespace-nowrap", useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>First Input Video</span>
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p className="max-w-xs text-xs">
-                                                Choose whether to use the project's aspect ratio or match the first input video's resolution.
-                                            </p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                        {/* Row 3: Resolution Source & FPS Source (only shown when respective toggles are true) */}
+                        {(showResolutionToggle || showFpsToggle) && (
+                            <div className="col-span-2 grid grid-cols-2 gap-x-6">
+                                {/* Resolution Source */}
+                                {showResolutionToggle && (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between h-5">
+                                            <Label className="text-sm font-medium">Output Resolution</Label>
+                                        </div>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
+                                                        <span className={cn("text-xs transition-colors whitespace-nowrap", !useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Project Resolution</span>
+                                                        <Switch
+                                                            id="join-resolution-source"
+                                                            checked={useInputVideoResolution ?? false}
+                                                            onCheckedChange={(val) => {
+                                                                console.log('[JoinClips] Toggle useInputVideoResolution:', val);
+                                                                setUseInputVideoResolution?.(val);
+                                                            }}
+                                                        />
+                                                        <span className={cn("text-xs transition-colors whitespace-nowrap", useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Input Video</span>
+                                                    </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p className="max-w-xs text-xs">
+                                                        Choose whether to use the project's aspect ratio or match the first input video's resolution.
+                                                    </p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+                                )}
+                                
+                                {/* FPS Source */}
+                                {showFpsToggle && (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between h-5">
+                                            <Label className="text-sm font-medium">Output FPS</Label>
+                                        </div>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
+                                                        <span className={cn("text-xs transition-colors whitespace-nowrap", !useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Project FPS</span>
+                                                        <Switch
+                                                            id="join-fps-source"
+                                                            checked={useInputVideoFps ?? false}
+                                                            onCheckedChange={(val) => {
+                                                                console.log('[JoinClips] Toggle useInputVideoFps:', val);
+                                                                setUseInputVideoFps?.(val);
+                                                            }}
+                                                        />
+                                                        <span className={cn("text-xs transition-colors whitespace-nowrap", useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Input Video</span>
+                                                    </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p className="max-w-xs text-xs">
+                                                        Choose whether to use the project's FPS (16 FPS) or keep the input video's original frame rate.
+                                                    </p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

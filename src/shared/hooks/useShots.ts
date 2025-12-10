@@ -1138,6 +1138,9 @@ export const useRemoveImageFromShot = () => {
       queryClient.invalidateQueries({ queryKey: ['shots', data.projectId] });
       queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });
+      // Invalidate unified-generations to refresh Generations pane when filtering by shot
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', data.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
     },
   });
 };
@@ -1244,7 +1247,9 @@ export const usePositionExistingGenerationInShot = () => {
       return { shot_id, generation_id, project_id, data };
     },
     onSuccess: (data) => {
-      // Don't invalidate all-shot-generations - realtime will handle it
+      // Invalidate all-shot-generations to ensure the generation appears immediately
+      // This is needed because realtime may skip invalidating for INSERT-only batches
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shot_id] });
       queryClient.invalidateQueries({ queryKey: ['shots', data.project_id] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shot_id] });
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shot_id] });

@@ -227,19 +227,24 @@ export const useImageGalleryPagination = ({
       
       console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination initiated - waiting for data arrival to clear loading...`);
     } else {
-      // Client-side pagination - show loading longer for bottom buttons
-      const loadingDelay = fromBottom ? 300 : 100;
+      // Client-side pagination - update page state immediately
+      // The ProgressiveLoadingManager will clear loadingButton when images are ready
+      // This ensures the animation syncs with when new items are actually rendered
       console.log(`🖥️ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination - updating local page state`);
       setPage(newPage);
-      setTimeout(() => {
-        console.log(`✅ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination completed`);
-        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via timeout - buttons will be re-enabled`, {
+      
+      // Set a longer safety timeout for client pagination to ensure loading clears even if ProgressiveLoadingManager doesn't fire
+      // But prefer ProgressiveLoadingManager callback for proper sync
+      const clientSafetyTimeout = setTimeout(() => {
+        console.log(`✅ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination safety timeout - clearing loading`);
+        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via safety timeout - buttons will be re-enabled`, {
           navId,
-          reason: `Client pagination timeout (${loadingDelay}ms)`,
+          reason: `Client pagination safety timeout (500ms)`,
           timestamp: Date.now()
         });
         setLoadingButton(null);
-        // Don't clear gallery safety timeout here - let progressive loading handle it
+        setIsGalleryLoading(false);
+        
         // Scroll to top of gallery AFTER page loads (only for bottom buttons)
         if (fromBottom && galleryTopRef.current) {
           const rect = galleryTopRef.current.getBoundingClientRect();
@@ -252,7 +257,11 @@ export const useImageGalleryPagination = ({
             behavior: 'smooth'
           });
         }
-      }, loadingDelay);
+      }, 500); // Longer timeout to allow React to render, but ProgressiveLoadingManager should fire first
+      
+      // Store timeout ref for cleanup (though ProgressiveLoadingManager should clear loading first)
+      // Note: ProgressiveLoadingManager's onImagesReady callback will clear loadingButton
+      // before this timeout fires, ensuring proper sync between animation and gallery update
     }
   }, [loadingButton, isServerPagination, onServerPageChange, setPage, isMobile, page, serverPage, enableAdjacentPagePreloading, galleryTopRef]);
   

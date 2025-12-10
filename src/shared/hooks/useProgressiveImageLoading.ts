@@ -59,10 +59,15 @@ export const useProgressiveImageLoading = ({
   
   // Create a stable identifier for the image set to detect changes
   // This prevents the bug where server pagination with same-length pages wouldn't trigger
-  // Using first 3 images provides enough uniqueness while being performant
+  // Include page number to ensure uniqueness across pages, and use first/last images for better coverage
   const imageSetId = React.useMemo(() => {
-    return images.slice(0, 3).map(img => img?.id).join(',');
-  }, [images]);
+    if (images.length === 0) return `empty-${page}`;
+    // Use first 2 and last 1 image IDs plus page number for better uniqueness
+    // This ensures different pages are detected even if they share some images
+    const firstIds = images.slice(0, 2).map(img => img?.id).join(',');
+    const lastId = images.length > 2 ? images[images.length - 1]?.id : '';
+    return `${page}-${firstIds}-${lastId}`;
+  }, [images, page]);
   
   // Helper function to safely cancel a loading session
   const cancelActiveSession = (reason: string) => {
@@ -171,9 +176,21 @@ export const useProgressiveImageLoading = ({
       return; // Session was canceled during setup
     }
     
-    // Check if all images are already cached
-    const allCached = images.every(img => isImageCached(img));
-    const cachedCount = images.filter(img => isImageCached(img)).length;
+    // Optimized cache check: batch check all images at once instead of individual calls
+    // This is more efficient for pages with many images (especially later pages)
+    let cachedCount = 0;
+    let allCached = true;
+    
+    // Use a single pass to check cache status
+    for (const img of images) {
+      if (isImageCached(img)) {
+        cachedCount++;
+      } else {
+        allCached = false;
+        // Early exit optimization: if we find uncached images, we know allCached is false
+        // But continue counting for logging purposes
+      }
+    }
       
     console.log(`📦 [PAGELOADINGDEBUG] [PROG:${sessionId}] Immediate load: ${images.length} images (${cachedCount}/${images.length} cached)`);
     
@@ -184,8 +201,12 @@ export const useProgressiveImageLoading = ({
         console.log(`⚡ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: IMMEDIATE (all cached)`);
         stableOnImagesReady.current();
       } else {
-        // Small delay for non-cached images
-        console.log(`⏱️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: DELAYED 16ms (${images.length - cachedCount} uncached)`);
+        // Adaptive delay based on number of uncached images
+        // Later pages may have more uncached images, so increase delay slightly
+        const uncachedCount = images.length - cachedCount;
+        // Use a small delay that scales slightly with uncached count, but caps at reasonable value
+        const delay = Math.min(uncachedCount > 10 ? 32 : 16, 50);
+        console.log(`⏱️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: DELAYED ${delay}ms (${uncachedCount} uncached)`);
         const readyTimeout = setTimeout(() => {
           if (isSessionActive()) {
             console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback executed`);
@@ -193,7 +214,7 @@ export const useProgressiveImageLoading = ({
           } else {
             console.log(`❌ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback cancelled (session inactive)`);
           }
-        }, 16);
+        }, delay);
         timeouts.push(readyTimeout);
       }
     }
