@@ -14,6 +14,7 @@ import { Shot } from '@/types/shots';
 import { ExternalLink } from 'lucide-react';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import { useShotSettings } from '@/tools/travel-between-images/hooks/useShotSettings';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '@/tools/travel-between-images/components/ShotEditor/state/types';
@@ -336,8 +337,90 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
           
           <div className={`${modal.scrollClass} -mx-6 px-6 flex-1 min-h-0`}>
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin h-8 w-8 border-2 border-zinc-500 border-t-transparent rounded-full" />
+              <div className="space-y-6 pb-4">
+                <div className="flex flex-col lg:flex-row gap-6">
+                  <div className="lg:w-1/2">
+                    {/* SectionHeader skeleton */}
+                    <div className="mb-4">
+                      <Skeleton className="h-8 w-32" />
+                    </div>
+                    <div className="space-y-4">
+                      {/* Prompt input */}
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-24 w-full rounded-md" />
+                      </div>
+                      {/* Frames and Steps */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-16" />
+                          <Skeleton className="h-10 w-full rounded-md" />
+                        </div>
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-16" />
+                          <Skeleton className="h-10 w-full rounded-md" />
+                        </div>
+                      </div>
+                      {/* Dimension source */}
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-10 w-full rounded-md" />
+                      </div>
+                      {/* Toggles */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-5 w-5 rounded" />
+                          <Skeleton className="h-4 w-32" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-5 w-5 rounded" />
+                          <Skeleton className="h-4 w-28" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-5 w-5 rounded" />
+                          <Skeleton className="h-4 w-36" />
+                        </div>
+                      </div>
+                      {/* Slider */}
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-2 w-full rounded-full" />
+                        <Skeleton className="h-4 w-12 ml-auto" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="lg:w-1/2">
+                    {/* SectionHeader skeleton */}
+                    <div className="mb-4">
+                      <Skeleton className="h-8 w-24" />
+                    </div>
+                    <div className="space-y-4">
+                      {/* Motion mode toggle */}
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-10 w-full rounded-md" />
+                      </div>
+                      {/* Generation type */}
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-10 w-full rounded-md" />
+                      </div>
+                      {/* LoRA section */}
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-16" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-16 w-full rounded-md" />
+                          <Skeleton className="h-16 w-full rounded-md" />
+                        </div>
+                      </div>
+                      {/* Phase config */}
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-32 w-full rounded-md" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-6 pb-4">

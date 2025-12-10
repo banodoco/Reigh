@@ -165,3 +165,4 @@ END $$;
 -- NOTE: Multiple shot_generations records for the same (shot_id, generation_id)
 -- pair is intentionally allowed - same image can appear multiple times in a shot.
 -- ============================================================================
+
