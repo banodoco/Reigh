@@ -2035,6 +2035,47 @@ async function createGenerationFromTask(
           childOrder = parseInt(String(segmentIndex), 10);
           console.log(`[GenMigration] Extracted child_order: ${childOrder}`);
 
+          // SPECIAL CASE: For join_clips_segment with single join (2 clips), the segment IS the final output
+          // Similar to travel single-segment handling - create a variant on the parent instead of a child
+          if (taskData.task_type === 'join_clips_segment') {
+            const isSingleJoin = taskData.params?.is_first_join === true && taskData.params?.is_last_join === true;
+            
+            if (isSingleJoin && parentGenerationId) {
+              console.log(`[JoinClipsSingleJoin] Detected single-join scenario (join_index: ${taskData.params?.join_index}) - creating variant for parent generation ${parentGenerationId}`);
+              
+              // Determine tool_type from orchestrator params (could be 'join-clips' or 'edit-video')
+              const toolType = taskData.params?.full_orchestrator_payload?.tool_type ||
+                               taskData.params?.tool_type || 
+                               'join-clips';
+              
+              const singleJoinResult = await createVariantOnParent(
+                parentGenerationId,
+                'join_clips_segment',
+                {
+                  tool_type: toolType,
+                  created_from: 'single_join_completion',
+                  join_index: taskData.params?.join_index ?? 0,
+                  is_single_join: true,
+                }
+              );
+              
+              if (singleJoinResult) {
+                console.log(`[JoinClipsSingleJoin] Successfully created variant and updated parent generation`);
+                
+                // Mark the orchestrator task as generation_created=true
+                await supabase
+                  .from('tasks')
+                  .update({ generation_created: true })
+                  .eq('id', orchestratorTaskId);
+                
+                // Return early - we've handled this as a variant, not a child generation
+                return singleJoinResult;
+              } else {
+                console.error(`[JoinClipsSingleJoin] Failed to create variant, falling through to child generation creation`);
+              }
+            }
+          }
+
           // Extract child-specific params from orchestrator_details if available
           const orchDetails = taskData.params?.orchestrator_details;
           if (orchDetails && !isNaN(childOrder)) {
