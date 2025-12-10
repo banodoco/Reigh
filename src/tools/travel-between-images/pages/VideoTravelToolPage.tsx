@@ -1305,15 +1305,37 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     }
   }, [preloaderState.isProcessingQueue, preloaderState.queueLength, preloaderState.cacheUtilization, selectedProjectId]);
   
-  // Calculate navigation state with memoization
+  // Sort shots based on shotSortMode for navigation (respects Newest/Oldest toggle)
+  const sortedShots = useMemo(() => {
+    if (!shots) return shots;
+    
+    if (shotSortMode === 'newest') {
+      return [...shots].sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA; // Newest first
+      });
+    } else if (shotSortMode === 'oldest') {
+      return [...shots].sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateA - dateB; // Oldest first
+      });
+    } else {
+      // 'ordered' mode - sort by position
+      return [...shots].sort((a, b) => (a.position || 0) - (b.position || 0));
+    }
+  }, [shots, shotSortMode]);
+  
+  // Calculate navigation state with memoization (uses sortedShots to respect sort order)
   const navigationState = useMemo(() => {
-    const currentShotIndex = shots?.findIndex(shot => shot.id === selectedShot?.id) ?? -1;
+    const currentShotIndex = sortedShots?.findIndex(shot => shot.id === selectedShot?.id) ?? -1;
     return {
       currentShotIndex,
       hasPrevious: currentShotIndex > 0,
-      hasNext: currentShotIndex >= 0 && currentShotIndex < (shots?.length ?? 0) - 1,
+      hasNext: currentShotIndex >= 0 && currentShotIndex < (sortedShots?.length ?? 0) - 1,
     };
-  }, [shots, selectedShot?.id]);
+  }, [sortedShots, selectedShot?.id]);
   // ------------------------------------------------------------------
   // URL Hash Synchronization (Combined Init + Sync)
   // ------------------------------------------------------------------
@@ -1930,41 +1952,43 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
   }, [setCurrentShotId, navigate, location.pathname]);
 
-  // Navigation handlers
+  // Navigation handlers (use sortedShots to respect Newest/Oldest sort order)
   const handlePreviousShot = useCallback(() => {
     console.log('[ShotNavPerf] === PREVIOUS SHOT CLICKED ===', {
       timestamp: Date.now(),
       currentShotId: selectedShot?.id?.substring(0, 8),
-      currentShotName: selectedShot?.name
+      currentShotName: selectedShot?.name,
+      sortMode: shotSortMode
     });
-    if (shots && selectedShot) {
-      navigateToPreviousShot(shots, selectedShot, { scrollToTop: true });
+    if (sortedShots && selectedShot) {
+      navigateToPreviousShot(sortedShots, selectedShot, { scrollToTop: true });
     }
-  }, [shots, selectedShot, navigateToPreviousShot]);
+  }, [sortedShots, selectedShot, navigateToPreviousShot, shotSortMode]);
 
   const handleNextShot = useCallback(() => {
     console.log('[ShotNavPerf] === NEXT SHOT CLICKED ===', {
       timestamp: Date.now(),
       currentShotId: selectedShot?.id?.substring(0, 8),
-      currentShotName: selectedShot?.name
+      currentShotName: selectedShot?.name,
+      sortMode: shotSortMode
     });
-    if (shots && selectedShot) {
-      navigateToNextShot(shots, selectedShot, { scrollToTop: true });
+    if (sortedShots && selectedShot) {
+      navigateToNextShot(sortedShots, selectedShot, { scrollToTop: true });
     }
-  }, [shots, selectedShot, navigateToNextShot]);
+  }, [sortedShots, selectedShot, navigateToNextShot, shotSortMode]);
 
   // Navigation handlers that preserve scroll position (for sticky header)
   const handlePreviousShotNoScroll = useCallback(() => {
-    if (shots && selectedShot) {
-      navigateToPreviousShot(shots, selectedShot, { scrollToTop: false });
+    if (sortedShots && selectedShot) {
+      navigateToPreviousShot(sortedShots, selectedShot, { scrollToTop: false });
     }
-  }, [shots, selectedShot, navigateToPreviousShot]);
+  }, [sortedShots, selectedShot, navigateToPreviousShot]);
 
   const handleNextShotNoScroll = useCallback(() => {
-    if (shots && selectedShot) {
-      navigateToNextShot(shots, selectedShot, { scrollToTop: false });
+    if (sortedShots && selectedShot) {
+      navigateToNextShot(sortedShots, selectedShot, { scrollToTop: false });
     }
-  }, [shots, selectedShot, navigateToNextShot]);
+  }, [sortedShots, selectedShot, navigateToNextShot]);
 
   // Navigation state is now memoized above
   const { currentShotIndex, hasPrevious, hasNext } = navigationState;
