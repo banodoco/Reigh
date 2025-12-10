@@ -70,3 +70,4 @@ GRANT EXECUTE ON FUNCTION duplicate_shot(UUID, UUID) TO authenticated;
 -- Add comment
 COMMENT ON FUNCTION duplicate_shot IS 'Duplicates a shot including all its shot_generations. Returns the new shot ID.';
 
+

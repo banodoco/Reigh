@@ -807,6 +807,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 guidance_scale: 3.0,
                 seed: -1,
                 parent_generation_id: parentGenerationId,
+                use_input_video_resolution: false,
+                use_input_video_fps: false,
                 ...(lorasForTask.length > 0 && { loras: lorasForTask }),
                 ...(resolutionTuple && { resolution: resolutionTuple }),
             });

@@ -152,6 +152,12 @@ const DEFAULT_JOIN_CLIPS_VALUES = {
 function buildJoinClipsPhaseConfig(
   userLoras: Array<{ path: string; strength: number }> = []
 ): PhaseConfig {
+  // Default LoRA that's always included
+  const defaultLora: PhaseLoraConfig = {
+    url: "https://huggingface.co/peteromallet/random_junk/resolve/main/motion_scale_000006500_high_noise.safetensors",
+    multiplier: "1.25"
+  };
+
   // Convert user LoRAs to phase config format
   const additionalLoras: PhaseLoraConfig[] = userLoras
     .filter(lora => lora.path)
@@ -172,6 +178,7 @@ function buildJoinClipsPhaseConfig(
         guidance_scale: 3.0,
         loras: [
           { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "0.75" },
+          defaultLora,
           ...additionalLoras
         ]
       },
@@ -180,6 +187,7 @@ function buildJoinClipsPhaseConfig(
         guidance_scale: 1.0,
         loras: [
           { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "1.0" },
+          defaultLora,
           ...additionalLoras
         ]
       },
@@ -188,6 +196,7 @@ function buildJoinClipsPhaseConfig(
         guidance_scale: 1.0,
         loras: [
           { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors", multiplier: "1.0" },
+          defaultLora,
           ...additionalLoras
         ]
       }

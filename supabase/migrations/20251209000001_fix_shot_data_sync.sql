@@ -166,3 +166,4 @@ END $$;
 -- pair is intentionally allowed - same image can appear multiple times in a shot.
 -- ============================================================================
 
+
