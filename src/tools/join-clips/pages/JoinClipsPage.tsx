@@ -350,6 +350,7 @@ const JoinClipsPage: React.FC = () => {
     keepBridgingImages,
     useIndividualPrompts = false,
     enhancePrompt = true,
+    useInputVideoResolution = false,
   } = joinSettings.settings;
   
   // Debug: Log enhancePrompt value
@@ -964,6 +965,7 @@ const JoinClipsPage: React.FC = () => {
         seed: joinSettings.settings.seed || -1,
         negative_prompt: negativePrompt,
         priority: joinSettings.settings.priority || 0,
+        use_input_video_resolution: useInputVideoResolution,
         ...(lorasForTask.length > 0 && { loras: lorasForTask }),
         ...(resolutionTuple && { resolution: resolutionTuple }),
       };
@@ -1199,6 +1201,9 @@ const JoinClipsPage: React.FC = () => {
                               console.log('[JoinClipsPage] setEnhancePrompt called with:', val);
                               joinSettings.updateField('enhancePrompt', val);
                             }}
+                            useInputVideoResolution={useInputVideoResolution}
+                            setUseInputVideoResolution={(val) => joinSettings.updateField('useInputVideoResolution', val)}
+                            showResolutionToggle={true}
                             availableLoras={availableLoras}
                             projectId={selectedProjectId}
                             loraPersistenceKey="join-clips"

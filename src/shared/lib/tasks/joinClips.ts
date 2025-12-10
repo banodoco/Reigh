@@ -114,6 +114,7 @@ export interface JoinClipsTaskParams {
   loras?: Array<{ path: string; strength: number }>; // LoRA models to apply
   parent_generation_id?: string;
   tool_type?: string; // Tool type identifier for filtering results
+  use_input_video_resolution?: boolean; // Use first input video's resolution instead of project resolution
   
   // Video edit mode - for regenerating portions of a single video
   video_edit_mode?: boolean;
@@ -319,6 +320,10 @@ function buildJoinClipsPayload(
 
   if (params.fps !== undefined) {
     orchestratorDetails.fps = params.fps;
+  }
+
+  if (params.use_input_video_resolution !== undefined) {
+    orchestratorDetails.use_input_video_resolution = params.use_input_video_resolution;
   }
 
   // Keep additional_loras for backward compatibility, but LoRAs are now primarily in phase_config

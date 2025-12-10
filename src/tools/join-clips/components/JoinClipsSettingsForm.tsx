@@ -74,6 +74,12 @@ export interface JoinClipsSettingsFormProps {
     enhancePrompt?: boolean;
     setEnhancePrompt?: (val: boolean) => void;
     
+    // Resolution source toggle (only shown when showResolutionToggle is true)
+    useInputVideoResolution?: boolean;
+    setUseInputVideoResolution?: (val: boolean) => void;
+    /** Whether to show the resolution source toggle (project vs first input video) */
+    showResolutionToggle?: boolean;
+    
     // LoRA props
     availableLoras: LoraModel[];
     projectId: string | null;
@@ -525,6 +531,9 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     clipCount = 2,
     enhancePrompt,
     setEnhancePrompt,
+    useInputVideoResolution,
+    setUseInputVideoResolution,
+    showResolutionToggle = false,
     availableLoras,
     projectId,
     loraPersistenceKey,
@@ -681,6 +690,38 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                 </Tooltip>
                             </TooltipProvider>
                         </div>
+
+                        {/* Row 3: Resolution Source (only shown when showResolutionToggle is true) */}
+                        {showResolutionToggle && (
+                            <div className="space-y-3 col-span-2">
+                                <div className="flex items-center justify-between h-5">
+                                    <Label className="text-sm font-medium">Output Resolution</Label>
+                                </div>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
+                                                <span className={cn("text-xs transition-colors whitespace-nowrap", !useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Project Resolution</span>
+                                                <Switch
+                                                    id="join-resolution-source"
+                                                    checked={useInputVideoResolution ?? false}
+                                                    onCheckedChange={(val) => {
+                                                        console.log('[JoinClips] Toggle useInputVideoResolution:', val);
+                                                        setUseInputVideoResolution?.(val);
+                                                    }}
+                                                />
+                                                <span className={cn("text-xs transition-colors whitespace-nowrap", useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>First Input Video</span>
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p className="max-w-xs text-xs">
+                                                Choose whether to use the project's aspect ratio or match the first input video's resolution.
+                                            </p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+                        )}
                     </div>
                 </div>
 

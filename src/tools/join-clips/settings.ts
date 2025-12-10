@@ -17,6 +17,7 @@ export const joinClipsSettings = {
     randomSeed: true,
     useIndividualPrompts: false, // Whether to use per-transition prompts
     enhancePrompt: true, // AI enhancement of prompts
+    useInputVideoResolution: false, // Use first input video's resolution instead of project resolution
     // Legacy two-video format (kept for backward compatibility)
     startingVideoUrl: undefined as string | undefined,
     startingVideoPosterUrl: undefined as string | undefined,
