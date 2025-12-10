@@ -589,12 +589,19 @@ const VideoTravelToolPage: React.FC = () => {
   const updateShotModeRef = useRef(updateShotMode);
   updateShotModeRef.current = updateShotMode;
 
-  const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
+const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
+    console.log('[GenerationModeDebug] 🔄 MODE CHANGE triggered:', {
+      shotId: selectedShotRef.current?.id?.substring(0, 8),
+      newMode: mode,
+      previousMode: shotSettingsRef.current.settings?.generationMode,
+      timestamp: Date.now()
+    });
+    
     // Optimistically update the cache for THIS shot immediately
     if (selectedShotRef.current?.id) {
       updateShotModeRef.current(selectedShotRef.current.id, mode);
     }
-    
+
     // Update the actual settings (will save to DB asynchronously)
     shotSettingsRef.current.updateField('generationMode', mode);
   }, []);
@@ -878,7 +885,7 @@ const VideoTravelToolPage: React.FC = () => {
     phaseConfig,
     selectedPhasePresetId,
     pairConfigs = [],
-    generationMode = 'timeline', // Default to 'timeline', inheritance will override if needed
+    generationMode: rawGenerationMode = 'timeline', // Default to 'timeline', inheritance will override if needed
     steerableMotionSettings = DEFAULT_STEERABLE_MOTION_SETTINGS,
     textBeforePrompts = '',
     textAfterPrompts = '',
@@ -887,6 +894,31 @@ const VideoTravelToolPage: React.FC = () => {
   
   // CRITICAL: Ensure amountOfMotion has a valid default (destructuring default doesn't apply when value is explicitly undefined)
   const amountOfMotion = rawAmountOfMotion ?? 50;
+
+  // [GenerationModeDebug] Track generationMode through its lifecycle
+  // Use cached value during loading to prevent flash of wrong mode
+  const cachedGenerationMode = getShotGenerationMode(selectedShot?.id ?? null);
+  
+  // FIX: Use cached mode during loading instead of the default 'timeline'
+  // This prevents the 10-second flash of wrong mode while DB loads
+  const generationMode: 'batch' | 'timeline' = 
+    shotSettings.status === 'loading' || shotSettings.status === 'idle'
+      ? (cachedGenerationMode ?? rawGenerationMode)
+      : rawGenerationMode;
+  React.useEffect(() => {
+    if (selectedShot?.id) {
+      console.log('[GenerationModeDebug] 🎯 MODE COMPARISON:', {
+        shotId: selectedShot.id.substring(0, 8),
+        shotName: selectedShot.name,
+        effectiveMode: generationMode,
+        rawFromSettings: rawGenerationMode,
+        fromCache: cachedGenerationMode,
+        settingsStatus: shotSettings.status,
+        usingCache: shotSettings.status === 'loading' || shotSettings.status === 'idle',
+        timestamp: Date.now()
+      });
+    }
+  }, [selectedShot?.id, selectedShot?.name, generationMode, rawGenerationMode, cachedGenerationMode, shotSettings.status]);
   
   // Debug: Log amountOfMotion value to track if default is being applied
   React.useEffect(() => {

@@ -404,9 +404,25 @@ export const useShotSettings = (
       timestamp: Date.now()
     });
     
+    // [GenerationModeDebug] Log what's coming from DB
+    console.log('[GenerationModeDebug] 📥 DB Settings loaded:', {
+      shotId: shotId.substring(0, 8),
+      dbSettings_generationMode: dbSettings?.generationMode,
+      dbSettings_raw: dbSettings,
+      default_generationMode: DEFAULT_SETTINGS.generationMode,
+      timestamp: Date.now()
+    });
+    
     // FIX: Don't overwrite user's changes while they're actively editing or have pending saves
     // NOTE: With optimistic cache updates, this protection is now less critical since saves
     // no longer trigger automatic refetches. However, it's still valuable for manual invalidations.
+    console.log('[GenerationModeDebug] 🔒 Checking edit protection:', {
+      shotId: shotId.substring(0, 8),
+      isUserEditingRef: isUserEditingRef.current,
+      hasSaveTimeout: saveTimeoutRef.current !== null,
+      hasPendingSettings: pendingSettingsRef.current !== null,
+      willSkip: isUserEditingRef.current || saveTimeoutRef.current !== null || pendingSettingsRef.current !== null,
+    });
     if (isUserEditingRef.current || saveTimeoutRef.current !== null || pendingSettingsRef.current !== null) {
       console.log('[useShotSettings] ⚠️ Skipping load - user is actively editing or has pending changes');
       return;
@@ -430,9 +446,18 @@ export const useShotSettings = (
       },
     };
     
-    // Deep clone to prevent React Query cache reference sharing
+// Deep clone to prevent React Query cache reference sharing
     const deepClonedSettings = JSON.parse(JSON.stringify(loadedSettings));
     
+    // [GenerationModeDebug] Log merged settings
+    console.log('[GenerationModeDebug] 🔀 Merged settings:', {
+      shotId: shotId.substring(0, 8),
+      merged_generationMode: deepClonedSettings.generationMode,
+      fromDb: dbSettings?.generationMode,
+      fromDefault: DEFAULT_SETTINGS.generationMode,
+      timestamp: Date.now()
+    });
+
     // Migration: ensure motionMode and advancedMode are in sync
     // advancedMode is now derived from motionMode, but old data may have them out of sync
     if (deepClonedSettings.advancedMode && deepClonedSettings.motionMode !== 'advanced') {
@@ -522,6 +547,11 @@ export const useShotSettings = (
     key: K,
     value: VideoTravelSettings[K]
   ) => {
+    // Mark that user is actively editing - MUST happen BEFORE the early return
+    // so that DB load won't overwrite user's changes during loading state
+    isUserEditingRef.current = true;
+    console.log('[GenerationModeDebug] 🛡️ User editing - set protection flag', { key, status });
+    
     // CRITICAL: Don't allow saves until we've loaded initial settings from DB
     // Otherwise we might overwrite good data with default/empty settings
     if (status !== 'ready' && status !== 'saving') {
@@ -529,9 +559,6 @@ export const useShotSettings = (
       setSettings(prev => ({ ...prev, [key]: value }));
       return;
     }
-    
-    // Mark that user is actively editing
-    isUserEditingRef.current = true;
     
     setSettings(prev => {
       const updated = { ...prev, [key]: value };
@@ -577,6 +604,10 @@ export const useShotSettings = (
       batchVideoPrompt: updates.batchVideoPrompt ? (typeof updates.batchVideoPrompt === 'string' ? updates.batchVideoPrompt.substring(0, 50) : updates.batchVideoPrompt) : undefined
     });
     
+    // Mark that user is actively editing - MUST happen BEFORE the early return
+    // so that DB load won't overwrite user's changes during loading state
+    isUserEditingRef.current = true;
+    
     // CRITICAL: Don't allow saves until we've loaded initial settings from DB
     // Otherwise we might overwrite good data with default/empty settings
     if (status !== 'ready' && status !== 'saving') {
@@ -584,9 +615,6 @@ export const useShotSettings = (
       setSettings(prev => ({ ...prev, ...updates }));
       return;
     }
-    
-    // Mark that user is actively editing
-    isUserEditingRef.current = true;
     
     setSettings(prev => {
       const updated = { ...prev, ...updates };

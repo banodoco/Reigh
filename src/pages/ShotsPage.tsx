@@ -248,7 +248,6 @@ const ShotsPage: React.FC = () => {
           <ShotListDisplay
             shots={shots}
             onSelectShot={handleSelectShot}
-            currentProjectId={selectedProjectId}
           />
         </>
       ) : (

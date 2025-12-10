@@ -9,6 +9,8 @@ export type SettingsScope = 'user' | 'project' | 'shot';
 
 // Single-flight dedupe for settings fetches across components
 const inflightSettingsFetches = new Map<string, Promise<unknown>>();
+// Single-flight dedupe for getSession calls (it's slow - 600ms to 16s!)
+let inflightGetSession: Promise<any> | null = null;
 // Lightweight user cache to avoid repeated auth calls within a short window
 let cachedUser: { id: string } | null = null;
 let cachedUserAt: number = 0;
@@ -69,20 +71,34 @@ async function getUserWithTimeout(timeoutMs = 15000) {
   }, timeoutMs);
   
   try {
+    // FIRST: Check cached user to avoid slow getSession calls
+    // This is critical because getSession() can take 600ms-16s!
+    if (cachedUser && (Date.now() - cachedUserAt) < USER_CACHE_MS) {
+      clearTimeout(timeoutId);
+      console.log('[GenerationModeDebug] ⚡ Using cached user (skipping getSession)');
+      return { data: { user: { id: cachedUser.id } }, error: null } as any;
+    }
+
     // Fast path: use local session (no network) to avoid auth network call in background
-    const { data: sessionData } = await supabase.auth.getSession();
+    // Single-flight the getSession call - it's slow and multiple components call it simultaneously
+    const sessionStart = Date.now();
+    
+    if (!inflightGetSession) {
+      inflightGetSession = supabase.auth.getSession().finally(() => {
+        inflightGetSession = null;
+      });
+    }
+    
+    const { data: sessionData } = await inflightGetSession;
+    const sessionDuration = Date.now() - sessionStart;
+    console.log('[GenerationModeDebug] ⏱️ getSession took:', sessionDuration + 'ms');
+    
     const sessionUser = sessionData?.session?.user || null;
     if (sessionUser) {
       cachedUser = { id: sessionUser.id };
       cachedUserAt = Date.now();
       clearTimeout(timeoutId);
       return { data: { user: sessionUser }, error: null } as any;
-    }
-
-    // Use short-lived cache to avoid duplicate getUser calls during bursts
-    if (cachedUser && (Date.now() - cachedUserAt) < USER_CACHE_MS) {
-      clearTimeout(timeoutId);
-      return { data: { user: { id: cachedUser.id } }, error: null } as any;
     }
 
     const result = await Promise.race([
@@ -149,14 +165,44 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
     const singleFlightKey = JSON.stringify({ toolId, projectId: ctx.projectId ?? null, shotId: ctx.shotId ?? null });
     const existingPromise = inflightSettingsFetches.get(singleFlightKey);
     if (existingPromise) {
+      if (ctx.shotId) {
+        console.log('[GenerationModeDebug] ♻️ DEDUPE hit - reusing existing request:', {
+          toolId,
+          shotId: ctx.shotId?.substring(0, 8),
+        });
+      }
       return existingPromise;
     }
 
     const promise = (async () => {
+      const fetchStart = Date.now();
+      
+      // [GenerationModeDebug] Log which tool is making the query
+      if (ctx.shotId) {
+        console.log('[GenerationModeDebug] 🚀 Query START:', {
+          toolId,
+          shotId: ctx.shotId?.substring(0, 8),
+          singleFlightKey,
+          timestamp: Date.now()
+        });
+      }
+      
       // Mobile optimization: Cache user info to avoid repeated auth calls
       // Add timeout to prevent hanging on mobile connections (aligned with Supabase global timeout)
       // Use generous timeout for mobile networks
       const { data: { user }, error: authError } = await getUserWithTimeout();
+      const authDuration = Date.now() - fetchStart;
+      
+      // [GenerationModeDebug] Log auth timing
+      if (ctx.shotId) {
+        console.log('[GenerationModeDebug] ⏱️ Auth completed:', {
+          toolId,
+          shotId: ctx.shotId?.substring(0, 8),
+          authDuration: `${authDuration}ms`,
+          timestamp: Date.now()
+        });
+      }
+      
       if (authError || !user) {
         throw new Error('Authentication required');
       }
@@ -166,6 +212,7 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
         throw new Error('Request was cancelled');
       }
 
+      const dbQueryStart = Date.now();
       // Mobile optimization: Use more efficient queries with targeted JSON extraction
       // NOTE: We fetch the entire settings JSON to avoid SQL path issues with tool IDs containing hyphens.
       const [userResult, projectResult, shotResult] = await Promise.all([
@@ -192,6 +239,19 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
           : Promise.resolve({ data: null, error: null }),
       ]);
 
+      const dbQueryDuration = Date.now() - dbQueryStart;
+      const totalDuration = Date.now() - fetchStart;
+      
+      // [GenerationModeDebug] Log timing
+      if (ctx.shotId) {
+        console.log('[GenerationModeDebug] ⏱️ DB queries completed:', {
+          shotId: ctx.shotId?.substring(0, 8),
+          dbQueryDuration: `${dbQueryDuration}ms`,
+          totalDuration: `${totalDuration}ms`,
+          timestamp: Date.now()
+        });
+      }
+
       // Handle errors more gracefully for mobile
       if (userResult.error && !userResult.error.message.includes('No rows found')) {
         console.warn('[fetchToolSettingsSupabase] User settings error:', userResult.error);
@@ -208,6 +268,20 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
       const projectSettings = (projectResult.data?.settings?.[toolId] as any) ?? {};
       const shotSettings = (shotResult.data?.settings?.[toolId] as any) ?? {};
 
+      // [GenerationModeDebug] Log what we're getting from each source
+      if (toolId === 'travel-between-images' && ctx.shotId) {
+        console.log('[GenerationModeDebug] 🗄️ useToolSettings raw data:', {
+          shotId: ctx.shotId?.substring(0, 8),
+          shotRawSettings: shotResult.data?.settings,
+          shotToolSettings: shotSettings,
+          shot_generationMode: shotSettings?.generationMode,
+          project_generationMode: projectSettings?.generationMode,
+          user_generationMode: userSettings?.generationMode,
+          defaults_generationMode: (toolDefaults[toolId] as any)?.generationMode,
+          timestamp: Date.now()
+        });
+      }
+
       // Merge in priority order: defaults → user → project → shot
       const merged = deepMerge(
         {},
@@ -216,6 +290,15 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
         projectSettings,
         shotSettings
       );
+      
+      // [GenerationModeDebug] Log merged result
+      if (toolId === 'travel-between-images' && ctx.shotId) {
+        console.log('[GenerationModeDebug] 🔀 useToolSettings merged result:', {
+          shotId: ctx.shotId?.substring(0, 8),
+          merged_generationMode: (merged as any)?.generationMode,
+          timestamp: Date.now()
+        });
+      }
       
       return merged;
     })();

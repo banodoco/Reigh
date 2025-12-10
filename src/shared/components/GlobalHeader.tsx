@@ -250,7 +250,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               aria-label="Go to homepage"
               onPointerUp={() => navigate(session ? "/tools" : "/")}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(session ? "/tools" : "/"); }}
-              className="group flex items-center space-x-4 relative p-2 -m-2 cursor-pointer z-40"
+              className="group flex items-center space-x-4 relative p-2 -m-2 cursor-pointer z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-2xl"
             >
               <div className="relative">
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-2xl border-3 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge animate-reigh-color-cycle">
@@ -403,7 +403,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 aria-label="Go to homepage"
                 onPointerUp={() => navigate(session ? "/tools" : "/")}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(session ? "/tools" : "/"); }}
-                className="group relative cursor-pointer z-40"
+                className="group relative cursor-pointer z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-xl"
               >
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
