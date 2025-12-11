@@ -31,6 +31,7 @@ export interface ImageGalleryHeaderProps {
   
   // Filter props
   hideTopFilters?: boolean;
+  hideMediaTypeFilter?: boolean;
   showStarredOnly: boolean;
   onStarredFilterChange?: (starredOnly: boolean) => void;
   onDownloadStarred?: () => void;
@@ -84,6 +85,7 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
   
   // Filter props
   hideTopFilters = false,
+  hideMediaTypeFilter = false,
   showStarredOnly,
   onStarredFilterChange,
   onDownloadStarred,
@@ -139,19 +141,34 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
           compact={true}
           isBottom={false}
           rightContent={!hideTopFilters ? (
-            <div className="flex items-center">
-              <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
-                onMediaTypeFilterChange?.(value);
-              }}>
-                <SelectTrigger id="media-type-filter" className={`h-8 text-xs w-[80px] ${whiteText ? 'bg-zinc-800 border-zinc-700 text-white' : ''}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">All</SelectItem>
-                  <SelectItem value="image" className="text-xs">Images</SelectItem>
-                  <SelectItem value="video" className="text-xs">Videos</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-2">
+              {/* Star filter - show here when media type filter is hidden */}
+              {hideMediaTypeFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`p-1 h-8 w-8 ${whiteText ? 'text-zinc-400 hover:text-white hover:bg-zinc-700' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => onStarredFilterChange?.(!showStarredOnly)}
+                  aria-label={showStarredOnly ? "Show all items" : "Show only starred items"}
+                >
+                  <Star className="h-5 w-5" fill={showStarredOnly ? 'currentColor' : 'none'} />
+                </Button>
+              )}
+              {/* Media type filter */}
+              {!hideMediaTypeFilter && (
+                <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
+                  onMediaTypeFilterChange?.(value);
+                }}>
+                  <SelectTrigger id="media-type-filter" className={`h-8 text-xs w-[80px] ${whiteText ? 'bg-zinc-800 border-zinc-700 text-white' : ''}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">All</SelectItem>
+                    <SelectItem value="image" className="text-xs">Images</SelectItem>
+                    <SelectItem value="video" className="text-xs">Videos</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           ) : undefined}
         />
@@ -164,52 +181,69 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
             Showing {rangeStart}-{rangeEnd} of {totalFilteredItems}
           </span>
         
-          {/* Media Type Filter on the right */}
+          {/* Filters on the right */}
           {!hideTopFilters && (
-            <div className="flex items-center">
-              <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
-                onMediaTypeFilterChange?.(value);
-              }}>
-                <SelectTrigger id="media-type-filter-single" className={`h-8 text-xs w-[80px] ${whiteText ? 'bg-zinc-800 border-zinc-700 text-white' : ''}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">All</SelectItem>
-                  <SelectItem value="image" className="text-xs">Images</SelectItem>
-                  <SelectItem value="video" className="text-xs">Videos</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-2">
+              {/* Star filter - show here when media type filter is hidden */}
+              {hideMediaTypeFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`p-1 h-8 w-8 ${whiteText ? 'text-zinc-400 hover:text-white hover:bg-zinc-700' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => onStarredFilterChange?.(!showStarredOnly)}
+                  aria-label={showStarredOnly ? "Show all items" : "Show only starred items"}
+                >
+                  <Star className="h-5 w-5" fill={showStarredOnly ? 'currentColor' : 'none'} />
+                </Button>
+              )}
+              {/* Media type filter */}
+              {!hideMediaTypeFilter && (
+                <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
+                  onMediaTypeFilterChange?.(value);
+                }}>
+                  <SelectTrigger id="media-type-filter-single" className={`h-8 text-xs w-[80px] ${whiteText ? 'bg-zinc-800 border-zinc-700 text-white' : ''}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">All</SelectItem>
+                    <SelectItem value="image" className="text-xs">Images</SelectItem>
+                    <SelectItem value="video" className="text-xs">Videos</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* Filters row */}
-      <ImageGalleryFilters
-        showShotFilter={showShotFilter}
-        allShots={allShots}
-        shotFilter={shotFilter}
-        onShotFilterChange={onShotFilterChange}
-        excludePositioned={excludePositioned}
-        onExcludePositionedChange={onExcludePositionedChange}
-        whiteText={whiteText}
-        showSearch={showSearch}
-        isSearchOpen={isSearchOpen}
-        searchTerm={searchTerm}
-        searchInputRef={searchInputRef}
-        toggleSearch={toggleSearch}
-        clearSearch={clearSearch}
-        handleSearchChange={handleSearchChange}
-        hideTopFilters={hideTopFilters}
-        showStarredOnly={showStarredOnly}
-        onStarredFilterChange={onStarredFilterChange}
-        onDownloadStarred={onDownloadStarred}
-        isDownloadingStarred={isDownloadingStarred}
-        toolTypeFilterEnabled={toolTypeFilterEnabled}
-        onToolTypeFilterChange={onToolTypeFilterChange}
-        currentToolTypeName={currentToolTypeName}
-        isMobile={isMobile}
-      />
+      {/* Filters row - hide when star has been moved to pagination row and there's nothing else to show */}
+      {(showShotFilter || showSearch || currentToolTypeName || !hideMediaTypeFilter) && (
+        <ImageGalleryFilters
+          showShotFilter={showShotFilter}
+          allShots={allShots}
+          shotFilter={shotFilter}
+          onShotFilterChange={onShotFilterChange}
+          excludePositioned={excludePositioned}
+          onExcludePositionedChange={onExcludePositionedChange}
+          whiteText={whiteText}
+          showSearch={showSearch}
+          isSearchOpen={isSearchOpen}
+          searchTerm={searchTerm}
+          searchInputRef={searchInputRef}
+          toggleSearch={toggleSearch}
+          clearSearch={clearSearch}
+          handleSearchChange={handleSearchChange}
+          hideTopFilters={hideTopFilters || hideMediaTypeFilter}
+          showStarredOnly={showStarredOnly}
+          onStarredFilterChange={onStarredFilterChange}
+          onDownloadStarred={onDownloadStarred}
+          isDownloadingStarred={isDownloadingStarred}
+          toolTypeFilterEnabled={toolTypeFilterEnabled}
+          onToolTypeFilterChange={onToolTypeFilterChange}
+          currentToolTypeName={currentToolTypeName}
+          isMobile={isMobile}
+        />
+      )}
     </div>
   );
 };

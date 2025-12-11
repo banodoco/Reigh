@@ -20,6 +20,10 @@ import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individual
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import { useJoinClipsSettings } from '@/tools/join-clips/hooks/useJoinClipsSettings';
+import { 
+    validateClipsForJoin, 
+    type ClipFrameInfo,
+} from '@/tools/join-clips/utils/validation';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useLoraManager, type LoraModel, type ActiveLora } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
@@ -247,6 +251,39 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         loras: joinLoras = [],
     } = joinSettings.settings;
     
+    // Calculate validation result for join clips based on segment frame counts
+    const joinValidationResult = useMemo((): ValidationResult | null => {
+        // Filter to only segments (exclude join outputs)
+        const segmentsOnly = sortedChildren.filter(child => {
+            const url = child.location || '';
+            return !url.includes('/joined_');
+        });
+        
+        if (segmentsOnly.length < 2) return null;
+        
+        // Build clip frame info from segment metadata
+        const clipFrameInfos: ClipFrameInfo[] = segmentsOnly.map((child, index) => {
+            // Get num_frames from child params/metadata
+            const params = child.params as any;
+            const numFrames = params?.num_frames || 
+                              params?.orchestrator_details?.segment_frames_target || 
+                              61; // Default to 61 if unknown
+            
+            return {
+                index,
+                name: `Segment ${index + 1}`,
+                frameCount: numFrames,
+                source: params?.num_frames ? 'metadata' : 'estimated',
+            };
+        });
+        
+        return validateClipsForJoin(
+            clipFrameInfos,
+            joinContextFrames,
+            joinGapFrames,
+            joinReplaceMode
+        );
+    }, [sortedChildren, joinContextFrames, joinGapFrames, joinReplaceMode]);
 
     // Fetch parent generation details to check for final output
     const { data: parentGeneration } = useQuery({
@@ -1035,14 +1072,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             gapFrames={joinGapFrames}
                             setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
                             contextFrames={joinContextFrames}
-                            setContextFrames={(val) => {
-                                const maxGap = Math.max(1, 81 - (val * 2));
-                                const newGapFrames = joinGapFrames > maxGap ? maxGap : joinGapFrames;
-                                joinSettings.updateFields({ 
-                                    contextFrameCount: val, 
-                                    gapFrameCount: newGapFrames 
-                                });
-                            }}
+                            setContextFrames={(val) => joinSettings.updateField('contextFrameCount', val)}
                             replaceMode={joinReplaceMode}
                             setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
                             keepBridgingImages={keepBridgingImages}
@@ -1059,6 +1089,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             isGenerating={isJoiningClips}
                             generateSuccess={joinClipsSuccess}
                             generateButtonText="Create Joined Video"
+                            shortestClipFrames={joinValidationResult?.shortestClipFrames}
                         />
                     </div>
                 </div>

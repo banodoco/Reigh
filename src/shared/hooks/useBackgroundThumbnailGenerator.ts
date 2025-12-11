@@ -78,7 +78,7 @@ export function useBackgroundThumbnailGenerator({
         location: videoUrl?.substring(videoUrl.lastIndexOf('/') + 1) || 'none',
         hasRealThumbnail,
         currentStatus: currentStatus || 'none',
-        passesFilter: isDefinitelyVideo && hasUrl && !hasRealThumbnail && currentStatus !== 'processing' && currentStatus !== 'success'
+        passesFilter: isDefinitelyVideo && hasUrl && !hasRealThumbnail && currentStatus !== 'processing' && currentStatus !== 'success' && currentStatus !== 'error'
       });
       
       // Must be a video (check isVideo property or URL extension)
@@ -90,8 +90,8 @@ export function useBackgroundThumbnailGenerator({
       // Must NOT have a real image thumbnail (if thumbUrl is .mp4, it's not a real thumbnail!)
       if (hasRealThumbnail) return false;
       
-      // Must not already be processed or processing
-      if (currentStatus === 'processing' || currentStatus === 'success') return false;
+      // Must not already be processed, processing, or errored (avoid retry loops)
+      if (currentStatus === 'processing' || currentStatus === 'success' || currentStatus === 'error') return false;
       
       return true;
     });

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, useRef, Suspense, useMemo } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -14,7 +14,7 @@ import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { JoinClipsSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
-import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -28,6 +28,13 @@ import { cn } from '@/shared/lib/utils';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { Card } from '@/shared/components/ui/card';
 import { extractVideoPosterFrame, extractVideoFinalFrame } from '@/shared/utils/videoPosterExtractor';
+import { extractVideoMetadataFromUrl } from '@/shared/lib/videoUploader';
+import { 
+  validateClipsForJoin, 
+  calculateEffectiveFrameCount,
+  type ClipFrameInfo,
+  type ValidationResult,
+} from '../utils/validation';
 import { useJoinClipsSettings } from '../hooks/useJoinClipsSettings';
 import { generateUUID } from '@/shared/lib/taskCreation';
 import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
@@ -59,6 +66,9 @@ interface VideoClip {
   file?: File;
   loaded: boolean;
   playing: boolean;
+  // Duration/frame info for validation
+  durationSeconds?: number;
+  metadataLoading?: boolean;
 }
 
 interface TransitionPrompt {
@@ -442,6 +452,12 @@ const JoinClipsPage: React.FC = () => {
   const videosLoading = generationsQuery.isLoading;
   const videosFetching = generationsQuery.isFetching;
   
+  // Delete mutation for gallery items
+  const deleteGenerationMutation = useDeleteGeneration();
+  const handleDeleteGeneration = useCallback((id: string) => {
+    deleteGenerationMutation.mutate(id);
+  }, [deleteGenerationMutation]);
+  
   // Clear videosViewJustEnabled flag when data loads
   useEffect(() => {
     if (videosViewJustEnabled && videosData?.items) {
@@ -488,6 +504,7 @@ const JoinClipsPage: React.FC = () => {
               url: clip.url,
               posterUrl: clip.posterUrl,
               finalFrameUrl: clip.finalFrameUrl,
+              durationSeconds: clip.durationSeconds,
               loaded: false,
               playing: false
             });
@@ -510,7 +527,7 @@ const JoinClipsPage: React.FC = () => {
             id: generateUUID(),
             url: joinSettings.settings.startingVideoUrl,
             posterUrl: joinSettings.settings.startingVideoPosterUrl,
-            finalFrameUrl: joinSettings.settings.startingVideoFinalFrameUrl,
+            // Legacy format doesn't have finalFrameUrl
             loaded: false,
             playing: false
           });
@@ -521,7 +538,7 @@ const JoinClipsPage: React.FC = () => {
             id: generateUUID(),
             url: joinSettings.settings.endingVideoUrl,
             posterUrl: joinSettings.settings.endingVideoPosterUrl,
-            finalFrameUrl: joinSettings.settings.endingVideoFinalFrameUrl,
+            // Legacy format doesn't have finalFrameUrl
             loaded: false,
             playing: false
           });
@@ -580,7 +597,8 @@ const JoinClipsPage: React.FC = () => {
       .map(clip => ({
         url: clip.url,
         posterUrl: clip.posterUrl,
-        finalFrameUrl: clip.finalFrameUrl
+        finalFrameUrl: clip.finalFrameUrl,
+        durationSeconds: clip.durationSeconds
       }));
     
     // Convert transitionPrompts to indexed format for persistence
@@ -607,6 +625,77 @@ const JoinClipsPage: React.FC = () => {
       });
     }
   }, [clips, transitionPrompts, settingsLoaded, joinSettings]);
+  
+  // Lazy-load duration for clips that have URLs but no duration (e.g., loaded from settings)
+  useEffect(() => {
+    const clipsNeedingDuration = clips.filter(
+      clip => clip.url && clip.durationSeconds === undefined && !clip.metadataLoading
+    );
+    
+    if (clipsNeedingDuration.length === 0) return;
+    
+    console.log('[JoinClips] Loading duration for', clipsNeedingDuration.length, 'clips');
+    
+    // Mark clips as loading
+    setClips(prev => prev.map(clip => 
+      clipsNeedingDuration.some(c => c.id === clip.id)
+        ? { ...clip, metadataLoading: true }
+        : clip
+    ));
+    
+    // Load duration for each clip
+    clipsNeedingDuration.forEach(async (clip) => {
+      try {
+        const metadata = await extractVideoMetadataFromUrl(clip.url);
+        console.log('[JoinClips] Loaded duration for clip:', clip.id.substring(0, 8), metadata.duration_seconds, 'seconds');
+        
+        setClips(prev => prev.map(c => 
+          c.id === clip.id
+            ? { ...c, durationSeconds: metadata.duration_seconds, metadataLoading: false }
+            : c
+        ));
+      } catch (error) {
+        console.error('[JoinClips] Failed to load duration for clip:', clip.id, error);
+        setClips(prev => prev.map(c => 
+          c.id === clip.id
+            ? { ...c, durationSeconds: 0, metadataLoading: false }
+            : c
+        ));
+      }
+    });
+  }, [clips]);
+  
+  // Calculate validation result based on current settings and clip durations
+  const validationResult = useMemo((): ValidationResult | null => {
+    const validClips = clips.filter(c => c.url);
+    if (validClips.length < 2) return null;
+    
+    // Check if any clips are still loading duration
+    const stillLoading = validClips.some(c => c.metadataLoading || c.durationSeconds === undefined);
+    if (stillLoading) return null;
+    
+    // Build clip frame info array
+    const clipFrameInfos: ClipFrameInfo[] = validClips.map((clip, index) => {
+      const frameCount = clip.durationSeconds 
+        ? calculateEffectiveFrameCount(clip.durationSeconds, useInputVideoFps)
+        : 0;
+      
+      return {
+        index,
+        name: `Clip #${index + 1}`,
+        frameCount,
+        durationSeconds: clip.durationSeconds,
+        source: clip.durationSeconds ? 'estimated' : 'unknown',
+      };
+    });
+    
+    return validateClipsForJoin(
+      clipFrameInfos,
+      contextFrameCount,
+      gapFrameCount,
+      replaceMode
+    );
+  }, [clips, contextFrameCount, gapFrameCount, replaceMode, useInputVideoFps]);
   
   // Ensure minimum of 2 clips, auto-add empty slot when all slots are filled, and remove extra trailing empty slots
   useEffect(() => {
@@ -701,7 +790,7 @@ const JoinClipsPage: React.FC = () => {
   const uploadVideoFile = async (
     file: File, 
     clipId: string
-  ): Promise<{ videoUrl: string; posterUrl: string; finalFrameUrl: string } | null> => {
+  ): Promise<{ videoUrl: string; posterUrl: string; finalFrameUrl: string; durationSeconds: number } | null> => {
     if (!file.type.startsWith('video/')) {
       toast({
         title: 'Invalid file type',
@@ -713,10 +802,25 @@ const JoinClipsPage: React.FC = () => {
     
     setUploadingClipId(clipId);
     try {
-      // Extract both first and final frames
-      const [posterBlob, finalFrameBlob] = await Promise.all([
+      // Extract video metadata (duration) and both first and final frames in parallel
+      const videoElement = document.createElement('video');
+      videoElement.preload = 'metadata';
+      const durationPromise = new Promise<number>((resolve) => {
+        videoElement.onloadedmetadata = () => {
+          resolve(videoElement.duration);
+          URL.revokeObjectURL(videoElement.src);
+        };
+        videoElement.onerror = () => {
+          resolve(0); // Fallback to 0 if we can't get duration
+          URL.revokeObjectURL(videoElement.src);
+        };
+        videoElement.src = URL.createObjectURL(file);
+      });
+      
+      const [posterBlob, finalFrameBlob, durationSeconds] = await Promise.all([
         extractVideoPosterFrame(file),
-        extractVideoFinalFrame(file)
+        extractVideoFinalFrame(file),
+        durationPromise
       ]);
       
       const fileExt = file.name.split('.').pop() || 'mp4';
@@ -765,7 +869,8 @@ const JoinClipsPage: React.FC = () => {
         description: 'Your video has been saved',
       });
       
-      return { videoUrl, posterUrl, finalFrameUrl };
+      console.log('[JoinClips] Video uploaded with duration:', durationSeconds, 'seconds');
+      return { videoUrl, posterUrl, finalFrameUrl, durationSeconds };
     } catch (error) {
       console.error('Error uploading video:', error);
       toast({
@@ -836,7 +941,16 @@ const JoinClipsPage: React.FC = () => {
     
     setClips(prev => prev.map(clip => 
       clip.id === clipId
-        ? { ...clip, url: result.videoUrl, posterUrl: result.posterUrl, finalFrameUrl: result.finalFrameUrl, file, loaded: false, playing: false }
+        ? { 
+            ...clip, 
+            url: result.videoUrl, 
+            posterUrl: result.posterUrl, 
+            finalFrameUrl: result.finalFrameUrl, 
+            durationSeconds: result.durationSeconds,
+            file, 
+            loaded: false, 
+            playing: false 
+          }
         : clip
     ));
   };
@@ -890,7 +1004,16 @@ const JoinClipsPage: React.FC = () => {
     
     setClips(prev => prev.map(clip => 
       clip.id === clipId
-        ? { ...clip, url: result.videoUrl, posterUrl: result.posterUrl, finalFrameUrl: result.finalFrameUrl, file, loaded: false, playing: false }
+        ? { 
+            ...clip, 
+            url: result.videoUrl, 
+            posterUrl: result.posterUrl, 
+            finalFrameUrl: result.finalFrameUrl, 
+            durationSeconds: result.durationSeconds,
+            file, 
+            loaded: false, 
+            playing: false 
+          }
         : clip
     ));
   };
@@ -1196,14 +1319,7 @@ const JoinClipsPage: React.FC = () => {
                             gapFrames={gapFrameCount}
                             setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
                             contextFrames={contextFrameCount}
-                            setContextFrames={(val) => {
-                              const maxGap = Math.max(1, 81 - (val * 2));
-                              const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
-                              joinSettings.updateFields({ 
-                                contextFrameCount: val, 
-                                gapFrameCount: newGapFrames 
-                              });
-                            }}
+                            setContextFrames={(val) => joinSettings.updateField('contextFrameCount', val)}
                             replaceMode={replaceMode}
                             setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
                             keepBridgingImages={keepBridgingImages}
@@ -1238,7 +1354,7 @@ const JoinClipsPage: React.FC = () => {
                               const transitionCount = Math.max(0, validClipsCount - 1);
                               return `Generate (${transitionCount} transition${transitionCount !== 1 ? 's' : ''})`;
                             })()}
-                            isGenerateDisabled={clips.filter(c => c.url).length < 2}
+                            isGenerateDisabled={clips.filter(c => c.url).length < 2 || clips.some(c => c.url && c.metadataLoading)}
                             onRestoreDefaults={() => {
                               // Import defaults from settings file
                               joinSettings.updateFields({
@@ -1254,8 +1370,9 @@ const JoinClipsPage: React.FC = () => {
                                 useInputVideoFps: false,
                               });
                               // Clear LoRAs
-                              loraManager.clearAll?.();
+                              loraManager.setSelectedLoras([]);
                             }}
+                            shortestClipFrames={validationResult?.shortestClipFrames}
                           />
         </Card>
 
@@ -1293,16 +1410,20 @@ const JoinClipsPage: React.FC = () => {
                   allShots={[]}
                   onAddToLastShot={async () => false}
                   onAddToLastShotWithoutPosition={async () => false}
+                  onDelete={handleDeleteGeneration}
+                  isDeleting={deleteGenerationMutation.isPending ? deleteGenerationMutation.variables as string : null}
                   currentToolType="join-clips"
                   initialMediaTypeFilter="video"
                   initialToolTypeFilter={true}
-                  currentToolTypeName="Join Clips"
                   showShotFilter={false}
                   initialShotFilter="all"
                   columnsPerRow={3}
                   itemsPerPage={isMobile ? 20 : 12}
                   reducedSpacing={true}
                   hidePagination={videosData.items.length <= (isMobile ? 20 : 12)}
+                  hideBottomPagination={true}
+                  hideMediaTypeFilter={true}
+                  showShare={false}
                 />
               </div>
             );

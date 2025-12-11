@@ -95,6 +95,7 @@ export interface ImageGalleryProps {
   reducedSpacing?: boolean;
   hidePagination?: boolean;
   hideTopFilters?: boolean;
+  hideMediaTypeFilter?: boolean;
   onPrefetchAdjacentPages?: (prevPage: number | null, nextPage: number | null) => void;
   enableAdjacentPagePreloading?: boolean;
   onCreateShot?: (shotName: string, files: File[]) => Promise<void>;

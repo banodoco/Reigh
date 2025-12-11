@@ -102,6 +102,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     reducedSpacing = false,
     hidePagination = false,
     hideTopFilters = false,
+    hideMediaTypeFilter = false,
     onPrefetchAdjacentPages,
     enableAdjacentPagePreloading = true,
     onCreateShot,
@@ -563,6 +564,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
             
             // Filter props
             hideTopFilters={hideTopFilters}
+            hideMediaTypeFilter={hideMediaTypeFilter}
             showStarredOnly={filtersHook.showStarredOnly}
             onStarredFilterChange={(val) => {
               const next = Boolean(val);
@@ -788,7 +790,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
         onServerPageChange={onServerPageChange}
         onNext={handleNextImage}
         onPrevious={handlePreviousImage}
-        onDelete={actionsHook.handleOptimisticDelete}
+        onDelete={showDelete ? actionsHook.handleOptimisticDelete : undefined}
         isDeleting={isDeleting}
         onApplySettings={onApplySettings}
         simplifiedShotOptions={simplifiedShotOptions}

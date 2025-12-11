@@ -8,7 +8,7 @@ import { ReighLoading } from '@/shared/components/ReighLoading';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { InlineEditVideoView } from '../components/InlineEditVideoView';
-import { useGenerations } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
 import ImageGallery from '@/shared/components/ImageGallery';
 import { useListShots } from '@/shared/hooks/useShots';
 import { cn } from '@/shared/lib/utils';
@@ -42,6 +42,12 @@ export default function EditVideoPage() {
   const [isLoadingPersistedMedia, setIsLoadingPersistedMedia] = useState(false);
   const isMobile = useIsMobile();
   const { data: shots } = useListShots(selectedProjectId);
+  
+  // Delete mutation for gallery items
+  const deleteGenerationMutation = useDeleteGeneration();
+  const handleDeleteGeneration = useCallback((id: string) => {
+    deleteGenerationMutation.mutate(id);
+  }, [deleteGenerationMutation]);
   
   // Track if we've already loaded from settings to prevent re-loading
   const hasLoadedFromSettings = useRef(false);
@@ -444,13 +450,16 @@ export default function EditVideoPage() {
                     totalCount={(resultsData as any)?.total || 0}
                     onServerPageChange={setResultsPage}
                     serverPage={resultsPage}
-                    showDelete={false}
+                    onDelete={handleDeleteGeneration}
+                    isDeleting={deleteGenerationMutation.isPending ? deleteGenerationMutation.variables as string : null}
                     showDownload={true}
                     showShare={false}
                     showEdit={false}
                     showStar={true}
                     showAddToShot={true}
                     enableSingleClick={true}
+                    hideMediaTypeFilter={true}
+                    hideBottomPagination={true}
                   />
                 )}
               </div>
@@ -526,13 +535,16 @@ export default function EditVideoPage() {
                     totalCount={(resultsData as any)?.total || 0}
                     onServerPageChange={setResultsPage}
                     serverPage={resultsPage}
-                    showDelete={false}
+                    onDelete={handleDeleteGeneration}
+                    isDeleting={deleteGenerationMutation.isPending ? deleteGenerationMutation.variables as string : null}
                     showDownload={true}
                     showShare={false}
                     showEdit={false}
                     showStar={true}
                     showAddToShot={true}
                     enableSingleClick={true}
+                    hideMediaTypeFilter={true}
+                    hideBottomPagination={true}
                   />
                 )}
               </div>

@@ -24,8 +24,13 @@ export const joinClipsSettings = {
     startingVideoPosterUrl: undefined as string | undefined,
     endingVideoUrl: undefined as string | undefined,
     endingVideoPosterUrl: undefined as string | undefined,
-    // New multi-clip format
-    clips: [] as Array<{ url: string; posterUrl?: string }>,
+    // New multi-clip format (with optional duration for validation)
+    clips: [] as Array<{ 
+      url: string; 
+      posterUrl?: string; 
+      finalFrameUrl?: string;
+      durationSeconds?: number;  // Video duration for frame validation
+    }>,
     transitionPrompts: [] as Array<{ clipIndex: number; prompt: string }>, // Prompts for each transition
     loras: [] as Array<{ id: string; strength: number }>, // Saved LoRA configurations
     hasEverSetLoras: false as boolean, // Track if user has ever set LoRAs
