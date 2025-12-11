@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, Globe, Lock, ChevronDown, Sun, Moon } from "lucide-react";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
@@ -111,6 +111,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   
   // Settings section toggle (Generation vs Transactions vs Preferences)
   const [settingsSection, setSettingsSection] = useState<'app' | 'transactions' | 'preferences'>('app');
+  
+  // Lock modal height based on first section content
+  const [lockedHeight, setLockedHeight] = useState<number | null>(null);
+  const dialogContentRef = useRef<HTMLDivElement>(null);
+  
+  // Measure and lock height when modal opens on first section
+  useLayoutEffect(() => {
+    if (isOpen && settingsSection === 'app' && dialogContentRef.current && lockedHeight === null) {
+      // Small delay to let content render
+      const timer = setTimeout(() => {
+        if (dialogContentRef.current) {
+          const height = dialogContentRef.current.offsetHeight;
+          setLockedHeight(height);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, settingsSection, lockedHeight]);
+  
+  // Reset locked height when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setLockedHeight(null);
+    }
+  }, [isOpen]);
   
   // Dark mode
   const { darkMode, setDarkMode } = useDarkMode();
@@ -470,8 +495,12 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
+        ref={dialogContentRef}
         className={modal.className}
-        style={{ ...modal.style, height: modal.isMobile ? undefined : '90vh' }}
+        style={{ 
+          ...modal.style, 
+          ...(lockedHeight ? { height: lockedHeight, maxHeight: '90vh' } : { maxHeight: '90vh' })
+        }}
         {...modal.props}
       >
         
