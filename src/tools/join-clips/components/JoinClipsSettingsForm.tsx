@@ -907,8 +907,17 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                 {shortestClipFrames && shortestClipFrames > 0 && (
                                     <>
                                         <span className="mx-2">•</span>
-                                        <span className="font-medium">Shortest clip:</span>{' '}
-                                        <span className="font-mono">{shortestClipFrames}</span> frames
+                                        {shortestClipFrames > 81 ? (
+                                            <>
+                                                <span className="font-medium">Constrained by max generation:</span>{' '}
+                                                <span className="font-mono">81</span> frames
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="font-medium">Constrained by shortest clip:</span>{' '}
+                                                <span className="font-mono">{shortestClipFrames}</span> frames
+                                            </>
+                                        )}
                                         <span className="mx-2">•</span>
                                         <span className="font-medium">Using:</span>{' '}
                                         <span className={cn(

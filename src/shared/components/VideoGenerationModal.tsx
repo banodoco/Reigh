@@ -301,38 +301,83 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
           {...modal.props}
         >
           <DialogHeader className={modal.headerClass}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <DialogTitle className="text-xl font-light">
-                  Generate Video - {shot.name || 'Unnamed Shot'}
-                </DialogTitle>
+            {modal.isMobile ? (
+              // Mobile layout: title and button on left (stacked), images on right
+              <div className="flex items-start gap-3 mb-2">
+                {/* Left side: Title and button stacked */}
+                <div className="flex flex-col gap-2 flex-1 min-w-0" style={{ maxWidth: '50%' }}>
+                  {/* Shot name - can wrap if > 1/2 width */}
+                  <DialogTitle className="text-xl font-light text-left break-words">
+                    Generate Video - {shot.name || 'Unnamed Shot'}
+                  </DialogTitle>
+                  
+                  {/* Open Shot Editor button below title */}
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={handleNavigateToShot} 
+                    className="gap-1 self-start text-xs whitespace-normal h-auto py-1.5"
+                  >
+                    <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                    <span className="break-words leading-tight">Open Shot Editor</span>
+                  </Button>
+                </div>
                 
-                {/* Input images preview - next to title */}
-                <div className="flex items-center gap-1">
+                {/* Images - on the right */}
+                <div className="flex items-center gap-1 flex-shrink-0">
                   {positionedImages.slice(0, 6).map((img, idx) => (
                     <img
                       key={img.id || idx}
                       src={getDisplayUrl(img.thumbUrl || img.imageUrl || img.location)}
                       alt={`Image ${idx + 1}`}
-                      className="w-7 h-7 object-cover rounded border border-zinc-600"
+                      className="w-7 h-7 object-cover rounded border border-zinc-600 flex-shrink-0"
                     />
                   ))}
                   {positionedImages.length > 6 && (
-                    <div className="w-7 h-7 rounded border border-zinc-600 bg-zinc-700 flex items-center justify-center text-[10px] text-zinc-400">
+                    <div className="w-7 h-7 rounded border border-zinc-600 bg-zinc-700 flex items-center justify-center text-[10px] text-zinc-400 flex-shrink-0">
                       +{positionedImages.length - 6}
                     </div>
                   )}
+                  {positionedImages.length < 1 && (
+                    <span className="text-xs text-amber-500 whitespace-nowrap">(need 1+ images)</span>
+                  )}
                 </div>
-                {positionedImages.length < 1 && (
-                  <span className="text-xs text-amber-500">(need 1+ images)</span>
-                )}
               </div>
-              
-              <Button variant="ghost" size="sm" onClick={handleNavigateToShot} className="text-zinc-400 hover:text-white hover:bg-zinc-700 gap-1 flex-shrink-0">
-                <ExternalLink className="h-4 w-4" />
-                Open Shot Editor
-              </Button>
-            </div>
+            ) : (
+              // Desktop layout: original horizontal layout
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <DialogTitle className="text-xl font-light">
+                    Generate Video - {shot.name || 'Unnamed Shot'}
+                  </DialogTitle>
+                  
+                  {/* Input images preview - next to title */}
+                  <div className="flex items-center gap-1">
+                    {positionedImages.slice(0, 6).map((img, idx) => (
+                      <img
+                        key={img.id || idx}
+                        src={getDisplayUrl(img.thumbUrl || img.imageUrl || img.location)}
+                        alt={`Image ${idx + 1}`}
+                        className="w-7 h-7 object-cover rounded border border-zinc-600"
+                      />
+                    ))}
+                    {positionedImages.length > 6 && (
+                      <div className="w-7 h-7 rounded border border-zinc-600 bg-zinc-700 flex items-center justify-center text-[10px] text-zinc-400">
+                        +{positionedImages.length - 6}
+                      </div>
+                    )}
+                  </div>
+                  {positionedImages.length < 1 && (
+                    <span className="text-xs text-amber-500">(need 1+ images)</span>
+                  )}
+                </div>
+                
+                <Button variant="secondary" size="sm" onClick={handleNavigateToShot} className="gap-1 flex-shrink-0 mr-2">
+                  <ExternalLink className="h-4 w-4" />
+                  Open Shot Editor
+                </Button>
+              </div>
+            )}
           </DialogHeader>
           
           <div className={`${modal.scrollClass} -mx-6 px-6 flex-1 min-h-0`}>
