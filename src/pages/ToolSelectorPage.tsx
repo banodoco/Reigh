@@ -308,15 +308,6 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
       {/* Horizontal layout for Process tools */}
       {!isSquare ? (
         <div className="flex items-center h-full px-2 py-1 sm:px-3 sm:py-1.5 lg:px-4 lg:py-2 relative">
-          {/* Large subtle number in background - responsive visibility */}
-          {index !== undefined && isLg && (
-            <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 -translate-y-5">
-              <span className="font-theme text-[8rem] lg:text-[10.5rem] font-theme-light text-wes-vintage-gold/30 select-none block w-20 lg:w-24 text-center">
-                {index + 1}
-              </span>
-            </div>
-          )}
-          
           {/* Icon */}
           <div className={`flex-shrink-0 ${isSm ? 'mr-4' : 'mr-3'} ${isLg ? 'mr-6' : ''} relative z-10`}>
             <div className={`${iconContainerSize} bg-gradient-to-br ${item.gradient} rounded-xl sm:rounded-2xl flex items-center justify-center shadow-wes-deep ${!isDisabled ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>

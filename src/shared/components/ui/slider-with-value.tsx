@@ -74,13 +74,13 @@ const SliderWithValue = ({
       )}
       <div className="flex gap-4">
         {formatValue ? (
-          <div className={`border rounded ${numberInputClassName} h-10 flex items-center justify-center bg-white`}>
+          <div className={`border rounded ${numberInputClassName} h-10 flex items-center justify-center bg-card dark:bg-gray-800`}>
             {formatValue(value)}
           </div>
         ) : (
           <input
             type="number"
-            className={`border rounded ${numberInputClassName} h-10 flex items-center justify-center bg-white text-center px-2`}
+            className={`border rounded ${numberInputClassName} h-10 flex items-center justify-center bg-card dark:bg-gray-800 text-center px-2`}
             value={inputValue}
             onChange={handleInputChange}
             step={step}

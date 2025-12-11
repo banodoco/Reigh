@@ -123,7 +123,7 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
           ref={scrollRef}
           className={`${modal.scrollClass} ${modal.isMobile ? 'px-4' : 'px-6'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4 relative`}
         >
-          <div className="space-y-4 pb-6 relative z-0">
+          <div className="space-y-4 pb-6">
             {/* Main Description */}
             <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
               <p>

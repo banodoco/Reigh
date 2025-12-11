@@ -253,7 +253,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               className="group flex items-center space-x-4 relative p-2 -m-2 cursor-pointer z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-2xl"
             >
               <div className="relative">
-                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-2xl border-3 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge animate-reigh-color-cycle">
+                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:from-wes-pink/90 dark:via-wes-lavender/90 dark:to-wes-dusty-blue/90 rounded-2xl border-3 border-wes-vintage-gold/40 dark:border-wes-vintage-gold/60 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge animate-reigh-color-cycle">
                   <Palette className="h-8 w-8 text-white group-hover:rotate-12 transition-transform duration-500 drop-shadow-lg" />
                 </div>
                 <div className="absolute -inset-1 border border-wes-vintage-gold/20 rounded-2xl animate-rotate-slow opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
@@ -265,7 +265,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             </div>
 
             {/* Project Management */}
-            <div className="flex items-center space-x-4 relative p-2 border-2 border-wes-vintage-gold/30 rounded-xl bg-white/50 shadow-wes-vintage z-40">
+            <div className="flex items-center space-x-4 relative p-2 border-2 border-wes-vintage-gold/30 rounded-xl bg-surface/50 dark:bg-surface/30 shadow-wes-vintage z-40">
               {isLoadingProjects && projects.length === 0 ? (
                 <div className="flex items-center space-x-4">
                   {/* Project Selector Skeleton */}
@@ -284,7 +284,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     onValueChange={handleProjectChange}
                     disabled={isLoadingProjects || projects.length === 0}
                   >
-                    <SelectTrigger className="w-[280px] wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-cocogoose text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-12 [&>svg]:opacity-30 relative z-50">
+                    <SelectTrigger className="w-[280px] wes-select border-2 border-wes-vintage-gold/30 bg-surface/95 dark:bg-surface/80 font-cocogoose text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-12 [&>svg]:opacity-30 relative z-50">
                       <SelectValue placeholder="Select a project" className="font-crimson text-primary" />
                     </SelectTrigger>
                     <SelectContent className="wes-vintage-card border-2 border-wes-vintage-gold/30 shadow-wes-deep">
@@ -334,7 +334,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-12 w-12 wes-button-subtle bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group disabled:cursor-not-allowed"
+                className="h-12 w-12 wes-button-subtle gradient-icon-coral border-2 border-wes-vintage-gold/30 shadow-wes-vintage hover:shadow-wes-hover group disabled:cursor-not-allowed"
                 disabled={isLoadingProjects || !selectedProject}
               >
                 <Wrench className="h-5 w-5 text-white transition-transform duration-300 group-hover:rotate-12" />
@@ -345,7 +345,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsCreateProjectModalOpen(true)} 
-                className="h-12 w-12 wes-button-pulse bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
+                className="h-12 w-12 wes-button-pulse gradient-icon-yellow border-2 border-wes-vintage-gold/30 shadow-wes-vintage hover:shadow-wes-hover group"
               >
                 <PlusCircle className="h-5 w-5 text-white transition-transform duration-300 group-hover:scale-110" />
               </Button>
@@ -355,7 +355,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           {/* Right side - Referral text and App Settings */}
           <div className="flex items-end gap-3 relative z-50">
             <button 
-              className="text-xs text-gray-400 underline cursor-pointer font-thin mb-0.5 hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500 relative z-50"
+              className="text-xs text-muted-foreground underline cursor-pointer font-thin mb-0.5 hover:text-foreground transition-colors duration-200 text-right touch-manipulation active:text-foreground/70 relative z-50"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -369,7 +369,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               variant="ghost"
               size="icon"
               onClick={onOpenSettings}
-              className="h-12 w-12 no-sweep wes-button-spin-pulse bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
+              className="h-12 w-12 no-sweep wes-button-spin-pulse gradient-icon-blue border-2 border-wes-vintage-gold/40 shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
             >
               {/* Animated background pattern */}
               <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain pointer-events-none"></div>
@@ -407,7 +407,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               >
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
-                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-xl border-2 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-300 animate-reigh-color-cycle">
+                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:from-wes-pink/90 dark:via-wes-lavender/90 dark:to-wes-dusty-blue/90 rounded-xl border-2 border-wes-vintage-gold/40 dark:border-wes-vintage-gold/60 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-300 animate-reigh-color-cycle">
                       <Palette className="h-6 w-6 text-white group-hover:rotate-12 transition-transform duration-300 drop-shadow-lg" />
                     </div>
                     <div className="absolute -top-1 -right-1 pointer-events-none">
@@ -432,7 +432,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-10 w-10 wes-button-subtle bg-gradient-to-br from-wes-coral to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-coral-dark hover:to-wes-salmon-dark shadow-wes-vintage hover:shadow-wes-hover group disabled:cursor-not-allowed"
+                className="h-10 w-10 wes-button-subtle gradient-icon-coral border-2 border-wes-vintage-gold/30 shadow-wes-vintage hover:shadow-wes-hover group disabled:cursor-not-allowed"
                 disabled={isLoadingProjects || !selectedProject}
               >
                 <Wrench className="h-4 w-4 text-white transition-transform duration-300 group-hover:rotate-12" />
@@ -443,7 +443,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsCreateProjectModalOpen(true)} 
-                className="h-10 w-10 wes-button-pulse bg-gradient-to-br from-wes-yellow to-wes-salmon border-2 border-wes-vintage-gold/30 hover:from-wes-yellow-dark hover:to-wes-salmon shadow-wes-vintage hover:shadow-wes-hover group"
+                className="h-10 w-10 wes-button-pulse gradient-icon-yellow border-2 border-wes-vintage-gold/30 shadow-wes-vintage hover:shadow-wes-hover group"
               >
                 <PlusCircle className="h-4 w-4 text-white transition-transform duration-300 group-hover:scale-110" />
               </Button>
@@ -452,7 +452,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             {/* Right side - Referral text and App Settings */}
             <div className="flex items-center gap-2 relative z-50">
               <button 
-                className="text-[10px] text-gray-400 underline cursor-pointer font-thin hover:text-gray-600 transition-colors duration-200 text-right touch-manipulation active:text-gray-500 min-h-[44px] px-2 py-2 relative z-50 max-w-[64px] leading-tight"
+                className="text-[10px] text-muted-foreground underline cursor-pointer font-thin hover:text-foreground transition-colors duration-200 text-right touch-manipulation active:text-foreground/70 min-h-[44px] px-2 py-2 relative z-50 max-w-[64px] leading-tight"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -472,7 +472,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={onOpenSettings}
-                className="h-10 w-10 no-sweep wes-button-spin-pulse bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
+                className="h-10 w-10 no-sweep wes-button-spin-pulse gradient-icon-blue border-2 border-wes-vintage-gold/40 shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
               >
                 <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain pointer-events-none"></div>
                 <Settings className="h-4 w-4 text-white relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />
@@ -482,7 +482,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
 
           {/* Bottom row - Project Selector */}
           <div className="flex items-center h-20 w-full border-t border-wes-vintage-gold/20 px-4 pt-2 pb-6">
-            <div className="flex-1 p-3 border-2 border-wes-vintage-gold/30 rounded-xl bg-white/50 shadow-wes-vintage relative z-40">
+            <div className="flex-1 p-3 border-2 border-wes-vintage-gold/30 rounded-xl bg-surface/50 dark:bg-surface/30 shadow-wes-vintage relative z-40">
               {isLoadingProjects && projects.length === 0 ? (
                 <div className="w-full h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
               ) : projects.length === 0 && !isLoadingProjects ? (
@@ -497,7 +497,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   onValueChange={handleProjectChange}
                   disabled={isLoadingProjects || projects.length === 0}
                 >
-                  <SelectTrigger className="w-full wes-select border-2 border-wes-vintage-gold/30 bg-white/95 font-cocogoose text-xs shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-10 [&>svg]:opacity-30 relative z-50">
+                  <SelectTrigger className="w-full wes-select border-2 border-wes-vintage-gold/30 bg-surface/95 dark:bg-surface/80 font-cocogoose text-xs shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-10 [&>svg]:opacity-30 relative z-50">
                     <SelectValue placeholder="Select project" className="font-crimson text-primary" />
                   </SelectTrigger>
                   <SelectContent className="wes-vintage-card border-2 border-wes-vintage-gold/30 shadow-wes-deep">

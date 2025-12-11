@@ -137,7 +137,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             <Button
               size="icon"
               variant="secondary"
-              className="h-8 w-8 bg-white/75 hover:bg-white/90"
+              className="h-8 w-8 bg-card/75 dark:bg-gray-800/75 hover:bg-card/90 dark:hover:bg-gray-800/90"
               onClick={(e) => {
                 e.stopPropagation();
                 // Open lightbox in unified edit mode
@@ -157,7 +157,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             <Button
               size="icon"
               variant="secondary"
-              className="h-8 w-8 bg-white/75 hover:bg-white/90"
+              className="h-8 w-8 bg-card/75 dark:bg-gray-800/75 hover:bg-card/90 dark:hover:bg-gray-800/90"
               onClick={(e) => {
                 e.stopPropagation();
                 // Use id (shot_generations.id) for duplication

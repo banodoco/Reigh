@@ -241,10 +241,10 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="mt-4">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-4">
+                  <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4 space-y-4">
                     <div className="space-y-3">
                       <div>
-                        <Label htmlFor="delete-confirm-input" className="text-sm font-light text-red-900">
+                        <Label htmlFor="delete-confirm-input" className="text-sm font-light text-red-900 dark:text-red-300">
                           Type "confirm" to make it clear you wish to delete the project and all associated data.
                         </Label>
                         <Input
@@ -253,7 +253,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
                           value={deleteConfirmText}
                           onChange={(e) => setDeleteConfirmText(e.target.value)}
                           disabled={isDeletingProject}
-                          className="mt-1 border-red-300 focus:border-red-500 focus:ring-red-500"
+                          className="mt-1 border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500 dark:bg-red-950/20 dark:text-red-100 dark:placeholder:text-red-400/50"
                         />
                       </div>
                       <Button

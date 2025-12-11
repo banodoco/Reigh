@@ -147,7 +147,10 @@ serve(async (req) => {
                             task.params?.orchestrator_details?.orchestrator_task_id ||
                             task.params?.originalParams?.orchestrator_details?.orchestrator_task_id ||
                             task.params?.orchestrator_task_id;
-    if (orchestratorRef) {
+    // IMPORTANT: Don't skip if the task references ITSELF as the orchestrator!
+    // This happens for orchestrator tasks (like join_clips_orchestrator) that store their own
+    // task ID in params.orchestrator_details.orchestrator_task_id for sub-tasks to reference.
+    if (orchestratorRef && orchestratorRef !== task.id) {
       logger.info("Skipping cost calculation (sub-task)", { 
         orchestrator_task_id: orchestratorRef 
       });

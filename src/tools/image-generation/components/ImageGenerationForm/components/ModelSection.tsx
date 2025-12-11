@@ -162,9 +162,9 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
                 className={cn(
                   "relative cursor-pointer rounded-lg border-2 overflow-hidden group",
                   "aspect-square transition-all hover:scale-105",
-                  isSelected 
-                    ? "border-purple-500 ring-2 ring-purple-500 shadow-lg" 
-                    : "border-gray-300 hover:border-purple-300"
+isSelected
+                    ? "border-purple-500 dark:border-purple-400 ring-2 ring-purple-500 dark:ring-purple-400 shadow-lg"
+                    : "border-border hover:border-purple-300 dark:hover:border-purple-600"
                 )}
                 onClick={() => !isGenerating && onSelectReference(ref.id)}
                 onTouchStart={(e) => {

@@ -20,7 +20,7 @@ const buttonVariants = cva(
         // Theme-adaptive variants
         theme: "theme-button bg-gradient-to-r from-primary to-primary/90 text-primary-foreground hover:from-primary/90 hover:to-primary shadow-theme hover:shadow-theme-hover border-2 border-primary/20",
         "theme-ghost": "theme-nav-item bg-transparent border-2 border-transparent hover:border-primary/20 hover:bg-accent/30",
-        "theme-outline": "border-2 border-primary/30 bg-white/80 hover:bg-accent/20 hover:border-primary/50 text-primary font-cocogoose tracking-wide transition-all duration-300",
+        "theme-outline": "border-2 border-primary/30 bg-card/80 dark:bg-card/90 hover:bg-accent/20 hover:border-primary/50 text-primary font-cocogoose tracking-wide transition-all duration-300",
         "theme-soft": "bg-gradient-to-br from-accent/80 to-secondary/80 border-2 border-primary/10 text-primary hover:from-accent hover:to-secondary shadow-theme hover:shadow-theme-hover",
         success: "bg-gradient-to-r from-secondary to-secondary/80 border-2 border-secondary/50 text-primary hover:from-secondary/90 hover:to-secondary shadow-theme hover:shadow-theme-hover transition-all duration-300",
         // Legacy aliases for backward compatibility

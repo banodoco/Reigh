@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, Globe, Lock, ChevronDown } from "lucide-react";
+import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, Globe, Lock, ChevronDown, Sun, Moon } from "lucide-react";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   Dialog,
@@ -39,6 +39,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { DialogFooter } from "@/shared/components/ui/dialog";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
+import { useDarkMode } from "@/shared/hooks/useDarkMode";
 import CreditsManagement from "./CreditsManagement";
 
 interface SettingsModalProps {
@@ -108,8 +109,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Memory profile preference (persistent)
   const [memoryProfile, setMemoryProfile] = usePersistentState<string>("memory-profile", "4");
   
-  // Settings section toggle (Generation vs Privacy vs Transactions)
-  const [settingsSection, setSettingsSection] = useState<'app' | 'user' | 'transactions'>('app');
+  // Settings section toggle (Generation vs Transactions vs Preferences)
+  const [settingsSection, setSettingsSection] = useState<'app' | 'transactions' | 'preferences'>('app');
+  
+  // Dark mode
+  const { darkMode, setDarkMode } = useDarkMode();
 
   // Generation method preferences (database-backed)
   const { 
@@ -467,7 +471,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
         className={modal.className}
-        style={modal.style}
+        style={{ ...modal.style, height: modal.isMobile ? undefined : '90vh' }}
         {...modal.props}
       >
         
@@ -489,16 +493,6 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                   Generation
                 </button>
                 <button
-                  onClick={() => setSettingsSection('user')}
-                  className={`${isMobile ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'} font-medium rounded-full transition-all duration-200 focus:outline-none ${
-                    settingsSection === 'user'
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Privacy
-                </button>
-                <button
                   onClick={() => setSettingsSection('transactions')}
                   className={`${isMobile ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'} font-medium rounded-full transition-all duration-200 focus:outline-none ${
                     settingsSection === 'transactions'
@@ -507,6 +501,16 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                   }`}
                 >
                   Transactions
+                </button>
+                <button
+                  onClick={() => setSettingsSection('preferences')}
+                  className={`${isMobile ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'} font-medium rounded-full transition-all duration-200 focus:outline-none ${
+                    settingsSection === 'preferences'
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                  }`}
+                >
+                  Preferences
                 </button>
               </div>
             </div>
@@ -525,100 +529,140 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
             </div>
           )}
 
-          {/* User Settings Section */}
-          {settingsSection === 'user' && (
+          {/* Preferences Section */}
+          {settingsSection === 'preferences' && (
             <div className="space-y-6">
-              {/* Privacy Defaults */}
-              {isLoadingPrivacyDefaults ? (
-                <div className="space-y-4">
-                  {/* Resources Toggle skeleton */}
-                  <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
-                    <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
-                      <Skeleton className="h-5 w-20" />
-                      <Skeleton className="h-8 w-40 rounded-full" />
+              {/* Appearance Subsection */}
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Appearance</h3>
+                <div className={`${isMobile ? 'p-3' : 'p-4'} bg-muted/30 rounded-lg space-y-2`}>
+                  <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                    <span className="font-medium">Theme</span>
+                    <div className="flex items-center gap-0">
+                      <button
+                        onClick={() => setDarkMode(false)}
+                        className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
+                          !darkMode
+                            ? 'bg-amber-400 text-white'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        <Sun className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
+                        Light
+                      </button>
+                      <button
+                        onClick={() => setDarkMode(true)}
+                        className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
+                          darkMode
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        <Moon className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
+                        Dark
+                      </button>
                     </div>
-                    <Skeleton className="h-4 w-64" />
                   </div>
-                  {/* Generations Toggle skeleton */}
-                  <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
-                    <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
-                      <Skeleton className="h-5 w-24" />
-                      <Skeleton className="h-8 w-40 rounded-full" />
-                    </div>
-                    <Skeleton className="h-4 w-72" />
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Switch between light and dark color schemes
+                  </p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Resources Toggle */}
-                  <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
-                    <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
-                      <span className="font-medium">Resources</span>
-                      <div className="flex items-center gap-0">
-                        <button
-                          onClick={() => updatePrivacyDefaults({ resourcesPublic: true })}
-                          className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
-                            privacyDefaults.resourcesPublic
-                              ? 'bg-green-500 text-white'
-                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          <Globe className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
-                          Public
-                        </button>
-                        <button
-                          onClick={() => updatePrivacyDefaults({ resourcesPublic: false })}
-                          className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
-                            !privacyDefaults.resourcesPublic
-                              ? 'bg-gray-600 text-white'
-                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          <Lock className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
-                          Private
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      LoRAs, presets, and reference images you create
-                    </p>
-                  </div>
+              </div>
 
-                  {/* Generations Toggle */}
-                  <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
-                    <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
-                      <span className="font-medium">Generations</span>
-                      <div className="flex items-center gap-0">
-                        <button
-                          onClick={() => updatePrivacyDefaults({ generationsPublic: true })}
-                          className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
-                            privacyDefaults.generationsPublic
-                              ? 'bg-green-500 text-white'
-                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          <Globe className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
-                          Public
-                        </button>
-                        <button
-                          onClick={() => updatePrivacyDefaults({ generationsPublic: false })}
-                          className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
-                            !privacyDefaults.generationsPublic
-                              ? 'bg-gray-600 text-white'
-                              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          <Lock className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
-                          Private
-                        </button>
+              {/* Privacy Subsection */}
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Privacy</h3>
+                {isLoadingPrivacyDefaults ? (
+                  <div className="space-y-4">
+                    {/* Resources Toggle skeleton */}
+                    <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
+                      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                        <Skeleton className="h-5 w-20" />
+                        <Skeleton className="h-8 w-40 rounded-full" />
                       </div>
+                      <Skeleton className="h-4 w-64" />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Images and videos you generate
-                    </p>
+                    {/* Generations Toggle skeleton */}
+                    <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
+                      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-8 w-40 rounded-full" />
+                      </div>
+                      <Skeleton className="h-4 w-72" />
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="space-y-4">
+                    {/* Resources Toggle */}
+                    <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
+                      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                        <span className="font-medium">Resources</span>
+                        <div className="flex items-center gap-0">
+                          <button
+                            onClick={() => updatePrivacyDefaults({ resourcesPublic: true })}
+                            className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
+                              privacyDefaults.resourcesPublic
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            <Globe className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
+                            Public
+                          </button>
+                          <button
+                            onClick={() => updatePrivacyDefaults({ resourcesPublic: false })}
+                            className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
+                              !privacyDefaults.resourcesPublic
+                                ? 'bg-gray-600 text-white'
+                                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            <Lock className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
+                            Private
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        LoRAs, presets, and reference images you create
+                      </p>
+                    </div>
+
+                    {/* Generations Toggle */}
+                    <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
+                      <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                        <span className="font-medium">Generations</span>
+                        <div className="flex items-center gap-0">
+                          <button
+                            onClick={() => updatePrivacyDefaults({ generationsPublic: true })}
+                            className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
+                              privacyDefaults.generationsPublic
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            <Globe className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
+                            Public
+                          </button>
+                          <button
+                            onClick={() => updatePrivacyDefaults({ generationsPublic: false })}
+                            className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
+                              !privacyDefaults.generationsPublic
+                                ? 'bg-gray-600 text-white'
+                                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            <Lock className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
+                            Private
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Images and videos you generate
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -647,7 +691,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                 </div>
               ) : (
                 <div className="flex items-center justify-start">
-                  <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner">
+                  <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1 shadow-inner">
                     {/* Toggle track */}
                     <div className="flex">
                       {/* In the cloud button */}
@@ -655,8 +699,8 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                         onClick={() => updateGenerationMethodsWithNotification({ inCloud: true, onComputer: false })}
                         className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                           inCloudChecked && !onComputerChecked
-                            ? 'bg-white text-blue-600 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-800'
+                            ? 'bg-card dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
                         }`}
                       >
                         In the cloud
@@ -667,8 +711,8 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                         onClick={() => updateGenerationMethodsWithNotification({ onComputer: true, inCloud: false })}
                         className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                           onComputerChecked && !inCloudChecked
-                            ? 'bg-white text-green-600 shadow-sm'
-                            : 'text-gray-600 hover:text-gray-800'
+                            ? 'bg-card dark:bg-gray-800 text-green-600 dark:text-green-400 shadow-sm'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
                         }`}
                       >
                         On my computer
@@ -757,9 +801,9 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
                       {/* Computer Type */}
                       <div>
-                        <Label className="text-xs text-blue-600 mb-1 block">Computer</Label>
+                        <Label className="text-xs text-blue-600 dark:text-blue-400 mb-1 block">Computer</Label>
                         <Select value={computerType} onValueChange={setComputerType}>
-                          <SelectTrigger className="w-full bg-blue-50/50 border-blue-200 h-9 text-blue-700">
+                          <SelectTrigger className="w-full bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 h-9 text-blue-700 dark:text-blue-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -772,9 +816,9 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                       {/* GPU Type */}
                       <div>
-                        <Label className="text-xs text-violet-600 mb-1 block">GPU</Label>
+                        <Label className="text-xs text-violet-600 dark:text-violet-400 mb-1 block">GPU</Label>
                         <Select value={gpuType} onValueChange={setGpuType} disabled={computerType === "mac"}>
-                          <SelectTrigger className="w-full bg-violet-50/50 border-violet-200 h-9 text-violet-700 disabled:opacity-50">
+                          <SelectTrigger className="w-full bg-violet-50/50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800 h-9 text-violet-700 dark:text-violet-300 disabled:opacity-50">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -787,9 +831,9 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                       {/* Memory Profile */}
                       <div>
-                        <Label className="text-xs text-emerald-600 mb-1 block">Memory</Label>
+                        <Label className="text-xs text-emerald-600 dark:text-emerald-400 mb-1 block">Memory</Label>
                         <Select value={memoryProfile} onValueChange={setMemoryProfile}>
-                          <SelectTrigger className="w-full bg-emerald-50/50 border-emerald-200 h-9 text-emerald-700">
+                          <SelectTrigger className="w-full bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 h-9 text-emerald-700 dark:text-emerald-300">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -841,13 +885,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                       {/* Debug Logs Toggle */}
                       <div>
-                        <Label className="text-xs text-amber-600 mb-1 block">Debug</Label>
+                        <Label className="text-xs text-amber-600 dark:text-amber-400 mb-1 block">Debug</Label>
                         <button
                           onClick={() => setShowDebugLogs(!showDebugLogs)}
                           className={`w-full h-9 px-3 text-sm rounded-md border transition-colors flex items-center justify-between ${
                             showDebugLogs
-                              ? 'bg-amber-50 border-amber-300 text-amber-700'
-                              : 'bg-amber-50/50 border-amber-200 text-amber-700 hover:bg-amber-50'
+                              ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300'
+                              : 'bg-amber-50/50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40'
                           }`}
                         >
                           <span className="flex items-center gap-1.5">
@@ -893,16 +937,16 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                     {computerType !== "mac" && gpuType !== "non-nvidia" && (
                       <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200 mb-3 h-9 p-1">
+                        <TabsList className="grid w-full grid-cols-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-3 h-9 p-1">
                           <TabsTrigger
                             value="need-install"
-                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm py-0 h-full leading-none"
+                            className="data-[state=active]:bg-card data-[state=active]:dark:bg-gray-700 data-[state=active]:shadow-sm data-[state=active]:text-foreground text-sm py-0 h-full leading-none"
                           >
                             Install
                           </TabsTrigger>
                           <TabsTrigger
                             value="already-installed"
-                            className="data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm py-0 h-full leading-none"
+                            className="data-[state=active]:bg-card data-[state=active]:dark:bg-gray-700 data-[state=active]:shadow-sm data-[state=active]:text-foreground text-sm py-0 h-full leading-none"
                           >
                             Run
                           </TabsTrigger>
@@ -915,7 +959,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                             <div className="border border-gray-200 rounded-lg">
                               <button
                                 onClick={() => setShowPrerequisites(!showPrerequisites)}
-                                className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 transition-colors"
+                                className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                               >
                                 <span className="text-sm text-gray-700">
                                   Prerequisites (install manually if not already installed):
@@ -958,7 +1002,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                           )}
                           
                           <div>
-                            <p className="text-sm text-gray-600 mb-4">
+                            <p className="text-sm text-muted-foreground mb-4">
                               Run this command to install and start the local worker:
                             </p>
                           </div>
@@ -976,11 +1020,6 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                                 {getInstallationCommand()}
                               </pre>
                             </div>
-                            
-                            {/* Fade overlay when collapsed */}
-                            {!showFullInstallCommand && (
-                              <div className="absolute inset-0 bottom-10 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg" />
-                            )}
                             
                             {/* Fixed buttons at bottom of command block - centered */}
                             <div className="absolute bottom-2 left-3 right-3 flex items-center justify-center gap-2">
@@ -1087,13 +1126,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                       <TabsContent value="already-installed" className="space-y-4">
                         <div className="space-y-4">
                           <div>                              
-                            <p className="text-sm text-gray-600 mb-4">
+<p className="text-sm text-muted-foreground mb-4">
                               Use this command to start your local worker:
                             </p>
                           </div>
 
                           <div className="relative" ref={runCommandRef}>
-                            <div 
+                            <div
                               className={`bg-gray-900 text-green-400 p-3 pb-12 rounded-lg font-mono text-xs sm:text-sm overflow-hidden ${
                                 showFullRunCommand ? 'overflow-x-auto' : ''
                               }`}
@@ -1105,12 +1144,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                                 {getRunCommand()}
                               </pre>
                             </div>
-                            
-                            {/* Fade overlay when collapsed */}
-                            {!showFullRunCommand && (
-                              <div className="absolute inset-0 bottom-10 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg" />
-                            )}
-                            
+
                             {/* Fixed buttons at bottom of command block - centered */}
                             <div className="absolute bottom-2 left-3 right-3 flex items-center justify-center gap-2">
                               <Button

@@ -16,7 +16,7 @@ export const AspectRatioVisualizer: React.FC<AspectRatioVisualizerProps> = ({
   // If ratio is invalid, show a square as fallback
   if (isNaN(ratio)) {
     return (
-      <div className={`w-16 h-16 border-2 border-gray-300 rounded bg-gray-50 ${className}`} />
+      <div className={`w-16 h-16 border-2 border-border rounded bg-muted ${className}`} />
     );
   }
 
@@ -38,7 +38,7 @@ export const AspectRatioVisualizer: React.FC<AspectRatioVisualizerProps> = ({
   return (
     <div className={`flex items-center justify-center w-16 h-16 ${className}`}>
       <div 
-        className="border-2 border-gray-300 bg-gray-50 rounded shadow-sm"
+        className="border-2 border-border bg-muted rounded shadow-sm"
         style={{
           width: `${width}px`,
           height: `${height}px`,

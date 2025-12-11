@@ -1,5 +1,5 @@
 import React from 'react';
-import { WesAndersonBackground } from './WesAndersonBackground';
+import { DecorativeBackground } from './DecorativeBackground';
 
 interface ReighLoadingProps {
   text?: string;
@@ -8,7 +8,7 @@ interface ReighLoadingProps {
 export const ReighLoading: React.FC<ReighLoadingProps> = ({ text }) => {
   return (
     <div className="min-h-screen wes-texture relative overflow-hidden flex items-center justify-center">
-      <WesAndersonBackground />
+      <DecorativeBackground />
       <div className="text-center relative z-10">
         <div className="relative w-32 h-1.5 mx-auto">
           {/* Background track */}

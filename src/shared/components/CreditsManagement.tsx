@@ -440,13 +440,13 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
         {(mode === 'all' || mode === 'add-credits') && (
         <div className="space-y-3">
           {/* Current Balance Container */}
-          <div className="p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+          <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-lg border border-emerald-100 dark:border-emerald-800">
             <div className="flex items-center gap-2">
-              <Coins className="h-4 w-4 text-emerald-500" />
-              <span className="text-sm font-medium text-emerald-700">Current balance</span>
-              <span className="text-lg font-semibold text-gray-900 ml-auto">
+              <Coins className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Current balance</span>
+              <span className="text-lg font-semibold text-foreground ml-auto">
                 {isLoadingBalance ? (
-                  <span className="animate-pulse bg-gray-200 rounded w-16 h-5 inline-block"></span>
+                  <span className="animate-pulse bg-muted rounded w-16 h-5 inline-block"></span>
                 ) : (
                   formatCurrency(balance?.balance || 0)
                 )}
@@ -455,11 +455,11 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                   </div>
                 
           {/* Add Credits Container */}
-          <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100 space-y-3">
+          <div className="p-3 bg-blue-50/50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-800 space-y-3">
             <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-medium text-blue-700">Add credits</span>
-              <span className="text-lg font-semibold text-gray-900 ml-auto">{formatDollarAmount(purchaseAmount)}</span>
+              <CreditCard className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Add credits</span>
+              <span className="text-lg font-semibold text-foreground ml-auto">{formatDollarAmount(purchaseAmount)}</span>
                     </div>
                     
             <div className="px-1">
@@ -470,14 +470,14 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                         max={100}
                         step={5}
                       />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
                         <span>$0</span>
                         <span>$100</span>
                   </div>
                 </div>
 
             {/* Auto top-up */}
-            <div className="flex items-center text-sm pt-2 border-t border-blue-100">
+            <div className="flex items-center text-sm pt-2 border-t border-blue-100 dark:border-blue-800">
               <div className="flex items-center gap-2">
                       <Checkbox
                         id="auto-topup"
@@ -485,11 +485,11 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                         onCheckedChange={(checked) => handleAutoTopupToggle(checked === true)}
                         disabled={isUpdatingAutoTopup}
                       />
-                <label htmlFor="auto-topup" className="text-gray-500 cursor-pointer">
+                <label htmlFor="auto-topup" className="text-muted-foreground cursor-pointer">
                   Auto top-up when below
                       </label>
                 <div className="flex items-center">
-                  <span className="text-gray-500">$</span>
+                  <span className="text-muted-foreground">$</span>
                   <input
                     type="number"
                           min={1}
@@ -500,7 +500,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                       handleAutoTopupThresholdChange(val);
                     }}
                     disabled={!localAutoTopupEnabled || isUpdatingAutoTopup}
-                    className="w-12 px-1 py-0.5 text-sm text-center border border-gray-300 rounded disabled:opacity-50 disabled:bg-gray-100"
+                    className="w-12 px-1 py-0.5 text-sm text-center border border-border rounded disabled:opacity-50 disabled:bg-muted bg-background text-foreground"
                         />
                       </div>
                   </div>
@@ -532,13 +532,13 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
         {(mode === 'all' || mode === 'transactions') && (
         <div className={`px-1 ${mode === 'all' ? 'mt-6' : ''}`}>
           <div className="flex justify-center mb-3">
-            <div className="grid grid-cols-2 bg-gray-100 border border-gray-200 rounded-md h-9 p-1 w-full max-w-xs">
+            <div className="grid grid-cols-2 bg-muted border border-border rounded-md h-9 p-1 w-full max-w-xs">
               <button
                 onClick={() => setActiveTab('history')}
                 className={`text-sm rounded-sm h-full flex items-center justify-center transition-all ${
                   activeTab === 'history'
-                    ? 'bg-white shadow-sm text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-card dark:bg-gray-800 shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Transactions
@@ -547,8 +547,8 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                 onClick={() => setActiveTab('task-log')}
                 className={`text-sm rounded-sm h-full flex items-center justify-center transition-all ${
                   activeTab === 'task-log'
-                    ? 'bg-white shadow-sm text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-card dark:bg-gray-800 shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Task Log
@@ -641,16 +641,16 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
             </div>
             
             {/* Filters Bar */}
-            <div className="p-4 bg-gray-50 rounded-lg border space-y-3 sm:space-y-0 mt-1 mb-6">
+            <div className="p-4 bg-muted rounded-lg border border-border space-y-3 sm:space-y-0 mt-1 mb-6">
               <div className="flex items-center gap-2 sm:hidden">
-                <Filter className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-light text-gray-700">Filter by:</span>
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-light text-foreground">Filter by:</span>
               </div>
               
               <div className="flex flex-wrap items-center gap-2">
                 <div className="hidden sm:flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-light text-gray-700">Filter by:</span>
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-light text-foreground">Filter by:</span>
                 </div>
 
               {/* Cost Filter */}
@@ -944,10 +944,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                   <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-14">ID</TableHead>
-                        <TableHead className="w-20">Date</TableHead>
+                        <TableHead className="w-10">ID</TableHead>
+                        <TableHead className="w-16">Date</TableHead>
                         <TableHead className="w-28">Task Type</TableHead>
-                        <TableHead className="hidden sm:table-cell w-28">Project</TableHead>
+                        <TableHead className="hidden sm:table-cell w-20">Project</TableHead>
                         <TableHead className="hidden sm:table-cell w-20">Status</TableHead>
                         <TableHead className="hidden sm:table-cell w-16">Duration</TableHead>
                         <TableHead className="w-16">Cost</TableHead>
@@ -1006,10 +1006,10 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                   <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-14">ID</TableHead>
-                        <TableHead className="w-20">Date</TableHead>
+                        <TableHead className="w-10">ID</TableHead>
+                        <TableHead className="w-16">Date</TableHead>
                         <TableHead className="w-28">Task Type</TableHead>
-                        <TableHead className="hidden sm:table-cell w-28">Project</TableHead>
+                        <TableHead className="hidden sm:table-cell w-20">Project</TableHead>
                         <TableHead className="hidden sm:table-cell w-20">Status</TableHead>
                         <TableHead className="hidden sm:table-cell w-16">Duration</TableHead>
                         <TableHead className="w-16">Cost</TableHead>
@@ -1023,8 +1023,8 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                               onClick={() => handleCopyTaskId(task.id)}
                               className={`flex items-center gap-1 px-1 py-0.5 text-[10px] rounded transition-colors border ${
                                 copiedTaskId === task.id
-                                  ? 'text-green-600 bg-green-50 border-green-300'
-                                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-gray-300 hover:border-gray-400'
+                                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/50 border-green-300 dark:border-green-700'
+                                  : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border hover:border-foreground/30'
                               }`}
                               title={`Copy task ID: ${task.id}`}
                             >
@@ -1076,8 +1076,8 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
 
                   {/* Pagination */}
                   {taskLogData?.pagination && taskLogData.pagination.totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
-                      <div className="text-sm text-gray-600">
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted">
+                      <div className="text-sm text-muted-foreground">
                         Page {taskLogData.pagination.currentPage} of {taskLogData.pagination.totalPages}
                       </div>
                       <div className="flex items-center gap-2">

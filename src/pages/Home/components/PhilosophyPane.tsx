@@ -49,7 +49,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   };
 
   return (
-    <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
+    <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-card dark:bg-gray-900 shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
       isOpen ? 'translate-x-0' : 'translate-x-full'
     }`}>
       <div ref={setRefs} className="px-4 sm:px-8 pt-2 sm:pt-4 pb-4 sm:pb-8 flex-1 overflow-y-auto overflow-x-visible min-h-0">

@@ -1440,7 +1440,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           {/* Optimistic delete overlay */}
           {isOptimisticallyDeleted && (
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center rounded-lg">
-              <div className="bg-white/90 px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium text-gray-700">
+              <div className="bg-card/90 dark:bg-gray-800/90 px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium text-foreground">
                 <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-600"></div>
                 Deleting...
               </div>

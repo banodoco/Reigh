@@ -78,7 +78,7 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200",
               "shadow-sm hover:shadow-md hover:scale-105",
-              "bg-white/90 hover:bg-white",
+              "bg-card/90 dark:bg-gray-800/90 hover:bg-card dark:hover:bg-gray-800",
               colorScheme.border,
               colorScheme.text,
               "text-xs font-light cursor-pointer"

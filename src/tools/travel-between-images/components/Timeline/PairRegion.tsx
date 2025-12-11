@@ -90,7 +90,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
             transition: 'none', // Prevent jitter when coordinate system changes
           }}
         >
-          <div className={`absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs font-light ${colorScheme.text} bg-white/80 px-2 py-0.5 rounded`}>
+          <div className={`absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs font-light ${colorScheme.text} bg-card/80 dark:bg-gray-800/80 px-2 py-0.5 rounded`}>
             Context ({visibleContextFrames}f)
           </div>
         </div>
@@ -124,7 +124,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={`absolute top-1/2 text-sm font-light ${colorScheme.text} bg-white/90 px-3 py-1 rounded-full border ${colorScheme.border} z-20 shadow-sm cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200`}
+              className={`absolute top-1/2 text-sm font-light ${colorScheme.text} bg-card/90 dark:bg-gray-800/90 px-3 py-1 rounded-full border ${colorScheme.border} z-20 shadow-sm cursor-pointer hover:bg-card dark:hover:bg-gray-800 hover:shadow-md transition-all duration-200`}
               style={{
                 left: `${(startPercent + endPercent) / 2}%`,
                 transform: 'translate(-50%, -50%)',

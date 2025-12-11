@@ -46,7 +46,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
   };
 
   return (
-    <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
+    <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-card dark:bg-gray-900 shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
       isOpen ? 'translate-x-0' : '-translate-x-full'
     }`}>
       <div ref={setRefs} className="px-4 sm:px-8 pt-2 sm:pt-4 pb-4 sm:pb-8 flex-1 overflow-y-auto overflow-x-visible min-h-0 relative z-20">
@@ -174,7 +174,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
                         }
                       }}
                     >
-                      <div className="w-[360px] h-[270px] overflow-hidden rounded border relative bg-white">
+                      <div className="w-[360px] h-[270px] overflow-hidden rounded border relative bg-card dark:bg-gray-800">
                         <iframe
                           title="Open Source Ecosystem"
                           style={{ width: '360px', height: '270px', border: 0 }}

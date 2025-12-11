@@ -25,7 +25,7 @@ export const ExamplesPane: React.FC<ExamplesPaneProps> = ({
 
   return (
     <div
-      className={`fixed left-0 bottom-0 w-full h-1/2 max-h-[50vh] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
+      className={`fixed left-0 bottom-0 w-full h-1/2 max-h-[50vh] bg-card dark:bg-gray-900 shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out ${
         isOpen ? 'translate-y-0' : 'translate-y-full'
       }`}
     >

@@ -230,8 +230,8 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                 onClick={() => updateGenerationMethods({ inCloud: true, onComputer: false })}
                 className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                   inCloudChecked && !onComputerChecked
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'bg-card dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 In the cloud ☁️
@@ -242,8 +242,8 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                 onClick={() => updateGenerationMethods({ onComputer: true, inCloud: false })}
                 className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                   onComputerChecked && !inCloudChecked
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'bg-card dark:bg-gray-800 text-green-600 dark:text-green-400 shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 On my computer 💻

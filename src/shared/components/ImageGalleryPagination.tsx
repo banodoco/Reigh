@@ -136,7 +136,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
   if (compact) {
     // Compact layout for top pagination - no range text, optional right content
     return (
-      <div className={`flex justify-between items-center ${whiteText ? 'text-white' : 'text-gray-600'}`}>
+      <div className={`flex justify-between items-center ${whiteText ? 'text-white' : 'text-foreground'}`}>
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
@@ -216,7 +216,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
             paddingRight: '16px',
           }}
         >
-          <div className="bg-white/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-gray-200/50">
+          <div className="bg-card/80 dark:bg-gray-900/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-border/50">
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"

@@ -191,7 +191,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             </div>
           ) : (
             <div 
-              className="mt-2 group relative p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px]" 
+              className="mt-2 group relative p-3 border rounded-md text-center bg-muted/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px]" 
               onClick={isMobile ? onOpenPromptModal : onOpenPromptModal}
             >
               {prompts.length === 1 && actionablePromptsCount === 0 ? (

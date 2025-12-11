@@ -58,7 +58,7 @@ const StatusIndicator: React.FC<StatusIndicatorProps> = ({ count, type, onClick,
         borderStyle,
         borderColor,
         count === 0 ? "opacity-50" : "opacity-100",
-        isSelected ? "bg-white/20" : "bg-white/10 md:hover:bg-white/15"
+        isSelected ? "bg-foreground/20" : "bg-foreground/10 md:hover:bg-foreground/15"
       )}
       onClick={onClick}
     >

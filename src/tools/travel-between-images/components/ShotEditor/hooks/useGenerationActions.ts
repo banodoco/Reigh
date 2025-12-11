@@ -338,10 +338,50 @@ export const useGenerationActions = ({
       return;
     }
 
+    // Check if we're deleting the first positioned item on the timeline
+    // If so, we need to shift all remaining items back proportionally
+    const positionedImages = orderedShotImages
+      .filter(img => img.timeline_frame != null && img.timeline_frame >= 0 && !isGenerationVideo(img))
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+    
+    const deletedItemFrame = imageToDelete?.timeline_frame;
+    const isDeletingFirstItem = positionedImages.length > 1 && 
+      deletedItemFrame != null && 
+      deletedItemFrame >= 0 &&
+      positionedImages[0]?.id === shotImageEntryId;
+    
+    // Calculate the offset to shift remaining items (gap between first and second item)
+    let frameOffset = 0;
+    let itemsToShift: Array<{ id: string; currentFrame: number }> = [];
+    
+    if (isDeletingFirstItem && positionedImages.length >= 2) {
+      const firstFrame = positionedImages[0].timeline_frame ?? 0;
+      const secondFrame = positionedImages[1].timeline_frame ?? 0;
+      frameOffset = secondFrame - firstFrame;
+      
+      // Collect all remaining items (excluding the one being deleted)
+      itemsToShift = positionedImages
+        .slice(1) // Skip first item (being deleted)
+        .map(img => ({
+          id: img.id,
+          currentFrame: img.timeline_frame ?? 0
+        }));
+      
+      console.log('[DeleteDebug] 📐 Deleting first item - will shift remaining items', {
+        firstFrame,
+        secondFrame,
+        frameOffset,
+        itemsToShiftCount: itemsToShift.length,
+        itemsToShift: itemsToShift.map(i => ({ id: i.id.substring(0, 8), frame: i.currentFrame }))
+      });
+    }
+
     console.log('[DeleteDebug] 📤 STEP 3: Calling removeImageFromShotMutation', {
       shotId: selectedShot.id.substring(0, 8),
       shotGenerationId: shotImageEntryId.substring(0, 8), // This is the shot_generations.id
-      projectId: projectId.substring(0, 8)
+      projectId: projectId.substring(0, 8),
+      isDeletingFirstItem,
+      frameOffset
     });
 
     // Emit event to lock timeline positions during mutation + refetch
@@ -349,14 +389,49 @@ export const useGenerationActions = ({
       detail: { shotId: selectedShot.id, type: 'delete' }
     }));
     
-    // CRITICAL: Pass shotGenerationId (shot_generations.id), NOT generationId (generations.id)
-    // This ensures only this specific entry is deleted, not all duplicates of the same generation
-    removeImageFromShotMutation.mutate({
-      shotId: selectedShot.id,
-      shotGenerationId: shotImageEntryId, // The unique shot_generations.id
-      projectId: projectId,
-    });
-  }, [selectedShot?.id, projectId, removeImageFromShotMutation, orderedShotImages]);
+    try {
+      // CRITICAL: Pass shotGenerationId (shot_generations.id), NOT generationId (generations.id)
+      // This ensures only this specific entry is deleted, not all duplicates of the same generation
+      await removeImageFromShotMutation.mutateAsync({
+        shotId: selectedShot.id,
+        shotGenerationId: shotImageEntryId, // The unique shot_generations.id
+        projectId: projectId,
+      });
+      
+      // If we deleted the first item, shift all remaining items back
+      if (isDeletingFirstItem && frameOffset > 0 && itemsToShift.length > 0) {
+        console.log('[DeleteDebug] 📐 STEP 4: Shifting remaining items back by', frameOffset);
+        
+        // Build batch updates for all remaining items
+        const updates = itemsToShift.map(item => ({
+          id: item.id,
+          newFrame: item.currentFrame - frameOffset
+        }));
+        
+        console.log('[DeleteDebug] 📐 Batch updating timeline_frames', {
+          updateCount: updates.length,
+          updates: updates.map(u => ({ id: u.id.substring(0, 8), newFrame: u.newFrame }))
+        });
+        
+        // Update all items in parallel using Supabase directly
+        await Promise.all(updates.map(update =>
+          supabase
+            .from('shot_generations')
+            .update({ timeline_frame: update.newFrame })
+            .eq('id', update.id)
+        ));
+        
+        console.log('[DeleteDebug] ✅ STEP 5: Timeline frames shifted successfully');
+        
+        // Invalidate queries to refresh the UI
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', selectedShot.id] });
+        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+      }
+    } catch (error) {
+      console.error('[DeleteDebug] ❌ Error during deletion or frame shift:', error);
+      // Error handling is done by the mutation itself
+    }
+  }, [selectedShot?.id, projectId, removeImageFromShotMutation, orderedShotImages, queryClient]);
 
   const handleBatchDeleteImages = useCallback(async (shotImageEntryIds: string[]) => {
     if (!selectedShot || !projectId || shotImageEntryIds.length === 0) {

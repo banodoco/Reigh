@@ -16,7 +16,6 @@ import { Profiler } from 'react';
 import App from './App.tsx';
 import '@/index.css';
 import { reactProfilerOnRender } from '@/shared/lib/logger';
-import { initializeTheme } from '@/shared/lib/theme-switcher';
 
 // Initialize autoplay monitoring in development (after console suppression check)
 if (import.meta.env.NODE_ENV === 'development') {
@@ -28,27 +27,11 @@ if (import.meta.env.DEV) {
   import('../shared/lib/simpleCacheValidator');
 }
 
-// Initialize theme system
-initializeTheme();
-
-// Add global theme switching helpers for debugging
-if (import.meta.env.DEV) {
-  (window as any).switchTheme = (themeName: 'lala-land' | 'wes-anderson' | 'cat-lounging') => {
-    const { switchTheme } = require('@/shared/lib/theme-switcher');
-    switchTheme(themeName);
-    console.log(`Switched to ${themeName} theme`);
-  };
-  
-  (window as any).getAvailableThemes = () => {
-    const { getAvailableThemes } = require('@/shared/lib/theme-switcher');
-    return getAvailableThemes();
-  };
-  
-  console.log('Theme helpers available:');
-  console.log('- switchTheme("wes-anderson")');
-  console.log('- switchTheme("lala-land")');
-  console.log('- switchTheme("cat-lounging")');
-  console.log('- getAvailableThemes()');
+// Initialize dark mode from localStorage (prevents flash of wrong theme)
+// This runs before React renders, reading directly from localStorage
+const storedDarkMode = localStorage.getItem('dark-mode');
+if (storedDarkMode === 'true') {
+  document.documentElement.classList.add('dark');
 }
 
 createRoot(document.getElementById('root')!).render(

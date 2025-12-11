@@ -1,10 +1,14 @@
 import React from 'react';
 
-export const WesAndersonBackground: React.FC = () => {
+/**
+ * Decorative background component with animated gradients, floating particles,
+ * and geometric shapes using the app's color palette.
+ */
+export const DecorativeBackground: React.FC = () => {
   return (
     <>
       {/* Animated Background - Base Layer */}
-      <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-60 animate-gradient-shift"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-background to-wes-mint/20 opacity-60 animate-gradient-shift"></div>
       
       {/* Secondary Dynamic Gradient - Subtle Color Breathing */}
       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-wes-mint/15 opacity-50 animate-gradient-breathe"></div>
@@ -36,4 +40,7 @@ export const WesAndersonBackground: React.FC = () => {
       </div>
     </>
   );
-}; 
+};
+
+// Keep backward compatibility alias
+export const WesAndersonBackground = DecorativeBackground;

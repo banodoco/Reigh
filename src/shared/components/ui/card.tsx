@@ -9,7 +9,7 @@ const cardVariants = cva(
       variant: {
         default: "rounded-lg border bg-card text-card-foreground shadow-sm",
         wes: "wes-card wes-frame wes-texture",
-        "wes-simple": "bg-white/90 backdrop-blur-sm border-2 border-primary/10 rounded-xl shadow-wes",
+        "wes-simple": "bg-card/90 dark:bg-card/95 backdrop-blur-sm border-2 border-primary/10 rounded-xl shadow-wes",
         "wes-floating": "wes-card animate-wes-float shadow-wes-hover",
       }
     },
@@ -61,7 +61,7 @@ const CardTitle = React.forwardRef<
 ))
 CardTitle.displayName = "CardTitle"
 
-// Wes Anderson-inspired card title variant
+// Decorative card title variant
 const CardTitleWes = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLHeadingElement>
@@ -89,7 +89,7 @@ const CardDescription = React.forwardRef<
 ))
 CardDescription.displayName = "CardDescription"
 
-// Wes Anderson-inspired card description variant
+// Decorative card description variant
 const CardDescriptionWes = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
