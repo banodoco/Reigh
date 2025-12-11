@@ -420,15 +420,6 @@ export default function EditVideoPage() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* Drag overlay */}
-      {isDraggingOver && (
-        <div className="absolute inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-dashed border-primary bg-primary/10">
-            <Film className="w-16 h-16 text-primary animate-bounce" />
-            <p className="text-xl font-medium text-primary">Drop video to upload</p>
-          </div>
-        </div>
-      )}
       {/* Header */}
       <div className="px-4 pt-6 pb-6 max-w-7xl mx-auto w-full">
         <h1 className="text-3xl font-light tracking-tight text-foreground">Edit Videos</h1>
@@ -517,6 +508,27 @@ export default function EditVideoPage() {
               <div 
                 className="relative flex items-center justify-center bg-black w-full h-[30%] md:w-[60%] md:h-full md:flex-1"
               >
+                {/* Drag overlay - positioned over left panel */}
+                {isDraggingOver && (
+                  <div className="absolute inset-0 z-20 bg-black/80 backdrop-blur-sm flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-dashed border-primary bg-primary/10">
+                      <Film className="w-16 h-16 text-primary animate-bounce" />
+                      <p className="text-xl font-medium text-primary">Drop video to upload</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Upload loading state */}
+                {isUploading && (
+                  <div className="absolute inset-0 z-20 bg-black/80 backdrop-blur-sm flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-4 p-8">
+                      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                      <p className="text-lg font-medium text-white">Uploading video...</p>
+                    </div>
+                  </div>
+                )}
+                
+                {!isUploading && !isDraggingOver && (
                  <div className="bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 p-6 md:p-8 flex flex-col items-center justify-center space-y-4 md:space-y-6 max-w-md mx-4">
                   <div className="text-center space-y-1 md:space-y-2">
                     <p className="text-muted-foreground text-xs md:hidden">
@@ -537,10 +549,11 @@ export default function EditVideoPage() {
                     />
                     <Button variant="outline" size="lg" className="w-full gap-2" disabled={isUploading}>
                       <Upload className="w-4 h-4" />
-                      {isUploading ? "Uploading..." : "Upload Video"}
+                      Upload Video
                     </Button>
                   </div>
-               </div>
+                 </div>
+                )}
               </div>
 
               {/* Right Panel - Selection UI */}

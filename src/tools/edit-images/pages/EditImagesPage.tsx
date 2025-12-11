@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useMemo, useRef, useCallback } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
-import { LayoutGrid, Upload, ChevronDown, ChevronUp } from 'lucide-react';
+import { LayoutGrid, Upload, ChevronDown, ChevronUp, ImageIcon } from 'lucide-react';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { GenerationRow } from '@/types/shots';
 import { ReighLoading } from '@/shared/components/ReighLoading';
@@ -42,6 +42,8 @@ export default function EditImagesPage() {
   const [resultsPage, setResultsPage] = useState(1);
   const [showResults, setShowResults] = useState(true);
   const [isLoadingPersistedMedia, setIsLoadingPersistedMedia] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounterRef = useRef(0);
   const isMobile = useIsMobile();
   const { data: shots } = useListShots(selectedProjectId);
   
@@ -214,6 +216,109 @@ export default function EditImagesPage() {
 
   const isEditingOnMobile = selectedMedia && isMobile;
 
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDraggingOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDraggingOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingOver(false);
+
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please drop an image file");
+      return;
+    }
+
+    if (!selectedProjectId) {
+      toast.error("Please select a project first");
+      return;
+    }
+
+    // Reuse the upload logic
+    setIsUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+      const userId = session.user.id;
+
+      // Generate and upload thumbnail
+      let publicUrl = '';
+      let thumbnailUrl = '';
+      
+      try {
+        // Generate thumbnail client-side
+        const thumbnailResult = await generateClientThumbnail(file, 300, 0.8);
+        
+        // Upload both main image and thumbnail
+        const uploadResult = await uploadImageWithThumbnail(file, thumbnailResult.thumbnailBlob, userId);
+        publicUrl = uploadResult.imageUrl;
+        thumbnailUrl = uploadResult.thumbnailUrl;
+      } catch (thumbnailError) {
+        console.warn('[EditImages] Client-side thumbnail generation failed:', thumbnailError);
+        // Fallback to original upload flow without thumbnail
+        publicUrl = await uploadImageToStorage(file, 3);
+        thumbnailUrl = publicUrl;
+      }
+
+      const { data: generation, error: dbError } = await supabase
+        .from('generations')
+        .insert({
+          project_id: selectedProjectId,
+          location: publicUrl,
+          thumbnail_url: thumbnailUrl,
+          type: 'image',
+          params: {
+            prompt: 'Uploaded image',
+            status: 'completed',
+            is_uploaded: true,
+            width: 1024,
+            height: 1024,
+            model: 'upload'
+          }
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      setSelectedMedia(generation as any);
+
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error("Failed to upload image: " + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [selectedProjectId]);
+
   // Get results items for navigation
   const resultsItems = (resultsData as any)?.items || [];
   const [lightboxIndex, setLightboxIndex] = useState<number>(-1);
@@ -337,10 +442,16 @@ export default function EditImagesPage() {
   };
 
   return (
-    <div className={cn(
-      "w-full flex flex-col",
-      isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "min-h-[calc(100dvh-96px)]"
-    )}>
+    <div 
+      className={cn(
+        "w-full flex flex-col relative",
+        isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "min-h-[calc(100dvh-96px)]"
+      )}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {/* Header */}
       <div className="px-4 pt-6 pb-6 max-w-7xl mx-auto w-full">
         <h1 className="text-3xl font-light tracking-tight text-foreground">Edit Images</h1>
@@ -413,7 +524,28 @@ export default function EditImagesPage() {
               <div 
                 className="relative flex items-center justify-center bg-black w-full h-[30%] md:w-[60%] md:h-full md:flex-1"
               >
-               <div className="bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 p-6 md:p-8 flex flex-col items-center justify-center space-y-4 md:space-y-6 max-w-md mx-4">
+                {/* Drag overlay - positioned over left panel */}
+                {isDraggingOver && (
+                  <div className="absolute inset-0 z-20 bg-black/80 backdrop-blur-sm flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-dashed border-primary bg-primary/10">
+                      <ImageIcon className="w-16 h-16 text-primary animate-bounce" />
+                      <p className="text-xl font-medium text-primary">Drop image to upload</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Upload loading state */}
+                {isUploading && (
+                  <div className="absolute inset-0 z-20 bg-black/80 backdrop-blur-sm flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-4 p-8">
+                      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                      <p className="text-lg font-medium text-white">Uploading image...</p>
+                    </div>
+                  </div>
+                )}
+                
+                {!isUploading && !isDraggingOver && (
+                 <div className="bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 p-6 md:p-8 flex flex-col items-center justify-center space-y-4 md:space-y-6 max-w-md mx-4">
                   <div className="text-center space-y-1 md:space-y-2">
                     <p className="text-muted-foreground text-xs md:hidden">
                       Select or upload an image
@@ -433,11 +565,12 @@ export default function EditImagesPage() {
                     />
                     <Button variant="outline" size="lg" className="w-full gap-2" disabled={isUploading}>
                       <Upload className="w-4 h-4" />
-                      {isUploading ? "Uploading..." : "Upload Image"}
+                      Upload Image
                     </Button>
                   </div>
-               </div>
-            </div>
+                 </div>
+                )}
+              </div>
 
             {/* Right Panel - Selection UI */}
             <div 
