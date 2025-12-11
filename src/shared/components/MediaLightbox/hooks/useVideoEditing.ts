@@ -112,34 +112,56 @@ export const useVideoEditing = ({
   
   // Get default gap frame count from settings
   const defaultGapFrameCount = editSettings.settings.gapFrameCount || 12;
-  
+  const contextFrameCount = editSettings.settings.contextFrameCount || 8;
+
+  // Helper to calculate gap frames from time range (matches InlineEditVideoView logic)
+  const calculateGapFramesFromRange = useCallback((start: number, end: number): number => {
+    const fps = 16; // Default FPS for AI-generated videos
+    if (end <= start) return defaultGapFrameCount;
+    
+    const frameCount = Math.round((end - start) * fps);
+    // Quantize to 4N+1 format (required by Wan models)
+    const n = Math.round((frameCount - 1) / 4);
+    const quantized = Math.max(1, n * 4 + 1);
+    // Also cap at max allowed (81 - context * 2)
+    const maxGap = Math.max(1, 81 - (contextFrameCount * 2));
+    return Math.min(quantized, maxGap);
+  }, [defaultGapFrameCount, contextFrameCount]);
+
   // Initialize selection to 10%-20% when video duration is available
   useEffect(() => {
     if (videoDuration > 0 && selections.length > 0 && selections[0].end === 0) {
+      const start = videoDuration * 0.1;
+      const end = videoDuration * 0.2;
+      const calculatedGapFrames = calculateGapFramesFromRange(start, end);
       setSelections(prev => [{
         ...prev[0],
-        start: videoDuration * 0.1,
-        end: videoDuration * 0.2,
-        gapFrameCount: prev[0].gapFrameCount ?? defaultGapFrameCount,
+        start,
+        end,
+        gapFrameCount: calculatedGapFrames,
         prompt: prev[0].prompt ?? '',
       }, ...prev.slice(1)]);
     }
-  }, [videoDuration, selections, defaultGapFrameCount]);
+  }, [videoDuration, selections, calculateGapFramesFromRange]);
   
-  // Reset selections when media changes
+  // Reset selections when media changes (start with 0,0 - will be initialized when duration is available)
   useEffect(() => {
     if (media?.id) {
-      setSelections([{ id: generateUUID(), start: 0, end: 0, gapFrameCount: defaultGapFrameCount, prompt: '' }]);
+      setSelections([{ id: generateUUID(), start: 0, end: 0, gapFrameCount: 12, prompt: '' }]);
       setActiveSelectionId(null);
     }
   }, [media?.id]);
   
-  // Update selection handler
+  // Update selection handler - also calculates gap frames from the new range
   const handleUpdateSelection = useCallback((id: string, start: number, end: number) => {
-    setSelections(prev => prev.map(s => 
-      s.id === id ? { ...s, start, end } : s
-    ));
-  }, []);
+    setSelections(prev => prev.map(s => {
+      if (s.id === id) {
+        const calculatedGapFrames = calculateGapFramesFromRange(start, end);
+        return { ...s, start, end, gapFrameCount: calculatedGapFrames };
+      }
+      return s;
+    }));
+  }, [calculateGapFramesFromRange]);
   
   // Add new selection - 10% after last, or 10% before first if no space
   const handleAddSelection = useCallback(() => {
@@ -181,16 +203,17 @@ export const useVideoEditing = ({
       newEnd = videoDuration * 0.2;
     }
     
+    const calculatedGapFrames = calculateGapFramesFromRange(newStart, newEnd);
     const newSelection: PortionSelection = {
       id: generateUUID(),
       start: newStart,
       end: newEnd,
-      gapFrameCount: defaultGapFrameCount,
+      gapFrameCount: calculatedGapFrames,
       prompt: '',
     };
     setSelections(prev => [...prev, newSelection]);
     setActiveSelectionId(newSelection.id);
-  }, [videoDuration, selections, defaultGapFrameCount]);
+  }, [videoDuration, selections, calculateGapFramesFromRange]);
   
   // Remove selection handler
   const handleRemoveSelection = useCallback((id: string) => {
@@ -198,14 +221,17 @@ export const useVideoEditing = ({
       const filtered = prev.filter(s => s.id !== id);
       // Always keep at least one selection
       if (filtered.length === 0) {
-        return [{ id: generateUUID(), start: videoDuration * 0.1, end: videoDuration * 0.2, gapFrameCount: defaultGapFrameCount, prompt: '' }];
+        const start = videoDuration * 0.1;
+        const end = videoDuration * 0.2;
+        const calculatedGapFrames = calculateGapFramesFromRange(start, end);
+        return [{ id: generateUUID(), start, end, gapFrameCount: calculatedGapFrames, prompt: '' }];
       }
       return filtered;
     });
     if (activeSelectionId === id) {
       setActiveSelectionId(null);
     }
-  }, [activeSelectionId, videoDuration, defaultGapFrameCount]);
+  }, [activeSelectionId, videoDuration, calculateGapFramesFromRange]);
   
   // Update a selection's per-segment settings
   const handleUpdateSelectionSettings = useCallback((id: string, updates: Partial<Pick<PortionSelection, 'gapFrameCount' | 'prompt'>>) => {

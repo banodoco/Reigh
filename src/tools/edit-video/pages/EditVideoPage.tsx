@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
-import { LayoutGrid, Upload, ChevronDown, ChevronUp } from 'lucide-react';
+import { LayoutGrid, Upload, ChevronDown, ChevronUp, Film } from 'lucide-react';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { GenerationRow } from '@/types/shots';
 import { ReighLoading } from '@/shared/components/ReighLoading';
@@ -40,6 +40,8 @@ export default function EditVideoPage() {
   const [resultsPage, setResultsPage] = useState(1);
   const [showResults, setShowResults] = useState(true);
   const [isLoadingPersistedMedia, setIsLoadingPersistedMedia] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const dragCounterRef = useRef(0);
   const isMobile = useIsMobile();
   const { data: shots } = useListShots(selectedProjectId);
   
@@ -285,11 +287,148 @@ export default function EditVideoPage() {
 
   const isEditingOnMobile = selectedMedia && isMobile;
 
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDraggingOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDraggingOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingOver(false);
+
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    if (!file.type.startsWith('video/')) {
+      toast.error("Please drop a video file");
+      return;
+    }
+
+    if (!selectedProjectId) {
+      toast.error("Please select a project first");
+      return;
+    }
+
+    // Reuse the upload logic
+    setIsUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+      const userId = session.user.id;
+
+      // Extract poster frame from video
+      let posterUrl = '';
+      try {
+        const posterBlob = await extractVideoPosterFrame(file);
+        const posterFileName = `edit-video/${userId}/${Date.now()}-poster.jpg`;
+        const { error: posterError } = await supabase.storage
+          .from('image_uploads')
+          .upload(posterFileName, posterBlob, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: 'image/jpeg'
+          });
+        
+        if (!posterError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('image_uploads')
+            .getPublicUrl(posterFileName);
+          posterUrl = publicUrl;
+        }
+      } catch (posterError) {
+        console.warn('[EditVideo] Poster extraction failed:', posterError);
+      }
+      
+      // Upload video
+      const fileExt = file.name.split('.').pop() || 'mp4';
+      const fileName = `edit-video/${userId}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('image_uploads')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl: videoUrl } } = supabase.storage
+        .from('image_uploads')
+        .getPublicUrl(fileName);
+
+      const { data: generation, error: dbError } = await supabase
+        .from('generations')
+        .insert({
+          project_id: selectedProjectId,
+          location: videoUrl,
+          thumbnail_url: posterUrl || videoUrl,
+          type: 'video',
+          params: {
+            prompt: 'Uploaded video',
+            status: 'completed',
+            is_uploaded: true,
+            model: 'upload'
+          }
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      setSelectedMedia(generation as any);
+
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error("Failed to upload video: " + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [selectedProjectId]);
+
   return (
-    <div className={cn(
-      "w-full flex flex-col",
-      isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "h-[calc(100dvh-96px)]"
-    )}>
+    <div 
+      className={cn(
+        "w-full flex flex-col relative",
+        isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "h-[calc(100dvh-96px)]"
+      )}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDraggingOver && (
+        <div className="absolute inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-dashed border-primary bg-primary/10">
+            <Film className="w-16 h-16 text-primary animate-bounce" />
+            <p className="text-xl font-medium text-primary">Drop video to upload</p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="px-4 pt-6 pb-6 max-w-7xl mx-auto w-full">
         <h1 className="text-3xl font-light tracking-tight text-foreground">Edit Videos</h1>
