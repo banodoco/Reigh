@@ -899,7 +899,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             </div>
             
             {/* Task Type Filter + Project Scope Filter - side by side, 50% each */}
-            <div className="mt-2 flex items-center gap-1">
+            <div className="mt-2 flex items-center gap-2">
               {/* Task Type Dropdown */}
               <Select
                 value={selectedTaskType || 'all'}
