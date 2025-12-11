@@ -382,86 +382,54 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
           
           <div className={`${modal.scrollClass} -mx-6 px-6 flex-1 min-h-0`}>
             {isLoading ? (
-              <div className="space-y-6 pb-4">
+              <div className="space-y-4 pb-4">
                 <div className="flex flex-col lg:flex-row gap-6">
+                  {/* Left column - Settings (matches BatchSettingsForm) */}
                   <div className="lg:w-1/2">
-                    {/* SectionHeader skeleton */}
-                    <div className="mb-4">
-                      <Skeleton className="h-8 w-32" />
-                    </div>
+                    <div className="mb-4"><Skeleton className="h-6 w-20" /></div>
                     <div className="space-y-4">
-                      {/* Prompt input */}
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-20" />
-                        <Skeleton className="h-24 w-full rounded-md" />
-                      </div>
-                      {/* Frames and Steps */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
+                      {/* Prompt + Negative prompt grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
                           <Skeleton className="h-4 w-16" />
-                          <Skeleton className="h-10 w-full rounded-md" />
+                          <Skeleton className="h-[70px] w-full rounded-md" />
                         </div>
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-16" />
-                          <Skeleton className="h-10 w-full rounded-md" />
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-[70px] w-full rounded-md" />
                         </div>
                       </div>
-                      {/* Dimension source */}
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-10 w-full rounded-md" />
-                      </div>
-                      {/* Toggles */}
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Skeleton className="h-5 w-5 rounded" />
-                          <Skeleton className="h-4 w-32" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Skeleton className="h-5 w-5 rounded" />
+                      {/* Enhance prompt toggle */}
+                      <Skeleton className="h-12 w-full rounded-lg" />
+                      {/* Before/After prompts grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
                           <Skeleton className="h-4 w-28" />
+                          <Skeleton className="h-9 w-full rounded-md" />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Skeleton className="h-5 w-5 rounded" />
-                          <Skeleton className="h-4 w-36" />
+                        <div className="space-y-1.5">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-9 w-full rounded-md" />
                         </div>
                       </div>
-                      {/* Slider */}
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-2 w-full rounded-full" />
-                        <Skeleton className="h-4 w-12 ml-auto" />
+                      {/* Duration slider */}
+                      <div className="space-y-1">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-5 w-full rounded-full" />
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Right column - Motion (matches MotionControl) */}
                   <div className="lg:w-1/2">
-                    {/* SectionHeader skeleton */}
-                    <div className="mb-4">
-                      <Skeleton className="h-8 w-24" />
-                    </div>
+                    <div className="mb-4"><Skeleton className="h-6 w-16" /></div>
                     <div className="space-y-4">
-                      {/* Motion mode toggle */}
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-20" />
-                        <Skeleton className="h-10 w-full rounded-md" />
-                      </div>
-                      {/* Generation type */}
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-28" />
-                        <Skeleton className="h-10 w-full rounded-md" />
-                      </div>
-                      {/* LoRA section */}
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-16" />
-                        <div className="space-y-2">
-                          <Skeleton className="h-16 w-full rounded-md" />
-                          <Skeleton className="h-16 w-full rounded-md" />
-                        </div>
-                      </div>
-                      {/* Phase config */}
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-32 w-full rounded-md" />
+                      {/* LoRAs section */}
+                      <Skeleton className="h-10 w-full rounded-md" />
+                      {/* Preset chips */}
+                      <div className="flex gap-2">
+                        <Skeleton className="h-8 w-16 rounded-full" />
+                        <Skeleton className="h-8 w-20 rounded-full" />
                       </div>
                     </div>
                   </div>
