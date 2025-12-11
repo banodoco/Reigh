@@ -165,8 +165,28 @@ Located in `/ui/` - Full shadcn-ui component library including:
 - **`TaskItem`** - Individual task display with progress tracking, cancellation
 - **`TasksPane`** - Task queue management with filtering, pagination, real-time updates  
 - **`SharedTaskDetails`** - Reusable task info display with hover/modal/panel variants
+- **`SharedMetadataDetails`** - Generation metadata display with structured layout
 - **`TaskDetailsPanel`** - Full task details view used in MediaLightbox
 - **`TaskDetailsModal`** - Standalone task modal for mobile-friendly viewing
+
+#### Variant-Based Detail Components
+
+Both `SharedTaskDetails` and `SharedMetadataDetails` use a variant pattern:
+
+| Variant | Use Case | Features |
+|---------|----------|----------|
+| `hover` | Desktop tooltips | Compact, `text-xs` |
+| `modal` | Dialog content | Medium, `text-sm` |
+| `panel` | Mobile popovers/sidebars | Full, mobile-optimized |
+
+```typescript
+<SharedMetadataDetails
+  metadata={image.metadata}
+  variant="hover"  // or "modal" or "panel"
+  showFullPrompt={showFullPrompt}
+  onShowFullPromptChange={setShowFullPrompt}
+/>
+```
 
 ### 📸 Media Components
 - **`ImageGallery`** - Grid display with lightbox
