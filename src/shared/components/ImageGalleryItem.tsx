@@ -1592,13 +1592,14 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
           </div>
 
-          {/* Delete button - Desktop Bottom Right */}
-              {!isMobile && onDelete && showDelete && (
-              <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          {/* Bottom Right Buttons - Delete, Download */}
+              {!isMobile && (onDelete && showDelete || showDownload) && (
+              <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                   {/* Delete button - Desktop */}
-                  <Button 
-                      variant="destructive" 
-                      size="icon" 
+                  {onDelete && showDelete && (
+                  <Button
+                      variant="destructive"
+                      size="icon"
                       className="h-7 w-7 p-0 rounded-full"
                       onClick={(e) => {
                           e.stopPropagation();
@@ -1612,7 +1613,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                           <Trash2 className="h-3.5 w-3.5" />
                       )}
                   </Button>
-                  {/* Download Button - Desktop Bottom Right (next to Delete) */}
+                  )}
+                  {/* Download Button - Desktop Bottom Right */}
                   {showDownload && (
                   <Button
                       variant="secondary"
