@@ -48,8 +48,6 @@
 | **Realtime Architecture** | [realtime_system.md](docs/structure_detail/realtime_system.md) | Implemented unified realtime system and usage guide |
 | **Tool: Image Gen** | [tool_image_generation.md](docs/structure_detail/tool_image_generation.md) | Multi-model image generation (Wan 2.2, Qwen.Image), LoRA support, resource-based style reference system (bulk migrated), inline AI prompt editing |
 | **Tool: Video Travel** | [tool_video_travel.md](docs/structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow, shot reordering, mobile video preloading, video gallery with hover-to-play |
-| **Tool: Edit Travel** | [tool_edit_travel.md](docs/structure_detail/tool_edit_travel.md) | Text-guided image transformations |
-| **Tool: Training Data** | [tool_training_data_helper.md](docs/structure_detail/tool_training_data_helper.md) | Training video upload & segmentation |
 | **Auto-Top-Up System** | [auto_topup_system.md](docs/structure_detail/auto_topup_system.md) | Credit purchases, auto-top-up setup, Stripe integration, database triggers |
 | **Referral System** | [referral_system.md](docs/structure_detail/referral_system.md) | Referral tracking with username-based links, visitor attribution, secure conversion handling |
 | **Debug Logging** | [debug_logging.md](docs/structure_detail/debug_logging.md) | PerfDebug log helpers & profiling |
@@ -210,8 +208,6 @@ tool-name/
 | **Animate Characters** | ✅ Active | - | Motion transfer from reference videos to static images |
 | **Edit Images** | ✅ Active | - | Transform and edit images directly with inpainting and magic edit |
 | **Join Clips** | ✅ Active | - | AI-generated transitions between two video clips with LoRA support |
-| **Edit Travel** | ⚠️ Hidden | [`tool_edit_travel.md`](docs/structure_detail/tool_edit_travel.md) | Text-guided transformations |
-| **Training Data** | ⚠️ Hidden | [`tool_training_data_helper.md`](docs/structure_detail/tool_training_data_helper.md) | Video upload & segmentation |
 
 ### 🔄 Shared Elements (`/src/shared/`)
 

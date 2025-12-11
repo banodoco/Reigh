@@ -7,7 +7,6 @@ import { toolsManifest } from '@/tools';
 const TOOL_IDS = [
   'image-generation',
   'travel-between-images',
-  'edit-travel',
   'project-image-settings', // Shared settings including reference images
 ];
 

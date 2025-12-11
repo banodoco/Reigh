@@ -347,10 +347,6 @@ export const useImageGalleryFiltersOptimized = ({
         const metadata = image.metadata;
         if (!metadata || !metadata.tool_type) return false;
         
-        if (currentToolType === 'edit-travel') {
-          return metadata.tool_type.startsWith('edit-travel');
-        }
-        
         if (metadata.tool_type === currentToolType) return true;
         if (metadata.tool_type === `${currentToolType}-reconstructed-client`) return true;
         

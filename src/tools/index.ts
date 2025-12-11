@@ -1,7 +1,6 @@
 // Centralized tool settings exports - automatically registers defaults in toolSettingsService
 export { videoTravelSettings } from './travel-between-images/settings';
 export { imageGenerationSettings } from './image-generation/settings';
-export { editTravelSettings } from './edit-travel/settings';
 export { characterAnimateSettings } from './character-animate/settings';
 export { joinClipsSettings } from './join-clips/settings';
 export { editImagesSettings } from './edit-images/settings';
@@ -11,7 +10,6 @@ export { userPreferencesSettings } from '../shared/settings/userPreferences';
 // Tool manifest for UI discovery and automatic registration
 import { videoTravelSettings } from './travel-between-images/settings';
 import { imageGenerationSettings } from './image-generation/settings';
-import { editTravelSettings } from './edit-travel/settings';
 import { characterAnimateSettings } from './character-animate/settings';
 import { joinClipsSettings } from './join-clips/settings';
 import { editImagesSettings } from './edit-images/settings';
@@ -23,7 +21,6 @@ import { Paintbrush, Video, Edit, Users, Link2, Film } from 'lucide-react';
 export const toolsManifest = [
   videoTravelSettings,
   imageGenerationSettings,
-  editTravelSettings,
   characterAnimateSettings,
   joinClipsSettings,
   editImagesSettings,
@@ -69,18 +66,6 @@ export const toolsUIManifest: ToolUIDefinition[] = [
     accent: 'wes-mint',
     ornament: '◆',
     badge: 'Popular',
-  },
-  {
-    id: editTravelSettings.id,
-    name: 'Edit Travel (Image Edit)',
-    path: '/tools/edit-travel',
-    description: 'Transform existing images using poetic text prompts with the sophisticated Fal Kontext model, reimagining reality with artistic precision.',
-    environments: [AppEnv.DEV],
-    icon: Edit,
-    gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
-    accent: 'wes-yellow',
-    ornament: '✧',
-    badge: 'New',
   },
   {
     id: characterAnimateSettings.id,

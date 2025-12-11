@@ -108,19 +108,6 @@ export const TOOL_FIELD_CATEGORIES = {
     ],
   },
   
-  'edit-travel': {
-    content: [
-      'prompts',            // Edit prompts
-    ],
-    configuration: [
-      'imagesPerPrompt',    // Number per prompt
-      'generationMode',     // kontext vs flux
-      'fluxSoftEdgeStrength', // Soft edge strength
-      'fluxDepthStrength',  // Depth strength
-      'reconstructVideo',   // Reconstruction toggle
-    ],
-  },
-  
   'character-animate': {
     content: [
       'defaultPrompt',      // Default prompt text

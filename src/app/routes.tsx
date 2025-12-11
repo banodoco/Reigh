@@ -17,10 +17,8 @@ import CharacterAnimatePage from '@/tools/character-animate/pages/CharacterAnima
 // Import JoinClipsPage eagerly for consistency with other main tools
 import JoinClipsPage from '@/tools/join-clips/pages/JoinClipsPage';
 // Keep other heavy tools lazy-loaded to preserve bundle size
-const EditTravelToolPage = lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
 const EditImagesPage = lazy(() => import('@/tools/edit-images/pages/EditImagesPage'));
 const EditVideoPage = lazy(() => import('@/tools/edit-video/pages/EditVideoPage'));
-const TrainingDataHelperPage = lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
 import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will be moved here or created
 import { LastAffectedShotProvider } from '@/shared/contexts/LastAffectedShotContext';
 import ShotsPage from "@/pages/ShotsPage";
@@ -109,14 +107,6 @@ const router = createBrowserRouter([
         element: <JoinClipsPage />, // No Suspense wrapper needed – component is loaded synchronously
       },
       {
-        path: '/tools/edit-travel',
-        element: (
-          <Suspense fallback={<LazyLoadingFallback />}>
-            <EditTravelToolPage />
-          </Suspense>
-        ),
-      },
-      {
         path: '/tools/edit-images',
         element: (
           <Suspense fallback={<LazyLoadingFallback />}>
@@ -129,14 +119,6 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<LazyLoadingFallback />}>
             <EditVideoPage />
-          </Suspense>
-        ),
-      },
-      {
-        path: '/tools/training-data-helper',
-        element: (
-          <Suspense fallback={<LazyLoadingFallback />}>
-            <TrainingDataHelperPage />
           </Suspense>
         ),
       },
