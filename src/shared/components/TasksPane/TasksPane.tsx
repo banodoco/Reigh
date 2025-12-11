@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import TaskList from './TaskList';
 import { cn } from '@/shared/lib/utils'; // For conditional classnames
 import { Button } from '@/shared/components/ui/button'; // For the lock button
-import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, Loader2, Filter, X } from 'lucide-react'; // Example icons
+import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, Loader2, Filter, X, FolderOpen } from 'lucide-react'; // Example icons
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
@@ -179,6 +179,29 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Task type filter state - null means "All types"
   const [selectedTaskType, setSelectedTaskType] = useState<string | null>(null);
   
+  // Project scope filter - 'current' shows current project, 'all' shows all projects, or a specific project ID
+  const [projectScope, setProjectScope] = useState<string>(() => {
+    // Restore from session storage if available
+    try {
+      const stored = sessionStorage.getItem('tasks-pane-project-scope');
+      if (stored) {
+        return stored;
+      }
+    } catch (e) {
+      // Session storage not available
+    }
+    return 'current';
+  });
+  
+  // Save project scope to session storage when it changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('tasks-pane-project-scope', projectScope);
+    } catch (e) {
+      // Session storage not available
+    }
+  }, [projectScope]);
+  
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -198,8 +221,20 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const [optimisticUnpositionedIds, setOptimisticUnpositionedIds] = useState<Set<string>>(new Set());
 
   // Project context & task helpers
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, projects } = useProject();
   const shouldLoadTasks = !!selectedProjectId;
+  
+  // Get all project IDs for "all projects" mode
+  const allProjectIds = useMemo(() => projects.map(p => p.id), [projects]);
+  
+  // Create a lookup map for project names
+  const projectNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    projects.forEach(p => {
+      map[p.id] = p.name;
+    });
+    return map;
+  }, [projects]);
   
   // Shots data for lightbox
   const { data: shots } = useListShots(selectedProjectId);
@@ -265,13 +300,24 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Realtime connection status
   const { isConnected: realtimeConnected, isConnecting: realtimeConnecting, error: realtimeError } = useSimpleRealtime();
   
+  // Determine the effective project ID(s) based on scope
+  const effectiveProjectId = projectScope === 'current' 
+    ? selectedProjectId 
+    : projectScope !== 'all' 
+      ? projectScope // Specific project ID selected
+      : null;
+  
+  const isAllProjectsMode = projectScope === 'all';
+  
   // Get paginated tasks - task type filter is now applied server-side
   const { data: paginatedData, isLoading: isPaginatedLoading, error: paginatedError, refetch: refetchPaginatedTasks } = usePaginatedTasks({
-    projectId: shouldLoadTasks ? selectedProjectId : null,
+    projectId: shouldLoadTasks ? effectiveProjectId : null,
     status: STATUS_GROUPS[selectedFilter],
     limit: ITEMS_PER_PAGE,
     offset: (currentPage - 1) * ITEMS_PER_PAGE,
     taskType: selectedTaskType, // Server-side task type filter
+    allProjects: isAllProjectsMode,
+    allProjectIds: isAllProjectsMode ? allProjectIds : undefined,
   });
 
   // NOTE: Task invalidation is now handled by the centralized TaskInvalidationSubscriber
@@ -852,36 +898,49 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
               </div>
             </div>
             
-            {/* Task Type Filter - compact dropdown */}
-            <div className="mt-2 flex items-center gap-2">
-              <Filter className="h-3 w-3 text-zinc-500 flex-shrink-0" />
+            {/* Task Type Filter + Project Scope Filter - side by side, 50% each */}
+            <div className="mt-2 flex items-center gap-1">
+              {/* Task Type Dropdown */}
               <Select
                 value={selectedTaskType || 'all'}
                 onValueChange={(value) => handleTaskTypeChange(value === 'all' ? null : value)}
               >
-                <SelectTrigger className="h-7 text-xs bg-zinc-700/50 border-zinc-600 text-zinc-300 flex-1">
+                <SelectTrigger className="h-7 !text-xs bg-zinc-700/50 border-zinc-600 text-zinc-300 flex-1 min-w-0 !px-2 !justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate">
                   <SelectValue placeholder="All task types" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
-                  <SelectItem value="all" className="text-xs text-zinc-300">All task types</SelectItem>
+                  <SelectItem value="all" className="!text-xs !pl-2 text-zinc-300">All task types</SelectItem>
                   {taskTypeOptions.map((type) => (
-                    <SelectItem key={type.value} value={type.value} className="text-xs text-zinc-300">
+                    <SelectItem key={type.value} value={type.value} className="!text-xs !pl-2 text-zinc-300">
                       {type.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {selectedTaskType && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleTaskTypeChange(null)}
-                  className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-200"
-                  title="Clear filter"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
+              
+              {/* Project Scope Dropdown */}
+              <Select
+                value={projectScope}
+                onValueChange={(value) => {
+                  setProjectScope(value);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-7 !text-xs bg-zinc-700/50 border-zinc-600 text-zinc-300 flex-1 min-w-0 !px-2 !justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700">
+                  <SelectItem value="current" className="!text-xs !pl-2 text-zinc-300">This project</SelectItem>
+                  <SelectItem value="all" className="!text-xs !pl-2 text-zinc-300">All projects</SelectItem>
+                  {projects
+                    .filter(p => p.id !== selectedProjectId)
+                    .map((project) => (
+                      <SelectItem key={project.id} value={project.id} className="!text-xs !pl-2 text-zinc-300">
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -915,6 +974,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             mobileActiveTaskId={mobileActiveTaskId}
             onMobileActiveTaskChange={setMobileActiveTaskId}
             taskTypeFilter={selectedTaskType}
+            showProjectIndicator={isAllProjectsMode}
+            projectNameMap={projectNameMap}
           />
           </div>
           </div> {/* Close inner wrapper with delayed pointer events */}

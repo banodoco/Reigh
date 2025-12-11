@@ -96,9 +96,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [isPageChange, setIsPageChange] = useState(false);
   const [isPageChangeFromBottom, setIsPageChangeFromBottom] = useState(false);
   const [isFilterChange, setIsFilterChange] = useState(false);
-  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('all'); // Add media type filter state
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('image'); // Default to images only
   const [starredOnly, setStarredOnly] = useState<boolean>(false);
-  const [toolTypeFilterEnabled, setToolTypeFilterEnabled] = useState<boolean>(true); // Default to filtering by tool type
+  const [toolTypeFilterEnabled, setToolTypeFilterEnabled] = useState<boolean>(false); // Default to All Tools (not filtering by tool type)
   const [formAssociatedShotId, setFormAssociatedShotId] = useState<string | null>(null); // Track the associated shot from the form
   // Optimistic initial state: read last known form state from sessionStorage for instant UI on revisit
   const [isFormExpanded, setIsFormExpanded] = useState<boolean | undefined>(() => {

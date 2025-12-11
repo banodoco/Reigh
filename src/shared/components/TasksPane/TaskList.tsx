@@ -133,6 +133,9 @@ interface TaskListProps {
   mobileActiveTaskId?: string | null;
   onMobileActiveTaskChange?: (taskId: string | null) => void;
   taskTypeFilter?: string; // Optional task type filter
+  // Project scope props for "All Projects" mode
+  showProjectIndicator?: boolean;
+  projectNameMap?: Record<string, string>;
 }
 
 const TaskList: React.FC<TaskListProps> = ({ 
@@ -148,6 +151,8 @@ const TaskList: React.FC<TaskListProps> = ({
   mobileActiveTaskId,
   onMobileActiveTaskChange,
   taskTypeFilter,
+  showProjectIndicator = false,
+  projectNameMap = {},
 }) => {
   const { selectedProjectId } = useProject();
 
@@ -352,6 +357,8 @@ const TaskList: React.FC<TaskListProps> = ({
                       onOpenVideoLightbox={onOpenVideoLightbox}
                       isMobileActive={mobileActiveTaskId === task.id}
                       onMobileActiveChange={onMobileActiveTaskChange}
+                      showProjectIndicator={showProjectIndicator}
+                      projectName={projectNameMap[task.projectId]}
                     />
                     {idx < filteredTasks.length - 1 && (
                       <div className="h-0 border-b border-zinc-700/40 my-1" />

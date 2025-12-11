@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Settings, Key, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, MoreHorizontal, Play, ImageIcon, ExternalLink } from "lucide-react";
+import { Settings, Key, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, MoreHorizontal, Play, ImageIcon, ExternalLink, FolderOpen } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -54,18 +54,21 @@ interface TaskItemProps {
   onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number) => void;
   isMobileActive?: boolean; // For mobile two-step tap interaction
   onMobileActiveChange?: (taskId: string | null) => void;
+  // Project indicator for "All Projects" mode
+  showProjectIndicator?: boolean;
+  projectName?: string;
 }
 
 // Timestamp formatting now handled by useTaskTimestamp hook
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = false, onOpenImageLightbox, onOpenVideoLightbox, isMobileActive = false, onMobileActiveChange }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = false, onOpenImageLightbox, onOpenVideoLightbox, isMobileActive = false, onMobileActiveChange, showProjectIndicator = false, projectName }) => {
   const { toast } = useToast();
   
   // Mobile detection hook - declare early for use throughout component
   const isMobile = useIsMobile();
 
   // Access project context early so it can be used in other hooks
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, setSelectedProjectId } = useProject();
   
   // Access pane controls for setting active task
   const { setActiveTaskId, setIsTasksPaneOpen, tasksPaneWidth } = usePanes();
@@ -919,6 +922,40 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
                 {idCopied ? 'Copied!' : 'Copy task ID'}
               </TooltipContent>
             </Tooltip>
+            
+            {/* Project indicator - shown in "All Projects" mode */}
+            {showProjectIndicator && projectName && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      // Switch to this task's project
+                      setSelectedProjectId(task.projectId);
+                      // Navigate to home page after switching
+                      navigate('/');
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSelectedProjectId(task.projectId);
+                      navigate('/');
+                    }}
+                    className={cn(
+                      "p-1 rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
+                      isMobile && "min-w-[32px] min-h-[32px] flex items-center justify-center"
+                    )}
+                    title={`Go to project: ${projectName}`}
+                  >
+                    <FolderOpen className={cn(isMobile ? "w-4 h-4" : "w-3 h-3")} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  {projectName}
+                </TooltipContent>
+              </Tooltip>
+            )}
             
             {/* Open Video button - show immediately for completed video tasks, fetch data on click if needed */}
             {taskInfo.isCompletedVideoTask && (
