@@ -55,7 +55,6 @@
 | **Debug Logging** | [debug_logging.md](docs/structure_detail/debug_logging.md) | PerfDebug log helpers & profiling |
 | **Image Loading System** | [image_loading_system.md](docs/structure_detail/image_loading_system.md) | Progressive loading, adjacent page preloading, performance optimization |
 | **Modal Styling System** | [modal_styling_system.md](docs/structure_detail/modal_styling_system.md) | Unified responsive modal system for both mobile and desktop, positioning, safe area handling |
-| **Mobile Video Toggle** | - | Mobile UI toggle functionality between MediaLightbox video playback and TaskDetailsModal for viewing generation parameters |
 | **Railway Deployment** | `railway.toml`, `nixpacks.toml`, `.dockerignore` | Optimized Railway deployment config: npm-based builds, excludes node_modules/bun.lock/dist from Docker context for faster builds (~60-90s improvement) |
 | **Instrumentation System** | [instrumentation/README.md](src/integrations/supabase/instrumentation/README.md) | Centralized instrumentation management, diagnostics, and debugging tools |
 | **Shot Generation Data Flow** | See "Data Flow Architecture" section below | How shot image data flows from database to UI components |
