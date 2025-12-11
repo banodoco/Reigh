@@ -49,6 +49,21 @@ function getQuantizedGap(desiredGap: number, context: number, minTotal: number =
     return gap;
 }
 
+/** Info about a clip pair for visualization */
+export interface ClipPairInfo {
+    pairIndex: number;
+    clipA: {
+        name: string;
+        frameCount: number;
+        finalFrameUrl?: string; // last frame of clip A
+    };
+    clipB: {
+        name: string;
+        frameCount: number;
+        posterUrl?: string; // first frame of clip B
+    };
+}
+
 export interface JoinClipsSettingsFormProps {
     // Settings state
     gapFrames: number;
@@ -112,6 +127,9 @@ export interface JoinClipsSettingsFormProps {
     
     // Shortest clip frame count for constraining sliders (prevents invalid settings)
     shortestClipFrames?: number;
+    
+    // Clip pairs for visualization (optional - if provided, enables pair selector)
+    clipPairs?: ClipPairInfo[];
 }
 
 const Visualization: React.FC<{
@@ -120,28 +138,29 @@ const Visualization: React.FC<{
     replaceMode: boolean;
     keepBridgingImages: boolean;
     infoContent?: React.ReactNode;
-}> = ({ gapFrames, contextFrames, replaceMode, keepBridgingImages, infoContent }) => {
+    clipPairs?: ClipPairInfo[];
+}> = ({ gapFrames, contextFrames, replaceMode, keepBridgingImages, infoContent, clipPairs }) => {
     // Handle undefined keepBridgingImages (defensive fallback)
     const keepBridgingImagesValue = keepBridgingImages ?? false;
+    
+    // State for selected pair
+    const [selectedPairIndex, setSelectedPairIndex] = useState(0);
+    
+    // Get selected pair info
+    const selectedPair = clipPairs?.[selectedPairIndex];
+    const hasPairs = clipPairs && clipPairs.length > 0;
+    const hasMultiplePairs = clipPairs && clipPairs.length > 1;
     
     const totalFrames = contextFrames + gapFrames + contextFrames;
     const anchor1Idx = Math.floor(gapFrames / 3);
     const anchor2Idx = Math.floor(gapFrames * 2 / 3);
     
-    // Debug logging
-    useEffect(() => {
-        console.log('[JoinClips Viz] State:', {
-            keepBridgingImages,
-            keepBridgingImagesValue,
-            gapFrames,
-            contextFrames,
-            replaceMode,
-            anchor1Idx,
-            anchor2Idx,
-            anchor1Pos: `${(anchor1Idx / gapFrames) * 100}%`,
-            anchor2Pos: `${(anchor2Idx / gapFrames) * 100}%`
-        });
-    }, [keepBridgingImages, keepBridgingImagesValue, gapFrames, contextFrames, replaceMode, anchor1Idx, anchor2Idx]);
+    // Calculate frames used/kept for current pair
+    const gapPortion = Math.ceil(gapFrames / 2);
+    const framesUsedFromClipA = replaceMode ? (contextFrames + gapPortion) : contextFrames;
+    const framesUsedFromClipB = replaceMode ? (contextFrames + Math.floor(gapFrames / 2)) : contextFrames;
+    const clipAKeptFrames = selectedPair ? Math.max(0, selectedPair.clipA.frameCount - framesUsedFromClipA) : null;
+    const clipBKeptFrames = selectedPair ? Math.max(0, selectedPair.clipB.frameCount - framesUsedFromClipB) : null;
 
     // In REPLACE mode: Total generation = context + gap + context (all generated)
     // In INSERT mode: Gap is separate, context frames are from original clips
@@ -157,10 +176,66 @@ const Visualization: React.FC<{
 
     return (
         <div className="border rounded-lg p-4 bg-background/50 text-xs h-full flex flex-col">
-            <h4 className="font-semibold mb-4 flex items-center gap-2">
+            <h4 className="font-semibold flex items-center gap-2 mb-2">
                 <Film className="w-3 h-3" />
                 Transition Structure Preview
             </h4>
+            
+            {/* Pair selector with thumbnails */}
+            {hasPairs && selectedPair && (
+                <div className="flex items-center gap-3 mb-4">
+                    {/* Pair selector buttons */}
+                    {hasMultiplePairs && (
+                        <div className="flex items-center gap-1">
+                            {clipPairs.map((pair, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => setSelectedPairIndex(idx)}
+                                    className={cn(
+                                        "px-2 py-1 text-[10px] rounded transition-colors",
+                                        selectedPairIndex === idx 
+                                            ? "bg-primary text-primary-foreground" 
+                                            : "bg-muted hover:bg-muted/80 text-muted-foreground"
+                                    )}
+                                >
+                                    Pair {idx + 1}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    
+                    {/* Thumbnails */}
+                    <div className="flex items-center gap-2">
+                        <div className="w-12 h-8 rounded border overflow-hidden bg-muted">
+                            {selectedPair.clipA.finalFrameUrl ? (
+                                <img 
+                                    src={selectedPair.clipA.finalFrameUrl} 
+                                    alt={selectedPair.clipA.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                    <Film className="w-3 h-3" />
+                                </div>
+                            )}
+                        </div>
+                        <span className="text-muted-foreground text-[10px]">→</span>
+                        <div className="w-12 h-8 rounded border overflow-hidden bg-muted">
+                            {selectedPair.clipB.posterUrl ? (
+                                <img 
+                                    src={selectedPair.clipB.posterUrl} 
+                                    alt={selectedPair.clipB.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                    <Film className="w-3 h-3" />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
             
             {infoContent && (
                 <div className="mb-4 bg-muted/50 rounded-lg px-3 py-2">
@@ -192,18 +267,26 @@ const Visualization: React.FC<{
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div 
-                                className="bg-blue-500/30 border-r border-blue-500/50 relative group flex items-center justify-center cursor-help" 
+                                className="bg-blue-500/30 border-r border-blue-500/50 relative group flex flex-col items-center justify-center cursor-help" 
                                 style={{ flex: clipAKeptFlex }}
                             >
                                 <span className="text-[9px] font-mono font-medium text-blue-700 dark:text-blue-300 opacity-70">
                                     Clip A
                                 </span>
+                                {clipAKeptFrames !== null && (
+                                    <span className="text-[8px] font-mono text-blue-600 dark:text-blue-400 mt-0.5">
+                                        {clipAKeptFrames}
+                                    </span>
+                                )}
                                 <div className="absolute inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p className="max-w-xs text-xs">
-                                This portion of Clip A is not used in generation - it will be stitched back together with the generated frames in the final output.
+                                {clipAKeptFrames !== null 
+                                    ? `There are ${clipAKeptFrames} frames from Clip A that won't be included in the generation but will be re-attached afterwards.`
+                                    : "This portion of Clip A is not used in generation - it will be stitched back together with the generated frames in the final output."
+                                }
                             </p>
                         </TooltipContent>
                     </Tooltip>
@@ -231,7 +314,7 @@ const Visualization: React.FC<{
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p className="max-w-xs text-xs">Context frames from Clip A - fed into generation to understand motion and maintain continuity. These will be blended between the original and the new.</p>
+                                    <p className="max-w-xs text-xs">{contextFrames} context frames from Clip A are fed into generation to understand motion and maintain continuity. These will be blended between the original and the new.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -250,7 +333,7 @@ const Visualization: React.FC<{
                                     ></div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p className="max-w-xs text-xs">This portion from the original video will be replaced.</p>
+                                    <p className="max-w-xs text-xs">{Math.ceil(gapFrames / 2)} frames from Clip A will be replaced with newly generated frames.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -269,7 +352,7 @@ const Visualization: React.FC<{
                                     ></div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p className="max-w-xs text-xs">This portion from the original video will be replaced.</p>
+                                    <p className="max-w-xs text-xs">{Math.floor(gapFrames / 2)} frames from Clip B will be replaced with newly generated frames.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -290,7 +373,7 @@ const Visualization: React.FC<{
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p className="max-w-xs text-xs">Context frames from Clip B - fed into generation to understand motion and maintain continuity</p>
+                                    <p className="max-w-xs text-xs">{contextFrames} context frames from Clip B are fed into generation to understand motion and maintain continuity.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -319,7 +402,7 @@ const Visualization: React.FC<{
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p className="max-w-xs text-xs">
-                                        New frames generated to replace the seam between clips, creating a smooth transition.
+                                        {gapFrames} new frames will be generated to replace the seam between clips, creating a smooth transition.
                                     </p>
                                 </TooltipContent>
                             </Tooltip>
@@ -386,7 +469,7 @@ const Visualization: React.FC<{
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p className="max-w-xs text-xs">
-                                        Context frames from Clip A - blended with the generated frames to ensure smooth motion continuity.
+                                        {contextFrames} context frames from Clip A are blended with the generated frames to ensure smooth motion continuity.
                                     </p>
                                 </TooltipContent>
                             </Tooltip>
@@ -452,7 +535,7 @@ const Visualization: React.FC<{
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p className="max-w-xs text-xs">
-                                        New frames generated and inserted between the two clips to create a smooth transition.
+                                        {gapFrames} new frames will be generated and inserted between the two clips to create a smooth transition.
                                     </p>
                                 </TooltipContent>
                             </Tooltip>
@@ -474,7 +557,7 @@ const Visualization: React.FC<{
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p className="max-w-xs text-xs">
-                                        Context frames from Clip B - blended with the generated frames to ensure smooth motion continuity.
+                                        {contextFrames} context frames from Clip B are blended with the generated frames to ensure smooth motion continuity.
                                     </p>
                                 </TooltipContent>
                             </Tooltip>
@@ -486,19 +569,27 @@ const Visualization: React.FC<{
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <div 
-                                className="bg-green-500/30 relative group flex items-center justify-center cursor-help" 
+                            <div
+                                className="bg-green-500/30 relative group flex flex-col items-center justify-center cursor-help"
                                 style={{ flex: clipBKeptFlex }}
                             >
                                 <span className="text-[9px] font-mono font-medium text-green-700 dark:text-green-300 opacity-70">
                                     Clip B
                                 </span>
+                                {clipBKeptFrames !== null && (
+                                    <span className="text-[8px] font-mono text-green-600 dark:text-green-400 mt-0.5">
+                                        {clipBKeptFrames}
+                                    </span>
+                                )}
                                 <div className="absolute inset-0 bg-green-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p className="max-w-xs text-xs">
-                                This portion of Clip B is not used in generation - it will be stitched back together with the generated frames in the final output.
+                                {clipBKeptFrames !== null 
+                                    ? `There are ${clipBKeptFrames} frames from Clip B that won't be included in the generation but will be re-attached afterwards.`
+                                    : "This portion of Clip B is not used in generation - it will be stitched back together with the generated frames in the final output."
+                                }
                             </p>
                         </TooltipContent>
                     </Tooltip>
@@ -570,6 +661,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     className,
     headerContent,
     shortestClipFrames,
+    clipPairs,
 }) => {
     // Handle undefined values (defensive fallback)
     const keepBridgingImagesValue = keepBridgingImages ?? false;
@@ -603,8 +695,9 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
         if (replaceMode) {
             // REPLACE mode: each clip needs context + ceil(gap/2) frames
             // Max gap: context + ceil(gap/2) <= shortestClipFrames
-            // gap <= 2 * (shortestClipFrames - context) - 1
-            const maxGapForClip = Math.max(1, 2 * (shortestClipFrames - contextFrames) - 1);
+            // ceil(gap/2) <= shortestClipFrames - context
+            // gap <= 2 * (shortestClipFrames - context)
+            const maxGapForClip = Math.max(1, 2 * (shortestClipFrames - contextFrames));
             const maxGapForTotal = Math.max(1, standardMaxTotal - (contextFrames * 2));
             const finalMaxGap = Math.min(maxGapForClip, maxGapForTotal);
             
@@ -690,9 +783,10 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                         </div>
                     )}
                     
-                    {/* Restore Default Settings - above the frame controls */}
-                    {onRestoreDefaults && (
-                        <div className="flex justify-end mb-2">
+                    {/* Settings header with restore defaults button */}
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-base font-semibold">Join Clips Settings</h3>
+                        {onRestoreDefaults && (
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -700,10 +794,10 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                 className="text-muted-foreground hover:text-foreground"
                             >
                                 <RotateCcw className="w-4 h-4 mr-2" />
-                                Restore Default Settings
+                                Restore Defaults
                             </Button>
-                        </div>
-                    )}
+                        )}
+                    </div>
 
                     <div className="grid grid-cols-2 gap-x-6 gap-y-8">
                         {/* Row 1: Gap Frames | Context Frames */}
@@ -809,80 +903,85 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                     <Button 
                                         variant="outline" 
                                         size="sm" 
-                                        className="w-full justify-between px-3 py-2 h-auto border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+                                        className={cn(
+                                            "w-full justify-between px-3 py-2 h-auto border-primary/30 text-primary hover:bg-primary/10 hover:text-primary",
+                                            isAdvancedOpen && "rounded-b-none"
+                                        )}
                                     >
                                         <span className="text-xs font-medium">Advanced</span>
                                         <ChevronDown className={cn(
                                             "h-4 w-4 transition-transform duration-200",
-                                            isAdvancedOpen && "rotate-180"
+                                            !isAdvancedOpen && "rotate-90"
                                         )} />
                                     </Button>
                                 </CollapsibleTrigger>
-                                <CollapsibleContent className="pt-4">
-                                    <div className="grid grid-cols-2 gap-x-6">
-                                        {/* Resolution Source */}
-                                        {showResolutionToggle && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-between h-5">
-                                                    <Label className="text-sm font-medium">Output Resolution</Label>
+                                <CollapsibleContent className="">
+                                    <div className="border border-t-0 rounded-b-lg p-4 bg-muted/30">
+                                        <div className="grid grid-cols-2 gap-x-6">
+                                            {/* Resolution Source */}
+                                            {showResolutionToggle && (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center justify-between h-5">
+                                                        <Label className="text-sm font-medium">Output Resolution</Label>
+                                                    </div>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
+                                                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
+                                                                    <Switch
+                                                                        id="join-resolution-source"
+                                                                        checked={useInputVideoResolution ?? false}
+                                                                        onCheckedChange={(val) => {
+                                                                            console.log('[JoinClips] Toggle useInputVideoResolution:', val);
+                                                                            setUseInputVideoResolution?.(val);
+                                                                        }}
+                                                                    />
+                                                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
+                                                                </div>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p className="max-w-xs text-xs">
+                                                                    Choose whether to use the project's aspect ratio or match the first input video's resolution.
+                                                                </p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
                                                 </div>
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
-                                                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
-                                                                <Switch
-                                                                    id="join-resolution-source"
-                                                                    checked={useInputVideoResolution ?? false}
-                                                                    onCheckedChange={(val) => {
-                                                                        console.log('[JoinClips] Toggle useInputVideoResolution:', val);
-                                                                        setUseInputVideoResolution?.(val);
-                                                                    }}
-                                                                />
-                                                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p className="max-w-xs text-xs">
-                                                                Choose whether to use the project's aspect ratio or match the first input video's resolution.
-                                                            </p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                            </div>
-                                        )}
-                                        
-                                        {/* FPS Source */}
-                                        {showFpsToggle && (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-between h-5">
-                                                    <Label className="text-sm font-medium">Output FPS</Label>
+                                            )}
+                                            
+                                            {/* FPS Source */}
+                                            {showFpsToggle && (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center justify-between h-5">
+                                                        <Label className="text-sm font-medium">Output FPS</Label>
+                                                    </div>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
+                                                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
+                                                                    <Switch
+                                                                        id="join-fps-source"
+                                                                        checked={useInputVideoFps ?? false}
+                                                                        onCheckedChange={(val) => {
+                                                                            console.log('[JoinClips] Toggle useInputVideoFps:', val);
+                                                                            setUseInputVideoFps?.(val);
+                                                                        }}
+                                                                    />
+                                                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
+                                                                </div>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p className="max-w-xs text-xs">
+                                                                    Choose whether to use the project's FPS (16 FPS) or keep the input video's original frame rate.
+                                                                </p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
                                                 </div>
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
-                                                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
-                                                                <Switch
-                                                                    id="join-fps-source"
-                                                                    checked={useInputVideoFps ?? false}
-                                                                    onCheckedChange={(val) => {
-                                                                        console.log('[JoinClips] Toggle useInputVideoFps:', val);
-                                                                        setUseInputVideoFps?.(val);
-                                                                    }}
-                                                                />
-                                                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p className="max-w-xs text-xs">
-                                                                Choose whether to use the project's FPS (16 FPS) or keep the input video's original frame rate.
-                                                            </p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
                                 </CollapsibleContent>
                             </Collapsible>
@@ -897,6 +996,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                         contextFrames={contextFrames}
                         replaceMode={replaceMode}
                         keepBridgingImages={keepBridgingImages}
+                        clipPairs={clipPairs}
                         infoContent={
                             <div className="text-xs text-muted-foreground">
                                 <span className="font-medium">Total generation:</span>{' '}
@@ -929,7 +1029,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                         {' '}frames per clip
                                         {replaceMode && (
                                             <span className="text-muted-foreground/70 ml-1">
-                                                ({contextFrames} context + {Math.ceil(gapFrames / 2)} gap)
+                                                ({contextFrames} context + {Math.ceil(gapFrames / 2)} half-gap)
                                             </span>
                                         )}
                                     </>

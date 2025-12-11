@@ -37,7 +37,7 @@ import {
 } from '../utils/validation';
 import { useJoinClipsSettings } from '../hooks/useJoinClipsSettings';
 import { generateUUID } from '@/shared/lib/taskCreation';
-import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
+import { JoinClipsSettingsForm, type ClipPairInfo } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import {
   DndContext,
   closestCenter,
@@ -344,6 +344,55 @@ const JoinClipsPage: React.FC = () => {
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [uploadingClipId, setUploadingClipId] = useState<string | null>(null);
   
+  // Track if we've already loaded from settings to prevent re-loading
+  const hasLoadedFromSettings = useRef(false);
+  // Track the project we loaded settings for
+  const loadedForProjectRef = useRef<string | null>(null);
+  // Track if we're still preloading persisted media
+  const [isLoadingPersistedMedia, setIsLoadingPersistedMedia] = useState(false);
+  // Track preloaded poster URLs to avoid flash on navigation
+  const preloadedPostersRef = useRef<Set<string>>(new Set());
+  
+  // Get cached clips count from localStorage for instant skeleton sizing
+  const getLocalStorageKey = (projectId: string) => `join-clips-count-${projectId}`;
+  const getCachedClipsCount = (projectId: string | null): number => {
+    if (!projectId) return 0;
+    try {
+      const cached = localStorage.getItem(getLocalStorageKey(projectId));
+      return cached ? parseInt(cached, 10) : 0;
+    } catch {
+      return 0;
+    }
+  };
+  const setCachedClipsCount = (projectId: string | null, count: number) => {
+    if (!projectId) return;
+    try {
+      if (count > 0) {
+        localStorage.setItem(getLocalStorageKey(projectId), count.toString());
+      } else {
+        localStorage.removeItem(getLocalStorageKey(projectId));
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  };
+  
+  // Initial cached count for skeleton sizing (read once on mount/project change)
+  const [cachedClipsCount, setCachedClipsCountState] = useState(() => getCachedClipsCount(selectedProjectId));
+  
+  // Reset loading state when project changes
+  useEffect(() => {
+    if (selectedProjectId && selectedProjectId !== loadedForProjectRef.current) {
+      hasLoadedFromSettings.current = false;
+      loadedForProjectRef.current = selectedProjectId;
+      setClips([]);
+      setTransitionPrompts([]);
+      preloadedPostersRef.current.clear();
+      // Update cached count for new project
+      setCachedClipsCountState(getCachedClipsCount(selectedProjectId));
+    }
+  }, [selectedProjectId]);
+  
   // Transition prompts (one for each pair) - still managed locally as they're tied to clip IDs
   const [transitionPrompts, setTransitionPrompts] = useState<TransitionPrompt[]>([]);
   
@@ -371,6 +420,22 @@ const JoinClipsPage: React.FC = () => {
   
   // Track whether settings have completed their initial load
   const settingsLoaded = joinSettings.status !== 'idle' && joinSettings.status !== 'loading';
+  
+  // Preload poster images helper - warm up the browser cache
+  const preloadPosters = useCallback((posterUrls: string[]): Promise<void[]> => {
+    const promises = posterUrls.filter(url => url && !preloadedPostersRef.current.has(url)).map(url => {
+      return new Promise<void>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          preloadedPostersRef.current.add(url);
+          resolve();
+        };
+        img.onerror = () => resolve(); // Resolve even on error to not block
+        img.src = url;
+      });
+    });
+    return Promise.all(promises);
+  }, []);
   
   // Initialize keepBridgingImages to false if undefined (new field for existing projects)
   useEffect(() => {
@@ -492,100 +557,132 @@ const JoinClipsPage: React.FC = () => {
   
   // Initialize clips from settings or create 2 empty slots
   useEffect(() => {
-    if (joinSettings.settings && settingsLoaded && clips.length === 0) {
-      const initialClips: VideoClip[] = [];
-      
-      // First, try loading from new multi-clip format
-      if (joinSettings.settings.clips && joinSettings.settings.clips.length > 0) {
-        joinSettings.settings.clips.forEach((clip) => {
-          if (clip.url) {
-            initialClips.push({
-              id: generateUUID(),
-              url: clip.url,
-              posterUrl: clip.posterUrl,
-              finalFrameUrl: clip.finalFrameUrl,
-              durationSeconds: clip.durationSeconds,
-              loaded: false,
-              playing: false
-            });
-          }
-        });
-        
-        // Load transition prompts
-        if (joinSettings.settings.transitionPrompts && joinSettings.settings.transitionPrompts.length > 0) {
-          const prompts = joinSettings.settings.transitionPrompts.map((tp) => ({
-            id: initialClips[tp.clipIndex]?.id || '',
-            prompt: tp.prompt
-          })).filter(p => p.id); // Filter out invalid ones
-          setTransitionPrompts(prompts);
-        }
-      }
-      // Fallback to legacy two-video format
-      else if (joinSettings.settings.startingVideoUrl || joinSettings.settings.endingVideoUrl) {
-        if (joinSettings.settings.startingVideoUrl) {
+    if (!selectedProjectId || !settingsLoaded || hasLoadedFromSettings.current) return;
+    
+    hasLoadedFromSettings.current = true; // Mark as attempted
+    
+    const initialClips: VideoClip[] = [];
+    const posterUrlsToPreload: string[] = [];
+    
+    // First, try loading from new multi-clip format
+    if (joinSettings.settings?.clips && joinSettings.settings.clips.length > 0) {
+      joinSettings.settings.clips.forEach((clip) => {
+        if (clip.url) {
           initialClips.push({
             id: generateUUID(),
-            url: joinSettings.settings.startingVideoUrl,
-            posterUrl: joinSettings.settings.startingVideoPosterUrl,
-            // Legacy format doesn't have finalFrameUrl
+            url: clip.url,
+            posterUrl: clip.posterUrl,
+            finalFrameUrl: clip.finalFrameUrl,
+            durationSeconds: clip.durationSeconds,
             loaded: false,
             playing: false
           });
+          if (clip.posterUrl) posterUrlsToPreload.push(clip.posterUrl);
         }
-        
-        if (joinSettings.settings.endingVideoUrl) {
-          initialClips.push({
-            id: generateUUID(),
-            url: joinSettings.settings.endingVideoUrl,
-            posterUrl: joinSettings.settings.endingVideoPosterUrl,
-            // Legacy format doesn't have finalFrameUrl
-            loaded: false,
-            playing: false
-          });
-        }
-        
-        // Initialize transition prompts from legacy format
-        if (initialClips.length >= 2 && joinSettings.settings.prompt) {
-          setTransitionPrompts([{
-            id: initialClips[1].id,
-            prompt: joinSettings.settings.prompt
-          }]);
-        }
-      }
+      });
       
-      // If we have saved clips, use them (but ensure minimum of 2)
-      if (initialClips.length > 0) {
-        // Ensure we always have at least 2 clips
-        if (initialClips.length < 2) {
-          const clipsToAdd = 2 - initialClips.length;
-          const emptyClips = Array.from({ length: clipsToAdd }, () => ({
-            id: generateUUID(),
-            url: '',
-            loaded: false,
-            playing: false
-          }));
-          setClips([...initialClips, ...emptyClips]);
-        } else {
-          setClips(initialClips);
-        }
-      } else {
-        // No saved clips - create 2 empty slots to start
-        const emptyClip1 = {
-          id: generateUUID(),
-          url: '',
-          loaded: false,
-          playing: false
-        };
-        const emptyClip2 = {
-          id: generateUUID(),
-          url: '',
-          loaded: false,
-          playing: false
-        };
-        setClips([emptyClip1, emptyClip2]);
+      // Load transition prompts
+      if (joinSettings.settings.transitionPrompts && joinSettings.settings.transitionPrompts.length > 0) {
+        const prompts = joinSettings.settings.transitionPrompts.map((tp) => ({
+          id: initialClips[tp.clipIndex]?.id || '',
+          prompt: tp.prompt
+        })).filter(p => p.id); // Filter out invalid ones
+        setTransitionPrompts(prompts);
       }
     }
-  }, [joinSettings.settings, settingsLoaded, clips.length]);
+    // Fallback to legacy two-video format
+    else if (joinSettings.settings?.startingVideoUrl || joinSettings.settings?.endingVideoUrl) {
+      if (joinSettings.settings.startingVideoUrl) {
+        initialClips.push({
+          id: generateUUID(),
+          url: joinSettings.settings.startingVideoUrl,
+          posterUrl: joinSettings.settings.startingVideoPosterUrl,
+          // Legacy format doesn't have finalFrameUrl
+          loaded: false,
+          playing: false
+        });
+        if (joinSettings.settings.startingVideoPosterUrl) {
+          posterUrlsToPreload.push(joinSettings.settings.startingVideoPosterUrl);
+        }
+      }
+      
+      if (joinSettings.settings.endingVideoUrl) {
+        initialClips.push({
+          id: generateUUID(),
+          url: joinSettings.settings.endingVideoUrl,
+          posterUrl: joinSettings.settings.endingVideoPosterUrl,
+          // Legacy format doesn't have finalFrameUrl
+          loaded: false,
+          playing: false
+        });
+        if (joinSettings.settings.endingVideoPosterUrl) {
+          posterUrlsToPreload.push(joinSettings.settings.endingVideoPosterUrl);
+        }
+      }
+      
+      // Initialize transition prompts from legacy format
+      if (initialClips.length >= 2 && joinSettings.settings.prompt) {
+        setTransitionPrompts([{
+          id: initialClips[1].id,
+          prompt: joinSettings.settings.prompt
+        }]);
+      }
+    }
+    
+    // If we have saved clips, preload posters then show them
+    if (initialClips.length > 0) {
+      // Set loading state while preloading posters
+      if (posterUrlsToPreload.length > 0) {
+        setIsLoadingPersistedMedia(true);
+      }
+      
+      // Ensure we always have at least 2 clips
+      let clipsToSet: VideoClip[];
+      if (initialClips.length < 2) {
+        const clipsToAdd = 2 - initialClips.length;
+        const emptyClips = Array.from({ length: clipsToAdd }, () => ({
+          id: generateUUID(),
+          url: '',
+          loaded: false,
+          playing: false
+        }));
+        clipsToSet = [...initialClips, ...emptyClips];
+      } else {
+        // Add one empty slot for "Add another clip" if all slots have content
+        clipsToSet = [...initialClips, {
+          id: generateUUID(),
+          url: '',
+          loaded: false,
+          playing: false
+        }];
+      }
+      
+      // Preload posters before showing content
+      if (posterUrlsToPreload.length > 0) {
+        preloadPosters(posterUrlsToPreload).then(() => {
+          setClips(clipsToSet);
+          setIsLoadingPersistedMedia(false);
+        });
+      } else {
+        setClips(clipsToSet);
+      }
+    } else {
+      // No saved clips - create 2 empty slots to start
+      const emptyClip1 = {
+        id: generateUUID(),
+        url: '',
+        loaded: false,
+        playing: false
+      };
+      const emptyClip2 = {
+        id: generateUUID(),
+        url: '',
+        loaded: false,
+        playing: false
+      };
+      setClips([emptyClip1, emptyClip2]);
+    }
+  }, [selectedProjectId, joinSettings.settings, settingsLoaded, preloadPosters]);
   
   // Persist clips to settings whenever they change
   useEffect(() => {
@@ -600,6 +697,9 @@ const JoinClipsPage: React.FC = () => {
         finalFrameUrl: clip.finalFrameUrl,
         durationSeconds: clip.durationSeconds
       }));
+    
+    // Cache the count to localStorage for instant skeleton sizing on next visit
+    setCachedClipsCount(selectedProjectId, clipsToSave.length);
     
     // Convert transitionPrompts to indexed format for persistence
     const promptsToSave = transitionPrompts
@@ -696,6 +796,40 @@ const JoinClipsPage: React.FC = () => {
       replaceMode
     );
   }, [clips, contextFrameCount, gapFrameCount, replaceMode, useInputVideoFps]);
+  
+  // Build clip pairs for visualization
+  const clipPairs = useMemo((): ClipPairInfo[] => {
+    const validClips = clips.filter(c => c.url);
+    if (validClips.length < 2) return [];
+    
+    const pairs: ClipPairInfo[] = [];
+    for (let i = 0; i < validClips.length - 1; i++) {
+      const clipA = validClips[i];
+      const clipB = validClips[i + 1];
+      
+      const clipAFrameCount = clipA.durationSeconds 
+        ? calculateEffectiveFrameCount(clipA.durationSeconds, useInputVideoFps)
+        : 0;
+      const clipBFrameCount = clipB.durationSeconds 
+        ? calculateEffectiveFrameCount(clipB.durationSeconds, useInputVideoFps)
+        : 0;
+      
+      pairs.push({
+        pairIndex: i,
+        clipA: {
+          name: `Clip ${i + 1}`,
+          frameCount: clipAFrameCount,
+          finalFrameUrl: clipA.finalFrameUrl,
+        },
+        clipB: {
+          name: `Clip ${i + 2}`,
+          frameCount: clipBFrameCount,
+          posterUrl: clipB.posterUrl,
+        },
+      });
+    }
+    return pairs;
+  }, [clips, useInputVideoFps]);
   
   // Ensure minimum of 2 clips, auto-add empty slot when all slots are filled, and remove extra trailing empty slots
   useEffect(() => {
@@ -1246,9 +1380,12 @@ const JoinClipsPage: React.FC = () => {
         </div>
         
         {/* Clips Grid */}
-        {joinSettings.status === 'loading' ? (
+        {/* Show skeleton when loading settings, loading persisted media, OR we have stored clips but haven't loaded them yet */}
+        {(joinSettings.status === 'loading' || isLoadingPersistedMedia || (settingsLoaded && joinSettings.settings?.clips?.length > 0 && clips.length === 0)) ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2].map((i) => (
+            {/* Use localStorage-cached count for instant correct skeleton sizing
+                +1 for "Add another clip" slot, minimum 2 clips */}
+            {Array.from({ length: Math.max(2, cachedClipsCount) + 1 }).map((_, i) => (
               <div key={i} className="space-y-3">
                 <div className="relative border rounded-lg p-3 space-y-3 bg-card">
                   {/* Header skeleton */}
@@ -1356,11 +1493,29 @@ const JoinClipsPage: React.FC = () => {
                             })()}
                             isGenerateDisabled={clips.filter(c => c.url).length < 2 || clips.some(c => c.url && c.metadataLoading)}
                             onRestoreDefaults={() => {
-                              // Import defaults from settings file
+                              // Default values (scaled for 16fps)
+                              let context = 10;
+                              let gap = 13;
+                              const replaceMode = true;
+                              
+                              // Scale down proportionally if constraint is violated
+                              // In REPLACE mode: each clip needs context + ceil(gap/2) frames
+                              const shortestFrames = validationResult?.shortestClipFrames;
+                              if (shortestFrames && shortestFrames > 0) {
+                                const framesNeeded = context + Math.ceil(gap / 2);
+                                if (framesNeeded > shortestFrames) {
+                                  // Scale down proportionally
+                                  const scale = shortestFrames / framesNeeded;
+                                  context = Math.max(4, Math.floor(context * scale));
+                                  gap = Math.max(1, Math.floor(gap * scale));
+                                  console.log('[JoinClips] Scaled defaults to fit constraint:', { context, gap, shortestFrames });
+                                }
+                              }
+                              
                               joinSettings.updateFields({
-                                contextFrameCount: 15,
-                                gapFrameCount: 23,
-                                replaceMode: true,
+                                contextFrameCount: context,
+                                gapFrameCount: gap,
+                                replaceMode,
                                 keepBridgingImages: false,
                                 prompt: '',
                                 negativePrompt: '',
@@ -1373,6 +1528,7 @@ const JoinClipsPage: React.FC = () => {
                               loraManager.setSelectedLoras([]);
                             }}
                             shortestClipFrames={validationResult?.shortestClipFrames}
+                            clipPairs={clipPairs}
                           />
         </Card>
 
