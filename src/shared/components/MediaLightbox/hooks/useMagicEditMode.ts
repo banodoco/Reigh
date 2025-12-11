@@ -28,6 +28,8 @@ interface UseMagicEditModeParams {
   // Variant tracking - when editing from a non-primary variant
   activeVariantId?: string | null;
   activeVariantLocation?: string | null;
+  // Create as new generation instead of variant
+  createAsGeneration?: boolean;
 }
 
 interface UseMagicEditModeReturn {
@@ -73,6 +75,7 @@ export const useMagicEditMode = ({
   setIsInSceneBoostEnabled,
   activeVariantId,
   activeVariantLocation,
+  createAsGeneration,
 }: UseMagicEditModeParams): UseMagicEditModeReturn => {
   // Magic Edit mode state
   const [isMagicEditMode, setIsMagicEditMode] = useState(false);
@@ -224,6 +227,7 @@ export const useMagicEditMode = ({
           loras: editModeLoRAs,
           based_on: actualGenerationId, // Track source generation for lineage (must be generations.id, not shot_generations.id)
           source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
+          create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
         };
         
         console.log('[VariantRelationship] Task params source_variant_id:', batchParams.source_variant_id);
@@ -274,7 +278,8 @@ export const useMagicEditMode = ({
     currentShotId,
     toolTypeOverride,
     media.id,
-    addMagicEditPrompt
+    addMagicEditPrompt,
+    createAsGeneration
   ]);
 
   return {

@@ -30,6 +30,8 @@ export interface UseInpaintingProps {
   loras?: Array<{ url: string; strength: number }>;
   // Active variant ID - strokes are stored per-variant, not per-generation
   activeVariantId?: string | null;
+  // Create as new generation instead of variant
+  createAsGeneration?: boolean;
 }
 
 export interface UseInpaintingReturn {
@@ -87,6 +89,7 @@ export const useInpainting = ({
   handleExitInpaintMode,
   loras,
   activeVariantId,
+  createAsGeneration,
 }: UseInpaintingProps): UseInpaintingReturn => {
   console.log('[InpaintDebug] 🎣 useInpainting hook received props:', {
     shotId: shotId?.substring(0, 8),
@@ -1967,6 +1970,7 @@ export const useInpainting = ({
         shot_id: shotId, // Pass shot_id so complete_task can link results to the shot
         tool_type: toolTypeOverride, // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
+        create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
       });
 
       console.log('[Inpaint] ✅ Inpaint tasks created successfully');
@@ -2101,6 +2105,7 @@ export const useInpainting = ({
         shot_id: shotId, // Pass shot_id so complete_task can link results to the shot
         tool_type: toolTypeOverride, // Override tool_type if provided
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
+        create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
       });
 
       console.log('[AnnotatedEdit] ✅ Annotated edit tasks created successfully');

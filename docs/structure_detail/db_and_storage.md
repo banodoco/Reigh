@@ -86,8 +86,16 @@ ORDER BY table_name, ordinal_position;
 | **`users`** | User accounts | `id`, `email`, `settings` (JSONB), `onboarding` (JSONB), `credits` | → projects, credits_ledger |
 | **`projects`** | Creative projects | `id`, `user_id`, `name`, `settings` | → shots, generations |
 | **`shots`** | Project scenes | `id`, `project_id`, `name`, `order`, `settings` | → shot_generations |
-| **`generations`** | AI outputs | `id`, `type`, `url`, `metadata`, `task_id` | → tasks, shots |
+| **`generations`** | AI outputs | `id`, `type`, `location`, `based_on`, `primary_variant_id`, `task_id` | → tasks, shots, generation_variants |
+| **`generation_variants`** | Alternate versions | `id`, `generation_id`, `location`, `variant_type`, `is_primary` | → generations |
 | **`tasks`** | Job queue | `id`, `task_type`, `status`, `params`, `output_location`, `worker_id` | → generations, workers |
+
+### Generation & Variant Relationship
+
+- **`generations`**: Standalone media items shown in gallery. Can have `based_on` pointing to source generation for lineage tracking.
+- **`generation_variants`**: Alternate versions of a generation (edits, upscales, repositions). Shown in variant selector, not gallery.
+- **`primary_variant_id`**: Points to the currently displayed variant for a generation.
+- **Key distinction**: Use `based_on` for lineage (still appears in gallery), use variants for alternate versions (grouped under parent).
 
 ### Financial & Credits
 

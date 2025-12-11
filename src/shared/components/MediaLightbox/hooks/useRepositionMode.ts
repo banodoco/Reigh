@@ -30,6 +30,8 @@ export interface UseRepositionModeProps {
   onVariantCreated?: (variantId: string) => void;
   // Callback to refetch variants after creation
   refetchVariants?: () => void;
+  // Create as new generation instead of variant
+  createAsGeneration?: boolean;
 }
 
 export interface UseRepositionModeReturn {
@@ -83,6 +85,7 @@ export const useRepositionMode = ({
   handleExitInpaintMode,
   onVariantCreated,
   refetchVariants,
+  createAsGeneration,
 }: UseRepositionModeProps): UseRepositionModeReturn => {
   const queryClient = useQueryClient();
   const [transform, setTransform] = useState<ImageTransform>(DEFAULT_TRANSFORM);
@@ -354,6 +357,7 @@ export const useRepositionMode = ({
         shot_id: shotId,
         tool_type: toolTypeOverride,
         loras: loras,
+        create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
       });
       
       console.log('[Reposition] ✅ Reposition inpaint tasks created successfully');
@@ -387,7 +391,8 @@ export const useRepositionMode = ({
     loras,
     resetTransform,
     handleExitInpaintMode,
-    createTransformedCanvas
+    createTransformedCanvas,
+    createAsGeneration
   ]);
   
   // Save transformed image as a variant (without AI generation)
@@ -465,31 +470,65 @@ export const useRepositionMode = ({
       // Get the actual generation ID
       const actualGenerationId = (media as any).generation_id || media.id;
       
-      // Create a new variant and set it as primary
-      const { data: insertedVariant, error: insertError } = await supabase
-        .from('generation_variants')
-        .insert({
-          generation_id: actualGenerationId,
-          location: transformedUrl,
-          thumbnail_url: thumbnailUrl,
-          is_primary: true,
-          variant_type: 'repositioned',
-          name: 'Repositioned',
-          params: {
-            transform: transform as any,
-            saved_at: new Date().toISOString(),
-            tool_type: toolTypeOverride || 'edit-images',
-          }
-        })
-        .select('id')
-        .single();
-      
-      if (insertError) {
-        console.error('[Reposition] Failed to create variant:', insertError);
-        throw insertError;
+      if (createAsGeneration) {
+        // Create a new generation with based_on pointing to the source
+        console.log('[Reposition] Creating as new generation (not variant)');
+        const { data: insertedGeneration, error: genError } = await supabase
+          .from('generations')
+          .insert({
+            project_id: selectedProjectId,
+            location: transformedUrl,
+            thumbnail_url: thumbnailUrl,
+            type: 'image',
+            based_on: actualGenerationId, // Track lineage
+            params: {
+              transform: transform as any,
+              saved_at: new Date().toISOString(),
+              tool_type: toolTypeOverride || 'edit-images',
+              repositioned_from: actualGenerationId,
+            }
+          })
+          .select('id')
+          .single();
+        
+        if (genError) {
+          console.error('[Reposition] Failed to create generation:', genError);
+          throw genError;
+        }
+        
+        console.log('[Reposition] ✅ Saved as new generation:', insertedGeneration?.id);
+      } else {
+        // Create a new variant and set it as primary (original behavior)
+        const { data: insertedVariant, error: insertError } = await supabase
+          .from('generation_variants')
+          .insert({
+            generation_id: actualGenerationId,
+            location: transformedUrl,
+            thumbnail_url: thumbnailUrl,
+            is_primary: true,
+            variant_type: 'repositioned',
+            name: 'Repositioned',
+            params: {
+              transform: transform as any,
+              saved_at: new Date().toISOString(),
+              tool_type: toolTypeOverride || 'edit-images',
+            }
+          })
+          .select('id')
+          .single();
+        
+        if (insertError) {
+          console.error('[Reposition] Failed to create variant:', insertError);
+          throw insertError;
+        }
+        
+        console.log('[Reposition] ✅ Saved as variant:', insertedVariant?.id);
+        
+        // Switch to the newly created variant (only for variant mode)
+        if (insertedVariant?.id && onVariantCreated) {
+          onVariantCreated(insertedVariant.id);
+        }
       }
-      
-      console.log('[Reposition] ✅ Saved as variant:', insertedVariant?.id);
       
       // Invalidate unified-generations cache so results galleries refresh
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
@@ -514,11 +553,6 @@ export const useRepositionMode = ({
       // Refetch variants to update the list
       if (refetchVariants) {
         refetchVariants();
-      }
-      
-      // Switch to the newly created variant
-      if (insertedVariant?.id && onVariantCreated) {
-        onVariantCreated(insertedVariant.id);
       }
       
       // Show success state
@@ -547,7 +581,11 @@ export const useRepositionMode = ({
     handleExitInpaintMode,
     createTransformedCanvas,
     onVariantCreated,
-    refetchVariants
+    refetchVariants,
+    createAsGeneration,
+    toolTypeOverride,
+    shotId,
+    queryClient
   ]);
   
   return {

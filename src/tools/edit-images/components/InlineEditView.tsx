@@ -70,6 +70,10 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
+  // Create as variant toggle - when true, creates variant; when false, creates new generation
+  // Default to false (createAsGeneration=false means variant mode is ON)
+  const [createAsGeneration, setCreateAsGeneration] = useState(false);
+  
   // Flip functionality removed - use reposition mode instead
   const isFlippedHorizontally = false;
   const isSaving = false;
@@ -99,6 +103,7 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     loras: editModeLoRAs,
     toolTypeOverride: 'edit-images',
     activeVariantId: activeVariant?.id, // Store strokes per-variant, not per-generation
+    createAsGeneration, // If true, create a new generation instead of a variant
   });
   const {
     isInpaintMode,
@@ -154,6 +159,7 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     isInSceneBoostEnabled,
     setIsInSceneBoostEnabled,
     toolTypeOverride: 'edit-images',
+    createAsGeneration, // If true, create a new generation instead of a variant
   });
   const {
     isCreatingMagicEditTasks,
@@ -178,6 +184,7 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     toolTypeOverride: 'edit-images',
     onVariantCreated: setActiveVariantId,
     refetchVariants,
+    createAsGeneration, // If true, create a new generation instead of a variant
   });
   const {
     transform: repositionTransform,
@@ -384,6 +391,8 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
                    onClose={onClose}
                    variant="mobile"
                    hideInfoEditToggle={true}
+                   createAsGeneration={createAsGeneration}
+                   onCreateAsGenerationChange={setCreateAsGeneration}
                  />
                ) : (
                  <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
@@ -606,6 +615,8 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
                   onClose={onClose}
                   variant="desktop"
                   hideInfoEditToggle={true}
+                  createAsGeneration={createAsGeneration}
+                  onCreateAsGenerationChange={setCreateAsGeneration}
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-4">

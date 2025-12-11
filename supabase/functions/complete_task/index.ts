@@ -778,9 +778,11 @@ serve(async (req) => {
 
           // ===== PRIORITY CHECK: Tasks with based_on create variants instead of new generations =====
           // This handles: image_inpaint, annotated_image_edit, qwen_image_edit, and any task with based_on
+          // UNLESS create_as_generation flag is set, in which case we create a new generation with based_on for lineage
           const basedOnGenerationId = extractBasedOn(taskData.params);
+          const createAsGeneration = taskData.params?.create_as_generation === true;
           
-          if (basedOnGenerationId && !isSubTask) {
+          if (basedOnGenerationId && !isSubTask && !createAsGeneration) {
             console.log(`[ImageEdit] Task ${taskIdString} has based_on=${basedOnGenerationId} - creating variant instead of new generation`);
             
             try {
@@ -846,8 +848,12 @@ serve(async (req) => {
             (taskCategory === 'processing' && isSubTask) ||
             // Processing tasks that produce images (inpaint, annotated_edit) should create generations
             // when they don't have based_on (standalone generation, not an edit of existing)
+            // OR when create_as_generation flag is set (user wants a new generation, not a variant)
             (taskCategory === 'processing' && contentType === 'image')
           ) {
+            if (createAsGeneration && basedOnGenerationId) {
+              console.log(`[GenMigration] Task ${taskIdString} has create_as_generation=true - creating new generation with based_on=${basedOnGenerationId} for lineage tracking`);
+            }
             console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete (category=${taskCategory}, isSubTask=${!!isSubTask}, contentType=${contentType})...`);
             try {
               await createGenerationFromTask(

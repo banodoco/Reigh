@@ -40,10 +40,16 @@ Each task type has its own helper module:
 
 ```
 src/shared/lib/tasks/
-├── travelBetweenImages.ts    ✅ (migrated)
-├── imageGeneration.ts        ✅ (migrated)
-├── magicEdit.ts              ✅ (migrated)
-└── replicateUpscale.ts       ⏳ (future)
+├── travelBetweenImages.ts      ✅ (migrated)
+├── imageGeneration.ts          ✅ (migrated)
+├── magicEdit.ts                ✅ (migrated)
+├── imageInpaint.ts             ✅ (migrated) - supports create_as_generation flag
+├── annotatedImageEdit.ts       ✅ (migrated) - supports create_as_generation flag
+├── imageUpscale.ts             ✅ (migrated)
+├── characterAnimate.ts         ✅ (migrated)
+├── joinClips.ts                ✅ (migrated)
+├── individualTravelSegment.ts  ✅ (migrated)
+└── replicateUpscale.ts         ⏳ (future - uses edge function directly)
 ```
 
 ### 3. Unified Edge Function (`supabase/functions/create-task/`)

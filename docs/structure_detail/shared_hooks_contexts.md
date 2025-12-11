@@ -26,6 +26,17 @@
 | **`useShots`** | Shot management | `create()`, `update()`, `delete()`, `reorder()` |
 | **`useVideoScrubbing`** | Video playback control | Frame-accurate scrubbing |
 
+### 🖌️ MediaLightbox Editing Hooks (`/src/shared/components/MediaLightbox/hooks/`)
+
+| Hook | Purpose | Key Features |
+|------|---------|--------------|
+| **`useMagicEditMode`** | Text-guided image editing | Prompt-based edits, batch creation, `createAsGeneration` flag |
+| **`useInpainting`** | Mask-based inpainting | Brush strokes, mask management, inpaint/annotate modes |
+| **`useRepositionMode`** | Image repositioning | Transform (pan/zoom), save as variant or generation |
+| **`useVideoEditing`** | Video trim/edit | Trim mode, video manipulation |
+| **`useEditModeLoRAs`** | LoRA management for edits | In-Scene Boost, custom LoRA selection |
+| **`useGenerationLineage`** | Track generation ancestry | `based_on` relationships, source tracking |
+
 ### 💰 Credits & Tasks
 
 | Hook | Purpose | Features |

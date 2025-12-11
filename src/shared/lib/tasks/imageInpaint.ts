@@ -10,6 +10,7 @@ export interface CreateImageInpaintTaskParams {
   shot_id?: string;
   tool_type?: string;
   loras?: Array<{ url: string; strength: number }>;
+  create_as_generation?: boolean; // If true, create a new generation instead of a variant
 }
 
 /**
@@ -30,6 +31,7 @@ export async function createImageInpaintTask(params: CreateImageInpaintTaskParam
     shot_id,
     tool_type,
     loras,
+    create_as_generation,
   } = params;
 
   console.log('[ImageInpaint] Creating inpaint tasks:', {
@@ -65,6 +67,7 @@ export async function createImageInpaintTask(params: CreateImageInpaintTaskParam
       ...(shot_id ? { shot_id } : {}), // Include shot_id only if provided
       ...(tool_type ? { tool_type } : {}), // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
       ...(loras && loras.length > 0 ? { loras } : {}), // Include loras if provided
+      ...(create_as_generation ? { create_as_generation: true } : {}), // If true, create a new generation instead of a variant
     },
   }));
 

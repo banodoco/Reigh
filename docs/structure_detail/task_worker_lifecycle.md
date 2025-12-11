@@ -102,13 +102,14 @@ The worker polls the same task queue but specializes in video generation:
 - Uses PostgreSQL (Supabase) for both local development and production
 
 ### 3. Task Completion
-- Worker calls `process-completed-task` Edge Function with:
+- Worker calls `complete_task` Edge Function with:
   - Task ID
   - Output data (URLs, metadata)
   - Error info (if failed)
 - Edge Function:
   - Updates task status using `func_mark_task_complete` or `func_mark_task_failed`
   - Deducts credits from user's balance
+  - **Variant vs Generation Logic**: If task has `based_on` parameter, creates a `generation_variant` on the source generation. If `create_as_generation=true` flag is set, overrides this and creates a new `generation` with `based_on` for lineage tracking instead.
 - **SQL Trigger** (`create_generation_on_task_complete`):
   - Automatically creates `generations` records when status → `Complete`
   - Normalizes image paths (removes local server IPs)

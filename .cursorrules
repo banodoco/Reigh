@@ -1,24 +1,38 @@
-- Remember, you can search and find files using your tools.
-- When asked to make a change, try to understand what the user needs. If they ask you to search, use the tools. If you need to understand the structure, look at the file structure.md to understand where you need to make changes. If need be, search up the relevant file for context. Try to find and use common components if they exist.
-- When the user asks to push to github, run "git diff | cat" to figure out what was changed - update structure.md, see below - and then make a one command like "git add . && git commit -m "{include specific commit message feat/ a summary/explanation of the changes}" && git push". Start this process if appropriate with the user if you think they'll be done with a task.
-- As per the above, you're pushing to Github - If there are structural changes - files add, deleted, or purposes of files changed - you should then update the appropriate place in structure.md.
-- Recognize when logic should be server-side in Supabase: Operations involving atomic database transactions (like linking related records on creation), needing elevated privileges, requiring sensitive keys, needing guaranteed execution regardless of client state, or directly triggered by database events (inserts/updates/deletes) are often best handled using Supabase Database Functions/Triggers or Edge Functions instead of client-side code.
-- When providing SQL queries for the user to run in Supabase SQL editor, wrap the query in `SELECT json_agg(results) FROM (...) results;` so all results are returned in a single cell that can be easily copied and shared.
-- When the developer asks you to create logs to debug something, give them all the logs that may be useful to you in unearthing an issue, a unique tag like [VideoLoadSpeedIssue] or [BasedOnNav]. Try to understand what additional logs could be useful to add. ALWAYS tell the user what the tag is immediately after adding the logs so they can filter the console.
-- When adding debug logs, ALWAYS use top-level console.log statements instead of nested objects so values are immediately visible without needing to expand objects in the console. Use separate console.log lines for each piece of data you want to inspect. Each value should be directly logged, not inside an object. Example: Instead of `console.log('Data:', { id, name, status })`, do `console.log('Data.id:', id); console.log('Data.name:', name); console.log('Data.status:', status);`. This makes debugging much faster since values are visible at a glance.
-- When they tell you to look at @structure.md, go through it in detail to understand how it might apply to the task.
-- Remember: you can run commands like "git diff | cat" in your environment.
-- NEVER proactively create documentation files (*.md) unless explicitly requested by the user. Only create documentation when specifically asked.
-- After each change, review what you've done and how it relates to the task, and ask yourself "Did I unintentionally delete or edit something out of scope?"
-- When using toast notifications, only show toasts for errors - do not show positive/success toasts for task creation or similar successful operations.
-- When creating task lists, save them in the `tasks/` folder with a date-based filename (e.g., `tasks/2025-12-06-video-player-tasks.md`). Use this structure per task:
-  1. **Header** - Task number, title, status emoji (✅/🚧/❌/⏸️)
-  2. **Area** - Where in the app
-  3. **Description** - What's wrong or needed
-  4. **Observed Behavior** - Current state (if bug)
-  5. **Requirements** - Bulleted list of what to implement
-  6. **Impacted Files** - File paths with brief descriptions
-  7. **Execution Notes** - Fill during/after with what was changed
-  8. **Additional Data Needed** - Debug tag if logs added, or "None"
-  9. **Testing Instructions** - Step-by-step verification
-  Include a Master Checklist at top with `[ ]`/`[x]` checkboxes grouped by dependency order. Group by: Quick Wins (easy fixes that unblock testing), then logical clusters (tasks touching same files), with brief notes on why order matters (e.g., "depends on Task 1", "do together - same files").
+# Project Understanding
+- Use `structure.md` to understand where to make changes. Sub-docs in `docs/structure_detail/` have implementation specifics.
+- Find and use common components in `src/shared/` before creating new ones.
+- After each change, ask yourself "Did I unintentionally delete or edit something out of scope?"
+
+# Key Concepts
+- **Generations vs Variants**: A `generation` is a standalone image/video in the gallery. A `variant` belongs to a generation (shown in variant selector). Use `based_on` for lineage tracking.
+- **Task creation**: Use helpers in `src/shared/lib/tasks/` (e.g., `imageInpaint.ts`, `magicEdit.ts`). Tasks are processed by workers, completed via `complete_task` edge function. See `docs/structure_detail/unified_task_creation.md`.
+- **Shots data**: Use `ShotsContext` via `useShots()` hook - single source of truth. For shot images, use `useAllShotGenerations(shotId)`. See `docs/structure_detail/shared_hooks_contexts.md`.
+- **React Query**: Invalidate caches after mutations with `queryClient.invalidateQueries({ queryKey: [...] })`.
+
+# Code Patterns
+- **Tool structure**: Each tool follows `src/tools/[name]/` with `pages/`, `components/`, `hooks/`, `settings.ts`. See `docs/structure_detail/adding_new_tool.md`.
+- **UI components**: Use shadcn-ui from `src/shared/components/ui/`, icons from lucide-react. Never hardcode colors - use theme tokens (`bg-background`, `text-foreground`).
+- **Responsive**: TailwindCSS with container queries (`@container`). Test both mobile and desktop.
+
+# Git Workflow
+- On push: run `git diff | cat`, update `structure.md` if files were added/deleted/changed purpose, then single command: `git add . && git commit -m "feat/fix: specific message" && git push`
+
+# Supabase & Server-Side Logic
+- Prefer server-side (Edge Functions, DB triggers) for: atomic transactions, elevated privileges, sensitive keys, guaranteed execution, or DB-triggered events.
+- **Deployments**: See `docs/structure_detail/deployment_and_migration_guide.md`. Deploy edge functions individually: `npx supabase functions deploy function-name --project-ref wczysqzxlwdndgxitrvc`. Use `npx supabase db push --linked` for migrations (NEVER `db reset --linked`).
+- SQL queries for Supabase editor: wrap in `SELECT json_agg(results) FROM (...) results;`
+
+# Debugging
+- Use unique tags like `[VideoLoadSpeedIssue]` - tell user the tag immediately so they can filter console.
+- Log values directly, not nested: `console.log('id:', id)` not `console.log({ id, name })` - values visible without expanding.
+
+# UI Conventions
+- Toast notifications: only for errors, never success toasts for task creation etc.
+- NEVER create documentation files (*.md) unless explicitly requested.
+
+# Task Lists
+Save in `tasks/` with date-based filename (e.g., `2025-12-06-video-player-tasks.md`).
+
+**Per task:** Header (number, title, status emoji), Area, Description, Observed Behavior (if bug), Requirements (bullets), Impacted Files, Execution Notes, Additional Data Needed, Testing Instructions.
+
+**Master Checklist:** `[ ]`/`[x]` checkboxes grouped by: Quick Wins first, then logical clusters (same files together), with dependency notes.

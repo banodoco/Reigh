@@ -277,6 +277,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Video ref and currentTime for trim mode (similar to videoEditing pattern)
   const trimVideoRef = useRef<HTMLVideoElement>(null);
   const [trimCurrentTime, setTrimCurrentTime] = useState(0);
+  
+  // Create as variant toggle - when false (createAsGeneration=true), creates new generation instead of variant
+  const [createAsGeneration, setCreateAsGeneration] = useState(false);
 
   // Track component lifecycle and media changes - ALL TOP LEVEL
   useEffect(() => {
@@ -463,6 +466,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     },
     loras: editModeLoRAs,
     activeVariantId: activeVariant?.id, // Store strokes per-variant, not per-generation
+    createAsGeneration, // If true, create a new generation instead of a variant
   });
   const {
     isInpaintMode,
@@ -629,6 +633,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     // Pass variant info for tracking source_variant_id
     activeVariantId: isViewingNonPrimaryVariant ? activeVariant?.id : null,
     activeVariantLocation: isViewingNonPrimaryVariant ? activeVariant?.location : null,
+    createAsGeneration, // If true, create a new generation instead of a variant
   });
   const {
         isMagicEditMode,
@@ -661,6 +666,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     shotId,
     onVariantCreated: setActiveVariantId,
     refetchVariants,
+    createAsGeneration, // If true, create a new generation instead of a variant
   });
   const {
     transform: repositionTransform,
@@ -2226,6 +2232,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isLoadingVariants={isLoadingVariants}
                       onClose={onClose}
                       variant="desktop"
+                      createAsGeneration={createAsGeneration}
+                      onCreateAsGenerationChange={setCreateAsGeneration}
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col">
@@ -2647,6 +2655,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isLoadingVariants={isLoadingVariants}
                       onClose={onClose}
                       variant="mobile"
+                      createAsGeneration={createAsGeneration}
+                      onCreateAsGenerationChange={setCreateAsGeneration}
                     />
                   ) : (
                     <div className="w-full">

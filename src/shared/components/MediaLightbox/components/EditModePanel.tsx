@@ -2,7 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { CheckCircle, Loader2, Move, Paintbrush, Pencil, Save, Sparkles, Type, X, XCircle } from 'lucide-react';
+import { Switch } from '@/shared/components/ui/switch';
+import { Label } from '@/shared/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { CheckCircle, Loader2, Move, Paintbrush, Pencil, Save, Sparkles, Type, X, XCircle, Layers } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { GenerationRow } from '@/types/shots';
@@ -86,6 +89,10 @@ export interface EditModePanelProps {
   // Variant
   variant: 'desktop' | 'mobile';
   hideInfoEditToggle?: boolean;
+  
+  // Create as generation toggle
+  createAsGeneration?: boolean;
+  onCreateAsGenerationChange?: (value: boolean) => void;
 }
 
 /**
@@ -143,6 +150,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   onClose,
   variant,
   hideInfoEditToggle = false,
+  createAsGeneration = false,
+  onCreateAsGenerationChange,
 }) => {
   const isMobile = variant === 'mobile';
   
@@ -405,6 +414,34 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             />
           </div>
         </div>
+        
+        {/* Create as Variant toggle */}
+        {onCreateAsGenerationChange && (
+          <div className="flex items-center justify-between py-2 px-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-2 cursor-help">
+                  <Layers className={cn(iconSize, "text-muted-foreground")} />
+                  <Label htmlFor="create-as-variant" className={cn(labelSize, "font-medium cursor-pointer")}>
+                    Create as variant
+                  </Label>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[250px]">
+                <p className="text-xs">
+                  <strong>On:</strong> Result appears as a variant of this image in the variant selector.
+                  <br />
+                  <strong>Off:</strong> Result appears as its own image in the gallery.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+            <Switch
+              id="create-as-variant"
+              checked={!createAsGeneration}
+              onCheckedChange={(checked) => onCreateAsGenerationChange(!checked)}
+            />
+          </div>
+        )}
         
         {/* Reposition Mode Buttons - Two options: Save or Generate with AI */}
         {editMode === 'reposition' ? (
