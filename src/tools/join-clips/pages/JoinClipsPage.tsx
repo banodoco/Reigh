@@ -1239,6 +1239,23 @@ const JoinClipsPage: React.FC = () => {
                               return `Generate (${transitionCount} transition${transitionCount !== 1 ? 's' : ''})`;
                             })()}
                             isGenerateDisabled={clips.filter(c => c.url).length < 2}
+                            onRestoreDefaults={() => {
+                              // Import defaults from settings file
+                              joinSettings.updateFields({
+                                contextFrameCount: 15,
+                                gapFrameCount: 23,
+                                replaceMode: true,
+                                keepBridgingImages: false,
+                                prompt: '',
+                                negativePrompt: '',
+                                useIndividualPrompts: false,
+                                enhancePrompt: true,
+                                useInputVideoResolution: false,
+                                useInputVideoFps: false,
+                              });
+                              // Clear LoRAs
+                              loraManager.clearAll?.();
+                            }}
                           />
         </Card>
 

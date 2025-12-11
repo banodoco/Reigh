@@ -218,7 +218,10 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
                 ? repositionTransformStyle.transform 
                 : (isFlippedHorizontally ? 'scaleX(-1)' : 'none'),
               transformOrigin: editMode === 'reposition' ? 'center center' : undefined,
-              pointerEvents: isInpaintMode ? 'none' : 'auto'
+              pointerEvents: isInpaintMode ? 'none' : 'auto',
+              // Keep image below settings panel during reposition (z-80 is the panel)
+              zIndex: editMode === 'reposition' ? 40 : undefined,
+              position: editMode === 'reposition' ? 'relative' : undefined,
             }}
             onLoad={(e) => {
               const img = e.target as HTMLImageElement;

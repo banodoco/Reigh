@@ -503,9 +503,11 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
             )}
           </div>
           
-          {/* Sticky footer with Generate button */}
-          {!isLoading && (
-            <div className="flex-shrink-0 border-t border-zinc-700 bg-background px-6 py-4 -mx-6 -mb-6 flex justify-center">
+          {/* Sticky footer with Generate button - always show, skeleton when loading */}
+          <div className="flex-shrink-0 border-t border-zinc-700 bg-background px-6 py-4 -mx-6 -mb-6 flex justify-center">
+            {isLoading ? (
+              <Skeleton className="h-11 w-full max-w-md rounded-md" />
+            ) : (
               <Button 
                 size="lg" 
                 className="w-full max-w-md" 
@@ -519,8 +521,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
                     ? 'Creating Tasks...' 
                     : 'Generate Video'}
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </DialogContent>
       </Dialog>
       

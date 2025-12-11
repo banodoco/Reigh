@@ -5,7 +5,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Switch } from '@/shared/components/ui/switch';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Button } from '@/shared/components/ui/button';
-import { Loader2, Check, Film, Info } from 'lucide-react';
+import { Loader2, Check, Film, Info, RotateCcw } from 'lucide-react';
 import { LoraManager } from '@/shared/components/LoraManager';
 import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
@@ -99,6 +99,9 @@ export interface JoinClipsSettingsFormProps {
     generateSuccess: boolean;
     generateButtonText: string;
     isGenerateDisabled?: boolean;
+    
+    // Optional callback to restore default settings
+    onRestoreDefaults?: () => void;
     
     // Optional overrides
     className?: string;
@@ -552,6 +555,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     generateSuccess,
     generateButtonText,
     isGenerateDisabled = false,
+    onRestoreDefaults,
     className,
     headerContent
 }) => {
@@ -603,6 +607,21 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                             {headerContent}
                         </div>
                     )}
+                    {/* Restore Default Settings - above the frame controls */}
+                    {onRestoreDefaults && (
+                        <div className="flex justify-end mb-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={onRestoreDefaults}
+                                className="text-muted-foreground hover:text-foreground"
+                            >
+                                <RotateCcw className="w-4 h-4 mr-2" />
+                                Restore Default Settings
+                            </Button>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-x-6 gap-y-8">
                         {/* Row 1: Gap Frames | Context Frames */}
                         
@@ -893,7 +912,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
             </div>
 
             {/* Generate Button */}
-            <div className="flex justify-center pt-4">
+            <div className="flex flex-col items-center gap-3 pt-4">
                 <Button
                     onClick={onGenerate}
                     disabled={isGenerateDisabled || isGenerating || generateSuccess}

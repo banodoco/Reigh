@@ -897,9 +897,19 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 {(child.thumbUrl || child.imageUrl) && (
                   <img
                     src={getDisplayUrl(child.thumbUrl || child.imageUrl || '')}
-                    className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
+                    className="w-full h-full object-cover transition-opacity duration-300"
                     alt={`Segment ${idx + 1}`}
                     loading="lazy"
+                    style={{ opacity: 0 }}
+                    onLoad={(e) => {
+                      (e.target as HTMLImageElement).style.opacity = '0.8';
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.target as HTMLImageElement).style.opacity = '1';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.target as HTMLImageElement).style.opacity = '0.8';
+                    }}
                   />
                 )}
               </div>
@@ -978,7 +988,11 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 alt="Video poster"
                 loading="eager"
                 decoding="sync"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-opacity duration-300"
+                style={{ opacity: 0 }}
+                onLoad={(e) => {
+                  (e.target as HTMLImageElement).style.opacity = '1';
+                }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-gray-300">

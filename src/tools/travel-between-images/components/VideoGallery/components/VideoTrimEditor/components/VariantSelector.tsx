@@ -212,11 +212,10 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   };
 
   if (isLoading) {
+    // Show single skeleton when loading since we don't know variant count yet
     return (
       <div className="flex flex-wrap gap-2 p-2 bg-background/80 backdrop-blur-sm rounded-lg">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="w-16 h-10 rounded" />
-        ))}
+        <Skeleton className="w-16 h-10 rounded" />
       </div>
     );
   }

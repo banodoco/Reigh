@@ -27,6 +27,26 @@ import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloade
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
+// Session-based tracking for tool visibility state (to prevent animation replays)
+const SEEN_DISABLED_TOOLS_KEY = 'reigh_seen_disabled_tools';
+const getSeenDisabledTools = (): Set<string> => {
+  try {
+    const stored = sessionStorage.getItem(SEEN_DISABLED_TOOLS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+const markToolAsSeenDisabled = (toolId: string): void => {
+  try {
+    const current = getSeenDisabledTools();
+    current.add(toolId);
+    sessionStorage.setItem(SEEN_DISABLED_TOOLS_KEY, JSON.stringify([...current]));
+  } catch {
+    // Silently fail if sessionStorage is unavailable
+  }
+};
+
 // Define process tools (main workflow)
 const processTools = [
   {
@@ -159,6 +179,9 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
     resizeKey 
   } = useContext(CardOverflowContext);
   
+  // Track if this tool was previously seen as disabled (for animation control)
+  const [hasSeenDisabled, setHasSeenDisabled] = useState(() => getSeenDisabledTools().has(item.id));
+  
   // Use content-responsive breakpoints for dynamic sizing
   const { isSm, isLg } = useContentResponsive();
   
@@ -200,15 +223,29 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
     };
   }, [isSquare, reportDescriptionOverflow, item.description, resizeKey, forceTwoLinesDescriptions, checkElementOverflow]);
 
+  // Special handling for character-animate: show as disabled when not in cloud mode
+  // For other tools, use comingSoon flag or missing tool to determine disabled state
+  const isDisabledForTool = item.id === 'character-animate' 
+    ? !isVisible  // Disabled when cloud mode is off
+    : (item.comingSoon || !item.tool);
+
+  // Track when a tool becomes disabled (for animation control)
+  useEffect(() => {
+    if (isDisabledForTool && !hasSeenDisabled) {
+      // Mark this tool as seen in disabled state for this session
+      markToolAsSeenDisabled(item.id);
+      setHasSeenDisabled(true);
+    }
+  }, [isDisabledForTool, hasSeenDisabled, item.id]);
+
   // Debug logging for tools
   useEffect(() => {
     if (item.id === 'character-animate' || item.id === 'join-clips') {
-      const isDisabled = !isVisible;
       console.log(`[${item.id}Visibility] ToolCard:`,
-        `isVisible=${isVisible}, isDisabled=${isDisabled}, ` +
-        `hasTool=${!!item.tool}`);
+        `isVisible=${isVisible}, isDisabled=${isDisabledForTool}, ` +
+        `hasSeenDisabled=${hasSeenDisabled}, hasTool=${!!item.tool}`);
     }
-  }, [item.id, isVisible, item.tool]);
+  }, [item.id, isVisible, isDisabledForTool, hasSeenDisabled, item.tool]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     triggerRipple(e);
@@ -234,15 +271,15 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
     );
   }
 
-  // Special handling for character-animate: show as disabled when not in cloud mode
-  // For other tools, use comingSoon flag or missing tool to determine disabled state
-  const isDisabled = item.id === 'character-animate' 
-    ? !isVisible  // Disabled when cloud mode is off
-    : (item.comingSoon || !item.tool);
+  // Use the pre-calculated isDisabled value
+  const isDisabled = isDisabledForTool;
   
   // Character-animate always shows (disabled if not visible)
   // Other tools show if coming soon or visible
   const shouldShow = item.id === 'character-animate' ? true : (isDisabled || isVisible);
+  
+  // Skip transition if this tool was already seen as disabled in this session
+  const skipTransition = hasSeenDisabled && isDisabled;
 
   if (!shouldShow) return null;
 
@@ -256,14 +293,14 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
 
   const content = (
     <div 
-      className={`wes-tool-card click-ripple relative ${isSquare ? '' : 'h-32 sm:h-32'} ${isDisabled ? 'opacity-40' : ''} ${isRippleActive ? 'ripple-active' : ''} h-full`}
+      className={`wes-tool-card click-ripple relative ${isSquare ? '' : 'h-32 sm:h-32'} ${isDisabled ? 'opacity-40' : ''} ${isRippleActive ? 'ripple-active' : ''} ${skipTransition ? 'transition-none' : ''} h-full`}
       style={rippleStyles}
     >
-      {/* Disabled/Coming Soon Badge */}
-      {isDisabled && isSm && item.id !== 'moon-soon' && (
+      {/* Coming Soon Badge - only for coming soon tools, not character-animate */}
+      {isDisabled && isSm && item.id !== 'moon-soon' && item.id !== 'character-animate' && (
         <div className={`absolute ${isSquare ? 'top-1 right-2' : 'top-2 right-2'} z-10 ${isWiggling ? 'animate-subtle-wiggle' : ''}`}>
           <div className="bg-gradient-to-r from-wes-vintage-gold to-wes-mustard text-primary text-xs font-bold px-2 py-0.5 rounded-md border border-primary/20 shadow-sm">
-            {item.id === 'character-animate' ? 'CLOUD MODE' : 'COMING SOON'}
+            COMING SOON
           </div>
         </div>
       )}
@@ -434,13 +471,21 @@ const ToolSelectorPage: React.FC = () => {
   const { value: generationMethods, isLoading: isLoadingGenerationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   // Allow tool if cloud generation is enabled (even if local is also enabled)
   const isCloudGenerationEnabled = generationMethods.inCloud;
+  
+  // Character-animate visibility: accounts for loading state and session-based seen tracking
+  // This determines if the tool should appear ENABLED (vs disabled/coming-soon style)
+  const wasCharacterAnimateSeenDisabled = getSeenDisabledTools().has('character-animate');
+  const isCharacterAnimateEnabled = isLoadingGenerationMethods 
+    ? !wasCharacterAnimateSeenDisabled  // During loading: hide if previously seen disabled, show otherwise
+    : isCloudGenerationEnabled;          // After loading: based on actual cloud setting
 
   // Debug logging for character-animate visibility
   useEffect(() => {
     console.log('[CharacterAnimateVisibility] Generation methods state:', 
       `onComputer=${generationMethods.onComputer}, inCloud=${generationMethods.inCloud}, ` +
-      `isLoading=${isLoadingGenerationMethods}, isCloudEnabled=${isCloudGenerationEnabled}, env=${currentEnv}`);
-  }, [generationMethods, isLoadingGenerationMethods, isCloudGenerationEnabled, currentEnv]);
+      `isLoading=${isLoadingGenerationMethods}, isCloudEnabled=${isCloudGenerationEnabled}, ` +
+      `wasSeenDisabled=${wasCharacterAnimateSeenDisabled}, isEnabled=${isCharacterAnimateEnabled}, env=${currentEnv}`);
+  }, [generationMethods, isLoadingGenerationMethods, isCloudGenerationEnabled, wasCharacterAnimateSeenDisabled, isCharacterAnimateEnabled, currentEnv]);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -450,22 +495,12 @@ const ToolSelectorPage: React.FC = () => {
   const isToolVisible = (tool: ToolUIDefinition | null, toolId?: string) => {
     if (!tool) return false;
     
-    // Character Animate only shows when using cloud generation
-    // This check applies even in DEV mode
+    // Character Animate: ALWAYS include in grid, let ToolCard handle disabled state
+    // This ensures ToolCard renders and can track "seen disabled" state for flash prevention
     if (toolId === 'character-animate') {
       const toolEnvironmentCheck = tool.environments.includes(currentEnv) || currentEnv === AppEnv.DEV;
-      const shouldShow = toolEnvironmentCheck && isCloudGenerationEnabled;
-      
-      console.log('[CharacterAnimateVisibility] Visibility check:',
-        `isLoading=${isLoadingGenerationMethods}, ` +
-        `onComputer=${generationMethods.onComputer}, inCloud=${generationMethods.inCloud}, ` +
-        `isCloudEnabled=${isCloudGenerationEnabled}, envCheck=${toolEnvironmentCheck}, ` +
-        `shouldShow=${shouldShow}, FINAL=${isLoadingGenerationMethods ? true : shouldShow}`);
-      
-      // Show during loading (optimistic UI) to prevent layout shift/flash
-      // Since default is inCloud: true, this matches the likely final state
-      if (isLoadingGenerationMethods) return true;
-      return shouldShow;
+      // Return true to include in grid, but pass actual visibility via isCharacterAnimateEnabled
+      return toolEnvironmentCheck;
     }
     
     // Join Clips always shows (no cloud requirement)
@@ -559,7 +594,11 @@ const ToolSelectorPage: React.FC = () => {
               <div className="w-full c-lg:w-1/2">
                 <div className={`grid ${itemGap} ${topMargin} grid-cols-2 sm:grid-cols-3 px-2 pt-2`}>
                   {displayedAssistantTools.map((tool, index) => {
-                    const isVisible = true; // Already filtered
+                    // Character-animate uses special visibility logic (cloud mode + seen-disabled tracking)
+                    // Other tools are already filtered, so they're always visible
+                    const isVisible = tool.id === 'character-animate' 
+                      ? isCharacterAnimateEnabled 
+                      : true;
                     
                     return (
                       <FadeInSection key={tool.id}>

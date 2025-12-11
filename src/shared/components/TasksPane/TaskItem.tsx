@@ -926,10 +926,21 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleViewVideo}
-                    className="p-1 rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                    onTouchEnd={(e) => {
+                      // Reliable touch handling for iPad
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!(isLoadingVideoGen && waitingForVideoToOpen)) {
+                        handleViewVideo(e as unknown as React.MouseEvent);
+                      }
+                    }}
+                    className={cn(
+                      "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
+                      isMobile ? "p-2 min-w-[32px] min-h-[32px]" : "p-1" // Larger touch target on mobile
+                    )}
                     disabled={isLoadingVideoGen && waitingForVideoToOpen}
                   >
-                    <Play className={cn("w-3 h-3", isLoadingVideoGen && waitingForVideoToOpen && "animate-pulse")} />
+                    <Play className={cn(isMobile ? "w-4 h-4" : "w-3 h-3", isLoadingVideoGen && waitingForVideoToOpen && "animate-pulse")} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">
@@ -944,9 +955,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleViewImage}
-                    className="p-1 rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                    onTouchEnd={(e) => {
+                      // Reliable touch handling for iPad
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleViewImage(e as unknown as React.MouseEvent);
+                    }}
+                    className={cn(
+                      "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
+                      isMobile ? "p-2 min-w-[32px] min-h-[32px]" : "p-1" // Larger touch target on mobile
+                    )}
                   >
-                    <ImageIcon className="w-3 h-3" />
+                    <ImageIcon className={isMobile ? "w-4 h-4" : "w-3 h-3"} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">
@@ -961,9 +981,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleVisitShot}
-                    className="p-1 rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                    onTouchEnd={(e) => {
+                      // Reliable touch handling for iPad
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleVisitShot(e as unknown as React.MouseEvent);
+                    }}
+                    className={cn(
+                      "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
+                      isMobile ? "p-2 min-w-[32px] min-h-[32px]" : "p-1" // Larger touch target on mobile
+                    )}
                   >
-                    <ExternalLink className="w-3 h-3" />
+                    <ExternalLink className={isMobile ? "w-4 h-4" : "w-3 h-3"} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">

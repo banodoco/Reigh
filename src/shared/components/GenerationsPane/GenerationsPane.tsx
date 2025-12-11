@@ -632,12 +632,13 @@ const GenerationsPaneComponent: React.FC = () => {
                     onStarredFilterChange={setStarredOnly}
                     reducedSpacing={true}
                     hidePagination={true}
-                                    hideTopFilters={true}
-                serverPage={page}
-                onServerPageChange={handleServerPageChange}
-                onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
-                currentViewingShotId={currentShotId || undefined}
-                onCreateShot={handleCreateShot}
+                    hideTopFilters={true}
+                    showShare={false}
+                    serverPage={page}
+                    onServerPageChange={handleServerPageChange}
+                    onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
+                    currentViewingShotId={currentShotId || undefined}
+                    onCreateShot={handleCreateShot}
                 />
                 </>
             )}

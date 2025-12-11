@@ -117,6 +117,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     onImageClick,
     hideBottomPagination = false,
     videosAsThumbnails = false,
+    hideShotNotifier = false,
   } = props;
 
   // [VideoSkeletonDebug] Mount/props summary for video gallery use
@@ -653,15 +654,17 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
         </div>
 
         {/* Shot Filter Notifier */}
-        <ShotNotifier
-          formAssociatedShotId={formAssociatedShotId}
-          shotFilter={filtersHook.shotFilter}
-          showShotFilter={showShotFilter}
-          allShots={simplifiedShotOptions}
-          onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
-          onShowAllShots={handleShowAllShots}
-          onVisitShot={handleVisitShotFromNotifier}
-        />
+        {!hideShotNotifier && (
+          <ShotNotifier
+            formAssociatedShotId={formAssociatedShotId}
+            shotFilter={filtersHook.shotFilter}
+            showShotFilter={showShotFilter}
+            allShots={simplifiedShotOptions}
+            onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
+            onShowAllShots={handleShowAllShots}
+            onVisitShot={handleVisitShotFromNotifier}
+          />
+        )}
 
         {/* Main Gallery Grid */}
         <ImageGalleryGrid

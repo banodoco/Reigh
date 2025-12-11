@@ -965,7 +965,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                           <div className="relative" ref={installCommandRef}>
                             <div 
-                              className={`bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-xs sm:text-sm overflow-hidden ${
+                              className={`bg-gray-900 text-green-400 p-3 pb-12 rounded-lg font-mono text-xs sm:text-sm overflow-hidden ${
                                 showFullInstallCommand ? 'overflow-x-auto' : ''
                               }`}
                               style={{
@@ -977,42 +977,18 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               </pre>
                             </div>
                             
+                            {/* Fade overlay when collapsed */}
                             {!showFullInstallCommand && (
-                              <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
-                                <div className="absolute bottom-4 left-4 right-4 flex justify-center gap-2">
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={handleCopyInstallCommand}
-                                    className="pointer-events-auto text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white border-blue-500"
-                                  >
-                                    {copiedInstallCommand ? "Copied!" : (
-                                      <>
-                                        <Copy className="h-3 w-3 mr-1" />
-                                        Copy
-                                      </>
-                                    )}
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={handleRevealInstallCommand}
-                                    className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
-                                  >
-                                    Reveal
-                                  </Button>
-                                </div>
-                              </div>
+                              <div className="absolute inset-0 bottom-10 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg" />
                             )}
-                          </div>
-
-                          {showFullInstallCommand && (
-                            <div className="flex items-center gap-2">
+                            
+                            {/* Fixed buttons at bottom of command block - centered */}
+                            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-center gap-2">
                               <Button
                                 variant="secondary"
                                 size="sm"
                                 onClick={handleCopyInstallCommand}
-                                className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white"
+                                className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white border-blue-500"
                               >
                                 {copiedInstallCommand ? "Copied!" : (
                                   <>
@@ -1024,13 +1000,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => setShowFullInstallCommand(false)}
-                                className="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200"
+                                onClick={showFullInstallCommand ? () => setShowFullInstallCommand(false) : handleRevealInstallCommand}
+                                className="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
                               >
-                                Hide
+                                {showFullInstallCommand ? 'Hide' : 'Reveal'}
                               </Button>
                             </div>
-                          )}
+                          </div>
                            
                            <div className="flex justify-center mt-1">
                              {isMobile ? (
@@ -1118,7 +1094,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                           <div className="relative" ref={runCommandRef}>
                             <div 
-                              className={`bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-xs sm:text-sm overflow-hidden ${
+                              className={`bg-gray-900 text-green-400 p-3 pb-12 rounded-lg font-mono text-xs sm:text-sm overflow-hidden ${
                                 showFullRunCommand ? 'overflow-x-auto' : ''
                               }`}
                               style={{
@@ -1130,42 +1106,18 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               </pre>
                             </div>
                             
+                            {/* Fade overlay when collapsed */}
                             {!showFullRunCommand && (
-                              <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg">
-                                <div className="absolute bottom-4 left-4 right-4 flex justify-center gap-2">
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={handleCopyRunCommand}
-                                    className="pointer-events-auto text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white border-blue-500"
-                                  >
-                                    {copiedRunCommand ? "Copied!" : (
-                                      <>
-                                        <Copy className="h-3 w-3 mr-1" />
-                                        Copy
-                                      </>
-                                    )}
-                                  </Button>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={handleRevealRunCommand}
-                                    className="pointer-events-auto text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
-                                  >
-                                    Reveal
-                                  </Button>
-                                </div>
-                              </div>
+                              <div className="absolute inset-0 bottom-10 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none rounded-lg" />
                             )}
-                          </div>
-
-                          {showFullRunCommand && (
-                            <div className="flex items-center gap-2">
+                            
+                            {/* Fixed buttons at bottom of command block - centered */}
+                            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-center gap-2">
                               <Button
                                 variant="secondary"
                                 size="sm"
                                 onClick={handleCopyRunCommand}
-                                className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white"
+                                className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white border-blue-500"
                               >
                                 {copiedRunCommand ? "Copied!" : (
                                   <>
@@ -1177,13 +1129,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => setShowFullRunCommand(false)}
-                                className="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200"
+                                onClick={showFullRunCommand ? () => setShowFullRunCommand(false) : handleRevealRunCommand}
+                                className="text-xs px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 border-gray-600"
                               >
-                                Hide
+                                {showFullRunCommand ? 'Hide' : 'Reveal'}
                               </Button>
                             </div>
-                          )}
+                          </div>
                            
                            <div className="flex justify-center mt-1">
                              <Popover>
@@ -1247,7 +1199,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
           )}
           
           <DialogFooter className={`${modal.isMobile ? 'px-2 pt-6 pb-3 flex-row justify-between' : 'px-2 pt-7 pb-3'} border-t relative z-20`}>
-            <div className={`flex gap-2 ${modal.isMobile ? '' : 'mr-auto'}`}>
+            <div className="flex gap-2 mr-auto">
               <Button variant="secondary" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign out

@@ -110,5 +110,7 @@ export interface ImageGalleryProps {
   hideBottomPagination?: boolean;
   /** When true, videos are rendered as static thumbnail images instead of HoverScrubVideo for better performance */
   videosAsThumbnails?: boolean;
+  /** When true, hides the shot filter notifier message */
+  hideShotNotifier?: boolean;
 }
 

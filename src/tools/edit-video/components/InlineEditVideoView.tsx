@@ -603,7 +603,11 @@ export function InlineEditVideoView({
             {/* Video Player */}
             <div className={cn(
               "w-full flex items-center justify-center",
-              useStackedLayout ? "p-2 pt-20 aspect-video" : "p-4 pt-24"
+              useStackedLayout 
+                ? isTablet 
+                  ? "p-2 pt-12 max-h-[35vh]" // Constrained height on iPad/tablet
+                  : "p-2 pt-20 aspect-video" // Mobile
+                : "p-4 pt-24" // Desktop
             )}>
               <video
                 ref={videoRef}
@@ -614,7 +618,9 @@ export function InlineEditVideoView({
                 className={cn(
                   "max-w-full object-contain rounded-lg",
                   useStackedLayout 
-                    ? "max-h-full cursor-pointer [&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden" 
+                    ? isTablet
+                      ? "max-h-[30vh] cursor-pointer [&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden" // Smaller on tablet
+                      : "max-h-full cursor-pointer [&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden" 
                     : "max-h-[40vh]" // Slightly smaller than original to accommodate buffer
                 )}
                 style={useStackedLayout ? {

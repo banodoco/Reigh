@@ -2288,39 +2288,40 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                     </>
                   )}
 
-                  {/* Shots vs Videos Toggle - moved to right of search/sort */}
-                  <div className="inline-flex items-center bg-muted rounded-full p-1">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        if (showVideosView) {
-                          handleToggleVideosView(e);
-                        }
-                      }}
-                      className={`px-3 sm:px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
-                        !showVideosView
-                          ? 'bg-background shadow-sm'
-                          : 'hover:bg-background/50'
-                      }`}
-                    >
-                      Shots
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        if (!showVideosView) {
-                          handleToggleVideosView(e);
-                        }
-                      }}
-                      className={`px-3 sm:px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
-                        showVideosView
-                          ? 'bg-background shadow-sm'
-                          : 'hover:bg-background/50'
-                      }`}
-                    >
-                      Videos
-                    </button>
-                  </div>
+                </div>
+                
+                {/* Right side: Shots vs Videos Toggle - always right-aligned */}
+                <div className="inline-flex items-center bg-muted rounded-full p-1 ml-auto">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (showVideosView) {
+                        handleToggleVideosView(e);
+                      }
+                    }}
+                    className={`px-3 sm:px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
+                      !showVideosView
+                        ? 'bg-background shadow-sm'
+                        : 'hover:bg-background/50'
+                    }`}
+                  >
+                    Shots
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (!showVideosView) {
+                        handleToggleVideosView(e);
+                      }
+                    }}
+                    className={`px-3 sm:px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
+                      showVideosView
+                        ? 'bg-background shadow-sm'
+                        : 'hover:bg-background/50'
+                    }`}
+                  >
+                    Videos
+                  </button>
                 </div>
               </div>
             </div>

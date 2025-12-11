@@ -345,9 +345,68 @@ export const AIInputButton = React.forwardRef<
   )
 
 
-  // On mobile, skip the tooltip wrapper entirely
+  // On mobile, skip the tooltip wrapper entirely but keep Popover for text mode
   if (isMobile) {
-    return mode === "voice" ? voiceButtonContent : textButtonTrigger
+    if (mode === "voice") {
+      return voiceButtonContent
+    }
+    // Text mode on mobile - wrap in Popover without Tooltip
+    return (
+      <Popover open={isPopoverOpen} onOpenChange={handlePopoverOpenChange}>
+        <PopoverTrigger asChild>
+          {textButtonTrigger}
+        </PopoverTrigger>
+        <PopoverContent 
+          side="top" 
+          align="end" 
+          sideOffset={8}
+          className="w-72 p-2"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onPointerDownOutside={() => textState !== "processing" && setIsPopoverOpen(false)}
+          onInteractOutside={() => textState !== "processing" && setIsPopoverOpen(false)}
+        >
+          <div className="flex flex-col gap-1.5">
+            <div className="text-xs text-muted-foreground">
+              Describe what you want:
+            </div>
+            <div className="relative">
+              <textarea
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Your prompt creation/edit instructions..."
+                disabled={textState === "processing"}
+                className={cn(
+                  "w-full min-h-[60px] max-h-[120px] rounded-md border border-input bg-background px-3 py-2 pr-8 text-base",
+                  "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "resize-none",
+                  textState === "processing" && "opacity-50"
+                )}
+                rows={2}
+              />
+              <button
+                type="button"
+                onClick={handleTextSubmit}
+                disabled={!inputValue.trim() || textState === "processing"}
+                className={cn(
+                  "absolute bottom-3 right-2 h-5 w-5 rounded flex items-center justify-center transition-colors",
+                  inputValue.trim() && textState !== "processing"
+                    ? "bg-purple-500 text-white hover:bg-purple-600"
+                    : "bg-muted text-muted-foreground cursor-not-allowed"
+                )}
+              >
+                {textState === "processing" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Send className="h-3 w-3" />
+                )}
+              </button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    )
   }
 
   // Voice mode: standard tooltip wrapper

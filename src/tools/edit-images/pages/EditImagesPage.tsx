@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
-import { Image, LayoutGrid, Upload, ChevronDown, ChevronUp } from 'lucide-react';
+import { LayoutGrid, Upload, ChevronDown, ChevronUp } from 'lucide-react';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import { GenerationRow } from '@/types/shots';
 import { ReighLoading } from '@/shared/components/ReighLoading';
 import { toast } from 'sonner';
@@ -19,6 +19,7 @@ import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { deriveInputImages } from '@/shared/components/ImageGallery/utils';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { parseRatio } from '@/shared/lib/aspectRatios';
 
 const TOOL_TYPE = 'edit-images';
 const TOOL_TYPE_NAME = 'Edit Images';
@@ -29,17 +30,25 @@ interface EditImagesUISettings {
 }
 
 export default function EditImagesPage() {
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, projects } = useProject();
+  
+  // Get project aspect ratio for skeleton sizing
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = selectedProject?.aspectRatio || '16:9';
+  const aspectRatioValue = parseRatio(projectAspectRatio);
   const [selectedMedia, setSelectedMedia] = useState<GenerationRow | null>(null);
   const [lightboxMedia, setLightboxMedia] = useState<GenerationRow | null>(null); // For viewing results in lightbox
   const [isUploading, setIsUploading] = useState(false);
   const [resultsPage, setResultsPage] = useState(1);
   const [showResults, setShowResults] = useState(true);
+  const [isLoadingPersistedMedia, setIsLoadingPersistedMedia] = useState(false);
   const isMobile = useIsMobile();
   const { data: shots } = useListShots(selectedProjectId);
   
   // Track if we've already loaded from settings to prevent re-loading
   const hasLoadedFromSettings = useRef(false);
+  // Track if user has explicitly closed the editor (vs initial mount state)
+  const userClosedEditor = useRef(false);
   
   // Project-level UI settings for persisting last edited media (syncs across devices)
   const { 
@@ -51,13 +60,26 @@ export default function EditImagesPage() {
     enabled: !!selectedProjectId 
   });
   
+  // Track preloaded image URLs to avoid flash on navigation
+  const preloadedImageRef = useRef<string | null>(null);
+  
+  // Preload image helper - warm up the browser cache
+  const preloadImage = (url: string) => {
+    if (!url || preloadedImageRef.current === url) return;
+    const img = new Image();
+    img.src = url;
+    preloadedImageRef.current = url;
+  };
+  
   // Load last edited image from database settings on mount
   useEffect(() => {
     if (!selectedProjectId || isUISettingsLoading || hasLoadedFromSettings.current) return;
     
     const storedId = uiSettings?.lastEditedMediaId;
+    hasLoadedFromSettings.current = true; // Mark as attempted even if no stored ID
+    
     if (storedId && !selectedMedia) {
-      hasLoadedFromSettings.current = true;
+      setIsLoadingPersistedMedia(true);
       // Fetch the generation from the database
       supabase
         .from('generations')
@@ -66,23 +88,28 @@ export default function EditImagesPage() {
         .single()
         .then(({ data, error }) => {
           if (data && !error) {
+            // Preload the image before showing the view to prevent flash
+            const imageUrl = (data as any).location || (data as any).thumbnail_url;
+            if (imageUrl) preloadImage(imageUrl);
             setSelectedMedia(data as any);
           } else {
             // Clear invalid stored ID
             updateUISettings('project', { lastEditedMediaId: undefined });
           }
+          setIsLoadingPersistedMedia(false);
         });
     }
   }, [selectedProjectId, uiSettings?.lastEditedMediaId, isUISettingsLoading, selectedMedia, updateUISettings]);
-  
+
   // Persist selected media ID to database settings (or clear it when media is removed)
   useEffect(() => {
-    if (!selectedProjectId || isUISettingsLoading) return;
+    if (!selectedProjectId || isUISettingsLoading || !hasLoadedFromSettings.current) return;
     
     if (selectedMedia && selectedMedia.id !== uiSettings?.lastEditedMediaId) {
       updateUISettings('project', { lastEditedMediaId: selectedMedia.id });
-    } else if (!selectedMedia && uiSettings?.lastEditedMediaId) {
-      // Clear the stored ID when media is removed/closed
+      userClosedEditor.current = false; // Reset close flag when new media selected
+    } else if (!selectedMedia && uiSettings?.lastEditedMediaId && userClosedEditor.current) {
+      // Only clear when user explicitly closed the editor, not on initial mount
       updateUISettings('project', { lastEditedMediaId: undefined });
     }
   }, [selectedMedia?.id, selectedProjectId, isUISettingsLoading, uiSettings?.lastEditedMediaId, updateUISettings]);
@@ -281,8 +308,6 @@ export default function EditImagesPage() {
             images={(resultsData as any)?.items || []}
             allShots={shots || []}
             onImageClick={handleResultClick}
-            currentToolType={TOOL_TYPE}
-            currentToolTypeName={TOOL_TYPE_NAME}
             itemsPerPage={12}
             offset={(resultsPage - 1) * 12}
             totalCount={(resultsData as any)?.total || 0}
@@ -295,6 +320,7 @@ export default function EditImagesPage() {
             showStar={true}
             showAddToShot={true}
             enableSingleClick={true}
+            initialToolTypeFilter={false}
           />
         )}
       </div>
@@ -311,7 +337,65 @@ export default function EditImagesPage() {
         <h1 className="text-3xl font-light tracking-tight text-foreground">Edit Images</h1>
       </div>
       
-      {!selectedMedia ? (
+      {/* Show skeleton when loading settings, loading persisted media, OR we have a stored ID but no media yet */}
+      {(isUISettingsLoading || isLoadingPersistedMedia || (uiSettings?.lastEditedMediaId && !selectedMedia)) && (
+        <div className="w-full px-4 overflow-y-auto" style={{ minHeight: 'calc(100dvh - 96px)' }}>
+          <div className="max-w-7xl mx-auto relative">
+            <div className={cn(
+              "rounded-2xl overflow-hidden bg-black",
+              isEditingOnMobile ? "flex flex-col min-h-[60vh]" : "h-[70vh]"
+            )}>
+              {isMobile ? (
+                // Mobile: Match InlineEditView mobile layout (45dvh height)
+                <div 
+                  className="flex items-center justify-center relative bg-black w-full shrink-0 rounded-t-2xl overflow-hidden"
+                  style={{ height: '45dvh' }}
+                >
+                  <Skeleton 
+                    className="rounded-lg"
+                    style={{ 
+                      aspectRatio: aspectRatioValue,
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      width: aspectRatioValue >= 1 ? '90%' : 'auto',
+                      height: aspectRatioValue >= 1 ? 'auto' : '90%'
+                    }} 
+                  />
+                </div>
+              ) : (
+                // Desktop: Match InlineEditView desktop layout (60% width, 100% height)
+                <div className="w-full h-full flex bg-transparent overflow-hidden">
+                  <div 
+                    className="flex-1 flex items-center justify-center relative bg-black rounded-l-xl overflow-hidden"
+                    style={{ width: '60%', height: '100%' }}
+                  >
+                    <Skeleton 
+                      className="rounded-lg"
+                      style={{ 
+                        aspectRatio: aspectRatioValue,
+                        maxWidth: '90%',
+                        maxHeight: '90%',
+                        width: aspectRatioValue >= 1 ? '80%' : 'auto',
+                        height: aspectRatioValue >= 1 ? 'auto' : '80%'
+                      }} 
+                    />
+                  </div>
+                  {/* Right panel skeleton for controls */}
+                  <div className="w-[40%] bg-background border-l border-border p-4">
+                    <div className="space-y-4">
+                      <Skeleton className="h-8 w-full" />
+                      <Skeleton className="h-24 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {!selectedMedia && !isUISettingsLoading && !isLoadingPersistedMedia && !uiSettings?.lastEditedMediaId && (
         <div className="w-full px-4 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             {/* Selection UI - reduced height */}
@@ -353,7 +437,12 @@ export default function EditImagesPage() {
               )}
             >
                <ImageSelectionModal 
-                 onSelect={(media) => setSelectedMedia(media)} 
+                 onSelect={(media) => {
+                   // Preload the image before showing edit view to prevent flash
+                   const imageUrl = (media as any).location || (media as any).url || (media as any).thumbnail_url;
+                   if (imageUrl) preloadImage(imageUrl);
+                   setSelectedMedia(media);
+                 }} 
                />
               </div>
             </div>
@@ -362,7 +451,9 @@ export default function EditImagesPage() {
             {renderResultsGallery()}
           </div>
         </div>
-      ) : (
+      )}
+      
+      {selectedMedia && (
         <div className="w-full px-4 overflow-y-auto" style={{ minHeight: 'calc(100dvh - 96px)' }}>
           <div className="max-w-7xl mx-auto relative">
             <div className={cn(
@@ -371,7 +462,10 @@ export default function EditImagesPage() {
             )}>
               <InlineEditView 
                 media={selectedMedia} 
-                onClose={() => setSelectedMedia(null)}
+                onClose={() => {
+                  userClosedEditor.current = true;
+                  setSelectedMedia(null);
+                }}
                 onNavigateToGeneration={async (generationId) => {
                   try {
                     const { data, error } = await supabase
@@ -427,13 +521,10 @@ export default function EditImagesPage() {
 
 function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) => void }) {
   const { selectedProjectId } = useProject();
-  const [activeTab, setActiveTab] = useState("gallery");
   const [shotFilter, setShotFilter] = useState<string>("all");
-  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>("image");
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const { data: shots } = useListShots(selectedProjectId);
-  const isMobile = useIsMobile();
   const itemsPerPage = 15;
   
   const {
@@ -446,7 +537,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
     true,
     {
       shotId: shotFilter === 'all' ? undefined : shotFilter,
-      mediaType: mediaTypeFilter,
+      mediaType: 'image', // Only show images
       searchTerm: searchTerm.trim() || undefined
     } 
   );
@@ -454,30 +545,18 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [shotFilter, searchTerm, mediaTypeFilter]);
+  }, [shotFilter, searchTerm]);
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-      <div className="px-6 pt-2 border-b">
-        <TabsList className="w-full justify-start bg-transparent p-0 h-auto gap-6">
-          <TabsTrigger 
-            value="gallery" 
-            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-3"
-          >
-            <LayoutGrid className="w-4 h-4 mr-2" />
-            All Images
-          </TabsTrigger>
-          <TabsTrigger 
-            value="shots" 
-            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 py-3"
-          >
-            <Image className="w-4 h-4 mr-2" />
-            Shots
-          </TabsTrigger>
-        </TabsList>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="px-6 pt-4 pb-2 border-b">
+        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <LayoutGrid className="w-4 h-4" />
+          Select an Image
+        </div>
       </div>
 
-      <TabsContent value="gallery" className="flex-1 overflow-y-auto p-0 m-0 relative pt-4 px-4 md:px-6">
+      <div className="flex-1 overflow-y-auto p-0 m-0 relative pt-4 px-4 md:px-6">
          {isGalleryLoading && !generationsData ? (
             <ReighLoading />
          ) : (
@@ -485,16 +564,17 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
                images={(generationsData as any)?.items || []}
                onImageClick={(media) => onSelect(media as any)}
                allShots={shots || []}
-               currentToolType={TOOL_TYPE}
-               currentToolTypeName={TOOL_TYPE_NAME}
                showShotFilter={true}
+               initialToolTypeFilter={false}
                initialShotFilter={shotFilter}
                onShotFilterChange={setShotFilter}
+               initialExcludePositioned={false}
                showSearch={true}
                initialSearchTerm={searchTerm}
                onSearchChange={setSearchTerm}
-               initialMediaTypeFilter={mediaTypeFilter}
-               onMediaTypeFilterChange={setMediaTypeFilter}
+               initialMediaTypeFilter="image"
+               hideTopFilters={true}
+               hideShotNotifier={true}
                itemsPerPage={itemsPerPage}
                offset={(currentPage - 1) * itemsPerPage}
                totalCount={(generationsData as any)?.total || 0}
@@ -510,53 +590,8 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
                hideBottomPagination={true}
             />
          )}
-      </TabsContent>
-
-      <TabsContent value="shots" className="flex-1 overflow-y-auto p-4 m-0">
-        <ShotsView onSelect={onSelect} />
-      </TabsContent>
-    </Tabs>
-  );
-}
-
-function ShotsView({ onSelect }: { onSelect: (media: GenerationRow) => void }) {
-  const { selectedProjectId } = useProject();
-  const { data: shots, isLoading } = useListShots(selectedProjectId);
-  
-  if (isLoading) return <ReighLoading />;
-
-  return (
-    <div className="space-y-8">
-      {shots?.map((shot) => (
-        <div key={shot.id} className="space-y-3">
-           <h3 className="font-medium text-lg flex items-center gap-2">
-             {shot.name}
-             <span className="text-xs text-muted-foreground font-normal">({shot.images?.length || 0} items)</span>
-           </h3>
-           <ShotImagesRow images={shot.images} onSelect={onSelect} />
-        </div>
-      ))}
-      {(!shots || shots.length === 0) && (
-         <div className="text-center py-10 text-muted-foreground">No shots found.</div>
-      )}
+      </div>
     </div>
   );
 }
 
-function ShotImagesRow({ images, onSelect }: { images: any[], onSelect: (media: GenerationRow) => void }) {
-  if (!images || images.length === 0) return <div className="text-xs text-muted-foreground italic pl-2">No images in shot</div>;
-
-  return (
-      <div className="flex gap-3 overflow-x-auto pb-4">
-          {images.map(img => (
-              <div 
-                key={img.id} 
-                className="w-32 h-32 flex-shrink-0 relative cursor-pointer rounded overflow-hidden border border-border/50 hover:border-primary"
-                onClick={() => onSelect(img)}
-              >
-                  <img src={img.imageUrl || img.url || img.location} className="w-full h-full object-cover" alt="" />
-              </div>
-          ))}
-      </div>
-  );
-}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
 import { LayoutGrid, Upload, ChevronDown, ChevronUp } from 'lucide-react';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import { GenerationRow } from '@/types/shots';
 import { ReighLoading } from '@/shared/components/ReighLoading';
 import { toast } from 'sonner';
@@ -16,6 +17,7 @@ import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
 import MediaLightbox from '@/shared/components/MediaLightbox/MediaLightboxRefactored';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import type { PortionSelection } from '@/shared/components/VideoPortionTimeline';
+import { parseRatio } from '@/shared/lib/aspectRatios';
 
 const TOOL_TYPE = 'edit-video';
 
@@ -26,17 +28,25 @@ interface EditVideoUISettings {
 }
 
 export default function EditVideoPage() {
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, projects } = useProject();
+  
+  // Get project aspect ratio for skeleton sizing
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = selectedProject?.aspectRatio || '16:9';
+  const aspectRatioValue = parseRatio(projectAspectRatio);
   const [selectedMedia, setSelectedMedia] = useState<GenerationRow | null>(null);
   const [savedSegments, setSavedSegments] = useState<PortionSelection[] | undefined>(undefined);
   const [isUploading, setIsUploading] = useState(false);
   const [resultsPage, setResultsPage] = useState(1);
   const [showResults, setShowResults] = useState(true);
+  const [isLoadingPersistedMedia, setIsLoadingPersistedMedia] = useState(false);
   const isMobile = useIsMobile();
   const { data: shots } = useListShots(selectedProjectId);
   
   // Track if we've already loaded from settings to prevent re-loading
   const hasLoadedFromSettings = useRef(false);
+  // Track if user has explicitly closed the editor (vs initial mount state)
+  const userClosedEditor = useRef(false);
   
   // Project-level UI settings for persisting last edited media (syncs across devices)
   const { 
@@ -48,14 +58,28 @@ export default function EditVideoPage() {
     enabled: !!selectedProjectId 
   });
   
+  // Track preloaded video URLs to avoid flash on navigation
+  const preloadedVideoRef = useRef<string | null>(null);
+  
+  // Preload video poster helper - warm up the browser cache
+  const preloadVideoPoster = (posterUrl: string | undefined, videoUrl: string | undefined) => {
+    const urlToPreload = posterUrl || videoUrl;
+    if (!urlToPreload || preloadedVideoRef.current === urlToPreload) return;
+    const img = new Image();
+    img.src = urlToPreload;
+    preloadedVideoRef.current = urlToPreload;
+  };
+  
   // Load last edited video from database settings on mount
   useEffect(() => {
     if (!selectedProjectId || isUISettingsLoading || hasLoadedFromSettings.current) return;
     
     const storedId = uiSettings?.lastEditedMediaId;
     const storedSegments = uiSettings?.lastEditedMediaSegments;
+    hasLoadedFromSettings.current = true; // Mark as attempted even if no stored ID
+    
     if (storedId && !selectedMedia) {
-      hasLoadedFromSettings.current = true;
+      setIsLoadingPersistedMedia(true);
       // Fetch the generation from the database
       supabase
         .from('generations')
@@ -64,6 +88,10 @@ export default function EditVideoPage() {
         .single()
         .then(({ data, error }) => {
           if (data && !error) {
+            // Preload the poster/thumbnail before showing the view
+            const posterUrl = (data as any).thumbnail_url;
+            const videoUrl = (data as any).location;
+            preloadVideoPoster(posterUrl, videoUrl);
             setSelectedMedia(data as any);
             // Also restore saved segments if they exist
             if (storedSegments && storedSegments.length > 0) {
@@ -73,18 +101,20 @@ export default function EditVideoPage() {
             // Clear invalid stored ID and segments
             updateUISettings('project', { lastEditedMediaId: undefined, lastEditedMediaSegments: undefined });
           }
+          setIsLoadingPersistedMedia(false);
         });
     }
   }, [selectedProjectId, uiSettings?.lastEditedMediaId, uiSettings?.lastEditedMediaSegments, isUISettingsLoading, selectedMedia, updateUISettings]);
   
   // Persist selected media ID to database settings (or clear it when media is removed)
   useEffect(() => {
-    if (!selectedProjectId || isUISettingsLoading) return;
+    if (!selectedProjectId || isUISettingsLoading || !hasLoadedFromSettings.current) return;
     
     if (selectedMedia && selectedMedia.id !== uiSettings?.lastEditedMediaId) {
       updateUISettings('project', { lastEditedMediaId: selectedMedia.id });
-    } else if (!selectedMedia && uiSettings?.lastEditedMediaId) {
-      // Clear the stored ID and segments when media is removed/closed
+      userClosedEditor.current = false; // Reset close flag when new media selected
+    } else if (!selectedMedia && uiSettings?.lastEditedMediaId && userClosedEditor.current) {
+      // Only clear when user explicitly closed the editor, not on initial mount
       updateUISettings('project', { lastEditedMediaId: undefined, lastEditedMediaSegments: undefined });
     }
   }, [selectedMedia?.id, selectedProjectId, isUISettingsLoading, uiSettings?.lastEditedMediaId, updateUISettings]);
@@ -259,7 +289,82 @@ export default function EditVideoPage() {
         <h1 className="text-3xl font-light tracking-tight text-foreground">Edit Videos</h1>
       </div>
       
-      {!selectedMedia ? (
+      {/* Show skeleton when loading settings, loading persisted media, OR we have a stored ID but no media yet */}
+      {(isUISettingsLoading || isLoadingPersistedMedia || (uiSettings?.lastEditedMediaId && !selectedMedia)) && (
+        <div className="w-full px-4 overflow-y-auto" style={{ minHeight: 'calc(100dvh - 96px)' }}>
+          <div className="max-w-7xl mx-auto relative">
+            <div className={cn(
+              "rounded-2xl overflow-hidden bg-black",
+              isEditingOnMobile ? "flex flex-col min-h-[60vh]" : "h-[70vh]"
+            )}>
+              {isMobile ? (
+                // Mobile: Match InlineEditVideoView mobile stacked layout
+                <div className="w-full flex flex-col bg-transparent">
+                  <div 
+                    className="flex items-center justify-center relative bg-black w-full shrink-0 rounded-t-2xl overflow-hidden"
+                    style={{ height: '35vh' }}
+                  >
+                    <Skeleton 
+                      className="rounded-lg"
+                      style={{ 
+                        aspectRatio: aspectRatioValue,
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        width: aspectRatioValue >= 1 ? '90%' : 'auto',
+                        height: aspectRatioValue >= 1 ? 'auto' : '90%'
+                      }} 
+                    />
+                  </div>
+                  {/* Timeline skeleton */}
+                  <div className="p-4 bg-background">
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                  </div>
+                </div>
+              ) : (
+                // Desktop: Match InlineEditVideoView desktop layout (flex-1 + w-[400px])
+                <div className="w-full h-full flex flex-row bg-transparent overflow-hidden">
+                  {/* Left side: Video + Timeline stacked */}
+                  <div className="flex-1 flex flex-col min-h-0 h-full">
+                    {/* Video area */}
+                    <div className="relative flex items-center justify-center bg-zinc-900 overflow-hidden flex-shrink rounded-t-lg p-4 pt-24">
+                      <Skeleton 
+                        className="rounded-lg"
+                        style={{ 
+                          aspectRatio: aspectRatioValue,
+                          maxWidth: '90%',
+                          maxHeight: '40vh',
+                          width: aspectRatioValue >= 1 ? '80%' : 'auto',
+                          height: aspectRatioValue >= 1 ? 'auto' : '80%'
+                        }} 
+                      />
+                    </div>
+                    {/* Spacer */}
+                    <div className="h-4 bg-zinc-900" />
+                    {/* Timeline skeleton */}
+                    <div className="bg-zinc-900 px-4 pt-3 pb-4 rounded-b-lg flex-shrink-0">
+                      <Skeleton className="h-16 w-full rounded-lg" />
+                      <div className="flex justify-center mt-2">
+                        <Skeleton className="h-8 w-32" />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Right panel skeleton for controls - fixed 400px width */}
+                  <div className="w-[400px] bg-background border-l border-border p-4 overflow-y-auto">
+                    <div className="space-y-4">
+                      <Skeleton className="h-8 w-full" />
+                      <Skeleton className="h-16 w-full" />
+                      <Skeleton className="h-24 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {!selectedMedia && !isUISettingsLoading && !isLoadingPersistedMedia && !uiSettings?.lastEditedMediaId && (
         <div className="w-full px-4 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row rounded-2xl overflow-hidden" style={{ height: isMobile ? '60vh' : '65vh' }}>
@@ -300,7 +405,13 @@ export default function EditVideoPage() {
                 )}
               >
                  <VideoSelectionPanel 
-                   onSelect={(media) => setSelectedMedia(media)} 
+                   onSelect={(media) => {
+                     // Preload the poster/thumbnail before showing edit view
+                     const posterUrl = (media as any).thumbnail_url || (media as any).thumbUrl;
+                     const videoUrl = (media as any).location || (media as any).url;
+                     preloadVideoPoster(posterUrl, videoUrl);
+                     setSelectedMedia(media);
+                   }} 
                  />
               </div>
             </div>
@@ -346,7 +457,9 @@ export default function EditVideoPage() {
             )}
           </div>
         </div>
-      ) : (
+      )}
+      
+      {selectedMedia && (
         <div className="w-full px-4 overflow-y-auto" style={{ minHeight: 'calc(100dvh - 96px)' }}>
           <div className="max-w-7xl mx-auto relative">
             <div className={cn(
@@ -357,6 +470,7 @@ export default function EditVideoPage() {
                 key={selectedMedia.id} // Force remount when media changes
                 media={selectedMedia} 
                 onClose={() => {
+                  userClosedEditor.current = true;
                   setSelectedMedia(null);
                   setSavedSegments(undefined);
                 }}
@@ -435,7 +549,8 @@ export default function EditVideoPage() {
             setLightboxOpen(false);
             setLightboxVariantId(null);
           }}
-          onNavigate={handleNavigateLightbox}
+          onNext={allResults.length > 1 ? () => handleNavigateLightbox('next') : undefined}
+          onPrevious={allResults.length > 1 ? () => handleNavigateLightbox('prev') : undefined}
           showNavigation={allResults.length > 1}
           showTaskDetails={true}
           initialVariantId={lightboxVariantId || undefined}
@@ -497,7 +612,9 @@ function VideoSelectionPanel({ onSelect }: { onSelect: (media: GenerationRow) =>
                initialSearchTerm={searchTerm}
                onSearchChange={setSearchTerm}
                initialMediaTypeFilter="video"
-               showMediaTypeFilter={false} // Hide media type filter since we only want videos
+               hideTopFilters={true}
+               hideShotNotifier={true}
+               initialExcludePositioned={false}
                itemsPerPage={itemsPerPage}
                offset={(currentPage - 1) * itemsPerPage}
                totalCount={(generationsData as any)?.total || 0}

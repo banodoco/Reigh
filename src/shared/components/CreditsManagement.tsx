@@ -3,6 +3,7 @@ import { Coins, CreditCard, History, Gift, DollarSign, Activity, Filter, Chevron
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Slider } from '@/shared/components/ui/slider';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -558,11 +559,31 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
           {activeTab === 'history' && (
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               {isLoadingLedger ? (
-                <div className="p-8 text-center">
-                  <div className="animate-pulse">
-                    <History className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600">Loading transaction history...</p>
-                  </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-20 sm:w-auto">Date</TableHead>
+                        <TableHead className="w-16 sm:w-auto">Type</TableHead>
+                        <TableHead className="w-20 sm:w-auto">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <TableRow key={i}>
+                          <TableCell className="w-20 sm:w-auto">
+                            <Skeleton className="h-4 w-20" />
+                          </TableCell>
+                          <TableCell className="w-16 sm:w-auto">
+                            <Skeleton className="h-5 w-16 rounded-full" />
+                          </TableCell>
+                          <TableCell className="w-20 sm:w-auto">
+                            <Skeleton className="h-4 w-14" />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : (ledgerData?.entries?.filter(tx => tx.type !== 'spend').length || 0) === 0 ? (
                 <div className="p-8 text-center">
@@ -919,11 +940,47 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
             {/* Task Table */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               {isLoadingTaskLog ? (
-                <div className="p-8 text-center">
-                  <div className="animate-pulse">
-                    <Activity className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600">Loading task log...</p>
-                  </div>
+                <div className="overflow-x-auto">
+                  <Table className="table-fixed w-full">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-14">ID</TableHead>
+                        <TableHead className="w-20">Date</TableHead>
+                        <TableHead className="w-28">Task Type</TableHead>
+                        <TableHead className="hidden sm:table-cell w-28">Project</TableHead>
+                        <TableHead className="hidden sm:table-cell w-20">Status</TableHead>
+                        <TableHead className="hidden sm:table-cell w-16">Duration</TableHead>
+                        <TableHead className="w-16">Cost</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                        <TableRow key={i}>
+                          <TableCell className="p-2">
+                            <Skeleton className="h-5 w-8" />
+                          </TableCell>
+                          <TableCell className="p-2">
+                            <Skeleton className="h-4 w-16" />
+                          </TableCell>
+                          <TableCell className="p-2">
+                            <Skeleton className="h-5 w-20 rounded-full" />
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell p-2">
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell p-2">
+                            <Skeleton className="h-5 w-16 rounded-full" />
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell p-2">
+                            <Skeleton className="h-4 w-12" />
+                          </TableCell>
+                          <TableCell className="p-2">
+                            <Skeleton className="h-4 w-10" />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : (taskLogData?.tasks?.length || 0) === 0 ? (
                 <div className="p-8 text-center">

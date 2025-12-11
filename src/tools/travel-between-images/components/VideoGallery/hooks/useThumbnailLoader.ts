@@ -95,7 +95,19 @@ export const useThumbnailLoader = (video: GenerationRow) => {
     return { inPreloaderCache, inBrowserCache, isInitiallyCached };
   }, [hasThumbnail, video.thumbUrl, video.id]);
   
-  const [thumbnailLoaded, setThumbnailLoaded] = useState(initialCacheStatus.isInitiallyCached);
+  // Initialize as true if cached to prevent flash - the onLoad will confirm it anyway
+  // This is the key fix for preventing flash on back navigation - trust the cache check
+  const [thumbnailLoaded, setThumbnailLoaded] = useState(() => {
+    // If initially cached, start as loaded to prevent any flash
+    if (initialCacheStatus.isInitiallyCached) {
+      return true;
+    }
+    // Also do an immediate sync check in case browser has it cached
+    if (hasThumbnail && video.thumbUrl) {
+      return isInBrowserCache(video.thumbUrl);
+    }
+    return false;
+  });
   const [thumbnailError, setThumbnailError] = useState(false);
 
   // Enhanced debug logging for thumbnail loading state
