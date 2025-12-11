@@ -16,16 +16,51 @@ const isIOSPwa = (): boolean => {
 };
 
 /**
+ * Get file extension from content type or URL
+ */
+const getFileExtension = (url: string, isVideo: boolean, contentType?: string): string => {
+  // Priority 1: Use stored content type if available
+  if (contentType) {
+    const ext = contentType.split('/')[1]?.split(';')[0]?.trim();
+    if (ext && ext !== 'octet-stream') {
+      return ext;
+    }
+  }
+  
+  // Priority 2: Extract from URL (strip query params first)
+  const urlWithoutParams = url.split('?')[0];
+  const urlParts = urlWithoutParams.split('.');
+  if (urlParts.length > 1) {
+    const ext = urlParts.pop()!;
+    if (ext && ext.length <= 5) { // Reasonable extension length
+      return ext;
+    }
+  }
+  
+  // Priority 3: Default based on media type
+  return isVideo ? 'mp4' : 'png';
+};
+
+/**
  * Download media (image or video) from a URL
  * Handles timeouts, fallbacks, and error cases
  * Special handling for iOS PWA where download attribute doesn't work
+ * 
+ * @param url - The URL to download from
+ * @param mediaId - Media ID for filename
+ * @param isVideo - Whether the media is a video
+ * @param contentType - Optional MIME type for proper file extension (e.g., 'video/mp4')
  */
-export const downloadMedia = async (url: string, mediaId: string, isVideo: boolean): Promise<void> => {
+export const downloadMedia = async (url: string, mediaId: string, isVideo: boolean, contentType?: string): Promise<void> => {
   const downloadStartTime = Date.now();
+  const fileExt = getFileExtension(url, isVideo, contentType);
+  
   console.log('[PollingBreakageIssue] [MediaLightbox] Download started', {
     mediaId,
     displayUrl: url,
     isVideo,
+    contentType,
+    fileExt,
     isIOSPwa: isIOSPwa(),
     timestamp: downloadStartTime
   });
@@ -43,8 +78,8 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
         if (!response.ok) throw new Error('Failed to fetch');
         
         const blob = await response.blob();
-        const filename = `media_${mediaId}.${isVideo ? 'mp4' : 'png'}`;
-        const file = new File([blob], filename, { type: blob.type });
+        const filename = `media_${mediaId}.${fileExt}`;
+        const file = new File([blob], filename, { type: contentType || blob.type });
         
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
@@ -105,7 +140,7 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
     });
 
     const objectUrl = URL.createObjectURL(blob);
-    const filename = `media_${mediaId}.${isVideo ? 'mp4' : 'png'}`;
+    const filename = `media_${mediaId}.${fileExt}`;
     
     const link = document.createElement('a');
     link.href = objectUrl;
@@ -158,7 +193,7 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
     try {
       const link = document.createElement('a');
       link.href = url;
-      link.download = `media_${mediaId}.${isVideo ? 'mp4' : 'png'}`;
+      link.download = `media_${mediaId}.${fileExt}`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();

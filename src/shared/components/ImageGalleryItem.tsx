@@ -1624,7 +1624,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                             image.url || '',
                             image.prompt || 'generation',
                             image.id,
-                            image.isVideo
+                            image.isVideo,
+                            image.contentType // Pass stored MIME type for proper file extension
                           );
                       }}
                       title="Download"

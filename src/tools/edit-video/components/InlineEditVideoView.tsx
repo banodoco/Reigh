@@ -177,7 +177,18 @@ export function InlineEditVideoView({
         // Initialize first selection to 10%-20% of video if not set
         setSelections(prev => {
           if (prev.length > 0 && prev[0].end === 0) {
-            return [{ ...prev[0], start: duration * 0.1, end: duration * 0.2 }, ...prev.slice(1)];
+            const start = duration * 0.1;
+            const end = duration * 0.2;
+            // Calculate gap frames based on actual frame difference
+            const calculatedGapFrames = videoFps 
+              ? (() => {
+                  const frameCount = Math.round((end - start) * videoFps);
+                  // Quantize to 4N+1 format (required by Wan models)
+                  const n = Math.round((frameCount - 1) / 4);
+                  return Math.max(1, n * 4 + 1);
+                })()
+              : (prev[0].gapFrameCount ?? gapFrameCount);
+            return [{ ...prev[0], start, end, gapFrameCount: calculatedGapFrames }, ...prev.slice(1)];
           }
           return prev;
         });
@@ -233,16 +244,26 @@ export function InlineEditVideoView({
       newEnd = videoDuration * 0.2;
     }
     
+    // Calculate gap frames based on actual frame difference
+    const calculatedGapFrames = videoFps 
+      ? (() => {
+          const frameCount = Math.round((newEnd - newStart) * videoFps);
+          // Quantize to 4N+1 format (required by Wan models)
+          const n = Math.round((frameCount - 1) / 4);
+          return Math.max(1, n * 4 + 1);
+        })()
+      : gapFrameCount; // Fallback to global default if FPS not available
+    
     const newSelection: PortionSelection = {
       id: generateUUID(),
       start: newStart,
       end: newEnd,
-      gapFrameCount: gapFrameCount, // Use current global default
+      gapFrameCount: calculatedGapFrames,
       prompt: '',
     };
     setSelections(prev => [...prev, newSelection]);
     setActiveSelectionId(newSelection.id);
-  }, [videoDuration, selections, gapFrameCount]);
+  }, [videoDuration, selections, gapFrameCount, videoFps]);
   
   // Remove a selection
   const handleRemoveSelection = useCallback((id: string) => {
@@ -255,12 +276,27 @@ export function InlineEditVideoView({
     }
   }, [activeSelectionId]);
   
+  // Helper to calculate gap frames from time range
+  const calculateGapFramesFromRange = useCallback((start: number, end: number, fps: number | null): number => {
+    if (!fps || end <= start) return gapFrameCount; // Fallback to global default
+    
+    const frameCount = Math.round((end - start) * fps);
+    // Quantize to 4N+1 format (required by Wan models)
+    const n = Math.round((frameCount - 1) / 4);
+    const quantized = Math.max(1, n * 4 + 1);
+    return quantized;
+  }, [gapFrameCount]);
+
   // Update a selection
   const handleUpdateSelection = useCallback((id: string, start: number, end: number) => {
-    setSelections(prev => prev.map(s => 
-      s.id === id ? { ...s, start, end } : s
-    ));
-  }, []);
+    setSelections(prev => prev.map(s => {
+      if (s.id === id) {
+        const calculatedGapFrames = calculateGapFramesFromRange(start, end, videoFps);
+        return { ...s, start, end, gapFrameCount: calculatedGapFrames };
+      }
+      return s;
+    }));
+  }, [videoFps, calculateGapFramesFromRange]);
   
   // Set portion start/end for backward compatibility with VideoPortionEditor
   const setPortionStart = useCallback((val: number) => {
@@ -415,29 +451,55 @@ export function InlineEditVideoView({
         }
       }
       
-      // Build phase config for lightning model
+      // Build phase config for lightning model (same as join clips)
+      // Default motion scale LoRA that's always included
+      const defaultLora = {
+        url: "https://huggingface.co/peteromallet/random_junk/resolve/main/motion_scale_000006500_high_noise.safetensors",
+        multiplier: "1.25"
+      };
+
+      // Convert user LoRAs to phase config format
+      const additionalLoras = lorasForTask
+        .filter(lora => lora.path)
+        .map(lora => ({
+          url: lora.path,
+          multiplier: lora.strength.toFixed(2)
+        }));
+
       const phaseConfig = {
         phases: [
           { 
             phase: 1, 
-            guidance_scale: 3, 
-            loras: [{ url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "0.75" }] 
+            guidance_scale: 3.0, 
+            loras: [
+              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "0.75" },
+              defaultLora,
+              ...additionalLoras
+            ]
           },
           { 
             phase: 2, 
-            guidance_scale: 1, 
-            loras: [{ url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "1.0" }] 
+            guidance_scale: 1.0, 
+            loras: [
+              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "1.0" },
+              defaultLora,
+              ...additionalLoras
+            ]
           },
           { 
             phase: 3, 
-            guidance_scale: 1, 
-            loras: [{ url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors", multiplier: "1.0" }] 
+            guidance_scale: 1.0, 
+            loras: [
+              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors", multiplier: "1.0" },
+              defaultLora,
+              ...additionalLoras
+            ]
           }
         ],
-        flow_shift: 5,
+        flow_shift: 5.0,
         num_phases: 3,
         sample_solver: "euler",
-        steps_per_phase: [2, 2, 2],
+        steps_per_phase: [2, 2, 5],
         model_switch_phase: 2
       };
       
@@ -612,21 +674,22 @@ export function InlineEditVideoView({
               <video
                 ref={videoRef}
                 src={videoUrl}
-                controls={!useStackedLayout} // Hide controls on mobile/tablet to avoid play button overlay
+                controls={false} // Hide controls
                 playsInline // Prevents fullscreen on iOS when video plays
                 poster={(media as any).thumbnail_url || media.thumbUrl || undefined} // Show thumbnail instead of play button
                 className={cn(
                   "max-w-full object-contain rounded-lg",
+                  "[&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden",
                   useStackedLayout 
                     ? isTablet
-                      ? "max-h-[30vh] cursor-pointer [&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden" // Smaller on tablet
-                      : "max-h-full cursor-pointer [&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden" 
+                      ? "max-h-[30vh] cursor-pointer" // Smaller on tablet
+                      : "max-h-full cursor-pointer"
                     : "max-h-[40vh]" // Slightly smaller than original to accommodate buffer
                 )}
-                style={useStackedLayout ? {
-                  // Additional CSS to hide native controls overlay on mobile/tablet
+                style={{
+                  // Additional CSS to hide native controls overlay
                   WebkitAppearance: 'none',
-                } : undefined}
+                }}
                 onLoadedMetadata={handleVideoLoadedMetadata}
                 preload="metadata"
                 // Prevent double-click fullscreen on mobile/tablet

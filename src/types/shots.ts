@@ -50,6 +50,7 @@ export interface GenerationRow {
   thumbUrl?: string;
   location?: string | null;
   type?: string | null;
+  contentType?: string; // MIME type for proper download file extensions (e.g., 'video/mp4', 'image/png')
   createdAt?: string;
   metadata?: GenerationMetadata; // Typed metadata field
   isOptimistic?: boolean;

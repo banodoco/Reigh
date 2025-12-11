@@ -1077,7 +1077,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const handleDownload = async () => {
     // Use the effective media URL (may be a variant)
     const urlToDownload = isVideo ? effectiveVideoUrl : effectiveMediaUrl;
-    await downloadMedia(urlToDownload, media.id, isVideo);
+    await downloadMedia(urlToDownload, media.id, isVideo, media.contentType);
   };
 
   const handleDelete = () => {

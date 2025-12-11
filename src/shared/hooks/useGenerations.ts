@@ -130,11 +130,21 @@ async function fetchEditVariants(
   // Transform variants to GeneratedImageWithMetadata format
   const items: GeneratedImageWithMetadata[] = (data || []).map((variant: any) => {
     const isVideo = isVideoUrl(variant.location);
+    // Extract content_type from params for proper download file extensions
+    const storedContentType = variant.params?.content_type;
+    let contentType: string | undefined;
+    if (storedContentType === 'video' || isVideo) {
+      contentType = 'video/mp4';
+    } else if (storedContentType === 'image' || !isVideo) {
+      contentType = 'image/png';
+    }
+    
     return {
       id: variant.id,
       url: variant.location,
       thumbUrl: variant.thumbnail_url || variant.location,
       isVideo,
+      contentType, // For proper download file extensions
       createdAt: variant.created_at,
       starred: false, // Variants don't have starred flag
       metadata: {
@@ -145,6 +155,7 @@ async function fetchEditVariants(
         tool_type: variant.params?.tool_type || toolType,
         created_from: variant.params?.created_from,
         source_task_id: variant.params?.source_task_id, // Task ID for fetching task details
+        content_type: storedContentType, // Include in metadata too
       },
       shot_id: undefined,
       position: undefined,
@@ -658,6 +669,34 @@ export function useDeleteGeneration() {
     onError: (error: Error) => {
       console.error('Error deleting generation:', error);
       toast.error(error.message || 'Failed to delete generation');
+    },
+  });
+}
+
+/**
+ * Delete a variant from generation_variants table.
+ * Use this for edit tools (edit-images, edit-video, character-animate) that create variants.
+ */
+export function useDeleteVariant() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('generation_variants')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        throw new Error(`Failed to delete variant: ${error.message}`);
+      }
+    },
+    onSuccess: (data, variables) => {
+      // Variant deletion events are handled by DataFreshnessManager via realtime events
+    },
+    onError: (error: Error) => {
+      console.error('Error deleting variant:', error);
+      toast.error(error.message || 'Failed to delete variant');
     },
   });
 }

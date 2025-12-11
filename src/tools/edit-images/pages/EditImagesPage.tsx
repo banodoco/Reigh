@@ -8,7 +8,7 @@ import { ReighLoading } from '@/shared/components/ReighLoading';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { InlineEditView } from '../components/InlineEditView';
-import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteVariant } from '@/shared/hooks/useGenerations';
 import ImageGallery from '@/shared/components/ImageGallery';
 import { useListShots } from '@/shared/hooks/useShots';
 import { cn } from '@/shared/lib/utils';
@@ -45,11 +45,11 @@ export default function EditImagesPage() {
   const isMobile = useIsMobile();
   const { data: shots } = useListShots(selectedProjectId);
   
-  // Delete mutation for gallery items
-  const deleteGenerationMutation = useDeleteGeneration();
-  const handleDeleteGeneration = useCallback((id: string) => {
-    deleteGenerationMutation.mutate(id);
-  }, [deleteGenerationMutation]);
+  // Delete mutation for gallery items (uses variants table for edit tools)
+  const deleteVariantMutation = useDeleteVariant();
+  const handleDeleteVariant = useCallback((id: string) => {
+    deleteVariantMutation.mutate(id);
+  }, [deleteVariantMutation]);
   
   // Track if we've already loaded from settings to prevent re-loading
   const hasLoadedFromSettings = useRef(false);
@@ -319,8 +319,8 @@ export default function EditImagesPage() {
             totalCount={(resultsData as any)?.total || 0}
             onServerPageChange={setResultsPage}
             serverPage={resultsPage}
-            onDelete={handleDeleteGeneration}
-            isDeleting={deleteGenerationMutation.isPending ? deleteGenerationMutation.variables as string : null}
+            onDelete={handleDeleteVariant}
+            isDeleting={deleteVariantMutation.isPending ? deleteVariantMutation.variables as string : null}
             showDownload={true}
             showShare={false}
             showEdit={false}

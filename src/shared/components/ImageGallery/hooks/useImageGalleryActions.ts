@@ -279,19 +279,28 @@ export const useImageGalleryActions = ({
 
       xhr.onload = function() {
         if (this.status === 200) {
-          const blobContentType = this.getResponseHeader('content-type') || originalContentType || (isVideo ? 'video/webm' : 'image/png');
+          // Priority: stored content type > response header > fallback
+          // Stored content type is most reliable (from database)
+          const responseContentType = this.getResponseHeader('content-type');
+          const blobContentType = originalContentType || responseContentType || (isVideo ? 'video/mp4' : 'image/png');
           const blob = new Blob([this.response], { type: blobContentType });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.style.display = 'none';
           a.href = url;
           
-          // Attempt to get a better filename extension
+          // Get file extension from content type
           let fileExtension = blobContentType.split('/')[1];
+          // Clean up extension - remove codec info (e.g., "mp4; codecs=..." -> "mp4")
+          if (fileExtension) {
+            fileExtension = fileExtension.split(';')[0].trim();
+          }
           if (!fileExtension || fileExtension === 'octet-stream') {
             // Fallback to guessing from URL or defaulting
-            const urlParts = accessibleImageUrl.split('.');
-            fileExtension = urlParts.length > 1 ? urlParts.pop()! : (isVideo ? 'webm' : 'png');
+            // Strip query params from URL before extracting extension
+            const urlWithoutParams = accessibleImageUrl.split('?')[0];
+            const urlParts = urlWithoutParams.split('.');
+            fileExtension = urlParts.length > 1 ? urlParts.pop()! : (isVideo ? 'mp4' : 'png');
           }
           const downloadFilename = filename.includes('.') ? filename : `${filename}.${fileExtension}`;
           a.download = downloadFilename;

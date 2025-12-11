@@ -41,6 +41,7 @@ export interface GeneratedImageWithMetadata {
   error?: string;
   file?: File;
   isVideo?: boolean;
+  contentType?: string; // MIME type for proper download file extensions (e.g., 'video/mp4', 'image/png')
   unsaved?: boolean;
   createdAt?: string;
   updatedAt?: string | null;

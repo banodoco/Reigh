@@ -13,7 +13,7 @@ import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { CharacterAnimateSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { createCharacterAnimateTask } from '@/shared/lib/tasks/characterAnimate';
-import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { SKELETON_COLUMNS } from '@/shared/components/ImageGallery/utils';
@@ -117,6 +117,12 @@ const CharacterAnimatePage: React.FC = () => {
   const videosLoading = generationsQuery.isLoading;
   const videosFetching = generationsQuery.isFetching;
   const videosError = generationsQuery.error;
+  
+  // Delete mutation for gallery items
+  const deleteGenerationMutation = useDeleteGeneration();
+  const handleDeleteGeneration = useCallback((id: string) => {
+    deleteGenerationMutation.mutate(id);
+  }, [deleteGenerationMutation]);
   
   // Clear videosViewJustEnabled flag when data loads
   useEffect(() => {
@@ -949,6 +955,8 @@ const CharacterAnimatePage: React.FC = () => {
                   allShots={[]}
                   onAddToLastShot={async () => false} // No-op for video gallery
                   onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
+                  onDelete={handleDeleteGeneration}
+                  isDeleting={deleteGenerationMutation.isPending ? deleteGenerationMutation.variables as string : null}
                   currentToolType="character-animate"
                   initialMediaTypeFilter="video"
                   initialToolTypeFilter={true}

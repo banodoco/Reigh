@@ -804,6 +804,7 @@ serve(async (req) => {
                   source_variant_id: taskData.params?.source_variant_id || null, // Track which variant this was edited from
                   created_from: taskData.task_type,
                   tool_type: toolType,
+                  content_type: contentType, // Include for download/display purposes
                 };
 
                 // Determine variant type based on task type
@@ -1597,11 +1598,16 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
 /**
  * Build generation params starting from normalized task params
  */
-function buildGenerationParams(baseParams: any, toolType: string, shotId?: string, thumbnailUrl?: string): any {
+function buildGenerationParams(baseParams: any, toolType: string, contentType?: string, shotId?: string, thumbnailUrl?: string): any {
   let generationParams = { ...baseParams };
 
   // Add tool_type to the params JSONB
   generationParams.tool_type = toolType;
+
+  // Add content_type to params for download/display purposes
+  if (contentType) {
+    generationParams.content_type = contentType;
+  }
 
   // Add shot_id if present and valid
   if (shotId) {
@@ -2233,10 +2239,11 @@ async function createGenerationFromTask(
     const generationType = taskData.content_type || 'image'; // Default to image if not set
     console.log(`[GenMigration] Using content_type for generation: ${generationType}`);
 
-    // Build generation params
+    // Build generation params - include content_type for download/display purposes
     const generationParams = buildGenerationParams(
       taskData.params,
       taskData.tool_type,
+      generationType, // content_type: 'image' or 'video'
       shotId,
       thumbnailUrl || undefined
     );

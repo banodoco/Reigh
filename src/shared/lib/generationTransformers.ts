@@ -146,6 +146,19 @@ export function transformGeneration(
   const taskId = extractTaskId(item.tasks);
   const prompt = extractPrompt(item.params);
   
+  // Extract content_type from params for proper download file extensions
+  // Stored as 'image' or 'video', convert to MIME type
+  const storedContentType = item.params?.content_type;
+  const isVideo = item.type?.includes('video') || storedContentType === 'video' || false;
+  let contentType: string | undefined;
+  if (storedContentType === 'video') {
+    // Default to mp4 for videos, can be overridden by URL extension
+    contentType = 'video/mp4';
+  } else if (storedContentType === 'image') {
+    // Default to png for images, can be overridden by URL extension  
+    contentType = 'image/png';
+  }
+  
   // Base transformation - fields common to all generations
   const baseItem: GeneratedImageWithMetadata = {
     id: item.id,
@@ -160,7 +173,8 @@ export function transformGeneration(
     },
     createdAt: item.created_at,
     updatedAt: item.updated_at,
-    isVideo: item.type?.includes('video') || false,
+    isVideo,
+    contentType, // For proper download file extensions
     starred: item.starred || false,
     based_on: item.based_on, // Top level for easy access
     position: null, // Will be set if shot context provided

@@ -224,7 +224,7 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
   const { localStarred, toggleStarMutation, handleToggleStar } = starToggleHook;
 
   const handleDownload = async () => {
-    await downloadMedia(effectiveImageUrl, media.id, isVideo);
+    await downloadMedia(effectiveImageUrl, media.id, isVideo, media.contentType);
   };
 
   useEffect(() => {
