@@ -116,6 +116,7 @@ export interface JoinClipsTaskParams {
   tool_type?: string; // Tool type identifier for filtering results
   use_input_video_resolution?: boolean; // Use first input video's resolution instead of project resolution
   use_input_video_fps?: boolean; // Use first input video's FPS instead of downsampling to 16fps (default: false)
+  vid2vid_init_strength?: number; // Adds noise to input video frames (0 = disabled, higher = more noise/creative freedom)
   
   // Video edit mode - for regenerating portions of a single video
   video_edit_mode?: boolean;
@@ -338,6 +339,10 @@ function buildJoinClipsPayload(
 
   if (params.use_input_video_fps !== undefined) {
     orchestratorDetails.use_input_video_fps = params.use_input_video_fps;
+  }
+
+  if (params.vid2vid_init_strength !== undefined && params.vid2vid_init_strength > 0) {
+    orchestratorDetails.vid2vid_init_strength = params.vid2vid_init_strength;
   }
 
   // Keep additional_loras for backward compatibility, but LoRAs are now primarily in phase_config

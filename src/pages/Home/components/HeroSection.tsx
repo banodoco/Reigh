@@ -410,7 +410,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       }`}
                       style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
                     >
-                      <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-primary/40 dark:via-wes-vintage-gold/20 to-transparent pointer-events-none -rotate-45" />
                       <CTAContent 
                         icon={platformInstall.showInstallCTA ? platformInstall.ctaIcon : 'paintbrush'}
                         text={platformInstall.showInstallCTA ? platformInstall.ctaText : 'Go to Tools'}
@@ -461,7 +460,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       }`}
                       style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
                     >
-                      <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-primary/40 dark:via-wes-vintage-gold/20 to-transparent pointer-events-none -rotate-45" />
                       <CTAContent 
                         icon={platformInstall.showInstallCTA ? platformInstall.ctaIcon : 'paintbrush'}
                         text={platformInstall.showInstallCTA ? platformInstall.ctaText : 'Sign in with Discord'}

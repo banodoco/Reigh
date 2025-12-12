@@ -19,6 +19,7 @@ export const joinClipsSettings = {
     enhancePrompt: true, // AI enhancement of prompts
     useInputVideoResolution: false, // Use first input video's resolution instead of project resolution
     useInputVideoFps: false, // Use first input video's FPS instead of downsampling to 16fps
+    noisedInputVideo: 0, // vid2vid init strength - adds noise to input video (0 = disabled)
     // Legacy two-video format (kept for backward compatibility)
     startingVideoUrl: undefined as string | undefined,
     startingVideoPosterUrl: undefined as string | undefined,

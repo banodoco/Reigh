@@ -102,6 +102,10 @@ export interface JoinClipsSettingsFormProps {
     /** Whether to show the FPS toggle (16fps vs input video fps) */
     showFpsToggle?: boolean;
     
+    // Noised input video (vid2vid init strength)
+    noisedInputVideo?: number;
+    setNoisedInputVideo?: (val: number) => void;
+    
     // LoRA props
     availableLoras: LoraModel[];
     projectId: string | null;
@@ -648,6 +652,8 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     useInputVideoFps,
     setUseInputVideoFps,
     showFpsToggle = false,
+    noisedInputVideo = 0,
+    setNoisedInputVideo,
     availableLoras,
     projectId,
     loraPersistenceKey,
@@ -892,8 +898,8 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                             </TooltipProvider>
                         </div>
 
-                        {/* Advanced Settings (Resolution & FPS) */}
-                        {(showResolutionToggle || showFpsToggle) && (
+                        {/* Advanced Settings (Resolution, FPS, Noised Input) */}
+                        {(showResolutionToggle || showFpsToggle || setNoisedInputVideo) && (
                             <Collapsible 
                                 open={isAdvancedOpen} 
                                 onOpenChange={setIsAdvancedOpen}
@@ -979,6 +985,39 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                                             </TooltipContent>
                                                         </Tooltip>
                                                     </TooltipProvider>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Noised Input Video */}
+                                            {setNoisedInputVideo && (
+                                                <div className="space-y-3 col-span-2 mt-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Label className="text-sm font-medium flex items-center gap-1 cursor-help">
+                                                                        Noised Input Video
+                                                                        <Info className="w-3 h-3 text-muted-foreground" />
+                                                                    </Label>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p className="max-w-xs text-xs">
+                                                                        Controls how much the original gap frames influence generation. Lower values preserve more of the original motion/structure; higher values allow more creative regeneration.
+                                                                    </p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                        <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{noisedInputVideo.toFixed(2)}</span>
+                                                    </div>
+                                                    <Slider
+                                                        id="join-noised-input"
+                                                        min={0}
+                                                        max={1}
+                                                        step={0.05}
+                                                        value={[noisedInputVideo]}
+                                                        onValueChange={(values) => setNoisedInputVideo(values[0])}
+                                                        className="py-2"
+                                                    />
                                                 </div>
                                             )}
                                         </div>

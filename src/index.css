@@ -1403,6 +1403,25 @@
     animation: sparkleColorWave 3s linear infinite;
   }
 
+  /* Dark mode: match gold-first palette */
+  .dark .sparkle-underline::after {
+    background-image: repeating-linear-gradient(
+      to right,
+      hsl(var(--wes-vintage-gold) / 0.45) 0 2px,
+      transparent 2px 4px
+    );
+  }
+
+  .dark .sparkle-underline::before {
+    background-image: linear-gradient(
+      90deg,
+      hsl(var(--wes-vintage-gold) / 0.55),
+      hsl(var(--wes-vintage-gold)),
+      hsl(var(--wes-vintage-gold) / 0.75),
+      hsl(var(--wes-vintage-gold) / 0.55) /* Loop back */
+    );
+  }
+
   .sparkle-underline:hover::before {
     opacity: 1; /* Fade in on hover */
   }

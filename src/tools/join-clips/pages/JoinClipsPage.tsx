@@ -411,6 +411,7 @@ const JoinClipsPage: React.FC = () => {
     enhancePrompt = true,
     useInputVideoResolution = false,
     useInputVideoFps = false,
+    noisedInputVideo = 0,
   } = joinSettings.settings;
   
   // Debug: Log enhancePrompt value
@@ -1244,6 +1245,7 @@ const JoinClipsPage: React.FC = () => {
         use_input_video_fps: useInputVideoFps,
         ...(lorasForTask.length > 0 && { loras: lorasForTask }),
         ...(resolutionTuple && { resolution: resolutionTuple }),
+        ...(noisedInputVideo > 0 && { vid2vid_init_strength: noisedInputVideo }),
       };
       
       console.log('[JoinClips] Creating task with params:', taskParams);
@@ -1479,6 +1481,8 @@ const JoinClipsPage: React.FC = () => {
                             useInputVideoFps={useInputVideoFps}
                             setUseInputVideoFps={(val) => joinSettings.updateField('useInputVideoFps', val)}
                             showFpsToggle={true}
+                            noisedInputVideo={noisedInputVideo}
+                            setNoisedInputVideo={(val) => joinSettings.updateField('noisedInputVideo', val)}
                             availableLoras={availableLoras}
                             projectId={selectedProjectId}
                             loraPersistenceKey="join-clips"
@@ -1523,6 +1527,7 @@ const JoinClipsPage: React.FC = () => {
                                 enhancePrompt: true,
                                 useInputVideoResolution: false,
                                 useInputVideoFps: false,
+                                noisedInputVideo: 0,
                               });
                               // Clear LoRAs
                               loraManager.setSelectedLoras([]);

@@ -16,6 +16,9 @@ const DEFAULT_JOIN_CLIPS_SETTINGS: JoinClipsSettings = {
   randomSeed: true,
   useIndividualPrompts: false,
   enhancePrompt: true,
+  useInputVideoResolution: false,
+  useInputVideoFps: false,
+  noisedInputVideo: 0,
   // Legacy two-video format
   startingVideoUrl: undefined,
   startingVideoPosterUrl: undefined,
