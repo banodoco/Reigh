@@ -119,3 +119,4 @@ CREATE POLICY "Service role only" ON rate_limits
 -- SELECT cron.schedule('cleanup-rate-limits', '0 * * * *', 'SELECT cleanup_old_rate_limits()');
 
 COMMIT;
+

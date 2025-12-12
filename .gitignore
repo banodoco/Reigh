@@ -47,3 +47,7 @@ temp/
 # Python cache
 __pycache__/
 *.pyc
+
+# Supabase CLI artifacts
+supabase/.temp/
+supabase/.branches/

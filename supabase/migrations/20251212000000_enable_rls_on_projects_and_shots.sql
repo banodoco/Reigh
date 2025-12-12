@@ -174,3 +174,4 @@ BEGIN
   RAISE NOTICE '✅ SECURITY FIX APPLIED: RLS enabled on projects, shots, and shot_generations';
   RAISE NOTICE '✅ All ownership policies created successfully';
 END $$;
+
