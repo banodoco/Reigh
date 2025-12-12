@@ -4,10 +4,10 @@ import usePersistentState from './usePersistentState';
 /**
  * Hook to manage dark mode state with persistence.
  * Applies the 'dark' class to document.documentElement when enabled.
- * Defaults to light mode (false) for new users.
+ * Defaults to dark mode (true) for new users.
  */
 export function useDarkMode() {
-  const [darkMode, setDarkMode] = usePersistentState<boolean>('dark-mode', false);
+  const [darkMode, setDarkMode] = usePersistentState<boolean>('dark-mode', true);
 
   useEffect(() => {
     if (darkMode) {

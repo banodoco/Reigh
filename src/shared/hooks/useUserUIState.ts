@@ -32,7 +32,7 @@ interface UISettings {
     generationsPublic: boolean;
   };
   theme: {
-    darkMode: boolean; // Defaults to false (light mode) for new users
+    darkMode: boolean; // Defaults to true (dark mode) for new users
   };
 }
 

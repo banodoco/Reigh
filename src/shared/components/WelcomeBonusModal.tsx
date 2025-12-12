@@ -511,7 +511,7 @@ const ThemeStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   // Also persist to database for cross-device sync
   const { 
     update: updateThemePreference 
-  } = useUserUIState('theme', { darkMode: false });
+  } = useUserUIState('theme', { darkMode: true });
 
   const handleThemeChange = (isDark: boolean) => {
     setDarkMode(isDark);
