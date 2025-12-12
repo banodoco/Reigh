@@ -3,6 +3,19 @@
 - Find and use common components in `src/shared/` before creating new ones.
 - After each change, ask yourself "Did I unintentionally delete or edit something out of scope?"
 
+# Code Quality Review
+When reading or modifying code, proactively flag potential issues:
+- **Duplication**: Similar logic in multiple places that should be abstracted
+- **God components**: Files doing too much (>300 lines is a warning sign)
+- **Prop drilling**: Props passed through 3+ levels - consider context or composition
+- **Mixed concerns**: UI logic mixed with business logic, or data fetching in presentation components
+- **Inconsistent patterns**: Code that doesn't follow established patterns in the codebase
+- **Missing error handling**: Async operations without proper error boundaries or catches
+- **Stale abstractions**: Utilities/components that exist but aren't used consistently
+- **Naming issues**: Unclear or misleading names that don't reflect actual behavior
+
+Mention these as brief observations (e.g., "Note: this file is getting large, might want to split out X") - don't derail the task, just flag for awareness.
+
 # Key Concepts
 - **Generations vs Variants**: A `generation` is a standalone image/video in the gallery. A `variant` belongs to a generation (shown in variant selector). Use `based_on` for lineage tracking.
 - **Task creation**: Use helpers in `src/shared/lib/tasks/` (e.g., `imageInpaint.ts`, `magicEdit.ts`). Tasks are processed by workers, completed via `complete_task` edge function. See `docs/structure_detail/unified_task_creation.md`.

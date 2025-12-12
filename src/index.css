@@ -193,6 +193,10 @@
     /* SEMANTIC COLORS - DARK MODE               */
     /* ========================================= */
     
+    /* Wes Anderson palette - darker/more saturated for dark mode */
+    --wes-vintage-gold: 40 70% 55%;         /* More saturated, darker gold */
+    --wes-coral: 10 80% 60%;                /* More saturated, darker coral */
+    
     /* Core backgrounds */
     --background: 150 30% 15%;              /* Dark Forest */
     --foreground: 120 25% 90%;              /* Light Pastel Green */
@@ -275,34 +279,6 @@
     position: relative;
   }
 
-  /* Starlight overlay */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-      linear-gradient(45deg, transparent 98%, hsl(var(--accent) / 0.05) 100%),
-      linear-gradient(-45deg, transparent 98%, hsl(var(--secondary) / 0.03) 100%);
-    background-size: 4px 4px;
-    pointer-events: none;
-    z-index: 1000;
-    opacity: 0.6;
-    animation: dreamyShimmer 3s ease-in-out infinite;
-  }
-
-  /* Spotlight effect */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-      radial-gradient(ellipse at 30% 20%, hsl(var(--accent) / 0.03) 0%, transparent 40%),
-      radial-gradient(ellipse at 70% 80%, hsl(var(--wes-pink) / 0.02) 0%, transparent 50%);
-    pointer-events: none;
-    z-index: 999;
-    opacity: 0.8;
-    animation: gentleSpotlight 6s ease-in-out infinite alternate;
-  }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--theme-font-family, 'Cocogoose', 'Inter', sans-serif);

@@ -7,7 +7,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/shared/components/ui/use-toast';
 import { useReferralTracking } from '@/shared/hooks/useReferralTracking';
 import { DecorativeBackground } from '@/shared/components/DecorativeBackground';
-import { WatercolorCorners } from '@/shared/components/WatercolorCorners';
 import { ConstellationCanvas } from '@/shared/components/ConstellationCanvas';
 import { useDebounce } from '@/shared/hooks/use-debounce';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -319,7 +318,6 @@ export default function HomePage() {
   return (
     <div className="wes-texture relative min-h-screen">
       <DecorativeBackground />
-      <WatercolorCorners />
       <ConstellationCanvas />
 
       <HeroSection 

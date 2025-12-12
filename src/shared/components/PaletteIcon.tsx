@@ -104,17 +104,21 @@ export const PaletteIcon: React.FC<PaletteIconProps> = ({ className = "" }) => {
       'flex items-center justify-center',
       'w-12 h-12 md:w-[4.2rem] md:h-[4.2rem]',
       'bg-gradient-to-br from-wes-coral/60 via-wes-salmon/60 to-wes-vintage-gold/60',
+      'dark:bg-transparent dark:from-transparent dark:via-transparent dark:to-transparent',
       'rounded-lg border border-wes-vintage-gold/20',
+      'dark:border-2 dark:border-wes-vintage-gold/50',
+      'dark:hover:border-wes-vintage-gold dark:hover:bg-wes-vintage-gold/10',
       'shadow-sm opacity-90',
+      'dark:shadow-none',
       'group group-hover:opacity-100',
       'cursor-pointer',
-      'transition-opacity duration-300 transition-transform duration-300'
+      'transition-all duration-300'
     ];
 
     const conditionalClasses = [
       isDehovering && 'dehovering',
       isHovering && 'is-hovering',
-      showQuote && 'ring-2 ring-wes-vintage-gold/40 shadow-lg'
+      showQuote && 'ring-2 ring-wes-vintage-gold/40 shadow-lg dark:shadow-[0_0_15px_rgba(196,164,106,0.3)] dark:ring-wes-vintage-gold/60'
     ].filter(Boolean);
 
     return [...baseClasses, ...conditionalClasses].join(' ');
@@ -125,7 +129,8 @@ export const PaletteIcon: React.FC<PaletteIconProps> = ({ className = "" }) => {
       'palette-icon',
       'h-6 w-6 md:h-[2.1rem] md:w-[2.1rem]',
       'text-white/90',
-      'transition-transform duration-300',
+      'dark:text-wes-vintage-gold/70 dark:group-hover:text-wes-vintage-gold',
+      'transition-all duration-300',
       'group-hover:rotate-3 group-hover:scale-105'
     ];
 
@@ -206,8 +211,8 @@ const QuoteModal: React.FC<QuoteModalProps> = ({
     ];
 
     const positionClasses = tooltipBelow
-      ? ['-top-3 origin-top bg-gradient-to-b from-wes-vintage-gold/80 to-wes-cream']
-      : ['-bottom-3 origin-bottom bg-gradient-to-t from-wes-vintage-gold/80 to-wes-cream'];
+      ? ['-top-3 origin-top bg-gradient-to-b from-wes-vintage-gold/80 to-wes-cream dark:to-wes-vintage-gold/20']
+      : ['-bottom-3 origin-bottom bg-gradient-to-t from-wes-vintage-gold/80 to-wes-cream dark:to-wes-vintage-gold/20'];
 
     const scaleClasses = [
       !isQuoteClosing ? 'scale-y-100' : 'scale-y-0'
@@ -240,10 +245,13 @@ const QuoteModal: React.FC<QuoteModalProps> = ({
     const baseClasses = [
       'group flex flex-col items-center gap-2',
       'text-center p-6 w-full border-2',
-      'bg-wes-cream rounded-lg shadow-md cursor-pointer',
+      'bg-wes-cream dark:!bg-zinc-900/95 dark:backdrop-blur-sm rounded-lg shadow-md cursor-pointer',
+      'dark:border-wes-vintage-gold/30',
       'transition-all duration-300',
       'hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10',
+      'dark:hover:from-wes-vintage-gold/5 dark:hover:via-wes-vintage-gold/10 dark:hover:to-wes-vintage-gold/5',
       'hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1',
+      'dark:hover:shadow-[0_0_30px_rgba(196,164,106,0.15)]',
       'relative'
     ];
 
@@ -285,7 +293,7 @@ const QuoteModal: React.FC<QuoteModalProps> = ({
             Practice any art
           </span>
           —music, singing, dancing, acting, drawing, painting, sculpting, poetry, fiction, essays, reportage—
-          <span className="not-italic font-light text-wes-forest">
+          <span className="not-italic font-light text-wes-forest dark:text-emerald-400/80">
             no matter how well or badly
           </span>
           , not to get money and fame, but to{' '}

@@ -10,6 +10,43 @@ interface UseShareGenerationResult {
 }
 
 /**
+ * Sanitize task data before caching in shared_generations
+ * Removes potentially sensitive fields from params
+ */
+function sanitizeTaskDataForSharing(taskData: any): any {
+  if (!taskData) return null;
+  
+  const sanitized = { ...taskData };
+
+  const redactDeep = (value: any, depth: number = 0): any => {
+    if (depth > 6) return null;
+    if (value == null) return value;
+    if (Array.isArray(value)) return value.map((v) => redactDeep(v, depth + 1));
+    if (typeof value !== 'object') return value;
+
+    const out: any = {};
+    for (const [k, v] of Object.entries(value)) {
+      // Strip any obviously sensitive keys
+      if (/(api[_-]?key|token|secret|password|service_role|authorization|stripe)/i.test(k)) {
+        continue;
+      }
+      out[k] = redactDeep(v, depth + 1);
+    }
+    return out;
+  };
+  
+  // Remove or sanitize sensitive fields from params
+  if (sanitized.params) {
+    sanitized.params = redactDeep(sanitized.params);
+  }
+  
+  // Remove fields that shouldn't be exposed
+  delete sanitized.error_message; // Could contain internal details
+  
+  return sanitized;
+}
+
+/**
  * Hook to handle sharing of generations via unique slug
  */
 export function useShareGeneration(
@@ -131,10 +168,16 @@ export function useShareGeneration(
         return;
       }
 
-      // Share doesn't exist, fetch full data to create it
+      // Share doesn't exist, fetch only the fields needed for display
       const [generationResult, taskResult] = await Promise.all([
-        supabase.from('generations').select('*').eq('id', generationId).single(),
-        supabase.from('tasks').select('*').eq('id', taskId).single()
+        supabase.from('generations')
+          .select('id, location, thumbnail_url, type, params, created_at, name')
+          .eq('id', generationId)
+          .single(),
+        supabase.from('tasks')
+          .select('id, task_type, params, status, created_at')
+          .eq('id', taskId)
+          .single()
       ]);
 
       if (generationResult.error || taskResult.error) {
@@ -178,7 +221,7 @@ export function useShareGeneration(
             creator_name: (creatorRow as any)?.name ?? null,
             creator_avatar_url: (creatorRow as any)?.avatar_url ?? null,
             cached_generation_data: generationResult.data,
-            cached_task_data: taskResult.data,
+            cached_task_data: sanitizeTaskDataForSharing(taskResult.data),
           })
           .select('share_slug')
           .single();

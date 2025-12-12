@@ -186,7 +186,7 @@ const Layout: React.FC = () => {
       <div className="flex flex-col">
         <ScrollToTop />
         {/* Theme-adaptive background gradient */}
-        <div className="fixed inset-0 bg-gradient-to-br from-[hsl(var(--color-surface))] via-[hsl(var(--color-surface-bright))] to-[hsl(var(--color-tertiary)_/_0.1)] opacity-60 pointer-events-none"></div>
+        <div className="fixed inset-0 bg-gradient-to-br from-background via-secondary/30 to-accent/10 opacity-60 pointer-events-none"></div>
         
         <GlobalHeader 
           contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 16} 

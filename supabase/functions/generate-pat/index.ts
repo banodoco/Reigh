@@ -17,17 +17,12 @@ function jsonResponse(body: any, status = 200) {
   });
 }
 
-// Generate a random 24-character token
+// Generate a cryptographically secure random 32-character token
 function generateToken(): string {
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  
-  for (let i = 0; i < 24; i++) {
-    const randomIndex = Math.floor(Math.random() * charset.length);
-    token += charset[randomIndex];
-  }
-  
-  return token;
+  const randomValues = new Uint8Array(32);
+  crypto.getRandomValues(randomValues);
+  return Array.from(randomValues, (v) => charset[v % charset.length]).join('');
 }
 
 serve(async (req) => {
@@ -66,7 +61,7 @@ serve(async (req) => {
 
     const { label } = await req.json();
 
-    // Generate a simple 24-character token
+    // Generate a cryptographically secure 32-character token
     const apiToken = generateToken();
 
     // Store token metadata

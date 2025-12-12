@@ -519,6 +519,27 @@ export const VideoItem = React.memo<VideoItemProps>(({
   };
 
   /**
+   * Sanitize task data before caching in shared_generations
+   * Removes potentially sensitive fields from params
+   */
+  const sanitizeTaskDataForSharing = (taskData: any): any => {
+    if (!taskData) return null;
+    
+    const sanitized = { ...taskData };
+    
+    if (sanitized.params) {
+      const sanitizedParams = { ...sanitized.params };
+      delete sanitizedParams.api_key;
+      delete sanitizedParams.internal_config;
+      delete sanitizedParams.worker_config;
+      sanitized.params = sanitizedParams;
+    }
+    
+    delete sanitized.error_message;
+    return sanitized;
+  };
+
+  /**
    * Handle share button click - create share link or copy existing
    * Optimized to avoid Edge Function - handles everything client-side
    */
@@ -617,10 +638,16 @@ export const VideoItem = React.memo<VideoItemProps>(({
         return;
       }
 
-      // Fetch full generation and task data for caching
+      // Fetch only the fields needed for display (not sensitive data)
       const [generationResult, taskResult] = await Promise.all([
-        supabase.from('generations').select('*').eq('id', video.id as string).single(),
-        supabase.from('tasks').select('*').eq('id', taskMapping.taskId).single()
+        supabase.from('generations')
+          .select('id, location, thumbnail_url, type, params, created_at, name')
+          .eq('id', video.id as string)
+          .single(),
+        supabase.from('tasks')
+          .select('id, task_type, params, status, created_at')
+          .eq('id', taskMapping.taskId)
+          .single()
       ]);
 
       if (generationResult.error || taskResult.error) {
@@ -664,7 +691,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
             creator_name: (creatorRow as any)?.name ?? null,
             creator_avatar_url: (creatorRow as any)?.avatar_url ?? null,
             cached_generation_data: generationResult.data,
-            cached_task_data: taskResult.data,
+            cached_task_data: sanitizeTaskDataForSharing(taskResult.data),
           })
           .select('share_slug')
           .single();

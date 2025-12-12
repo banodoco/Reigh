@@ -31,15 +31,12 @@ export function useWelcomeBonus() {
           return;
         }
 
-        // Check if user is eligible for welcome bonus by querying users table directly
-        // First let's see what columns are available
+        // Check if user is eligible for welcome bonus - only fetch the field we need
         const { data: userData, error } = await supabase
           .from('users')
-          .select('*')
+          .select('given_credits')
           .eq('id', user.id)
           .single();
-        
-        console.log('[WelcomeBonus] Query result:', { userData, error });
         
         if (error) {
           console.log('[WelcomeBonus] Query error:', error);

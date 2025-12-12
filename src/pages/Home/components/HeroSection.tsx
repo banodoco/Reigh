@@ -269,7 +269,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               
               {/* Main title */}
               <div style={getFadeStyle(0.5, 20)}>
-                <h1 className="font-theme text-6xl md:text-8xl font-theme-heading text-primary mb-8 text-shadow-vintage">
+                <h1 className="font-theme text-6xl md:text-8xl font-theme-heading text-primary dark:text-wes-vintage-gold mb-8 text-shadow-vintage dark:text-shadow-none">
                   Reigh
                 </h1>
               </div>
@@ -285,7 +285,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div className="absolute inset-0 bg-muted/20 rounded-full"></div>
             {/* Loaded bar - always full width now */}
             <div 
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full shadow-inner-vintage ease-out"
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-wes-pink to-wes-vintage-gold dark:from-wes-vintage-gold/60 dark:to-wes-vintage-gold/40 rounded-full shadow-inner-vintage dark:shadow-none ease-out"
               style={{ 
                 width: barWidth, 
                 transition: 'width 0.8s cubic-bezier(0.22, 1, 0.36, 1)' 
@@ -320,7 +320,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         side="top"
                         align="center"
                         onClick={handleOpenToolActivate}
-                        className="group flex items-center gap-2 text-left p-3 max-w-xs border-2 border-transparent bg-wes-cream/80 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
+                        className="group flex items-center gap-2 text-left p-3 max-w-xs border-2 border-transparent bg-wes-cream/80 dark:bg-card/95 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 dark:hover:from-primary/10 dark:hover:via-accent/10 dark:hover:to-secondary/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
                       >
                         <div className="flex-shrink-0">
                           <ChevronLeft className="hover-arrow w-6 h-6 text-wes-vintage-gold transition-transform transition-colors duration-700 ease-in-out group-hover:text-wes-coral group-hover:animate-sway-x" />
@@ -359,7 +359,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         side="top"
                         align="center"
                         onClick={handleEmergingActivate}
-                        className="group flex items-center gap-2 text-left p-4 max-w-xs min-h-[80px] border-2 border-transparent bg-wes-cream/80 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
+                        className="group flex items-center gap-2 text-left p-4 max-w-xs min-h-[80px] border-2 border-transparent bg-wes-cream/80 dark:bg-card/95 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 dark:hover:from-primary/10 dark:hover:via-accent/10 dark:hover:to-secondary/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
                       >
                         <div className="flex items-center gap-1 text-primary">
                           <img 
@@ -405,12 +405,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           navigate('/tools');
                         }
                       }}
-                      className={`flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden ${
+                      className={`flex items-center space-x-2 px-6 py-4 bg-primary hover:bg-primary/90 dark:bg-transparent dark:hover:bg-wes-vintage-gold/10 rounded-full border-2 border-primary/40 hover:border-primary/60 dark:border-wes-vintage-gold/50 dark:hover:border-wes-vintage-gold shadow-wes-vintage hover:shadow-wes-hover dark:shadow-none dark:hover:shadow-[0_0_20px_rgba(196,164,106,0.3)] text-primary-foreground dark:text-wes-vintage-gold text-lg font-light mx-auto relative overflow-hidden ${
                         platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''
                       }`}
                       style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
                     >
-                      <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
+                      <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-primary/40 dark:via-wes-vintage-gold/20 to-transparent pointer-events-none -rotate-45" />
                       <CTAContent 
                         icon={platformInstall.showInstallCTA ? platformInstall.ctaIcon : 'paintbrush'}
                         text={platformInstall.showInstallCTA ? platformInstall.ctaText : 'Go to Tools'}
@@ -456,12 +456,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           handleDiscordSignIn();
                         }
                       }}
-                      className={`flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden ${
+                      className={`flex items-center space-x-2 px-6 py-4 bg-primary hover:bg-primary/90 dark:bg-transparent dark:hover:bg-wes-vintage-gold/10 rounded-full border-2 border-primary/40 hover:border-primary/60 dark:border-wes-vintage-gold/50 dark:hover:border-wes-vintage-gold shadow-wes-vintage hover:shadow-wes-hover dark:shadow-none dark:hover:shadow-[0_0_20px_rgba(196,164,106,0.3)] text-primary-foreground dark:text-wes-vintage-gold text-lg font-light mx-auto relative overflow-hidden ${
                         platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''
                       }`}
                       style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
                     >
-                      <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none -rotate-45" />
+                      <div className="absolute -bottom-1/2 -left-1/2 w-1/2 h-[200%] group-hover:animate-pulse-sweep bg-gradient-to-r from-transparent via-primary/40 dark:via-wes-vintage-gold/20 to-transparent pointer-events-none -rotate-45" />
                       <CTAContent 
                         icon={platformInstall.showInstallCTA ? platformInstall.ctaIcon : 'paintbrush'}
                         text={platformInstall.showInstallCTA ? platformInstall.ctaText : 'Sign in with Discord'}

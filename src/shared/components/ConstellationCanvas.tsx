@@ -70,7 +70,7 @@ export const ConstellationCanvas: React.FC = () => {
           baseY: y,
           size: Math.random() * 1.5 + 0.5,
           opacity: Math.random() * 0.5 + 0.3,
-          twinkleSpeed: Math.random() * 0.02 + 0.005,
+          twinkleSpeed: Math.random() * 0.003 + 0.001,
           twinklePhase: Math.random() * Math.PI * 2,
           vx: (Math.random() - 0.5) * 0.05, // Very slow drift
           vy: (Math.random() - 0.5) * 0.05
@@ -96,8 +96,8 @@ export const ConstellationCanvas: React.FC = () => {
     };
 
     const spawnShootingStar = () => {
-      // Low probability check
-      if (Math.random() > 0.995 && shootingStarsRef.current.length < 2) {
+      // Very low probability check - roughly one every 30-60 seconds
+      if (Math.random() > 0.9998 && shootingStarsRef.current.length < 1) {
         const startX = Math.random() * canvas.width;
         const startY = Math.random() * canvas.height * 0.5; // Start in top half
         shootingStarsRef.current.push({

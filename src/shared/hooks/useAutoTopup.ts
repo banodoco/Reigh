@@ -8,9 +8,8 @@ export interface AutoTopupPreferences {
   amount: number; // in dollars
   threshold: number; // in dollars
   hasPaymentMethod: boolean;
-  customerId?: string;
-  paymentMethodId?: string;
   lastTriggered?: string;
+  // Note: Stripe IDs (customerId, paymentMethodId) are intentionally NOT exposed to frontend
 }
 
 // Fetch user's auto-top-up preferences
@@ -24,15 +23,16 @@ async function fetchAutoTopupPreferences(): Promise<AutoTopupPreferences> {
   // Try without the problematic field first, since we know it's causing 400 errors
   console.log('[AutoTopup:Hook] Fetching auto-top-up preferences for user:', user.id);
   
+  // Fetch auto-topup preferences.
+  // IMPORTANT: Stripe IDs are NOT selected client-side (column privileges revoked).
   const { data, error } = await supabase
-    .from('users')
+    .from('users' as any)
     .select(`
       auto_topup_enabled,
       auto_topup_amount,
       auto_topup_threshold,
       auto_topup_last_triggered,
-      stripe_customer_id,
-      stripe_payment_method_id
+      auto_topup_setup_completed
     `)
     .eq('id', user.id)
     .single();
@@ -43,19 +43,18 @@ async function fetchAutoTopupPreferences(): Promise<AutoTopupPreferences> {
     throw new Error(`Failed to fetch auto-top-up preferences: ${error.message}`);
   }
 
+  const row = data as any;
+  const hasPaymentMethod = !!row?.auto_topup_setup_completed;
+
   return {
-    enabled: data.auto_topup_enabled || false,
-    // For now, consider setup completed if user has both Stripe customer and payment method
-    // This handles the case where the auto_topup_setup_completed field doesn't exist yet
-    setupCompleted: data.auto_topup_setup_completed !== undefined 
-      ? data.auto_topup_setup_completed 
-      : !!(data.stripe_customer_id && data.stripe_payment_method_id),
-    amount: data.auto_topup_amount ? data.auto_topup_amount / 100 : 50, // Convert cents to dollars
-    threshold: data.auto_topup_threshold ? data.auto_topup_threshold / 100 : 10, // Convert cents to dollars
-    hasPaymentMethod: !!(data.stripe_customer_id && data.stripe_payment_method_id),
-    customerId: data.stripe_customer_id,
-    paymentMethodId: data.stripe_payment_method_id,
-    lastTriggered: data.auto_topup_last_triggered,
+    enabled: row?.auto_topup_enabled || false,
+    // Setup completed if payment method is configured
+    setupCompleted: hasPaymentMethod,
+    amount: row?.auto_topup_amount ? row.auto_topup_amount / 100 : 50, // Convert cents to dollars
+    threshold: row?.auto_topup_threshold ? row.auto_topup_threshold / 100 : 10, // Convert cents to dollars
+    hasPaymentMethod,
+    lastTriggered: row?.auto_topup_last_triggered,
+    // Note: Stripe IDs are intentionally NOT exposed to frontend
   };
 }
 
@@ -93,7 +92,7 @@ async function updateAutoTopupPreferences(params: UpdateAutoTopupParams): Promis
     timeoutMs: 20000,
   });
   
-  console.log('[AutoTopup:Hook] Edge function response:', { data, error });
+  console.log('[AutoTopup:Hook] Edge function response:', { data });
   
   if ((data as any)?.error) {
     console.error('[AutoTopup:Hook] Edge function returned error:', data);
