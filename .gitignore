@@ -43,3 +43,7 @@ temp/
 !structure_detail/*.md
 !docs/structure_detail/*.md
 !tasks/*.md
+
+# Python cache
+__pycache__/
+*.pyc
