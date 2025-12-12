@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import Stripe from "https://esm.sh/stripe@12.18.0?target=deno";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "../_shared/rateLimit.ts";
 
 // Helper for standard JSON responses with CORS headers
 function jsonResponse(body: any, status = 200) {
@@ -97,6 +98,22 @@ serve(async (req) => {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
     return jsonResponse({ error: "Authentication failed" }, 401);
+  }
+
+  // ─── 5. Rate limit check ──────────────────────────────────────────
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (serviceKey) {
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    const rateLimitResult = await checkRateLimit(
+      supabaseAdmin,
+      'stripe-checkout',
+      user.id,
+      RATE_LIMITS.expensive,
+      '[STRIPE-CHECKOUT]'
+    );
+    if (!rateLimitResult.allowed) {
+      return rateLimitResponse(rateLimitResult, RATE_LIMITS.expensive);
+    }
   }
 
   try {

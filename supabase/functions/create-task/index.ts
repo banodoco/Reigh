@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { SystemLogger } from "../_shared/systemLogger.ts";
+import { checkRateLimit, rateLimitResponse, getClientIp, RATE_LIMITS } from "../_shared/rateLimit.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const Deno: any;
@@ -165,7 +166,24 @@ serve(async (req) => {
     }
   }
 
-  // ─── 6. Determine final project_id and validate permissions ─────
+  // ─── 6. Rate limit check (skip for service role) ─────────────────
+  if (!isServiceRole && callerId) {
+    const rateLimitResult = await checkRateLimit(
+      supabaseAdmin,
+      'create-task',
+      callerId,
+      RATE_LIMITS.taskCreation,
+      '[CREATE-TASK]'
+    );
+    
+    if (!rateLimitResult.allowed) {
+      logger.warn("Rate limit exceeded", { user_id: callerId, retry_after: rateLimitResult.retryAfter });
+      await logger.flush();
+      return rateLimitResponse(rateLimitResult, RATE_LIMITS.taskCreation);
+    }
+  }
+
+  // ─── 7. Determine final project_id and validate permissions ─────
   let finalProjectId;
   if (isServiceRole) {
     if (!project_id) {

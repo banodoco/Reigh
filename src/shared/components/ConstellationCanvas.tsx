@@ -30,6 +30,7 @@ export const ConstellationCanvas: React.FC = () => {
   const shootingStarsRef = useRef<ShootingStar[]>([]);
   const animationFrameRef = useRef<number>();
   const mouseRef = useRef({ x: 0, y: 0 });
+  const smoothMouseRef = useRef({ x: 0, y: 0 }); // Smoothed mouse position for lerping
   const dimensionsRef = useRef({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export const ConstellationCanvas: React.FC = () => {
     // Initial dimensions
     dimensionsRef.current = { width: window.innerWidth, height: window.innerHeight };
     mouseRef.current = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    smoothMouseRef.current = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
     // Set canvas to full viewport size
     const resizeCanvas = () => {
@@ -116,9 +118,14 @@ export const ConstellationCanvas: React.FC = () => {
     const drawStars = (time: number) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Calculate parallax offset based on mouse
-      const parallaxX = (mouseRef.current.x - dimensionsRef.current.width / 2) * 0.02;
-      const parallaxY = (mouseRef.current.y - dimensionsRef.current.height / 2) * 0.02;
+      // Smoothly lerp towards actual mouse position (prevents jump on first hover)
+      const lerpFactor = 0.05;
+      smoothMouseRef.current.x += (mouseRef.current.x - smoothMouseRef.current.x) * lerpFactor;
+      smoothMouseRef.current.y += (mouseRef.current.y - smoothMouseRef.current.y) * lerpFactor;
+      
+      // Calculate parallax offset based on smoothed mouse position
+      const parallaxX = (smoothMouseRef.current.x - dimensionsRef.current.width / 2) * 0.02;
+      const parallaxY = (smoothMouseRef.current.y - dimensionsRef.current.height / 2) * 0.02;
 
       // Draw and update stars
       starsRef.current.forEach((star, index) => {

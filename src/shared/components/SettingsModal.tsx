@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, Globe, Lock, ChevronDown, Sun, Moon } from "lucide-react";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
@@ -116,19 +116,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [lockedHeight, setLockedHeight] = useState<number | null>(null);
   const dialogContentRef = useRef<HTMLDivElement>(null);
   
-  // Measure and lock height when modal opens on first section
-  useLayoutEffect(() => {
-    if (isOpen && settingsSection === 'app' && dialogContentRef.current && lockedHeight === null) {
-      // Small delay to let content render
-      const timer = setTimeout(() => {
-        if (dialogContentRef.current) {
-          const height = dialogContentRef.current.offsetHeight;
-          setLockedHeight(height);
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, settingsSection, lockedHeight]);
+  // Lock height immediately on open (avoid "skeleton -> real data" resize)
+  const setDialogContentNode = React.useCallback((node: HTMLDivElement | null) => {
+    dialogContentRef.current = node;
+    if (!node) return;
+    if (!isOpen) return;
+    if (lockedHeight !== null) return;
+    if (settingsSection !== 'app') return;
+    setLockedHeight(node.offsetHeight);
+  }, [isOpen, lockedHeight, settingsSection]);
   
   // Reset locked height when modal closes
   useEffect(() => {
@@ -495,11 +491,11 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        ref={dialogContentRef}
+        ref={setDialogContentNode}
         className={modal.className}
         style={{ 
           ...modal.style, 
-          ...(lockedHeight ? { height: lockedHeight, maxHeight: '90vh' } : { maxHeight: '90vh' })
+          ...(lockedHeight !== null ? { height: lockedHeight, maxHeight: '90vh', overflow: 'hidden' } : { maxHeight: '90vh' })
         }}
         {...modal.props}
       >
@@ -549,7 +545,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
         {/* Scrollable content container */}
         <div 
           ref={scrollRef}
-          className={`${modal.scrollClass} ${modal.isMobile ? 'px-2' : 'px-2'} overflow-x-visible [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}
+          className={`${modal.scrollClass} ${modal.isMobile ? 'px-2' : 'px-2'} overflow-x-hidden [scrollbar-gutter:stable_both-edges] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:[&::-webkit-scrollbar]:block sm:[-ms-overflow-style:auto] sm:[scrollbar-width:auto] sm:pr-4`}
         >
           {/* Transactions Section */}
           {settingsSection === 'transactions' && (

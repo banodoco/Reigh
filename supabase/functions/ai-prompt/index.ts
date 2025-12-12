@@ -2,7 +2,9 @@
 // @ts-nocheck
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import Groq from "npm:groq-sdk@0.26.0";
+import { checkRateLimit, rateLimitResponse, getClientIp, RATE_LIMITS } from "../_shared/rateLimit.ts";
 
 function jsonResponse(body: any, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -25,6 +27,24 @@ const groq = new Groq({ apiKey });
 serve(async (req) => {
   if (req.method === "OPTIONS") return jsonResponse({ ok: true });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+  // Rate limit by IP (this is an expensive AI endpoint)
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (supabaseUrl && serviceKey) {
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    const clientIp = getClientIp(req);
+    const rateLimitResult = await checkRateLimit(
+      supabaseAdmin,
+      'ai-prompt',
+      clientIp,
+      RATE_LIMITS.expensive,
+      '[AI-PROMPT]'
+    );
+    if (!rateLimitResult.allowed) {
+      return rateLimitResponse(rateLimitResult, RATE_LIMITS.expensive);
+    }
+  }
 
   let body: any;
   try {

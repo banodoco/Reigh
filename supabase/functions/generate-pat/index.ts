@@ -3,6 +3,7 @@
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from "../_shared/rateLimit.ts";
 
 // Helper for standard JSON responses with CORS headers
 function jsonResponse(body: any, status = 200) {
@@ -57,6 +58,18 @@ serve(async (req) => {
     
     if (authError || !user) {
       return jsonResponse({ error: 'Invalid authentication token' }, 401);
+    }
+
+    // Rate limit: max 10 PAT generations per minute per user
+    const rateLimitResult = await checkRateLimit(
+      supabaseAdmin,
+      'generate-pat',
+      user.id,
+      { maxRequests: 10, windowSeconds: 60, identifierType: 'user' },
+      '[GENERATE-PAT]'
+    );
+    if (!rateLimitResult.allowed) {
+      return rateLimitResponse(rateLimitResult, { maxRequests: 10, windowSeconds: 60, identifierType: 'user' });
     }
 
     const { label } = await req.json();
