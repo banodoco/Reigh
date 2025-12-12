@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Gift, Sparkles, ChevronRight, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart, Globe, Lock } from 'lucide-react';
+import { Gift, Sparkles, ChevronRight, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart, Globe, Lock, Sun, Moon } from 'lucide-react';
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { useDarkMode } from '@/shared/hooks/useDarkMode';
 import { useMediumModal } from '@/shared/hooks/useModal';
 import { useScrollFade } from '@/shared/hooks/useScrollFade';
 import { supabase } from '@/integrations/supabase/client';
@@ -102,7 +103,7 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         <Users className="w-4 h-4 mr-2" />
         Join Discord Community
       </Button>
-      <Button variant="outline" onClick={onNext} className="w-full">
+      <Button variant="ghost" onClick={onNext} className="w-full text-foreground/70 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-foreground">
         Continue Setup
       </Button>
     </div>
@@ -147,7 +148,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 
           {/* Skeleton for toggle switch - matches actual design */}
           <div className="flex justify-center px-4">
-            <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner min-w-fit">
+            <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-800 rounded-full p-1 shadow-inner min-w-fit">
               <div className="flex">
                 {/* In the cloud button skeleton */}
                 <div className="px-4 py-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse">
@@ -222,7 +223,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         </p>
 
         <div className="flex justify-center px-4">
-          <div className="relative inline-flex items-center bg-gray-200 rounded-full p-1 shadow-inner min-w-fit">
+          <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-800 rounded-full p-1 shadow-inner min-w-fit">
             {/* Toggle track */}
             <div className="flex">
               {/* In the cloud button */}
@@ -230,7 +231,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                 onClick={() => updateGenerationMethods({ inCloud: true, onComputer: false })}
                 className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                   inCloudChecked && !onComputerChecked
-                    ? 'bg-card dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -242,7 +243,7 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
                 onClick={() => updateGenerationMethods({ onComputer: true, inCloud: false })}
                 className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
                   onComputerChecked && !inCloudChecked
-                    ? 'bg-card dark:bg-gray-800 text-green-600 dark:text-green-400 shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 text-green-600 dark:text-green-400 shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -325,10 +326,10 @@ const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-
     </div>
     
     <div className="flex flex-col space-y-2 pt-5 pb-2">
-      <Button onClick={() => onNext('music-video')} className="w-full">
+      <Button onClick={() => onNext('music-video')} className="w-full hover:opacity-90">
         I'll do it, gimme the credits 🎵
       </Button>
-      <Button variant="ghost" onClick={() => onNext('no-thanks')} className="w-full text-muted-foreground bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700">
+      <Button variant="ghost" onClick={() => onNext('no-thanks')} className="w-full text-foreground/70 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-foreground">
         Sorry, I only make good stuff
       </Button>
     </div>
@@ -494,7 +495,7 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
         <Users className="w-4 h-4 mr-2" />
         Join Discord
       </Button>
-      <Button variant="outline" onClick={onNext} className="w-full">
+      <Button variant="ghost" onClick={onNext} className="w-full text-foreground/70 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-foreground">
         Continue Setup
       </Button>
     </div>
@@ -502,9 +503,88 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
 );
 };
 
-// Step 6: Privacy Defaults
-const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+// Step 6: Theme Selection
+const ThemeStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const colors = getStepColors(6);
+  const { darkMode, setDarkMode } = useDarkMode();
+  
+  // Also persist to database for cross-device sync
+  const { 
+    update: updateThemePreference 
+  } = useUserUIState('theme', { darkMode: true });
+
+  const handleThemeChange = (isDark: boolean) => {
+    setDarkMode(isDark);
+    updateThemePreference({ darkMode: isDark });
+  };
+
+  return (
+    <>
+      <DialogHeader className="text-center space-y-4 mb-6">
+        <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+          {darkMode ? (
+            <Moon className={`w-8 h-8 ${colors.icon}`} />
+          ) : (
+            <Sun className={`w-8 h-8 ${colors.icon}`} />
+          )}
+        </div>
+        <DialogTitle className="text-2xl font-bold text-center">
+          Choose Your Theme
+        </DialogTitle>
+      </DialogHeader>
+      
+      <div className="space-y-6">
+        <p className="text-center text-muted-foreground">
+          Which mode do you prefer? You can always change this later in settings.
+        </p>
+
+        <div className="flex justify-center px-4">
+          <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1 shadow-inner min-w-fit">
+            <div className="flex">
+              {/* Light mode button */}
+              <button
+                onClick={() => handleThemeChange(false)}
+                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none flex items-center gap-2 ${
+                  !darkMode
+                    ? 'bg-amber-400 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Sun className="h-4 w-4" />
+                Light
+              </button>
+              
+              {/* Dark mode button */}
+              <button
+                onClick={() => handleThemeChange(true)}
+                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none flex items-center gap-2 ${
+                  darkMode
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Moon className="h-4 w-4" />
+                Dark
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      
+      <div className="flex justify-center pt-5 pb-2">
+        <Button onClick={onNext} className="w-full sm:w-auto">
+          Continue
+          <ChevronRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+    </>
+  );
+};
+
+// Step 7: Privacy Defaults
+const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const colors = getStepColors(7);
   
   // Privacy defaults state using database-backed preferences
   const { 
@@ -621,9 +701,9 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 );
 };
 
-// Step 7: Setup Complete
+// Step 8: Setup Complete
 const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const colors = getStepColors(7);
+  const colors = getStepColors(8);
   
   const handleOpenSettings = () => {
     onClose();
@@ -693,7 +773,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   }, [isOpen]);
 
   const handleNext = () => {
-    setCurrentStep(prev => Math.min(prev + 1, 7));
+    setCurrentStep(prev => Math.min(prev + 1, 8));
   };
 
   const handleBack = () => {
@@ -813,15 +893,17 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
       case 5:
         return <CreditsResultStep choice={userChoice!} onNext={handleNext} shouldShowConfetti={shouldShowConfetti} onConfettiConsumed={() => setShouldShowConfetti(false)} />;
       case 6:
-        return <PrivacyDefaultsStep onNext={handleNext} />;
+        return <ThemeStep onNext={handleNext} />;
       case 7:
+        return <PrivacyDefaultsStep onNext={handleNext} />;
+      case 8:
         return <SetupCompleteStep onClose={handleClose} />;
       default:
         return <IntroductionStep onNext={handleNext} />;
     }
   };
 
-  const stepTitles = ["Welcome", "Community", "Generation", "Promise", "Credits", "Privacy", "Complete"];
+  const stepTitles = ["Welcome", "Community", "Generation", "Promise", "Credits", "Theme", "Privacy", "Complete"];
   
   return (
     <Dialog open={isOpen} onOpenChange={handleShake}>

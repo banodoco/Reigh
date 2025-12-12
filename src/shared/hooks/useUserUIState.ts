@@ -31,6 +31,9 @@ interface UISettings {
     resourcesPublic: boolean;
     generationsPublic: boolean;
   };
+  theme: {
+    darkMode: boolean;
+  };
 }
 
 // Cached settings loader to prevent duplicate database calls  
