@@ -29,9 +29,8 @@ if (import.meta.env.DEV) {
 
 // Initialize dark mode from localStorage (prevents flash of wrong theme)
 // This runs before React renders, reading directly from localStorage
-// Defaults to dark mode for new users (when no stored value exists)
 const storedDarkMode = localStorage.getItem('dark-mode');
-if (storedDarkMode === null || storedDarkMode === 'true') {
+if (storedDarkMode === 'true') {
   document.documentElement.classList.add('dark');
 }
 
