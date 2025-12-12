@@ -772,33 +772,35 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   let aspectRatioPadding = '100%'; 
   let minHeight = '120px'; // Minimum height for very small images
   
-  // Try to get dimensions from multiple sources
-  let width = image.metadata?.width;
-  let height = image.metadata?.height;
-  
-  // If not found, try to extract from resolution string
-  if (!width || !height) {
-    const resolution = (image.metadata as any)?.originalParams?.orchestrator_details?.resolution;
-    if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
-      const [w, h] = resolution.split('x').map(Number);
-      if (!isNaN(w) && !isNaN(h)) {
-        width = w;
-        height = h;
-      }
-    }
-  }
-  
-  if (width && height) {
-    const calculatedPadding = (height / width) * 100;
-    // Ensure reasonable aspect ratio bounds
-    const minPadding = 60; // Minimum 60% height (for very wide images)
-    const maxPadding = 200; // Maximum 200% height (for very tall images)
-    aspectRatioPadding = `${Math.min(Math.max(calculatedPadding, minPadding), maxPadding)}%`;
-  } else if (projectAspectRatio) {
-    // Use project aspect ratio as fallback instead of square
+  // Always use project aspect ratio for consistent gallery display
+  if (projectAspectRatio) {
     const ratio = parseRatio(projectAspectRatio);
     if (!isNaN(ratio)) {
       const calculatedPadding = (1 / ratio) * 100; // height/width * 100
+      // Ensure reasonable aspect ratio bounds
+      const minPadding = 60; // Minimum 60% height (for very wide images)
+      const maxPadding = 200; // Maximum 200% height (for very tall images)
+      aspectRatioPadding = `${Math.min(Math.max(calculatedPadding, minPadding), maxPadding)}%`;
+    }
+  } else {
+    // Fallback: try to get dimensions from image metadata if no project aspect ratio
+    let width = image.metadata?.width;
+    let height = image.metadata?.height;
+    
+    // If not found, try to extract from resolution string
+    if (!width || !height) {
+      const resolution = (image.metadata as any)?.originalParams?.orchestrator_details?.resolution;
+      if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
+        const [w, h] = resolution.split('x').map(Number);
+        if (!isNaN(w) && !isNaN(h)) {
+          width = w;
+          height = h;
+        }
+      }
+    }
+    
+    if (width && height) {
+      const calculatedPadding = (height / width) * 100;
       // Ensure reasonable aspect ratio bounds
       const minPadding = 60; // Minimum 60% height (for very wide images)
       const maxPadding = 200; // Maximum 200% height (for very tall images)
