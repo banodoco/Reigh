@@ -194,10 +194,10 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
         
         <div className={modal.footerClass}>
           <DialogFooter className={`${modal.isMobile ? 'px-4 pt-4 pb-0 flex-row justify-between' : 'px-6 pt-5 pb-0'} border-t`}>
-            <Button variant="outline" onClick={handleClose} disabled={isLoading} className={modal.isMobile ? '' : 'mr-auto'}>
+            <Button variant="retro-secondary" size="retro-sm" onClick={handleClose} disabled={isLoading} className={modal.isMobile ? '' : 'mr-auto'}>
               Cancel
             </Button>
-            <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
+            <Button variant="retro" size="retro-sm" type="submit" onClick={handleSubmit} disabled={isLoading}>
               {isLoading ? 'Creating...' : 'New Shot'}
             </Button>
           </DialogFooter>

@@ -59,7 +59,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
         </button>
         
         <div className="mb-8 pr-12 sm:pr-0 space-y-3 relative z-10">
-          <h2 className="font-theme text-2xl sm:text-3xl font-theme-heading text-primary">Reigh is an open source tool built on top of open models</h2>
+          <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary">reigh is an open source tool built on top of open models</h2>
           <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full animate-pulse-breathe"></div>
         </div>
         

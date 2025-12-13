@@ -39,9 +39,9 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
       </div>
       
       <Button 
-        size="lg" 
+        size="retro-default" 
         className="w-full max-w-md" 
-        variant={justQueued ? "success" : "default"}
+        variant={justQueued ? "success" : "retro"}
         onClick={onGenerate}
         disabled={disabled}
       >

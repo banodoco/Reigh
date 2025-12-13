@@ -952,19 +952,19 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
                 onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
               }}>
-                <SelectTrigger className="h-7 w-[100px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                <SelectTrigger variant="retro" size="sm" className="h-7 w-[100px] px-2 py-0 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
                   <SelectValue>
                     <span className="text-xs">{structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}</span>
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="flow">
+                <SelectContent variant="retro">
+                  <SelectItem variant="retro" value="flow">
                     <span className="text-xs">Optical flow</span>
                   </SelectItem>
-                  <SelectItem value="canny">
+                  <SelectItem variant="retro" value="canny">
                     <span className="text-xs">Canny</span>
                   </SelectItem>
-                  <SelectItem value="depth">
+                  <SelectItem variant="retro" value="depth">
                     <span className="text-xs">Depth</span>
                   </SelectItem>
                 </SelectContent>

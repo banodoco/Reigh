@@ -285,8 +285,10 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
             
             {/* Apply button */}
             <Button 
+              variant="retro"
+              size="retro-sm"
               onClick={handleApplySettingsFromTask}
-              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium gap-2"
+              className="flex-1 gap-2"
             >
               <CornerDownLeft className="h-4 w-4" />
               Apply Settings

@@ -253,8 +253,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               className="group flex items-center space-x-4 relative p-2 -m-2 cursor-pointer z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-2xl"
             >
               <div className="relative">
-                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:from-wes-pink/90 dark:via-wes-lavender/90 dark:to-wes-dusty-blue/90 rounded-2xl border-3 border-wes-vintage-gold/40 dark:border-wes-vintage-gold/60 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-500 wes-badge animate-reigh-color-cycle">
-                  <Palette className="h-8 w-8 text-white group-hover:rotate-12 transition-transform duration-500 drop-shadow-lg" />
+                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-4px_4px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-4px_4px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-2px_2px_0_0_rgba(180,160,100,0.4)] dark:group-hover:border-[#c9b896] group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-500">
+                  <Palette className="h-8 w-8 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] group-hover:rotate-12 transition-transform duration-500 drop-shadow-lg dark:drop-shadow-none" />
                 </div>
                 <div className="absolute -inset-1 border border-wes-vintage-gold/20 rounded-2xl animate-rotate-slow opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
                 <div className="absolute -top-2 -right-2 pointer-events-none">
@@ -269,7 +269,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               {isLoadingProjects && projects.length === 0 ? (
                 <div className="flex items-center space-x-4">
                   {/* Project Selector Skeleton */}
-                  <div className="w-[280px] h-12 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
+                  <div className="w-[280px] h-12 bg-muted animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
                 </div>
               ) : projects.length === 0 && !isLoadingProjects ? (
                 <div className="w-[280px] text-center">
@@ -284,21 +284,21 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     onValueChange={handleProjectChange}
                     disabled={isLoadingProjects || projects.length === 0}
                   >
-                    <SelectTrigger className="w-[280px] wes-select border-2 border-wes-vintage-gold/30 bg-surface/95 dark:bg-surface/80 font-cocogoose text-sm shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-12 [&>svg]:opacity-30 relative z-50">
-                      <SelectValue placeholder="Select a project" className="font-crimson text-primary" />
+                    <SelectTrigger variant="retro" className="w-[280px] h-12 relative z-50">
+                      <SelectValue placeholder="Select a project" />
                     </SelectTrigger>
-                    <SelectContent className="wes-vintage-card border-2 border-wes-vintage-gold/30 shadow-wes-deep">
+                    <SelectContent variant="retro">
                       {projects.map(project => (
                         <SelectItem 
+                          variant="retro"
                           key={project.id} 
                           value={project.id}
-                          className="font-cocogoose hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2"
                         >
                           <div className="flex items-center space-x-2">
-                            <div className="w-4 h-4 bg-gradient-to-br from-wes-mint to-wes-sage rounded-full flex items-center justify-center flex-shrink-0">
+                            <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                               <Star className="h-2 w-2 text-white flex-shrink-0" />
                             </div>
-                            <span className="font-crimson font-light text-primary truncate">
+                            <span className="truncate">
                               {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
                             </span>
                           </div>
@@ -306,17 +306,18 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                       ))}
                       {projects.length > 0 && (
                         <div className="px-2 py-2">
-                          <div className="border-t-2 border-wes-vintage-gold/30 relative">
-                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold/60 to-transparent" />
+                          <div className="border-t-2 border-[#6a8a8a]/30 dark:border-[#8a9a9a]/30 relative">
+                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6a8a8a]/40 dark:via-[#8a9a9a]/40 to-transparent" />
                           </div>
                         </div>
                       )}
                       <SelectItem 
+                        variant="retro"
                         value="create-new"
-                        className="font-cocogoose hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
+                        className="mt-1"
                       >
                         <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 bg-gradient-to-br from-wes-vintage-gold to-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
+                          <div className="w-4 h-4 bg-[#5a7a7a] dark:bg-[#7a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                             <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
                           </div>
                           <span className="font-crimson font-light text-primary">
@@ -334,10 +335,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-12 w-12 wes-button-subtle gradient-icon-coral border-2 border-wes-vintage-gold/30 shadow-wes-vintage hover:shadow-wes-hover group disabled:cursor-not-allowed"
+                className="h-12 w-12 wes-button-subtle gradient-icon-coral dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[1px] hover:translate-y-[1px] group disabled:cursor-not-allowed transition-all duration-300"
                 disabled={isLoadingProjects || !selectedProject}
               >
-                <Wrench className="h-5 w-5 text-white transition-transform duration-300 group-hover:rotate-12" />
+                <Wrench className="h-5 w-5 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] transition-transform duration-300 group-hover:rotate-12" />
               </Button>
               
               {/* Create Project Button - Always visible */}
@@ -345,9 +346,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsCreateProjectModalOpen(true)} 
-                className="h-12 w-12 wes-button-pulse gradient-icon-yellow border-2 border-wes-vintage-gold/30 shadow-wes-vintage hover:shadow-wes-hover group"
+                className="h-12 w-12 wes-button-pulse gradient-icon-yellow dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[1px] hover:translate-y-[1px] group transition-all duration-300"
               >
-                <PlusCircle className="h-5 w-5 text-white transition-transform duration-300 group-hover:scale-110" />
+                <PlusCircle className="h-5 w-5 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] transition-transform duration-300 group-hover:scale-110" />
               </Button>
             </div>
           </div>
@@ -369,13 +370,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               variant="ghost"
               size="icon"
               onClick={onOpenSettings}
-              className="h-12 w-12 no-sweep wes-button-spin-pulse gradient-icon-blue border-2 border-wes-vintage-gold/40 shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
+              className="h-12 w-12 no-sweep wes-button-spin-pulse gradient-icon-blue dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[1px] hover:translate-y-[1px] group relative overflow-hidden transition-all duration-300"
             >
               {/* Animated background pattern */}
               <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain pointer-events-none"></div>
               
               {/* Main settings icon */}
-              <Settings className="h-5 w-5 text-white relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />
+              <Settings className="h-5 w-5 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />
             </Button>
           </div>
         </div>
@@ -407,8 +408,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               >
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
-                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:from-wes-pink/90 dark:via-wes-lavender/90 dark:to-wes-dusty-blue/90 rounded-xl border-2 border-wes-vintage-gold/40 dark:border-wes-vintage-gold/60 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-300 animate-reigh-color-cycle">
-                      <Palette className="h-6 w-6 text-white group-hover:rotate-12 transition-transform duration-300 drop-shadow-lg" />
+                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-1px_1px_0_0_rgba(90,90,80,0.4)] group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-300">
+                      <Palette className="h-6 w-6 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] group-hover:rotate-12 transition-transform duration-300 drop-shadow-lg dark:drop-shadow-none" />
                     </div>
                     <div className="absolute -top-1 -right-1 pointer-events-none">
                       <Crown className="w-2.5 h-2.5 text-wes-vintage-gold animate-bounce-gentle opacity-60" />
@@ -432,10 +433,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-10 w-10 wes-button-subtle gradient-icon-coral border-2 border-wes-vintage-gold/30 shadow-wes-vintage hover:shadow-wes-hover group disabled:cursor-not-allowed"
+                className="h-10 w-10 wes-button-subtle gradient-icon-coral dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group disabled:cursor-not-allowed transition-all duration-300"
                 disabled={isLoadingProjects || !selectedProject}
               >
-                <Wrench className="h-4 w-4 text-white transition-transform duration-300 group-hover:rotate-12" />
+                <Wrench className="h-4 w-4 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] transition-transform duration-300 group-hover:rotate-12" />
               </Button>
               
               {/* Create Project Button - Always visible */}
@@ -443,9 +444,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsCreateProjectModalOpen(true)} 
-                className="h-10 w-10 wes-button-pulse gradient-icon-yellow border-2 border-wes-vintage-gold/30 shadow-wes-vintage hover:shadow-wes-hover group"
+                className="h-10 w-10 wes-button-pulse gradient-icon-yellow dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group transition-all duration-300"
               >
-                <PlusCircle className="h-4 w-4 text-white transition-transform duration-300 group-hover:scale-110" />
+                <PlusCircle className="h-4 w-4 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] transition-transform duration-300 group-hover:scale-110" />
               </Button>
             </div>
 
@@ -472,10 +473,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={onOpenSettings}
-                className="h-10 w-10 no-sweep wes-button-spin-pulse gradient-icon-blue border-2 border-wes-vintage-gold/40 shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
+                className="h-10 w-10 no-sweep wes-button-spin-pulse gradient-icon-blue dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group relative overflow-hidden transition-all duration-300"
               >
                 <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain pointer-events-none"></div>
-                <Settings className="h-4 w-4 text-white relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />
+                <Settings className="h-4 w-4 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />
               </Button>
             </div>
           </div>
@@ -484,7 +485,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           <div className="flex items-center h-20 w-full border-t border-wes-vintage-gold/20 px-4 pt-2 pb-6">
             <div className="flex-1 p-3 border-2 border-wes-vintage-gold/30 rounded-xl bg-surface/50 dark:bg-surface/30 shadow-wes-vintage relative z-40">
               {isLoadingProjects && projects.length === 0 ? (
-                <div className="w-full h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
+                <div className="w-full h-10 bg-muted animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
               ) : projects.length === 0 && !isLoadingProjects ? (
                 <div className="text-center">
                   <div className="wes-vintage-card p-2">
@@ -497,21 +498,21 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   onValueChange={handleProjectChange}
                   disabled={isLoadingProjects || projects.length === 0}
                 >
-                  <SelectTrigger className="w-full wes-select border-2 border-wes-vintage-gold/30 bg-surface/95 dark:bg-surface/80 font-cocogoose text-xs shadow-wes-vintage hover:shadow-wes-hover transition-all duration-300 h-10 [&>svg]:opacity-30 relative z-50">
-                    <SelectValue placeholder="Select project" className="font-crimson text-primary" />
+                  <SelectTrigger variant="retro" size="sm" className="w-full h-10 relative z-50">
+                    <SelectValue placeholder="Select project" />
                   </SelectTrigger>
-                  <SelectContent className="wes-vintage-card border-2 border-wes-vintage-gold/30 shadow-wes-deep">
+                  <SelectContent variant="retro">
                     {projects.map(project => (
                       <SelectItem 
+                        variant="retro"
                         key={project.id} 
                         value={project.id}
-                        className="font-cocogoose hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2"
                       >
                         <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 bg-gradient-to-br from-wes-mint to-wes-sage rounded-full flex items-center justify-center flex-shrink-0">
+                          <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                             <Star className="h-2 w-2 text-white flex-shrink-0" />
                           </div>
-                          <span className="font-crimson font-light text-primary text-sm truncate">
+                          <span className="text-sm truncate">
                             {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
                           </span>
                         </div>
@@ -519,20 +520,21 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     ))}
                     {projects.length > 0 && (
                       <div className="px-2 py-2">
-                        <div className="border-t-2 border-wes-vintage-gold/30 relative">
-                          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold/60 to-transparent" />
+                        <div className="border-t-2 border-[#6a8a8a]/30 dark:border-[#8a9a9a]/30 relative">
+                          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6a8a8a]/40 dark:via-[#8a9a9a]/40 to-transparent" />
                         </div>
                       </div>
                     )}
                     <SelectItem 
+                      variant="retro"
                       value="create-new"
-                      className="font-cocogoose hover:bg-wes-vintage-gold/20 transition-colors duration-300 p-3 pl-3 pr-8 [&>span:first-child]:left-auto [&>span:first-child]:right-2 mt-1"
+                      className="mt-1"
                     >
                       <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 bg-gradient-to-br from-wes-vintage-gold to-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
+                        <div className="w-4 h-4 bg-[#5a7a7a] dark:bg-[#7a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                           <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
                         </div>
-                        <span className="font-crimson font-light text-primary text-sm">
+                        <span className="text-sm">
                           Create New Project
                         </span>
                       </div>

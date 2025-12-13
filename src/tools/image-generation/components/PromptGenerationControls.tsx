@@ -568,6 +568,8 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           <div className="w-full sm:w-[300px] space-y-2">
             <Button 
               type="button"
+              variant="retro"
+              size="retro-sm"
               onClick={handleGenerateClick}
               disabled={!hasApiKey || isGenerating} 
               className="w-full"
@@ -575,15 +577,17 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
               {isGenerating ? 'Generating...' : 'Generate Prompts'}
             </Button>
             {onGenerateAndQueue && (
-              <button 
+              <Button 
                 type="button"
+                variant="retro-secondary"
+                size="retro-sm"
                 onClick={handleGenerateAndQueueClick}
                 disabled={!hasApiKey || isGenerating} 
-                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 py-1"
+                className="w-full"
               >
-                <Zap className="h-3.5 w-3.5" />
-                {isGenerating ? 'Generating...' : 'Generate Prompts & Queue Images'}
-              </button>
+                <Zap className="h-3.5 w-3.5 mr-1.5" />
+                {isGenerating ? 'Generating...' : 'Generate & Queue Images'}
+              </Button>
             )}
           </div>
         </div>

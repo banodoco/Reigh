@@ -905,13 +905,13 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 value={selectedTaskType || 'all'}
                 onValueChange={(value) => handleTaskTypeChange(value === 'all' ? null : value)}
               >
-                <SelectTrigger className="h-7 !text-xs bg-zinc-700/50 border-zinc-600 text-zinc-300 flex-1 min-w-0 !px-2 !justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate">
+                <SelectTrigger variant="retro-dark" size="sm" colorScheme="zinc" className="h-7 !text-xs flex-1 min-w-0">
                   <SelectValue placeholder="All task types" />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-700">
-                  <SelectItem value="all" className="!text-xs !pl-2 text-zinc-300">All task types</SelectItem>
+                <SelectContent variant="zinc">
+                  <SelectItem variant="zinc" value="all" className="!text-xs">All task types</SelectItem>
                   {taskTypeOptions.map((type) => (
-                    <SelectItem key={type.value} value={type.value} className="!text-xs !pl-2 text-zinc-300">
+                    <SelectItem variant="zinc" key={type.value} value={type.value} className="!text-xs">
                       {type.label}
                     </SelectItem>
                   ))}
@@ -926,16 +926,16 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-7 !text-xs bg-zinc-700/50 border-zinc-600 text-zinc-300 flex-1 min-w-0 !px-2 !justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate">
+                <SelectTrigger variant="retro-dark" size="sm" colorScheme="zinc" className="h-7 !text-xs flex-1 min-w-0">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-700">
-                  <SelectItem value="current" className="!text-xs !pl-2 text-zinc-300">This project</SelectItem>
-                  <SelectItem value="all" className="!text-xs !pl-2 text-zinc-300">All projects</SelectItem>
+                <SelectContent variant="zinc">
+                  <SelectItem variant="zinc" value="current" className="!text-xs">This project</SelectItem>
+                  <SelectItem variant="zinc" value="all" className="!text-xs">All projects</SelectItem>
                   {projects
                     .filter(p => p.id !== selectedProjectId)
                     .map((project) => (
-                      <SelectItem key={project.id} value={project.id} className="!text-xs !pl-2 text-zinc-300">
+                      <SelectItem variant="zinc" key={project.id} value={project.id} className="!text-xs">
                         {project.name}
                       </SelectItem>
                     ))}

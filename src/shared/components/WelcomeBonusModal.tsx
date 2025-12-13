@@ -63,7 +63,7 @@ const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     </div>
     
     <div className="flex justify-center pt-5 pb-2">
-      <Button onClick={onNext} className="w-full sm:w-auto">
+      <Button variant="retro" size="retro-sm" onClick={onNext} className="w-full sm:w-auto">
         Let's get started
         <ChevronRight className="w-4 h-4 ml-2" />
       </Button>
@@ -97,13 +97,15 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     
     <div className="flex flex-col space-y-2 pt-5 pb-2">
       <Button 
+        variant="retro"
+        size="retro-sm"
         onClick={() => window.open('https://discord.gg/D5K2c6kfhy', '_blank')}
         className="w-full"
       >
         <Users className="w-4 h-4 mr-2" />
         Join Discord Community
       </Button>
-      <Button variant="ghost" onClick={onNext} className="w-full text-foreground/70 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-foreground">
+      <Button variant="retro-secondary" size="retro-sm" onClick={onNext} className="w-full">
         Continue Setup
       </Button>
     </div>
@@ -289,6 +291,8 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       
       <div className="flex justify-center pt-5 pb-2">
         <Button 
+          variant="retro"
+          size="retro-sm"
           onClick={onNext} 
           disabled={!onComputerChecked && !inCloudChecked}
           className="w-full sm:w-auto"
@@ -495,7 +499,7 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
         <Users className="w-4 h-4 mr-2" />
         Join Discord
       </Button>
-      <Button variant="ghost" onClick={onNext} className="w-full text-foreground/70 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-foreground">
+      <Button variant="retro-secondary" size="retro-sm" onClick={onNext} className="w-full">
         Continue Setup
       </Button>
     </div>
@@ -573,7 +577,7 @@ const ThemeStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       </div>
       
       <div className="flex justify-center pt-5 pb-2">
-        <Button onClick={onNext} className="w-full sm:w-auto">
+        <Button variant="retro" size="retro-sm" onClick={onNext} className="w-full sm:w-auto">
           Continue
           <ChevronRight className="w-4 h-4 ml-2" />
         </Button>
@@ -692,7 +696,7 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       </div>
       
       <div className="flex justify-center pt-5 pb-2">
-        <Button onClick={onNext} className="w-full sm:w-auto">
+        <Button variant="retro" size="retro-sm" onClick={onNext} className="w-full sm:w-auto">
           Continue
           <ChevronRight className="w-4 h-4 ml-2" />
         </Button>
@@ -735,11 +739,11 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       </div>
       
       <div className="flex flex-col space-y-2 pt-5 pb-2">
-        <Button onClick={handleOpenSettings} className="w-full">
+        <Button variant="retro" size="retro-sm" onClick={handleOpenSettings} className="w-full">
           <Settings className="w-4 h-4 mr-2" />
           Open Settings to Get Set Up
         </Button>
-        <Button variant="outline" onClick={onClose} className="w-full">
+        <Button variant="retro-secondary" size="retro-sm" onClick={onClose} className="w-full">
           Start Creating
         </Button>
       </div>

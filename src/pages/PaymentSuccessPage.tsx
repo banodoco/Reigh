@@ -97,11 +97,11 @@ const PaymentSuccessPage: React.FC = () => {
               You can check your transaction history in Settings.
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => navigate('/')} className="flex-1">
+              <Button variant="retro-secondary" size="retro-sm" onClick={() => navigate('/')} className="flex-1">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Go Home
               </Button>
-              <Button onClick={handleViewTransactions} className="flex-1">
+              <Button variant="retro" size="retro-sm" onClick={handleViewTransactions} className="flex-1">
                 View Transactions
               </Button>
             </div>
@@ -168,10 +168,10 @@ const PaymentSuccessPage: React.FC = () => {
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={handleContinue} className="flex-1">
+            <Button variant="retro" size="retro-sm" onClick={handleContinue} className="flex-1">
               Return to Tool
             </Button>
-            <Button variant="outline" onClick={handleViewTransactions} className="flex-1">
+            <Button variant="retro-secondary" size="retro-sm" onClick={handleViewTransactions} className="flex-1">
               View Transactions
             </Button>
           </div>

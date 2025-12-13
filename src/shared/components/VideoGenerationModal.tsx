@@ -522,9 +522,9 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
               <Skeleton className="h-11 w-full max-w-md rounded-md" />
             ) : (
               <Button 
-                size="lg" 
+                size="retro-default" 
                 className="w-full max-w-md" 
-                variant={justQueued ? "success" : "default"}
+                variant={justQueued ? "success" : "retro"}
                 onClick={handleGenerate}
                 disabled={isDisabled}
               >

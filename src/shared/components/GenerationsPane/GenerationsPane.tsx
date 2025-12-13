@@ -474,13 +474,13 @@ const GenerationsPaneComponent: React.FC = () => {
                           setMediaTypeFilterOpen(open);
                         }}
                       >
-                        <SelectTrigger className="w-[80px] h-8 text-xs bg-zinc-800 border-zinc-700 text-white">
+                        <SelectTrigger variant="retro-dark" size="sm" colorScheme="zinc" className="w-[80px] h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent ref={mediaTypeContentRef}>
-                          <SelectItem value="all">All</SelectItem>
-                          <SelectItem value="image">Images</SelectItem>
-                          <SelectItem value="video">Videos</SelectItem>
+                        <SelectContent variant="zinc" ref={mediaTypeContentRef}>
+                          <SelectItem variant="zinc" value="all">All</SelectItem>
+                          <SelectItem variant="zinc" value="image">Images</SelectItem>
+                          <SelectItem variant="zinc" value="video">Videos</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

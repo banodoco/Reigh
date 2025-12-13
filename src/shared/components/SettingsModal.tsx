@@ -828,13 +828,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                       <div>
                         <Label className="text-xs text-blue-600 dark:text-blue-400 mb-1 block">Computer</Label>
                         <Select value={computerType} onValueChange={setComputerType}>
-                          <SelectTrigger className="w-full bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 h-9 text-blue-700 dark:text-blue-300">
+                          <SelectTrigger variant="retro" size="sm" colorScheme="blue" className="w-full h-9">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="linux">Linux</SelectItem>
-                            <SelectItem value="windows">Windows</SelectItem>
-                            <SelectItem value="mac">Mac</SelectItem>
+                          <SelectContent variant="retro">
+                            <SelectItem variant="retro" value="linux">Linux</SelectItem>
+                            <SelectItem variant="retro" value="windows">Windows</SelectItem>
+                            <SelectItem variant="retro" value="mac">Mac</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -843,13 +843,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                       <div>
                         <Label className="text-xs text-violet-600 dark:text-violet-400 mb-1 block">GPU</Label>
                         <Select value={gpuType} onValueChange={setGpuType} disabled={computerType === "mac"}>
-                          <SelectTrigger className="w-full bg-violet-50/50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800 h-9 text-violet-700 dark:text-violet-300 disabled:opacity-50">
+                          <SelectTrigger variant="retro" size="sm" colorScheme="violet" className="w-full h-9">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="nvidia-30-40">NVIDIA ≤40 series</SelectItem>
-                            <SelectItem value="nvidia-50">NVIDIA 50 series</SelectItem>
-                            <SelectItem value="non-nvidia">Non-NVIDIA</SelectItem>
+                          <SelectContent variant="retro">
+                            <SelectItem variant="retro" value="nvidia-30-40">NVIDIA ≤40 series</SelectItem>
+                            <SelectItem variant="retro" value="nvidia-50">NVIDIA 50 series</SelectItem>
+                            <SelectItem variant="retro" value="non-nvidia">Non-NVIDIA</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -858,14 +858,14 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                       <div>
                         <Label className="text-xs text-emerald-600 dark:text-emerald-400 mb-1 block">Memory</Label>
                         <Select value={memoryProfile} onValueChange={setMemoryProfile}>
-                          <SelectTrigger className="w-full bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 h-9 text-emerald-700 dark:text-emerald-300">
+                          <SelectTrigger variant="retro" size="sm" colorScheme="emerald" className="w-full h-9">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent variant="retro">
                             <TooltipProvider>
                               <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
-                                  <SelectItem value="1" className="cursor-pointer">Max Performance</SelectItem>
+                                  <SelectItem variant="retro" value="1" className="cursor-pointer">Max Performance</SelectItem>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" className="max-w-md" sideOffset={5}>
                                   <p className="text-sm">64GB+ RAM, 24GB VRAM. Fastest.</p>
@@ -873,7 +873,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               </Tooltip>
                               <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
-                                  <SelectItem value="2" className="cursor-pointer">High RAM</SelectItem>
+                                  <SelectItem variant="retro" value="2" className="cursor-pointer">High RAM</SelectItem>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" className="max-w-md" sideOffset={5}>
                                   <p className="text-sm">64GB+ RAM, 12GB VRAM. Long videos.</p>
@@ -881,7 +881,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               </Tooltip>
                               <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
-                                  <SelectItem value="3" className="cursor-pointer">Balanced</SelectItem>
+                                  <SelectItem variant="retro" value="3" className="cursor-pointer">Balanced</SelectItem>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" className="max-w-md" sideOffset={5}>
                                   <p className="text-sm">32GB RAM, 24GB VRAM. Recommended for 3090/4090.</p>
@@ -889,7 +889,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               </Tooltip>
                               <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
-                                  <SelectItem value="4" className="cursor-pointer">Conservative</SelectItem>
+                                  <SelectItem variant="retro" value="4" className="cursor-pointer">Conservative</SelectItem>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" className="max-w-md" sideOffset={5}>
                                   <p className="text-sm">32GB RAM, 12GB VRAM. Works everywhere.</p>
@@ -897,7 +897,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               </Tooltip>
                               <Tooltip delayDuration={0}>
                                 <TooltipTrigger asChild>
-                                  <SelectItem value="5" className="cursor-pointer">Minimum</SelectItem>
+                                  <SelectItem variant="retro" value="5" className="cursor-pointer">Minimum</SelectItem>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" className="max-w-md" sideOffset={5}>
                                   <p className="text-sm">24GB RAM, 10GB VRAM. Slowest.</p>
@@ -1259,12 +1259,12 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
           
           <DialogFooter className={`${modal.isMobile ? 'px-2 pt-6 pb-3 flex-row justify-between' : 'px-2 pt-7 pb-3'} border-t relative z-20`}>
             <div className="flex gap-2 mr-auto">
-              <Button variant="secondary" onClick={handleSignOut}>
+              <Button variant="retro-secondary" size="retro-sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign out
               </Button>
             </div>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="retro" size="retro-sm" onClick={() => onOpenChange(false)}>
               Close
             </Button>
           </DialogFooter>

@@ -266,9 +266,10 @@ export const ReferralModal: React.FC<ReferralModalProps> = ({ isOpen, onOpenChan
                   </a>
                 </p>
                 <Button 
-                  variant="outline" 
+                  variant="retro" 
+                  size="retro-sm"
                   onClick={() => onOpenChange(false)}
-                  className="h-12 px-4 text-sm font-medium mt-8"
+                  className="mt-8"
                 >
                   Close
                 </Button>

@@ -261,15 +261,15 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
           className="flex-grow"
         />
         <Select value={sortOption} onValueChange={(value) => setSortOption(value as SortOption)}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger variant="retro" className="w-[180px]">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="newest">Newest First</SelectItem>
-            <SelectItem value="oldest">Oldest First</SelectItem>
-            <SelectItem value="mostUsed">Most Used</SelectItem>
-            <SelectItem value="name">Name (A-Z)</SelectItem>
-            <SelectItem value="default">Default Order</SelectItem>
+          <SelectContent variant="retro">
+            <SelectItem variant="retro" value="newest">Newest First</SelectItem>
+            <SelectItem variant="retro" value="oldest">Oldest First</SelectItem>
+            <SelectItem variant="retro" value="mostUsed">Most Used</SelectItem>
+            <SelectItem variant="retro" value="name">Name (A-Z)</SelectItem>
+            <SelectItem variant="retro" value="default">Default Order</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -1987,6 +1987,8 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         </CardContent>
         <ItemCardFooter>
             <Button 
+              variant="retro"
+              size="retro-sm"
               onClick={handleAddPresetFromForm}
               disabled={isSubmitting || !addForm.name.trim()}
             >
@@ -2261,9 +2263,10 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                     </div>
                   )}
 
-                  {/* Close Button */}
-                  <Button 
-                    variant="outline" 
+{/* Close Button */}
+                  <Button
+                    variant="retro"
+                    size="retro-sm"
                     onClick={onClose}
                     className={`flex items-center gap-1.5 ${modal.isMobile ? 'w-full mt-2' : 'ml-auto'}`}
                   >

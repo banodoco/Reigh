@@ -116,6 +116,8 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
       
       <Button 
           type="button"
+          variant="retro"
+          size="retro-sm"
           onClick={handleBulkEditClick}
           disabled={!hasApiKey || isEditing || !editInstructions.trim() || numberOfPromptsToEdit === 0} 
           className="w-full sm:w-auto"

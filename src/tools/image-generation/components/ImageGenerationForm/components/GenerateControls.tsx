@@ -69,17 +69,17 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
                   onValueChange={(value) => onChangeSteps?.(parseInt(value, 10))}
                   disabled={!hasApiKey || isGenerating}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger variant="retro">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="8">8</SelectItem>
-                    <SelectItem value="12">12</SelectItem>
-                    <SelectItem value="16">16</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="24">24</SelectItem>
-                    <SelectItem value="28">28</SelectItem>
-                    <SelectItem value="32">32</SelectItem>
+                  <SelectContent variant="retro">
+                    <SelectItem variant="retro" value="8">8</SelectItem>
+                    <SelectItem variant="retro" value="12">12</SelectItem>
+                    <SelectItem variant="retro" value="16">16</SelectItem>
+                    <SelectItem variant="retro" value="20">20</SelectItem>
+                    <SelectItem variant="retro" value="24">24</SelectItem>
+                    <SelectItem variant="retro" value="28">28</SelectItem>
+                    <SelectItem variant="retro" value="32">32</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -103,7 +103,8 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
         <Button
           type="submit"
           className="w-full md:w-1/2 transition-none disabled:opacity-100 disabled:saturate-100 disabled:brightness-100"
-          variant={justQueued ? "success" : "default"}
+          variant={justQueued ? "success" : "retro"}
+          size="retro-default"
           disabled={isGenerating || !hasApiKey || (normalizedPromptMode === 'managed' && actionablePromptsCount === 0)}
         >
           {justQueued

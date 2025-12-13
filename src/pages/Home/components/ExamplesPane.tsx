@@ -39,7 +39,7 @@ export const ExamplesPane: React.FC<ExamplesPaneProps> = ({
         </button>
 
         <div className="mb-8 text-center space-y-3">
-          <h2 className="font-theme text-2xl sm:text-3xl font-theme-heading text-primary">Reigh is a tool made just for travelling between images</h2>
+          <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary">reigh is a tool made just for travelling between images</h2>
           <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full mx-auto animate-pulse-breathe"></div>
         </div>
 

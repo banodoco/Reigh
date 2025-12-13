@@ -26,6 +26,8 @@ export interface ShotSelectorProps {
   className?: string;
   triggerClassName?: string;
   contentClassName?: string;
+  /** Select variant - defaults to retro-dark for dark contexts */
+  variant?: "default" | "retro" | "retro-dark";
   
   // Add Shot functionality
   showAddShot?: boolean;
@@ -63,6 +65,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   className,
   triggerClassName,
   contentClassName,
+  variant = "retro-dark",
   showAddShot = false,
   onCreateShot,
   isCreatingShot = false,
@@ -261,6 +264,8 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
       >
         <SelectTrigger
           ref={triggerRef}
+          variant={variant}
+          size="sm"
           className={triggerClassName}
           aria-label="Select target shot"
           onMouseEnter={(e) => e.stopPropagation()}
@@ -281,8 +286,9 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
           </SelectValue>
         </SelectTrigger>
         <SelectContent 
+          variant={variant}
           header={addShotHeader}
-          className={`z-[9999] bg-zinc-900 border-zinc-700 text-white max-h-60 ${contentClassName || ''}`}
+          className={`z-[9999] max-h-60 ${contentClassName || ''}`}
           style={{ zIndex: 10000 }}
           position="popper"
           side={side}
@@ -294,6 +300,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
           {shots.map(shot => (
             <div key={shot.id} className="group relative flex items-center">
               <SelectItem 
+                variant={variant}
                 value={shot.id} 
                 className="text-xs flex-1 pr-8"
                 onPointerDown={(e) => {

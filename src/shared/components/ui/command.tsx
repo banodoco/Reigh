@@ -2,20 +2,37 @@ import * as React from "react"
 import { type DialogProps } from "@radix-ui/react-dialog"
 import { Command as CommandPrimitive } from "cmdk"
 import { Search } from "lucide-react"
+import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/shared/lib/utils"
 import { Dialog, DialogContent } from "@/shared/components/ui/dialog"
 
+const commandVariants = cva(
+  "flex h-full w-full flex-col overflow-hidden rounded-md",
+  {
+    variants: {
+      variant: {
+        default: "bg-popover text-popover-foreground",
+        retro: "bg-[#f5f3ed] dark:bg-[#3a4a4a] text-[#5a7a7a] dark:text-[#d8d4cb] rounded-sm border-2 border-[#6a8a8a] dark:border-[#8a9a9a]",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+export interface CommandProps
+  extends React.ComponentPropsWithoutRef<typeof CommandPrimitive>,
+    VariantProps<typeof commandVariants> {}
+
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
-  React.ComponentPropsWithoutRef<typeof CommandPrimitive>
->(({ className, ...props }, ref) => (
+  CommandProps
+>(({ className, variant, ...props }, ref) => (
   <CommandPrimitive
     ref={ref}
-    className={cn(
-      "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
-      className
-    )}
+    className={cn(commandVariants({ variant, className }))}
     {...props}
   />
 ))
@@ -108,16 +125,32 @@ const CommandSeparator = React.forwardRef<
 ))
 CommandSeparator.displayName = CommandPrimitive.Separator.displayName
 
+const commandItemVariants = cva(
+  "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
+  {
+    variants: {
+      variant: {
+        default: "data-[selected='true']:bg-accent data-[selected=true]:text-accent-foreground",
+        retro: "data-[selected='true']:bg-[#e8e4db] dark:data-[selected='true']:bg-[#4a5a5a] data-[selected='true']:text-[#4a6a6a] dark:data-[selected='true']:text-[#e8e4db] font-heading",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+export interface CommandItemProps
+  extends React.ComponentPropsWithoutRef<typeof CommandPrimitive.Item>,
+    VariantProps<typeof commandItemVariants> {}
+
 const CommandItem = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Item>
->(({ className, ...props }, ref) => (
+  CommandItemProps
+>(({ className, variant, ...props }, ref) => (
   <CommandPrimitive.Item
     ref={ref}
-    className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected='true']:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50",
-      className
-    )}
+    className={cn(commandItemVariants({ variant, className }))}
     {...props}
   />
 ))
@@ -150,4 +183,6 @@ export {
   CommandItem,
   CommandShortcut,
   CommandSeparator,
+  commandVariants,
+  commandItemVariants,
 }

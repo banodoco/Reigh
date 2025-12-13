@@ -157,12 +157,12 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
               onValueChange={handlePageSelect}
               disabled={loadingButton !== null}
             >
-              <SelectTrigger className={`h-8 w-16 text-sm ${whiteText ? 'bg-zinc-800 border-zinc-600 text-white' : ''}`}>
+              <SelectTrigger variant={whiteText ? "retro-dark" : "retro"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 w-16 text-sm">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent variant={whiteText ? "zinc" : "retro"}>
                 {Array.from({ length: totalPages }, (_, i) => (
-                  <SelectItem key={i + 1} value={(i + 1).toString()} className="text-sm">
+                  <SelectItem variant={whiteText ? "zinc" : "retro"} key={i + 1} value={(i + 1).toString()} className="text-sm">
                     {i + 1}
                   </SelectItem>
                 ))}
@@ -237,12 +237,12 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
                   onValueChange={(value) => handlePageSelect(value, true)}
                   disabled={loadingButton !== null}
                 >
-                  <SelectTrigger className="h-8 w-16 text-sm">
+                  <SelectTrigger variant="retro" size="sm" className="h-8 w-16 text-sm">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent variant="retro">
                     {Array.from({ length: totalPages }, (_, i) => (
-                      <SelectItem key={i + 1} value={(i + 1).toString()} className="text-sm">
+                      <SelectItem variant="retro" key={i + 1} value={(i + 1).toString()} className="text-sm">
                         {i + 1}
                       </SelectItem>
                     ))}
@@ -291,12 +291,12 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
           onValueChange={handlePageSelect}
           disabled={loadingButton !== null}
         >
-          <SelectTrigger className={`h-8 w-16 text-sm ${whiteText ? 'bg-zinc-800 border-zinc-600 text-white' : ''}`}>
+          <SelectTrigger variant={whiteText ? "retro-dark" : "retro"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 w-16 text-sm">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent variant={whiteText ? "zinc" : "retro"}>
             {Array.from({ length: totalPages }, (_, i) => (
-              <SelectItem key={i + 1} value={(i + 1).toString()} className="text-sm">
+              <SelectItem variant={whiteText ? "zinc" : "retro"} key={i + 1} value={(i + 1).toString()} className="text-sm">
                 {i + 1}
               </SelectItem>
             ))}

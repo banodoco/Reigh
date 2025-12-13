@@ -421,19 +421,19 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             <Label className="text-sm">How would you like to cut the guidance video to match the timeline?</Label>
             <div className="flex flex-col md:flex-row md:items-center gap-3">
               <div className="flex-shrink-0 w-full md:w-[200px]">
-                <Select value={treatment} onValueChange={onTreatmentChange} disabled={readOnly}>
-                  <SelectTrigger className="h-9 w-full">
+<Select value={treatment} onValueChange={onTreatmentChange} disabled={readOnly}>
+                  <SelectTrigger variant="retro" size="sm" className="h-9 w-full">
                     <SelectValue>
-                      {treatment === 'adjust' 
+                      {treatment === 'adjust'
                         ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
                         : 'Use video as is'}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="adjust">
+                  <SelectContent variant="retro">
+                    <SelectItem variant="retro" value="adjust">
                       {totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} to timeline
                     </SelectItem>
-                    <SelectItem value="clip">
+                    <SelectItem variant="retro" value="clip">
                       Use video as is
                     </SelectItem>
                   </SelectContent>
@@ -458,19 +458,19 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                   }}
                   disabled={readOnly}
                 >
-                  <SelectTrigger className="h-9 w-full text-sm">
+                  <SelectTrigger variant="retro" size="sm" className="h-9 w-full text-sm">
                     <SelectValue>
                       {structureType === 'flow' ? 'Optical flow' : structureType === 'canny' ? 'Canny' : 'Depth'}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="flow">
+                  <SelectContent variant="retro">
+                    <SelectItem variant="retro" value="flow">
                       <span className="text-sm">Optical flow</span>
                     </SelectItem>
-                    <SelectItem value="canny">
+                    <SelectItem variant="retro" value="canny">
                       <span className="text-sm">Canny</span>
                     </SelectItem>
-                    <SelectItem value="depth">
+                    <SelectItem variant="retro" value="depth">
                       <span className="text-sm">Depth</span>
                     </SelectItem>
                   </SelectContent>

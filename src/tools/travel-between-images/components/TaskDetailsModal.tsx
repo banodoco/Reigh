@@ -288,7 +288,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                   </div>
                   {onApplySettingsFromTask && task && taskId && (
                     <Button 
-                      variant="default" 
+                      variant="retro" 
+                      size="retro-sm"
                       onClick={handleApplySettingsFromTask}
                       className={`text-sm ${isMobile ? 'whitespace-pre-line leading-tight py-3 px-4 min-h-[3rem]' : ''}`}
                     >

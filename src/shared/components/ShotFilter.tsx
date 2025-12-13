@@ -50,9 +50,7 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
   const textSizeClass = size === 'sm' ? 'text-xs' : 'text-sm';
   const labelSizeClass = size === 'sm' ? 'text-xs' : 'text-sm';
   
-  const defaultTriggerClassName = whiteText 
-    ? `${triggerWidth} ${heightClass} ${textSizeClass} bg-zinc-800 border-zinc-700 text-white`
-    : `${triggerWidth} ${heightClass} ${textSizeClass}`;
+  const defaultTriggerClassName = `${triggerWidth} ${heightClass} ${textSizeClass}`;
 
   // Adjust layout for mobile
   const containerClassName = isMobile 
@@ -69,16 +67,22 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
         )}
         
         <Select value={selectedShotId} onValueChange={onShotChange} open={open} onOpenChange={onOpenChange}>
-          <SelectTrigger className={triggerClassName || defaultTriggerClassName}>
+          <SelectTrigger 
+            variant={whiteText ? "retro-dark" : "retro"} 
+            colorScheme={whiteText ? "zinc" : "default"}
+            size={size === 'sm' ? 'sm' : 'default'}
+            className={triggerClassName || defaultTriggerClassName}
+          >
             <SelectValue placeholder="Filter by shot..." />
           </SelectTrigger>
           <SelectContent
-            className="w-[var(--radix-select-trigger-width)] bg-zinc-900 border-zinc-700 text-white max-h-60 overflow-y-auto"
+            variant={whiteText ? "zinc" : "retro"}
+            className="w-[var(--radix-select-trigger-width)] max-h-60 overflow-y-auto"
             ref={contentRef}
           >
-            <SelectItem value="all">All Shots</SelectItem>
+            <SelectItem variant={whiteText ? "zinc" : "retro"} value="all">All Shots</SelectItem>
             {shots?.map(shot => (
-              <SelectItem key={shot.id} value={shot.id}>
+              <SelectItem variant={whiteText ? "zinc" : "retro"} key={shot.id} value={shot.id}>
                 {shot.name}
               </SelectItem>
             ))}

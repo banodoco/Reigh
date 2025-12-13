@@ -1,8 +1,10 @@
-import { Link, useRouteError } from 'react-router-dom';
+import { Link, useRouteError, useNavigate } from 'react-router-dom';
 import { Home, Compass, Sparkles } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 
 export default function NotFoundPage() {
   const error = useRouteError() as any; // Basic error handling
+  const navigate = useNavigate();
   console.error(error);
 
   return (
@@ -47,13 +49,15 @@ export default function NotFoundPage() {
 
           {/* Navigation Options */}
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
-            <Link 
-              to="/" 
-              className="group flex items-center space-x-3 wes-button px-8 py-4 text-primary-foreground rounded-xl transition-all duration-300 hover:scale-105"
+            <Button
+              variant="retro"
+              size="retro-default"
+              onClick={() => navigate('/')}
+              className="group"
             >
-              <Home className="h-5 w-5 group-hover:rotate-12 transition-transform duration-300" />
-              <span className="font-cocogoose font-light tracking-wide">Return Home</span>
-            </Link>
+              <Home className="h-5 w-5 mr-2 group-hover:rotate-12 transition-transform duration-300" />
+              Return Home
+            </Button>
             
             <div className="flex items-center space-x-2 text-muted-foreground">
               <div className="w-2 h-2 bg-wes-dusty-blue rounded-full animate-pulse"></div>
@@ -61,13 +65,15 @@ export default function NotFoundPage() {
               <div className="w-2 h-2 bg-wes-mint rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
             </div>
             
-            <button 
-              onPointerUp={() => window.history.back()}
-              className="group flex items-center space-x-3 px-6 py-3 border-2 border-primary/20 rounded-xl bg-card/80 dark:bg-gray-800/80 hover:bg-accent/30 transition-all duration-300 hover:scale-105"
+            <Button
+              variant="retro-secondary"
+              size="retro-sm"
+              onClick={() => window.history.back()}
+              className="group"
             >
-              <Sparkles className="h-4 w-4 text-primary group-hover:animate-spin" />
-              <span className="font-cocogoose font-light text-primary tracking-wide">Go Back</span>
-            </button>
+              <Sparkles className="h-4 w-4 mr-2 group-hover:animate-spin" />
+              Go Back
+            </Button>
           </div>
 
           {/* Decorative Elements */}

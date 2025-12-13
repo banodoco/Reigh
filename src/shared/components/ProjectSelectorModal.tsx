@@ -253,10 +253,12 @@ export const ProjectSelectorModal: React.FC<ProjectSelectorModalProps> = ({
           )}
           
           <DialogFooter className="border-t relative z-20">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="retro-secondary" size="retro-sm" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button
+              variant="retro"
+              size="retro-sm"
               onClick={handleConfirm}
               disabled={!selectedProjectId || loading}
             >

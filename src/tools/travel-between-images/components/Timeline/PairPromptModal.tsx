@@ -340,13 +340,14 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
         <div className={modal.footerClass}>
           <DialogFooter className={`${modal.isMobile ? 'px-4 pt-4 pb-0 flex-col gap-3' : 'px-6 pt-5 pb-0'} border-t`}>
             {readOnly ? (
-              <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">
+              <Button variant="retro" size="retro-sm" onClick={onClose} className="w-full sm:w-auto">
                 Close
               </Button>
             ) : (
               <div className={`${modal.isMobile ? 'flex flex-col gap-3 w-full' : 'flex justify-between w-full'}`}>
                 <Button
-                  variant="outline"
+                  variant="retro-secondary"
+                  size="retro-sm"
                   onClick={handleReset}
                   disabled={!hasCustomPrompts}
                   className={`flex items-center gap-2 ${modal.isMobile ? 'order-3' : ''}`}
@@ -354,10 +355,10 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                   Reset to Defaults
                 </Button>
                 <div className={`flex gap-2 ${modal.isMobile ? 'order-1 justify-between' : ''}`}>
-                  <Button variant="outline" onClick={onClose} className={modal.isMobile ? 'flex-1' : ''}>
+                  <Button variant="retro-secondary" size="retro-sm" onClick={onClose} className={modal.isMobile ? 'flex-1' : ''}>
                     Cancel
                   </Button>
-                  <Button onClick={handleSave} className={`flex items-center gap-2 ${modal.isMobile ? 'flex-1' : ''}`}>
+                  <Button variant="retro" size="retro-sm" onClick={handleSave} className={`flex items-center gap-2 ${modal.isMobile ? 'flex-1' : ''}`}>
                     <Save className="h-4 w-4" />
                     Save
                   </Button>

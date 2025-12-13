@@ -644,8 +644,8 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
               </div>
             )}
             
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="hidden md:inline-flex">
-              Cancel
+            <Button variant="retro" size="retro-sm" onClick={() => onOpenChange(false)} className="hidden md:inline-flex">
+              Close
             </Button>
           </DialogFooter>
         </div>

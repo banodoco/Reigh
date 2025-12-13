@@ -758,7 +758,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
           
           <DialogFooter className={`${modal.isMobile ? 'p-4 pt-4 pb-1 flex-row justify-between' : 'p-6 pt-6 pb-2'} border-t relative z-20`}>
             <div className={`flex gap-2 ${modal.isMobile ? '' : 'mr-auto'}`}>
-              <Button variant="outline" onClick={handleInternalAddBlankPrompt}>
+              <Button variant="retro-secondary" size="retro-sm" onClick={handleInternalAddBlankPrompt}>
                 <PackagePlus className={`h-4 w-4 ${modal.isMobile ? '' : 'mr-2'}`} />
                 <span className={modal.isMobile ? 'hidden' : ''}>Blank Prompt</span>
                 {modal.isMobile && <span className="sr-only">Blank Prompt</span>}
@@ -766,6 +766,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
               {internalPrompts.length > 0 && (
                 <Button 
                   variant="destructive" 
+                  size="retro-sm"
                   onClick={handleRemoveAllPrompts}
                   disabled={internalPrompts.length === 1 && !internalPrompts[0].fullPrompt.trim() && !internalPrompts[0].shortPrompt?.trim()}
                 >
@@ -775,7 +776,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                 </Button>
               )}
             </div>
-            <Button onClick={handleFinalSaveAndClose}>Close</Button>
+            <Button variant="retro" size="retro-sm" onClick={handleFinalSaveAndClose}>Close</Button>
           </DialogFooter>
         </div>
       </DialogContent>

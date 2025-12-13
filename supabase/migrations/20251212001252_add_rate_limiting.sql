@@ -120,3 +120,4 @@ CREATE POLICY "Service role only" ON rate_limits
 
 COMMIT;
 
+

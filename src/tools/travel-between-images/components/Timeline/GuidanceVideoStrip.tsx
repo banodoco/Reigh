@@ -778,15 +778,15 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
               <Select value={treatment} onValueChange={(treatment: 'adjust' | 'clip') => {
                 onTreatmentChange(treatment);
               }}>
-                <SelectTrigger className="h-6 w-[180px] text-[9px] px-2 py-0 bg-background/95 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                <SelectTrigger variant="retro" size="sm" className="h-6 w-[180px] text-[9px] px-2 py-0 bg-background/95 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
                   <SelectValue>
                     {treatment === 'adjust' 
                       ? ((effectiveMetadata?.total_frames || 0) > timelineFrames ? 'Compress' : (effectiveMetadata?.total_frames || 0) < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
                       : 'Use video as is'}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="adjust">
+                <SelectContent variant="retro">
+                  <SelectItem variant="retro" value="adjust">
                     <div className="flex flex-col gap-0.5 py-1">
                       <span className="text-xs font-medium">
                         {(effectiveMetadata?.total_frames || 0) > timelineFrames ? 'Compress' : (effectiveMetadata?.total_frames || 0) < timelineFrames ? 'Stretch' : 'Match'} to timeline
@@ -809,7 +809,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
                       </span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="clip">
+                  <SelectItem variant="retro" value="clip">
                     <div className="flex flex-col gap-0.5 py-1">
                       <span className="text-xs font-medium">Use video as is</span>
                       <span className="text-[10px] text-muted-foreground leading-tight">

@@ -37,12 +37,12 @@ const PaymentCancelPage: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Button onClick={handleRetryPayment} className="w-full">
+            <Button variant="retro" size="retro-sm" onClick={handleRetryPayment} className="w-full">
               <CreditCard className="w-4 h-4 mr-2" />
               Try Again
             </Button>
             
-            <Button variant="outline" onClick={handleContinue} className="w-full">
+            <Button variant="retro-secondary" size="retro-sm" onClick={handleContinue} className="w-full">
               Continue to Tools
             </Button>
             

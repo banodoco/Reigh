@@ -230,6 +230,8 @@ const SharePage: React.FC = () => {
           </div>
           
           <Button 
+            variant="retro"
+            size="retro-sm"
             onClick={() => navigate('/')}
             className="w-full"
           >
@@ -272,7 +274,8 @@ const SharePage: React.FC = () => {
                 </span>
               </div>
               <Button 
-                variant="outline"
+                variant="retro"
+                size="retro-sm"
                 onClick={() => navigate(signupUrl)}
               >
                 Create Your Own

@@ -26,6 +26,7 @@ import { time, timeEnd } from '@/shared/lib/logger';
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { useDarkMode } from '@/shared/hooks/useDarkMode';
 
 // Session-based tracking for tool visibility state (to prevent animation replays)
 const SEEN_DISABLED_TOOLS_KEY = 'reigh_seen_disabled_tools';
@@ -52,22 +53,24 @@ const processTools = [
   {
     id: 'image-generation',
     name: 'Generate Images',
-    description: 'Create images using a variety of models and styles, with support from LLMs.',
+    description: 'Create images using a variety of models and styles, with support from LLMs',
     descriptionMobile: 'Create images support from LLMs.',
     tool: toolsUIManifest.find(t => t.id === 'image-generation'),
     icon: Paintbrush,
     gradient: 'from-wes-vintage-gold via-wes-mustard to-wes-yellow',
     accent: 'wes-pink',
+    darkIconColor: '#a67d2a', // vintage-gold (darker)
   },
   {
     id: 'travel-between-images',
     name: 'Travel Between Images',
-    description: 'Transform static images into video sequences with controllable transitions.',
+    description: 'Transform static images into video sequences with controllable transitions',
     descriptionMobile: 'Turn images into video sequences.',
     tool: toolsUIManifest.find(t => t.id === 'travel-between-images'),
     icon: Video,
     gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue',
     accent: 'wes-mint',
+    darkIconColor: '#3d8a62', // mint (darker)
   },
   // {
   //   id: 'reinvent-videos',
@@ -105,6 +108,7 @@ const assistantTools = [
     icon: Edit,
     gradient: 'from-wes-mustard via-wes-vintage-gold to-wes-coral', // Warm gold tones
     accent: 'wes-mustard',
+    darkIconColor: '#a68018', // mustard (darker)
   },
   {
     id: 'edit-video',
@@ -116,6 +120,7 @@ const assistantTools = [
     icon: Clapperboard,
     gradient: 'from-wes-dusty-blue via-wes-lavender to-wes-mint', // Cool blue-lavender (contrasts with warm Edit Images)
     accent: 'wes-dusty-blue',
+    darkIconColor: '#4a7099', // dusty-blue (darker)
   },
   {
     id: 'join-clips',
@@ -127,6 +132,7 @@ const assistantTools = [
     icon: Link2,
     gradient: 'from-wes-pink via-wes-salmon to-wes-coral', // Warm pink-coral (contrasts with cool Edit Videos)
     accent: 'wes-pink',
+    darkIconColor: '#e07070', // coral/salmon (pink too pale)
   },
   {
     id: 'character-animate',
@@ -138,6 +144,7 @@ const assistantTools = [
     icon: Users,
     gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue', // Cool green-blue (contrasts with warm Join Clips)
     accent: 'wes-mint',
+    darkIconColor: '#3d8a62', // mint (darker)
   },
   {
     id: 'moon-soon',
@@ -149,6 +156,7 @@ const assistantTools = [
     icon: Sparkles,
     gradient: 'from-wes-lavender via-wes-pink to-wes-salmon', // Warm lavender-pink (contrasts with cool Characters)
     accent: 'wes-lavender',
+    darkIconColor: '#7d5a94', // lavender (darker)
     comingSoon: true,
   },
   {
@@ -161,6 +169,7 @@ const assistantTools = [
     icon: Sparkles, // Won't be shown
     gradient: '',
     accent: '',
+    darkIconColor: '',
     isEmpty: true,
   },
 ];
@@ -169,6 +178,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   const [isWiggling, setIsWiggling] = useState(false);
   const navigate = useNavigate();
   const { triggerRipple, triggerRippleAtCenter, rippleStyles, isRippleActive } = useClickRipple();
+  const { darkMode } = useDarkMode();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const { 
@@ -310,14 +320,14 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
         <div className="flex items-center h-full px-2 py-1 sm:px-3 sm:py-1.5 lg:px-4 lg:py-2 relative">
           {/* Icon */}
           <div className={`flex-shrink-0 ${isSm ? 'mr-4' : 'mr-3'} ${isLg ? 'mr-6' : ''} relative z-10`}>
-            <div className={`${iconContainerSize} bg-gradient-to-br ${item.gradient} rounded-xl sm:rounded-2xl flex items-center justify-center shadow-wes-deep ${!isDisabled ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>
-              <item.icon className={`${iconSize} text-white drop-shadow-lg`} />
+<div className={`${iconContainerSize} bg-gradient-to-br ${item.gradient} dark:bg-none dark:bg-transparent dark:border-2 rounded-sm flex items-center justify-center shadow-[-4px_4px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-4px_4px_0_0_rgba(90,90,80,0.3)] ${!isDisabled ? 'group-hover:shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-2px_2px_0_0_rgba(180,160,100,0.4)] group-hover:translate-x-[1px] group-hover:translate-y-[1px]' : ''} transition-all duration-300`} style={darkMode ? { borderColor: item.darkIconColor } : undefined}>
+                              <item.icon className={`${iconSize} drop-shadow-lg dark:drop-shadow-none transition-colors duration-300`} style={{ color: darkMode ? item.darkIconColor : 'white' }} />
             </div>
           </div>
           
           {/* Text content */}
           <div className="flex-1 relative z-10 min-w-0">
-            <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 leading-tight`}>
+            <h3 className={`${titleSize} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 leading-tight`}>
               {item.name}
             </h3>
             <p className={`font-theme ${descriptionSize} font-theme-body text-muted-foreground leading-relaxed pr-2`}>
@@ -333,14 +343,14 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
             {/* Title */}
             <h3 
               ref={titleRef}
-              className={`font-theme ${titleSizeSquare} font-theme-heading text-primary ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage leading-tight text-right`}
+              className={`${titleSizeSquare} font-theme-heading text-primary ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage leading-tight text-right`}
             >
               {item.name}
             </h3>
             
             {/* Mini icon badge */}
-            <div className={`${isLg ? 'w-6 h-6' : isSm ? 'w-5 h-5' : 'w-4 h-4'} bg-gradient-to-br ${item.gradient} rounded-lg flex items-center justify-center shadow-sm ${!isDisabled ? 'group-hover:scale-110 group-hover:shadow-md' : ''} transition-all duration-500 flex-shrink-0`}>
-              <item.icon className={`${isLg ? 'w-3 h-3' : isSm ? 'w-2.5 h-2.5' : 'w-2 h-2'} text-white drop-shadow-sm`} />
+<div className={`${isLg ? 'w-6 h-6' : isSm ? 'w-5 h-5' : 'w-4 h-4'} bg-gradient-to-br ${item.gradient} dark:bg-none dark:bg-transparent dark:border rounded-none flex items-center justify-center shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.3)] ${!isDisabled ? 'group-hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] group-hover:translate-x-[0.5px] group-hover:translate-y-[0.5px]' : ''} transition-all duration-300 flex-shrink-0`} style={darkMode ? { borderColor: item.darkIconColor } : undefined}>
+                              <item.icon className={`${isLg ? 'w-3 h-3' : isSm ? 'w-2.5 h-2.5' : 'w-2 h-2'} drop-shadow-sm dark:drop-shadow-none transition-colors duration-300`} style={{ color: darkMode ? item.darkIconColor : 'white' }} />
             </div>
           </div>
           

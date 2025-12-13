@@ -510,6 +510,8 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                 </div>
 
               <Button
+                variant="retro"
+                size="retro-sm"
                 onClick={handlePurchase}
                 disabled={isCreatingCheckout || purchaseAmount === 0}
                 className="w-full"

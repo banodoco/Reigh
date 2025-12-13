@@ -329,15 +329,15 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
           className="flex-grow"
         />
         <Select value={sortOption} onValueChange={(value) => setSortOption(value as SortOption)}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger variant="retro" className="w-[180px]">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="default">Default Order</SelectItem>
-            <SelectItem value="downloads">Downloads</SelectItem>
-            <SelectItem value="likes">Likes</SelectItem>
-            <SelectItem value="lastModified">Last Modified</SelectItem>
-            <SelectItem value="name">Name (A-Z)</SelectItem>
+          <SelectContent variant="retro">
+            <SelectItem variant="retro" value="default">Default Order</SelectItem>
+            <SelectItem variant="retro" value="downloads">Downloads</SelectItem>
+            <SelectItem variant="retro" value="likes">Likes</SelectItem>
+            <SelectItem variant="retro" value="lastModified">Last Modified</SelectItem>
+            <SelectItem variant="retro" value="name">Name (A-Z)</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -663,7 +663,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
         created_by_is_you: false,
         created_by_username: '',
         huggingface_url: '',
-        base_model: 'Wan 2.1 T2V',
+        base_model: 'Wan 2.2 I2V',
         is_public: defaultIsPublic,
         trigger_word: '', // Add trigger word to form state
     });
@@ -930,7 +930,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 created_by_is_you: false,
                 created_by_username: '',
                 huggingface_url: '',
-                base_model: 'Wan 2.1 T2V',
+                base_model: 'Wan 2.2 I2V',
                 is_public: defaultIsPublic,
                 trigger_word: '',
             });
@@ -970,7 +970,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         created_by_is_you: false,
                         created_by_username: '',
                         huggingface_url: '',
-                        base_model: 'Wan 2.1 T2V',
+                        base_model: 'Wan 2.2 I2V',
                         is_public: defaultIsPublic,
                         trigger_word: '',
                       });
@@ -1079,14 +1079,20 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                             value={addForm.base_model} 
                             onValueChange={(value) => handleFormChange('base_model', value)}
                         >
-                            <SelectTrigger>
+                            <SelectTrigger variant="retro">
                                 <SelectValue placeholder="Select Base Model" />
                             </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Wan 2.1 T2V">Wan 2.1 T2V</SelectItem>
-                                <SelectItem value="Flux.dev">Flux.dev</SelectItem>
-                                <SelectItem value="SD 1.5">SD 1.5</SelectItem>
-                                <SelectItem value="SDXL">SDXL</SelectItem>
+                            <SelectContent variant="retro">
+                                <SelectItem variant="retro" value="Wan 2.2 I2V">Wan 2.2 I2V</SelectItem>
+                                <SelectItem variant="retro" value="Wan 2.2 T2V">Wan 2.2 T2V</SelectItem>
+                                <SelectItem variant="retro" value="Wan 2.1 I2V">Wan 2.1 I2V</SelectItem>
+                                <SelectItem variant="retro" value="Wan 2.1 T2V">Wan 2.1 T2V</SelectItem>
+                                <SelectItem variant="retro" value="Qwen Image">Qwen Image</SelectItem>
+                                <SelectItem variant="retro" value="Qwen Image Edit">Qwen Image Edit</SelectItem>
+                                <SelectItem variant="retro" value="Qwen Image Edit 2509">Qwen Image Edit 2509</SelectItem>
+                                <SelectItem variant="retro" value="Flux.dev">Flux.dev</SelectItem>
+                                <SelectItem variant="retro" value="SD 1.5">SD 1.5</SelectItem>
+                                <SelectItem variant="retro" value="SDXL">SDXL</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -1520,9 +1526,10 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     </div>
                   )}
 
-                  {/* Close Button */}
-                  <Button 
-                    variant="outline" 
+{/* Close Button */}
+                  <Button
+                    variant="retro"
+                    size="retro-sm"
                     onClick={onClose}
                     className={`flex items-center gap-1.5 ${modal.isMobile ? 'w-full mt-2' : 'ml-auto'}`}
                   >

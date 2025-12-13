@@ -31,6 +31,7 @@ interface AspectRatioSelectorProps {
   className?: string;
   id?: string;
   placeholder?: string;
+  variant?: "default" | "retro";
 }
 
 export const AspectRatioSelector: React.FC<AspectRatioSelectorProps> = ({
@@ -40,7 +41,8 @@ export const AspectRatioSelector: React.FC<AspectRatioSelectorProps> = ({
   showVisualizer = true,
   className = '',
   id,
-  placeholder = "Select aspect ratio"
+  placeholder = "Select aspect ratio",
+  variant = "retro"
 }) => {
   const [hoveredAspectRatio, setHoveredAspectRatio] = useState<string>('');
 
@@ -50,16 +52,17 @@ export const AspectRatioSelector: React.FC<AspectRatioSelectorProps> = ({
       <div className={`flex items-center gap-3 ${className}`}>
         <div className="w-1/2">
           <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-            <SelectTrigger className="w-full" id={id}>
+            <SelectTrigger variant={variant} className="w-full" id={id}>
               <SelectValue placeholder={placeholder}>
                 {value ? value : placeholder}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent variant={variant}>
               {ASPECT_RATIOS.map((ratio) => (
                 <SelectItem 
                   key={ratio.value} 
                   value={ratio.value}
+                  variant={variant}
                   onMouseEnter={() => setHoveredAspectRatio(ratio.value)}
                   onMouseLeave={() => setHoveredAspectRatio('')}
                 >
@@ -80,14 +83,14 @@ export const AspectRatioSelector: React.FC<AspectRatioSelectorProps> = ({
   return (
     <div className={className}>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-        <SelectTrigger className="w-full" id={id}>
+        <SelectTrigger variant={variant} className="w-full" id={id}>
           <SelectValue placeholder={placeholder}>
             {value ? value : placeholder}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent variant={variant}>
           {ASPECT_RATIOS.map((ratio) => (
-            <SelectItem key={ratio.value} value={ratio.value}>
+            <SelectItem key={ratio.value} value={ratio.value} variant={variant}>
               {ratio.label}
             </SelectItem>
           ))}

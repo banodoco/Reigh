@@ -356,14 +356,14 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               <label className={`${labelSize} font-medium whitespace-nowrap`}>LoRA</label>
               <div className="flex items-center gap-1 flex-1">
                 <Select value={loraMode} onValueChange={setLoraMode}>
-                  <SelectTrigger className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
+                  <SelectTrigger variant="retro" className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="z-[100001]">
-                    <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="in-scene">InScene</SelectItem>
-                    <SelectItem value="next-scene">Next Scene</SelectItem>
-                    <SelectItem value="custom">Custom</SelectItem>
+                  <SelectContent variant="retro" className="z-[100001]">
+                    <SelectItem variant="retro" value="none">None</SelectItem>
+                    <SelectItem variant="retro" value="in-scene">InScene</SelectItem>
+                    <SelectItem variant="retro" value="next-scene">Next Scene</SelectItem>
+                    <SelectItem variant="retro" value="custom">Custom</SelectItem>
                   </SelectContent>
                 </Select>
                 {loraMode !== 'none' && (

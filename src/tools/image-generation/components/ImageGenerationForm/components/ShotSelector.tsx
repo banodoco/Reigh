@@ -81,13 +81,13 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
             }}
             disabled={!hasApiKey || isGenerating}
           >
-            <SelectTrigger id="associatedShot" className="inline-flex w-full min-w-[200px]">
+            <SelectTrigger variant="retro" id="associatedShot" className="inline-flex w-full min-w-[200px]">
               <SelectValue placeholder="None" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
+            <SelectContent variant="retro">
+              <SelectItem variant="retro" value="none">None</SelectItem>
               {shots?.map((shot) => (
-                <SelectItem key={shot.id} value={shot.id}>
+                <SelectItem variant="retro" key={shot.id} value={shot.id}>
                   {shot.name}
                 </SelectItem>
               ))}

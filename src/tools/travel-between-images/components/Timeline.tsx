@@ -801,8 +801,8 @@ const Timeline: React.FC<TimelineProps> = ({
                         </Label>
                         
                         <Button
-                          variant="default"
-                          size="default"
+                          variant="retro"
+                          size="retro-sm"
                           onClick={() => {
                             // Open image generation in a new tab to preserve context in travel tool
                             window.open('/tools/image-generation', '_blank', 'noopener,noreferrer');

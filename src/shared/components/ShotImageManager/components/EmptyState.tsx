@@ -54,8 +54,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onImageUpload, isUploadi
               </Label>
               
               <Button
-                variant="default"
-                size="sm"
+                variant="retro"
+                size="retro-sm"
                 onClick={() => navigate("/tools/image-generation")}
                 className="flex-1"
               >
