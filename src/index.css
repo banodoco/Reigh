@@ -4,6 +4,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* TT Gertika Font Face Declarations */
+@font-face {
+  font-family: 'TTGertika';
+  src: url('/fonts/tt_gertika/TT_Gertika_Trial_Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TTGertika';
+  src: url('/fonts/tt_gertika/TT_Gertika_Trial_Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'TTGertika';
+  src: url('/fonts/tt_gertika/TT_Gertika_Trial_Black.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Cocogoose Font Face Declarations - Using cleaner variants */
 
 /* Primary font - Clean Semilight Italic for main text */
@@ -120,6 +145,7 @@
     /* TYPOGRAPHY                                */
     /* ========================================= */
     --theme-font-family: 'Crimson Text', serif;
+    --theme-heading-font: 'TTGertika', sans-serif;
     --theme-heading-weight: 700;
     --theme-body-weight: 600;
     --theme-light-weight: 600;
@@ -256,6 +282,7 @@
 @layer base {
   * {
     @apply border-border;
+    text-transform: lowercase !important;
   }
 
   body {
@@ -281,8 +308,8 @@
 
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--theme-font-family, 'Cocogoose', 'Inter', sans-serif);
-    font-weight: var(--theme-heading-weight, 350);
+    font-family: var(--theme-heading-font, 'TTGertika', sans-serif);
+    font-weight: var(--theme-heading-weight, 700);
     letter-spacing: 0.02em;
     position: relative;
   }
@@ -569,6 +596,7 @@
   
   /* Font family utilities */
   .font-theme { font-family: var(--theme-font-family, 'Inter', sans-serif); }
+  .font-heading { font-family: var(--theme-heading-font, 'TTGertika', sans-serif); }
   
   /* Font weight utilities - adapt to current theme */
   .font-theme-light { font-weight: var(--theme-light-weight, 300); }
@@ -2605,22 +2633,18 @@
   0% {
     transform: scale(0);
     opacity: 0;
-    filter: brightness(0.75) hue-rotate(-30deg) saturate(1.5);
   }
   60% {
-    transform: scale(1.2);
+    transform: scale(1.15);
     opacity: 1;
-    /* Flash/Hover state */
-    filter: brightness(1.0) hue-rotate(-15deg) saturate(1.5);
   }
   80% {
     transform: scale(0.95);
-    filter: brightness(0.9) hue-rotate(-20deg) saturate(1.5);
+    opacity: 1;
   }
   100% {
     transform: scale(1);
-    /* Resting state */
-    filter: brightness(0.75) hue-rotate(-30deg) saturate(1.5);
+    opacity: 1;
   }
 }
 

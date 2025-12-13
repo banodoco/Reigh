@@ -1,12 +1,11 @@
 /* eslint-disable no-sequences */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { toast } from '@/shared/components/ui/use-toast';
 import { useReferralTracking } from '@/shared/hooks/useReferralTracking';
-import { DecorativeBackground } from '@/shared/components/DecorativeBackground';
 import { ConstellationCanvas } from '@/shared/components/ConstellationCanvas';
 import { useDebounce } from '@/shared/hooks/use-debounce';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -49,6 +48,42 @@ export default function HomePage() {
   // Pane Logic Hook
   const paneState = usePaneState();
   
+  // Background video ref for dynamic playback rate
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Dynamic playback rate - slows down near loop points for smooth transition
+  const updatePlaybackRate = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !video.duration) return;
+    
+    const currentTime = video.currentTime;
+    const duration = video.duration;
+    
+    // How far into the video (0 to 1)
+    const progress = currentTime / duration;
+    
+    // Ease zone: slow down in first/last 15% of video
+    // With 30fps interpolated video, we can use higher speeds
+    const easeZone = 0.15;
+    const minSpeed = 0.8;  // ~24fps at slowest
+    const maxSpeed = 1.0;  // 30fps at full speed
+    
+    let speed = maxSpeed;
+    
+    if (progress < easeZone) {
+      // Easing in from start
+      const t = progress / easeZone; // 0 to 1 within ease zone
+      // Smooth ease: use sine curve
+      speed = minSpeed + (maxSpeed - minSpeed) * Math.sin(t * Math.PI / 2);
+    } else if (progress > 1 - easeZone) {
+      // Easing out to end
+      const t = (1 - progress) / easeZone; // 1 to 0 within ease zone
+      speed = minSpeed + (maxSpeed - minSpeed) * Math.sin(t * Math.PI / 2);
+    }
+    
+    video.playbackRate = speed;
+  }, []);
+  
   // Video Preload Hook
   useVideoPreload({ 
     showPhilosophy: paneState.showPhilosophy, 
@@ -84,6 +119,15 @@ export default function HomePage() {
       document.body.style.overflow = 'auto';
     };
   }, []);
+  
+  // Dynamic video playback rate for smooth loop transitions
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    video.addEventListener('timeupdate', updatePlaybackRate);
+    return () => video.removeEventListener('timeupdate', updatePlaybackRate);
+  }, [updatePlaybackRate]);
 
   // Auth Session Management
   useEffect(() => {
@@ -317,29 +361,33 @@ export default function HomePage() {
 
   return (
     <div className="wes-texture relative min-h-screen">
-      <DecorativeBackground />
+      {/* Background Video */}
+      <video
+        ref={videoRef}
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+        poster="/hero-background-poster.jpg"
+        className="fixed inset-0 w-full h-full object-cover z-0"
+      >
+        <source src="/hero-background-interpolated-seamless.mp4" type="video/mp4" />
+      </video>
+      {/* Overlay to darken video for readability */}
+      <div className="fixed inset-0 bg-black/50 z-0" />
+      
       <ConstellationCanvas />
 
       <HeroSection 
         barTransitionCompleted={barTransitionCompleted}
-        openTipOpen={openTipOpen}
-        setOpenTipOpen={setOpenTipOpen}
-        openTipDisabled={openTipDisabled}
-        setOpenTipDisabled={setOpenTipDisabled}
-        handleOpenToolActivate={wrappedHandleOpenToolActivate}
-        showCreativePartner={paneState.showCreativePartner}
-        showPhilosophy={paneState.showPhilosophy}
-        showExamples={paneState.showExamples}
-        emergingTipOpen={emergingTipOpen}
-        setEmergingTipOpen={setEmergingTipOpen}
-        emergingTipDisabled={emergingTipDisabled}
-        setEmergingTipDisabled={setEmergingTipDisabled}
-        handleEmergingActivate={wrappedHandleEmergingActivate}
-        currentExample={currentExample}
         session={session}
         handleDiscordSignIn={handleDiscordSignIn}
         navigate={navigate}
         assetsLoaded={assetsLoaded}
+        handleOpenToolActivate={wrappedHandleOpenToolActivate}
+        handleEmergingActivate={wrappedHandleEmergingActivate}
+        currentExample={currentExample}
       />
 
       {/* Overlay for Panes */}

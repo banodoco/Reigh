@@ -1,97 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { PaletteIcon } from '@/shared/components/PaletteIcon';
+import React, { useState, useEffect } from 'react';
+import { Github, MessageCircle, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { ChevronLeft, ChevronRight, Github, MessageCircle, Plus, Download, ExternalLink } from 'lucide-react';
-import { PaintParticles } from '@/shared/components/PaintParticles';
-import { usePlatformInstall } from '@/shared/hooks/usePlatformInstall';
-import { InstallInstructionsModal } from './InstallInstructionsModal';
 import type { Session } from '@supabase/supabase-js';
-
-// Animated CTA button content that smoothly transitions between states
-interface CTAContentProps {
-  icon: 'download' | 'plus' | 'external' | 'discord' | 'paintbrush';
-  text: string;
-  isWaiting?: boolean;
-}
-
-const CTAContent: React.FC<CTAContentProps> = ({ icon, text, isWaiting }) => {
-  const [displayedIcon, setDisplayedIcon] = useState(icon);
-  const [displayedText, setDisplayedText] = useState(text);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const prevIconRef = useRef(icon);
-  const prevTextRef = useRef(text);
-
-  useEffect(() => {
-    // Only animate if the content actually changed
-    if (icon !== prevIconRef.current || text !== prevTextRef.current) {
-      setIsTransitioning(true);
-      
-      // After fade out, update content
-      const updateTimer = setTimeout(() => {
-        setDisplayedIcon(icon);
-        setDisplayedText(text);
-      }, 150);
-      
-      // After content update, fade back in
-      const fadeInTimer = setTimeout(() => {
-        setIsTransitioning(false);
-      }, 180);
-      
-      prevIconRef.current = icon;
-      prevTextRef.current = text;
-      
-      return () => {
-        clearTimeout(updateTimer);
-        clearTimeout(fadeInTimer);
-      };
-    }
-  }, [icon, text]);
-
-  const renderIcon = () => {
-    switch (displayedIcon) {
-      case 'download':
-        return <Download className={`w-full h-full text-white ${isWaiting ? 'animate-subtle-bob' : ''}`} />;
-      case 'plus':
-        return <Plus className="w-full h-full text-white" />;
-      case 'external':
-        return <ExternalLink className="w-full h-full text-white" />;
-      case 'paintbrush':
-        return (
-          <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
-            <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
-          </div>
-        );
-      default:
-        return (
-          <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
-            <img src="/brush-paintbrush-icon.webp" alt="Paintbrush" className="w-full h-full brightness-0 invert" />
-          </div>
-        );
-    }
-  };
-
-  return (
-    <>
-      <div className="relative">
-        {icon === 'paintbrush' && <PaintParticles />}
-        <div 
-          className={`w-5 h-5 relative z-10 transition-all duration-150 ${
-            isTransitioning ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
-          }`}
-        >
-          {renderIcon()}
-        </div>
-      </div>
-      <span 
-        className={`transition-all duration-150 ${
-          isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'
-        }`}
-      >
-        {displayedText}
-      </span>
-    </>
-  );
-};
 
 interface ExampleStyle {
   prompt: string;
@@ -102,66 +12,30 @@ interface ExampleStyle {
 
 interface HeroSectionProps {
   barTransitionCompleted: boolean;
-  openTipOpen: boolean;
-  setOpenTipOpen: (open: boolean) => void;
-  openTipDisabled: boolean;
-  setOpenTipDisabled: (disabled: boolean) => void;
-  handleOpenToolActivate: () => void;
-  showCreativePartner: boolean;
-  showPhilosophy: boolean;
-  showExamples: boolean;
-  emergingTipOpen: boolean;
-  setEmergingTipOpen: (open: boolean) => void;
-  emergingTipDisabled: boolean;
-  setEmergingTipDisabled: (disabled: boolean) => void;
-  handleEmergingActivate: () => void;
-  currentExample: ExampleStyle;
   session: Session | null;
   handleDiscordSignIn: () => void;
   navigate: (path: string) => void;
   assetsLoaded: boolean;
+  handleOpenToolActivate: () => void;
+  handleEmergingActivate: () => void;
+  currentExample: ExampleStyle;
 }
 
 type AnimationPhase = 'initial' | 'loading' | 'bar-complete' | 'content-revealing' | 'complete';
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   barTransitionCompleted,
-  openTipOpen,
-  setOpenTipOpen,
-  openTipDisabled,
-  setOpenTipDisabled,
-  handleOpenToolActivate,
-  showCreativePartner,
-  showPhilosophy,
-  showExamples,
-  emergingTipOpen,
-  setEmergingTipOpen,
-  emergingTipDisabled,
-  setEmergingTipDisabled,
-  handleEmergingActivate,
-  currentExample,
   session,
   handleDiscordSignIn,
   navigate,
   assetsLoaded,
+  handleOpenToolActivate,
+  handleEmergingActivate,
+  currentExample,
 }) => {
   const [phase, setPhase] = useState<AnimationPhase>('initial');
-  const [barWidth, setBarWidth] = useState('0%');
   const [banodocoState, setBanodocoState] = useState<'hidden' | 'animating' | 'visible'>('hidden');
-  const [showUnderlineWave, setShowUnderlineWave] = useState(false);
   const [minLoadTimePassed, setMinLoadTimePassed] = useState(false);
-  const [showInstallModal, setShowInstallModal] = useState(false);
-  
-  // Platform-aware PWA install detection
-  const platformInstall = usePlatformInstall();
-
-  // Close install modal if we're in standalone mode (PWA)
-  // This handles the case where Chrome transfers page state when clicking "Open in app"
-  useEffect(() => {
-    if (platformInstall.isStandalone && showInstallModal) {
-      setShowInstallModal(false);
-    }
-  }, [platformInstall.isStandalone, showInstallModal]);
 
   // Enforce minimum loading time
   useEffect(() => {
@@ -192,11 +66,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     }
     
     if (phase === 'content-revealing') {
-      // Trigger underline wave when content animations finish (1000ms after content starts)
-      const waveTimer = setTimeout(() => {
-        setShowUnderlineWave(true);
-      }, 1000);
-      
       // Trigger Banodoco after second social icon + 500ms pause (950ms + 500ms = 1450ms)
       const banodocoTimer = setTimeout(() => {
         setBanodocoState('animating');
@@ -204,16 +73,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       }, 1450);
       
       return () => {
-        clearTimeout(waveTimer);
         clearTimeout(banodocoTimer);
       };
     }
   }, [phase, assetsLoaded, barTransitionCompleted, minLoadTimePassed]);
-
-  // Bar width management
-  useEffect(() => {
-    setBarWidth(assetsLoaded ? '100%' : '92%');
-  }, [assetsLoaded]);
 
   // Helper for staggering animations based on animation phase
   // Calculated to match the grid-template-rows expansion (1000ms ease-out)
@@ -251,7 +114,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   };
 
   return (
-    <div className="container mx-auto px-4 relative flex items-center justify-center min-h-screen py-8">
+    <div className="container mx-auto px-4 relative flex items-center justify-center min-h-[calc(100vh-64px)] py-8">
       <div className="text-center w-full">
         <div className="max-w-4xl mx-auto">
           
@@ -262,35 +125,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             style={{ gridTemplateRows: phase === 'content-revealing' || phase === 'complete' ? '1fr' : '0fr' }}
           >
             <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
-              {/* Icon above title - wait for assets */}
-              <div style={getFadeStyle(0, 20, !assetsLoaded)} className="relative z-30">
-                <PaletteIcon className="mb-6 mt-0" />
-              </div>
-              
               {/* Main title */}
               <div style={getFadeStyle(0.5, 20)}>
-                <h1 className="font-theme text-6xl md:text-8xl font-theme-heading text-primary dark:text-wes-vintage-gold mb-8 text-shadow-vintage dark:text-shadow-none">
-                  Reigh
+                <h1 className="text-8xl md:text-[10rem] text-[#ecede3] mb-0 leading-tight">
+                  reigh
                 </h1>
               </div>
             </div>
-          </div>
-          
-          {/* Decorative divider - THE BAR */}
-          {/* This element is always visible and dictates the center point when other sections are collapsed */}
-          <div 
-            className="w-32 h-1.5 mx-auto relative"
-          >
-            {/* Background track */}
-            <div className="absolute inset-0 bg-muted/20 rounded-full"></div>
-            {/* Loaded bar - always full width now */}
-            <div 
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-wes-pink to-wes-vintage-gold dark:from-wes-vintage-gold/60 dark:to-wes-vintage-gold/40 rounded-full shadow-inner-vintage dark:shadow-none ease-out"
-              style={{ 
-                width: barWidth, 
-                transition: 'width 0.8s cubic-bezier(0.22, 1, 0.36, 1)' 
-              }}
-            ></div>
           </div>
           
           {/* Bottom Section: Subtitle + Buttons + Footer */}
@@ -299,19 +140,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             style={{ gridTemplateRows: phase === 'content-revealing' || phase === 'complete' ? '1fr' : '0fr' }}
           >
             <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
-              {/* Subtitle - Start -60px (UP) to simulate coming from bar */}
-              <div className="mt-6 md:mt-8" style={getFadeStyle(4.5, -60, false)}>
-                <p className="font-theme text-xl md:text-2xl font-theme-body text-muted-foreground leading-relaxed tracking-wide mb-6 md:mb-8">
-                  An{' '}
+              {/* Subtitle */}
+              <div className="-mt-4 flex justify-center" style={getFadeStyle(4.5, -60, false)}>
+                <p className="font-theme text-2xl md:text-3xl font-theme-body text-[#ecede3]/90 leading-snug tracking-wide mb-8 md:mb-10">
+                  an{' '}
                   <TooltipProvider>
-                    <Tooltip open={openTipOpen} onOpenChange={(o)=>{ if(!openTipDisabled) setOpenTipOpen(o); }}>
+                    <Tooltip>
                       <TooltipTrigger asChild>
                         <span
                           onClick={handleOpenToolActivate}
-                          onMouseLeave={() => { if(openTipDisabled) setOpenTipDisabled(false);} }
-                          className={`sparkle-underline cursor-pointer transition-colors duration-200 ${openTipOpen ? 'tooltip-open' : ''} ${openTipDisabled ? 'pointer-events-none' : ''} ${showUnderlineWave ? 'underline-wave-first' : ''} ${
-                            showCreativePartner ? 'pointer-events-none opacity-60' : showPhilosophy || showExamples ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100' : 'opacity-100 pointer-events-auto transition-all duration-300'
-                          }`}
+                          className="underline decoration-[#ecede3]/40 hover:decoration-[#ecede3] cursor-pointer transition-all duration-200"
                         >
                           open source tool
                         </span>
@@ -330,29 +168,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         </p>
                       </TooltipContent>
                     </Tooltip>
-                  </TooltipProvider>{' '}for{' '}
+                  </TooltipProvider>{' '}
+                  for<br />
                   <TooltipProvider>
-                    <Tooltip
-                      open={emergingTipOpen}
-                      onOpenChange={(o) => {
-                        if (!emergingTipDisabled) setEmergingTipOpen(o);
-                      }}
-                    >
+                    <Tooltip>
                       <TooltipTrigger asChild>
                         <span
                           onClick={handleEmergingActivate}
-                          onMouseLeave={() => {
-                            if (emergingTipDisabled) setEmergingTipDisabled(false);
-                          }}
-                          className={`sparkle-underline cursor-pointer transition-colors duration-200 whitespace-nowrap ${emergingTipOpen ? 'tooltip-open' : ''} ${emergingTipDisabled ? 'pointer-events-none' : ''} ${showUnderlineWave ? 'underline-wave-second' : ''} ${
-                            showExamples
-                              ? 'pointer-events-none opacity-60'
-                              : showCreativePartner || showPhilosophy
-                              ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
-                              : 'opacity-100 pointer-events-auto transition-all duration-300'
-                          }`}
+                          className="underline decoration-[#ecede3]/40 hover:decoration-[#ecede3] cursor-pointer transition-all duration-200"
                         >
-                          travelling between images
+                          traveling between images
                         </span>
                       </TooltipTrigger>
                       <TooltipContent
@@ -384,121 +209,28 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </p>
               </div>
               
-            {/* CTA button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
-            <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-4 md:pb-6 overflow-visible">
+            {/* CTA button */}                                                                
+            <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-4 md:pb-6 overflow-visible flex justify-center">
               {session ? (
-                // User is logged in - show install CTA if available, otherwise go to tools
-                <div className="flex flex-col items-center gap-2 md:gap-3">
-                  <div className="group">
-                    <button
-                      onClick={async () => {
-                        if (platformInstall.showInstallCTA) {
-                          if (platformInstall.canInstall) {
-                            const installed = await platformInstall.triggerInstall();
-                            if (!installed) {
-                              setShowInstallModal(true);
-                            }
-                          } else {
-                            setShowInstallModal(true);
-                          }
-                        } else {
-                          navigate('/tools');
-                        }
-                      }}
-                      className={`flex items-center space-x-2 px-6 py-4 bg-primary hover:bg-primary/90 dark:bg-transparent dark:hover:bg-wes-vintage-gold/10 rounded-full border-2 border-primary/40 hover:border-primary/60 dark:border-wes-vintage-gold/50 dark:hover:border-wes-vintage-gold shadow-wes-vintage hover:shadow-wes-hover dark:shadow-none dark:hover:shadow-[0_0_20px_rgba(196,164,106,0.3)] text-primary-foreground dark:text-wes-vintage-gold text-lg font-light mx-auto relative overflow-hidden ${
-                        platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''
-                      }`}
-                      style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
-                    >
-                      <CTAContent 
-                        icon={platformInstall.showInstallCTA ? platformInstall.ctaIcon : 'paintbrush'}
-                        text={platformInstall.showInstallCTA ? platformInstall.ctaText : 'Go to Tools'}
-                        isWaiting={platformInstall.isWaitingForPrompt}
-                      />
-                    </button>
-                  </div>
-                  {/* Show secondary browser option when install CTA is showing */}
-                  <div 
-                    className={`transition-all duration-300 ${
-                      platformInstall.showInstallCTA 
-                        ? 'opacity-100 translate-y-0' 
-                        : 'opacity-0 -translate-y-2 pointer-events-none h-0'
-                    }`}
-                  >
-                    <button
-                      onClick={() => navigate('/tools')}
-                      className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                    >
-                      or continue in browser
-                    </button>
-                  </div>
-                </div>
+                // User is logged in - go to tools
+                <button
+                  onClick={() => navigate('/tools')}
+                  className="px-12 py-4 bg-[#e8e4db] hover:bg-[#d8d4cb] rounded-sm border-2 border-[#2d4a4a] text-[#2d4a4a] text-2xl tracking-wide transition-all duration-200 shadow-[-8px_8px_0_0_#1a2b2b] hover:shadow-[-4px_4px_0_0_#1a2b2b] hover:translate-x-[-2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[-4px] active:translate-y-[4px]"
+                  style={{ fontFamily: "'TTGertika', sans-serif" }}
+                >
+                  go to tools
+                </button>
               ) : (
-                // Not logged in - show install CTA or Discord sign-in with smooth transitions
-                <div className="flex flex-col items-center gap-2 md:gap-3">
-                  <div className="group">
-                    <button
-                      onClick={async () => {
-                        if (platformInstall.showInstallCTA) {
-                          // If we can trigger the browser's install prompt, do it
-                          if (platformInstall.canInstall) {
-                            const installed = await platformInstall.triggerInstall();
-                            if (!installed) {
-                              setShowInstallModal(true);
-                            }
-                          } else {
-                            // Manual install or waiting - show instructions modal
-                            setShowInstallModal(true);
-                          }
-                        } else {
-                          // No install CTA - do Discord sign-in
-                          handleDiscordSignIn();
-                        }
-                      }}
-                      className={`flex items-center space-x-2 px-6 py-4 bg-primary hover:bg-primary/90 dark:bg-transparent dark:hover:bg-wes-vintage-gold/10 rounded-full border-2 border-primary/40 hover:border-primary/60 dark:border-wes-vintage-gold/50 dark:hover:border-wes-vintage-gold shadow-wes-vintage hover:shadow-wes-hover dark:shadow-none dark:hover:shadow-[0_0_20px_rgba(196,164,106,0.3)] text-primary-foreground dark:text-wes-vintage-gold text-lg font-light mx-auto relative overflow-hidden ${
-                        platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''
-                      }`}
-                      style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
-                    >
-                      <CTAContent 
-                        icon={platformInstall.showInstallCTA ? platformInstall.ctaIcon : 'paintbrush'}
-                        text={platformInstall.showInstallCTA ? platformInstall.ctaText : 'Sign in with Discord'}
-                        isWaiting={platformInstall.isWaitingForPrompt}
-                      />
-                    </button>
-                  </div>
-                  {/* Show secondary Discord option only when install CTA is showing */}
-                  <div 
-                    className={`transition-all duration-300 ${
-                      platformInstall.showInstallCTA 
-                        ? 'opacity-100 translate-y-0' 
-                        : 'opacity-0 -translate-y-2 pointer-events-none h-0'
-                    }`}
-                  >
-                    <button
-                      onClick={handleDiscordSignIn}
-                      className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                    >
-                      or sign in here instead
-                    </button>
-                  </div>
-                </div>
+                // Not logged in - Discord sign-in
+                <button
+                  onClick={handleDiscordSignIn}
+                  className="px-12 py-4 bg-[#e8e4db] hover:bg-[#d8d4cb] rounded-sm border-2 border-[#2d4a4a] text-[#2d4a4a] text-2xl tracking-wide transition-all duration-200 shadow-[-8px_8px_0_0_#1a2b2b] hover:shadow-[-4px_4px_0_0_#1a2b2b] hover:translate-x-[-2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[-4px] active:translate-y-[4px]"
+                  style={{ fontFamily: "'TTGertika', sans-serif" }}
+                >
+                  sign in with Discord
+                </button>
               )}
             </div>
-            
-            {/* Install Instructions Modal */}
-            <InstallInstructionsModal
-              open={showInstallModal}
-              onOpenChange={setShowInstallModal}
-              installMethod={platformInstall.installMethod}
-              platform={platformInstall.platform}
-              browser={platformInstall.browser}
-              deviceType={platformInstall.deviceType}
-              instructions={platformInstall.installInstructions}
-              isAppInstalled={platformInstall.isAppInstalled}
-              isSignedIn={!!session}
-              onFallbackToDiscord={session ? () => navigate('/tools') : handleDiscordSignIn}
-            />
             </div>
           </div>
 
@@ -508,8 +240,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             style={{ gridTemplateRows: phase === 'content-revealing' || phase === 'complete' ? '1fr' : '0fr' }}
           >
             <div className="overflow-hidden">
-              <div className="mt-4 md:mt-8 flex justify-center pt-2 pb-4">
-                <div className="flex flex-col items-center space-y-2 md:space-y-3">
+              <div className="mt-2 flex justify-center">
+                <div className="flex flex-col items-center space-y-1">
                   {/* GitHub and Discord icons side by side */}
                   <div className="flex items-center space-x-3">
                     <div style={getPopStyle(0.8, false)}>
@@ -517,9 +249,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         href="http://github.com/peteromallet/reigh"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block p-2 bg-card/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-card/70 dark:hover:bg-gray-800/70 group opacity-80 hover:opacity-100 shadow-md"
+                        className="block p-2 bg-transparent rounded-full border border-[#ecede3]/30 hover:border-[#ecede3]/60 transition-all duration-300 hover:bg-[#ecede3]/10 group"
                       >
-                        <Github className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                        <Github className="w-4 h-4 text-[#ecede3]/70 group-hover:text-[#ecede3] transition-colors duration-300" strokeWidth={1.5} />
                       </a>
                     </div>
                     <div style={getPopStyle(0.95, false)}>
@@ -527,43 +259,41 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         href="https://discord.gg/D5K2c6kfhy"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block p-2 bg-card/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-card/70 dark:hover:bg-gray-800/70 group opacity-80 hover:opacity-100 shadow-md"
+                        className="block p-2 bg-transparent rounded-full border border-[#ecede3]/30 hover:border-[#ecede3]/60 transition-all duration-300 hover:bg-[#ecede3]/10 group"
                       >
-                        <MessageCircle className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                        <MessageCircle className="w-4 h-4 text-[#ecede3]/70 group-hover:text-[#ecede3] transition-colors duration-300" strokeWidth={1.5} />
                       </a>
                     </div>
-              </div>
+                  </div>
 
                   {/* Placeholder icon beneath them */}
                   <div style={getPopStyle(1.1, false)}>
-                    <div className="p-1.5 bg-card/20 dark:bg-gray-800/20 backdrop-blur-sm rounded-full border border-wes-vintage-gold/5 opacity-30">
-                      <Plus className="w-2.5 h-2.5 text-wes-vintage-gold/40" />
+                    <div className="p-1 opacity-0">
+                      <Plus className="w-2 h-2 text-transparent" />
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Banodoco Logo */}
-              <div className="flex justify-center">
-                <div className="mt-2">
+              <div className="flex justify-center mt-4">
                   <a
                     href="http://banodoco.ai/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block"
+                    className="block opacity-60 hover:opacity-100 transition-opacity duration-300"
                   >
                   <img 
                     src="/banodoco-gold.png" 
                     alt="Banodoco" 
-                    className={`w-[34px] h-[34px] object-contain image-rendering-pixelated
+                    className={`w-[40px] h-[40px] object-contain image-rendering-pixelated
                       ${banodocoState === 'hidden' ? 'opacity-0' : ''}
                       ${banodocoState === 'animating' ? 'animate-burst-and-flash' : ''}
-                      ${banodocoState === 'visible' ? 'opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 hover:saturate-150 hover:hue-rotate-[-15deg] transition-all duration-700 ease-in-out' : ''}
+                      ${banodocoState === 'visible' ? 'opacity-100' : ''}
                     `} 
                     style={{ imageRendering: 'auto' }}
                   />
                   </a>
-                </div>
               </div>
             </div>
           </div>
