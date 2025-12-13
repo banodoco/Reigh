@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useProjectContextDebug } from '@/shared/hooks/useProjectContextDebug';
 
 import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
+import { useDarkMode } from '@/shared/hooks/useDarkMode';
 
 interface GlobalHeaderProps {
   contentOffsetRight?: number;
@@ -31,6 +32,21 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
+  const { darkMode } = useDarkMode();
+  
+  // Dark mode icon colors (muted versions of gradient colors)
+  const darkIconColors = {
+    palette: '#8a7090',    // lavender (muted)
+    coral: '#9a6565',      // coral (muted)
+    yellow: '#8a7550',     // gold (muted)
+    blue: '#6080a0',       // dusty-blue (muted)
+  };
+  
+  // Get subtle background style for dark mode icons
+  const getDarkIconStyle = (color: string) => darkMode ? { 
+    borderColor: color, 
+    backgroundColor: `${color}0d` // 0d = ~5% opacity
+  } : undefined;
   
   // Tablets should have sticky header like desktop, only phones have scrolling header
   const shouldHaveStickyHeader = !isMobile || isTablet;
@@ -253,8 +269,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               className="group flex items-center space-x-4 relative p-2 -m-2 cursor-pointer z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-2xl"
             >
               <div className="relative">
-                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-4px_4px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-4px_4px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-2px_2px_0_0_rgba(180,160,100,0.4)] dark:group-hover:border-[#c9b896] group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-500">
-                  <Palette className="h-8 w-8 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] group-hover:rotate-12 transition-transform duration-500 drop-shadow-lg dark:drop-shadow-none" />
+                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:border-2 rounded-sm shadow-[-4px_4px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-4px_4px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-2px_2px_0_0_rgba(180,160,100,0.4)] group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-500" style={getDarkIconStyle(darkIconColors.palette)}>
+                  <Palette className="h-8 w-8 group-hover:rotate-12 transition-transform duration-500 drop-shadow-lg dark:drop-shadow-none" style={{ color: darkMode ? darkIconColors.palette : 'white' }} />
                 </div>
                 <div className="absolute -inset-1 border border-wes-vintage-gold/20 rounded-2xl animate-rotate-slow opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
                 <div className="absolute -top-2 -right-2 pointer-events-none">
@@ -285,7 +301,18 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                     disabled={isLoadingProjects || projects.length === 0}
                   >
                     <SelectTrigger variant="retro" className="w-[280px] h-12 relative z-50">
-                      <SelectValue placeholder="Select a project" />
+                      <SelectValue placeholder="Select a project">
+                        {selectedProject && (
+                          <div className="flex items-center space-x-2">
+                            <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
+                              <Star className="h-2 w-2 text-white flex-shrink-0" fill="white" strokeWidth={0} />
+                            </div>
+                            <span className="truncate">
+                              {selectedProject.name.length > 30 ? `${selectedProject.name.substring(0, 30)}...` : selectedProject.name}
+                            </span>
+                          </div>
+                        )}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent variant="retro">
                       {projects.map(project => (
@@ -335,10 +362,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-12 w-12 wes-button-subtle gradient-icon-coral dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[1px] hover:translate-y-[1px] group disabled:cursor-not-allowed transition-all duration-300"
+                className="h-12 w-12 wes-button-subtle gradient-icon-coral dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[1px] hover:translate-y-[1px] group disabled:cursor-not-allowed transition-all duration-300"
                 disabled={isLoadingProjects || !selectedProject}
+                style={getDarkIconStyle(darkIconColors.coral)}
               >
-                <Wrench className="h-5 w-5 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] transition-transform duration-300 group-hover:rotate-12" />
+                <Wrench className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" style={{ color: darkMode ? darkIconColors.coral : 'white' }} />
               </Button>
               
               {/* Create Project Button - Always visible */}
@@ -346,9 +374,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsCreateProjectModalOpen(true)} 
-                className="h-12 w-12 wes-button-pulse gradient-icon-yellow dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[1px] hover:translate-y-[1px] group transition-all duration-300"
+                className="h-12 w-12 wes-button-pulse gradient-icon-yellow dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[1px] hover:translate-y-[1px] group transition-all duration-300"
+                style={getDarkIconStyle(darkIconColors.yellow)}
               >
-                <PlusCircle className="h-5 w-5 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] transition-transform duration-300 group-hover:scale-110" />
+                <PlusCircle className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" style={{ color: darkMode ? darkIconColors.yellow : 'white' }} />
               </Button>
             </div>
           </div>
@@ -370,13 +399,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               variant="ghost"
               size="icon"
               onClick={onOpenSettings}
-              className="h-12 w-12 no-sweep wes-button-spin-pulse gradient-icon-blue dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[1px] hover:translate-y-[1px] group relative overflow-hidden transition-all duration-300"
+              className="h-12 w-12 no-sweep wes-button-spin-pulse gradient-icon-blue dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[1px] hover:translate-y-[1px] group relative overflow-hidden transition-all duration-300"
+              style={getDarkIconStyle(darkIconColors.blue)}
             >
               {/* Animated background pattern */}
               <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain pointer-events-none"></div>
               
               {/* Main settings icon */}
-              <Settings className="h-5 w-5 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />
+              <Settings className="h-5 w-5 relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" style={{ color: darkMode ? darkIconColors.blue : 'white' }} />
             </Button>
           </div>
         </div>
@@ -408,8 +438,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               >
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
-                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-1px_1px_0_0_rgba(90,90,80,0.4)] group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-300">
-                      <Palette className="h-6 w-6 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] group-hover:rotate-12 transition-transform duration-300 drop-shadow-lg dark:drop-shadow-none" />
+                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-1px_1px_0_0_rgba(90,90,80,0.4)] group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-300" style={getDarkIconStyle(darkIconColors.palette)}>
+                      <Palette className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300 drop-shadow-lg dark:drop-shadow-none" style={{ color: darkMode ? darkIconColors.palette : 'white' }} />
                     </div>
                     <div className="absolute -top-1 -right-1 pointer-events-none">
                       <Crown className="w-2.5 h-2.5 text-wes-vintage-gold animate-bounce-gentle opacity-60" />
@@ -433,10 +463,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-10 w-10 wes-button-subtle gradient-icon-coral dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group disabled:cursor-not-allowed transition-all duration-300"
+                className="h-10 w-10 wes-button-subtle gradient-icon-coral dark:bg-none dark:border-2 rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group disabled:cursor-not-allowed transition-all duration-300"
                 disabled={isLoadingProjects || !selectedProject}
+                style={getDarkIconStyle(darkIconColors.coral)}
               >
-                <Wrench className="h-4 w-4 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] transition-transform duration-300 group-hover:rotate-12" />
+                <Wrench className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" style={{ color: darkMode ? darkIconColors.coral : 'white' }} />
               </Button>
               
               {/* Create Project Button - Always visible */}
@@ -444,9 +475,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsCreateProjectModalOpen(true)} 
-                className="h-10 w-10 wes-button-pulse gradient-icon-yellow dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group transition-all duration-300"
+                className="h-10 w-10 wes-button-pulse gradient-icon-yellow dark:bg-none dark:border-2 rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group transition-all duration-300"
+                style={getDarkIconStyle(darkIconColors.yellow)}
               >
-                <PlusCircle className="h-4 w-4 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] transition-transform duration-300 group-hover:scale-110" />
+                <PlusCircle className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" style={{ color: darkMode ? darkIconColors.yellow : 'white' }} />
               </Button>
             </div>
 
@@ -473,10 +505,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={onOpenSettings}
-                className="h-10 w-10 no-sweep wes-button-spin-pulse gradient-icon-blue dark:bg-none dark:!bg-transparent dark:border-2 dark:border-[#7a7a6a] rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] dark:hover:border-[#c9b896] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group relative overflow-hidden transition-all duration-300"
+                className="h-10 w-10 no-sweep wes-button-spin-pulse gradient-icon-blue dark:bg-none dark:border-2 rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group relative overflow-hidden transition-all duration-300"
+                style={getDarkIconStyle(darkIconColors.blue)}
               >
                 <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain pointer-events-none"></div>
-                <Settings className="h-4 w-4 text-white dark:!text-[#a0a090] dark:group-hover:!text-[#d4c4a0] relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />
+                <Settings className="h-4 w-4 relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" style={{ color: darkMode ? darkIconColors.blue : 'white' }} />
               </Button>
             </div>
           </div>
@@ -499,7 +532,18 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   disabled={isLoadingProjects || projects.length === 0}
                 >
                   <SelectTrigger variant="retro" size="sm" className="w-full h-10 relative z-50">
-                    <SelectValue placeholder="Select project" />
+                    <SelectValue placeholder="Select project">
+                      {selectedProject && (
+                        <div className="flex items-center space-x-2">
+                          <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
+                            <Star className="h-2 w-2 text-white flex-shrink-0" fill="white" strokeWidth={0} />
+                          </div>
+                          <span className="text-sm truncate">
+                            {selectedProject.name.length > 30 ? `${selectedProject.name.substring(0, 30)}...` : selectedProject.name}
+                          </span>
+                        </div>
+                      )}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent variant="retro">
                     {projects.map(project => (

@@ -320,7 +320,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
         <div className="flex items-center h-full px-2 py-1 sm:px-3 sm:py-1.5 lg:px-4 lg:py-2 relative">
           {/* Icon */}
           <div className={`flex-shrink-0 ${isSm ? 'mr-4' : 'mr-3'} ${isLg ? 'mr-6' : ''} relative z-10`}>
-<div className={`${iconContainerSize} bg-gradient-to-br ${item.gradient} dark:bg-none dark:bg-transparent dark:border-2 rounded-sm flex items-center justify-center shadow-[-4px_4px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-4px_4px_0_0_rgba(90,90,80,0.3)] ${!isDisabled ? 'group-hover:shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-2px_2px_0_0_rgba(180,160,100,0.4)] group-hover:translate-x-[1px] group-hover:translate-y-[1px]' : ''} transition-all duration-300`} style={darkMode ? { borderColor: item.darkIconColor } : undefined}>
+<div className={`${iconContainerSize} bg-gradient-to-br ${item.gradient} dark:bg-none dark:border-2 rounded-sm flex items-center justify-center shadow-[-4px_4px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-4px_4px_0_0_rgba(90,90,80,0.3)] ${!isDisabled ? 'group-hover:shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-2px_2px_0_0_rgba(180,160,100,0.4)] group-hover:translate-x-[1px] group-hover:translate-y-[1px]' : ''} transition-all duration-300`} style={darkMode ? { borderColor: item.darkIconColor, backgroundColor: `${item.darkIconColor}0d` } : undefined}>
                               <item.icon className={`${iconSize} drop-shadow-lg dark:drop-shadow-none transition-colors duration-300`} style={{ color: darkMode ? item.darkIconColor : 'white' }} />
             </div>
           </div>
@@ -349,7 +349,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
             </h3>
             
             {/* Mini icon badge */}
-<div className={`${isLg ? 'w-6 h-6' : isSm ? 'w-5 h-5' : 'w-4 h-4'} bg-gradient-to-br ${item.gradient} dark:bg-none dark:bg-transparent dark:border rounded-none flex items-center justify-center shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.3)] ${!isDisabled ? 'group-hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] group-hover:translate-x-[0.5px] group-hover:translate-y-[0.5px]' : ''} transition-all duration-300 flex-shrink-0`} style={darkMode ? { borderColor: item.darkIconColor } : undefined}>
+<div className={`${isLg ? 'w-6 h-6' : isSm ? 'w-5 h-5' : 'w-4 h-4'} bg-gradient-to-br ${item.gradient} dark:bg-none dark:border rounded-none flex items-center justify-center shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.3)] ${!isDisabled ? 'group-hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] group-hover:translate-x-[0.5px] group-hover:translate-y-[0.5px]' : ''} transition-all duration-300 flex-shrink-0`} style={darkMode ? { borderColor: item.darkIconColor, backgroundColor: `${item.darkIconColor}0d` } : undefined}>
                               <item.icon className={`${isLg ? 'w-3 h-3' : isSm ? 'w-2.5 h-2.5' : 'w-2 h-2'} drop-shadow-sm dark:drop-shadow-none transition-colors duration-300`} style={{ color: darkMode ? item.darkIconColor : 'white' }} />
             </div>
           </div>
