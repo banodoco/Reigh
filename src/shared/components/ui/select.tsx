@@ -34,8 +34,8 @@ const selectTriggerVariants = cva(
         emerald: "!border-emerald-400 dark:!border-emerald-500 !text-emerald-600 dark:!text-emerald-400 focus:!ring-emerald-400/30",
         amber: "!border-amber-400 dark:!border-amber-500 !text-amber-600 dark:!text-amber-400 focus:!ring-amber-400/30",
         rose: "!border-rose-400 dark:!border-rose-500 !text-rose-600 dark:!text-rose-400 focus:!ring-rose-400/30",
-        // Zinc scheme for dark panes - matches TasksPane zinc buttons exactly
-        zinc: "!bg-zinc-700 !border-zinc-600 !text-zinc-300 hover:!bg-zinc-600 hover:!text-zinc-100 focus:!ring-zinc-500/30",
+        // Zinc scheme for dark panes - subtle secondary style
+        zinc: "!bg-zinc-800/70 !border-zinc-700 !text-zinc-400 hover:!bg-zinc-700/70 hover:!text-zinc-300 focus:!ring-zinc-600/30",
       },
     },
     defaultVariants: {

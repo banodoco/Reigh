@@ -68,7 +68,7 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
         
         <Select value={selectedShotId} onValueChange={onShotChange} open={open} onOpenChange={onOpenChange}>
           <SelectTrigger 
-            variant={whiteText ? "retro-dark" : "retro"} 
+            variant={whiteText ? "retro-dark" : "default"} 
             colorScheme={whiteText ? "zinc" : "default"}
             size={size === 'sm' ? 'sm' : 'default'}
             className={triggerClassName || defaultTriggerClassName}
@@ -76,13 +76,13 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
             <SelectValue placeholder="Filter by shot..." />
           </SelectTrigger>
           <SelectContent
-            variant={whiteText ? "zinc" : "retro"}
+            variant={whiteText ? "zinc" : "default"}
             className="w-[var(--radix-select-trigger-width)] max-h-60 overflow-y-auto"
             ref={contentRef}
           >
-            <SelectItem variant={whiteText ? "zinc" : "retro"} value="all">All Shots</SelectItem>
+            <SelectItem variant={whiteText ? "zinc" : "default"} value="all">All Shots</SelectItem>
             {shots?.map(shot => (
-              <SelectItem variant={whiteText ? "zinc" : "retro"} key={shot.id} value={shot.id}>
+              <SelectItem variant={whiteText ? "zinc" : "default"} key={shot.id} value={shot.id}>
                 {shot.name}
               </SelectItem>
             ))}

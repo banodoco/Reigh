@@ -157,12 +157,12 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
               onValueChange={handlePageSelect}
               disabled={loadingButton !== null}
             >
-              <SelectTrigger variant={whiteText ? "retro-dark" : "retro"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 w-16 text-sm">
+              <SelectTrigger variant={whiteText ? "retro-dark" : "default"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 w-16 text-sm">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent variant={whiteText ? "zinc" : "retro"}>
+              <SelectContent variant={whiteText ? "zinc" : "default"}>
                 {Array.from({ length: totalPages }, (_, i) => (
-                  <SelectItem variant={whiteText ? "zinc" : "retro"} key={i + 1} value={(i + 1).toString()} className="text-sm">
+                  <SelectItem variant={whiteText ? "zinc" : "default"} key={i + 1} value={(i + 1).toString()} className="text-sm">
                     {i + 1}
                   </SelectItem>
                 ))}
@@ -291,12 +291,12 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
           onValueChange={handlePageSelect}
           disabled={loadingButton !== null}
         >
-          <SelectTrigger variant={whiteText ? "retro-dark" : "retro"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 w-16 text-sm">
+          <SelectTrigger variant={whiteText ? "retro-dark" : "default"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 w-16 text-sm">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent variant={whiteText ? "zinc" : "retro"}>
+          <SelectContent variant={whiteText ? "zinc" : "default"}>
             {Array.from({ length: totalPages }, (_, i) => (
-              <SelectItem variant={whiteText ? "zinc" : "retro"} key={i + 1} value={(i + 1).toString()} className="text-sm">
+              <SelectItem variant={whiteText ? "zinc" : "default"} key={i + 1} value={(i + 1).toString()} className="text-sm">
                 {i + 1}
               </SelectItem>
             ))}

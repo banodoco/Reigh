@@ -159,13 +159,13 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
                 <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
                   onMediaTypeFilterChange?.(value);
                 }}>
-                  <SelectTrigger id="media-type-filter" variant={whiteText ? "retro-dark" : "retro"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 text-xs w-[80px]">
+                  <SelectTrigger id="media-type-filter" variant={whiteText ? "retro-dark" : "default"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 text-xs w-[80px]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent variant={whiteText ? "zinc" : "retro"}>
-                    <SelectItem variant={whiteText ? "zinc" : "retro"} value="all" className="text-xs">All</SelectItem>
-                    <SelectItem variant={whiteText ? "zinc" : "retro"} value="image" className="text-xs">Images</SelectItem>
-                    <SelectItem variant={whiteText ? "zinc" : "retro"} value="video" className="text-xs">Videos</SelectItem>
+                  <SelectContent variant={whiteText ? "zinc" : "default"}>
+                    <SelectItem variant={whiteText ? "zinc" : "default"} value="all" className="text-xs">All</SelectItem>
+                    <SelectItem variant={whiteText ? "zinc" : "default"} value="image" className="text-xs">Images</SelectItem>
+                    <SelectItem variant={whiteText ? "zinc" : "default"} value="video" className="text-xs">Videos</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -201,13 +201,13 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
                 <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
                   onMediaTypeFilterChange?.(value);
                 }}>
-                  <SelectTrigger id="media-type-filter-single" variant={whiteText ? "retro-dark" : "retro"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 text-xs w-[80px]">
+                  <SelectTrigger id="media-type-filter-single" variant={whiteText ? "retro-dark" : "default"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 text-xs w-[80px]">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent variant={whiteText ? "zinc" : "retro"}>
-                    <SelectItem variant={whiteText ? "zinc" : "retro"} value="all" className="text-xs">All</SelectItem>
-                    <SelectItem variant={whiteText ? "zinc" : "retro"} value="image" className="text-xs">Images</SelectItem>
-                    <SelectItem variant={whiteText ? "zinc" : "retro"} value="video" className="text-xs">Videos</SelectItem>
+                  <SelectContent variant={whiteText ? "zinc" : "default"}>
+                    <SelectItem variant={whiteText ? "zinc" : "default"} value="all" className="text-xs">All</SelectItem>
+                    <SelectItem variant={whiteText ? "zinc" : "default"} value="image" className="text-xs">Images</SelectItem>
+                    <SelectItem variant={whiteText ? "zinc" : "default"} value="video" className="text-xs">Videos</SelectItem>
                   </SelectContent>
                 </Select>
               )}
