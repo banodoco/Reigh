@@ -9,6 +9,7 @@ import { useReferralTracking } from '@/shared/hooks/useReferralTracking';
 import { ConstellationCanvas } from '@/shared/components/ConstellationCanvas';
 import { useDebounce } from '@/shared/hooks/use-debounce';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import usePersistentState from '@/shared/hooks/usePersistentState';
 
 // Components
 import { HeroSection } from './components/HeroSection';
@@ -27,6 +28,22 @@ export default function HomePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  
+  // Get user's actual dark mode preference (don't use the hook to avoid side effects)
+  const [userDarkModePref] = usePersistentState<boolean>('dark-mode', true);
+  
+  // Force dark mode on homepage without changing user's settings
+  useEffect(() => {
+    // Always add dark class on homepage
+    document.documentElement.classList.add('dark');
+    
+    // Restore user's preference when leaving
+    return () => {
+      if (!userDarkModePref) {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+  }, [userDarkModePref]);
   
   // Assets & Animation State
   const [assetsLoaded, setAssetsLoaded] = useState(false);
@@ -63,10 +80,9 @@ export default function HomePage() {
     const progress = currentTime / duration;
     
     // Ease zone: slow down in first/last 15% of video
-    // With 30fps interpolated video, we can use higher speeds
     const easeZone = 0.15;
-    const minSpeed = 0.8;  // ~24fps at slowest
-    const maxSpeed = 1.0;  // 30fps at full speed
+    const minSpeed = 0.5;   // Slowest at loop points
+    const maxSpeed = 0.7;   // Normal playback speed
     
     let speed = maxSpeed;
     
@@ -120,15 +136,16 @@ export default function HomePage() {
     };
   }, []);
   
-  // Dynamic video playback rate for smooth loop transitions
-  // TEMPORARILY DISABLED to debug flashing issue
-  // useEffect(() => {
-  //   const video = videoRef.current;
-  //   if (!video) return;
-  //
-  //   video.addEventListener('timeupdate', updatePlaybackRate);
-  //   return () => video.removeEventListener('timeupdate', updatePlaybackRate);
-  // }, [updatePlaybackRate]);
+  // Dynamic video playback rate for smooth loop transitions (desktop only)
+  useEffect(() => {
+    if (isMobile) return; // Skip on mobile - was causing flashing
+    
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.addEventListener('timeupdate', updatePlaybackRate);
+    return () => video.removeEventListener('timeupdate', updatePlaybackRate);
+  }, [updatePlaybackRate, isMobile]);
 
   // Mobile video autoplay fix
   useEffect(() => {
