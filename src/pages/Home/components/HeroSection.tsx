@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Github, MessageCircle, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Github, MessageCircle, Plus, ChevronLeft, ChevronRight, Download, ExternalLink } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { Button } from '@/shared/components/ui/button';
+import { usePlatformInstall } from '@/shared/hooks/usePlatformInstall';
+import { InstallInstructionsModal } from './InstallInstructionsModal';
 import type { Session } from '@supabase/supabase-js';
 
 interface ExampleStyle {
@@ -39,6 +41,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [minLoadTimePassed, setMinLoadTimePassed] = useState(false);
   const [openTipOpen, setOpenTipOpen] = useState(false);
   const [emergingTipOpen, setEmergingTipOpen] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  
+  // Platform-aware PWA install detection
+  const platformInstall = usePlatformInstall();
+
+  // Close install modal if we're in standalone mode (PWA)
+  // This handles the case where Chrome transfers page state when clicking "Open in app"
+  useEffect(() => {
+    if (platformInstall.isStandalone && showInstallModal) {
+      setShowInstallModal(false);
+    }
+  }, [platformInstall.isStandalone, showInstallModal]);
 
   // Enforce minimum loading time
   useEffect(() => {
@@ -228,25 +242,122 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             {/* CTA button */}                                                                
             <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-4 md:pb-6 overflow-visible flex justify-center">
               {session ? (
-                // User is logged in - go to tools
-                <Button
-                  variant="retro"
-                  size="retro-lg"
-                  onClick={() => navigate('/tools')}
-                >
-                  go to tools
-                </Button>
+                // User is logged in - show install CTA if available, otherwise go to tools
+                <div className="flex flex-col items-center gap-2 md:gap-3">
+                  <Button
+                    variant="retro"
+                    size="retro-lg"
+                    className={platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''}
+                    onClick={async () => {
+                      if (platformInstall.showInstallCTA) {
+                        if (platformInstall.canInstall) {
+                          const installed = await platformInstall.triggerInstall();
+                          if (!installed) {
+                            setShowInstallModal(true);
+                          }
+                        } else {
+                          setShowInstallModal(true);
+                        }
+                      } else {
+                        navigate('/tools');
+                      }
+                    }}
+                  >
+                    {platformInstall.showInstallCTA ? (
+                      <>
+                        {platformInstall.ctaIcon === 'download' && <Download className="w-5 h-5" />}
+                        {platformInstall.ctaIcon === 'plus' && <Plus className="w-5 h-5" />}
+                        {platformInstall.ctaIcon === 'external' && <ExternalLink className="w-5 h-5" />}
+                        {platformInstall.ctaText}
+                      </>
+                    ) : (
+                      'go to tools'
+                    )}
+                  </Button>
+                  {/* Show secondary browser option when install CTA is showing */}
+                  <div 
+                    className={`transition-all duration-300 ${
+                      platformInstall.showInstallCTA 
+                        ? 'opacity-100 translate-y-0' 
+                        : 'opacity-0 -translate-y-2 pointer-events-none h-0'
+                    }`}
+                  >
+                    <button
+                      onClick={() => navigate('/tools')}
+                      className="text-xs text-[#ecede3]/50 hover:text-[#ecede3] transition-colors"
+                    >
+                      or continue in browser
+                    </button>
+                  </div>
+                </div>
               ) : (
-                // Not logged in - Discord sign-in
-                <Button
-                  variant="retro"
-                  size="retro-lg"
-                  onClick={handleDiscordSignIn}
-                >
-                  sign in with Discord
-                </Button>
+                // Not logged in - show install CTA or Discord sign-in
+                <div className="flex flex-col items-center gap-2 md:gap-3">
+                  <Button
+                    variant="retro"
+                    size="retro-lg"
+                    className={platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''}
+                    onClick={async () => {
+                      if (platformInstall.showInstallCTA) {
+                        // If we can trigger the browser's install prompt, do it
+                        if (platformInstall.canInstall) {
+                          const installed = await platformInstall.triggerInstall();
+                          if (!installed) {
+                            setShowInstallModal(true);
+                          }
+                        } else {
+                          // Manual install or waiting - show instructions modal
+                          setShowInstallModal(true);
+                        }
+                      } else {
+                        // No install CTA - do Discord sign-in
+                        handleDiscordSignIn();
+                      }
+                    }}
+                  >
+                    {platformInstall.showInstallCTA ? (
+                      <>
+                        {platformInstall.ctaIcon === 'download' && <Download className="w-5 h-5" />}
+                        {platformInstall.ctaIcon === 'plus' && <Plus className="w-5 h-5" />}
+                        {platformInstall.ctaIcon === 'external' && <ExternalLink className="w-5 h-5" />}
+                        {platformInstall.ctaText}
+                      </>
+                    ) : (
+                      'sign in with Discord'
+                    )}
+                  </Button>
+                  {/* Show secondary Discord option only when install CTA is showing */}
+                  <div 
+                    className={`transition-all duration-300 ${
+                      platformInstall.showInstallCTA 
+                        ? 'opacity-100 translate-y-0' 
+                        : 'opacity-0 -translate-y-2 pointer-events-none h-0'
+                    }`}
+                  >
+                    <button
+                      onClick={handleDiscordSignIn}
+                      className="text-xs text-[#ecede3]/50 hover:text-[#ecede3] transition-colors"
+                    >
+                      or sign in here instead
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
+            
+            {/* Install Instructions Modal */}
+            <InstallInstructionsModal
+              open={showInstallModal}
+              onOpenChange={setShowInstallModal}
+              installMethod={platformInstall.installMethod}
+              platform={platformInstall.platform}
+              browser={platformInstall.browser}
+              deviceType={platformInstall.deviceType}
+              instructions={platformInstall.installInstructions}
+              isAppInstalled={platformInstall.isAppInstalled}
+              isSignedIn={!!session}
+              onFallbackToDiscord={session ? () => navigate('/tools') : handleDiscordSignIn}
+            />
             </div>
           </div>
 
