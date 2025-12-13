@@ -350,6 +350,17 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         // Priority 3: Let the task creation logic handle it (fetches from project)
         return undefined;
     }, [shotData?.aspect_ratio, projectResolution, projectAspectRatio, parentShotId]);
+    
+    // Aspect ratio priority for video players: shot's aspect_ratio > project's aspect_ratio > default "16:9"
+    const effectiveAspectRatio = useMemo(() => {
+        if (shotData?.aspect_ratio) {
+            return shotData.aspect_ratio;
+        }
+        if (projectAspectRatio) {
+            return projectAspectRatio;
+        }
+        return '16:9';
+    }, [shotData?.aspect_ratio, projectAspectRatio]);
 
     // Extract expected segment count and data from parent's orchestrator_details
     const expectedSegmentData = React.useMemo(() => {
@@ -940,6 +951,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                     originalIndex={-1}
                                     shouldPreload="metadata"
                                     isMobile={isMobile}
+                                    projectAspectRatio={effectiveAspectRatio}
                                     projectId={projectId}
                                     onLightboxOpen={() => setIsParentLightboxOpen(true)}
                                     onMobileTap={handleMobileTap}
@@ -1004,6 +1016,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 onUpdate={refetch}
                                                 availableLoras={availableLoras}
                                                 projectResolution={effectiveResolution}
+                                                aspectRatio={effectiveAspectRatio}
                                                 onImageLightboxOpen={(imageIndex, images) => {
                                                     console.log('[SegmentImageFlow] onImageLightboxOpen called in parent');
                                                     console.log('[SegmentImageFlow] imageIndex:', imageIndex);
@@ -1275,12 +1288,25 @@ interface SegmentCardProps {
     availableLoras: LoraModel[];
     onImageLightboxOpen: (imageIndex: 0 | 1, images: { start: { url: string; generationId?: string } | null; end: { url: string; generationId?: string } | null }) => void;
     projectResolution?: string; // Resolution derived from project's aspect ratio
+    aspectRatio?: string; // Aspect ratio string like "16:9" for video player containers
 }
 
-const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution }) => {
+const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio }) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [params, setParams] = useState<any>(child.params || {});
+    
+    // Calculate aspect ratio style for video container based on project/shot dimensions
+    const aspectRatioStyle = useMemo(() => {
+        if (!aspectRatio) {
+            return { aspectRatio: '16/9' }; // Default to 16:9
+        }
+        const [width, height] = aspectRatio.split(':').map(Number);
+        if (width && height) {
+            return { aspectRatio: `${width}/${height}` };
+        }
+        return { aspectRatio: '16/9' }; // Fallback to 16:9
+    }, [aspectRatio]);
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -1753,7 +1779,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         <Card className="overflow-hidden flex flex-col">
             {/* Video Preview */}
             <div 
-                className="relative aspect-video bg-black group"
+                className="relative bg-black group"
+                style={aspectRatioStyle}
             >
                     {/* Trim button - bottom right overlay, appears on hover */}
                     <Button
@@ -1774,6 +1801,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                         originalIndex={index}
                         shouldPreload="metadata"
                         isMobile={isMobile}
+                        projectAspectRatio={aspectRatio}
                         projectId={projectId}
                         onLightboxOpen={() => onLightboxOpen()}
                         onMobileTap={onMobileTap}
