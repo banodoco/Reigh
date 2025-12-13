@@ -314,7 +314,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 // User is logged in - show install CTA if available, otherwise go to tools
                 <div className="flex flex-col items-center gap-2 md:gap-3">
                   <button
-                    className={`${retroButtonBaseStyles} ${platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''}`}
+                    className={retroButtonBaseStyles}
                     style={retroButtonInlineStyles}
                     onClick={async () => {
                       if (platformInstall.showInstallCTA) {
@@ -356,7 +356,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 // Not logged in - show install CTA or Discord sign-in
                 <div className="flex flex-col items-center gap-2 md:gap-3">
                   <button
-                    className={`${retroButtonBaseStyles} ${platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''}`}
+                    className={retroButtonBaseStyles}
                     style={retroButtonInlineStyles}
                     onClick={async () => {
                       if (platformInstall.showInstallCTA) {
