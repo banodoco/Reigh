@@ -34,12 +34,12 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const isTablet = useIsTablet();
   const { darkMode } = useDarkMode();
   
-  // Dark mode icon colors (muted versions of gradient colors)
+  // Dark mode icon colors (very muted/faded versions)
   const darkIconColors = {
-    palette: '#8a7090',    // lavender (muted)
-    coral: '#9a6565',      // coral (muted)
-    yellow: '#8a7550',     // gold (muted)
-    blue: '#6080a0',       // dusty-blue (muted)
+    palette: '#a098a8',    // lavender (faded)
+    coral: '#a89090',      // coral (faded)
+    yellow: '#a8a088',     // gold (faded)
+    blue: '#8898a8',       // dusty-blue (faded)
   };
   
   // Get subtle background style for dark mode icons

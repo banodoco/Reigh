@@ -865,7 +865,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background-image: 
+    background-image:
       radial-gradient(circle at 1px 1px, hsl(var(--primary)) 1px, transparent 0),
       linear-gradient(45deg, transparent 48%, hsl(var(--primary) / 0.01) 49%, hsl(var(--primary) / 0.01) 51%, transparent 52%);
     background-size: 20px 20px, 8px 8px;

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Github, MessageCircle, Plus, ChevronLeft, ChevronRight, Download, ExternalLink } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Button } from '@/shared/components/ui/button';
 import { usePlatformInstall } from '@/shared/hooks/usePlatformInstall';
 import { InstallInstructionsModal } from './InstallInstructionsModal';
 import type { Session } from '@supabase/supabase-js';
@@ -25,6 +24,15 @@ interface HeroSectionProps {
 }
 
 type AnimationPhase = 'initial' | 'loading' | 'bar-complete' | 'content-revealing' | 'complete';
+
+// Force dark mode styles for retro button to prevent white flash during hydration/theme switch
+// Using inline styles for colors to guarantee they're present during re-renders, Tailwind classes for layout/behavior
+const retroButtonBaseStyles = "inline-flex items-center justify-center gap-2 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-14 px-12 py-4 text-xl font-heading rounded-sm border-2 tracking-wide transition-[transform,box-shadow] duration-200 shadow-[-3px_3px_0_0_rgba(20,30,30,0.4)] hover:shadow-[-1.5px_1.5px_0_0_rgba(20,30,30,0.4)] hover:translate-x-[-0.75px] hover:translate-y-[0.75px] active:shadow-none active:translate-x-[-1.5px] active:translate-y-[1.5px]";
+const retroButtonInlineStyles = {
+  backgroundColor: '#3a4a4a',
+  borderColor: '#8a9a9a',
+  color: '#d8d4cb',
+} as const;
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   barTransitionCompleted,
@@ -244,10 +252,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {session ? (
                 // User is logged in - show install CTA if available, otherwise go to tools
                 <div className="flex flex-col items-center gap-2 md:gap-3">
-                  <Button
-                    variant="retro"
-                    size="retro-lg"
-                    className={platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''}
+                  <button
+                    className={`${retroButtonBaseStyles} ${platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''}`}
+                    style={retroButtonInlineStyles}
                     onClick={async () => {
                       if (platformInstall.showInstallCTA) {
                         if (platformInstall.canInstall) {
@@ -273,7 +280,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     ) : (
                       'go to tools'
                     )}
-                  </Button>
+                  </button>
                   {/* Show secondary browser option when install CTA is showing */}
                   <div 
                     className={`transition-all duration-300 ${
@@ -293,10 +300,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               ) : (
                 // Not logged in - show install CTA or Discord sign-in
                 <div className="flex flex-col items-center gap-2 md:gap-3">
-                  <Button
-                    variant="retro"
-                    size="retro-lg"
-                    className={platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''}
+                  <button
+                    className={`${retroButtonBaseStyles} ${platformInstall.isWaitingForPrompt ? 'animate-pulse' : ''}`}
+                    style={retroButtonInlineStyles}
                     onClick={async () => {
                       if (platformInstall.showInstallCTA) {
                         // If we can trigger the browser's install prompt, do it
@@ -325,7 +331,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     ) : (
                       'sign in with Discord'
                     )}
-                  </Button>
+                  </button>
                   {/* Show secondary Discord option only when install CTA is showing */}
                   <div 
                     className={`transition-all duration-300 ${

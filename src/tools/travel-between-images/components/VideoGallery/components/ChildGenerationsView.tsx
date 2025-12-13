@@ -944,7 +944,24 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         </div>
                         
                         <div className="flex justify-center mt-4">
-                            <div className="w-full max-w-2xl">
+                            {/* Limit video size: max 50% width for square/landscape, max height for portrait */}
+                            <div 
+                                className="w-full"
+                                style={{
+                                    maxWidth: (() => {
+                                        if (!effectiveAspectRatio) return '50%';
+                                        const [w, h] = effectiveAspectRatio.split(':').map(Number);
+                                        if (w && h) {
+                                            // For portrait videos, limit by height instead
+                                            if (h > w) {
+                                                // Calculate width from max height of 60vh
+                                                return `min(50%, calc(60vh * ${w / h}))`;
+                                            }
+                                        }
+                                        return '50%';
+                                    })()
+                                }}
+                            >
                                 <VideoItem
                                     video={parentVideoRow}
                                     index={-1}

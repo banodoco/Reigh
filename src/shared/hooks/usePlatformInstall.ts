@@ -405,11 +405,8 @@ export function usePlatformInstall(): PlatformInstallState {
   // Should we show install CTA vs Discord sign-in
   const showInstallCTA = useMemo(() => {
     if (isStandalone) return false;
-    // Don't show install CTA while waiting for prompt - this prevents flash from
-    // "Install for Mac" to "Open Reigh App" when app is already installed
-    if (isWaitingForPrompt) return false;
-    // Show CTA if we have an install method or app is installed
-    return installMethod !== 'none' || isAppInstalled || (promptTimedOut && isDesktopChromium);
+    // Show CTA if we have an install method, we're waiting for the prompt, or app is installed
+    return installMethod !== 'none' || isWaitingForPrompt || isAppInstalled || (promptTimedOut && isDesktopChromium);
   }, [isStandalone, installMethod, isWaitingForPrompt, isAppInstalled, promptTimedOut, isDesktopChromium]);
   
   // Trigger install action

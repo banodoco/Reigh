@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, Globe, Lock, ChevronDown, Sun, Moon } from "lucide-react";
+import { Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, ChevronDown, Sun, Moon } from "lucide-react";
+import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
+import { PrivacyToggle } from "@/shared/components/ui/privacy-toggle";
 import { Skeleton } from "@/shared/components/ui/skeleton";
 import {
   Dialog,
@@ -622,30 +624,12 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
                       <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
                         <span className="font-medium">Resources</span>
-                        <div className="flex items-center gap-0">
-                          <button
-                            onClick={() => updatePrivacyDefaults({ resourcesPublic: true })}
-                            className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
-                              privacyDefaults.resourcesPublic
-                                ? 'bg-green-500 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                            }`}
-                          >
-                            <Globe className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
-                            Public
-                          </button>
-                          <button
-                            onClick={() => updatePrivacyDefaults({ resourcesPublic: false })}
-                            className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
-                              !privacyDefaults.resourcesPublic
-                                ? 'bg-gray-600 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                            }`}
-                          >
-                            <Lock className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
-                            Private
-                          </button>
-                        </div>
+                        <PrivacyToggle
+                          isPublic={privacyDefaults.resourcesPublic}
+                          onValueChange={(isPublic) => updatePrivacyDefaults({ resourcesPublic: isPublic })}
+                          size={isMobile ? "sm" : "default"}
+                          className={isMobile ? "w-full" : "w-auto"}
+                        />
                       </div>
                       <p className="text-xs text-muted-foreground">
                         LoRAs, presets, and reference images you create
@@ -656,30 +640,12 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
                       <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
                         <span className="font-medium">Generations</span>
-                        <div className="flex items-center gap-0">
-                          <button
-                            onClick={() => updatePrivacyDefaults({ generationsPublic: true })}
-                            className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
-                              privacyDefaults.generationsPublic
-                                ? 'bg-green-500 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                            }`}
-                          >
-                            <Globe className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
-                            Public
-                          </button>
-                          <button
-                            onClick={() => updatePrivacyDefaults({ generationsPublic: false })}
-                            className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
-                              !privacyDefaults.generationsPublic
-                                ? 'bg-gray-600 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                            }`}
-                          >
-                            <Lock className={`${isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5'} inline mr-1`} />
-                            Private
-                          </button>
-                        </div>
+                        <PrivacyToggle
+                          isPublic={privacyDefaults.generationsPublic}
+                          onValueChange={(isPublic) => updatePrivacyDefaults({ generationsPublic: isPublic })}
+                          size={isMobile ? "sm" : "default"}
+                          className={isMobile ? "w-full" : "w-auto"}
+                        />
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Images and videos you generate
@@ -716,34 +682,24 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                 </div>
               ) : (
                 <div className="flex items-center justify-start">
-                  <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1 shadow-inner">
-                    {/* Toggle track */}
-                    <div className="flex">
-                      {/* In the cloud button */}
-                      <button
-                        onClick={() => updateGenerationMethodsWithNotification({ inCloud: true, onComputer: false })}
-                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
-                          inCloudChecked && !onComputerChecked
-                            ? 'bg-card dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-                        }`}
-                      >
-                        In the cloud
-                      </button>
-                      
-                      {/* On my computer button */}
-                      <button
-                        onClick={() => updateGenerationMethodsWithNotification({ onComputer: true, inCloud: false })}
-                        className={`px-6 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
-                          onComputerChecked && !inCloudChecked
-                            ? 'bg-card dark:bg-gray-800 text-green-600 dark:text-green-400 shadow-sm'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-                        }`}
-                      >
-                        On my computer
-                      </button>
-                    </div>
-                  </div>
+                  <SegmentedControl
+                    value={inCloudChecked && !onComputerChecked ? 'cloud' : onComputerChecked && !inCloudChecked ? 'local' : ''}
+                    onValueChange={(value) => {
+                      if (value === 'cloud') {
+                        updateGenerationMethodsWithNotification({ inCloud: true, onComputer: false });
+                      } else if (value === 'local') {
+                        updateGenerationMethodsWithNotification({ onComputer: true, inCloud: false });
+                      }
+                    }}
+                    variant="pill"
+                  >
+                    <SegmentedControlItem value="cloud" colorScheme="blue">
+                      In the cloud
+                    </SegmentedControlItem>
+                    <SegmentedControlItem value="local" colorScheme="emerald">
+                      On my computer
+                    </SegmentedControlItem>
+                  </SegmentedControl>
                 </div>
               )}
             </div>

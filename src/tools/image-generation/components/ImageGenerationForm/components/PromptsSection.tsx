@@ -14,6 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/shared/components/ui/popover";
+import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
 import { PromptEntry, PromptMode } from "../types";
 import { PromptInputRow } from "./PromptInputRow";
 import { SectionHeader } from "./SectionHeader";
@@ -91,30 +92,18 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
         </div>
         <div className="flex items-center space-x-2">
           {/* Automated vs Managed Toggle */}
-          <div className="inline-flex items-center bg-muted rounded-full p-1">
-            <button
-              type="button"
-              onClick={() => onPromptModeChange('automated')}
-              className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
-                normalizedPromptMode === 'automated'
-                  ? 'bg-background shadow-sm'
-                  : 'hover:bg-background/50'
-              }`}
-            >
+          <SegmentedControl
+            value={normalizedPromptMode}
+            onValueChange={(value) => onPromptModeChange(value as PromptMode)}
+            size="sm"
+          >
+            <SegmentedControlItem value="automated">
               Automated
-            </button>
-            <button
-              type="button"
-              onClick={() => onPromptModeChange('managed')}
-              className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
-                normalizedPromptMode === 'managed'
-                  ? 'bg-background shadow-sm'
-                  : 'hover:bg-background/50'
-              }`}
-            >
+            </SegmentedControlItem>
+            <SegmentedControlItem value="managed">
               Managed
-            </button>
-          </div>
+            </SegmentedControlItem>
+          </SegmentedControl>
         </div>
       </div>
 

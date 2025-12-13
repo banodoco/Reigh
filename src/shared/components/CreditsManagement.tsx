@@ -4,6 +4,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Slider } from '@/shared/components/ui/slider';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 import {
   Table,
   TableBody,
@@ -534,28 +535,19 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
         {(mode === 'all' || mode === 'transactions') && (
         <div className={`px-1 ${mode === 'all' ? 'mt-6' : ''}`}>
           <div className="flex justify-center mb-3">
-            <div className="grid grid-cols-2 bg-muted border border-border rounded-md h-9 p-1 w-full max-w-xs">
-              <button
-                onClick={() => setActiveTab('history')}
-                className={`text-sm rounded-sm h-full flex items-center justify-center transition-all ${
-                  activeTab === 'history'
-                    ? 'bg-card dark:bg-gray-800 shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
+            <SegmentedControl
+              value={activeTab}
+              onValueChange={(value) => setActiveTab(value as 'history' | 'task-log')}
+              size="sm"
+              className="w-full max-w-xs"
+            >
+              <SegmentedControlItem value="history">
                 Transactions
-              </button>
-              <button
-                onClick={() => setActiveTab('task-log')}
-                className={`text-sm rounded-sm h-full flex items-center justify-center transition-all ${
-                  activeTab === 'task-log'
-                    ? 'bg-card dark:bg-gray-800 shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
+              </SegmentedControlItem>
+              <SegmentedControlItem value="task-log">
                 Task Log
-              </button>
-            </div>
+              </SegmentedControlItem>
+            </SegmentedControl>
           </div>
 
           {activeTab === 'history' && (

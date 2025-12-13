@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Gift, Sparkles, ChevronRight, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart, Globe, Lock, Sun, Moon } from 'lucide-react';
+import { Gift, Sparkles, ChevronRight, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart, Sun, Moon, Cloud, Globe } from 'lucide-react';
+import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
+import { PrivacyToggle } from '@/shared/components/ui/privacy-toggle';
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -225,34 +227,24 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         </p>
 
         <div className="flex justify-center px-4">
-          <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-800 rounded-full p-1 shadow-inner min-w-fit">
-            {/* Toggle track */}
-            <div className="flex">
-              {/* In the cloud button */}
-              <button
-                onClick={() => updateGenerationMethods({ inCloud: true, onComputer: false })}
-                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
-                  inCloudChecked && !onComputerChecked
-                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                In the cloud ☁️
-              </button>
-              
-              {/* On my computer button */}
-              <button
-                onClick={() => updateGenerationMethods({ onComputer: true, inCloud: false })}
-                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none ${
-                  onComputerChecked && !inCloudChecked
-                    ? 'bg-white dark:bg-gray-700 text-green-600 dark:text-green-400 shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                On my computer 💻
-              </button>
-            </div>
-          </div>
+          <SegmentedControl
+            value={inCloudChecked && !onComputerChecked ? 'cloud' : onComputerChecked && !inCloudChecked ? 'local' : ''}
+            onValueChange={(value) => {
+              if (value === 'cloud') {
+                updateGenerationMethods({ inCloud: true, onComputer: false });
+              } else if (value === 'local') {
+                updateGenerationMethods({ onComputer: true, inCloud: false });
+              }
+            }}
+            variant="pill"
+          >
+            <SegmentedControlItem value="cloud" colorScheme="blue">
+              In the cloud ☁️
+            </SegmentedControlItem>
+            <SegmentedControlItem value="local" colorScheme="emerald">
+              On my computer 💻
+            </SegmentedControlItem>
+          </SegmentedControl>
         </div>
 
         {/* Additional info below toggle */}
@@ -543,35 +535,18 @@ const ThemeStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         </p>
 
         <div className="flex justify-center px-4">
-          <div className="relative inline-flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1 shadow-inner min-w-fit">
-            <div className="flex">
-              {/* Light mode button */}
-              <button
-                onClick={() => handleThemeChange(false)}
-                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none flex items-center gap-2 ${
-                  !darkMode
-                    ? 'bg-amber-400 text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Sun className="h-4 w-4" />
-                Light
-              </button>
-              
-              {/* Dark mode button */}
-              <button
-                onClick={() => handleThemeChange(true)}
-                className={`px-4 py-2 font-light rounded-full transition-all duration-200 whitespace-nowrap text-sm focus:outline-none flex items-center gap-2 ${
-                  darkMode
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Moon className="h-4 w-4" />
-                Dark
-              </button>
-            </div>
-          </div>
+          <SegmentedControl
+            value={darkMode ? 'dark' : 'light'}
+            onValueChange={(value) => handleThemeChange(value === 'dark')}
+            variant="pill"
+          >
+            <SegmentedControlItem value="light" colorScheme="amber" icon={<Sun className="h-4 w-4" />}>
+              Light
+            </SegmentedControlItem>
+            <SegmentedControlItem value="dark" colorScheme="violet" icon={<Moon className="h-4 w-4" />}>
+              Dark
+            </SegmentedControlItem>
+          </SegmentedControl>
         </div>
 
       </div>
@@ -635,30 +610,11 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             <p className="text-xs text-muted-foreground leading-snug">
               This will allow others to use them. You can update this for individual resources.
             </p>
-            <div className="flex w-full">
-              <button
-                onClick={() => updatePrivacyDefaults({ resourcesPublic: true })}
-                className={`flex-1 px-2.5 py-1.5 text-xs rounded-l-full transition-all focus:outline-none ${
-                  privacyDefaults.resourcesPublic
-                    ? 'bg-green-500 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                <Globe className="h-3 w-3 inline mr-0.5" />
-                Public
-              </button>
-              <button
-                onClick={() => updatePrivacyDefaults({ resourcesPublic: false })}
-                className={`flex-1 px-2.5 py-1.5 text-xs rounded-r-full transition-all focus:outline-none ${
-                  !privacyDefaults.resourcesPublic
-                    ? 'bg-gray-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                <Lock className="h-3 w-3 inline mr-0.5" />
-                Private
-              </button>
-            </div>
+            <PrivacyToggle
+              isPublic={privacyDefaults.resourcesPublic}
+              onValueChange={(isPublic) => updatePrivacyDefaults({ resourcesPublic: isPublic })}
+              size="sm"
+            />
           </div>
 
           {/* Generations Toggle */}
@@ -667,30 +623,11 @@ const PrivacyDefaultsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
             <p className="text-xs text-muted-foreground leading-snug">
               This will allow others to view your generations, and train LoRAs on them.
             </p>
-            <div className="flex w-full">
-              <button
-                onClick={() => updatePrivacyDefaults({ generationsPublic: true })}
-                className={`flex-1 px-2.5 py-1.5 text-xs rounded-l-full transition-all focus:outline-none ${
-                  privacyDefaults.generationsPublic
-                    ? 'bg-green-500 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                <Globe className="h-3 w-3 inline mr-0.5" />
-                Public
-              </button>
-              <button
-                onClick={() => updatePrivacyDefaults({ generationsPublic: false })}
-                className={`flex-1 px-2.5 py-1.5 text-xs rounded-r-full transition-all focus:outline-none ${
-                  !privacyDefaults.generationsPublic
-                    ? 'bg-gray-600 text-white'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-              >
-                <Lock className="h-3 w-3 inline mr-0.5" />
-                Private
-              </button>
-            </div>
+            <PrivacyToggle
+              isPublic={privacyDefaults.generationsPublic}
+              onValueChange={(isPublic) => updatePrivacyDefaults({ generationsPublic: isPublic })}
+              size="sm"
+            />
           </div>
         </div>
       </div>

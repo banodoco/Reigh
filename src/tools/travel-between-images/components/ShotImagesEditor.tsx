@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { GenerationRow } from "@/types/shots";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
+import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
 import ShotImageManager from "@/shared/components/ShotImageManager";
 import Timeline from "./Timeline"; // Main timeline component with drag/drop and image actions
 import { Button } from "@/shared/components/ui/button";
@@ -795,32 +795,23 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           <div className="flex items-center gap-2">
             {/* Generation Mode Toggle - Hidden on mobile, disabled look in read-only mode */}
             {!isMobile && (
-              <ToggleGroup
-                type="single"
+              <SegmentedControl
                 value={generationMode}
                 onValueChange={(value) => {
-                  if (!readOnly && value && (value === "batch" || value === "timeline")) {
+                  if (!readOnly && (value === "batch" || value === "timeline")) {
                     onGenerationModeChange(value);
                   }
                 }}
-                className={`h-9 border rounded-md ${readOnly ? 'bg-muted/30 opacity-60 cursor-not-allowed' : 'bg-muted/50'}`}
                 disabled={readOnly}
+                size="sm"
               >
-                <ToggleGroupItem 
-                  value="timeline" 
-                  disabled={readOnly}
-                  className={`text-sm px-3 h-9 font-medium ${readOnly ? 'cursor-not-allowed' : 'transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm'}`}
-                >
+                <SegmentedControlItem value="timeline">
                   Timeline
-                </ToggleGroupItem>
-                <ToggleGroupItem 
-                  value="batch" 
-                  disabled={readOnly}
-                  className={`text-sm px-3 h-9 font-medium ${readOnly ? 'cursor-not-allowed' : 'transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm'}`}
-                >
+                </SegmentedControlItem>
+                <SegmentedControlItem value="batch">
                   Batch
-                </ToggleGroupItem>
-              </ToggleGroup>
+                </SegmentedControlItem>
+              </SegmentedControl>
             )}
 
           </div>

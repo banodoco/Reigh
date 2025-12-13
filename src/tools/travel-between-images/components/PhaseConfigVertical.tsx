@@ -9,7 +9,7 @@ import { Switch } from '@/shared/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu';
 import { Info, RotateCcw, Trash2, Download, Search, Save, Library, FilePlus, AlertTriangle } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/shared/components/ui/toggle-group';
+import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
@@ -199,29 +199,22 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
               </TooltipContent>
             </Tooltip>
           </div>
-          <ToggleGroup
-            type="single"
+          <SegmentedControl
             value={generationTypeMode}
             onValueChange={(value) => {
               if (value) {
                 onGenerationTypeModeChange(value as 'i2v' | 'vace');
               }
             }}
-            className="h-9 border rounded-md bg-muted/50 w-fit"
+            size="sm"
           >
-            <ToggleGroupItem 
-              value="i2v" 
-              className="text-sm px-4 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
-            >
+            <SegmentedControlItem value="i2v">
               I2V
-            </ToggleGroupItem>
-            <ToggleGroupItem 
-              value="vace" 
-              className="text-sm px-4 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
-            >
+            </SegmentedControlItem>
+            <SegmentedControlItem value="vace">
               VACE
-            </ToggleGroupItem>
-          </ToggleGroup>
+            </SegmentedControlItem>
+          </SegmentedControl>
           
           {/* Warning when I2V mode is selected but structure video exists */}
           {generationTypeMode === 'i2v' && hasStructureVideo && (

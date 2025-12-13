@@ -7,6 +7,7 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
+import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 import { ChevronLeft, ChevronRight, ArrowDown, Search } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
@@ -465,7 +466,7 @@ const VideoTravelToolPage: React.FC = () => {
     });
     
     // When switching to advanced mode, initialize phaseConfig from basic mode settings
-    if (mode === 'advanced' || mode === 'presets') {
+    if (mode === 'advanced') {
       const currentPhaseConfig = shotSettingsRef.current.settings?.phaseConfig;
       if (!currentPhaseConfig) {
         // Build phase config from current basic mode settings (respects I2V/VACE mode)
@@ -901,7 +902,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   
   // FIX: Use cached mode during loading instead of the default 'timeline'
   // This prevents the 10-second flash of wrong mode while DB loads
-  const generationMode: 'batch' | 'timeline' = 
+  const generationMode: 'batch' | 'timeline' | 'by-pair' = 
     shotSettings.status === 'loading' || shotSettings.status === 'idle'
       ? (cachedGenerationMode ?? rawGenerationMode)
       : rawGenerationMode;
@@ -2128,9 +2129,13 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   //   }
   // };
 
-  const handleSteerableMotionSettingsChange = useCallback((settings: Partial<typeof steerableMotionSettings>) => {
+  const handleSteerableMotionSettingsChange = useCallback((settings: Partial<SteerableMotionSettings>) => {
     // FIX: Use ref to get current value and avoid callback recreation
-    const currentSettings = shotSettingsRef.current.settings?.steerableMotionSettings || {};
+    // Ensure required fields are always present by seeding with defaults
+    const currentSettings: SteerableMotionSettings = {
+      ...DEFAULT_STEERABLE_MOTION_SETTINGS,
+      ...(shotSettingsRef.current.settings?.steerableMotionSettings ?? {}),
+    };
     shotSettingsRef.current.updateFields({
       steerableMotionSettings: {
         ...currentSettings,
@@ -2291,38 +2296,28 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                 </div>
                 
                 {/* Right side: Shots vs Videos Toggle - always right-aligned */}
-                <div className="inline-flex items-center bg-muted rounded-full p-1 ml-auto">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      if (showVideosView) {
-                        handleToggleVideosView(e);
-                      }
-                    }}
-                    className={`px-3 sm:px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
-                      !showVideosView
-                        ? 'bg-background shadow-sm'
-                        : 'hover:bg-background/50'
-                    }`}
-                  >
+                <SegmentedControl
+                  value={showVideosView ? 'videos' : 'shots'}
+                  onValueChange={(value) => {
+                    if ((value === 'videos') !== showVideosView) {
+                      // Create a synthetic event that satisfies the handler
+                      const syntheticEvent = { stopPropagation: () => {} } as unknown as React.MouseEvent<HTMLButtonElement>;
+                      handleToggleVideosView(syntheticEvent);
+                    }
+                  }}
+                  // Prevent clicks on the toggle from bubbling to parent click handlers
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  size="sm"
+                  className="ml-auto"
+                >
+                  <SegmentedControlItem value="shots">
                     Shots
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      if (!showVideosView) {
-                        handleToggleVideosView(e);
-                      }
-                    }}
-                    className={`px-3 sm:px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
-                      showVideosView
-                        ? 'bg-background shadow-sm'
-                        : 'hover:bg-background/50'
-                    }`}
-                  >
+                  </SegmentedControlItem>
+                  <SegmentedControlItem value="videos">
                     Videos
-                  </button>
-                </div>
+                  </SegmentedControlItem>
+                </SegmentedControl>
               </div>
             </div>
           </div>

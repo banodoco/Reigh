@@ -1,5 +1,5 @@
 /* eslint-disable no-sequences */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -33,7 +33,8 @@ export default function HomePage() {
   const [userDarkModePref] = usePersistentState<boolean>('dark-mode', true);
   
   // Force dark mode on homepage without changing user's settings
-  useEffect(() => {
+  // Use useLayoutEffect to set dark mode BEFORE paint, preventing flash
+  useLayoutEffect(() => {
     // Always add dark class on homepage
     document.documentElement.classList.add('dark');
     
@@ -67,8 +68,11 @@ export default function HomePage() {
   
   // Background video ref for dynamic playback rate
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hasLoopedRef = useRef(false);
+  const lastProgressRef = useRef(0);
   
   // Dynamic playback rate - slows down near loop points for smooth transition
+  // Only applies after first loop completes
   const updatePlaybackRate = useCallback(() => {
     const video = videoRef.current;
     if (!video || !video.duration) return;
@@ -79,6 +83,12 @@ export default function HomePage() {
     // How far into the video (0 to 1)
     const progress = currentTime / duration;
     
+    // Detect loop: if progress jumped backward significantly, we've looped
+    if (lastProgressRef.current > 0.9 && progress < 0.1) {
+      hasLoopedRef.current = true;
+    }
+    lastProgressRef.current = progress;
+    
     // Ease zone: slow down in first/last 15% of video
     const easeZone = 0.15;
     const minSpeed = 0.5;   // Slowest at loop points
@@ -86,15 +96,18 @@ export default function HomePage() {
     
     let speed = maxSpeed;
     
-    if (progress < easeZone) {
-      // Easing in from start
-      const t = progress / easeZone; // 0 to 1 within ease zone
-      // Smooth ease: use sine curve
-      speed = minSpeed + (maxSpeed - minSpeed) * Math.sin(t * Math.PI / 2);
-    } else if (progress > 1 - easeZone) {
-      // Easing out to end
-      const t = (1 - progress) / easeZone; // 1 to 0 within ease zone
-      speed = minSpeed + (maxSpeed - minSpeed) * Math.sin(t * Math.PI / 2);
+    // Only apply easing after first loop
+    if (hasLoopedRef.current) {
+      if (progress < easeZone) {
+        // Easing in from start
+        const t = progress / easeZone; // 0 to 1 within ease zone
+        // Smooth ease: use sine curve
+        speed = minSpeed + (maxSpeed - minSpeed) * Math.sin(t * Math.PI / 2);
+      } else if (progress > 1 - easeZone) {
+        // Easing out to end
+        const t = (1 - progress) / easeZone; // 1 to 0 within ease zone
+        speed = minSpeed + (maxSpeed - minSpeed) * Math.sin(t * Math.PI / 2);
+      }
     }
     
     video.playbackRate = speed;
@@ -414,7 +427,7 @@ export default function HomePage() {
   const barTransitionCompleted = useDebounce(assetsLoaded, 200);
 
   return (
-    <div className="wes-texture relative min-h-screen">
+    <div className="wes-texture relative min-h-screen overflow-hidden">
       {/* Background Poster Image - fallback behind video */}
       <img 
         src="/hero-background-poster.jpg" 

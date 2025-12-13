@@ -5,6 +5,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Switch } from '@/shared/components/ui/switch';
 import { Label } from '@/shared/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 import { CheckCircle, Loader2, Move, Paintbrush, Pencil, Save, Sparkles, Type, X, XCircle, Layers } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
@@ -221,20 +222,22 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         {/* Info | Edit Toggle and Close Button */}
         <div className="flex items-center gap-3">
           {!hideInfoEditToggle && (
-          <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-            <button
-              onClick={handleExitMagicEditMode}
-              className="px-3 py-1.5 text-sm rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-background/50"
-            >
+          <SegmentedControl
+            value="edit"
+            onValueChange={(value) => {
+              if (value === 'info') {
+                handleExitMagicEditMode();
+              }
+            }}
+            size="sm"
+          >
+            <SegmentedControlItem value="info">
               Info
-            </button>
-            <button
-              className="px-3 py-1.5 text-sm rounded transition-colors bg-background text-foreground shadow-sm"
-              disabled
-            >
+            </SegmentedControlItem>
+            <SegmentedControlItem value="edit" disabled>
               Edit
-            </button>
-          </div>
+            </SegmentedControlItem>
+          </SegmentedControl>
           )}
           
           <Button
