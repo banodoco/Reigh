@@ -437,7 +437,7 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-wes-cream border-wes-vintage-gold/30 gap-3">
+      <DialogContent className="sm:max-w-md bg-card border-border gap-3">
         <DialogHeader className="text-center">
           <DialogTitle className="text-xl font-theme font-theme-heading text-center">
             {getTitle()}
