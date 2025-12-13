@@ -121,13 +121,50 @@ export default function HomePage() {
   }, []);
   
   // Dynamic video playback rate for smooth loop transitions
+  // TEMPORARILY DISABLED to debug flashing issue
+  // useEffect(() => {
+  //   const video = videoRef.current;
+  //   if (!video) return;
+  //
+  //   video.addEventListener('timeupdate', updatePlaybackRate);
+  //   return () => video.removeEventListener('timeupdate', updatePlaybackRate);
+  // }, [updatePlaybackRate]);
+
+  // Mobile video autoplay fix
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    // Ensure video is muted (required for autoplay)
+    video.muted = true;
     
-    video.addEventListener('timeupdate', updatePlaybackRate);
-    return () => video.removeEventListener('timeupdate', updatePlaybackRate);
-  }, [updatePlaybackRate]);
+    const attemptPlay = async () => {
+      try {
+        await video.play();
+        console.log('[VideoAutoplay] Autoplay success');
+      } catch (e) {
+        console.log('[VideoAutoplay] Autoplay blocked, waiting for interaction');
+        const playOnInteraction = async () => {
+          try {
+            video.muted = true;
+            await video.play();
+          } catch (err) {
+            console.log('[VideoAutoplay] Interaction play failed:', err);
+          }
+          document.removeEventListener('touchstart', playOnInteraction);
+          document.removeEventListener('click', playOnInteraction);
+        };
+        document.addEventListener('touchstart', playOnInteraction, { once: true, passive: true });
+        document.addEventListener('click', playOnInteraction, { once: true });
+      }
+    };
+
+    if (video.readyState >= 3) {
+      attemptPlay();
+    } else {
+      video.addEventListener('loadeddata', attemptPlay, { once: true });
+    }
+  }, []);
 
   // Auth Session Management
   useEffect(() => {
@@ -361,21 +398,31 @@ export default function HomePage() {
 
   return (
     <div className="wes-texture relative min-h-screen">
-      {/* Background Video */}
+      {/* Background Poster Image - fallback behind video */}
+      <img 
+        src="/hero-background-poster.jpg" 
+        alt="Background" 
+        className="fixed inset-0 w-full h-full object-cover"
+        style={{ zIndex: -2 }}
+      />
+      
+      {/* Background Video - sits on top of poster */}
       <video
         ref={videoRef}
         autoPlay
         loop
         muted
         playsInline
+        // @ts-expect-error webkit-specific attribute for iOS
+        webkit-playsinline="true"
         preload="auto"
-        poster="/hero-background-poster.jpg"
-        className="fixed inset-0 w-full h-full object-cover z-0"
+        className="fixed inset-0 w-full h-full object-cover"
+        style={{ zIndex: -1 }}
       >
-        <source src="/hero-background-interpolated-seamless.mp4" type="video/mp4" />
+        <source src="/hero-background-mobile.mp4" type="video/mp4" />
       </video>
       {/* Overlay to darken video for readability */}
-      <div className="fixed inset-0 bg-black/50 z-0" />
+      <div className="fixed inset-0 bg-black/50" style={{ zIndex: 0 }} />
       
       <ConstellationCanvas />
 

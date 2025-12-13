@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Github, MessageCircle, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { Button } from '@/shared/components/ui/button';
 import type { Session } from '@supabase/supabase-js';
 
 interface ExampleStyle {
@@ -36,6 +37,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [phase, setPhase] = useState<AnimationPhase>('initial');
   const [banodocoState, setBanodocoState] = useState<'hidden' | 'animating' | 'visible'>('hidden');
   const [minLoadTimePassed, setMinLoadTimePassed] = useState(false);
+  const [openTipOpen, setOpenTipOpen] = useState(false);
+  const [emergingTipOpen, setEmergingTipOpen] = useState(false);
 
   // Enforce minimum loading time
   useEffect(() => {
@@ -114,7 +117,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   };
 
   return (
-    <div className="container mx-auto px-4 relative flex items-center justify-center min-h-[calc(100vh-64px)] py-8">
+    <div className="container mx-auto px-4 relative flex items-center justify-center min-h-[calc(100svh-64px)] md:min-h-[calc(100vh-64px)] py-4 md:py-8">
       <div className="text-center w-full">
         <div className="max-w-4xl mx-auto">
           
@@ -127,7 +130,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
               {/* Main title */}
               <div style={getFadeStyle(0.5, 20)}>
-                <h1 className="text-8xl md:text-[10rem] text-[#ecede3] mb-0 leading-tight">
+                <h1 className="text-7xl md:text-[10rem] text-[#ecede3] mb-0 leading-tight">
                   reigh
                 </h1>
               </div>
@@ -145,10 +148,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 <p className="font-theme text-2xl md:text-3xl font-theme-body text-[#ecede3]/90 leading-snug tracking-wide mb-8 md:mb-10">
                   an{' '}
                   <TooltipProvider>
-                    <Tooltip>
+                    <Tooltip open={openTipOpen} onOpenChange={setOpenTipOpen}>
                       <TooltipTrigger asChild>
                         <span
-                          onClick={handleOpenToolActivate}
+                          onClick={() => {
+                            handleOpenToolActivate();
+                            // Small delay to let close animation play
+                            setTimeout(() => setOpenTipOpen(false), 50);
+                          }}
                           className="underline decoration-[#ecede3]/40 hover:decoration-[#ecede3] cursor-pointer transition-all duration-200"
                         >
                           open source tool
@@ -157,7 +164,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <TooltipContent
                         side="top"
                         align="center"
-                        onClick={handleOpenToolActivate}
+                        onClick={() => {
+                          handleOpenToolActivate();
+                          setTimeout(() => setOpenTipOpen(false), 50);
+                        }}
                         className="group flex items-center gap-2 text-left p-3 max-w-xs border-2 border-transparent bg-wes-cream/80 dark:bg-card/95 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 dark:hover:from-primary/10 dark:hover:via-accent/10 dark:hover:to-secondary/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
                       >
                         <div className="flex-shrink-0">
@@ -171,10 +181,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   </TooltipProvider>{' '}
                   for<br />
                   <TooltipProvider>
-                    <Tooltip>
+                    <Tooltip open={emergingTipOpen} onOpenChange={setEmergingTipOpen}>
                       <TooltipTrigger asChild>
                         <span
-                          onClick={handleEmergingActivate}
+                          onClick={() => {
+                            handleEmergingActivate();
+                            setTimeout(() => setEmergingTipOpen(false), 50);
+                          }}
                           className="underline decoration-[#ecede3]/40 hover:decoration-[#ecede3] cursor-pointer transition-all duration-200"
                         >
                           traveling between images
@@ -183,7 +196,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       <TooltipContent
                         side="top"
                         align="center"
-                        onClick={handleEmergingActivate}
+                        onClick={() => {
+                          handleEmergingActivate();
+                          setTimeout(() => setEmergingTipOpen(false), 50);
+                        }}
                         className="group flex items-center gap-2 text-left p-4 max-w-xs min-h-[80px] border-2 border-transparent bg-wes-cream/80 dark:bg-card/95 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 dark:hover:from-primary/10 dark:hover:via-accent/10 dark:hover:to-secondary/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
                       >
                         <div className="flex items-center gap-1 text-primary">
@@ -213,22 +229,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-4 md:pb-6 overflow-visible flex justify-center">
               {session ? (
                 // User is logged in - go to tools
-                <button
+                <Button
+                  variant="retro"
+                  size="retro-lg"
                   onClick={() => navigate('/tools')}
-                  className="px-12 py-4 bg-[#e8e4db] hover:bg-[#d8d4cb] rounded-sm border-2 border-[#2d4a4a] text-[#2d4a4a] text-2xl tracking-wide transition-all duration-200 shadow-[-8px_8px_0_0_#1a2b2b] hover:shadow-[-4px_4px_0_0_#1a2b2b] hover:translate-x-[-2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[-4px] active:translate-y-[4px]"
-                  style={{ fontFamily: "'TTGertika', sans-serif" }}
                 >
                   go to tools
-                </button>
+                </Button>
               ) : (
                 // Not logged in - Discord sign-in
-                <button
+                <Button
+                  variant="retro"
+                  size="retro-lg"
                   onClick={handleDiscordSignIn}
-                  className="px-12 py-4 bg-[#e8e4db] hover:bg-[#d8d4cb] rounded-sm border-2 border-[#2d4a4a] text-[#2d4a4a] text-2xl tracking-wide transition-all duration-200 shadow-[-8px_8px_0_0_#1a2b2b] hover:shadow-[-4px_4px_0_0_#1a2b2b] hover:translate-x-[-2px] hover:translate-y-[2px] active:shadow-none active:translate-x-[-4px] active:translate-y-[4px]"
-                  style={{ fontFamily: "'TTGertika', sans-serif" }}
                 >
                   sign in with Discord
-                </button>
+                </Button>
               )}
             </div>
             </div>
