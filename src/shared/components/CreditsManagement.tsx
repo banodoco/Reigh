@@ -539,7 +539,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
               value={activeTab}
               onValueChange={(value) => setActiveTab(value as 'history' | 'task-log')}
               size="sm"
-              className="w-full max-w-xs"
+              className="max-w-xs"
             >
               <SegmentedControlItem value="history">
                 Transactions

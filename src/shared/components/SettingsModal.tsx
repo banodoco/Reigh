@@ -665,7 +665,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
           {/* Mobile header */}
           {isMobile && (
             <div className="mb-2">
-              <h3 className="font-light">How would you like to generate?</h3>
+              <p className="text-sm text-muted-foreground mb-4">How would you like to generate?</p>
             </div>
           )}
           
@@ -673,7 +673,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
             {/* Left column: options */}
             <div className="space-y-2 sm:space-y-4">
               {!isMobile && (
-                <h3 className="font-light">How would you like to generate?</h3>
+                <p className="text-sm text-muted-foreground mb-4">How would you like to generate?</p>
               )}
               
               {isLoadingGenerationMethods ? (
