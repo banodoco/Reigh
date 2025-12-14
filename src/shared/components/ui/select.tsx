@@ -16,8 +16,8 @@ const selectTriggerVariants = cva(
     variants: {
       variant: {
         default: "border border-input bg-background focus:ring-2 focus:ring-ring focus:ring-offset-2",
-        // Retro style matching buttons - softened for light mode, justify-start with span flex for tight left alignment
-        retro: "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-[#f5f3ed] dark:bg-[#2d3d3d] rounded-sm border-2 border-[#6a8a8a]/25 dark:border-[#6a7a7a] text-[#5a7a7a] dark:text-[#c8c4bb] font-heading tracking-wide transition-all duration-200 shadow-[-2px_2px_0_0_rgba(106,138,138,0.06)] hover:shadow-[-1px_1px_0_0_rgba(106,138,138,0.06)] dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] hover:translate-x-[-0.5px] hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
+        // Retro style matching buttons - uses theme bg-background to match outline buttons
+        retro: "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-background rounded-sm border-2 border-[#6a8a8a]/25 dark:border-[#6a7a7a] text-[#5a7a7a] dark:text-[#c8c4bb] font-heading tracking-wide transition-all duration-200 shadow-[-2px_2px_0_0_rgba(106,138,138,0.06)] hover:shadow-[-1px_1px_0_0_rgba(106,138,138,0.06)] dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] hover:translate-x-[-0.5px] hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
         // Retro dark - for always-dark contexts (panes, galleries)
         "retro-dark": "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-[#3a4a4a] hover:bg-[#4a5a5a] rounded-sm border-2 border-[#6a7a7a] text-[#d8d4cb] font-heading tracking-wide transition-all duration-200 shadow-[-2px_2px_0_0_rgba(20,30,30,0.3)] hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.3)] hover:translate-x-[-0.5px] hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a7a7a]/30 focus:ring-offset-0",
       },
@@ -118,7 +118,7 @@ const selectContentVariants = cva(
     variants: {
       variant: {
         default: "rounded-md border bg-popover text-popover-foreground shadow-md",
-        retro: "rounded-sm border-2 border-[#6a8a8a] dark:border-[#6a7a7a] bg-[#f5f3ed] dark:bg-[#2d3d3d] text-[#5a7a7a] dark:text-[#c8c4bb] shadow-[-3px_3px_0_0_rgba(106,138,138,0.15)] dark:shadow-[-3px_3px_0_0_rgba(20,30,30,0.4)]",
+        retro: "rounded-sm border-2 border-[#6a8a8a] dark:border-[#6a7a7a] bg-background text-[#5a7a7a] dark:text-[#c8c4bb] shadow-[-3px_3px_0_0_rgba(106,138,138,0.15)] dark:shadow-[-3px_3px_0_0_rgba(20,30,30,0.4)]",
         "retro-dark": "rounded-sm border-2 border-[#6a7a7a] bg-[#3a4a4a] text-[#d8d4cb] shadow-[-3px_3px_0_0_rgba(20,30,30,0.3)]",
         // Zinc variant for dark panes
         zinc: "rounded-sm border border-zinc-600 bg-zinc-800 text-zinc-300 shadow-lg",
