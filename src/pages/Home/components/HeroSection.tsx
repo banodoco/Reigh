@@ -252,27 +252,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
               {/* Subtitle */}
               <div className="-mt-4 flex justify-center" style={getFadeStyle(4.5, -60, false)}>
-                <p className="font-theme text-2xl md:text-3xl font-theme-body text-[#ecede3]/90 leading-snug tracking-wide mb-8 md:mb-10">
-                  {/* Left arrow indicator - clickable */}
-                  <span 
-                    className="inline-flex items-center align-baseline mr-1 cursor-pointer"
-                    onClick={handleOpenToolActivate}
-                  >
-                    <svg 
-                      className="w-5 h-5 md:w-6 md:h-6 text-[#ecede3]/40 hover-arrow-left transition-colors duration-200 hover:text-[#ecede3]/70" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      {/* Arrow pointing left with extending line */}
-                      <path d="M7 12L3 12M3 12L6 9M3 12L6 15" />
-                      <path d="M7 12L21 12" strokeDasharray="2 2" opacity="0.5" />
-                    </svg>
-                  </span>
-                  an{' '}
+                <p className="subtitle-container font-theme text-2xl md:text-3xl font-theme-body text-[#ecede3]/90 leading-snug tracking-wide mb-8 md:mb-10">
                   <TooltipProvider>
                     <Tooltip open={openTipOpen} onOpenChange={setOpenTipOpen}>
                       <TooltipTrigger asChild>
@@ -284,9 +264,37 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           }}
                           className="subtitle-link-left cursor-pointer transition-all duration-200"
                         >
-                          open source tool
+                          {/* Left arrow tail (pushed out + more angular) */}
+                          <svg
+                            className="arrow-wrap-left absolute -left-5 -bottom-[1px] w-5 h-5 pointer-events-none"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                          >
+                            <g className="arrow-group-left" opacity="0.4">
+                              {/* Curve from right edge to arrow */}
+                              <path 
+                                className="arrow-curve-left arrow-draw-curve-left"
+                                d="M20 17.25 Q12 17.25 12 11 Q12 6 1 6" 
+                                stroke="#ecede3"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                fill="none"
+                              />
+                              <path
+                                className="arrow-head-left"
+                                d="M4 3 L1 6 L4 9"
+                                stroke="#ecede3"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                fill="none"
+                              />
+                            </g>
+                          </svg>
+                          an open source tool
                         </span>
                       </TooltipTrigger>
+                      {/* TooltipContent intentionally commented out
                       <TooltipContent
                         side="top"
                         align="center"
@@ -303,6 +311,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           Reigh is open source and can be run for free on your computer, or in the cloud for convenience.
                         </p>
                       </TooltipContent>
+                      */}
                     </Tooltip>
                   </TooltipProvider>{' '}
                   for<br />
@@ -317,8 +326,36 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           className="subtitle-link-right cursor-pointer transition-all duration-200"
                         >
                           traveling between images
+                          {/* Right arrow tail (pushed out + more angular) */}
+                          <svg
+                            className="arrow-wrap-right absolute -right-5 -bottom-[1px] w-5 h-5 pointer-events-none"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                          >
+                            <g className="arrow-group-right" opacity="0.4">
+                              {/* Curve from left edge to arrow */}
+                              <path 
+                                className="arrow-curve-right arrow-draw-curve-right"
+                                d="M0 17.25 Q8 17.25 8 11 Q8 6 19 6" 
+                                stroke="#ecede3"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                fill="none"
+                              />
+                              <path
+                                className="arrow-head-right"
+                                d="M16 3 L19 6 L16 9"
+                                stroke="#ecede3"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                fill="none"
+                              />
+                            </g>
+                          </svg>
                         </span>
                       </TooltipTrigger>
+                      {/* TooltipContent intentionally commented out
                       <TooltipContent
                         side="top"
                         align="center"
@@ -329,14 +366,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         className="group flex items-center gap-2 text-left p-4 max-w-xs min-h-[80px] border-2 border-transparent bg-wes-cream/80 dark:bg-card/95 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 dark:hover:from-primary/10 dark:hover:via-accent/10 dark:hover:to-secondary/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
                       >
                         <div className="flex items-center gap-1 text-primary">
-                          <img 
-                            src={currentExample.image1} 
+                          <img
+                            src={currentExample.image1}
                             alt="Input image 1"
                             className="w-16 h-16 sm:w-20 sm:h-20 object-cover border rounded ml-2"
                           />
                           <span className="text-lg sm:text-xl font-light px-3">+</span>
-                          <img 
-                            src={currentExample.image2} 
+                          <img
+                            src={currentExample.image2}
                             alt="Input image 2"
                             className="w-16 h-16 sm:w-20 sm:h-20 object-cover border rounded"
                           />
@@ -346,27 +383,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           <ChevronRight className="hover-arrow w-6 h-6 text-primary transition-transform transition-colors duration-700 ease-in-out group-hover:text-primary group-hover:animate-sway-x" strokeWidth={1.5} />
                         </div>
                       </TooltipContent>
+                      */}
                     </Tooltip>
                   </TooltipProvider>
-                  {/* Right arrow indicator - clickable */}
-                  <span 
-                    className="inline-flex items-center align-baseline ml-1 cursor-pointer"
-                    onClick={handleEmergingActivate}
-                  >
-                    <svg 
-                      className="w-5 h-5 md:w-6 md:h-6 text-[#ecede3]/40 hover-arrow-right transition-colors duration-200 hover:text-[#ecede3]/70" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      {/* Line extending with arrow pointing right */}
-                      <path d="M3 12L17 12" strokeDasharray="2 2" opacity="0.5" />
-                      <path d="M17 12L21 12M21 12L18 9M21 12L18 15" />
-                    </svg>
-                  </span>
                 </p>
               </div>
               
