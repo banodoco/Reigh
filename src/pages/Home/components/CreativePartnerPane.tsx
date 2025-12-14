@@ -78,7 +78,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
               
               <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
                 <img 
-                  src="https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads//easy.png"
+                  src="/gpu.png"
                   alt="Screenshot showing how easy it is to run Reigh locally"
                   className="w-full h-auto rounded-lg"
                 />
@@ -150,7 +150,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
                     <TooltipContent
                       side="top"
                       align="center"
-                      className="group p-2 sm:p-3 bg-wes-cream/90 dark:bg-gray-900/95 border-2 border-transparent dark:border-gray-800 rounded-lg shadow-md"
+                      className="group p-2 sm:p-3 bg-wes-cream/90 dark:bg-gray-950 dark:border-gray-700 border-2 border-transparent rounded-lg shadow-md"
                       onPointerEnter={() => {
                         console.log('[EcosystemTooltip] Pointer entered content – holding open');
                         if (!isMobile) {
@@ -172,7 +172,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
                           style={{ width: '360px', height: '270px', border: 0 }}
                           onLoad={() => console.log('[EcosystemTooltip] Iframe loaded')}
                           onError={() => console.log('[EcosystemTooltip] Iframe error')}
-                          src={`/ecosystem-embed.html?scale=1.1`}
+                          src={`/ecosystem-embed.html?scale=1.1&dark=true`}
                         />
                       </div>
                     </TooltipContent>
