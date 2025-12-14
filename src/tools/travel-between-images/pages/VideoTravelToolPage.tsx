@@ -2220,14 +2220,12 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         <>
           {/* Shot List Header - Constrained */}
           <div className="px-4 max-w-7xl mx-auto pt-6 pb-4">
-            <div className="flex flex-col gap-3 sm:gap-4">
+            <div className="flex flex-col gap-2 sm:gap-4">
               {/* Title row */}
-              <div className="flex items-center justify-between">
-                <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
-              </div>
-              {/* Controls row */}
-              <div className="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
-                {/* Left side: Search and Sort */}
+              <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
+              {/* Controls row - all on one line */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Search and Sort */}
                 <div className="flex items-center gap-2 sm:gap-3">
                   {/* Search and Sort - Only show in Shots view */}
                   {!showVideosView && (
