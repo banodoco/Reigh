@@ -253,6 +253,25 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {/* Subtitle */}
               <div className="-mt-4 flex justify-center" style={getFadeStyle(4.5, -60, false)}>
                 <p className="font-theme text-2xl md:text-3xl font-theme-body text-[#ecede3]/90 leading-snug tracking-wide mb-8 md:mb-10">
+                  {/* Left arrow indicator - clickable */}
+                  <span 
+                    className="inline-flex items-center align-baseline mr-1 cursor-pointer"
+                    onClick={handleOpenToolActivate}
+                  >
+                    <svg 
+                      className="w-5 h-5 md:w-6 md:h-6 text-[#ecede3]/40 hover-arrow-left transition-colors duration-200 hover:text-[#ecede3]/70" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      {/* Arrow pointing left with extending line */}
+                      <path d="M7 12L3 12M3 12L6 9M3 12L6 15" />
+                      <path d="M7 12L21 12" strokeDasharray="2 2" opacity="0.5" />
+                    </svg>
+                  </span>
                   an{' '}
                   <TooltipProvider>
                     <Tooltip open={openTipOpen} onOpenChange={setOpenTipOpen}>
@@ -263,7 +282,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                             // Small delay to let close animation play
                             setTimeout(() => setOpenTipOpen(false), 50);
                           }}
-                          className="underline decoration-[#ecede3]/40 hover:decoration-[#ecede3] cursor-pointer transition-all duration-200"
+                          className="subtitle-link-left cursor-pointer transition-all duration-200"
                         >
                           open source tool
                         </span>
@@ -295,7 +314,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                             handleEmergingActivate();
                             setTimeout(() => setEmergingTipOpen(false), 50);
                           }}
-                          className="underline decoration-[#ecede3]/40 hover:decoration-[#ecede3] cursor-pointer transition-all duration-200"
+                          className="subtitle-link-right cursor-pointer transition-all duration-200"
                         >
                           traveling between images
                         </span>
@@ -329,6 +348,25 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                  {/* Right arrow indicator - clickable */}
+                  <span 
+                    className="inline-flex items-center align-baseline ml-1 cursor-pointer"
+                    onClick={handleEmergingActivate}
+                  >
+                    <svg 
+                      className="w-5 h-5 md:w-6 md:h-6 text-[#ecede3]/40 hover-arrow-right transition-colors duration-200 hover:text-[#ecede3]/70" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      {/* Line extending with arrow pointing right */}
+                      <path d="M3 12L17 12" strokeDasharray="2 2" opacity="0.5" />
+                      <path d="M17 12L21 12M21 12L18 9M21 12L18 15" />
+                    </svg>
+                  </span>
                 </p>
               </div>
               

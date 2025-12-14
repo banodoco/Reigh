@@ -195,6 +195,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     React.useEffect(() => {
         if (children.length > 0) {
             const firstChild = children[0];
+            const childParams = firstChild.params as any;
             console.log('[SegmentCardPopulation] Transformed children data', {
                 hasData: !!data,
                 dataKeys: data ? Object.keys(data) : [],
@@ -209,7 +210,11 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     paramsIsString: typeof firstChild.params === 'string',
                     paramsKeys: firstChild.params && typeof firstChild.params === 'object' ? Object.keys(firstChild.params) : [],
                     paramsPreview: firstChild.params ? (typeof firstChild.params === 'string' ? firstChild.params.substring(0, 200) : JSON.stringify(firstChild.params).substring(0, 200)) : 'null',
-                    allKeys: Object.keys(firstChild)
+                    allKeys: Object.keys(firstChild),
+                    // EXPLICIT base_prompt logging
+                    base_prompt: childParams?.base_prompt ? childParams.base_prompt.substring(0, 100) : '>>> EMPTY/MISSING <<<',
+                    prompt: childParams?.prompt ? childParams.prompt.substring(0, 100) : '>>> EMPTY/MISSING <<<',
+                    orch_base_prompt: childParams?.orchestrator_details?.base_prompt ? childParams.orchestrator_details.base_prompt.substring(0, 100) : '>>> EMPTY/MISSING <<<',
                 },
                 timestamp: Date.now()
             });

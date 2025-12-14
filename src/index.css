@@ -721,7 +721,8 @@
 
   .wes-vintage-card::after {
     content: '';
-    @apply absolute inset-0 rounded-xl;
+    @apply absolute inset-0;
+    border-radius: inherit;
     background-image: 
       repeating-linear-gradient(
         45deg,
@@ -1026,32 +1027,9 @@
       0 4px 8px hsl(var(--primary) / 0.3);
   }
 
-  /* Enhanced decorative corners */
+  /* Corner decorations disabled */
   .wes-corners {
     position: relative;
-  }
-
-  .wes-corners::before,
-  .wes-corners::after {
-    content: '';
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    border: 3px solid hsl(var(--wes-vintage-gold));
-  }
-
-  .wes-corners::before {
-    top: -3px;
-    left: -3px;
-    border-right: none;
-    border-bottom: none;
-  }
-
-  .wes-corners::after {
-    bottom: -3px;
-    right: -3px;
-    border-left: none;
-    border-top: none;
   }
 
   /* Vintage polaroid effect */
@@ -1205,11 +1183,13 @@
         hsl(var(--wes-vintage-gold) / 0.05) 100px,
         hsl(var(--wes-vintage-gold) / 0.05) 102px
       );
-    border-bottom: 1px solid hsl(var(--wes-vintage-gold) / 0.25);
+    border-bottom: 1px solid hsl(var(--wes-vintage-gold) / 0.5);
+    box-shadow: 0 1px 3px hsl(var(--primary) / 0.1);
   }
   
   .dark .wes-header {
-    border-bottom: 1px solid hsl(var(--wes-vintage-gold) / 0.15);
+    border-bottom: 1px solid hsl(var(--wes-vintage-gold) / 0.3);
+    box-shadow: 0 1px 4px hsl(0 0% 0% / 0.3);
   }
 
   .dark .wes-header {
@@ -1328,11 +1308,12 @@
     @apply wes-vintage-card wes-ornate-frame;
     @apply transition-all duration-500 ease-out cursor-pointer;
     @apply hover:shadow-2xl hover:border-primary/20;
+    @apply rounded-md; /* Sharper edges like buttons */
     position: relative;
     overflow: hidden;
     background: hsl(var(--card));
     padding: 12px;
-    box-shadow: 
+    box-shadow:
       0 4px 8px hsl(var(--primary) / 0.1),
       0 0 0 1px hsl(var(--primary) / 0.05),
       inset 0 0 0 1px hsl(var(--primary) / 0.1);
@@ -1675,6 +1656,117 @@
 
   .underline-wave-second::after {
     animation: underlineWaveOut 2.7s ease-in-out 0.15s 1 !important;
+  }
+
+  /* Subtitle link styles with arrow-connected underlines */
+  .subtitle-link-left,
+  .subtitle-link-right {
+    position: relative;
+    padding-bottom: 3px;
+  }
+
+  /* Base underline - subtle dashed line */
+  .subtitle-link-left::after,
+  .subtitle-link-right::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    height: 1.5px;
+    background: linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(236, 237, 227, 0.35) 10%,
+      rgba(236, 237, 227, 0.35) 90%,
+      transparent 100%
+    );
+    transition: all 0.3s ease;
+  }
+
+  /* Left link: underline extends from arrow (left side fades in) */
+  .subtitle-link-left::after {
+    left: -8px;
+    right: 0;
+    background: linear-gradient(
+      to right,
+      rgba(236, 237, 227, 0.15) 0%,
+      rgba(236, 237, 227, 0.4) 15%,
+      rgba(236, 237, 227, 0.4) 100%
+    );
+  }
+
+  /* Right link: underline extends to arrow (right side fades out) */
+  .subtitle-link-right::after {
+    left: 0;
+    right: -8px;
+    background: linear-gradient(
+      to right,
+      rgba(236, 237, 227, 0.4) 0%,
+      rgba(236, 237, 227, 0.4) 85%,
+      rgba(236, 237, 227, 0.15) 100%
+    );
+  }
+
+  /* Hover states - brighter underline */
+  .subtitle-link-left:hover::after {
+    background: linear-gradient(
+      to right,
+      rgba(236, 237, 227, 0.3) 0%,
+      rgba(236, 237, 227, 0.8) 15%,
+      rgba(236, 237, 227, 0.8) 100%
+    );
+  }
+
+  .subtitle-link-right:hover::after {
+    background: linear-gradient(
+      to right,
+      rgba(236, 237, 227, 0.8) 0%,
+      rgba(236, 237, 227, 0.8) 85%,
+      rgba(236, 237, 227, 0.3) 100%
+    );
+  }
+
+  /* Arrow hover animations */
+  .hover-arrow-left {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+  }
+
+  .hover-arrow-right {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+  }
+
+  /* Subtle bounce animation for arrows */
+  @keyframes arrowBounceLeft {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(-3px); }
+  }
+
+  @keyframes arrowBounceRight {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(3px); }
+  }
+
+  /* Animate arrows when hovering on corresponding links */
+  .subtitle-link-left:hover ~ .hover-arrow-left,
+  p:has(.subtitle-link-left:hover) .hover-arrow-left {
+    animation: arrowBounceLeft 0.6s ease-in-out infinite;
+    opacity: 1;
+  }
+
+  .subtitle-link-right:hover ~ .hover-arrow-right,
+  p:has(.subtitle-link-right:hover) .hover-arrow-right {
+    animation: arrowBounceRight 0.6s ease-in-out infinite;
+    opacity: 1;
+  }
+
+  /* When arrow itself is hovered (via parent span) */
+  span:has(.hover-arrow-left):hover .hover-arrow-left {
+    animation: arrowBounceLeft 0.6s ease-in-out infinite;
+    color: rgba(236, 237, 227, 0.7);
+  }
+
+  span:has(.hover-arrow-right):hover .hover-arrow-right {
+    animation: arrowBounceRight 0.6s ease-in-out infinite;
+    color: rgba(236, 237, 227, 0.7);
   }
    
   /* Multicolour border for tooltips on hover */
@@ -2302,6 +2394,23 @@
 
 .animate-sway {
   animation: sway 4s ease-in-out infinite;
+}
+
+/* Subtle color shifting for logo icon */
+@keyframes color-shift {
+  0%, 100% {
+    color: #a098a8; /* lavender faded */
+  }
+  33% {
+    color: #b0a0a8; /* pink-ish faded */
+  }
+  66% {
+    color: #8898a8; /* dusty-blue faded */
+  }
+}
+
+.animate-color-shift {
+  animation: color-shift 8s ease-in-out infinite;
 }
 
 .animate-paintbrush-stroke {
