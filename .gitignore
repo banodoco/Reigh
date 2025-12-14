@@ -44,6 +44,11 @@ temp/
 !docs/structure_detail/*.md
 !tasks/*.md
 
+# Stray video/media files in root (should be in public/)
+/*.mp4
+/*.webm
+/*.mov
+
 # Python cache
 __pycache__/
 *.pyc
