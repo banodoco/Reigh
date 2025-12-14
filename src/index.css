@@ -1205,6 +1205,11 @@
         hsl(var(--wes-vintage-gold) / 0.05) 100px,
         hsl(var(--wes-vintage-gold) / 0.05) 102px
       );
+    border-bottom: 1px solid hsl(var(--wes-vintage-gold) / 0.25);
+  }
+  
+  .dark .wes-header {
+    border-bottom: 1px solid hsl(var(--wes-vintage-gold) / 0.15);
   }
 
   .dark .wes-header {
