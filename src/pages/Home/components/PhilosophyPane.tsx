@@ -56,14 +56,14 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 sm:top-4 sm:right-4 p-2 sm:p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-200 z-10"
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 p-2 sm:p-2 rounded-full bg-secondary/80 hover:bg-secondary transition-colors duration-200 z-10"
         >
-          <X className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
+          <X className="w-5 h-5 sm:w-4 sm:h-4 text-secondary-foreground" />
         </button>
 
-        <div className="mb-8 space-y-3">
-          <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary">reigh is a tool made just for travelling between images</h2>
-          <div className="w-16 h-1 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full animate-pulse-breathe"></div>
+        <div className="mb-8 relative z-10">
+          <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary leading-tight mb-5">reigh is a tool made just for travelling between images</h2>
+          <div className="w-20 h-1.5 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full animate-pulse-breathe opacity-90"></div>
         </div>
 
         <div className="space-y-3 pb-4 text-left text-muted-foreground">

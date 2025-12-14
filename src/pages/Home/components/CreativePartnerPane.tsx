@@ -53,14 +53,14 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 sm:top-4 sm:right-4 p-2 sm:p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors duration-200 z-10"
+          className="absolute top-2 right-2 sm:top-4 sm:right-4 p-2 sm:p-2 rounded-full bg-secondary/80 hover:bg-secondary transition-colors duration-200 z-10"
         >
-          <X className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
+          <X className="w-5 h-5 sm:w-4 sm:h-4 text-secondary-foreground" />
         </button>
         
-        <div className="mb-8 pr-12 sm:pr-0 space-y-3 relative z-10">
-          <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary">reigh is an open source tool built on top of open models</h2>
-          <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full animate-pulse-breathe"></div>
+        <div className="mb-8 pr-12 sm:pr-0 relative z-10">
+          <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary leading-tight mb-5">reigh is an open source tool built on top of open models</h2>
+          <div className="w-20 h-1.5 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full animate-pulse-breathe opacity-90"></div>
         </div>
         
         <div className="space-y-6 text-muted-foreground">
@@ -73,11 +73,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
               <h3 className="font-theme-light text-primary text-lg">1) You can run Reigh for free on your computer</h3>
               
               <p className="text-sm leading-relaxed">
-                When you sign up to Reigh, you'll notice something strange: if you have a decent computer, you can run it for free! <strong>We make this very easy</strong>—you can use the app in any browser while the tasks process at home.
-              </p>
-              
-              <p className="text-sm leading-relaxed">
-                This isn't just possible, but <strong>we make it very easy</strong>. To run it for free, you just need to run this command:
+                If you have a decent computer, you can run Reigh for free. We make it easy—you can use the app in any browser while tasks process at home. Just run this command:
               </p>
               
               <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
@@ -89,7 +85,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
               </div>
               
               <p className="text-sm leading-relaxed">
-                We call our approach an <strong className="text-primary">Open Creative Partner Programme</strong>. In short, we open source our tool, capabilities, and models, then make it as easy as possible for people to run them for free. We hope that artists will use the free tool to create, and this in turn attracts others—many of whom won't have powerful computers or will want to pay for convenience.
+                We call our approach an <strong className="text-primary">Open Creative Partner Programme</strong>. We open source our tool and models so artists can create for free, hoping this attracts others who choose to pay for convenience.
               </p>
             </div>
 
@@ -97,15 +93,11 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
               <h3 className="font-theme-light text-primary text-lg">2) Reigh is very convenient and cheap to run on the cloud</h3>
               
               <p className="text-sm leading-relaxed">
-                Some open source tools can be difficult to run - you often need to go through a complicated local setup process to even start creating.
+                While we make it as easy as possible to run Reigh for free, you can also run it conveniently and cheaply in the cloud. Because we use open models on consumer-grade hardware, <strong>our costs are a fraction of what big platforms charge.</strong>
               </p>
               
               <p className="text-sm leading-relaxed">
-                While we make it as easy as possible to run Reigh for free if you have a good computer, you can also run it conveniently and cheaply in the cloud. Because we use open models and run on consumer-grade hardware, <strong>our costs are a fraction of what big platforms charge.</strong>
-              </p>
-              
-              <p className="text-sm leading-relaxed">
-                Threfore, if you choose to create with Reigh, you'll be honouring the age-old truth in the sentiment expressed by Picasso:
+                Therefore, if you choose to create with Reigh, you'll be honouring the age-old truth in the sentiment expressed by Picasso:
               </p>
               
               <blockquote className="bg-wes-coral/10 border-l-4 border-wes-coral p-3 rounded-r-lg">
@@ -158,7 +150,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
                     <TooltipContent
                       side="top"
                       align="center"
-                      className="group p-2 sm:p-3 bg-wes-cream/90 border-2 border-transparent rounded-lg shadow-md"
+                      className="group p-2 sm:p-3 bg-wes-cream/90 dark:bg-gray-900/95 border-2 border-transparent dark:border-gray-800 rounded-lg shadow-md"
                       onPointerEnter={() => {
                         console.log('[EcosystemTooltip] Pointer entered content – holding open');
                         if (!isMobile) {
@@ -186,18 +178,11 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                , meaning we have a responsibility to help this ecosystem flourish.
-              </p>
-
-              <p className="text-sm leading-relaxed">
-                To do this, we will share our profits with projects and people whose contributions enabled Reigh to exist:
+                . We have a responsibility to help this ecosystem flourish, so we share our profits with the people and projects that make Reigh possible:
               </p>
               
               <ProfitSplitBar className="space-y-2" />
               <div className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
-                <p>
-                  Practically, we will charge roughly twice our inference costs — because we're running on consumer hardware, we'll still be over 50 times cheaper than Veo3, for example.
-                </p>
                 <p>After other costs like hosting, we'll <strong>split the profit three ways</strong>:</p>
                 <div className="space-y-2">
                   <div>

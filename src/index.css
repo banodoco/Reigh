@@ -1194,7 +1194,7 @@
 
   .dark .wes-header {
     background: 
-      linear-gradient(90deg, hsl(var(--background)) 0%, hsl(210 20% 18% / 0.6) 30%, hsl(var(--wes-vintage-gold) / 0.08) 50%, hsl(210 20% 18% / 0.6) 70%, hsl(var(--background)) 100%),
+      linear-gradient(90deg, hsl(var(--background)) 0%, hsl(210 20% 18% / 0.6) 50%, hsl(var(--background)) 100%),
       repeating-linear-gradient(
         90deg,
         transparent,
@@ -1575,10 +1575,10 @@
   .dark .sparkle-underline::before {
     background-image: linear-gradient(
       90deg,
-      hsl(var(--wes-vintage-gold) / 0.55),
+      hsl(var(--wes-vintage-gold) / 0.8),
       hsl(var(--wes-vintage-gold)),
-      hsl(var(--wes-vintage-gold) / 0.75),
-      hsl(var(--wes-vintage-gold) / 0.55) /* Loop back */
+      hsl(var(--wes-vintage-gold) / 0.9),
+      hsl(var(--wes-vintage-gold) / 0.8) /* Loop back */
     );
   }
 

@@ -291,7 +291,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                               />
                             </g>
                           </svg>
-                          an open source tool
+                          an open source tool for
                         </span>
                       </TooltipTrigger>
                       {/* TooltipContent intentionally commented out
@@ -313,8 +313,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       </TooltipContent>
                       */}
                     </Tooltip>
-                  </TooltipProvider>{' '}
-                  for<br />
+                  </TooltipProvider>
+                  <br />
                   <TooltipProvider>
                     <Tooltip open={emergingTipOpen} onOpenChange={setEmergingTipOpen}>
                       <TooltipTrigger asChild>
