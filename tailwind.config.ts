@@ -708,7 +708,7 @@ export default {
 			},
 			backgroundImage: {
 				'vintage-gradient': 'linear-gradient(135deg, hsl(var(--wes-cream)) 0%, hsl(var(--wes-pink) / 0.3) 100%)',
-				'film-grain': 'none', /* DISABLED - was creating golden grid artifact */
+				'film-grain': 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)',
 				'wes-pattern': 'linear-gradient(45deg, hsl(var(--accent)) 25%, transparent 25%)',
 			}
 		}

@@ -289,19 +289,7 @@
     @apply text-foreground font-cocogoose font-light antialiased;
     font-family: 'Cocogoose', 'CocogooseNumbers', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: hsl(var(--background));
-    background-image:
-      linear-gradient(135deg,
-        hsl(var(--background)) 0%,
-        hsl(var(--secondary) / 0.3) 25%,
-        hsl(var(--accent) / 0.2) 50%,
-        hsl(var(--wes-vintage-gold) / 0.2) 75%,
-        hsl(var(--background)) 100%
-      ),
-      radial-gradient(circle at 15% 25%, hsl(var(--secondary) / 0.1) 0%, transparent 30%),
-      radial-gradient(circle at 85% 15%, hsl(var(--accent) / 0.1) 0%, transparent 25%),
-      radial-gradient(circle at 75% 85%, hsl(var(--wes-vintage-gold) / 0.1) 0%, transparent 35%);
-    background-size: 100% 100%, 80% 80%, 70% 70%, 90% 90%;
-    background-attachment: fixed;
+    /* Removed decorative gradients that were creating visible grid artifacts */
     letter-spacing: 0.015em;
     position: relative;
   }
@@ -862,16 +850,8 @@
   }
   
   .wes-texture::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      radial-gradient(circle at 1px 1px, hsl(var(--primary)) 1px, transparent 0),
-      linear-gradient(45deg, transparent 48%, hsl(var(--primary) / 0.01) 49%, hsl(var(--primary) / 0.01) 51%, transparent 52%);
-    background-size: 20px 20px, 8px 8px;
-    opacity: 0.015;
-    pointer-events: none;
-    mix-blend-mode: multiply;
+    /* DISABLED - investigating golden grid issue */
+    display: none;
   }
 
   /* Enhanced geometric patterns */
