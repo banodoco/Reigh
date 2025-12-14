@@ -219,7 +219,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
               {/* Main title */}
               <div style={getFadeStyle(0.5, 20)}>
-                <h1 className="text-7xl md:text-[10rem] text-[#ecede3] mb-0 leading-tight">
+                <h1 className="text-8xl md:text-[10rem] text-[#ecede3] mb-0 leading-tight">
                   reigh
                 </h1>
               </div>
