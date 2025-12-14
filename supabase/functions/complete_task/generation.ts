@@ -10,6 +10,62 @@ import {
   buildGenerationParams,
 } from './params.ts';
 
+// ===== SEGMENT PARAM EXPANSION =====
+
+/**
+ * Helper to safely extract value from array by index
+ */
+function extractFromArray(arr: any[], index: number): any | undefined {
+  if (Array.isArray(arr) && index >= 0 && index < arr.length) {
+    return arr[index];
+  }
+  return undefined;
+}
+
+/**
+ * Extract segment-specific params from expanded arrays in orchestrator_details
+ * For travel segments, each segment can have different prompts, frame counts, etc.
+ * 
+ * @param params - Original task params
+ * @param orchDetails - orchestrator_details containing expanded arrays
+ * @param segmentIndex - The index of this segment
+ * @returns Modified params with segment-specific values
+ */
+function extractSegmentSpecificParams(
+  params: any,
+  orchDetails: any,
+  segmentIndex: number
+): any {
+  const specificParams = { ...params };
+
+  // Extract specific prompt from base_prompts_expanded
+  const specificPrompt = extractFromArray(orchDetails.base_prompts_expanded, segmentIndex);
+  if (specificPrompt !== undefined) {
+    specificParams.prompt = specificPrompt;
+    console.log(`[GenMigration] Set child prompt: "${String(specificPrompt).substring(0, 20)}..."`);
+  }
+
+  // Extract specific negative prompt from negative_prompts_expanded
+  const specificNegativePrompt = extractFromArray(orchDetails.negative_prompts_expanded, segmentIndex);
+  if (specificNegativePrompt !== undefined) {
+    specificParams.negative_prompt = specificNegativePrompt;
+  }
+
+  // Extract specific frames count from segment_frames_expanded
+  const specificFrames = extractFromArray(orchDetails.segment_frames_expanded, segmentIndex);
+  if (specificFrames !== undefined) {
+    specificParams.num_frames = specificFrames;
+  }
+
+  // Extract specific overlap from frame_overlap_expanded
+  const specificOverlap = extractFromArray(orchDetails.frame_overlap_expanded, segmentIndex);
+  if (specificOverlap !== undefined) {
+    specificParams.frame_overlap = specificOverlap;
+  }
+
+  return specificParams;
+}
+
 // ===== TOOL TYPE RESOLUTION =====
 
 /**
@@ -528,21 +584,70 @@ export async function createGenerationFromTask(
           childOrder = parseInt(String(segmentIndex), 10);
           console.log(`[GenMigration] Extracted child_order: ${childOrder}`);
 
-          // Handle single-segment case
-          const orchDetails = taskData.params?.orchestrator_details;
-          if (orchDetails && childOrder === 0) {
-            const numSegments = orchDetails.num_new_segments_to_generate;
-            if (numSegments === 1 && parentGenerationId) {
-              console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent`);
-              const result = await createVariantOnParent(
+          // SPECIAL CASE: join_clips_segment with single join (2 clips)
+          // The segment output IS the final output - create variant on parent instead of child
+          if (taskData.task_type === 'join_clips_segment') {
+            const isSingleJoin = taskData.params?.is_first_join === true && taskData.params?.is_last_join === true;
+            
+            if (isSingleJoin && parentGenerationId) {
+              console.log(`[JoinClipsSingleJoin] Detected single-join scenario (join_index: ${taskData.params?.join_index}) - creating variant for parent generation ${parentGenerationId}`);
+              
+              // Determine tool_type from orchestrator params (could be 'join-clips' or 'edit-video')
+              const toolType = taskData.params?.full_orchestrator_payload?.tool_type ||
+                               taskData.params?.tool_type || 
+                               'join-clips';
+              
+              const singleJoinResult = await createVariantOnParent(
                 supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
-                'travel_segment', { tool_type: 'travel-between-images', created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true }
+                'join_clips_segment',
+                {
+                  tool_type: toolType,
+                  created_from: 'single_join_completion',
+                  join_index: taskData.params?.join_index ?? 0,
+                  is_single_join: true,
+                }
               );
-              if (result) {
-                await supabase.from('tasks').update({ generation_created: true }).eq('id', orchestratorTaskId);
-                return result;
+              
+              if (singleJoinResult) {
+                console.log(`[JoinClipsSingleJoin] Successfully created variant and updated parent generation`);
+                
+                // Mark the orchestrator task as generation_created=true
+                await supabase
+                  .from('tasks')
+                  .update({ generation_created: true })
+                  .eq('id', orchestratorTaskId);
+                
+                // Return early - we've handled this as a variant, not a child generation
+                return singleJoinResult;
+              } else {
+                console.error(`[JoinClipsSingleJoin] Failed to create variant, falling through to child generation creation`);
               }
             }
+          }
+
+          // Extract child-specific params from orchestrator_details if available
+          const orchDetails = taskData.params?.orchestrator_details;
+          if (orchDetails && !isNaN(childOrder)) {
+            console.log(`[GenMigration] Extracting specific params for child segment ${childOrder}`);
+
+            // SPECIAL CASE: For travel orchestrators with only 1 segment, the segment IS the final output
+            if (childOrder === 0) {
+              const numSegments = orchDetails.num_new_segments_to_generate;
+              if (numSegments === 1 && parentGenerationId) {
+                console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent`);
+                const result = await createVariantOnParent(
+                  supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
+                  'travel_segment', { tool_type: 'travel-between-images', created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true }
+                );
+                if (result) {
+                  await supabase.from('tasks').update({ generation_created: true }).eq('id', orchestratorTaskId);
+                  return result;
+                }
+              }
+            }
+
+            // Extract segment-specific params from expanded arrays
+            taskData.params = extractSegmentSpecificParams(taskData.params, orchDetails, childOrder);
           }
         }
       }

@@ -19,6 +19,13 @@ export const IDS = {
   GENERATION_SOURCE: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   GENERATION_PARENT: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
   SHOT_1: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+  // New IDs for additional test scenarios
+  TASK_JOIN_CLIPS_SINGLE: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+  TASK_JOIN_CLIPS_ORCHESTRATOR: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+  TASK_BAD_SHOT: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+  TASK_SEGMENT_WITH_EXPANSION: '11111111-2222-3333-4444-555555555555',
+  INVALID_SHOT: 'not-a-valid-uuid',
+  NONEXISTENT_SHOT: 'deadbeef-dead-beef-dead-beefdeadbeef',
 };
 
 // Base mock config with common data
@@ -119,6 +126,71 @@ export const baseMockConfig: MockConfig = {
         },
       },
     },
+    // New test tasks for additional coverage
+    [IDS.TASK_JOIN_CLIPS_SINGLE]: {
+      id: IDS.TASK_JOIN_CLIPS_SINGLE,
+      task_type: 'join_clips_segment',
+      project_id: IDS.PROJECT_1,
+      user_id: IDS.USER_1,
+      status: 'In Progress',
+      params: {
+        segment_index: 0,
+        join_index: 0,
+        is_first_join: true,
+        is_last_join: true, // Single join = 2 clips
+        orchestrator_task_id: IDS.TASK_JOIN_CLIPS_ORCHESTRATOR,
+        orchestrator_details: {
+          orchestrator_task_id: IDS.TASK_JOIN_CLIPS_ORCHESTRATOR,
+          parent_generation_id: IDS.GENERATION_PARENT,
+        },
+        full_orchestrator_payload: {
+          tool_type: 'join-clips',
+        },
+      },
+    },
+    [IDS.TASK_JOIN_CLIPS_ORCHESTRATOR]: {
+      id: IDS.TASK_JOIN_CLIPS_ORCHESTRATOR,
+      task_type: 'join_clips_orchestrator',
+      project_id: IDS.PROJECT_1,
+      user_id: IDS.USER_1,
+      status: 'In Progress',
+      params: {
+        orchestrator_details: {
+          clip_list: ['clip1.mp4', 'clip2.mp4'],
+          parent_generation_id: IDS.GENERATION_PARENT,
+        },
+      },
+    },
+    [IDS.TASK_BAD_SHOT]: {
+      id: IDS.TASK_BAD_SHOT,
+      task_type: 'single_image',
+      project_id: IDS.PROJECT_1,
+      user_id: IDS.USER_1,
+      status: 'In Progress',
+      params: {
+        prompt: 'Image with invalid shot',
+        shot_id: IDS.INVALID_SHOT, // Invalid UUID format
+      },
+    },
+    [IDS.TASK_SEGMENT_WITH_EXPANSION]: {
+      id: IDS.TASK_SEGMENT_WITH_EXPANSION,
+      task_type: 'travel_segment',
+      project_id: IDS.PROJECT_1,
+      user_id: IDS.USER_1,
+      status: 'In Progress',
+      params: {
+        segment_index: 1,
+        orchestrator_task_id: IDS.TASK_ORCHESTRATOR,
+        orchestrator_details: {
+          orchestrator_task_id: IDS.TASK_ORCHESTRATOR,
+          num_new_segments_to_generate: 3,
+          base_prompts_expanded: ['Prompt for segment 0', 'Prompt for segment 1', 'Prompt for segment 2'],
+          negative_prompts_expanded: ['Neg 0', 'Neg 1', 'Neg 2'],
+          segment_frames_expanded: [81, 97, 81],
+          frame_overlap_expanded: [5, 5, 5],
+        },
+      },
+    },
   },
   taskTypes: {
     'single_image': {
@@ -167,6 +239,20 @@ export const baseMockConfig: MockConfig = {
       name: 'travel_stitch',
       category: 'processing',
       tool_type: 'travel-between-images',
+      content_type: 'video',
+      is_active: true,
+    },
+    'join_clips_segment': {
+      name: 'join_clips_segment',
+      category: 'generation',
+      tool_type: 'join-clips',
+      content_type: 'video',
+      is_active: true,
+    },
+    'join_clips_orchestrator': {
+      name: 'join_clips_orchestrator',
+      category: 'orchestration',
+      tool_type: 'join-clips',
       content_type: 'video',
       is_active: true,
     },
@@ -414,6 +500,66 @@ export const TEST_SCENARIOS: TestScenario[] = [
     mockConfig: baseMockConfig,
     expectedStatusCode: 400,
     expectedBehavior: ['return error response'],
+  },
+  
+  // ============ ADDITIONAL COVERAGE: Join Clips ============
+  {
+    name: 'join_clips_single_creates_parent_variant',
+    description: 'Single join (2 clips) creates variant on parent instead of child generation',
+    request: {
+      task_id: IDS.TASK_JOIN_CLIPS_SINGLE,
+      file_data: TINY_PNG_BASE64,
+      filename: 'joined.mp4',
+    },
+    mockConfig: baseMockConfig,
+    expectedStatusCode: 200,
+    expectedBehavior: [
+      'upload joined video',
+      'detect is_first_join && is_last_join (single join)',
+      'create variant on parent generation',
+      'mark orchestrator task generation_created',
+      'mark task Complete',
+    ],
+  },
+  
+  // ============ ADDITIONAL COVERAGE: Shot Validation ============
+  {
+    name: 'invalid_shot_uuid_cleaned',
+    description: 'Invalid shot_id UUID format is cleaned from params',
+    request: {
+      task_id: IDS.TASK_BAD_SHOT,
+      file_data: TINY_PNG_BASE64,
+      filename: 'output.png',
+    },
+    mockConfig: baseMockConfig,
+    expectedStatusCode: 200,
+    expectedBehavior: [
+      'upload file',
+      'detect invalid shot_id UUID format',
+      'remove shot_id from params',
+      'create generation without shot link',
+      'mark task Complete',
+    ],
+  },
+  
+  // ============ ADDITIONAL COVERAGE: Segment Param Expansion ============
+  {
+    name: 'segment_uses_expanded_params',
+    description: 'Travel segment extracts segment-specific params from expanded arrays',
+    request: {
+      task_id: IDS.TASK_SEGMENT_WITH_EXPANSION,
+      file_data: TINY_PNG_BASE64,
+      filename: 'segment_1.mp4',
+    },
+    mockConfig: baseMockConfig,
+    expectedStatusCode: 200,
+    expectedBehavior: [
+      'upload segment video',
+      'extract prompt from base_prompts_expanded[1]',
+      'extract negative_prompt from negative_prompts_expanded[1]',
+      'extract num_frames from segment_frames_expanded[1]',
+      'create child generation with segment-specific params',
+    ],
   },
 ];
 

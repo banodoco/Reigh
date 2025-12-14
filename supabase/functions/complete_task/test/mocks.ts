@@ -59,6 +59,9 @@ export class OperationCapture {
  * Create a mock Supabase client that captures all operations
  */
 export function createMockSupabase(config: MockConfig, capture: OperationCapture) {
+  // Maintain mutable in-memory state so multi-step flows behave realistically.
+  // NOTE: We intentionally mutate the provided config object to keep things simple.
+
   // Helper to create chainable query builder
   const createQueryBuilder = (table: string, operation: 'select' | 'insert' | 'update' | 'delete') => {
     const state: any = {
@@ -146,17 +149,23 @@ export function createMockSupabase(config: MockConfig, capture: OperationCapture
       // Return mock data based on config
       let result: any = null;
       let error: any = null;
+
+      const eqFilters = state.filters.filter((f: any) => f.type === 'eq');
+      const getEq = (field: string) => eqFilters.find((f: any) => f.field === field)?.value;
+      const allEqMatch = (row: any) => eqFilters.every((f: any) => row?.[f.field] === f.value);
       
       if (table === 'tasks') {
-        const idFilter = state.filters.find((f: any) => f.type === 'eq' && f.field === 'id');
-        if (idFilter && config.tasks[idFilter.value]) {
-          result = config.tasks[idFilter.value];
+        const id = getEq('id');
+        if (id && config.tasks[id]) {
+          result = config.tasks[id];
+        } else if (state.operation === 'select') {
+          // Support list queries (e.g., orchestrator sibling checks)
+          const rows = Object.values(config.tasks).filter((t: any) => allEqMatch(t));
+          result = state.single || state.maybeSingle ? (rows[0] ?? null) : rows;
         }
       } else if (table === 'task_types') {
-        const nameFilter = state.filters.find((f: any) => f.type === 'eq' && f.field === 'name');
-        if (nameFilter && config.taskTypes[nameFilter.value]) {
-          result = config.taskTypes[nameFilter.value];
-        }
+        const name = getEq('name');
+        if (name && config.taskTypes[name]) result = config.taskTypes[name];
       } else if (table === 'generations') {
         const idFilter = state.filters.find((f: any) => f.type === 'eq' && f.field === 'id');
         if (idFilter && config.generations[idFilter.value]) {
@@ -174,10 +183,8 @@ export function createMockSupabase(config: MockConfig, capture: OperationCapture
           }
         }
       } else if (table === 'shots') {
-        const idFilter = state.filters.find((f: any) => f.type === 'eq' && f.field === 'id');
-        if (idFilter && config.shots[idFilter.value]) {
-          result = config.shots[idFilter.value];
-        }
+        const id = getEq('id');
+        if (id && config.shots[id]) result = config.shots[id];
       }
       
       // For inserts/updates, return the data that was sent
@@ -186,6 +193,53 @@ export function createMockSupabase(config: MockConfig, capture: OperationCapture
       }
       if (state.operation === 'update' && state.returning) {
         result = state.data;
+      }
+
+      // Apply state mutations for inserts/updates so later selects see changes
+      if (state.operation === 'insert') {
+        if (table === 'tasks') {
+          const row = Array.isArray(state.data) ? state.data[0] : state.data;
+          if (row?.id) config.tasks[row.id] = { ...(config.tasks[row.id] || {}), ...row };
+        } else if (table === 'generations') {
+          const row = Array.isArray(state.data) ? state.data[0] : state.data;
+          const id = row?.id || crypto.randomUUID();
+          config.generations[id] = { ...(config.generations[id] || {}), ...row, id };
+        } else if (table === 'shots') {
+          const row = Array.isArray(state.data) ? state.data[0] : state.data;
+          if (row?.id) config.shots[row.id] = { ...(config.shots[row.id] || {}), ...row };
+        }
+      }
+
+      if (state.operation === 'update') {
+        if (table === 'tasks') {
+          const id = getEq('id');
+          if (id && config.tasks[id] && allEqMatch(config.tasks[id])) {
+            config.tasks[id] = { ...config.tasks[id], ...state.data };
+            result = config.tasks[id];
+          } else if (state.single) {
+            result = null;
+          }
+        } else if (table === 'generations') {
+          const id = getEq('id');
+          if (id && config.generations[id] && allEqMatch(config.generations[id])) {
+            config.generations[id] = { ...config.generations[id], ...state.data };
+            result = config.generations[id];
+          } else if (state.single) {
+            result = null;
+          }
+        }
+      }
+
+      // Simulate joined fields for tasks when requested
+      if (table === 'tasks' && state.operation === 'select' && result) {
+        const includeTaskTypes = typeof state.selectFields === 'string' && state.selectFields.includes('task_types');
+        if (includeTaskTypes) {
+          if (Array.isArray(result)) {
+            result = result.map((t: any) => ({ ...t, task_types: config.taskTypes[t.task_type] ?? null }));
+          } else {
+            result = { ...result, task_types: config.taskTypes[result.task_type] ?? null };
+          }
+        }
       }
       
       if (state.single && !result) {

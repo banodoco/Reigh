@@ -22,6 +22,7 @@ import {
   handleUpscaleVariant 
 } from './generation.ts';
 import { checkOrchestratorCompletion } from './orchestrator.ts';
+import { validateAndCleanupShotId } from './shotValidation.ts';
 
 // Provide a loose Deno type for local tooling
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,7 +49,32 @@ declare const Deno: any;
  * MODE 4 (REFERENCE EXISTING PATH):
  *   Body: { task_id, storage_path: "user_id/filename", ... }
  */
-serve(async (req) => {
+export interface CompleteTaskDeps {
+  /**
+   * Override Supabase client factory for tests.
+   */
+  createClient?: (supabaseUrl: string, serviceKey: string) => any;
+  /**
+   * Provide a pre-constructed Supabase client (bypasses createClient).
+   */
+  supabaseAdmin?: any;
+  /**
+   * Override auth + ownership utilities for tests.
+   */
+  authenticateRequest?: typeof authenticateRequest;
+  verifyTaskOwnership?: typeof verifyTaskOwnership;
+  getTaskUserId?: typeof getTaskUserId;
+  /**
+   * Override logger implementation for tests.
+   */
+  LoggerClass?: typeof SystemLogger;
+  /**
+   * Override env var access for tests.
+   */
+  env?: { get: (key: string) => string | undefined };
+}
+
+export async function completeTaskHandler(req: Request, deps: CompleteTaskDeps = {}): Promise<Response> {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
@@ -64,16 +90,19 @@ serve(async (req) => {
   console.log(`[COMPLETE-TASK] Processing task ${taskIdString} (mode: ${parsedRequest.mode})`);
 
   // 2) Get environment variables and create Supabase client
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const env = deps.env ?? Deno.env;
+  const serviceKey = env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = env.get("SUPABASE_URL");
   if (!serviceKey || !supabaseUrl) {
     console.error("Missing required environment variables");
     return new Response("Server configuration error", { status: 500 });
   }
-  const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+  const createClientFn = deps.createClient ?? createClient;
+  const supabaseAdmin = deps.supabaseAdmin ?? createClientFn(supabaseUrl, serviceKey);
   
   // Create logger
-  const logger = new SystemLogger(supabaseAdmin, 'complete-task', taskIdString);
+  const LoggerClass = deps.LoggerClass ?? SystemLogger;
+  const logger = new LoggerClass(supabaseAdmin, 'complete-task', taskIdString);
   logger.info("Processing task", { 
     task_id: taskIdString, 
     mode: parsedRequest.mode,
@@ -96,7 +125,8 @@ serve(async (req) => {
   }
 
   // 4) Authenticate request
-  const auth = await authenticateRequest(req, supabaseAdmin, "[COMPLETE-TASK]");
+  const authenticateFn = deps.authenticateRequest ?? authenticateRequest;
+  const auth = await authenticateFn(req, supabaseAdmin, "[COMPLETE-TASK]");
   if (!auth.success) {
     logger.error("Authentication failed", { error: auth.error });
     await logger.flush();
@@ -109,7 +139,8 @@ serve(async (req) => {
   try {
     // 5) Verify task ownership if user token
     if (!isServiceRole && callerId) {
-      const ownershipResult = await verifyTaskOwnership(supabaseAdmin, taskIdString, callerId, "[COMPLETE-TASK]");
+      const verifyOwnershipFn = deps.verifyTaskOwnership ?? verifyTaskOwnership;
+      const ownershipResult = await verifyOwnershipFn(supabaseAdmin, taskIdString, callerId, "[COMPLETE-TASK]");
       if (!ownershipResult.success) {
         return new Response(ownershipResult.error || "Forbidden", { status: ownershipResult.statusCode || 403 });
       }
@@ -131,7 +162,8 @@ serve(async (req) => {
     // 7) Determine user ID for storage path
     let userId: string;
     if (isServiceRole) {
-      const taskUserResult = await getTaskUserId(supabaseAdmin, taskIdString, "[COMPLETE-TASK]");
+      const getTaskUserIdFn = deps.getTaskUserId ?? getTaskUserId;
+      const taskUserResult = await getTaskUserIdFn(supabaseAdmin, taskIdString, "[COMPLETE-TASK]");
       if (taskUserResult.error) {
         return new Response(taskUserResult.error, { status: taskUserResult.statusCode || 404 });
       }
@@ -144,8 +176,8 @@ serve(async (req) => {
     const storageResult = await handleStorageOperations(supabaseAdmin, parsedRequest, userId, isServiceRole);
     const { publicUrl, objectPath, thumbnailUrl } = storageResult;
 
-    // 9) Validate shot and update params if needed
-    let updatedParams: any = null;
+    // 9) Validate shot references and update params if needed
+    console.log(`[COMPLETE-TASK] Validating shot references for task ${taskIdString}`);
     try {
       const { data: currentTask, error: taskFetchError } = await supabaseAdmin
         .from("tasks")
@@ -154,8 +186,20 @@ serve(async (req) => {
         .single();
 
       if (!taskFetchError && currentTask && currentTask.params) {
-        updatedParams = { ...currentTask.params };
+        let updatedParams = { ...currentTask.params };
         let needsParamsUpdate = false;
+
+        // task_types is returned as object from !inner join with .single()
+        const taskTypeInfo = currentTask.task_types as any;
+        const toolType = taskTypeInfo?.tool_type as string | null;
+        console.log(`[COMPLETE-TASK] Task type: ${currentTask.task_type}, tool_type: ${toolType}`);
+
+        // Validate and cleanup invalid shot_id references
+        const shotValidation = await validateAndCleanupShotId(supabaseAdmin, updatedParams, toolType);
+        if (shotValidation.needsUpdate) {
+          needsParamsUpdate = true;
+          updatedParams = shotValidation.updatedParams;
+        }
 
         // Add thumbnail URL if available
         if (thumbnailUrl) {
@@ -164,11 +208,13 @@ serve(async (req) => {
         }
 
         if (needsParamsUpdate) {
+          console.log(`[COMPLETE-TASK] Updating task parameters${thumbnailUrl ? ' with thumbnail_url' : ''}${shotValidation.needsUpdate ? ' with cleaned shot references' : ''}`);
           await supabaseAdmin.from("tasks").update({ params: updatedParams }).eq("id", taskIdString);
         }
       }
     } catch (validationError) {
       console.error(`[COMPLETE-TASK] Error during validation:`, validationError);
+      // Continue anyway - don't fail task completion due to validation errors
     }
 
     // 10) Create generation (if applicable)
@@ -258,7 +304,12 @@ serve(async (req) => {
     await logger.flush();
     return new Response(`Internal error: ${error?.message}`, { status: 500 });
   }
-});
+}
+
+// Some TS envs don't know about import.meta.main; Deno does.
+if ((import.meta as any).main) {
+  serve((req) => completeTaskHandler(req));
+}
 
 /**
  * Handle generation creation based on task type

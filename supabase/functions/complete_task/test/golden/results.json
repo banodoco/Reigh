@@ -6,6 +6,63 @@
     "expectedStatusCode": 200,
     "operations": [
       {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/output.png",
+        "data": {
+          "size": 70,
+          "contentType": "image/png"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/output.png"
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg",
+        "data": {
+          "size": 631,
+          "contentType": "image/jpeg"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "params": {
+            "prompt": "A beautiful sunset",
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg"
+          }
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      },
+      {
         "type": "db_select",
         "table": "tasks",
         "data": null,
@@ -30,32 +87,41 @@
         ]
       },
       {
-        "type": "storage_upload",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/output.png",
-        "data": {
-          "size": 10
-        }
-      },
-      {
-        "type": "storage_upload",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765751438146.jpg",
-        "data": {
-          "size": 5
-        }
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"33333333-3333-3333-3333-333333333333\"]"
+          }
+        ]
       },
       {
         "type": "db_insert",
         "table": "generations",
         "data": {
-          "id": "be0816cf-5208-4fc1-8cee-fc19b85f0dcc",
+          "id": "5127dc30-acd2-4078-9021-8e85a6d2f119",
           "tasks": [
             "33333333-3333-3333-3333-333333333333"
           ],
-          "project_id": "22222222-2222-2222-2222-222222222222",
+          "params": {
+            "prompt": "A beautiful sunset",
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg",
+            "tool_type": "image-generation",
+            "content_type": "image",
+            "thumbnailUrl": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg"
+          },
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png",
           "type": "image",
-          "location": "https://mock-url.com/output.png"
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg",
+          "based_on": null,
+          "parent_generation_id": null,
+          "is_child": false,
+          "child_order": null,
+          "created_at": "2025-12-14T23:06:10.380Z"
         },
         "filters": []
       },
@@ -63,8 +129,23 @@
         "type": "db_update",
         "table": "tasks",
         "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
           "status": "Complete",
-          "output_location": "https://mock-url.com/output"
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png",
+          "generation_processed_at": "2025-12-14T23:06:10.383Z"
         },
         "filters": [
           {
@@ -80,11 +161,9 @@
         ]
       },
       {
-        "type": "db_update",
+        "type": "db_select",
         "table": "tasks",
-        "data": {
-          "generation_created": true
-        },
+        "data": null,
         "filters": [
           {
             "type": "eq",
@@ -93,7 +172,8 @@
           }
         ]
       }
-    ]
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
   },
   {
     "scenario": "mode1_video_i2v",
@@ -102,6 +182,79 @@
     "expectedStatusCode": 200,
     "operations": [
       {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/output.mp4",
+        "data": {
+          "size": 70,
+          "contentType": "video/mp4"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/output.mp4"
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb.png",
+        "data": {
+          "size": 70,
+          "contentType": "image/png"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb.png"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "shots",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "cccccccc-cccc-cccc-cccc-cccccccccccc"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "params": {
+            "prompt": "Camera pans slowly",
+            "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "orchestrator_details": {
+              "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+              "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb.png"
+            }
+          }
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      },
+      {
         "type": "db_select",
         "table": "tasks",
         "data": null,
@@ -126,32 +279,58 @@
         ]
       },
       {
-        "type": "storage_upload",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/output.mp4",
-        "data": {
-          "size": 10
-        }
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"44444444-4444-4444-4444-444444444444\"]"
+          }
+        ]
       },
       {
-        "type": "storage_upload",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb.png",
-        "data": {
-          "size": 5
-        }
+        "type": "db_select",
+        "table": "shots",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "cccccccc-cccc-cccc-cccc-cccccccccccc"
+          }
+        ]
       },
       {
         "type": "db_insert",
         "table": "generations",
         "data": {
-          "id": "c64d6cc0-168d-41d3-ae51-c46b8bbb8324",
+          "id": "34a8c828-2027-4568-baa4-08ecb84c916e",
           "tasks": [
             "44444444-4444-4444-4444-444444444444"
           ],
-          "project_id": "22222222-2222-2222-2222-222222222222",
+          "params": {
+            "prompt": "Camera pans slowly",
+            "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "orchestrator_details": {
+              "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+              "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb.png"
+            },
+            "tool_type": "image-to-video",
+            "content_type": "video",
+            "shotId": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "thumbnailUrl": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb.png"
+          },
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.mp4",
           "type": "video",
-          "location": "https://mock-url.com/output.png"
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb.png",
+          "based_on": null,
+          "parent_generation_id": null,
+          "is_child": false,
+          "child_order": null,
+          "created_at": "2025-12-14T23:06:10.385Z"
         },
         "filters": []
       },
@@ -160,7 +339,7 @@
         "table": "add_generation_to_shot",
         "data": {
           "p_shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-          "p_generation_id": "78e25888-3b0d-40a4-8901-f666af4175e9",
+          "p_generation_id": "34a8c828-2027-4568-baa4-08ecb84c916e",
           "p_with_position": false
         }
       },
@@ -168,8 +347,23 @@
         "type": "db_update",
         "table": "tasks",
         "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
           "status": "Complete",
-          "output_location": "https://mock-url.com/output"
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.mp4",
+          "generation_processed_at": "2025-12-14T23:06:10.385Z"
         },
         "filters": [
           {
@@ -185,11 +379,9 @@
         ]
       },
       {
-        "type": "db_update",
+        "type": "db_select",
         "table": "tasks",
-        "data": {
-          "generation_created": true
-        },
+        "data": null,
         "filters": [
           {
             "type": "eq",
@@ -198,7 +390,8 @@
           }
         ]
       }
-    ]
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.mp4\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb.png\",\"message\":\"Task completed and file uploaded successfully\"}"
   },
   {
     "scenario": "mode3_presigned",
@@ -206,6 +399,23 @@
     "statusCode": 200,
     "expectedStatusCode": 200,
     "operations": [
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      },
       {
         "type": "db_select",
         "table": "tasks",
@@ -231,41 +441,50 @@
         ]
       },
       {
-        "type": "storage_get_url",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png"
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"33333333-3333-3333-3333-333333333333\"]"
+          }
+        ]
       },
       {
         "type": "db_insert",
-        "table": "generations",
+        "table": "generation_variants",
         "data": {
-          "id": "eaced4ab-02ef-4e42-b6e2-04cfddc85c0d",
-          "tasks": [
-            "33333333-3333-3333-3333-333333333333"
-          ],
-          "project_id": "22222222-2222-2222-2222-222222222222",
-          "type": "image",
-          "location": "https://mock-url.com/output.png"
+          "generation_id": "5127dc30-acd2-4078-9021-8e85a6d2f119",
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png",
+          "thumbnail_url": null,
+          "params": {
+            "prompt": "A beautiful sunset",
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg",
+            "source_task_id": "33333333-3333-3333-3333-333333333333",
+            "created_from": "task_completion",
+            "tool_type": "image-generation"
+          },
+          "is_primary": true,
+          "variant_type": "regenerated",
+          "name": null,
+          "created_at": "2025-12-14T23:06:10.385Z"
         },
         "filters": []
       },
       {
         "type": "db_update",
-        "table": "tasks",
+        "table": "generations",
         "data": {
-          "status": "Complete",
-          "output_location": "https://mock-url.com/output"
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png",
+          "thumbnail_url": null
         },
         "filters": [
           {
             "type": "eq",
             "field": "id",
-            "value": "33333333-3333-3333-3333-333333333333"
-          },
-          {
-            "type": "eq",
-            "field": "status",
-            "value": "In Progress"
+            "value": "5127dc30-acd2-4078-9021-8e85a6d2f119"
           }
         ]
       },
@@ -282,15 +501,28 @@
             "value": "33333333-3333-3333-3333-333333333333"
           }
         ]
-      }
-    ]
-  },
-  {
-    "scenario": "mode3_with_thumbnail",
-    "passed": true,
-    "statusCode": 200,
-    "expectedStatusCode": 200,
-    "operations": [
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png",
+          "generation_processed_at": "2025-12-14T23:06:10.386Z"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
       {
         "type": "db_select",
         "table": "tasks",
@@ -299,22 +531,19 @@
           {
             "type": "eq",
             "field": "id",
-            "value": "44444444-4444-4444-4444-444444444444"
+            "value": "33333333-3333-3333-3333-333333333333"
           }
         ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "wan_2_2_i2v"
-          }
-        ]
-      },
+      }
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png\",\"thumbnail_url\":null,\"message\":\"Task completed and file uploaded successfully\"}"
+  },
+  {
+    "scenario": "mode3_with_thumbnail",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
       {
         "type": "storage_get_url",
         "bucket": "image_uploads",
@@ -326,25 +555,132 @@
         "path": "11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg"
       },
       {
-        "type": "db_insert",
-        "table": "generations",
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "shots",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "cccccccc-cccc-cccc-cccc-cccccccccccc"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
         "data": {
-          "id": "2d6b8ea8-04f3-461b-9661-40f6a3b1b0d2",
-          "tasks": [
-            "44444444-4444-4444-4444-444444444444"
-          ],
-          "project_id": "22222222-2222-2222-2222-222222222222",
-          "type": "video",
-          "location": "https://mock-url.com/output.png"
+          "params": {
+            "prompt": "Camera pans slowly",
+            "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "orchestrator_details": {
+              "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+              "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg"
+            }
+          }
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "wan_2_2_i2v"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"44444444-4444-4444-4444-444444444444\"]"
+          }
+        ]
+      },
+      {
+        "type": "db_insert",
+        "table": "generation_variants",
+        "data": {
+          "generation_id": "34a8c828-2027-4568-baa4-08ecb84c916e",
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg",
+          "params": {
+            "prompt": "Camera pans slowly",
+            "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "orchestrator_details": {
+              "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+              "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg"
+            },
+            "source_task_id": "44444444-4444-4444-4444-444444444444",
+            "created_from": "task_completion",
+            "tool_type": "image-to-video"
+          },
+          "is_primary": true,
+          "variant_type": "regenerated",
+          "name": null,
+          "created_at": "2025-12-14T23:06:10.386Z"
         },
         "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "generations",
+        "data": {
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "34a8c828-2027-4568-baa4-08ecb84c916e"
+          }
+        ]
       },
       {
         "type": "db_rpc",
         "table": "add_generation_to_shot",
         "data": {
           "p_shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-          "p_generation_id": "8a173743-595b-47c9-a2ba-79d34b653058",
+          "p_generation_id": "34a8c828-2027-4568-baa4-08ecb84c916e",
           "p_with_position": false
         }
       },
@@ -352,8 +688,23 @@
         "type": "db_update",
         "table": "tasks",
         "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
           "status": "Complete",
-          "output_location": "https://mock-url.com/output"
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4",
+          "generation_processed_at": "2025-12-14T23:06:10.386Z"
         },
         "filters": [
           {
@@ -369,11 +720,9 @@
         ]
       },
       {
-        "type": "db_update",
+        "type": "db_select",
         "table": "tasks",
-        "data": {
-          "generation_created": true
-        },
+        "data": null,
         "filters": [
           {
             "type": "eq",
@@ -382,7 +731,8 @@
           }
         ]
       }
-    ]
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
   },
   {
     "scenario": "inpaint_creates_variant",
@@ -390,6 +740,65 @@
     "statusCode": 200,
     "expectedStatusCode": 200,
     "operations": [
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/inpainted.png",
+        "data": {
+          "size": 70,
+          "contentType": "image/png"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/inpainted.png"
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg",
+        "data": {
+          "size": 631,
+          "contentType": "image/jpeg"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "77777777-7777-7777-7777-777777777777"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "params": {
+            "based_on": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "prompt": "Remove the person",
+            "mask": "base64mask...",
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg"
+          }
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "77777777-7777-7777-7777-777777777777"
+          }
+        ]
+      },
       {
         "type": "db_select",
         "table": "tasks",
@@ -415,22 +824,6 @@
         ]
       },
       {
-        "type": "storage_upload",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/inpainted.png",
-        "data": {
-          "size": 10
-        }
-      },
-      {
-        "type": "storage_upload",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765751438147.jpg",
-        "data": {
-          "size": 5
-        }
-      },
-      {
         "type": "db_select",
         "table": "generations",
         "data": null,
@@ -447,9 +840,23 @@
         "table": "generation_variants",
         "data": {
           "generation_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-          "location": "https://mock-url.com/output.png",
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/inpainted.png",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg",
+          "params": {
+            "based_on": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "prompt": "Remove the person",
+            "mask": "base64mask...",
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg",
+            "source_task_id": "77777777-7777-7777-7777-777777777777",
+            "source_variant_id": null,
+            "created_from": "image_inpaint",
+            "tool_type": "magic-edit",
+            "content_type": "image"
+          },
           "is_primary": false,
-          "variant_type": "edit"
+          "variant_type": "inpaint",
+          "name": "Edit: Remove the person...",
+          "created_at": "2025-12-14T23:06:10.387Z"
         },
         "filters": []
       },
@@ -457,8 +864,23 @@
         "type": "db_update",
         "table": "tasks",
         "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "77777777-7777-7777-7777-777777777777"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
           "status": "Complete",
-          "output_location": "https://mock-url.com/output"
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/inpainted.png",
+          "generation_processed_at": "2025-12-14T23:06:10.387Z"
         },
         "filters": [
           {
@@ -474,11 +896,9 @@
         ]
       },
       {
-        "type": "db_update",
+        "type": "db_select",
         "table": "tasks",
-        "data": {
-          "generation_created": true
-        },
+        "data": null,
         "filters": [
           {
             "type": "eq",
@@ -487,7 +907,8 @@
           }
         ]
       }
-    ]
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/inpainted.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
   },
   {
     "scenario": "upscale_creates_primary_variant",
@@ -495,6 +916,65 @@
     "statusCode": 200,
     "expectedStatusCode": 200,
     "operations": [
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/upscaled.png",
+        "data": {
+          "size": 70,
+          "contentType": "image/png"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/upscaled.png"
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg",
+        "data": {
+          "size": 631,
+          "contentType": "image/jpeg"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "88888888-8888-8888-8888-888888888888"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "params": {
+            "generation_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "image": "https://example.com/original.png",
+            "model": "real-esrgan",
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg"
+          }
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "88888888-8888-8888-8888-888888888888"
+          }
+        ]
+      },
       {
         "type": "db_select",
         "table": "tasks",
@@ -520,22 +1000,6 @@
         ]
       },
       {
-        "type": "storage_upload",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/upscaled.png",
-        "data": {
-          "size": 10
-        }
-      },
-      {
-        "type": "storage_upload",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765751438147.jpg",
-        "data": {
-          "size": 5
-        }
-      },
-      {
         "type": "db_select",
         "table": "generations",
         "data": null,
@@ -552,9 +1016,19 @@
         "table": "generation_variants",
         "data": {
           "generation_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-          "location": "https://mock-url.com/upscaled.png",
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/upscaled.png",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg",
+          "params": {
+            "prompt": "Original image",
+            "upscale_task_id": "88888888-8888-8888-8888-888888888888",
+            "upscaled_from": "https://example.com/original.png",
+            "upscale_model": "real-esrgan",
+            "tool_type": "image-generation"
+          },
           "is_primary": true,
-          "variant_type": "upscaled"
+          "variant_type": "upscaled",
+          "name": "Upscaled",
+          "created_at": "2025-12-14T23:06:10.387Z"
         },
         "filters": []
       },
@@ -563,7 +1037,8 @@
         "table": "tasks",
         "data": {
           "status": "Complete",
-          "output_location": "https://mock-url.com/output"
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/upscaled.png",
+          "generation_processed_at": "2025-12-14T23:06:10.387Z"
         },
         "filters": [
           {
@@ -579,11 +1054,9 @@
         ]
       },
       {
-        "type": "db_update",
+        "type": "db_select",
         "table": "tasks",
-        "data": {
-          "generation_created": true
-        },
+        "data": null,
         "filters": [
           {
             "type": "eq",
@@ -592,7 +1065,8 @@
           }
         ]
       }
-    ]
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/upscaled.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
   },
   {
     "scenario": "travel_segment_creates_child",
@@ -600,6 +1074,32 @@
     "statusCode": 200,
     "expectedStatusCode": 200,
     "operations": [
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/segment_0.mp4",
+        "data": {
+          "size": 70,
+          "contentType": "video/mp4"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/segment_0.mp4"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "55555555-5555-5555-5555-555555555555"
+          }
+        ]
+      },
       {
         "type": "db_select",
         "table": "tasks",
@@ -625,12 +1125,28 @@
         ]
       },
       {
-        "type": "storage_upload",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/segment_0.mp4",
-        "data": {
-          "size": 10
-        }
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"55555555-5555-5555-5555-555555555555\"]"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "66666666-6666-6666-6666-666666666666"
+          }
+        ]
       },
       {
         "type": "db_select",
@@ -648,15 +1164,31 @@
         "type": "db_insert",
         "table": "generations",
         "data": {
-          "id": "4ba808a9-a8ef-4e17-8acd-da8b6087c4ab",
+          "id": "343f7d9e-6f2b-426a-9d56-93376c0e4c89",
           "tasks": [
             "55555555-5555-5555-5555-555555555555"
           ],
-          "project_id": "22222222-2222-2222-2222-222222222222",
+          "params": {
+            "segment_index": 0,
+            "orchestrator_task_id": "66666666-6666-6666-6666-666666666666",
+            "orchestrator_run_id": "run-123",
+            "orchestrator_details": {
+              "orchestrator_task_id": "66666666-6666-6666-6666-666666666666",
+              "run_id": "run-123",
+              "num_new_segments_to_generate": 3
+            },
+            "tool_type": "travel-between-images",
+            "content_type": "video"
+          },
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_0.mp4",
           "type": "video",
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "thumbnail_url": null,
+          "based_on": null,
           "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
           "is_child": true,
-          "child_order": 0
+          "child_order": 0,
+          "created_at": "2025-12-14T23:06:10.390Z"
         },
         "filters": []
       },
@@ -665,26 +1197,40 @@
         "table": "generation_variants",
         "data": {
           "generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-          "location": "https://mock-url.com/segment.mp4",
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_0.mp4",
+          "thumbnail_url": null,
+          "params": {
+            "segment_index": 0,
+            "orchestrator_task_id": "66666666-6666-6666-6666-666666666666",
+            "orchestrator_run_id": "run-123",
+            "orchestrator_details": {
+              "orchestrator_task_id": "66666666-6666-6666-6666-666666666666",
+              "run_id": "run-123",
+              "num_new_segments_to_generate": 3
+            },
+            "tool_type": "travel-between-images",
+            "source_task_id": "55555555-5555-5555-5555-555555555555",
+            "created_from": "travel_segment",
+            "child_generation_id": "343f7d9e-6f2b-426a-9d56-93376c0e4c89"
+          },
           "is_primary": false,
-          "variant_type": "travel_segment"
+          "variant_type": "travel_segment",
+          "name": "Segment 1",
+          "created_at": "2025-12-14T23:06:10.390Z"
         },
         "filters": []
       },
       {
-        "type": "db_select",
+        "type": "db_update",
         "table": "tasks",
-        "data": null,
+        "data": {
+          "generation_created": true
+        },
         "filters": [
           {
             "type": "eq",
-            "field": "task_type",
-            "value": "travel_segment"
-          },
-          {
-            "type": "eq",
-            "field": "project_id",
-            "value": "22222222-2222-2222-2222-222222222222"
+            "field": "id",
+            "value": "55555555-5555-5555-5555-555555555555"
           }
         ]
       },
@@ -693,7 +1239,8 @@
         "table": "tasks",
         "data": {
           "status": "Complete",
-          "output_location": "https://mock-url.com/output"
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_0.mp4",
+          "generation_processed_at": "2025-12-14T23:06:10.390Z"
         },
         "filters": [
           {
@@ -709,11 +1256,9 @@
         ]
       },
       {
-        "type": "db_update",
+        "type": "db_select",
         "table": "tasks",
-        "data": {
-          "generation_created": true
-        },
+        "data": null,
         "filters": [
           {
             "type": "eq",
@@ -721,8 +1266,42 @@
             "value": "55555555-5555-5555-5555-555555555555"
           }
         ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "66666666-6666-6666-6666-666666666666"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "task_type",
+            "value": "travel_segment"
+          },
+          {
+            "type": "eq",
+            "field": "project_id",
+            "value": "22222222-2222-2222-2222-222222222222"
+          },
+          {
+            "type": "or",
+            "conditions": "params->>orchestrator_run_id.eq.run-123,params->>run_id.eq.run-123,params->orchestrator_details->>run_id.eq.run-123"
+          }
+        ]
       }
-    ]
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_0.mp4\",\"thumbnail_url\":null,\"message\":\"Task completed and file uploaded successfully\"}"
   },
   {
     "scenario": "travel_stitch_updates_parent",
@@ -730,6 +1309,32 @@
     "statusCode": 200,
     "expectedStatusCode": 200,
     "operations": [
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/stitched.mp4",
+        "data": {
+          "size": 70,
+          "contentType": "video/mp4"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/stitched.mp4"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "99999999-9999-9999-9999-999999999999"
+          }
+        ]
+      },
       {
         "type": "db_select",
         "table": "tasks",
@@ -755,12 +1360,754 @@
         ]
       },
       {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"99999999-9999-9999-9999-999999999999\"]"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+          }
+        ]
+      },
+      {
+        "type": "db_insert",
+        "table": "generation_variants",
+        "data": {
+          "generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/stitched.mp4",
+          "thumbnail_url": null,
+          "params": {
+            "orchestrator_task_id": "66666666-6666-6666-6666-666666666666",
+            "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "orchestrator_details": {
+              "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+            },
+            "full_orchestrator_payload": {
+              "thumbnail_url": null
+            },
+            "source_task_id": "99999999-9999-9999-9999-999999999999",
+            "tool_type": "travel-between-images",
+            "created_from": "travel_stitch_completion"
+          },
+          "is_primary": true,
+          "variant_type": "travel_stitch",
+          "name": null,
+          "created_at": "2025-12-14T23:06:10.391Z"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "generations",
+        "data": {
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/stitched.mp4",
+          "thumbnail_url": null,
+          "type": "video",
+          "params": {
+            "tool_type": "travel-between-images",
+            "created_from": "travel_stitch_completion"
+          }
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "99999999-9999-9999-9999-999999999999"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/stitched.mp4",
+          "generation_processed_at": "2025-12-14T23:06:10.391Z"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "99999999-9999-9999-9999-999999999999"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "99999999-9999-9999-9999-999999999999"
+          }
+        ]
+      }
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/stitched.mp4\",\"thumbnail_url\":null,\"message\":\"Task completed and file uploaded successfully\"}"
+  },
+  {
+    "scenario": "error_missing_task_id",
+    "passed": true,
+    "statusCode": 400,
+    "expectedStatusCode": 400,
+    "operations": [],
+    "responseBody": "task_id, file_data (base64), and filename required (or use storage_path for pre-uploaded files)"
+  },
+  {
+    "scenario": "error_missing_file_data",
+    "passed": true,
+    "statusCode": 400,
+    "expectedStatusCode": 400,
+    "operations": [],
+    "responseBody": "task_id, file_data (base64), and filename required (or use storage_path for pre-uploaded files)"
+  },
+  {
+    "scenario": "error_invalid_base64",
+    "passed": true,
+    "statusCode": 400,
+    "expectedStatusCode": 400,
+    "operations": [],
+    "responseBody": "Invalid base64 file_data"
+  },
+  {
+    "scenario": "join_clips_single_creates_parent_variant",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
         "type": "storage_upload",
         "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/stitched.mp4",
+        "path": "11111111-1111-1111-1111-111111111111/joined.mp4",
         "data": {
-          "size": 10
+          "size": 70,
+          "contentType": "video/mp4"
         }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/joined.mp4"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "join_clips_segment"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"dddddddd-dddd-dddd-dddd-dddddddddddd\"]"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+          }
+        ]
+      },
+      {
+        "type": "db_insert",
+        "table": "generation_variants",
+        "data": {
+          "generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/joined.mp4",
+          "thumbnail_url": null,
+          "params": {
+            "segment_index": 0,
+            "join_index": 0,
+            "is_first_join": true,
+            "is_last_join": true,
+            "orchestrator_task_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+            "orchestrator_details": {
+              "orchestrator_task_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+              "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+            },
+            "full_orchestrator_payload": {
+              "tool_type": "join-clips"
+            },
+            "source_task_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "tool_type": "join-clips",
+            "created_from": "single_join_completion",
+            "is_single_join": true
+          },
+          "is_primary": true,
+          "variant_type": "join_clips_segment",
+          "name": null,
+          "created_at": "2025-12-14T23:06:10.398Z"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "generations",
+        "data": {
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/joined.mp4",
+          "thumbnail_url": null,
+          "type": "video",
+          "params": {
+            "tool_type": "join-clips",
+            "created_from": "single_join_completion",
+            "join_index": 0,
+            "is_single_join": true
+          }
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/joined.mp4",
+          "generation_processed_at": "2025-12-14T23:06:10.398Z"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "task_type",
+            "value": "join_clips_segment"
+          },
+          {
+            "type": "eq",
+            "field": "project_id",
+            "value": "22222222-2222-2222-2222-222222222222"
+          },
+          {
+            "type": "or",
+            "conditions": "params->>orchestrator_task_id.eq.eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee,params->>orchestrator_task_id_ref.eq.eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee,params->orchestrator_details->>orchestrator_task_id.eq.eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/joined.mp4",
+          "generation_started_at": "2025-12-14T23:06:10.399Z",
+          "generation_processed_at": "2025-12-14T23:06:10.399Z"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+          },
+          {
+            "type": "in",
+            "field": "status",
+            "values": [
+              "Queued",
+              "In Progress"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "fetch",
+        "url": "https://mock.supabase.co/functions/v1/calculate-task-cost",
+        "method": "POST",
+        "body": {
+          "task_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+        }
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+          }
+        ]
+      },
+      {
+        "type": "db_insert",
+        "table": "generation_variants",
+        "data": {
+          "generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/joined.mp4",
+          "thumbnail_url": null,
+          "params": {
+            "orchestrator_details": {
+              "clip_list": [
+                "clip1.mp4",
+                "clip2.mp4"
+              ],
+              "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+            },
+            "tool_type": "join-clips",
+            "source_task_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "orchestrator_task_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+            "created_from": "join_clips_complete"
+          },
+          "is_primary": true,
+          "variant_type": "clip_join",
+          "name": null,
+          "created_at": "2025-12-14T23:06:10.399Z"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "generations",
+        "data": {
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/joined.mp4",
+          "thumbnail_url": null,
+          "type": "video",
+          "params": {
+            "tool_type": "join-clips",
+            "created_from": "single_join_completion",
+            "join_index": 0,
+            "is_single_join": true
+          }
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+          }
+        ]
+      }
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/joined.mp4\",\"thumbnail_url\":null,\"message\":\"Task completed and file uploaded successfully\"}"
+  },
+  {
+    "scenario": "invalid_shot_uuid_cleaned",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/output.png",
+        "data": {
+          "size": 70,
+          "contentType": "image/png"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/output.png"
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg",
+        "data": {
+          "size": 631,
+          "contentType": "image/jpeg"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "params": {
+            "prompt": "Image with invalid shot",
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg"
+          }
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "single_image"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"ffffffff-ffff-ffff-ffff-ffffffffffff\"]"
+          }
+        ]
+      },
+      {
+        "type": "db_insert",
+        "table": "generations",
+        "data": {
+          "id": "478f5525-d640-4d31-a3f1-a61af9da8cb3",
+          "tasks": [
+            "ffffffff-ffff-ffff-ffff-ffffffffffff"
+          ],
+          "params": {
+            "prompt": "Image with invalid shot",
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg",
+            "tool_type": "image-generation",
+            "content_type": "image",
+            "thumbnailUrl": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg"
+          },
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png",
+          "type": "image",
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg",
+          "based_on": null,
+          "parent_generation_id": null,
+          "is_child": false,
+          "child_order": null,
+          "created_at": "2025-12-14T23:06:10.400Z"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png",
+          "generation_processed_at": "2025-12-14T23:06:10.400Z"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+          }
+        ]
+      }
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
+  },
+  {
+    "scenario": "segment_uses_expanded_params",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/segment_1.mp4",
+        "data": {
+          "size": 70,
+          "contentType": "video/mp4"
+        }
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/segment_1.mp4"
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "11111111-2222-3333-4444-555555555555"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "11111111-2222-3333-4444-555555555555"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "travel_segment"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"11111111-2222-3333-4444-555555555555\"]"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "66666666-6666-6666-6666-666666666666"
+          }
+        ]
       },
       {
         "type": "db_select",
@@ -778,15 +2125,53 @@
         "type": "db_insert",
         "table": "generations",
         "data": {
-          "id": "32039237-9aee-4409-a422-1b66e1d236e7",
+          "id": "3c1d6382-f8e7-4cc0-8587-d7cae79a501b",
           "tasks": [
-            "99999999-9999-9999-9999-999999999999"
+            "11111111-2222-3333-4444-555555555555"
           ],
-          "project_id": "22222222-2222-2222-2222-222222222222",
+          "params": {
+            "segment_index": 1,
+            "orchestrator_task_id": "66666666-6666-6666-6666-666666666666",
+            "orchestrator_details": {
+              "orchestrator_task_id": "66666666-6666-6666-6666-666666666666",
+              "num_new_segments_to_generate": 3,
+              "base_prompts_expanded": [
+                "Prompt for segment 0",
+                "Prompt for segment 1",
+                "Prompt for segment 2"
+              ],
+              "negative_prompts_expanded": [
+                "Neg 0",
+                "Neg 1",
+                "Neg 2"
+              ],
+              "segment_frames_expanded": [
+                81,
+                97,
+                81
+              ],
+              "frame_overlap_expanded": [
+                5,
+                5,
+                5
+              ]
+            },
+            "prompt": "Prompt for segment 1",
+            "negative_prompt": "Neg 1",
+            "num_frames": 97,
+            "frame_overlap": 5,
+            "tool_type": "travel-between-images",
+            "content_type": "video"
+          },
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_1.mp4",
           "type": "video",
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "thumbnail_url": null,
+          "based_on": null,
           "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
           "is_child": true,
-          "child_order": 0
+          "child_order": 1,
+          "created_at": "2025-12-14T23:06:10.400Z"
         },
         "filters": []
       },
@@ -795,11 +2180,109 @@
         "table": "generation_variants",
         "data": {
           "generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-          "location": "https://mock-url.com/segment.mp4",
+          "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_1.mp4",
+          "thumbnail_url": null,
+          "params": {
+            "segment_index": 1,
+            "orchestrator_task_id": "66666666-6666-6666-6666-666666666666",
+            "orchestrator_details": {
+              "orchestrator_task_id": "66666666-6666-6666-6666-666666666666",
+              "num_new_segments_to_generate": 3,
+              "base_prompts_expanded": [
+                "Prompt for segment 0",
+                "Prompt for segment 1",
+                "Prompt for segment 2"
+              ],
+              "negative_prompts_expanded": [
+                "Neg 0",
+                "Neg 1",
+                "Neg 2"
+              ],
+              "segment_frames_expanded": [
+                81,
+                97,
+                81
+              ],
+              "frame_overlap_expanded": [
+                5,
+                5,
+                5
+              ]
+            },
+            "prompt": "Prompt for segment 1",
+            "negative_prompt": "Neg 1",
+            "num_frames": 97,
+            "frame_overlap": 5,
+            "tool_type": "travel-between-images",
+            "source_task_id": "11111111-2222-3333-4444-555555555555",
+            "created_from": "travel_segment",
+            "child_generation_id": "3c1d6382-f8e7-4cc0-8587-d7cae79a501b"
+          },
           "is_primary": false,
-          "variant_type": "travel_segment"
+          "variant_type": "travel_segment",
+          "name": "Segment 2",
+          "created_at": "2025-12-14T23:06:10.400Z"
         },
         "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "11111111-2222-3333-4444-555555555555"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_1.mp4",
+          "generation_processed_at": "2025-12-14T23:06:10.400Z"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "11111111-2222-3333-4444-555555555555"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "11111111-2222-3333-4444-555555555555"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "66666666-6666-6666-6666-666666666666"
+          }
+        ]
       },
       {
         "type": "db_select",
@@ -815,64 +2298,14 @@
             "type": "eq",
             "field": "project_id",
             "value": "22222222-2222-2222-2222-222222222222"
-          }
-        ]
-      },
-      {
-        "type": "db_update",
-        "table": "tasks",
-        "data": {
-          "status": "Complete",
-          "output_location": "https://mock-url.com/output"
-        },
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "99999999-9999-9999-9999-999999999999"
           },
           {
-            "type": "eq",
-            "field": "status",
-            "value": "In Progress"
-          }
-        ]
-      },
-      {
-        "type": "db_update",
-        "table": "tasks",
-        "data": {
-          "generation_created": true
-        },
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "99999999-9999-9999-9999-999999999999"
+            "type": "or",
+            "conditions": "params->>orchestrator_task_id.eq.66666666-6666-6666-6666-666666666666,params->>orchestrator_task_id_ref.eq.66666666-6666-6666-6666-666666666666,params->orchestrator_details->>orchestrator_task_id.eq.66666666-6666-6666-6666-666666666666"
           }
         ]
       }
-    ]
-  },
-  {
-    "scenario": "error_missing_task_id",
-    "passed": true,
-    "statusCode": 400,
-    "expectedStatusCode": 400,
-    "operations": []
-  },
-  {
-    "scenario": "error_missing_file_data",
-    "passed": true,
-    "statusCode": 400,
-    "expectedStatusCode": 400,
-    "operations": []
-  },
-  {
-    "scenario": "error_invalid_base64",
-    "passed": true,
-    "statusCode": 400,
-    "expectedStatusCode": 400,
-    "operations": []
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_1.mp4\",\"thumbnail_url\":null,\"message\":\"Task completed and file uploaded successfully\"}"
   }
 ]
