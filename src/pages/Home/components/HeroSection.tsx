@@ -88,7 +88,7 @@ const CTAContent: React.FC<CTAContentProps> = ({ icon, text }) => {
 
 // Force dark mode styles for retro button to prevent white flash during hydration/theme switch
 // Using inline styles for colors to guarantee they're present during re-renders, Tailwind classes for layout/behavior
-const retroButtonBaseStyles = "inline-flex items-center justify-center gap-2 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-14 px-12 py-4 text-xl font-heading rounded-sm border-2 tracking-wide transition-[transform,box-shadow] duration-200 shadow-[-3px_3px_0_0_rgba(20,30,30,0.4)] hover:shadow-[-1.5px_1.5px_0_0_rgba(20,30,30,0.4)] hover:translate-x-[-0.75px] hover:translate-y-[0.75px] active:shadow-none active:translate-x-[-1.5px] active:translate-y-[1.5px]";
+const retroButtonBaseStyles = "inline-flex items-center justify-center gap-2 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-14 px-8 sm:px-12 py-4 text-base sm:text-xl max-w-[90vw] sm:max-w-none font-heading rounded-sm border-2 tracking-wide transition-[transform,box-shadow] duration-200 shadow-[-3px_3px_0_0_rgba(20,30,30,0.4)] hover:shadow-[-1.5px_1.5px_0_0_rgba(20,30,30,0.4)] hover:translate-x-[-0.75px] hover:translate-y-[0.75px] active:shadow-none active:translate-x-[-1.5px] active:translate-y-[1.5px]";
 const retroButtonInlineStyles = {
   backgroundColor: '#3a4a4a',
   borderColor: '#8a9a9a',
