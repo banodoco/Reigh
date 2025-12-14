@@ -130,17 +130,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // Loading bar animation - wait for assets AND CTA detection
-  const ctaReady = !platformInstall.isWaitingForPrompt;
+  // Loading bar animation
   useEffect(() => {
-    if (assetsLoaded && ctaReady) {
-      setBarWidth('100%');
-    } else if (assetsLoaded) {
-      setBarWidth('95%'); // Almost there, waiting for CTA
-    } else {
-      setBarWidth('92%');
-    }
-  }, [assetsLoaded, ctaReady]);
+    setBarWidth(assetsLoaded ? '100%' : '92%');
+  }, [assetsLoaded]);
 
   // Master animation orchestrator
   useEffect(() => {
@@ -150,7 +143,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       return () => clearTimeout(timer);
     }
     
-    if (phase === 'loading' && assetsLoaded && barTransitionCompleted && minLoadTimePassed && ctaReady) {
+    if (phase === 'loading' && assetsLoaded && barTransitionCompleted && minLoadTimePassed) {
       // Bar has reached 100%, wait for it to settle
       const timer = setTimeout(() => setPhase('bar-complete'), 300);
       return () => clearTimeout(timer);
