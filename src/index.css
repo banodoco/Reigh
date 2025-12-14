@@ -800,29 +800,35 @@
   .dark .gradient-icon-coral {
     background: linear-gradient(to bottom right, hsl(var(--wes-coral) / 0.7), hsl(var(--wes-salmon) / 0.7));
   }
+  /* Light mode: subtle saturation increase on hover */
   .gradient-icon-coral:hover {
-    background: linear-gradient(to bottom right, hsl(var(--wes-coral-dark)), hsl(var(--wes-salmon)));
+    background: linear-gradient(to bottom right, hsl(var(--wes-coral) / 0.9), hsl(var(--wes-salmon) / 0.95));
   }
-  
+  /* Dark mode: no background change on hover (dark:bg-none is used, hover is handled by shadow/border) */
+
   .gradient-icon-yellow {
     background: linear-gradient(to bottom right, hsl(var(--wes-yellow)), hsl(var(--wes-salmon)));
   }
   .dark .gradient-icon-yellow {
     background: linear-gradient(to bottom right, hsl(var(--wes-vintage-gold) / 0.8), hsl(var(--wes-salmon) / 0.7));
   }
+  /* Light mode: subtle saturation increase on hover */
   .gradient-icon-yellow:hover {
-    background: linear-gradient(to bottom right, hsl(var(--wes-yellow-dark)), hsl(var(--wes-salmon)));
+    background: linear-gradient(to bottom right, hsl(var(--wes-yellow) / 0.9), hsl(var(--wes-salmon) / 0.95));
   }
-  
+  /* Dark mode: no background change on hover (dark:bg-none is used, hover is handled by shadow/border) */
+
   .gradient-icon-blue {
     background: linear-gradient(to bottom right, hsl(var(--wes-dusty-blue)), hsl(var(--wes-lavender)));
   }
   .dark .gradient-icon-blue {
     background: linear-gradient(to bottom right, hsl(var(--wes-dusty-blue) / 0.7), hsl(var(--wes-lavender) / 0.7));
   }
+  /* Light mode: subtle saturation increase on hover */
   .gradient-icon-blue:hover {
-    background: linear-gradient(to bottom right, hsl(var(--wes-dusty-blue-dark)), hsl(var(--wes-lavender-dark)));
+    background: linear-gradient(to bottom right, hsl(var(--wes-dusty-blue) / 0.9), hsl(var(--wes-lavender) / 0.95));
   }
+  /* Dark mode: no background change on hover (dark:bg-none is used, hover is handled by shadow/border) */
   
   .gradient-icon-mint {
     background: linear-gradient(to bottom right, hsl(var(--wes-mint)), hsl(var(--wes-sage)));
@@ -2215,20 +2221,37 @@
 
 /* Missing animations for GlobalHeader buttons */
 @keyframes wrenchTurn {
-  0%, 15% {
-    transform: scale(1.1) rotate(0deg);
+  0% {
+    transform: rotate(0deg);
   }
-  25%, 40% {
-    transform: scale(1.1) rotate(-12deg);
+  /* First turn */
+  15% {
+    transform: rotate(-20deg);
   }
-  50%, 65% {
-    transform: scale(1.1) rotate(12deg);
+  /* Hold at turn */
+  25% {
+    transform: rotate(-20deg);
   }
-  75%, 90% {
-    transform: scale(1.1) rotate(-8deg);
+  35% {
+    transform: rotate(0deg);
+  }
+  /* Pause at neutral */
+  50% {
+    transform: rotate(0deg);
+  }
+  /* Second turn */
+  65% {
+    transform: rotate(-20deg);
+  }
+  /* Hold at turn */
+  75% {
+    transform: rotate(-20deg);
+  }
+  90% {
+    transform: rotate(0deg);
   }
   100% {
-    transform: scale(1.1) rotate(0deg);
+    transform: rotate(0deg);
   }
 }
 
@@ -2466,7 +2489,7 @@
 
 /* Group-hover variants for custom animations */
 .group:hover .group-hover\:animate-wrench-turn {
-  animation: wrenchTurn 1.2s ease-in-out infinite;
+  animation: wrenchTurn 0.7s ease-out;
 }
 
 .group:hover .group-hover\:animate-bubble-pop {

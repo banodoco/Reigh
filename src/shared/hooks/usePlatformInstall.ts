@@ -289,6 +289,13 @@ export function usePlatformInstall(): PlatformInstallState {
   const installInstructions = useMemo<string[]>(() => {
     // App appears to be installed - just show how to open it
     if (isAppInstalled || (promptTimedOut && isDesktopChromium)) {
+      // Mobile/tablet: tell them to find it on home screen
+      if (deviceType === 'phone' || deviceType === 'tablet') {
+        return [
+          'Find Reigh on your home screen:'
+        ];
+      }
+      // Desktop: tell them to look in address bar
       return [
         'Look for this in your address bar:'
       ];

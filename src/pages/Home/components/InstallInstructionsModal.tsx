@@ -328,7 +328,7 @@ const AndroidInstallPrompt = () => (
   </div>
 );
 
-// Chrome/Edge "Open in app" button - appears in address bar when PWA is installed
+// Chrome/Edge "Open in app" button - appears in address bar when PWA is installed (desktop only)
 const OpenInAppBadge = () => (
   <div className="relative w-full max-w-[280px] bg-gray-100 rounded-lg border border-gray-300 shadow-sm overflow-hidden">
     <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-200 border-b border-gray-300">
@@ -346,6 +346,18 @@ const OpenInAppBadge = () => (
       </div>
     </div>
     <div className="h-8 bg-gray-50" />
+  </div>
+);
+
+// Mobile "Find on home screen" - shows app icon on home screen
+const MobileHomeScreenIcon = () => (
+  <div className="relative w-full max-w-[140px] flex flex-col items-center gap-2">
+    {/* App icon */}
+    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-300 shadow-lg flex items-center justify-center animate-pulse ring-2 ring-wes-vintage-gold ring-offset-2">
+      <img src="/favicon-192x192.png" alt="Reigh" className="w-12 h-12 rounded-xl" />
+    </div>
+    {/* App name */}
+    <span className="text-xs text-gray-600 font-medium">Reigh</span>
   </div>
 );
 
@@ -376,8 +388,13 @@ export const InstallInstructionsModal: React.FC<InstallInstructionsModalProps> =
 
   // Get the main visual mockup for this scenario
   const getMainVisual = (): React.ReactNode | null => {
-    // App is installed - show "Open in app" mockup
+    // App is installed - show appropriate mockup based on device
     if (isAppInstalled) {
+      // Mobile/tablet: show home screen icon
+      if (deviceType === 'phone' || deviceType === 'tablet') {
+        return <MobileHomeScreenIcon />;
+      }
+      // Desktop: show "Open in app" address bar badge
       return <OpenInAppBadge />;
     }
     

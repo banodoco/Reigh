@@ -17,7 +17,9 @@ const selectTriggerVariants = cva(
       variant: {
         default: "border border-input bg-background focus:ring-2 focus:ring-ring focus:ring-offset-2",
         // Retro style matching buttons - uses theme bg-background to match outline buttons
-        retro: "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-background rounded-sm border-2 border-[#6a8a8a]/25 dark:border-[#6a7a7a] text-[#5a7a7a] dark:text-[#c8c4bb] font-heading tracking-wide transition-all duration-200 shadow-[-2px_2px_0_0_rgba(106,138,138,0.06)] hover:shadow-[-1px_1px_0_0_rgba(106,138,138,0.06)] dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] hover:translate-x-[-0.5px] hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
+        // Light mode: subtle shadow increase + bg tint on hover for gentle "active" feel
+        // Dark mode: keeps existing press-down interaction pattern
+        retro: "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-background hover:bg-[#6a8a8a]/10 rounded-sm border-2 border-[#6a8a8a]/30 hover:border-[#6a8a8a]/45 dark:border-[#6a7a7a] dark:hover:bg-transparent text-[#5a7a7a] dark:text-[#c8c4bb] font-heading tracking-wide transition-all duration-200 shadow-[0_1px_2px_0_rgba(106,138,138,0.06)] hover:shadow-[0_2px_4px_-1px_rgba(106,138,138,0.1)] dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] dark:hover:translate-x-[-0.5px] dark:hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
         // Retro dark - for always-dark contexts (panes, galleries)
         "retro-dark": "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-[#3a4a4a] hover:bg-[#4a5a5a] rounded-sm border-2 border-[#6a7a7a] text-[#d8d4cb] font-heading tracking-wide transition-all duration-200 shadow-[-2px_2px_0_0_rgba(20,30,30,0.3)] hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.3)] hover:translate-x-[-0.5px] hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a7a7a]/30 focus:ring-offset-0",
       },
@@ -27,13 +29,14 @@ const selectTriggerVariants = cva(
         lg: "h-11 text-base px-4",
       },
       // Color schemes for retro variants - overrides border/text colors
+      // Light mode hover: saturated color at low opacity (not pale -50 shades)
       colorScheme: {
         default: "",
-        blue: "!border-blue-400 dark:!border-blue-500 !text-blue-600 dark:!text-blue-400 focus:!ring-blue-400/30",
-        violet: "!border-violet-400 dark:!border-violet-500 !text-violet-600 dark:!text-violet-400 focus:!ring-violet-400/30",
-        emerald: "!border-emerald-400 dark:!border-emerald-500 !text-emerald-600 dark:!text-emerald-400 focus:!ring-emerald-400/30",
-        amber: "!border-amber-400 dark:!border-amber-500 !text-amber-600 dark:!text-amber-400 focus:!ring-amber-400/30",
-        rose: "!border-rose-400 dark:!border-rose-500 !text-rose-600 dark:!text-rose-400 focus:!ring-rose-400/30",
+        blue: "!border-blue-400/60 hover:!border-blue-500 hover:!bg-blue-400/15 dark:!border-blue-500 dark:hover:!bg-blue-500/20 !text-blue-600 dark:!text-blue-400 hover:!shadow-[0_2px_6px_-2px_rgba(59,130,246,0.15)] dark:hover:!shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] focus:!ring-blue-400/30",
+        violet: "!border-violet-400/60 hover:!border-violet-500 hover:!bg-violet-400/15 dark:!border-violet-500 dark:hover:!bg-violet-500/20 !text-violet-600 dark:!text-violet-400 hover:!shadow-[0_2px_6px_-2px_rgba(139,92,246,0.15)] dark:hover:!shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] focus:!ring-violet-400/30",
+        emerald: "!border-emerald-400/60 hover:!border-emerald-500 hover:!bg-emerald-400/15 dark:!border-emerald-500 dark:hover:!bg-emerald-500/20 !text-emerald-600 dark:!text-emerald-400 hover:!shadow-[0_2px_6px_-2px_rgba(16,185,129,0.15)] dark:hover:!shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] focus:!ring-emerald-400/30",
+        amber: "!border-amber-400/60 hover:!border-amber-500 hover:!bg-amber-400/15 dark:!border-amber-500 dark:hover:!bg-amber-500/20 !text-amber-600 dark:!text-amber-400 hover:!shadow-[0_2px_6px_-2px_rgba(245,158,11,0.15)] dark:hover:!shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] focus:!ring-amber-400/30",
+        rose: "!border-rose-400/60 hover:!border-rose-500 hover:!bg-rose-400/15 dark:!border-rose-500 dark:hover:!bg-rose-500/20 !text-rose-600 dark:!text-rose-400 hover:!shadow-[0_2px_6px_-2px_rgba(244,63,94,0.15)] dark:hover:!shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] focus:!ring-rose-400/30",
         // Zinc scheme for dark panes - subtle secondary style
         zinc: "!bg-zinc-800/70 !border-zinc-700 !text-zinc-400 hover:!bg-zinc-700/70 hover:!text-zinc-300 focus:!ring-zinc-600/30",
       },

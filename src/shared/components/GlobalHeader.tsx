@@ -366,7 +366,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 disabled={isLoadingProjects || !selectedProject}
                 style={getDarkIconStyle(darkIconColors.coral)}
               >
-                <Wrench className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" style={{ color: darkMode ? darkIconColors.coral : 'white' }} />
+                <Wrench className="h-5 w-5 group-hover:animate-wrench-turn" style={{ color: darkMode ? darkIconColors.coral : 'white' }} />
               </Button>
               
               {/* Create Project Button - Always visible */}
@@ -467,7 +467,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 disabled={isLoadingProjects || !selectedProject}
                 style={getDarkIconStyle(darkIconColors.coral)}
               >
-                <Wrench className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" style={{ color: darkMode ? darkIconColors.coral : 'white' }} />
+                <Wrench className="h-4 w-4 group-hover:animate-wrench-turn" style={{ color: darkMode ? darkIconColors.coral : 'white' }} />
               </Button>
               
               {/* Create Project Button - Always visible */}

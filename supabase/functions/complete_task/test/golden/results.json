@@ -1,0 +1,878 @@
+[
+  {
+    "scenario": "mode1_simple_image",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "single_image"
+          }
+        ]
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/output.png",
+        "data": {
+          "size": 10
+        }
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765751438146.jpg",
+        "data": {
+          "size": 5
+        }
+      },
+      {
+        "type": "db_insert",
+        "table": "generations",
+        "data": {
+          "id": "be0816cf-5208-4fc1-8cee-fc19b85f0dcc",
+          "tasks": [
+            "33333333-3333-3333-3333-333333333333"
+          ],
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "type": "image",
+          "location": "https://mock-url.com/output.png"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-url.com/output"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario": "mode1_video_i2v",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "wan_2_2_i2v"
+          }
+        ]
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/output.mp4",
+        "data": {
+          "size": 10
+        }
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb.png",
+        "data": {
+          "size": 5
+        }
+      },
+      {
+        "type": "db_insert",
+        "table": "generations",
+        "data": {
+          "id": "c64d6cc0-168d-41d3-ae51-c46b8bbb8324",
+          "tasks": [
+            "44444444-4444-4444-4444-444444444444"
+          ],
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "type": "video",
+          "location": "https://mock-url.com/output.png"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_rpc",
+        "table": "add_generation_to_shot",
+        "data": {
+          "p_shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "p_generation_id": "78e25888-3b0d-40a4-8901-f666af4175e9",
+          "p_with_position": false
+        }
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-url.com/output"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario": "mode3_presigned",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "single_image"
+          }
+        ]
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png"
+      },
+      {
+        "type": "db_insert",
+        "table": "generations",
+        "data": {
+          "id": "eaced4ab-02ef-4e42-b6e2-04cfddc85c0d",
+          "tasks": [
+            "33333333-3333-3333-3333-333333333333"
+          ],
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "type": "image",
+          "location": "https://mock-url.com/output.png"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-url.com/output"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario": "mode3_with_thumbnail",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "wan_2_2_i2v"
+          }
+        ]
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4"
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg"
+      },
+      {
+        "type": "db_insert",
+        "table": "generations",
+        "data": {
+          "id": "2d6b8ea8-04f3-461b-9661-40f6a3b1b0d2",
+          "tasks": [
+            "44444444-4444-4444-4444-444444444444"
+          ],
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "type": "video",
+          "location": "https://mock-url.com/output.png"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_rpc",
+        "table": "add_generation_to_shot",
+        "data": {
+          "p_shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "p_generation_id": "8a173743-595b-47c9-a2ba-79d34b653058",
+          "p_with_position": false
+        }
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-url.com/output"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "44444444-4444-4444-4444-444444444444"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario": "inpaint_creates_variant",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "77777777-7777-7777-7777-777777777777"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "image_inpaint"
+          }
+        ]
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/inpainted.png",
+        "data": {
+          "size": 10
+        }
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765751438147.jpg",
+        "data": {
+          "size": 5
+        }
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+          }
+        ]
+      },
+      {
+        "type": "db_insert",
+        "table": "generation_variants",
+        "data": {
+          "generation_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "location": "https://mock-url.com/output.png",
+          "is_primary": false,
+          "variant_type": "edit"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-url.com/output"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "77777777-7777-7777-7777-777777777777"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "77777777-7777-7777-7777-777777777777"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario": "upscale_creates_primary_variant",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "88888888-8888-8888-8888-888888888888"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "image_upscale"
+          }
+        ]
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/upscaled.png",
+        "data": {
+          "size": 10
+        }
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765751438147.jpg",
+        "data": {
+          "size": 5
+        }
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+          }
+        ]
+      },
+      {
+        "type": "db_insert",
+        "table": "generation_variants",
+        "data": {
+          "generation_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "location": "https://mock-url.com/upscaled.png",
+          "is_primary": true,
+          "variant_type": "upscaled"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-url.com/output"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "88888888-8888-8888-8888-888888888888"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "88888888-8888-8888-8888-888888888888"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario": "travel_segment_creates_child",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "55555555-5555-5555-5555-555555555555"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "travel_segment"
+          }
+        ]
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/segment_0.mp4",
+        "data": {
+          "size": 10
+        }
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"66666666-6666-6666-6666-666666666666\"]"
+          }
+        ]
+      },
+      {
+        "type": "db_insert",
+        "table": "generations",
+        "data": {
+          "id": "4ba808a9-a8ef-4e17-8acd-da8b6087c4ab",
+          "tasks": [
+            "55555555-5555-5555-5555-555555555555"
+          ],
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "type": "video",
+          "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "is_child": true,
+          "child_order": 0
+        },
+        "filters": []
+      },
+      {
+        "type": "db_insert",
+        "table": "generation_variants",
+        "data": {
+          "generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "location": "https://mock-url.com/segment.mp4",
+          "is_primary": false,
+          "variant_type": "travel_segment"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "task_type",
+            "value": "travel_segment"
+          },
+          {
+            "type": "eq",
+            "field": "project_id",
+            "value": "22222222-2222-2222-2222-222222222222"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-url.com/output"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "55555555-5555-5555-5555-555555555555"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "55555555-5555-5555-5555-555555555555"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario": "travel_stitch_updates_parent",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "99999999-9999-9999-9999-999999999999"
+          }
+        ]
+      },
+      {
+        "type": "db_select",
+        "table": "task_types",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "name",
+            "value": "travel_stitch"
+          }
+        ]
+      },
+      {
+        "type": "storage_upload",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/stitched.mp4",
+        "data": {
+          "size": 10
+        }
+      },
+      {
+        "type": "db_select",
+        "table": "generations",
+        "data": null,
+        "filters": [
+          {
+            "type": "contains",
+            "field": "tasks",
+            "value": "[\"66666666-6666-6666-6666-666666666666\"]"
+          }
+        ]
+      },
+      {
+        "type": "db_insert",
+        "table": "generations",
+        "data": {
+          "id": "32039237-9aee-4409-a422-1b66e1d236e7",
+          "tasks": [
+            "99999999-9999-9999-9999-999999999999"
+          ],
+          "project_id": "22222222-2222-2222-2222-222222222222",
+          "type": "video",
+          "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "is_child": true,
+          "child_order": 0
+        },
+        "filters": []
+      },
+      {
+        "type": "db_insert",
+        "table": "generation_variants",
+        "data": {
+          "generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "location": "https://mock-url.com/segment.mp4",
+          "is_primary": false,
+          "variant_type": "travel_segment"
+        },
+        "filters": []
+      },
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "task_type",
+            "value": "travel_segment"
+          },
+          {
+            "type": "eq",
+            "field": "project_id",
+            "value": "22222222-2222-2222-2222-222222222222"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "status": "Complete",
+          "output_location": "https://mock-url.com/output"
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "99999999-9999-9999-9999-999999999999"
+          },
+          {
+            "type": "eq",
+            "field": "status",
+            "value": "In Progress"
+          }
+        ]
+      },
+      {
+        "type": "db_update",
+        "table": "tasks",
+        "data": {
+          "generation_created": true
+        },
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "99999999-9999-9999-9999-999999999999"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario": "error_missing_task_id",
+    "passed": true,
+    "statusCode": 400,
+    "expectedStatusCode": 400,
+    "operations": []
+  },
+  {
+    "scenario": "error_missing_file_data",
+    "passed": true,
+    "statusCode": 400,
+    "expectedStatusCode": 400,
+    "operations": []
+  },
+  {
+    "scenario": "error_invalid_base64",
+    "passed": true,
+    "statusCode": 400,
+    "expectedStatusCode": 400,
+    "operations": []
+  }
+]
