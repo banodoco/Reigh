@@ -143,7 +143,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       return () => clearTimeout(timer);
     }
     
-    if (phase === 'loading' && assetsLoaded && barTransitionCompleted && minLoadTimePassed) {
+    if (phase === 'loading' && assetsLoaded && minLoadTimePassed) {
       // Bar has reached 100%, wait for it to settle
       const timer = setTimeout(() => setPhase('bar-complete'), 300);
       return () => clearTimeout(timer);
@@ -168,7 +168,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         clearTimeout(banodocoTimer);
       };
     }
-  }, [phase, assetsLoaded, barTransitionCompleted, minLoadTimePassed]);
+  }, [phase, assetsLoaded, minLoadTimePassed]);
 
   // Helper for staggering animations based on animation phase
   // Calculated to match the grid-template-rows expansion (1000ms ease-out)

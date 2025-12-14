@@ -124,12 +124,25 @@ export default function HomePage() {
 
   // --- Effects ---
 
-  // Preload assets
+  // Preload assets with fallback timeout
   useEffect(() => {
+    let loaded = false;
+    const markLoaded = () => {
+      if (!loaded) {
+        loaded = true;
+        setAssetsLoaded(true);
+      }
+    };
+    
     const img = new Image();
     img.src = '/brush-paintbrush-icon.webp';
-    img.onload = () => setAssetsLoaded(true);
-    img.onerror = () => setAssetsLoaded(true);
+    img.onload = markLoaded;
+    img.onerror = markLoaded;
+    
+    // Fallback: if image events don't fire within 2s, proceed anyway
+    const fallbackTimer = setTimeout(markLoaded, 2000);
+    
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
   // Redirect check
