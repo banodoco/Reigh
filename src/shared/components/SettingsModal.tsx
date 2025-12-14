@@ -1002,8 +1002,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               </pre>
                             </div>
                             
+                            {/* Gradient fade behind buttons */}
+                            {!showFullInstallCommand && (
+                              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-900 via-gray-900/90 to-transparent pointer-events-none rounded-b-lg" />
+                            )}
+                            
                             {/* Fixed buttons at bottom of command block - centered */}
-                            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-center gap-2">
+                            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-center gap-2 z-10">
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -1126,8 +1131,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                               </pre>
                             </div>
 
+                            {/* Gradient fade behind buttons */}
+                            {!showFullRunCommand && (
+                              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-900 via-gray-900/90 to-transparent pointer-events-none rounded-b-lg" />
+                            )}
+
                             {/* Fixed buttons at bottom of command block - centered */}
-                            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-center gap-2">
+                            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-center gap-2 z-10">
                               <Button
                                 variant="secondary"
                                 size="sm"

@@ -111,6 +111,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [openTipOpen, setOpenTipOpen] = useState(false);
   const [emergingTipOpen, setEmergingTipOpen] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
+  const [barWidth, setBarWidth] = useState('0%');
   
   // Platform-aware PWA install detection
   const platformInstall = usePlatformInstall();
@@ -129,6 +130,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
+  // Loading bar animation - wait for assets AND CTA detection
+  const ctaReady = !platformInstall.isWaitingForPrompt;
+  useEffect(() => {
+    if (assetsLoaded && ctaReady) {
+      setBarWidth('100%');
+    } else if (assetsLoaded) {
+      setBarWidth('95%'); // Almost there, waiting for CTA
+    } else {
+      setBarWidth('92%');
+    }
+  }, [assetsLoaded, ctaReady]);
+
   // Master animation orchestrator
   useEffect(() => {
     if (phase === 'initial') {
@@ -137,7 +150,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       return () => clearTimeout(timer);
     }
     
-    if (phase === 'loading' && assetsLoaded && barTransitionCompleted && minLoadTimePassed) {
+    if (phase === 'loading' && assetsLoaded && barTransitionCompleted && minLoadTimePassed && ctaReady) {
       // Bar has reached 100%, wait for it to settle
       const timer = setTimeout(() => setPhase('bar-complete'), 300);
       return () => clearTimeout(timer);
@@ -218,6 +231,24 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </h1>
               </div>
             </div>
+          </div>
+          
+          {/* Loading Bar - visible during loading phase */}
+          <div 
+            className={`w-32 h-1.5 mx-auto relative transition-opacity duration-500 ${
+              phase === 'content-revealing' || phase === 'complete' ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            {/* Background track */}
+            <div className="absolute inset-0 bg-amber-900/30 rounded-full"></div>
+            {/* Animated progress bar - golden gradient */}
+            <div 
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.4)]"
+              style={{ 
+                width: barWidth, 
+                transition: 'width 0.8s cubic-bezier(0.22, 1, 0.36, 1)' 
+              }}
+            ></div>
           </div>
           
           {/* Bottom Section: Subtitle + Buttons + Footer */}

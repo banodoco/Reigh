@@ -38,6 +38,10 @@ export const useModal = (size: ModalSize = 'medium'): ModalStyling => {
     maxHeight: (size === 'large' || size === 'extra-large')
       ? 'min(80vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 80px))'
       : 'min(90vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 64px))',
+    // Position modal lower on mobile to account for safe area at top
+    top: (size === 'large' || size === 'extra-large') 
+      ? 'calc(50% + env(safe-area-inset-top, 0px) / 2)' 
+      : undefined,
   } : {};
 
   // Mobile props to prevent auto-focus (prevents keyboard popup)

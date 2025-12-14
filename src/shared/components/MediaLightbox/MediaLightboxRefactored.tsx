@@ -4,7 +4,6 @@ import { isVideoAny } from '@/shared/lib/typeGuards';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
-import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
@@ -2245,54 +2244,92 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         {/* Info | Edit | Trim Toggle and Close Button */}
                         <div className="flex items-center gap-3">
                           {showImageEditTools && !readOnly && !isVideo && (
-                            <SegmentedControl
-                              value="info"
-                              onValueChange={(value) => {
-                                if (value === 'edit') {
-                                  setIsInpaintMode(true);
-                                  setEditMode('inpaint');
-                                }
-                              }}
-                              size="sm"
-                            >
-                              <SegmentedControlItem value="info">
+                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                              <button
+                                onClick={() => {
+                                  if (isInpaintMode) {
+                                    handleExitInpaintMode();
+                                  }
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  !isInpaintMode
+                                    ? "bg-background text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
                                 Info
-                              </SegmentedControlItem>
-                              <SegmentedControlItem value="edit">
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!isInpaintMode) {
+                                    setIsInpaintMode(true);
+                                    setEditMode('inpaint');
+                                  }
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  isInpaintMode
+                                    ? "bg-background text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
                                 Edit
-                              </SegmentedControlItem>
-                            </SegmentedControl>
+                              </button>
+                            </div>
                           )}
                           {/* Video controls: Trim and Edit (for videos) */}
                           {isVideo && !readOnly && (
-                            <SegmentedControl
-                              value={isVideoTrimMode ? 'trim' : isVideoEditMode ? 'edit' : 'info'}
-                              onValueChange={(value) => {
-                                if (value === 'info') {
-                                  if (isVideoTrimMode) handleExitVideoTrimMode();
-                                  if (isVideoEditMode) handleExitVideoEditMode();
-                                } else if (value === 'trim') {
-                                  if (isVideoEditMode) handleExitVideoEditMode();
-                                  handleEnterVideoTrimMode();
-                                } else if (value === 'edit') {
+                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                              <button
+                                onClick={() => {
+                                  if (isVideoTrimMode) {
+                                    handleExitVideoTrimMode();
+                                  }
+                                  if (isVideoEditMode) {
+                                    handleExitVideoEditMode();
+                                  }
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  !isVideoTrimMode && !isVideoEditMode 
+                                    ? "bg-background text-foreground shadow-sm" 
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
+                                Info
+                              </button>
+                              {showVideoTrimEditor && (
+                                <button
+                                  onClick={() => {
+                                    if (isVideoEditMode) handleExitVideoEditMode();
+                                    handleEnterVideoTrimMode();
+                                  }}
+                                  className={cn(
+                                    "px-3 py-1.5 text-sm rounded transition-colors",
+                                    isVideoTrimMode 
+                                      ? "bg-background text-foreground shadow-sm" 
+                                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                  )}
+                                >
+                                  Trim
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
                                   if (isVideoTrimMode) handleExitVideoTrimMode();
                                   handleEnterVideoEditMode();
-                                }
-                              }}
-                              size="sm"
-                            >
-                              <SegmentedControlItem value="info">
-                                Info
-                              </SegmentedControlItem>
-                              {showVideoTrimEditor && (
-                                <SegmentedControlItem value="trim">
-                                  Trim
-                                </SegmentedControlItem>
-                              )}
-                              <SegmentedControlItem value="edit">
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  isVideoEditMode 
+                                    ? "bg-background text-foreground shadow-sm" 
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
                                 Edit
-                              </SegmentedControlItem>
-                            </SegmentedControl>
+                              </button>
+                            </div>
                           )}
                           <Button
                             variant="ghost"
@@ -2659,54 +2696,92 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         {/* Info | Edit Toggle and Close Button */}
                         <div className="flex items-center gap-3">
                           {showImageEditTools && !readOnly && !isVideo && (
-                            <SegmentedControl
-                              value="info"
-                              onValueChange={(value) => {
-                                if (value === 'edit') {
-                                  setIsInpaintMode(true);
-                                  setEditMode('inpaint');
-                                }
-                              }}
-                              size="sm"
-                            >
-                              <SegmentedControlItem value="info">
+                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                              <button
+                                onClick={() => {
+                                  if (isInpaintMode) {
+                                    handleExitInpaintMode();
+                                  }
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  !isInpaintMode
+                                    ? "bg-background text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
                                 Info
-                              </SegmentedControlItem>
-                              <SegmentedControlItem value="edit">
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!isInpaintMode) {
+                                    setIsInpaintMode(true);
+                                    setEditMode('inpaint');
+                                  }
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  isInpaintMode
+                                    ? "bg-background text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
                                 Edit
-                              </SegmentedControlItem>
-                            </SegmentedControl>
+                              </button>
+                            </div>
                           )}
                           {/* Video controls: Trim and Edit (for videos on mobile) */}
                           {isVideo && !readOnly && (
-                            <SegmentedControl
-                              value={isVideoTrimMode ? 'clip' : isVideoEditMode ? 'edit' : 'info'}
-                              onValueChange={(value) => {
-                                if (value === 'info') {
-                                  if (isVideoTrimMode) handleExitVideoTrimMode();
-                                  if (isVideoEditMode) handleExitVideoEditMode();
-                                } else if (value === 'clip') {
-                                  if (isVideoEditMode) handleExitVideoEditMode();
-                                  handleEnterVideoTrimMode();
-                                } else if (value === 'edit') {
+                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                              <button
+                                onClick={() => {
+                                  if (isVideoTrimMode) {
+                                    handleExitVideoTrimMode();
+                                  }
+                                  if (isVideoEditMode) {
+                                    handleExitVideoEditMode();
+                                  }
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  !isVideoTrimMode && !isVideoEditMode 
+                                    ? "bg-background text-foreground shadow-sm" 
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
+                                Info
+                              </button>
+                              {showVideoTrimEditor && (
+                                <button
+                                  onClick={() => {
+                                    if (isVideoEditMode) handleExitVideoEditMode();
+                                    handleEnterVideoTrimMode();
+                                  }}
+                                  className={cn(
+                                    "px-3 py-1.5 text-sm rounded transition-colors",
+                                    isVideoTrimMode 
+                                      ? "bg-background text-foreground shadow-sm" 
+                                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                  )}
+                                >
+                                  Clip
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
                                   if (isVideoTrimMode) handleExitVideoTrimMode();
                                   handleEnterVideoEditMode();
-                                }
-                              }}
-                              size="sm"
-                            >
-                              <SegmentedControlItem value="info">
-                                Info
-                              </SegmentedControlItem>
-                              {showVideoTrimEditor && (
-                                <SegmentedControlItem value="clip">
-                                  Clip
-                                </SegmentedControlItem>
-                              )}
-                              <SegmentedControlItem value="edit">
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 text-sm rounded transition-colors",
+                                  isVideoEditMode 
+                                    ? "bg-background text-foreground shadow-sm" 
+                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                )}
+                              >
                                 Edit
-                              </SegmentedControlItem>
-                            </SegmentedControl>
+                              </button>
+                            </div>
                           )}
                           <Button
                             variant="ghost"
