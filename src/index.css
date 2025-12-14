@@ -220,62 +220,62 @@
     /* ========================================= */
     
     /* Wes Anderson palette - darker/more saturated for dark mode */
-    --wes-vintage-gold: 40 70% 55%;         /* More saturated, darker gold */
-    --wes-coral: 10 80% 60%;                /* More saturated, darker coral */
+    --wes-vintage-gold: 40 65% 50%;         /* Richer gold */
+    --wes-coral: 10 70% 55%;                /* Warmer coral */
     
-    /* Core backgrounds */
-    --background: 150 30% 15%;              /* Dark Forest */
-    --foreground: 120 25% 90%;              /* Light Pastel Green */
+    /* Core backgrounds - subtle green tint, not overwhelming */
+    --background: 150 12% 10%;              /* Dark with subtle green */
+    --foreground: 45 20% 88%;               /* Warm cream white */
     
-    /* Cards & Popovers */
-    --card: 150 25% 20%;                    /* Slightly lighter forest */
-    --card-foreground: 120 25% 90%;
-    --popover: 150 25% 20%;
-    --popover-foreground: 120 25% 90%;
+    /* Cards & Popovers - warmer, clear depth separation */
+    --card: 140 8% 15%;                     /* Elevated, hint of green */
+    --card-foreground: 45 20% 88%;
+    --popover: 130 6% 18%;                  /* Highest elevation */
+    --popover-foreground: 45 20% 88%;
     
-    /* Primary - use gold for better visibility */
-    --primary: 40 60% 70%;                  /* Vintage Gold (lighter) */
-    --primary-foreground: 150 30% 15%;
+    /* Primary - vintage gold */
+    --primary: 40 55% 58%;                  /* Warm gold */
+    --primary-foreground: 150 20% 10%;
     
-    /* Secondary */
-    --secondary: 210 30% 35%;               /* Darker Dusty Blue */
-    --secondary-foreground: 210 35% 85%;
+    /* Secondary - dusty blue as cool counter-hue */
+    --secondary: 210 20% 28%;               /* Cool dusty blue */
+    --secondary-foreground: 210 25% 85%;
     
-    /* Muted/subtle */
-    --muted: 150 20% 25%;                   /* Dark muted forest */
-    --muted-foreground: 120 20% 70%;
+    /* Muted/subtle - cooler for contrast with green */
+    --muted: 200 10% 18%;                   /* Blue-gray muted */
+    --muted-foreground: 200 8% 55%;
     
-    /* Accent */
-    --accent: 333 25% 65%;                  /* Pink (adjusted for dark) */
-    --accent-foreground: 150 30% 15%;
+    /* Accent - dusty rose */
+    --accent: 333 22% 52%;                  /* Dusty rose */
+    --accent-foreground: 150 12% 10%;
     
     /* Destructive */
-    --destructive: 0 65% 50%;
+    --destructive: 0 60% 45%;
     --destructive-foreground: 0 0% 100%;
     
     /* Borders & Inputs */
-    --border: 150 20% 30%;
-    --input: 150 25% 22%;
-    --ring: 40 60% 70%;
+    --border: 150 8% 22%;                   /* Green-tinted border */
+    --input: 140 8% 16%;
+    --ring: 40 55% 58%;
     
-    /* Sidebar */
-    --sidebar-background: 150 25% 18%;
-    --sidebar-foreground: 120 25% 90%;
-    --sidebar-primary: 40 60% 70%;
-    --sidebar-primary-foreground: 150 30% 15%;
-    --sidebar-accent: 333 25% 60%;
-    --sidebar-accent-foreground: 120 25% 90%;
-    --sidebar-border: 150 20% 30%;
-    --sidebar-ring: 40 60% 70%;
+    /* Sidebar - signature forest green */
+    --sidebar-background: 150 25% 12%;      /* Forest green sidebar */
+    --sidebar-foreground: 45 20% 88%;
+    --sidebar-primary: 40 55% 58%;
+    --sidebar-primary-foreground: 150 25% 10%;
+    --sidebar-accent: 150 20% 22%;          /* Lighter forest for hover */
+    --sidebar-accent-foreground: 45 20% 90%;
+    --sidebar-border: 150 18% 18%;
+    --sidebar-ring: 40 55% 58%;
     
     /* Icon colors for dark mode */
-    --icon-primary: 40 60% 70%;             /* Vintage Gold */
-    --icon-secondary: 333 30% 75%;          /* Soft Pink */
-    --icon-muted: 210 30% 60%;              /* Dusty Blue */
-    --icon-interactive: 40 60% 80%;
-    --icon-success: 145 35% 60%;            /* Mint */
-    --icon-warning: 45 80% 65%;             /* Mustard */
-    --icon-danger: 0 65% 55%;
+    --icon-primary: 40 55% 60%;             /* Warm gold */
+    --icon-secondary: 210 25% 65%;          /* Dusty blue (cool counter-hue) */
+    --icon-muted: 150 10% 45%;              /* Muted forest */
+    --icon-interactive: 40 50% 70%;
+    --icon-success: 150 30% 45%;            /* Forest green */
+    --icon-danger: 0 55% 50%;
+    --icon-warning: 45 70% 55%;             /* Mustard */
   }
 }
 
@@ -673,8 +673,32 @@
     box-shadow: 
       0 10px 25px -5px hsl(var(--primary) / 0.2),
       0 4px 6px -2px hsl(var(--primary) / 0.1),
-      inset 0 1px 0 hsl(var(--accent) / 0.15),
-      inset 0 0 0 1px hsl(var(--accent) / 0.1);
+      inset 0 1px 0 hsl(45 30% 70% / 0.08),
+      inset 0 0 0 1px hsl(210 15% 40% / 0.15);
+  }
+  
+  /* ========================================= */
+  /* DARK MODE CARD DEPTH REFINEMENTS          */
+  /* Cards need inner highlight + hue shift    */
+  /* ========================================= */
+  
+  /* Default cards in dark mode - add inner highlight and cooler hue */
+  .dark .bg-card,
+  .dark [class*="bg-card"] {
+    /* Slight blue shift from background (210° vs 150°) */
+    box-shadow: 
+      inset 0 1px 0 hsl(45 25% 60% / 0.06),
+      inset 0 0 0 1px hsl(210 12% 35% / 0.12);
+  }
+  
+  /* Elevated cards (popovers, modals, dropdowns) */
+  .dark [data-radix-popper-content-wrapper] > *,
+  .dark [data-radix-dialog-content],
+  .dark [data-radix-select-content] {
+    box-shadow: 
+      0 8px 30px -8px hsl(0 0% 0% / 0.5),
+      inset 0 1px 0 hsl(45 30% 65% / 0.08),
+      inset 0 0 0 1px hsl(210 15% 40% / 0.15);
   }
 
   .wes-card::before {
@@ -1074,10 +1098,104 @@
   }
 }
 
+/* ========================================= */
+/* NEW SHOT ZONE - "Moment of Creation"      */
+/* Soft glow on hover, subtle accent tint    */
+/* ========================================= */
+
+.new-group-drop-zone {
+  transition: all 0.25s ease-out;
+}
+
+.new-group-drop-zone:hover {
+  border-color: hsl(var(--wes-vintage-gold) / 0.5) !important;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--wes-vintage-gold) / 0.08) 0%,
+    hsl(150 20% 20% / 0.1) 100%
+  ) !important;
+  box-shadow: 
+    0 0 20px hsl(var(--wes-vintage-gold) / 0.15),
+    inset 0 1px 0 hsl(var(--wes-vintage-gold) / 0.1);
+  transform: scale(1.02);
+}
+
+.new-group-drop-zone:hover p {
+  color: hsl(var(--wes-vintage-gold)) !important;
+}
+
+/* Plus icon container - subtle idle pulse */
+.new-group-drop-zone .plus-icon-container {
+  animation: subtle-plus-pulse 3s ease-in-out infinite;
+}
+
+@keyframes subtle-plus-pulse {
+  0%, 100% { 
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.85;
+    transform: scale(1.05);
+  }
+}
+
+/* On hover, stop idle pulse and apply glow */
+.new-group-drop-zone:hover .plus-icon-container {
+  animation: none;
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Plus icon glow effect for create buttons in dark mode */
+.dark .new-group-drop-zone:hover svg,
+.dark [class*="create"]:hover svg,
+.dark [aria-label*="create"]:hover svg {
+  filter: drop-shadow(0 0 6px hsl(var(--wes-vintage-gold) / 0.7));
+}
+
+/* ========================================= */
+/* TEXT HIERARCHY REFINEMENTS               */
+/* Sharper distinction between levels        */
+/* ========================================= */
+
+/* Shot titles - more prominent */
+.dark .shot-title,
+.dark [class*="shot-name"],
+.dark h3[class*="font-light"] {
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+
+/* Section headers - bolder, wider spacing */
+.dark .section-header,
+.dark [class*="text-xl"],
+.dark h2 {
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+/* Metadata/labels - smaller, more muted */
+.dark .metadata,
+.dark .label,
+.dark [class*="text-xs"][class*="text-muted"],
+.dark [class*="text-sm"][class*="text-zinc-400"] {
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+/* Shot group cards - icons dim until card hover */
+.dark .shot-group button {
+  transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+}
+
+.dark .shot-group:hover button {
+  opacity: 1 !important;
+}
+
 @layer components {
   .wes-header {
-    @apply wes-symmetry backdrop-blur-md border-b-2 border-primary/10 relative;
-    @apply shadow-sm;
+    @apply wes-symmetry backdrop-blur-md relative;
     background: 
       linear-gradient(90deg, hsl(var(--background)) 0%, hsl(var(--wes-dusty-lavender) / 0.3) 50%, hsl(var(--background)) 100%),
       repeating-linear-gradient(
@@ -1091,14 +1209,55 @@
 
   .dark .wes-header {
     background: 
-      linear-gradient(90deg, hsl(var(--background)) 0%, hsl(var(--wes-dusty-lavender) / 0.15) 50%, hsl(var(--background)) 100%),
+      linear-gradient(90deg, hsl(var(--background)) 0%, hsl(210 20% 18% / 0.6) 30%, hsl(var(--wes-vintage-gold) / 0.08) 50%, hsl(210 20% 18% / 0.6) 70%, hsl(var(--background)) 100%),
       repeating-linear-gradient(
         90deg,
         transparent,
-        transparent 100px,
-        hsl(var(--wes-vintage-gold) / 0.03) 100px,
-        hsl(var(--wes-vintage-gold) / 0.03) 102px
+        transparent 80px,
+        hsl(var(--wes-vintage-gold) / 0.04) 80px,
+        hsl(var(--wes-vintage-gold) / 0.04) 82px
       );
+    /* Subtle noise texture for dark header */
+    position: relative;
+  }
+  
+  .dark .wes-header::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.015;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+  
+  /* Project selector identity glow - the brand strip */
+  .dark .wes-header .shadow-wes-vintage {
+    position: relative;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--card) / 0.9) 0%,
+      hsl(210 15% 18% / 0.95) 50%,
+      hsl(var(--card) / 0.9) 100%
+    );
+    box-shadow: 
+      0 0 30px hsl(var(--wes-vintage-gold) / 0.12),
+      0 0 60px hsl(210 20% 30% / 0.1),
+      inset 0 1px 0 hsl(var(--wes-vintage-gold) / 0.15),
+      inset 0 0 0 1px hsl(210 15% 35% / 0.2);
+  }
+  
+  /* Horizontal gradient band beneath header in dark mode */
+  .dark .wes-header > .absolute.bottom-0 {
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--wes-vintage-gold) / 0.3) 20%,
+      hsl(210 25% 50% / 0.25) 50%,
+      hsl(var(--wes-vintage-gold) / 0.3) 80%,
+      transparent 100%
+    );
   }
 
   .wes-header::before {
@@ -1115,6 +1274,13 @@
       hsl(var(--wes-vintage-gold)), 
       hsl(var(--wes-vintage-gold))
     );
+  }
+  
+  /* Hide decorative header line on mobile */
+  @media (max-width: 767px) {
+    .wes-header::before {
+      display: none;
+    }
   }
 
   .wes-nav-item {

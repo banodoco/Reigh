@@ -241,7 +241,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
             e.stopPropagation();
           }}
           onDoubleClick={handleNameDoubleClick}
-          className="text-white text-sm font-light truncate cursor-pointer hover:bg-zinc-700/70 p-1 rounded transition-colors"
+          className="text-white text-sm font-medium tracking-wide truncate cursor-pointer hover:bg-zinc-700/70 p-1 rounded transition-colors"
           title={currentName}
         >
           {currentName}
@@ -303,16 +303,16 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
         )}
       </div>
 
-      <div className="flex items-center justify-between text-xs text-zinc-400 pt-1 border-t border-zinc-700/50">
-        <span>Total: {allImages.length} image(s)</span>
+      <div className="flex items-center justify-between text-xs text-zinc-500 pt-1 border-t border-zinc-700/50">
+        <span className="text-zinc-500">Total: {allImages.length} image(s)</span>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                className={`flex items-center justify-center w-6 h-6 rounded text-white transition-colors ${
+                className={`flex items-center justify-center w-6 h-6 rounded text-white transition-all duration-200 ${
                   allImages.length === 0 
-                    ? 'bg-zinc-600 cursor-not-allowed opacity-50' 
-                    : 'bg-violet-600/80 hover:bg-violet-500'
+                    ? 'bg-zinc-600 cursor-not-allowed opacity-30' 
+                    : 'bg-violet-600/50 opacity-60 hover:opacity-100 hover:bg-violet-500 hover:scale-110'
                 }`}
                 onClick={(e) => {
                   e.stopPropagation();

@@ -242,8 +242,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
         {/* Vintage film grain overlay */}
         <div className="absolute inset-0 bg-film-grain opacity-10 animate-film-grain pointer-events-none"></div>
         
-        {/* Ornate top border with animated elements */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-wes-vintage-gold via-wes-coral via-wes-mint via-wes-yellow to-wes-vintage-gold animate-vintage-glow pointer-events-none"></div>
+        {/* Ornate top border with animated elements - desktop only */}
+        <div className="hidden md:block absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-wes-vintage-gold via-wes-coral via-wes-mint via-wes-yellow to-wes-vintage-gold animate-vintage-glow pointer-events-none"></div>
         
         {/* Decorative corner elements */}
         <div className="absolute top-2 left-4 text-wes-vintage-gold text-xs animate-sway pointer-events-none">❋</div>
@@ -281,11 +281,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             </div>
 
             {/* Project Management */}
-            <div className="flex items-center space-x-4 relative p-2 border-2 border-wes-vintage-gold/30 rounded-xl bg-surface/50 dark:bg-surface/30 shadow-wes-vintage z-40">
+            <div className="flex items-center space-x-3 relative p-1 rounded-xl bg-transparent dark:bg-surface/20 z-40">
               {isLoadingProjects && projects.length === 0 ? (
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
                   {/* Project Selector Skeleton */}
-                  <div className="w-[280px] h-12 bg-muted animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
+                  <div className="w-[280px] h-12 bg-muted animate-pulse rounded-sm border-2 border-[#6a8a8a]/25 dark:border-[#6a7a7a]"></div>
                 </div>
               ) : projects.length === 0 && !isLoadingProjects ? (
                 <div className="w-[280px] text-center">
@@ -294,7 +294,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center space-x-4 relative z-50">
+                <div className="flex items-center space-x-3 relative z-50">
                   <Select 
                     value={selectedProjectId || ''} 
                     onValueChange={handleProjectChange}
@@ -515,10 +515,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           </div>
 
           {/* Bottom row - Project Selector */}
-          <div className="flex items-center h-20 w-full border-t border-wes-vintage-gold/20 px-4 pt-2 pb-6">
-            <div className="flex-1 p-3 border-2 border-wes-vintage-gold/30 rounded-xl bg-surface/50 dark:bg-surface/30 shadow-wes-vintage relative z-40">
+          <div className="flex items-center h-16 w-full px-4 pt-1 pb-4">
+            <div className="flex-1 relative z-40">
               {isLoadingProjects && projects.length === 0 ? (
-                <div className="w-full h-10 bg-muted animate-pulse rounded-lg border-2 border-wes-vintage-gold/30"></div>
+                <div className="w-full h-10 bg-muted animate-pulse rounded-sm border-2 border-[#6a8a8a]/25 dark:border-[#6a7a7a]"></div>
               ) : projects.length === 0 && !isLoadingProjects ? (
                 <div className="text-center">
                   <div className="wes-vintage-card p-2">
@@ -590,9 +590,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
           </div>
         </div>
         
-        {/* Enhanced decorative bottom border */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none"></div>
-        <div className="absolute bottom-0 left-1/4 right-1/4 h-px bg-gradient-to-r from-transparent via-wes-coral/30 to-transparent pointer-events-none"></div>
+        {/* Enhanced decorative bottom border - desktop only */}
+        <div className="hidden md:block absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-wes-vintage-gold/40 to-transparent pointer-events-none"></div>
+        <div className="hidden md:block absolute bottom-0 left-1/4 right-1/4 h-px bg-gradient-to-r from-transparent via-wes-coral/30 to-transparent pointer-events-none"></div>
         
         {/* Floating decorative elements */}
         <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 pointer-events-none">

@@ -185,8 +185,8 @@ const Layout: React.FC = () => {
     <AIInputModeProvider>
       <div className="flex flex-col">
         <ScrollToTop />
-        {/* Theme-adaptive background gradient */}
-        <div className="fixed inset-0 bg-gradient-to-br from-background via-secondary/30 to-accent/10 opacity-60 pointer-events-none"></div>
+        {/* Theme-adaptive background gradient - subtle in dark mode */}
+        <div className="fixed inset-0 bg-gradient-to-br from-background via-secondary/10 to-accent/5 opacity-40 dark:opacity-0 pointer-events-none"></div>
         
         <GlobalHeader 
           contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 16} 

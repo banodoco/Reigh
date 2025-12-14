@@ -4,6 +4,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useListShots } from '@/shared/hooks/useShots';
 import { toast } from 'sonner';
 import { isValidDropTarget, getGenerationDropData, isFileDrag, type GenerationDropData } from '@/shared/lib/dragDrop';
+import { Plus } from 'lucide-react';
 
 const NEW_GROUP_DROPPABLE_ID = 'new-shot-group-dropzone';
 
@@ -97,10 +98,10 @@ const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick, onGene
   const isDropTarget = isDragOver;
   return (
     <div 
-      className={`new-group-drop-zone p-4 border-2 border-dashed rounded flex items-center justify-center min-w-[200px] transition-all cursor-pointer ${
+      className={`new-group-drop-zone group p-4 border-2 border-dashed rounded-lg flex items-center justify-center gap-3 min-w-[200px] transition-all duration-200 cursor-pointer ${
         isDropTarget 
           ? 'border-green-500 bg-green-500/10 scale-105' 
-          : 'border-zinc-600 hover:border-zinc-500 hover:bg-zinc-800/50'
+          : 'border-zinc-600'
       }`}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -108,8 +109,11 @@ const NewGroupDropZone: React.FC<NewGroupDropZoneProps> = ({ onZoneClick, onGene
       onDrop={handleDrop}
       onClick={onZoneClick}
     >
-      <p className="text-zinc-400 text-center text-sm">
-        {isDropTarget ? 'Release to create new shot' : 'Drop or click to create new shot'}
+      <div className="plus-icon-container flex items-center justify-center w-8 h-8 rounded-full border-2 border-dashed border-zinc-500 group-hover:border-[hsl(40,55%,58%)] transition-all duration-200 group-hover:bg-[hsl(40,55%,58%,0.15)] group-hover:shadow-[0_0_16px_hsl(40,55%,58%,0.4)]">
+        <Plus className="w-4 h-4 text-zinc-400 group-hover:text-[hsl(40,55%,58%)] transition-all duration-200" />
+      </div>
+      <p className="text-zinc-400 text-center text-sm group-hover:text-zinc-200 transition-colors duration-200">
+        {isDropTarget ? 'Release to create new shot' : 'Create new shot'}
       </p>
     </div>
   );
