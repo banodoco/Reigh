@@ -118,7 +118,8 @@ async function handleThumbnail(
   // Auto-generate thumbnail for images
   const contentType = getContentType(parsedRequest.filename);
   if (contentType.startsWith("image/") && parsedRequest.fileData) {
-    return await generateThumbnail(supabase, parsedRequest.fileData, userId);
+    // Match legacy behavior: if auto-thumbnail generation fails, fall back to main image URL
+    return await generateThumbnail(supabase, parsedRequest.fileData, userId, mainFileUrl);
   }
 
   return null;
@@ -130,7 +131,8 @@ async function handleThumbnail(
 async function generateThumbnail(
   supabase: any,
   sourceBytes: Uint8Array,
-  userId: string
+  userId: string,
+  fallbackUrl: string
 ): Promise<string | null> {
   console.log(`[ThumbnailGen] Starting auto-thumbnail generation`);
   
@@ -161,7 +163,8 @@ async function generateThumbnail(
 
     if (uploadErr) {
       console.error('[ThumbnailGen] Upload error:', uploadErr);
-      return null;
+      console.log(`[ThumbnailGen] Using fallback - main image URL as thumbnail: ${fallbackUrl}`);
+      return fallbackUrl;
     }
 
     const { data: thumbUrlData } = supabase.storage.from('image_uploads').getPublicUrl(thumbPath);
@@ -170,7 +173,8 @@ async function generateThumbnail(
 
   } catch (err: any) {
     console.error('[ThumbnailGen] Generation failed:', err);
-    return null;
+    console.log(`[ThumbnailGen] Using fallback - main image URL as thumbnail: ${fallbackUrl}`);
+    return fallbackUrl;
   }
 }
 

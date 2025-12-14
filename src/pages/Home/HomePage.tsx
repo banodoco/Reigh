@@ -209,6 +209,28 @@ export default function HomePage() {
     }
   }, []);
 
+  // Handle video end - pause for 1.5 seconds before restarting
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleVideoEnd = () => {
+      // Pause the video
+      video.pause();
+      
+      // Wait 1.5 seconds, then restart
+      setTimeout(() => {
+        video.currentTime = 0;
+        video.play().catch((err) => {
+          console.log('[VideoEnd] Failed to restart video:', err);
+        });
+      }, 1500);
+    };
+
+    video.addEventListener('ended', handleVideoEnd);
+    return () => video.removeEventListener('ended', handleVideoEnd);
+  }, []);
+
   // Auth Session Management
   useEffect(() => {
     // [iPadAuthFix] Explicitly check for OAuth tokens in URL hash on mount
@@ -453,7 +475,6 @@ export default function HomePage() {
       <video
         ref={videoRef}
         autoPlay
-        loop
         muted
         playsInline
         // @ts-expect-error webkit-specific attribute for iOS

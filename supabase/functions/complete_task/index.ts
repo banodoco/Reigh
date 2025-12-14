@@ -123,22 +123,22 @@ serve(async (req) => {
       if (!isMode3Format) {
         const fileCheck = await verifyFileExists(supabaseAdmin, parsedRequest.storagePath);
         if (!fileCheck.exists) {
-            return new Response("Referenced file does not exist or is not accessible in storage", { status: 404 });
-          }
+          return new Response("Referenced file does not exist or is not accessible in storage", { status: 404 });
+        }
       }
     }
 
     // 7) Determine user ID for storage path
     let userId: string;
-      if (isServiceRole) {
+    if (isServiceRole) {
       const taskUserResult = await getTaskUserId(supabaseAdmin, taskIdString, "[COMPLETE-TASK]");
-        if (taskUserResult.error) {
+      if (taskUserResult.error) {
         return new Response(taskUserResult.error, { status: taskUserResult.statusCode || 404 });
-        }
-      userId = taskUserResult.userId!;
-      } else {
-      userId = callerId!;
       }
+      userId = taskUserResult.userId!;
+    } else {
+      userId = callerId!;
+    }
 
     // 8) Handle storage operations
     const storageResult = await handleStorageOperations(supabaseAdmin, parsedRequest, userId, isServiceRole);
@@ -174,7 +174,15 @@ serve(async (req) => {
     // 10) Create generation (if applicable)
     const CREATE_GENERATION_IN_EDGE = Deno.env.get("CREATE_GENERATION_IN_EDGE") !== "false";
     if (CREATE_GENERATION_IN_EDGE) {
-      await handleGenerationCreation(supabaseAdmin, taskIdString, publicUrl, thumbnailUrl);
+      try {
+        await handleGenerationCreation(supabaseAdmin, taskIdString, publicUrl, thumbnailUrl);
+      } catch (genErr: any) {
+        const msg = genErr?.message || String(genErr);
+        logger.error("Generation creation failed", { error: msg });
+        await logger.flush();
+        // Preserve atomic semantics: do NOT mark the task Complete if generation creation failed.
+        return new Response(`Generation creation failed: ${msg}`, { status: 500 });
+      }
     }
 
     // 11) Update task to Complete
@@ -201,10 +209,10 @@ serve(async (req) => {
 
       if (completedTask) {
         await checkOrchestratorCompletion(
-                          supabaseAdmin,
+          supabaseAdmin,
           taskIdString,
           completedTask,
-                          publicUrl,
+          publicUrl,
           thumbnailUrl,
           supabaseUrl,
           serviceKey
@@ -310,18 +318,20 @@ async function handleGenerationCreation(
     
     if (createAsGeneration && basedOnGenerationId) {
       console.log(`[GenMigration] Task ${taskId} has create_as_generation=true`);
-  }
+    }
 
-  try {
+    try {
       await createGenerationFromTask(supabase, taskId, combinedTaskData, publicUrl, thumbnailUrl);
     } catch (genError: any) {
       console.error(`[GenMigration] Error creating generation for task ${taskId}:`, genError);
+      // Preserve atomic semantics: bubble up so the main handler can fail the request
+      throw genError;
     }
 
   } else if (taskCategory === 'upscale') {
     await handleUpscaleVariant(supabase, taskId, combinedTaskData, publicUrl, thumbnailUrl);
 
-    } else {
+  } else {
     console.log(`[GenMigration] Skipping generation creation for task ${taskId} - category is '${taskCategory}'`);
   }
 }
@@ -340,7 +350,7 @@ async function triggerCostCalculation(
       .from("tasks")
       .select("params")
       .eq("id", taskId)
-        .single();
+      .single();
 
     const subTaskOrchestratorRef = extractOrchestratorTaskId(taskForCostCheck?.params, 'CostCalc');
     if (subTaskOrchestratorRef) {
@@ -363,7 +373,7 @@ async function triggerCostCalculation(
       if (costData && typeof costData.cost === 'number') {
         console.log(`[COMPLETE-TASK] Cost calculation successful: $${costData.cost.toFixed(3)}`);
       }
-      } else {
+    } else {
       const errTxt = await costCalcResp.text();
       console.error(`[COMPLETE-TASK] Cost calculation failed: ${errTxt}`);
     }
