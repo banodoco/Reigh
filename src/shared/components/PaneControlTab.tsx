@@ -375,6 +375,19 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
               <LockIcon className="h-4 w-4" />
             </Button>
           </TooltipButton>
+          {fourthButton && (
+            <TooltipButton tooltip={fourthButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={fourthButton.onClick}
+                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label={fourthButton.ariaLabel}
+              >
+                {fourthButton.content || <Square className="h-4 w-4" />}
+              </Button>
+            </TooltipButton>
+          )}
         </div>
       </TooltipProvider>
     );

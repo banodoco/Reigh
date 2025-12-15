@@ -83,8 +83,12 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
         {/* Controls row - all on one line matching actual layout */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* SegmentedControl skeleton - Shots/Videos toggle */}
-          {/* Actual has p-1 padding, each item is text-lg font-light px-5 py-0 */}
-          <Skeleton className="h-10 w-[180px] sm:w-[200px] rounded-lg" />
+          {/* Actual has bg-muted rounded-full p-1, h-10, with two items (px-5 py-0 text-lg) */}
+          {/* One item appears "active" (bg-background), the other is transparent/muted */}
+          <div className="h-10 bg-muted rounded-full p-1 inline-flex items-center gap-0.5">
+            <div className="h-8 w-[85px] sm:w-[95px] rounded-full bg-background shadow-sm animate-pulse" />
+            <div className="h-8 w-[85px] sm:w-[95px] rounded-full" />
+          </div>
           
           {/* Mobile: Search icon button skeleton */}
           <Skeleton className="h-8 w-8 rounded-md sm:hidden" />
@@ -99,10 +103,12 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
       
       {/* Grid content with matching container - matches ShotListDisplay grid exactly */}
       {/* Breakpoints: 1 col default, 2 cols at lg (1024px), 3 cols at xl (1280px) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4">
-          {Array.from({ length: gridItemCount }).map((_, idx) => (
-          <Skeleton key={idx} className="h-32 rounded-lg" />
-          ))}
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4">
+            {Array.from({ length: gridItemCount }).map((_, idx) => (
+            <Skeleton key={idx} className="h-32 rounded-lg" />
+            ))}
+        </div>
       </div>
     </>
   );
