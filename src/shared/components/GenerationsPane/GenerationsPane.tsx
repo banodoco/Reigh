@@ -387,7 +387,8 @@ const GenerationsPaneComponent: React.FC = () => {
               navigate('/tools/image-generation?formCollapsed=true'); // Navigate with collapsed form parameter
             },
             ariaLabel: "Open Image Generation Tool",
-            tooltip: "Go to Image Generation"
+            tooltip: "Go to Image Generation",
+            content: <Sparkles className="h-4 w-4" />
           }}
           paneIcon="gallery"
           paneTooltip="View generations gallery"
