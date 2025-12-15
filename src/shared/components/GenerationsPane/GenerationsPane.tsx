@@ -480,7 +480,7 @@ const GenerationsPaneComponent: React.FC = () => {
                           setMediaTypeFilterOpen(open);
                         }}
                       >
-                        <SelectTrigger variant="retro-dark" size="sm" colorScheme="zinc" className="w-[80px] h-8 text-xs">
+                        <SelectTrigger variant="retro-dark" size="sm" colorScheme="zinc" className="w-[80px] h-8 text-xs" hideIcon>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent variant="zinc" ref={mediaTypeContentRef}>

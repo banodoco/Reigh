@@ -3,7 +3,7 @@ import { Shot } from '../../../types/shots';
 import { useUpdateShotName, useDeleteShot, useDuplicateShot } from '../../../shared/hooks/useShots';
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
-import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2, Video, ChevronDown, ChevronUp, Target } from 'lucide-react';
+import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2, Video, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
@@ -432,17 +432,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                         : 'bg-background/90 hover:bg-background border'
                     }`}
                   >
-                    {isSelectedForAddition ? (
-                      <>
-                        <Check className="h-3 w-3 mr-1" />
-                        Selected
-                      </>
-                    ) : (
-                      <>
-                        <Target className="h-3 w-3 mr-1" />
-                        Select
-                      </>
-                    )}
+                    {isSelectedForAddition ? 'Selected' : 'Select'}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
