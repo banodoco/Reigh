@@ -445,41 +445,9 @@ export function useGenerationsPageLogic({
           timestamp: Date.now()
         });
       } else {
-        // Calculate the target frame BEFORE calling mutation (same as drag path)
-        // This lets us show the skeleton immediately
-        const currentCache = queryClient.getQueryData<any[]>(['all-shot-generations', targetShotId]) || [];
-        // NOTE: -1 is used as sentinel for unpositioned items in useTimelinePositionUtils
-        const positionedImages = currentCache.filter((img: any) => img.timeline_frame !== null && img.timeline_frame !== undefined && img.timeline_frame >= 0);
-        const maxFrame = positionedImages.length > 0 
-          ? Math.max(...positionedImages.map((g: any) => g.timeline_frame || 0)) 
-          : -60;
-        const calculatedFrame = maxFrame + 60;
-        
-        console.log('[PATH_COMPARE] 🔵 BUTTON PATH - calculated frame BEFORE mutation:', {
-          calculatedFrame,
-          maxFrame,
-          positionedImagesCount: positionedImages.length,
-          timestamp: Date.now()
-        });
-        
-        // Emit skeleton event BEFORE mutation (same timing as drag path)
-        if (typeof window !== 'undefined') {
-          const event = new CustomEvent('timeline:pending-add', {
-            detail: { 
-              frame: calculatedFrame,
-              shotId: targetShotId
-            }
-          });
-          console.log('[PATH_COMPARE] 🔵 BUTTON PATH - emitting skeleton event BEFORE mutation:', {
-            frame: calculatedFrame,
-            shotId: targetShotId?.substring(0, 8),
-            eventType: event.type,
-            eventDetail: event.detail,
-            timestamp: Date.now()
-          });
-          window.dispatchEvent(event);
-          console.log('[PATH_COMPARE] 🔵 BUTTON PATH - event dispatched');
-        }
+        // Let the mutation calculate the frame from the database (same as drag-drop path)
+        // This ensures correct positioning even when adding to a shot we're not currently viewing
+        // The mutation will query the DB for existing frames and append at the end
         
         console.log('[PATH_COMPARE] 🔵 BUTTON PATH - calling addImageToShotMutation.mutateAsync:', {
           shot_id: targetShotId?.substring(0, 8),
@@ -487,17 +455,16 @@ export function useGenerationsPageLogic({
           imageUrl: imageUrl?.substring(0, 60),
           thumbUrl: thumbUrl?.substring(0, 60),
           project_id: selectedProjectId?.substring(0, 8),
-          timelineFrame: calculatedFrame,
           timestamp: Date.now()
         });
         
-        // Use the regular add function - now with pre-calculated frame!
+        // Use the regular add function - let mutation calculate frame from DB
         const result = await addImageToShotMutation.mutateAsync({
           shot_id: targetShotId,
           generation_id: generationId,
           imageUrl: imageUrl,
           thumbUrl: thumbUrl,
-          timelineFrame: calculatedFrame, // Pass the pre-calculated frame
+          // Don't pass timelineFrame - let mutation query DB for correct position
           project_id: selectedProjectId,
         });
         

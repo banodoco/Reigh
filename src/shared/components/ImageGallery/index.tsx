@@ -395,12 +395,14 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     const handleSelectShotForAddition = (event: CustomEvent<{ shotId: string; shotName: string }>) => {
       const { shotId, shotName } = event.detail;
       console.log('[ImageGallery] Selecting shot for addition:', { shotId, shotName });
-      stateHook.setSelectedShotIdLocal(shotId);
+      // Use handleShotChange to update both selectedShotIdLocal AND lastAffectedShotId
+      // This ensures handleAddToShot will use the correct target shot
+      actionsHook.handleShotChange(shotId);
     };
 
     window.addEventListener('selectShotForAddition', handleSelectShotForAddition as EventListener);
     return () => window.removeEventListener('selectShotForAddition', handleSelectShotForAddition as EventListener);
-  }, [stateHook.setSelectedShotIdLocal]);
+  }, [actionsHook.handleShotChange]);
 
   // Create refs to store current values to avoid stale closures
   const navigationDataRef = useRef({
