@@ -264,8 +264,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               role="link"
               tabIndex={0}
               aria-label="Go to homepage"
-              onPointerUp={() => navigate(session ? "/tools" : "/")}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(session ? "/tools" : "/"); }}
+              onPointerUp={() => navigate("/")}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate("/"); }}
               className="group flex items-center space-x-4 relative p-2 -m-2 cursor-pointer z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-2xl"
             >
               <div className="relative">
@@ -432,8 +432,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 role="link"
                 tabIndex={0}
                 aria-label="Go to homepage"
-                onPointerUp={() => navigate(session ? "/tools" : "/")}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(session ? "/tools" : "/"); }}
+                onPointerUp={() => navigate("/")}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate("/"); }}
                 className="group relative cursor-pointer z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-xl"
               >
                 <div className="relative flex items-center space-x-2">

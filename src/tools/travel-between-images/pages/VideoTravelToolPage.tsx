@@ -1359,7 +1359,21 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
       return;
     }
 
-    const hashShotId = location.hash?.replace('#', '');
+    const hashShotId = location.hash?.replace('#', '') || '';
+
+    // URL is the source of truth:
+    // If we are on the tool root (no hash) but we still have a selected shot in state,
+    // it means something navigated here without clearing selection (e.g. clicking a top-left
+    // tool icon / nav item). Previously, the "sync hash to selection" logic below would
+    // immediately re-add `#<shotId>` via replaceState, making it appear like navigation failed.
+    //
+    // In this case, treat "no hash" as "back to shot list" and clear selection.
+    if (!hashShotId && selectedShot && !viaShotClick) {
+      setSelectedShot(null);
+      setCurrentShotId(null);
+      setShowVideosView(false);
+      return;
+    }
 
     // Init: Try to select shot from hash if not already selected
     if (hashShotId && selectedShot?.id !== hashShotId) {
@@ -1401,7 +1415,19 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         window.history.replaceState(null, '', basePath);
       }
     }
-  }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash, navigate, shotFromState]);
+  }, [
+    isLoading,
+    shots,
+    selectedShot,
+    viaShotClick,
+    location.pathname,
+    location.search,
+    location.hash,
+    navigate,
+    shotFromState,
+    setCurrentShotId,
+    setShowVideosView,
+  ]);
 
   // If we have a hashShotId but shots have loaded and shot doesn't exist, redirect
   // Moved here to be before early returns
