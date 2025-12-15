@@ -72,6 +72,19 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   debugContext = 'MediaDisplay'
 }) => {
   const [imageLoadError, setImageLoadError] = React.useState(false);
+  // Progressive loading: show thumbnail first, then swap to full image when loaded
+  const [fullImageLoaded, setFullImageLoaded] = React.useState(() => {
+    // If there's no thumbnail (or thumb equals full), we can render full immediately.
+    if (!thumbUrl || thumbUrl === effectiveImageUrl) return true;
+    // If the full image is already in the browser cache, skip the thumb flash.
+    try {
+      const img = new Image();
+      img.src = effectiveImageUrl;
+      return img.complete;
+    } catch {
+      return false;
+    }
+  });
   
   // Track component lifecycle
   React.useEffect(() => {
@@ -81,14 +94,32 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
     };
   }, [debugContext]);
   
-  // Reset error state when URL changes
-  React.useEffect(() => {
+  // Reset error/loading state when URL changes, and try to skip the thumbnail
+  // if the full image is already cached (prevents "small thumb then normal size" flash).
+  React.useLayoutEffect(() => {
     console.log(`[${debugContext}] 🔄 ========== URL CHANGED ==========`);
     console.log(`[${debugContext}] newUrl:`, effectiveImageUrl);
     console.log(`[${debugContext}] hasUrl:`, !!effectiveImageUrl);
     console.log(`[${debugContext}] ========================================`);
     setImageLoadError(false);
-  }, [effectiveImageUrl, debugContext]);
+    if (!thumbUrl || thumbUrl === effectiveImageUrl) {
+      setFullImageLoaded(true);
+      return;
+    }
+
+    try {
+      const img = new Image();
+      img.src = effectiveImageUrl;
+      if (img.complete) {
+        setFullImageLoaded(true);
+        onImageLoad?.({ width: img.naturalWidth, height: img.naturalHeight });
+      } else {
+        setFullImageLoaded(false);
+      }
+    } catch {
+      setFullImageLoaded(false);
+    }
+  }, [effectiveImageUrl, thumbUrl, debugContext, onImageLoad]);
   
   // Variant-specific styling
   const getMediaStyle = () => {
@@ -162,7 +193,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   return (
     <div 
       ref={imageContainerRef} 
-      className={`relative flex items-center justify-center ${containerClassName}`}
+      className={`relative flex items-center justify-center w-full h-full ${containerClassName}`}
       style={{ 
         touchAction: 'none',
         // Checkered pattern background for reposition mode
@@ -196,14 +227,15 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
           playbackEnd={playbackEnd}
         />
       ) : (
-        // Image with Canvas Overlays
+        // Image with Canvas Overlays - Progressive loading: thumbnail first, then full image
         <>
+          {/* Use thumbnail or full image based on loading state */}
           <img 
-            src={effectiveImageUrl} 
+            src={thumbUrl && thumbUrl !== effectiveImageUrl && !fullImageLoaded ? thumbUrl : effectiveImageUrl} 
             alt="Media content"
             draggable={false}
             className={`
-              object-contain select-none
+              w-full h-full object-contain select-none
               ${variant === 'regular-centered' ? 'max-w-full max-h-full rounded' : ''}
               ${isFlippedHorizontally ? 'scale-x-[-1]' : ''}
               ${isSaving ? 'opacity-30' : 'opacity-100'}
@@ -225,15 +257,21 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
             }}
             onLoad={(e) => {
               const img = e.target as HTMLImageElement;
-              console.log(`[${debugContext}] ✅ Image loaded successfully:`, {
-                url: effectiveImageUrl.substring(0, 100),
-                width: img.naturalWidth,
-                height: img.naturalHeight
-              });
-              onImageLoad?.({
-                width: img.naturalWidth,
-                height: img.naturalHeight
-              });
+              // Only call onImageLoad when the full image (not thumbnail) loads
+              if (img.src === effectiveImageUrl || !thumbUrl || thumbUrl === effectiveImageUrl) {
+                console.log(`[${debugContext}] ✅ Full image loaded successfully:`, {
+                  url: effectiveImageUrl.substring(0, 100),
+                  width: img.naturalWidth,
+                  height: img.naturalHeight
+                });
+                setFullImageLoaded(true);
+                onImageLoad?.({
+                  width: img.naturalWidth,
+                  height: img.naturalHeight
+                });
+              } else {
+                console.log(`[${debugContext}] 🖼️ Thumbnail loaded, preloading full image...`);
+              }
             }}
             onError={(e) => {
               console.error(`[${debugContext}] ❌ Image load error:`, {
@@ -243,6 +281,28 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
               setImageLoadError(true);
             }}
           />
+          
+          {/* Preload full image in background when showing thumbnail */}
+          {thumbUrl && thumbUrl !== effectiveImageUrl && !fullImageLoaded && (
+            <img 
+              src={effectiveImageUrl}
+              alt=""
+              className="hidden"
+              onLoad={(e) => {
+                const img = e.target as HTMLImageElement;
+                console.log(`[${debugContext}] ✅ Full image preloaded, swapping...`);
+                setFullImageLoaded(true);
+                onImageLoad?.({
+                  width: img.naturalWidth,
+                  height: img.naturalHeight
+                });
+              }}
+              onError={() => {
+                console.error(`[${debugContext}] ❌ Full image preload failed`);
+                // Still try to show thumbnail
+              }}
+            />
+          )}
 
           {/* Original Image Bounds Outline - Shows the canvas boundary in reposition mode */}
           {isRepositionMode && (

@@ -10,6 +10,7 @@ import { Upload, Film, X, Play, Plus, GripVertical, Trash2 } from 'lucide-react'
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { storagePaths, getFileExtension, generateUniqueFilename, MEDIA_BUCKET } from '@/shared/lib/storagePaths';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { JoinClipsSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
@@ -958,25 +959,33 @@ const JoinClipsPage: React.FC = () => {
         durationPromise
       ]);
       
-      const fileExt = file.name.split('.').pop() || 'mp4';
+      // Get userId for storage path
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+      const userId = session.user.id;
+
+      // Generate storage paths using centralized utilities
+      const fileExt = getFileExtension(file.name, file.type, 'mp4');
       const timestamp = Date.now();
       const randomId = Math.random().toString(36).substring(7);
-      const fileName = `join-clips/${selectedProjectId}/${timestamp}-${clipId}-${randomId}.${fileExt}`;
-      const posterFileName = `join-clips/${selectedProjectId}/${timestamp}-${clipId}-${randomId}-poster.jpg`;
-      const finalFrameFileName = `join-clips/${selectedProjectId}/${timestamp}-${clipId}-${randomId}-final.jpg`;
+      const fileName = storagePaths.upload(userId, `${timestamp}-${clipId}-${randomId}.${fileExt}`);
+      const posterFileName = storagePaths.thumbnail(userId, `${timestamp}-${clipId}-${randomId}-poster.jpg`);
+      const finalFrameFileName = storagePaths.thumbnail(userId, `${timestamp}-${clipId}-${randomId}-final.jpg`);
       
       // Upload video and both frames in parallel
       const [videoUpload, posterUpload, finalFrameUpload] = await Promise.all([
-        supabase.storage.from('image_uploads').upload(fileName, file, {
+        supabase.storage.from(MEDIA_BUCKET).upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
         }),
-        supabase.storage.from('image_uploads').upload(posterFileName, posterBlob, {
+        supabase.storage.from(MEDIA_BUCKET).upload(posterFileName, posterBlob, {
           cacheControl: '3600',
           upsert: false,
           contentType: 'image/jpeg'
         }),
-        supabase.storage.from('image_uploads').upload(finalFrameFileName, finalFrameBlob, {
+        supabase.storage.from(MEDIA_BUCKET).upload(finalFrameFileName, finalFrameBlob, {
           cacheControl: '3600',
           upsert: false,
           contentType: 'image/jpeg'
@@ -988,15 +997,15 @@ const JoinClipsPage: React.FC = () => {
       if (finalFrameUpload.error) throw finalFrameUpload.error;
       
       const { data: { publicUrl: videoUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(fileName);
         
       const { data: { publicUrl: posterUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(posterFileName);
         
       const { data: { publicUrl: finalFrameUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(finalFrameFileName);
       
       toast({

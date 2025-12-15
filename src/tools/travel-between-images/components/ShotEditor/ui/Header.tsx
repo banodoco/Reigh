@@ -144,7 +144,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
             variant="outline" 
             size="sm" 
             onClick={onBack}
-            className="flex items-center justify-center gap-1 border-2 w-full"
+            className="flex items-center justify-center gap-1 border-2 border-[#6a8a8a]/30 dark:border-[#6a7a7a] w-full"
             title="Back to shots"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -263,7 +263,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
                 variant="outline" 
                 size="sm" 
                 onClick={onBack}
-                className="flex items-center justify-center border-2 w-full px-0 text-[10px]"
+                className="flex items-center justify-center border-2 border-[#6a8a8a]/30 dark:border-[#6a7a7a] w-full px-0 text-[10px]"
                 title="Back to shots"
               >
                 <ArrowLeft className="h-2.5 w-2.5" />

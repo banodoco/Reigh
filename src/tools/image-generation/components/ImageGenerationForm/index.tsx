@@ -23,6 +23,7 @@ import { processStyleReferenceForAspectRatioString } from "@/shared/lib/styleRef
 import { resolveProjectResolution } from "@/shared/lib/taskCreation";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
 import { generateClientThumbnail } from "@/shared/lib/clientThumbnailGenerator";
+import { storagePaths, generateThumbnailFilename, MEDIA_BUCKET } from "@/shared/lib/storagePaths";
 import { nanoid } from 'nanoid';
 import { supabase } from "@/integrations/supabase/client";
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
@@ -75,6 +76,11 @@ interface ImageGenerationFormProps {
    * Called when the associated shot selection changes in the form
    */
   onShotChange?: (shotId: string | null) => void;
+  /**
+   * When true, the generate controls will be rendered with sticky positioning
+   * at the bottom of the scroll container (for modal contexts)
+   */
+  stickyFooter?: boolean;
 }
 
 interface LoraDataEntry {
@@ -105,6 +111,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   openaiApiKey,
   justQueued = false,
   onShotChange,
+  stickyFooter = false,
 }, ref) => {
   
   // Debug logging for callback prop
@@ -1098,14 +1105,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           size: thumbnailResult.thumbnailBlob.size
         });
         
-        // Upload thumbnail to storage
-        const timestamp = Date.now();
-        const randomString = Math.random().toString(36).substring(2, 10);
-        const thumbnailFilename = `thumb_${timestamp}_${randomString}.jpg`;
-        const thumbnailPath = `files/thumbnails/${thumbnailFilename}`;
+        // Upload thumbnail to storage using centralized path utilities
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) {
+          throw new Error('User not authenticated');
+        }
+        const thumbnailFilename = generateThumbnailFilename();
+        const thumbnailPath = storagePaths.thumbnail(session.user.id, thumbnailFilename);
         
         const { data: thumbnailUploadData, error: thumbnailUploadError } = await supabase.storage
-          .from('image_uploads')
+          .from(MEDIA_BUCKET)
           .upload(thumbnailPath, thumbnailResult.thumbnailBlob, {
             contentType: 'image/jpeg',
             upsert: true
@@ -1117,7 +1126,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           thumbnailUrl = originalUploadedUrl;
         } else {
           const { data: thumbnailUrlData } = supabase.storage
-            .from('image_uploads')
+            .from(MEDIA_BUCKET)
             .getPublicUrl(thumbnailPath);
           thumbnailUrl = thumbnailUrlData.publicUrl;
           console.log('[ThumbnailDebug] Thumbnail uploaded successfully:', thumbnailUrl);
@@ -2491,7 +2500,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Main Content Layout */}
-        <div className="flex gap-6 flex-col md:flex-row">
+        <div className="flex gap-6 flex-col md:flex-row pb-4">
           {/* Left Column - Prompts and Shot Selector */}
           <div className="flex-1 space-y-6">
             <PromptsSection
@@ -2592,20 +2601,22 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           />
         </div>
 
-        <GenerateControls
-          imagesPerPrompt={imagesPerPrompt}
-          onChangeImagesPerPrompt={handleSliderChange(setImagesPerPrompt)}
-          actionablePromptsCount={actionablePromptsCount}
-          isGenerating={isGenerating || isGeneratingAutomatedPrompts}
-          hasApiKey={hasApiKey}
-          justQueued={justQueued}
-          steps={steps}
-          onChangeSteps={setSteps}
-          showStepsDropdown={isLocalGenerationEnabled}
-          promptMode={promptMode}
-          onUseExistingPrompts={handleUseExistingPrompts}
-          onNewPromptsLikeExisting={handleNewPromptsLikeExisting}
-        />
+        <div className={stickyFooter ? "sticky bottom-0 z-50 !mt-0 -mx-6 px-6 py-3 bg-background border-t border-zinc-700" : ""}>
+          <GenerateControls
+            imagesPerPrompt={imagesPerPrompt}
+            onChangeImagesPerPrompt={handleSliderChange(setImagesPerPrompt)}
+            actionablePromptsCount={actionablePromptsCount}
+            isGenerating={isGenerating || isGeneratingAutomatedPrompts}
+            hasApiKey={hasApiKey}
+            justQueued={justQueued}
+            steps={steps}
+            onChangeSteps={setSteps}
+            showStepsDropdown={isLocalGenerationEnabled}
+            promptMode={promptMode}
+            onUseExistingPrompts={handleUseExistingPrompts}
+            onNewPromptsLikeExisting={handleNewPromptsLikeExisting}
+          />
+        </div>
       </form>
 
       <Suspense fallback={<div className="sr-only">Loading...</div>}>

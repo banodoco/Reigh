@@ -82,6 +82,7 @@ export const useVideoTravelHeader = ({
                   value={shotSearchQuery}
                   onChange={(e) => onSearchQueryChange(e.target.value)}
                   className="bg-transparent border-none outline-none text-base flex-1"
+                  style={{ fontSize: '16px' }} // Prevents iOS auto-zoom on focus
                 />
                 {shotSearchQuery && (
                   <Button
@@ -101,7 +102,7 @@ export const useVideoTravelHeader = ({
                   onClick={() => onSortModeChange('ordered')}
                   className={`text-sm px-3 py-1 rounded-md transition-colors ${
                     shotSortMode === 'ordered' 
-                      ? 'bg-primary text-primary-foreground' 
+                      ? 'bg-foreground/20 text-foreground font-medium' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
                 >
@@ -111,7 +112,7 @@ export const useVideoTravelHeader = ({
                   onClick={() => onSortModeChange('newest')}
                   className={`text-sm px-3 py-1 rounded-md transition-colors ${
                     shotSortMode === 'newest' 
-                      ? 'bg-primary text-primary-foreground' 
+                      ? 'bg-foreground/20 text-foreground font-medium' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
                 >
@@ -121,7 +122,7 @@ export const useVideoTravelHeader = ({
                   onClick={() => onSortModeChange('oldest')}
                   className={`text-sm px-3 py-1 rounded-md transition-colors ${
                     shotSortMode === 'oldest' 
-                      ? 'bg-primary text-primary-foreground' 
+                      ? 'bg-foreground/20 text-foreground font-medium' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
                 >

@@ -298,6 +298,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
         <DialogContent
           className={`${modal.className} gap-2 overflow-hidden flex flex-col`}
           style={{ ...modal.style, maxWidth: '1000px', width: 'calc(100vw - 2rem)' }}
+          onPointerDownOutside={() => onClose()}
+          onInteractOutside={() => onClose()}
           {...modal.props}
         >
           <DialogHeader className={modal.headerClass}>

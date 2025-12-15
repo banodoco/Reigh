@@ -24,6 +24,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { storagePaths, MEDIA_BUCKET } from '../_shared/storagePaths.ts';
 
 declare const Deno: {
   env: {
@@ -181,6 +182,7 @@ async function downloadVideo(url: string): Promise<ArrayBuffer> {
 
 /**
  * Upload video to Supabase Storage
+ * Note: projectId param kept for backwards compatibility but no longer used in path
  */
 async function uploadToStorage(
   supabase: ReturnType<typeof createClient>,
@@ -189,18 +191,19 @@ async function uploadToStorage(
   projectId: string,
   contentType: string = 'video/mp4'
 ): Promise<string> {
+  // Generate storage path using centralized utilities
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8);
   const extension = contentType.includes('mp4') ? 'mp4' : 'webm';
   const filename = `trimmed_${timestamp}_${randomStr}.${extension}`;
-  const storagePath = `${userId}/${projectId}/trimmed/${filename}`;
+  const uploadPath = storagePaths.upload(userId, filename);
 
-  console.log(`[TRIM-VIDEO] Uploading to storage: ${storagePath}`);
+  console.log(`[TRIM-VIDEO] Uploading to storage: ${uploadPath}`);
   console.log(`[TRIM-VIDEO] Size: ${(videoBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
 
   const { error } = await supabase.storage
-    .from('image_uploads')
-    .upload(storagePath, videoBuffer, {
+    .from(MEDIA_BUCKET)
+    .upload(uploadPath, videoBuffer, {
       contentType,
       upsert: true,
     });
@@ -210,8 +213,8 @@ async function uploadToStorage(
   }
 
   const { data: urlData } = supabase.storage
-    .from('image_uploads')
-    .getPublicUrl(storagePath);
+    .from(MEDIA_BUCKET)
+    .getPublicUrl(uploadPath);
 
   console.log(`[TRIM-VIDEO] Uploaded: ${urlData.publicUrl}`);
   return urlData.publicUrl;

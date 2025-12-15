@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { SUPABASE_URL } from "@/integrations/supabase/config/env";
+import { storagePaths, getFileExtension, generateUniqueFilename, MEDIA_BUCKET } from "./storagePaths";
 
 /**
  * Helper function to wait for a specified amount of time
@@ -19,13 +20,17 @@ export const uploadImageToStorage = async (
     throw new Error("No file provided");
   }
 
-  const BUCKET_NAME = 'image_uploads';
+  // Get current user ID for storage path organization
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated');
+  }
+  const userId = session.user.id;
 
-  // Generate a unique filename to avoid collisions
-  const timestamp = Date.now();
-  const randomString = Math.random().toString(36).substring(2, 10);
-  const fileExtension = file.name.split('.').pop();
-  const filePath = `files/${timestamp}-${randomString}.${fileExtension}`;
+  // Generate storage path using centralized utilities
+  const fileExtension = getFileExtension(file.name, file.type);
+  const filename = generateUniqueFilename(fileExtension);
+  const filePath = storagePaths.upload(userId, filename);
 
   // Add debug logging for large file uploads
   const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
@@ -44,12 +49,7 @@ export const uploadImageToStorage = async (
       // Use XHR for progress tracking if callback is provided
       if (onProgress) {
         try {
-          const { data: session } = await supabase.auth.getSession();
-          if (!session?.session?.access_token) {
-            throw new Error('No active session');
-          }
-          
-          const bucketUrl = `${SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${filePath}`;
+          const bucketUrl = `${SUPABASE_URL}/storage/v1/object/${MEDIA_BUCKET}/${filePath}`;
           
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
@@ -74,7 +74,7 @@ export const uploadImageToStorage = async (
             xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
             
             xhr.open('POST', bucketUrl);
-            xhr.setRequestHeader('Authorization', `Bearer ${session.session.access_token}`);
+            xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
             xhr.setRequestHeader('Content-Type', file.type);
             xhr.setRequestHeader('Cache-Control', '3600');
             
@@ -90,7 +90,7 @@ export const uploadImageToStorage = async (
       } else {
         // Fallback to Supabase client (no progress tracking)
         const result = await supabase.storage
-          .from(BUCKET_NAME)
+          .from(MEDIA_BUCKET)
           .upload(filePath, file, {
             contentType: file.type,
             cacheControl: '3600',
@@ -142,7 +142,7 @@ export const uploadImageToStorage = async (
       // Retrieve the public URL for the newly-uploaded object
       const {
         data: { publicUrl },
-      } = supabase.storage.from(BUCKET_NAME).getPublicUrl(data.path);
+      } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(data.path);
 
       if (!publicUrl) {
         console.error(`[ImageUploadDebug] Failed to get public URL for ${file.name}, path: ${data.path}`);

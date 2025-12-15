@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { SUPABASE_URL } from "@/integrations/supabase/config/env";
+import { storagePaths, getFileExtension, generateUniqueFilename, MEDIA_BUCKET } from "./storagePaths";
 
 export interface VideoMetadata {
   duration_seconds: number;
@@ -88,6 +89,9 @@ export const extractVideoMetadataFromUrl = async (videoUrl: string): Promise<Vid
 /**
  * Uploads a video file to Supabase storage with real progress tracking.
  * Uses XMLHttpRequest to track actual upload progress.
+ * 
+ * Note: projectId and shotId params are kept for backwards compatibility but
+ * are no longer used in the storage path (tracked in DB instead).
  */
 export const uploadVideoToStorage = async (
   file: File,
@@ -96,8 +100,17 @@ export const uploadVideoToStorage = async (
   onProgress?: (progress: number) => void,
   maxRetries: number = 3
 ): Promise<string> => {
-  const fileExt = file.name.split('.').pop() || 'mp4';
-  const fileName = `guidance-videos/${projectId}/${shotId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+  // Get session for auth and user ID
+  const { data: session } = await supabase.auth.getSession();
+  if (!session?.session?.access_token || !session?.session?.user?.id) {
+    throw new Error('No active session');
+  }
+  const userId = session.session.user.id;
+  
+  // Generate storage path using centralized utilities
+  const fileExt = getFileExtension(file.name, file.type, 'mp4');
+  const filename = generateUniqueFilename(fileExt);
+  const fileName = storagePaths.upload(userId, filename);
   
   let lastError: Error | null = null;
   
@@ -105,13 +118,7 @@ export const uploadVideoToStorage = async (
     try {
       console.log(`[videoUploader] Upload attempt ${attempt + 1}/${maxRetries}:`, fileName);
       
-      // Get upload URL from Supabase
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.access_token) {
-        throw new Error('No active session');
-      }
-      
-      const bucketUrl = `${SUPABASE_URL}/storage/v1/object/image_uploads/${fileName}`;
+      const bucketUrl = `${SUPABASE_URL}/storage/v1/object/${MEDIA_BUCKET}/${fileName}`;
       
       // Upload with XMLHttpRequest to track progress
       await new Promise<void>((resolve, reject) => {
@@ -144,7 +151,7 @@ export const uploadVideoToStorage = async (
         });
         
         xhr.open('POST', bucketUrl);
-        xhr.setRequestHeader('Authorization', `Bearer ${session.session.access_token}`);
+        xhr.setRequestHeader('Authorization', `Bearer ${session.session!.access_token}`);
         xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
         xhr.setRequestHeader('Cache-Control', '3600');
         
@@ -153,7 +160,7 @@ export const uploadVideoToStorage = async (
       
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(fileName);
       
       console.log('[videoUploader] Upload successful:', publicUrl);

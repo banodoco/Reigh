@@ -56,12 +56,12 @@ const PairRegion: React.FC<PairRegionProps> = ({
   hidePairLabel = false,
 }) => {
   const pairColorSchemes = [
-    { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-300 dark:border-blue-700', context: 'bg-blue-200/60 dark:bg-blue-800/40', text: 'text-blue-700 dark:text-blue-300', line: 'bg-blue-400 dark:bg-blue-600' },
-    { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-300 dark:border-emerald-700', context: 'bg-emerald-200/60 dark:bg-emerald-800/40', text: 'text-emerald-700 dark:text-emerald-300', line: 'bg-emerald-400 dark:bg-emerald-600' },
-    { bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-300 dark:border-purple-700', context: 'bg-purple-200/60 dark:bg-purple-800/40', text: 'text-purple-700 dark:text-purple-300', line: 'bg-purple-400 dark:bg-purple-600' },
-    { bg: 'bg-orange-50 dark:bg-orange-950/40', border: 'border-orange-300 dark:border-orange-700', context: 'bg-orange-200/60 dark:bg-orange-800/40', text: 'text-orange-700 dark:text-orange-300', line: 'bg-orange-400 dark:bg-orange-600' },
-    { bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-300 dark:border-rose-700', context: 'bg-rose-200/60 dark:bg-rose-800/40', text: 'text-rose-700 dark:text-rose-300', line: 'bg-rose-400 dark:bg-rose-600' },
-    { bg: 'bg-teal-50 dark:bg-teal-950/40', border: 'border-teal-300 dark:border-teal-700', context: 'bg-teal-200/60 dark:bg-teal-800/40', text: 'text-teal-700 dark:text-teal-300', line: 'bg-teal-400 dark:bg-teal-600' },
+    { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-300 dark:border-blue-700', context: 'bg-blue-200/60 dark:bg-blue-800/40', text: 'text-blue-700 dark:text-blue-200', line: 'bg-blue-400 dark:bg-blue-600' },
+    { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-300 dark:border-emerald-700', context: 'bg-emerald-200/60 dark:bg-emerald-800/40', text: 'text-emerald-700 dark:text-emerald-200', line: 'bg-emerald-400 dark:bg-emerald-600' },
+    { bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-300 dark:border-purple-700', context: 'bg-purple-200/60 dark:bg-purple-800/40', text: 'text-purple-700 dark:text-purple-200', line: 'bg-purple-400 dark:bg-purple-600' },
+    { bg: 'bg-orange-50 dark:bg-orange-950/40', border: 'border-orange-300 dark:border-orange-700', context: 'bg-orange-200/60 dark:bg-orange-800/40', text: 'text-orange-700 dark:text-orange-200', line: 'bg-orange-400 dark:bg-orange-600' },
+    { bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-300 dark:border-rose-700', context: 'bg-rose-200/60 dark:bg-rose-800/40', text: 'text-rose-700 dark:text-rose-200', line: 'bg-rose-400 dark:bg-rose-600' },
+    { bg: 'bg-teal-50 dark:bg-teal-950/40', border: 'border-teal-300 dark:border-teal-700', context: 'bg-teal-200/60 dark:bg-teal-800/40', text: 'text-teal-700 dark:text-teal-200', line: 'bg-teal-400 dark:bg-teal-600' },
   ];
   const colorScheme = pairColorSchemes[index % pairColorSchemes.length];
 

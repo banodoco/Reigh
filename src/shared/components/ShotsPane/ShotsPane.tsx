@@ -288,6 +288,9 @@ const ShotsPaneComponent: React.FC = () => {
   
   // Show the button if we're NOT on the travel page, OR if we're on the travel page but viewing a specific shot
   const shouldShowTravelButton = !isOnTravelBetweenImagesPage || isViewingSpecificShot;
+  
+  // Hide the entire shots pane toggle on the shot list view (no hash), but show when viewing a specific shot
+  const shouldHideShotsPane = isOnTravelBetweenImagesPage && !isViewingSpecificShot;
 
   const {
     isGenerationsPaneLocked,
@@ -319,6 +322,19 @@ const ShotsPaneComponent: React.FC = () => {
       setIsPointerEventsEnabled(false);
     }
   }, [isOpen]);
+
+  // Close and hide the pane when navigating to the travel-between-images shot list page
+  useEffect(() => {
+    if (shouldHideShotsPane && (isOpen || isLocked)) {
+      // Force close the pane immediately by unlocking it
+      setIsShotsPaneLocked(false);
+    }
+  }, [shouldHideShotsPane, isOpen, isLocked, setIsShotsPaneLocked]);
+  
+  // Completely hide the pane on shot list page
+  if (shouldHideShotsPane) {
+    return null;
+  }
 
   const handleCreateShot = async (shotName: string, files: File[], aspectRatio: string | null) => {
     // DEBUG ALERT - REMOVE BEFORE PRODUCTION
@@ -438,24 +454,27 @@ const ShotsPaneComponent: React.FC = () => {
 
   return (
     <>
-      <PaneControlTab
-        side="left"
-        isLocked={isLocked}
-        isOpen={isOpen}
-        toggleLock={toggleLock}
-        openPane={openPane}
-        paneDimension={shotsPaneWidth}
-        bottomOffset={useBottomOffset()}
-        handlePaneEnter={handlePaneEnter}
-        handlePaneLeave={handlePaneLeave}
-        thirdButton={shouldShowTravelButton ? {
-          onClick: () => {
-            setIsShotsPaneLocked(false); // Unlock and close the pane immediately
-            navigateToShotEditor({ closeMobilePanes: true });
-          },
-          ariaLabel: "Open Travel Between Images tool"
-        } : undefined}
-      />
+      {/* Hide the shots pane toggle on the travel-between-images shot list page */}
+      {!shouldHideShotsPane && (
+        <PaneControlTab
+          side="left"
+          isLocked={isLocked}
+          isOpen={isOpen}
+          toggleLock={toggleLock}
+          openPane={openPane}
+          paneDimension={shotsPaneWidth}
+          bottomOffset={useBottomOffset()}
+          handlePaneEnter={handlePaneEnter}
+          handlePaneLeave={handlePaneLeave}
+          thirdButton={shouldShowTravelButton ? {
+            onClick: () => {
+              setIsShotsPaneLocked(false); // Unlock and close the pane immediately
+              navigateToShotEditor({ closeMobilePanes: true });
+            },
+            ariaLabel: "Open Travel Between Images tool"
+          } : undefined}
+        />
+      )}
       <div
         className="pointer-events-none"
         style={{

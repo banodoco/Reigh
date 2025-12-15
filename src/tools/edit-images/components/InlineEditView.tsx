@@ -243,7 +243,7 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
             >
                <MediaDisplayWithCanvas
                  effectiveImageUrl={effectiveImageUrl}
-                 thumbUrl={media.thumbUrl}
+                 thumbUrl={(media as any).thumbnail_url || media.thumbUrl}
                  isVideo={isVideo}
                  isFlippedHorizontally={isFlippedHorizontally}
                  isSaving={isSaving}
@@ -428,7 +428,7 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
           >
             <MediaDisplayWithCanvas
               effectiveImageUrl={effectiveImageUrl}
-              thumbUrl={media.thumbUrl}
+              thumbUrl={(media as any).thumbnail_url || media.thumbUrl}
               isVideo={isVideo}
               isFlippedHorizontally={isFlippedHorizontally}
               isSaving={isSaving}

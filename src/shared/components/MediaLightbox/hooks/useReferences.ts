@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { GenerationRow } from '@/types/shots';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { generateClientThumbnail } from '@/shared/lib/clientThumbnailGenerator';
+import { storagePaths, generateThumbnailFilename, MEDIA_BUCKET } from '@/shared/lib/storagePaths';
 import { processStyleReferenceForAspectRatioString } from '@/shared/lib/styleReferenceProcessor';
 import { resolveProjectResolution } from '@/shared/lib/taskCreation';
 import { dataURLtoFile } from '@/shared/lib/utils';
@@ -96,14 +97,16 @@ export const useReferences = ({
           size: thumbnailResult.thumbnailBlob.size
         });
         
-        // Upload thumbnail to storage
-        const timestamp = Date.now();
-        const randomString = Math.random().toString(36).substring(2, 10);
-        const thumbnailFilename = `thumb_${timestamp}_${randomString}.jpg`;
-        const thumbnailPath = `files/thumbnails/${thumbnailFilename}`;
+        // Upload thumbnail to storage using centralized path utilities
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) {
+          throw new Error('User not authenticated');
+        }
+        const thumbnailFilename = generateThumbnailFilename();
+        const thumbnailPath = storagePaths.thumbnail(session.user.id, thumbnailFilename);
         
         const { data: thumbnailUploadData, error: thumbnailUploadError } = await supabase.storage
-          .from('image_uploads')
+          .from(MEDIA_BUCKET)
           .upload(thumbnailPath, thumbnailResult.thumbnailBlob, {
             contentType: 'image/jpeg',
             upsert: true
@@ -115,7 +118,7 @@ export const useReferences = ({
           thumbnailUrl = originalUploadedUrl;
         } else {
           const { data: thumbnailUrlData } = supabase.storage
-            .from('image_uploads')
+            .from(MEDIA_BUCKET)
             .getPublicUrl(thumbnailPath);
           thumbnailUrl = thumbnailUrlData.publicUrl;
           console.log('[AddToReferences] Thumbnail uploaded successfully:', thumbnailUrl);

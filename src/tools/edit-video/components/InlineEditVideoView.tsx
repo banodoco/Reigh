@@ -91,6 +91,10 @@ export function InlineEditVideoView({
   const [videoFps, setVideoFps] = useState<number | null>(null);
   const [fpsDetectionStatus, setFpsDetectionStatus] = useState<'pending' | 'detecting' | 'detected' | 'fallback'>('pending');
   
+  // Progressive loading: show thumbnail first, then video when ready
+  const [videoReady, setVideoReady] = useState(false);
+  const thumbnailUrl = (media as any).thumbnail_url || (media as any).thumbUrl;
+  
   // Multiple portion selections - start at 10%-20% of video
   // Each selection can have its own gapFrameCount and prompt
   // Initialize from saved segments if provided, otherwise default to empty selection
@@ -170,6 +174,9 @@ export function InlineEditVideoView({
     if (videoRef.current) {
       // Ensure video is paused immediately
       videoRef.current.pause();
+      
+      // Mark video as ready to show (hide thumbnail)
+      setVideoReady(true);
       
       const duration = videoRef.current.duration;
       if (Number.isFinite(duration) && duration > 0) {
@@ -662,21 +669,38 @@ export function InlineEditVideoView({
             "relative flex items-center justify-center bg-zinc-900 overflow-hidden",
             useStackedLayout ? "w-full" : "flex-shrink rounded-t-lg"
           )}>
-            {/* Video Player */}
+            {/* Video Player with progressive loading - thumbnail first, then video */}
             <div className={cn(
-              "w-full flex items-center justify-center",
+              "w-full flex items-center justify-center relative",
               useStackedLayout 
                 ? isTablet 
                   ? "p-2 pt-12 max-h-[35vh]" // Constrained height on iPad/tablet
                   : "p-2 pt-20 aspect-video" // Mobile
                 : "p-4 pt-24" // Desktop
             )}>
+              {/* Thumbnail shown while video loads */}
+              {thumbnailUrl && !videoReady && (
+                <img
+                  src={thumbnailUrl}
+                  alt="Video thumbnail"
+                  className={cn(
+                    "max-w-full object-contain rounded-lg",
+                    useStackedLayout 
+                      ? isTablet
+                        ? "max-h-[30vh]"
+                        : "max-h-full"
+                      : "max-h-[40vh]"
+                  )}
+                />
+              )}
+              
+              {/* Video element - hidden until ready if thumbnail is showing */}
               <video
                 ref={videoRef}
                 src={videoUrl}
                 controls={false} // Hide controls
                 playsInline // Prevents fullscreen on iOS when video plays
-                poster={(media as any).thumbnail_url || media.thumbUrl || undefined} // Show thumbnail instead of play button
+                poster={thumbnailUrl} // Fallback poster
                 className={cn(
                   "max-w-full object-contain rounded-lg",
                   "[&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden",
@@ -684,7 +708,9 @@ export function InlineEditVideoView({
                     ? isTablet
                       ? "max-h-[30vh] cursor-pointer" // Smaller on tablet
                       : "max-h-full cursor-pointer"
-                    : "max-h-[40vh]" // Slightly smaller than original to accommodate buffer
+                    : "max-h-[40vh]", // Slightly smaller than original to accommodate buffer
+                  // Hide video until ready if we have a thumbnail showing
+                  thumbnailUrl && !videoReady ? "absolute opacity-0 pointer-events-none" : ""
                 )}
                 style={{
                   // Additional CSS to hide native controls overlay

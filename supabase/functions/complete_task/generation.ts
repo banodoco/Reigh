@@ -630,21 +630,24 @@ export async function createGenerationFromTask(
           if (orchDetails && !isNaN(childOrder)) {
             console.log(`[GenMigration] Extracting specific params for child segment ${childOrder}`);
 
-            // SPECIAL CASE: For travel orchestrators with only 1 segment, the segment IS the final output
-            if (childOrder === 0) {
-              const numSegments = orchDetails.num_new_segments_to_generate;
-              if (numSegments === 1 && parentGenerationId) {
-                console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent`);
-                const result = await createVariantOnParent(
-                  supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
-                  'travel_segment', { tool_type: 'travel-between-images', created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true }
-                );
-                if (result) {
-                  await supabase.from('tasks').update({ generation_created: true }).eq('id', orchestratorTaskId);
-                  return result;
-                }
-              }
+          // SPECIAL CASE: For travel orchestrators with only 1 segment, the segment IS the final output
+          // We create a variant on parent to update parent.location, but DON'T return early
+          // The child generation is still needed for consistency (variant selector, segment management, etc.)
+          if (childOrder === 0) {
+            const numSegments = orchDetails.num_new_segments_to_generate;
+            if (numSegments === 1 && parentGenerationId) {
+              console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent AND child generation`);
+              // Create variant on parent to update parent.location immediately
+              // Note: We don't return early - child generation will be created below
+              await createVariantOnParent(
+                supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
+                'travel_segment', { tool_type: 'travel-between-images', created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true }
+              );
+              // Mark orchestrator task as having created a generation
+              await supabase.from('tasks').update({ generation_created: true }).eq('id', orchestratorTaskId);
+              // Continue to create child generation below (don't return early)
             }
+          }
 
             // Extract segment-specific params from expanded arrays
             taskData.params = extractSegmentSpecificParams(taskData.params, orchDetails, childOrder);

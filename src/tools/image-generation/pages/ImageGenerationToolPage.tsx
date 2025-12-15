@@ -1144,19 +1144,19 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
               <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
-                    className={`${isFormExpanded ? 'w-full justify-between px-6 py-6 hover:bg-accent/30 bg-accent/10 border border-b-0 rounded-t-lg shadow-sm' : 'w-full justify-between px-6 py-6 gradient-primary-collapsed rounded-lg'} transition-all duration-700 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]`}
+                    className={`${isFormExpanded ? 'w-full justify-between px-6 py-6 hover:bg-accent/50 bg-accent/10 border border-b-0 rounded-t-lg shadow-sm text-foreground' : 'w-full justify-between px-6 py-6 gradient-primary-collapsed rounded-lg'} transition-all duration-700 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]`}
                     type="button"
                   >
                     <div className="flex items-center gap-2 transition-all duration-700 ease-in-out">
-                      <Settings2 className={`h-4 w-4 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : ''}`} />
-                      <span className={`font-light flex items-center gap-1 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : ''}`}>
+                      <Settings2 className={`h-4 w-4 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : 'text-foreground'}`} />
+                      <span className={`font-light flex items-center gap-1 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : 'text-foreground'}`}>
                         Make images
-                        <Sparkles className={`h-3 w-3 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : ''}`} />
+                        <Sparkles className={`h-3 w-3 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : 'text-foreground'}`} />
                       </span>
                     </div>
                     <div className="transition-transform duration-700 ease-in-out">
                       {isFormExpanded ? (
-                        <ChevronDown className="h-4 w-4 transition-all duration-700 ease-in-out" />
+                        <ChevronDown className="h-4 w-4 transition-all duration-700 ease-in-out text-foreground" />
                       ) : (
                         <ChevronLeft className="h-4 w-4 text-white transition-all duration-700 ease-in-out" />
                       )}

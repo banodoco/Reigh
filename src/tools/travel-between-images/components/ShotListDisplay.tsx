@@ -531,22 +531,27 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
               onDrop={handleNewShotDrop}
               onClick={onCreateNewShot}
               className={cn(
-                'min-h-32 p-4 border-2 border-dashed rounded-lg bg-card/30 hover:bg-card/50 hover:border-primary/50 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center gap-3',
-                isNewShotDropTarget && 'border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]'
+                'group min-h-32 p-4 border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer flex flex-col items-center justify-center gap-3',
+                isNewShotDropTarget 
+                  ? 'border-green-500 bg-green-500/10 scale-105' 
+                  : 'border-zinc-600 hover:border-[hsl(40,55%,58%)]'
               )}
             >
               {isNewShotDropTarget ? (
                 <>
-                  <Upload className="h-10 w-10 text-primary animate-bounce" />
-                  <span className="text-sm font-medium text-primary">
+                  <Upload className="h-10 w-10 text-green-500 animate-bounce" />
+                  <span className="text-sm font-medium text-green-500">
                     {newShotDropType === 'file' ? 'Drop files to create new shot' : 'Drop to create new shot'}
                   </span>
                 </>
               ) : (
                 <>
-                  <Plus className="h-8 w-8 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">New Shot</span>
-                  <span className="text-xs text-muted-foreground/60">Click or drop image here</span>
+                  <div className="plus-icon-container flex items-center justify-center w-8 h-8 rounded-full border-2 border-dashed border-zinc-500 group-hover:border-[hsl(40,55%,58%)] transition-all duration-200 group-hover:bg-[hsl(40,55%,58%,0.15)] group-hover:shadow-[0_0_16px_hsl(40,55%,58%,0.4)]">
+                    <Plus className="w-4 h-4 text-zinc-400 group-hover:text-[hsl(40,55%,58%)] transition-all duration-200" />
+                  </div>
+                  <p className="text-muted-foreground text-center text-sm group-hover:text-[hsl(40,55%,58%)] transition-colors duration-200">
+                    Create new shot
+                  </p>
                 </>
               )}
             </div>

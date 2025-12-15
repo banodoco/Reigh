@@ -251,6 +251,37 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 | **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns, reference image recropping (`recropReferences.ts`), generation transformers (`generationTransformers.ts`), URL resolution (`imageUrlResolver.ts`) |
 | **lib/tasks/** | `/src/shared/lib/tasks/` | Task creation utilities: `imageGeneration.ts`, `magicEdit.ts`, `imageInpaint.ts`, `annotatedImageEdit.ts`, `imageUpscale.ts`, `travelBetweenImages.ts`, `joinClips.ts`, `characterAnimate.ts`, `individualTravelSegment.ts` |
 
+#### 📦 Storage Path Structure
+
+All files in the `image_uploads` bucket follow a user-namespaced structure for security and easy data management:
+
+```
+{userId}/
+  uploads/           # All media files (images + videos)
+    {timestamp}-{random}.{ext}
+  thumbnails/        # All generated thumbnails
+    thumb_{timestamp}_{random}.jpg
+  tasks/             # Task/worker outputs via pre-signed URLs
+    {taskId}/
+      {filename}
+      thumbnails/
+        {filename}
+```
+
+**Key Principles:**
+- **User isolation**: Every file path starts with `{userId}/` for security and GDPR compliance
+- **Consistent structure**: All client uploads → `uploads/`, all thumbnails → `thumbnails/`
+- **Task outputs**: Workers use pre-signed URLs via `generate-upload-url` edge function → `tasks/{taskId}/`
+
+**Upload Utilities:**
+| Utility | Location | Output Path |
+|---------|----------|-------------|
+| `uploadImageToStorage()` | `imageUploader.ts` | `{userId}/uploads/...` |
+| `uploadVideoToStorage()` | `videoUploader.ts` | `{userId}/uploads/...` |
+| `uploadImageWithThumbnail()` | `clientThumbnailGenerator.ts` | `{userId}/uploads/...` + `{userId}/thumbnails/...` |
+| `complete_task` (MODE 1) | Edge function | `{userId}/uploads/...` |
+| `generate-upload-url` | Edge function | `{userId}/tasks/{taskId}/...` |
+
 ---
 
 ## 3.5. Data Flow Architecture: Shot Generations

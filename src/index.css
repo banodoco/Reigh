@@ -1673,19 +1673,57 @@
   .subtitle-link-right {
     position: relative;
     padding-bottom: 2px;
+    transition: color 0.2s ease;
+  }
+  
+  .subtitle-link-text {
+    transition: color 0.2s ease;
+  }
+  
+  .subtitle-link-left:hover .subtitle-link-text,
+  .subtitle-link-right:hover .subtitle-link-text {
+    color: hsl(var(--wes-vintage-gold));
   }
 
-  /* Underline sits just under the baseline */
+  /* Underline sits just under the baseline - dotted */
   .subtitle-link-left::after,
   .subtitle-link-right::after {
     content: '';
     position: absolute;
-    left: 0;
-    right: 0;
     bottom: 1px;
     height: 1.5px;
-    background-color: rgba(236, 237, 227, 0.4);
-    transition: background-color 0.2s ease;
+    background-image: repeating-linear-gradient(
+      to right,
+      rgba(236, 237, 227, 0.5) 0px,
+      rgba(236, 237, 227, 0.5) 3px,
+      transparent 3px,
+      transparent 6px
+    );
+    transition: background-image 0.2s ease;
+  }
+  
+  /* Left underline: starts at beginning, ends a bit early */
+  .subtitle-link-left::after {
+    left: 0;
+    right: 0.75em;
+    transition: background-image 0.2s ease, background-color 0.2s ease, right 0.2s ease;
+  }
+  
+  /* Right underline: starts a bit late, extends to end */
+  .subtitle-link-right::after {
+    left: 0.75em;
+    right: 0;
+    transition: background-image 0.2s ease, background-color 0.2s ease, left 0.2s ease;
+  }
+  
+  /* Hover: left shrinks to just "an open source tool" */
+  .subtitle-link-left:hover::after {
+    right: 1.6em;
+  }
+  
+  /* Hover: right expands to cover full text */
+  .subtitle-link-right:hover::after {
+    left: 0;
   }
 
   /* Hover: brighten underline + SVG group together */
@@ -1693,15 +1731,31 @@
   .arrow-group-right {
     transition: opacity 0.2s ease;
   }
+  
+  .arrow-group-left path,
+  .arrow-group-right path {
+    transition: stroke 0.2s ease, stroke-dasharray 0.2s ease;
+  }
+  
+  .subtitle-link-left:hover .arrow-group-left path,
+  .subtitle-link-right:hover .arrow-group-right path {
+    stroke-dasharray: none;
+  }
 
   .subtitle-link-left:hover::after,
   .subtitle-link-right:hover::after {
-    background-color: rgba(236, 237, 227, 0.8);
+    background-image: none;
+    background-color: hsl(var(--wes-vintage-gold));
   }
 
   .subtitle-link-left:hover .arrow-group-left,
   .subtitle-link-right:hover .arrow-group-right {
-    opacity: 0.8 !important;
+    opacity: 1 !important;
+  }
+  
+  .subtitle-link-left:hover .arrow-group-left path,
+  .subtitle-link-right:hover .arrow-group-right path {
+    stroke: hsl(var(--wes-vintage-gold));
   }
    
   /* Multicolour border for tooltips on hover */

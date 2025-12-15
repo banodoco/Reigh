@@ -206,7 +206,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   };
 
   return (
-    <div className="container mx-auto px-4 relative flex items-center justify-center min-h-[calc(100svh-64px)] md:min-h-[calc(100vh-64px)] py-4 md:py-8">
+    <div className="container mx-auto px-4 relative flex items-center justify-center min-h-[calc(100svh-64px)] md:min-h-[calc(100dvh-96px)] py-4 md:py-16">
       <div className="text-center w-full">
         <div className="max-w-4xl mx-auto">
           
@@ -270,7 +270,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                             viewBox="0 0 20 20"
                             fill="none"
                           >
-                            <g className="arrow-group-left" opacity="0.4">
+                            <g className="arrow-group-left" opacity="0.5">
                               {/* Curve from right edge to arrow */}
                               <path 
                                 className="arrow-curve-left arrow-draw-curve-left"
@@ -278,6 +278,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                                 stroke="#ecede3"
                                 strokeWidth="1.5"
                                 strokeLinecap="round"
+                                strokeDasharray="3 3"
                                 fill="none"
                               />
                               <path
@@ -287,11 +288,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                                 strokeWidth="1.5"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
+                                strokeDasharray="3 3"
                                 fill="none"
                               />
                             </g>
                           </svg>
-                          an open source tool for
+                          <span className="subtitle-link-text">an open source tool</span> for
                         </span>
                       </TooltipTrigger>
                       {/* TooltipContent intentionally commented out
@@ -325,14 +327,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           }}
                           className="subtitle-link-right cursor-pointer transition-all duration-200"
                         >
-                          traveling between images
+                          <span className="subtitle-link-text">traveling between images</span>
                           {/* Right arrow tail (pushed out + more angular) */}
                           <svg
                             className="arrow-wrap-right absolute -right-5 -bottom-[1px] w-5 h-5 pointer-events-none"
                             viewBox="0 0 20 20"
                             fill="none"
                           >
-                            <g className="arrow-group-right" opacity="0.4">
+                            <g className="arrow-group-right" opacity="0.5">
                               {/* Curve from left edge to arrow */}
                               <path 
                                 className="arrow-curve-right arrow-draw-curve-right"
@@ -340,6 +342,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                                 stroke="#ecede3"
                                 strokeWidth="1.5"
                                 strokeLinecap="round"
+                                strokeDasharray="3 3"
                                 fill="none"
                               />
                               <path
@@ -349,6 +352,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                                 strokeWidth="1.5"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
+                                strokeDasharray="3 3"
                                 fill="none"
                               />
                             </g>

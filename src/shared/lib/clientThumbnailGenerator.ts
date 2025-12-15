@@ -125,11 +125,7 @@ export async function uploadImageWithThumbnail(
 ): Promise<{imageUrl: string, thumbnailUrl: string}> {
   const { uploadImageToStorage } = await import('./imageUploader');
   const { supabase } = await import('@/integrations/supabase/client');
-  
-  // Generate unique filenames
-  const timestamp = Date.now();
-  const randomString = Math.random().toString(36).substring(2, 10);
-  const fileExtension = originalFile.name.split('.').pop();
+  const { storagePaths, generateThumbnailFilename, MEDIA_BUCKET } = await import('./storagePaths');
   
   // Upload original image using existing utility (with progress tracking)
   // Original image is ~90% of the work, thumbnail is ~10%
@@ -142,15 +138,15 @@ export async function uploadImageWithThumbnail(
     } : undefined
   );
   
-  // Upload thumbnail
-  const thumbnailFilename = `thumb_${timestamp}_${randomString}.jpg`;
-  const thumbnailPath = `${userId}/thumbnails/${thumbnailFilename}`;
+  // Upload thumbnail using centralized path utilities
+  const thumbnailFilename = generateThumbnailFilename();
+  const thumbnailPath = storagePaths.thumbnail(userId, thumbnailFilename);
   
   // Report 90% progress before thumbnail upload
   onProgress?.(90);
   
   const { data: thumbnailUploadData, error: thumbnailUploadError } = await supabase.storage
-    .from('image_uploads')
+    .from(MEDIA_BUCKET)
     .upload(thumbnailPath, thumbnailBlob, {
       contentType: 'image/jpeg',
       upsert: true
@@ -167,7 +163,7 @@ export async function uploadImageWithThumbnail(
   
   // Get public URL for thumbnail
   const { data: thumbnailUrlData } = supabase.storage
-    .from('image_uploads')
+    .from(MEDIA_BUCKET)
     .getPublicUrl(thumbnailPath);
   
   const thumbnailUrl = thumbnailUrlData.publicUrl;

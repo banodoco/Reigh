@@ -19,9 +19,9 @@ const selectTriggerVariants = cva(
         // Retro style matching buttons - uses theme bg-background to match outline buttons
         // Light mode: subtle shadow increase + bg tint on hover for gentle "active" feel
         // Dark mode: keeps existing press-down interaction pattern
-        retro: "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-background hover:bg-[#6a8a8a]/10 rounded-sm border-2 border-[#6a8a8a]/30 hover:border-[#6a8a8a]/45 dark:border-[#6a7a7a] dark:hover:bg-transparent text-[#5a7a7a] dark:text-[#c8c4bb] font-heading tracking-wide transition-all duration-200 shadow-[0_1px_2px_0_rgba(106,138,138,0.06)] hover:shadow-[0_2px_4px_-1px_rgba(106,138,138,0.1)] dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] dark:hover:translate-x-[-0.5px] dark:hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
+        retro: "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-background hover:bg-[#6a8a8a]/10 rounded-sm border-2 border-[#6a8a8a]/30 hover:border-[#6a8a8a]/45 dark:border-[#6a7a7a] dark:hover:bg-transparent text-[#5a7a7a] dark:text-[#c8c4bb] font-heading font-light tracking-wide transition-all duration-200 shadow-[0_1px_2px_0_rgba(106,138,138,0.06)] hover:shadow-[0_2px_4px_-1px_rgba(106,138,138,0.1)] dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] dark:hover:translate-x-[-0.5px] dark:hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
         // Retro dark - for always-dark contexts (panes, galleries)
-        "retro-dark": "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-[#3a4a4a] hover:bg-[#4a5a5a] rounded-sm border-2 border-[#6a7a7a] text-[#d8d4cb] font-heading tracking-wide transition-all duration-200 shadow-[-2px_2px_0_0_rgba(20,30,30,0.3)] hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.3)] hover:translate-x-[-0.5px] hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a7a7a]/30 focus:ring-offset-0",
+        "retro-dark": "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-[#3a4a4a] hover:bg-[#4a5a5a] rounded-sm border-2 border-[#6a7a7a] text-[#d8d4cb] font-heading font-light tracking-wide transition-all duration-200 shadow-[-2px_2px_0_0_rgba(20,30,30,0.3)] hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.3)] hover:translate-x-[-0.5px] hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a7a7a]/30 focus:ring-offset-0",
       },
       size: {
         default: "h-10",
@@ -170,10 +170,12 @@ const SelectContent = React.forwardRef<
         className={cn(
           isCompact ? "py-1" : "p-1",
           position === "popper" &&
-            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]",
+          // Enable touch scrolling on mobile
+          "overflow-y-auto overscroll-contain touch-pan-y"
         )}
-        // Prevent viewport interactions from passing through
-        onPointerDown={(e) => e.stopPropagation()}
+        style={{ WebkitOverflowScrolling: 'touch' }}
+        // Prevent viewport click from passing through, but allow scroll gestures
         onClick={(e) => e.stopPropagation()}
       >
         {children}
@@ -202,11 +204,11 @@ const selectItemVariants = cva(
   {
     variants: {
       variant: {
-        default: "pl-8 pr-2 focus:bg-accent focus:text-accent-foreground",
-        retro: "px-2 focus:bg-[#e8e4db] dark:focus:bg-[#3d4d4d] focus:text-[#4a6a6a] dark:focus:text-[#e8e4db] font-heading",
-        "retro-dark": "px-2 focus:bg-[#4a5a5a] focus:text-[#e8e4db] font-heading text-[#d8d4cb]",
+        default: "pl-8 pr-2 focus:bg-accent focus:text-accent-foreground data-[state=checked]:bg-accent/50 data-[state=checked]:font-medium",
+        retro: "px-2 focus:bg-[#e8e4db] dark:focus:bg-[#3d4d4d] focus:text-[#4a6a6a] dark:focus:text-[#e8e4db] font-heading font-light data-[state=checked]:bg-[#d8d4cb] dark:data-[state=checked]:bg-[#4a5a5a] data-[state=checked]:font-normal",
+        "retro-dark": "px-2 focus:bg-[#4a5a5a] focus:text-[#e8e4db] font-heading font-light text-[#d8d4cb] data-[state=checked]:bg-[#5a6a6a] data-[state=checked]:font-normal",
         // Zinc variant for dark panes
-        zinc: "px-2 text-zinc-300 focus:bg-zinc-700 focus:text-zinc-100",
+        zinc: "px-2 text-zinc-300 focus:bg-zinc-700 focus:text-zinc-100 data-[state=checked]:bg-zinc-600 data-[state=checked]:text-zinc-100",
       },
     },
     defaultVariants: {

@@ -762,17 +762,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     // Reset hover state immediately
     setIsHoveringTaskItem(false);
     
-    // Use callback if provided, otherwise do nothing (old behavior)
+    // If video data is already loaded, open lightbox immediately
     if (onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
       onOpenVideoLightbox(task, travelData.videoOutputs, 0);
-    } else if (!onOpenVideoLightbox) {
-      // Fallback: if no callback, maintain old behavior
-      // Set this task as active and open tasks pane (desktop only)
+    } else {
+      // Video data not loaded yet - trigger fetch and wait for it
+      // This fixes the race condition where user clicks before hovering
       if (!isMobile) {
         setActiveTaskId(task.id);
         setIsTasksPaneOpen(true);
       }
-      // If not loaded yet, trigger fetch and mark that we're waiting to open
       setShouldFetchVideo(true);
       setWaitingForVideoToOpen(true);
     }

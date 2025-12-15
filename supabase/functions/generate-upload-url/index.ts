@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 // @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 import { authenticateRequest, verifyTaskOwnership, getTaskUserId } from "../_shared/auth.ts";
+import { storagePaths, MEDIA_BUCKET } from "../_shared/storagePaths.ts";
 // Provide a loose Deno type for local tooling; real type comes at runtime in Edge Functions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const Deno: any;
@@ -118,16 +119,15 @@ serve(async (req) => {
       console.log(`[GENERATE-UPLOAD-URL] Task ownership verified for user: ${userId}`);
     }
 
-    // Generate storage paths with task_id for organization and security
-    // Format: userId/tasks/{task_id}/filename
-    const storagePath = `${userId}/tasks/${taskIdString}/${filename}`;
+    // Generate storage paths with task_id for organization and security using centralized utilities
+    const taskStoragePath = storagePaths.taskOutput(userId, taskIdString, filename);
     
-    console.log(`[GENERATE-UPLOAD-URL] Generating signed upload URL for: ${storagePath}`);
+    console.log(`[GENERATE-UPLOAD-URL] Generating signed upload URL for: ${taskStoragePath}`);
 
     // Generate signed upload URL (expires in 1 hour)
     const { data: signedData, error: signedError } = await supabaseAdmin.storage
-      .from('image_uploads')
-      .createSignedUploadUrl(storagePath);
+      .from(MEDIA_BUCKET)
+      .createSignedUploadUrl(taskStoragePath);
 
     if (signedError || !signedData) {
       console.error("[GENERATE-UPLOAD-URL] Failed to create signed URL:", signedError);
@@ -136,21 +136,20 @@ serve(async (req) => {
 
     const response: any = {
       upload_url: signedData.signedUrl,
-      storage_path: storagePath,
+      storage_path: taskStoragePath,
       token: signedData.token,
       expires_at: new Date(Date.now() + 3600000).toISOString() // 1 hour
     };
 
-    // Generate thumbnail upload URL if requested
+    // Generate thumbnail upload URL if requested using centralized path utilities
     if (generate_thumbnail_url) {
       const thumbnailFilename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.jpg`;
-      // Format: userId/tasks/{task_id}/thumbnails/filename
-      const thumbnailPath = `${userId}/tasks/${taskIdString}/thumbnails/${thumbnailFilename}`;
+      const thumbnailPath = storagePaths.taskThumbnail(userId, taskIdString, thumbnailFilename);
 
       console.log(`[GENERATE-UPLOAD-URL] Generating signed upload URL for thumbnail: ${thumbnailPath}`);
 
       const { data: thumbSignedData, error: thumbSignedError } = await supabaseAdmin.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .createSignedUploadUrl(thumbnailPath);
 
       if (thumbSignedError || !thumbSignedData) {

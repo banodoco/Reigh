@@ -42,14 +42,60 @@ npm run db:seed
 
 ---
 
-## 🗂️ Storage Buckets Map
+## 🗂️ Storage Buckets & Path Structure
+
+### Buckets
 
 | Bucket | Access | Purpose | Notes |
 |--------|--------|---------|-------|
-| **`public`** | ✅ Public | Generated media | Default Supabase bucket |
+| **`image_uploads`** | ✅ Public | All generated/uploaded media | Images AND videos (despite the name) |
 | **`training-data`** | 🔒 RLS | Training videos | Owner-restricted access |
 | **`lora_files`** | ✅ Public | LoRA models | User uploads |
-| *(others)* | — | Various | Check `/supabase/migrations/` |
+
+### Path Structure (`image_uploads` bucket)
+
+All files follow a **user-namespaced** structure for security and easy data management:
+
+```
+{userId}/
+  uploads/           # All media files (images + videos)
+    {timestamp}-{random}.{ext}
+  thumbnails/        # All generated thumbnails  
+    thumb_{timestamp}_{random}.jpg
+    {generationId}-thumb.jpg
+  tasks/             # Task/worker outputs via pre-signed URLs
+    {taskId}/
+      {filename}
+      thumbnails/
+        {filename}
+```
+
+### Upload Sources & Paths
+
+| Source | File | Path Pattern |
+|--------|------|--------------|
+| **Client image upload** | `imageUploader.ts` | `{userId}/uploads/{ts}-{rand}.{ext}` |
+| **Client video upload** | `videoUploader.ts` | `{userId}/uploads/{ts}-{rand}.{ext}` |
+| **Client thumbnail** | `clientThumbnailGenerator.ts` | `{userId}/thumbnails/thumb_{ts}_{rand}.jpg` |
+| **Video thumbnail gen** | `videoThumbnailGenerator.ts` | `{userId}/thumbnails/{genId}-thumb.jpg` |
+| **Worker output (MODE 1)** | `complete_task/storage.ts` | `{userId}/uploads/{filename}` |
+| **Worker output (MODE 3/4)** | `generate-upload-url` | `{userId}/tasks/{taskId}/{filename}` |
+| **Trim video** | `trim-video/index.ts` | `{userId}/uploads/trimmed_{ts}_{rand}.mp4` |
+| **Edge thumbnail gen** | `generate-thumbnail/index.ts` | `{userId}/thumbnails/thumb_{ts}_{rand}.jpg` |
+
+### Key Design Principles
+
+1. **User isolation**: Every path starts with `{userId}/` — defense-in-depth alongside RLS
+2. **Easy cleanup**: `DELETE FROM storage WHERE path LIKE '{userId}/%'` for GDPR requests
+3. **Consistent organization**: `uploads/` for media, `thumbnails/` for thumbnails, `tasks/` for worker outputs
+4. **Unique filenames**: `{timestamp}-{random}` pattern prevents collisions without needing UUIDs
+
+### Extension Handling
+
+All upload utilities handle missing file extensions gracefully:
+- First tries to extract from filename (e.g., `photo.jpg` → `jpg`)
+- Falls back to MIME type (e.g., `image/png` → `png`, `image/jpeg` → `jpg`)
+- Last resort: `bin` for unknown types
 
 ---
 

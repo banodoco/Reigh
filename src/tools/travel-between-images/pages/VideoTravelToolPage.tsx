@@ -695,10 +695,9 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   
   // Handle floating header name click - scroll to top and trigger edit mode
   const handleFloatingHeaderNameClick = useCallback(() => {
-    // Scroll to the original header
-    if (headerContainerRef.current) {
-      headerContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    // Scroll to absolute top (position 0) to fully hide floating header
+    // Using window.scrollTo instead of scrollIntoView to ensure we scroll past the global header
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     
     // Trigger edit mode after a short delay to let scroll finish
     setTimeout(() => {

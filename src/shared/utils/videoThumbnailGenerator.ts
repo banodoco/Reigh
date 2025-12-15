@@ -7,6 +7,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { storagePaths, MEDIA_BUCKET } from '@/shared/lib/storagePaths';
 
 export interface ThumbnailGenerationResult {
   success: boolean;
@@ -92,14 +93,22 @@ async function extractThumbnailFromVideo(
 
 /**
  * Uploads a thumbnail blob to Supabase storage
+ * Note: projectId param kept for backwards compatibility but no longer used in path
  */
 async function uploadThumbnailToStorage(
   blob: Blob,
   generationId: string,
   projectId: string
 ): Promise<string> {
+  // Get userId for storage path
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) {
+    throw new Error('User not authenticated');
+  }
+  const userId = session.user.id;
+
   const fileName = `${generationId}-thumb.jpg`;
-  const filePath = `${projectId}/thumbnails/${fileName}`;
+  const filePath = storagePaths.thumbnail(userId, fileName);
 
   console.log('[ThumbnailGenerator] Uploading thumbnail:', {
     generationId: generationId.substring(0, 8),
@@ -109,7 +118,7 @@ async function uploadThumbnailToStorage(
   });
 
   const { data, error } = await supabase.storage
-    .from('image_uploads')
+    .from(MEDIA_BUCKET)
     .upload(filePath, blob, {
       contentType: 'image/jpeg',
       upsert: true, // Overwrite if exists
@@ -122,7 +131,7 @@ async function uploadThumbnailToStorage(
 
   // Get public URL
   const { data: urlData } = supabase.storage
-    .from('image_uploads')
+    .from(MEDIA_BUCKET)
     .getPublicUrl(filePath);
 
   return urlData.publicUrl;

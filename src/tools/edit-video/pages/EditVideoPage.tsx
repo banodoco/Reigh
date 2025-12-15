@@ -7,6 +7,7 @@ import { GenerationRow } from '@/types/shots';
 import { ReighLoading } from '@/shared/components/ReighLoading';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { storagePaths, getFileExtension, MEDIA_BUCKET } from '@/shared/lib/storagePaths';
 import { InlineEditVideoView } from '../components/InlineEditVideoView';
 import { useGenerations, useDeleteVariant } from '@/shared/hooks/useGenerations';
 import ImageGallery from '@/shared/components/ImageGallery';
@@ -215,14 +216,15 @@ export default function EditVideoPage() {
         throw new Error('User not authenticated');
       }
       const userId = session.user.id;
+      const timestamp = Date.now();
 
       // Extract poster frame from video
       let posterUrl = '';
       try {
         const posterBlob = await extractVideoPosterFrame(file);
-        const posterFileName = `edit-video/${userId}/${Date.now()}-poster.jpg`;
+        const posterFileName = storagePaths.thumbnail(userId, `${timestamp}-poster.jpg`);
         const { error: posterError } = await supabase.storage
-          .from('image_uploads')
+          .from(MEDIA_BUCKET)
           .upload(posterFileName, posterBlob, {
             cacheControl: '3600',
             upsert: false,
@@ -231,7 +233,7 @@ export default function EditVideoPage() {
         
         if (!posterError) {
           const { data: { publicUrl } } = supabase.storage
-            .from('image_uploads')
+            .from(MEDIA_BUCKET)
             .getPublicUrl(posterFileName);
           posterUrl = publicUrl;
         }
@@ -239,12 +241,12 @@ export default function EditVideoPage() {
         console.warn('[EditVideo] Poster extraction failed:', posterError);
       }
       
-      // Upload video
-      const fileExt = file.name.split('.').pop() || 'mp4';
-      const fileName = `edit-video/${userId}/${Date.now()}.${fileExt}`;
+      // Upload video using centralized path utilities
+      const fileExt = getFileExtension(file.name, file.type, 'mp4');
+      const fileName = storagePaths.upload(userId, `${timestamp}.${fileExt}`);
       
       const { error: uploadError } = await supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -253,7 +255,7 @@ export default function EditVideoPage() {
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl: videoUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(fileName);
 
       const { data: generation, error: dbError } = await supabase
@@ -339,14 +341,15 @@ export default function EditVideoPage() {
         throw new Error('User not authenticated');
       }
       const userId = session.user.id;
+      const timestamp = Date.now();
 
       // Extract poster frame from video
       let posterUrl = '';
       try {
         const posterBlob = await extractVideoPosterFrame(file);
-        const posterFileName = `edit-video/${userId}/${Date.now()}-poster.jpg`;
+        const posterFileName = storagePaths.thumbnail(userId, `${timestamp}-poster.jpg`);
         const { error: posterError } = await supabase.storage
-          .from('image_uploads')
+          .from(MEDIA_BUCKET)
           .upload(posterFileName, posterBlob, {
             cacheControl: '3600',
             upsert: false,
@@ -355,7 +358,7 @@ export default function EditVideoPage() {
         
         if (!posterError) {
           const { data: { publicUrl } } = supabase.storage
-            .from('image_uploads')
+            .from(MEDIA_BUCKET)
             .getPublicUrl(posterFileName);
           posterUrl = publicUrl;
         }
@@ -363,12 +366,12 @@ export default function EditVideoPage() {
         console.warn('[EditVideo] Poster extraction failed:', posterError);
       }
       
-      // Upload video
-      const fileExt = file.name.split('.').pop() || 'mp4';
-      const fileName = `edit-video/${userId}/${Date.now()}.${fileExt}`;
+      // Upload video using centralized path utilities
+      const fileExt = getFileExtension(file.name, file.type, 'mp4');
+      const fileName = storagePaths.upload(userId, `${timestamp}.${fileExt}`);
       
       const { error: uploadError } = await supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -377,7 +380,7 @@ export default function EditVideoPage() {
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl: videoUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(fileName);
 
       const { data: generation, error: dbError } = await supabase

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { storagePaths, generateThumbnailFilename, MEDIA_BUCKET } from '../_shared/storagePaths.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -97,16 +98,14 @@ serve(async (req) => {
       quality: 0.8 
     })
 
-    // Generate thumbnail filename
-    const timestamp = Date.now()
-    const randomString = Math.random().toString(36).substring(2, 8)
-    const thumbnailFilename = `thumb_${timestamp}_${randomString}.jpg`
-    const thumbnailPath = `${user_id}/thumbnails/${thumbnailFilename}`
+    // Generate thumbnail filename using centralized path utilities
+    const thumbnailFilename = generateThumbnailFilename()
+    const thumbnailPath = storagePaths.thumbnail(user_id, thumbnailFilename)
 
     // Upload thumbnail to Supabase Storage
     console.log(`[GENERATE-THUMBNAIL] Uploading thumbnail to: ${thumbnailPath}`)
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('image_uploads')
+      .from(MEDIA_BUCKET)
       .upload(thumbnailPath, thumbnailBlob, {
         contentType: 'image/jpeg',
         upsert: true
@@ -119,7 +118,7 @@ serve(async (req) => {
 
     // Get public URL for thumbnail
     const { data: urlData } = supabase.storage
-      .from('image_uploads')
+      .from(MEDIA_BUCKET)
       .getPublicUrl(thumbnailPath)
     
     const thumbnailUrl = urlData.publicUrl

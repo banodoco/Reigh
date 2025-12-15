@@ -89,77 +89,72 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className={`${modal.className} gap-2 overflow-hidden`}
+        className={`${modal.className} gap-2 overflow-hidden flex flex-col`}
         style={{
           ...modal.style,
           maxWidth: '900px',
           width: 'calc(100vw - 2rem)',
-          // On mobile, position modal higher to avoid overlapping with displayed images
-          ...(modal.isMobile ? {
-            top: '10%',
-            transform: 'translateX(-50%) translateY(0)',
-          } : {})
         }}
+        onPointerDownOutside={() => onClose()}
+        onInteractOutside={() => onClose()}
         {...modal.props}
       >
         <DialogHeader className={modal.headerClass}>
           <DialogTitle className="text-xl font-light">Generate Images</DialogTitle>
         </DialogHeader>
         
-        <div className={`${modal.scrollClass} -mx-6 px-6`}>
+        <div className={`${modal.scrollClass} -mx-6 -mb-6 px-6 flex-1 min-h-0`}>
           <Suspense fallback={
-            <div className="space-y-6 py-4">
-              {/* Main Content Layout - matches flex gap-6 flex-col md:flex-row */}
-              <div className="flex gap-6 flex-col md:flex-row">
-                {/* Left Column - Prompts and Shot Selector */}
-                <div className="flex-1 space-y-6">
-                  {/* PromptsSection skeleton */}
-                  <div className="space-y-4">
-                    <Skeleton className="h-8 w-32" />
-                    <div className="space-y-3">
-                      <Skeleton className="h-24 w-full rounded-md" />
-                      <Skeleton className="h-24 w-full rounded-md" />
-                    </div>
-                    <div className="flex gap-2">
-                      <Skeleton className="h-9 flex-1 rounded-md" />
-                      <Skeleton className="h-9 w-24 rounded-md" />
-                    </div>
-                  </div>
-                  {/* ShotSelector skeleton */}
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-10 w-full rounded-md" />
-                  </div>
-                </div>
-                
-                {/* Right Column - ModelSection */}
-                <div className="md:w-80 space-y-6">
-                  {/* ModelSection skeleton */}
-                  <div className="space-y-4">
-                    <Skeleton className="h-8 w-40" />
-                    <div className="space-y-3">
-                      <Skeleton className="h-32 w-full rounded-md" />
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-20" />
-                        <Skeleton className="h-10 w-full rounded-md" />
+            <div className="flex flex-col h-full">
+              <div className="space-y-6 py-4 flex-1">
+                {/* Main Content Layout - matches flex gap-6 flex-col md:flex-row */}
+                <div className="flex gap-6 flex-col md:flex-row">
+                  {/* Left Column - Prompts and Shot Selector */}
+                  <div className="flex-1 space-y-6">
+                    {/* PromptsSection skeleton */}
+                    <div className="space-y-4">
+                      <Skeleton className="h-8 w-32" />
+                      <div className="space-y-3">
+                        <Skeleton className="h-24 w-full rounded-md" />
+                        <Skeleton className="h-24 w-full rounded-md" />
                       </div>
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-10 w-full rounded-md" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-9 flex-1 rounded-md" />
+                        <Skeleton className="h-9 w-24 rounded-md" />
+                      </div>
+                    </div>
+                    {/* ShotSelector skeleton */}
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-10 w-full rounded-md" />
+                    </div>
+                  </div>
+                  
+                  {/* Right Column - ModelSection */}
+                  <div className="md:w-80 space-y-6">
+                    {/* ModelSection skeleton */}
+                    <div className="space-y-4">
+                      <Skeleton className="h-8 w-40" />
+                      <div className="space-y-3">
+                        <Skeleton className="h-32 w-full rounded-md" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-10 w-full rounded-md" />
+                        </div>
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-10 w-full rounded-md" />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
               
-              {/* GenerateControls skeleton */}
-              <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-2 w-full rounded-full" />
-                  </div>
-                  <Skeleton className="h-10 w-32 rounded-md" />
+              {/* Sticky GenerateControls skeleton */}
+              <div className="sticky bottom-0 z-50 -mx-6 px-6 py-3 bg-background border-t border-zinc-700">
+                <div className="flex justify-center">
+                  <Skeleton className="h-11 w-full max-w-md rounded-md" />
                 </div>
               </div>
             </div>
@@ -172,6 +167,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               apiKey={falApiKey}
               openaiApiKey={openaiApiKey}
               justQueued={justQueued}
+              stickyFooter={true}
             />
           </Suspense>
         </div>

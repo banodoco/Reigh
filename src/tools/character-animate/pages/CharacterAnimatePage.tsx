@@ -9,6 +9,7 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
+import { storagePaths, getFileExtension, MEDIA_BUCKET } from '@/shared/lib/storagePaths';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { CharacterAnimateSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
@@ -289,16 +290,23 @@ const CharacterAnimatePage: React.FC = () => {
       // Extract poster frame
       const posterBlob = await extractVideoPosterFrame(file);
       
-      // Upload video to Supabase storage
-      const fileExt = file.name.split('.').pop() || 'mp4';
+      // Get userId for storage path
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+      const userId = session.user.id;
+
+      // Generate storage paths using centralized utilities
+      const fileExt = getFileExtension(file.name, file.type, 'mp4');
       const timestamp = Date.now();
       const randomId = Math.random().toString(36).substring(7);
-      const fileName = `character-animate/${selectedProjectId}/${timestamp}-${randomId}.${fileExt}`;
-      const posterFileName = `character-animate/${selectedProjectId}/${timestamp}-${randomId}-poster.jpg`;
+      const fileName = storagePaths.upload(userId, `${timestamp}-${randomId}.${fileExt}`);
+      const posterFileName = storagePaths.thumbnail(userId, `${timestamp}-${randomId}-poster.jpg`);
       
       // Upload video
       const { data: videoData, error: videoError } = await supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -308,7 +316,7 @@ const CharacterAnimatePage: React.FC = () => {
       
       // Upload poster image
       const { data: posterData, error: posterError } = await supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .upload(posterFileName, posterBlob, {
           cacheControl: '3600',
           upsert: false,
@@ -319,11 +327,11 @@ const CharacterAnimatePage: React.FC = () => {
       
       // Get public URLs
       const { data: { publicUrl: videoUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(fileName);
         
       const { data: { publicUrl: posterUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(posterFileName);
       
       // Reset loaded and playing state
@@ -554,14 +562,22 @@ const CharacterAnimatePage: React.FC = () => {
     try {
       const posterBlob = await extractVideoPosterFrame(file);
       
-      const fileExt = file.name.split('.').pop() || 'mp4';
+      // Get userId for storage path
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+      const userId = session.user.id;
+
+      // Generate storage paths using centralized utilities
+      const fileExt = getFileExtension(file.name, file.type, 'mp4');
       const timestamp = Date.now();
       const randomId = Math.random().toString(36).substring(7);
-      const fileName = `character-animate/${selectedProjectId}/${timestamp}-${randomId}.${fileExt}`;
-      const posterFileName = `character-animate/${selectedProjectId}/${timestamp}-${randomId}-poster.jpg`;
+      const fileName = storagePaths.upload(userId, `${timestamp}-${randomId}.${fileExt}`);
+      const posterFileName = storagePaths.thumbnail(userId, `${timestamp}-${randomId}-poster.jpg`);
       
       const { data: videoData, error: videoError } = await supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -570,7 +586,7 @@ const CharacterAnimatePage: React.FC = () => {
       if (videoError) throw videoError;
       
       const { data: posterData, error: posterError } = await supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .upload(posterFileName, posterBlob, {
           cacheControl: '3600',
           upsert: false,
@@ -580,11 +596,11 @@ const CharacterAnimatePage: React.FC = () => {
       if (posterError) throw posterError;
       
       const { data: { publicUrl: videoUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(fileName);
         
       const { data: { publicUrl: posterUrl } } = supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .getPublicUrl(posterFileName);
       
       setMotionVideoLoaded(false);
