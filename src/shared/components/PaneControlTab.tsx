@@ -47,6 +47,11 @@ interface PaneControlTabProps {
    * Tooltip for the main pane open button.
    */
   paneTooltip?: string;
+  /**
+   * Whether to show lock/unlock buttons on mobile. Defaults to false.
+   * When false, mobile uses simplified open/close behavior without locking.
+   */
+  allowMobileLock?: boolean;
 }
 
 // Helper component to wrap buttons in tooltips (desktop only)
@@ -87,6 +92,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   paneIcon = 'chevron',
   customIcon,
   paneTooltip,
+  allowMobileLock = false,
 }) => {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -176,17 +182,119 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
     }
   };
 
-  // Small phones (not tablets): Only show button when pane is closed
+  // Small phones (not tablets): Show simplified mobile controls
   // Tablets use desktop behavior with lock/unlock icons
   if (!useDesktopBehavior) {
     if (selectionActive) return null; // hide when selection active
-    // Don't show control when pane is open on phones
-    if (isOpen) return null;
 
     // On mobile, bottom pane control should be BEHIND side panes (which are z-60)
     // Use z-[50] for bottom pane controls so they don't overlap open Task/Shot panes
     const mobileZIndex = side === 'bottom' ? 'z-[50]' : PANE_CONFIG.zIndex.CONTROL_UNLOCKED;
 
+    // Only show lock/unlock buttons if allowMobileLock is true
+    if (allowMobileLock) {
+      // Pane is locked on mobile - show unlock button
+      if (isLocked) {
+        return (
+          <div
+            data-pane-control
+            style={dynamicStyle}
+            className={cn(
+              `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex flex-col items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+              getPositionClasses(),
+              'opacity-100'
+            )}
+          >
+            {thirdButton && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={thirdButton.onClick}
+                className={cn(
+                  'text-zinc-300 hover:text-white hover:bg-zinc-700',
+                  side === 'bottom' ? 'h-8 w-16' : 'h-8 w-8'
+                )}
+                aria-label={thirdButton.ariaLabel}
+              >
+                {thirdButton.content || <Square className="h-4 w-4" />}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onPointerUp={() => toggleLock(false)}
+              className={cn(
+                'text-zinc-300 hover:text-white hover:bg-zinc-700',
+                side === 'bottom' ? 'h-8 w-16' : 'h-8 w-8'
+              )}
+              aria-label="Unlock pane"
+            >
+              <UnlockIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      }
+
+      // Pane is closed on mobile with lock enabled - show open button AND lock button
+      return (
+        <div
+          data-pane-control
+          style={dynamicStyle}
+          className={cn(
+            `fixed ${mobileZIndex} flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+            getPositionClasses(),
+            'opacity-100'
+          )}
+        >
+          {thirdButton && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onPointerUp={thirdButton.onClick}
+              className={cn(
+                'text-zinc-300 hover:text-white hover:bg-zinc-700',
+                side === 'bottom' ? 'h-8 w-16' : 'h-8 w-8'
+              )}
+              aria-label={thirdButton.ariaLabel}
+            >
+              {thirdButton.content || <Square className="h-4 w-4" />}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerUp={() => openPane()}
+            className={cn(
+              'text-zinc-300 hover:text-white hover:bg-zinc-700',
+              side === 'bottom' ? 'h-8 w-16' : 'h-8 w-8'
+            )}
+            aria-label={paneTooltip || "Open pane"}
+          >
+            {getIcon()}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerUp={() => toggleLock(true)}
+            className={cn(
+              'text-zinc-300 hover:text-white hover:bg-zinc-700',
+              side === 'bottom' ? 'h-8 w-16' : 'h-8 w-8'
+            )}
+            aria-label="Lock pane open"
+          >
+            <LockIcon className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+    }
+
+    // Original simplified mobile behavior (no lock buttons)
+    // Pane is open - no control shown (pane handles its own close via tap outside)
+    if (isOpen) {
+      return null;
+    }
+
+    // Pane is closed on mobile - show open button only
     return (
       <div
         data-pane-control

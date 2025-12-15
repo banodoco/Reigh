@@ -21,6 +21,7 @@ import { usePageVisibility } from '@/shared/hooks/usePageVisibility';
 import '@/shared/lib/debugPolling';
 import { SocialIcons } from '@/shared/components/SocialIcons';
 import { AIInputModeProvider } from '@/shared/contexts/AIInputModeContext';
+import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -45,6 +46,14 @@ const Layout: React.FC = () => {
   } = usePanes();
   const { header } = useHeaderState();
   const { setCurrentShotId } = useCurrentShot();
+  
+  // Mobile detection for split-view scroll handling
+  const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
+  const isSmallMobile = isMobile && !isTablet;
+  
+  // On small mobile with locked generations pane, create split-view scroll behavior
+  const isMobileSplitView = isSmallMobile && isGenerationsPaneLocked;
   
   // Track page visibility for debugging polling issues
   // TEMPORARILY DISABLED to avoid conflicts with RealtimeBoundary
@@ -154,10 +163,19 @@ const Layout: React.FC = () => {
     return <Navigate to="/" replace state={{ fromProtected: true }} />;
   }
 
+  // Mobile split view styles for creating independent scroll region
+  const mobileSplitViewStyles: React.CSSProperties = isMobileSplitView ? {
+    height: `calc(100dvh - ${generationsPaneHeight}px)`,
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+    WebkitOverflowScrolling: 'touch',
+  } : {};
+
   const mainContentStyle = {
     marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
     marginLeft: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
-    paddingBottom: (isGenerationsPaneLocked || isGenerationsPaneOpen) ? `${generationsPaneHeight}px` : '0px',
+    // On mobile split view, don't use padding - use fixed height instead
+    paddingBottom: isMobileSplitView ? '0px' : ((isGenerationsPaneLocked || isGenerationsPaneOpen) ? `${generationsPaneHeight}px` : '0px'),
     // CSS custom properties for content-responsive behavior
     '--content-width': `${contentWidth}px`,
     '--content-height': `${contentHeight}px`,
@@ -167,6 +185,7 @@ const Layout: React.FC = () => {
     '--content-xl': isXl ? '1' : '0',
     '--content-2xl': is2Xl ? '1' : '0',
     willChange: 'margin, padding',
+    ...mobileSplitViewStyles,
   } as React.CSSProperties;
 
   // Footer style matches main content margins for side panes

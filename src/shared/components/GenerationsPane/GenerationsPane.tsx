@@ -390,6 +390,7 @@ const GenerationsPaneComponent: React.FC = () => {
           }}
           paneIcon="gallery"
           paneTooltip="View generations gallery"
+          allowMobileLock={true}
         />
       )}
       <div
@@ -572,7 +573,10 @@ const GenerationsPaneComponent: React.FC = () => {
                 )}
             </div>
         </div>
-        <div className="flex-grow px-1 sm:px-3 overflow-y-auto overscroll-contain flex flex-col">
+        <div 
+          className="flex-grow px-1 sm:px-3 overflow-y-auto overscroll-contain flex flex-col"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
             {isLoading && (
                 <SkeletonGallery 
                     count={12}

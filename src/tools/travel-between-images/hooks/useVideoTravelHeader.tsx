@@ -72,7 +72,7 @@ export const useVideoTravelHeader = ({
           </div>
           {/* Search box - only show when in shots view and there are shots */}
           {!showVideosView && shots && shots.length > 0 && (
-            <div className="px-4">
+            <div>
               <div className="flex items-center space-x-2 border rounded-md px-3 py-1 h-8 bg-background w-full max-w-xs">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <input
@@ -100,7 +100,7 @@ export const useVideoTravelHeader = ({
               <div className="flex items-center space-x-2 mt-4 mb-1">
                 <button
                   onClick={() => onSortModeChange('ordered')}
-                  className={`text-sm px-3 py-1 rounded-md transition-colors ${
+                  className={`text-base px-3 py-1 rounded-md transition-colors ${
                     shotSortMode === 'ordered' 
                       ? 'bg-foreground/20 text-foreground font-medium' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -110,7 +110,7 @@ export const useVideoTravelHeader = ({
                 </button>
                 <button
                   onClick={() => onSortModeChange('newest')}
-                  className={`text-sm px-3 py-1 rounded-md transition-colors ${
+                  className={`text-base px-3 py-1 rounded-md transition-colors ${
                     shotSortMode === 'newest' 
                       ? 'bg-foreground/20 text-foreground font-medium' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -120,7 +120,7 @@ export const useVideoTravelHeader = ({
                 </button>
                 <button
                   onClick={() => onSortModeChange('oldest')}
-                  className={`text-sm px-3 py-1 rounded-md transition-colors ${
+                  className={`text-base px-3 py-1 rounded-md transition-colors ${
                     shotSortMode === 'oldest' 
                       ? 'bg-foreground/20 text-foreground font-medium' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'

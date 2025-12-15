@@ -37,21 +37,15 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
     setIsOpen(open);
   }, [isLocked, side, isSmallMobile]);
 
-  // Sync open state with lock state (desktop and tablet)
+  // Sync open state with lock state (all devices including mobile)
   useEffect(() => {
-    if (isSmallMobile) {
-      // On small phones, always start closed
-      setIsOpen(false);
-      return;
-    }
-
-    // Desktop and tablet behavior (original)
+    // Locked panes are always open, unlocked panes close
     if (isLocked) {
-      setIsOpen(true); // Locked panes are always open
+      setIsOpen(true);
     } else {
-      setIsOpen(false); // Unlocked panes should close immediately
+      setIsOpen(false);
     }
-  }, [isLocked, isSmallMobile]);
+  }, [isLocked]);
 
   // Close pane on route change (small phones only)
   useEffect(() => {
@@ -61,7 +55,8 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  // Lock body scroll when pane is open on small phones to prevent scroll bleed-through
+  // Lock body scroll when pane is open on small phones (both temporary and locked states)
+  // When locked, Layout.tsx handles creating a scrollable main content area instead
   useEffect(() => {
     if (!isSmallMobile) return;
     
@@ -70,7 +65,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
       const originalOverflow = document.body.style.overflow;
       const originalTouchAction = document.body.style.touchAction;
       
-      // Lock body scroll
+      // Lock body scroll - Layout.tsx creates separate scroll containers for split view
       document.body.style.overflow = 'hidden';
       document.body.style.touchAction = 'none';
       
@@ -82,9 +77,10 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
     }
   }, [isSmallMobile, isOpen]);
 
-  // Click outside handler for small phones
+  // Click outside handler for small phones (only when not locked)
   useEffect(() => {
-    if (!isSmallMobile || !isOpen) return;
+    // Don't close on click outside if pane is locked
+    if (!isSmallMobile || !isOpen || isLocked) return;
 
     const handleClickOutside = (event: MouseEvent | PointerEvent) => {
       const targetEl = event.target as HTMLElement;
@@ -116,7 +112,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
 
     document.addEventListener('pointerdown', handleClickOutside, true);
     return () => document.removeEventListener('pointerdown', handleClickOutside, true);
-  }, [isSmallMobile, isOpen, additionalRefs]);
+  }, [isSmallMobile, isOpen, isLocked, additionalRefs]);
 
   // Close on dragstart anywhere (small phones)
   useEffect(() => {
@@ -133,21 +129,24 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
   }, [isSmallMobile, isOpen]);
 
   // Exclusive pane coordination on small phones
+  // When another pane opens, this one should close (locking the other will handle unlocking this via PanesContext)
   useEffect(() => {
     if (!isSmallMobile) return;
 
     const handleMobilePaneOpen = (evt: Event) => {
       const customEvt = evt as CustomEvent<{ side: string | null }>;
       const openedSide = customEvt.detail?.side ?? null;
-      if (openedSide !== side) {
-        // Another pane (or null) requested – close this one
+      if (openedSide !== side && !isLocked) {
+        // Another pane (or null) requested and we're not locked – close this one
         setIsOpen(false);
       }
+      // Note: If this pane IS locked, PanesContext will handle unlocking it
+      // when the other pane gets locked (only one can be locked at a time on mobile)
     };
 
     window.addEventListener('mobilePaneOpen', handleMobilePaneOpen as EventListener);
     return () => window.removeEventListener('mobilePaneOpen', handleMobilePaneOpen as EventListener);
-  }, [isSmallMobile, side]);
+  }, [isSmallMobile, side, isLocked]);
 
   const openPane = () => {
     if (leaveTimeoutRef.current) {
@@ -185,19 +184,14 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
   };
 
   const toggleLock = (force?: boolean) => {
-    // On small phones, don't use locks at all
-    if (isSmallMobile) return;
-
-    // Desktop behavior (original)
+    // Allow locking on all devices including mobile
     if (force !== undefined) {
       // Force to specific state - used by UI buttons
       if (force !== isLocked) {
-
         onToggleLock();
       }
     } else {
       // Toggle current state
-
       onToggleLock();
     }
   };
@@ -212,9 +206,8 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
   }, []);
 
   const getTransformClass = () => {
-    // On small phones, only use isOpen state
-    // On tablets and desktop, pane is visible if open OR locked
-    const isVisible = isSmallMobile ? isOpen : (isOpen || isLocked);
+    // Pane is visible if open OR locked (all devices)
+    const isVisible = isOpen || isLocked;
     
     switch (side) {
       case 'left':
@@ -235,7 +228,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
   };
 
   return {
-    isLocked: isSmallMobile ? false : isLocked, // Always false on small phones, but tablets can lock
+    isLocked, // Return actual lock state on all devices
     isOpen,
     toggleLock,
     openPane,
