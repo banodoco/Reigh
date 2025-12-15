@@ -242,9 +242,9 @@
     --muted: 200 10% 18%;                   /* Blue-gray muted */
     --muted-foreground: 200 8% 55%;
     
-    /* Accent - dusty rose */
-    --accent: 333 22% 52%;                  /* Dusty rose */
-    --accent-foreground: 150 12% 10%;
+    /* Accent - subtle forest highlight */
+    --accent: 150 15% 25%;                  /* Forest green hover */
+    --accent-foreground: 45 20% 88%;        /* Cream text for readability */
     
     /* Destructive */
     --destructive: 0 60% 45%;
