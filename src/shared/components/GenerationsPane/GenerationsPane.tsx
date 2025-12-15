@@ -6,7 +6,7 @@ import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages,
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye, Sparkles } from 'lucide-react';
+import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye, Sparkles, ExternalLink } from 'lucide-react';
 import { ImageGenerationModal } from '@/shared/components/ImageGenerationModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
@@ -383,12 +383,20 @@ const GenerationsPaneComponent: React.FC = () => {
           handlePaneLeave={handlePaneLeave}
           thirdButton={{
             onClick: () => {
-              setIsGenerationsPaneLocked(false); // Unlock and close the pane immediately
-              navigate('/tools/image-generation?formCollapsed=true'); // Navigate with collapsed form parameter
+              setIsGenerationModalOpen(true);
             },
-            ariaLabel: "Open Image Generation Tool",
-            tooltip: "Go to Image Generation",
+            ariaLabel: "Generate new image",
+            tooltip: "Generate new image",
             content: <Sparkles className="h-4 w-4" />
+          }}
+          fourthButton={{
+            onClick: () => {
+              setIsGenerationsPaneLocked(false);
+              navigate('/tools/image-generation');
+            },
+            ariaLabel: "Go to Image Generation tool",
+            tooltip: "Go to Image Generation tool",
+            content: <ExternalLink className="h-4 w-4" />
           }}
           paneIcon="gallery"
           paneTooltip="View generations gallery"

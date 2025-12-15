@@ -35,6 +35,15 @@ interface PaneControlTabProps {
     tooltip?: string; // Tooltip text for this button
   };
   /**
+   * Optional fourth button that appears AFTER the lock button (to the right/bottom of lock)
+   */
+  fourthButton?: {
+    onClick: () => void;
+    ariaLabel: string;
+    content?: React.ReactNode;
+    tooltip?: string;
+  };
+  /**
    * Icon to show on the pane control tab instead of chevron.
    * Defaults to 'chevron' for backward compatibility.
    */
@@ -88,6 +97,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   handlePaneEnter, 
   handlePaneLeave, 
   thirdButton,
+  fourthButton,
   horizontalOffset = 0,
   paneIcon = 'chevron',
   customIcon,
@@ -225,6 +235,17 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             >
               <UnlockIcon className="h-4 w-4" />
             </Button>
+            {fourthButton && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={fourthButton.onClick}
+                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label={fourthButton.ariaLabel}
+              >
+                {fourthButton.content || <Square className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
         );
       }
@@ -254,20 +275,20 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            onPointerUp={() => openPane()}
-            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-            aria-label={paneTooltip || "Open pane"}
-          >
-            {getIcon()}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
             onPointerUp={() => toggleLock(true)}
             className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
             aria-label="Lock pane open"
           >
             <LockIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerUp={() => openPane()}
+            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+            aria-label={paneTooltip || "Open pane"}
+          >
+            {getIcon()}
           </Button>
         </div>
       );
@@ -394,6 +415,19 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
               <UnlockIcon className="h-4 w-4" />
             </Button>
           </TooltipButton>
+          {fourthButton && (
+            <TooltipButton tooltip={fourthButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={fourthButton.onClick}
+                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label={fourthButton.ariaLabel}
+              >
+                {fourthButton.content || <Square className="h-4 w-4" />}
+              </Button>
+            </TooltipButton>
+          )}
         </div>
       </TooltipProvider>
     );
@@ -424,6 +458,17 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             </Button>
           </TooltipButton>
         )}
+        <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerUp={() => toggleLock(true)}
+            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+            aria-label="Lock pane"
+          >
+            <LockIcon className="h-4 w-4" />
+          </Button>
+        </TooltipButton>
         <TooltipButton tooltip={paneTooltip} showTooltip={showTooltips} side={tooltipSide}>
           <Button
             variant="ghost"
@@ -435,17 +480,6 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             aria-label={paneTooltip || "Open pane"}
           >
             {getIcon()}
-          </Button>
-        </TooltipButton>
-        <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
-          <Button
-            variant="ghost"
-            size="icon"
-            onPointerUp={() => toggleLock(true)}
-            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-            aria-label="Lock pane"
-          >
-            <LockIcon className="h-4 w-4" />
           </Button>
         </TooltipButton>
       </div>

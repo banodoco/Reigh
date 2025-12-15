@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/components/ui/dialog';
+import { Button } from '@/shared/components/ui/button';
 import { useExtraLargeModal } from '@/shared/hooks/useModal';
 import { ImageGenerationForm } from '@/tools/image-generation/components/ImageGenerationForm';
 import { ImageGenerationFormHandles } from '@/tools/image-generation/components/ImageGenerationForm/types';
@@ -14,6 +15,8 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface ImageGenerationModalProps {
   isOpen: boolean;
@@ -29,6 +32,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   const { selectedProjectId } = useProject();
   const queryClient = useQueryClient();
   const { getApiKey } = useApiKeys();
+  const navigate = useNavigate();
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [justQueued, setJustQueued] = useState(false);
@@ -86,6 +90,11 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
     };
   }, []);
 
+  const handleNavigateToTool = useCallback(() => {
+    onClose();
+    navigate('/tools/image-generation');
+  }, [onClose, navigate]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -100,7 +109,13 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
         {...modal.props}
       >
         <DialogHeader className={modal.headerClass}>
-          <DialogTitle className="text-xl font-light">Generate Images</DialogTitle>
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle className="text-xl font-light">Generate Images</DialogTitle>
+            <Button variant="secondary" size="sm" onClick={handleNavigateToTool} className="gap-1 flex-shrink-0 mr-2">
+              <ExternalLink className="h-4 w-4" />
+              Open Tool
+            </Button>
+          </div>
         </DialogHeader>
         
         <div className={`${modal.scrollClass} -mx-6 -mb-6 px-6 flex-1 min-h-0`}>
