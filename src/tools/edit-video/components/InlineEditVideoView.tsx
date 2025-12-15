@@ -3,7 +3,7 @@ import { GenerationRow } from '@/types/shots';
 import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowLeft, Loader2, Check, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Check, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { TooltipProvider } from '@/shared/components/ui/tooltip';
 import { VideoPortionEditor } from './VideoPortionEditor';
@@ -91,6 +91,9 @@ export function InlineEditVideoView({
   const [videoFps, setVideoFps] = useState<number | null>(null);
   const [fpsDetectionStatus, setFpsDetectionStatus] = useState<'pending' | 'detecting' | 'detected' | 'fallback'>('pending');
   
+  // Current video playhead time for overlay display
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  
   // Progressive loading: show thumbnail first, then video when ready
   const [videoReady, setVideoReady] = useState(false);
   const thumbnailUrl = (media as any).thumbnail_url || (media as any).thumbUrl;
@@ -125,8 +128,43 @@ export function InlineEditVideoView({
   // Currently active selection for editing
   const [activeSelectionId, setActiveSelectionId] = useState<string | null>(null);
   
+  // Track video time updates for overlay display
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    const handleTimeUpdate = () => {
+      setCurrentVideoTime(video.currentTime);
+    };
+    
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+  }, []);
+  
+  // Check if current time is in a regeneration zone and which segment
+  const regenerationZoneInfo = useMemo(() => {
+    // Sort by start time to get correct index
+    const sortedSelections = [...selections].sort((a, b) => a.start - b.start);
+    for (let i = 0; i < sortedSelections.length; i++) {
+      const selection = sortedSelections[i];
+      if (currentVideoTime >= selection.start && currentVideoTime <= selection.end) {
+        return { inZone: true, segmentIndex: i };
+      }
+    }
+    return { inZone: false, segmentIndex: -1 };
+  }, [currentVideoTime, selections]);
+  
+  // Segment colors matching VideoPortionEditor
+  const SEGMENT_COLORS = [
+    { bg: 'bg-primary/40', text: 'text-primary' },
+    { bg: 'bg-blue-500/40', text: 'text-blue-400' },
+    { bg: 'bg-green-500/40', text: 'text-green-400' },
+    { bg: 'bg-orange-500/40', text: 'text-orange-400' },
+    { bg: 'bg-purple-500/40', text: 'text-purple-400' },
+  ];
+  
   // Handler to update per-segment settings
-  const handleUpdateSelectionSettings = useCallback((id: string, updates: Partial<Pick<PortionSelection, 'gapFrameCount' | 'prompt'>>) => {
+  const handleUpdateSelectionSettings = useCallback((id: string, updates: Partial<Pick<PortionSelection, 'gapFrameCount' | 'prompt' | 'name'>>) => {
     setSelections(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   }, []);
   
@@ -283,19 +321,55 @@ export function InlineEditVideoView({
     }
   }, [activeSelectionId]);
   
-  // Helper to calculate gap frames from time range
+  // Helper to calculate gap frames from time range (enforces max limit)
   const calculateGapFramesFromRange = useCallback((start: number, end: number, fps: number | null): number => {
     if (!fps || end <= start) return gapFrameCount; // Fallback to global default
-    
+
     const frameCount = Math.round((end - start) * fps);
     // Quantize to 4N+1 format (required by Wan models)
     const n = Math.round((frameCount - 1) / 4);
     const quantized = Math.max(1, n * 4 + 1);
-    return quantized;
-  }, [gapFrameCount]);
+    
+    // Enforce max limit: 81 - (contextFrameCount * 2)
+    const maxGapFrames = Math.max(1, 81 - (contextFrameCount * 2));
+    return Math.min(quantized, maxGapFrames);
+  }, [gapFrameCount, contextFrameCount]);
 
-  // Update a selection
+  // Update a selection with minimum 2 frame gap enforcement
   const handleUpdateSelection = useCallback((id: string, start: number, end: number) => {
+    // Minimum gap of 2 frames
+    const minGapFrames = 2;
+    const minGapTime = videoFps ? minGapFrames / videoFps : 0.1;
+    
+    // Enforce minimum gap - adjust whichever value was likely being dragged
+    let adjustedStart = start;
+    let adjustedEnd = end;
+    
+    if (end - start < minGapTime) {
+      // If gap is too small, we need to figure out which handle is being moved
+      // We'll adjust the value that makes the gap smaller
+      setSelections(prev => {
+        const existing = prev.find(s => s.id === id);
+        if (existing) {
+          // If start moved closer to end, push start back
+          if (Math.abs(start - existing.start) > Math.abs(end - existing.end)) {
+            adjustedStart = end - minGapTime;
+          } else {
+            // If end moved closer to start, push end forward
+            adjustedEnd = start + minGapTime;
+          }
+        }
+        return prev.map(s => {
+          if (s.id === id) {
+            const calculatedGapFrames = calculateGapFramesFromRange(adjustedStart, adjustedEnd, videoFps);
+            return { ...s, start: adjustedStart, end: adjustedEnd, gapFrameCount: calculatedGapFrames };
+          }
+          return s;
+        });
+      });
+      return;
+    }
+    
     setSelections(prev => prev.map(s => {
       if (s.id === id) {
         const calculatedGapFrames = calculateGapFramesFromRange(start, end, videoFps);
@@ -669,6 +743,39 @@ export function InlineEditVideoView({
             "relative flex items-center justify-center bg-zinc-900 overflow-hidden",
             useStackedLayout ? "w-full" : "flex-shrink rounded-t-lg"
           )}>
+            {/* Playhead info overlay - top right of video */}
+            {videoReady && videoDuration > 0 && (
+              <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 text-[11px] font-mono text-white/80 bg-black/50 backdrop-blur-sm rounded px-2 py-1">
+                {formatTime(currentVideoTime)}
+                {videoFps && <span className="text-white/50 ml-1">f{Math.round(currentVideoTime * videoFps)}</span>}
+                {' '}
+                <span className={cn(
+                  "px-1.5 py-0.5 rounded text-[10px] ml-1",
+                  regenerationZoneInfo.inZone
+                    ? SEGMENT_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_COLORS.length].bg + ' ' + SEGMENT_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_COLORS.length].text
+                    : "bg-white/20 text-white/70"
+                )}>
+                  {regenerationZoneInfo.inZone ? `segment ${regenerationZoneInfo.segmentIndex + 1}` : 'keep'}
+                </span>
+                {/* Delete button - only show when in a segment and there's more than 1 */}
+                {regenerationZoneInfo.inZone && selections.length > 1 && (
+                  <button
+                    onClick={() => {
+                      // Find the actual selection ID for this segment index
+                      const sortedSelections = [...selections].sort((a, b) => a.start - b.start);
+                      const selectionToDelete = sortedSelections[regenerationZoneInfo.segmentIndex];
+                      if (selectionToDelete) {
+                        handleRemoveSelection(selectionToDelete.id);
+                      }
+                    }}
+                    className="ml-1 p-0.5 rounded hover:bg-white/20 text-white/50 hover:text-white transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
+            
             {/* Video Player with progressive loading - thumbnail first, then video */}
             <div className={cn(
               "w-full flex items-center justify-center relative",
@@ -743,7 +850,7 @@ export function InlineEditVideoView({
           {videoDuration > 0 && (
             <div className={cn(
               "bg-zinc-900 select-none touch-manipulation flex-shrink-0",
-              useStackedLayout ? "px-3 py-3" : "px-4 pt-3 pb-4 rounded-b-lg"
+              useStackedLayout ? "px-3 py-2" : "px-4 pt-2 pb-2 rounded-b-lg"
             )}>
               {/* Timeline */}
               <MultiPortionTimeline
@@ -756,24 +863,19 @@ export function InlineEditVideoView({
                 videoRef={videoRef}
                 videoUrl={videoUrl}
                 fps={videoFps}
+                maxGapFrames={Math.max(1, 81 - (contextFrameCount * 2))}
               />
               
               {/* Add button */}
-              <div className={cn(
-                "flex justify-center",
-                useStackedLayout ? "-mt-1" : "mt-2"
-              )}>
+              <div className="flex justify-center -mt-3 pb-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleAddSelection}
-                  className={cn(
-                    "text-white/70 hover:text-white hover:bg-white/10 gap-1",
-                    useStackedLayout ? "text-xs h-7 px-2" : "text-sm h-8"
-                  )}
+                  className="text-white/70 hover:text-white hover:bg-white/10 gap-1 text-xs h-6 px-2"
                 >
-                  <Plus className={useStackedLayout ? "w-3 h-3" : "w-4 h-4"} />
-                  {useStackedLayout ? "Add selection" : "Add new selection"}
+                  <Plus className="w-3 h-3" />
+                  Add selection
                 </Button>
               </div>
             </div>
@@ -783,7 +885,7 @@ export function InlineEditVideoView({
         {/* Settings Panel */}
         <div className={cn(
           "bg-background overflow-y-auto",
-          useStackedLayout ? "w-full border-t border-border" : "w-[400px] border-l border-border"
+          useStackedLayout ? "w-full border-t border-border" : "w-[40%] border-l border-border"
         )}>
           <VideoPortionEditor
             gapFrames={gapFrameCount}
@@ -792,9 +894,9 @@ export function InlineEditVideoView({
             setContextFrames={(val) => {
               const maxGap = Math.max(1, 81 - (val * 2));
               const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
-              editSettings.updateFields({ 
-                contextFrameCount: val, 
-                gapFrameCount: newGapFrames 
+              editSettings.updateFields({
+                contextFrameCount: val,
+                gapFrameCount: newGapFrames
               });
             }}
             maxContextFrames={maxContextFrames}
@@ -805,7 +907,9 @@ export function InlineEditVideoView({
             selections={selections}
             onUpdateSelectionSettings={handleUpdateSelectionSettings}
             onRemoveSelection={handleRemoveSelection}
+            onAddSelection={handleAddSelection}
             videoUrl={videoUrl}
+            fps={videoFps}
             availableLoras={availableLoras}
             projectId={selectedProjectId}
             loraManager={loraManager}

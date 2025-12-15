@@ -8,6 +8,7 @@ export interface PortionSelection {
   end: number;    // End time in seconds
   gapFrameCount?: number;  // Per-segment gap frame count (defaults to global setting)
   prompt?: string;  // Per-segment prompt (defaults to global prompt)
+  name?: string;  // Optional user-defined name for the segment
 }
 
 // Format seconds to MM:SS.ms
@@ -146,10 +147,21 @@ export interface MultiPortionTimelineProps {
   onSelectionChange: (id: string, start: number, end: number) => void;
   onSelectionClick: (id: string | null) => void;
   onRemoveSelection: (id: string) => void;
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   videoUrl: string;
   fps: number | null;
+  /** Maximum gap frames allowed (to enforce limits from settings) */
+  maxGapFrames?: number;
 }
+
+// Color palette for segments
+const SEGMENT_COLORS = [
+  'bg-primary',
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-orange-500',
+  'bg-purple-500',
+];
 
 // Timeline with multiple portion selections, thumbnails, and time labels
 export function MultiPortionTimeline({
@@ -162,9 +174,15 @@ export function MultiPortionTimeline({
   videoRef,
   videoUrl,
   fps,
+  maxGapFrames,
 }: MultiPortionTimelineProps) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const scrubberRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<{ id: string; handle: 'start' | 'end' } | null>(null);
+  
+  // Playhead state
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
   
   // Tap-to-move mode: tap a handle to select it, tap track to move it
   const [selectedHandle, setSelectedHandle] = useState<{ id: string; handle: 'start' | 'end' } | null>(null);
@@ -182,6 +200,96 @@ export function MultiPortionTimeline({
   // Keep a ref to selections so handleMove doesn't need to depend on it
   const selectionsRef = useRef(selections);
   selectionsRef.current = selections;
+  
+  // Track video time for playhead
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    const handleTimeUpdate = () => {
+      if (!isDraggingPlayhead) {
+        setCurrentTime(video.currentTime);
+      }
+    };
+    
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+  }, [videoRef, isDraggingPlayhead]);
+  
+  // Check if a time is in a regeneration zone
+  const isInRegenerationZone = useCallback((time: number): { inZone: boolean; segmentIndex: number } => {
+    for (let i = 0; i < selections.length; i++) {
+      if (time >= selections[i].start && time <= selections[i].end) {
+        return { inZone: true, segmentIndex: i };
+      }
+    }
+    return { inZone: false, segmentIndex: -1 };
+  }, [selections]);
+  
+  // Get frame number from time
+  const getFrameNumber = useCallback((time: number): number => {
+    return fps ? Math.round(time * fps) : 0;
+  }, [fps]);
+  
+  // Handle scrubber click/drag
+  const handleScrubberInteraction = useCallback((e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
+    if (!scrubberRef.current || !videoRef.current) return;
+    
+    const rect = scrubberRef.current.getBoundingClientRect();
+    const clientX = 'touches' in e 
+      ? (e.touches[0]?.clientX ?? (e as TouchEvent).changedTouches?.[0]?.clientX ?? 0)
+      : (e as MouseEvent).clientX;
+    const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const time = percent * duration;
+    
+    setCurrentTime(time);
+    videoRef.current.currentTime = time;
+  }, [duration, videoRef]);
+  
+  // Start dragging playhead
+  const startPlayheadDrag = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (videoRef.current) {
+      wasPlayingRef.current = !videoRef.current.paused;
+      videoRef.current.pause();
+    }
+    
+    setIsDraggingPlayhead(true);
+    handleScrubberInteraction(e);
+  }, [videoRef, handleScrubberInteraction]);
+  
+  // Handle playhead drag move
+  useEffect(() => {
+    if (!isDraggingPlayhead) return;
+    
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      handleScrubberInteraction(e);
+    };
+    
+    const handleEnd = () => {
+      setIsDraggingPlayhead(false);
+      if (wasPlayingRef.current && videoRef.current) {
+        videoRef.current.play();
+      }
+    };
+    
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleEnd);
+    window.addEventListener('touchcancel', handleEnd);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+      window.removeEventListener('touchcancel', handleEnd);
+    };
+  }, [isDraggingPlayhead, handleScrubberInteraction, videoRef]);
   
   // Get position from mouse or touch event
   const getClientX = (e: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent): number => {
@@ -247,12 +355,20 @@ export function MultiPortionTimeline({
     const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     const time = (percent / 100) * duration;
     
+    // Enforce min (2 frames) and max gap limits
+    const minGapTime = fps ? 2 / fps : 0.1;
+    const maxGapTime = (fps && maxGapFrames) ? maxGapFrames / fps : duration;
+    
     let newTime: number;
     if (selectedHandle.handle === 'start') {
-      newTime = Math.min(time, selection.end - 0.1);
+      const minStart = selection.end - maxGapTime;
+      const maxStart = selection.end - minGapTime;
+      newTime = Math.max(Math.max(0, minStart), Math.min(time, maxStart));
       onSelectionChange(selectedHandle.id, newTime, selection.end);
     } else {
-      newTime = Math.max(time, selection.start + 0.1);
+      const minEnd = selection.start + minGapTime;
+      const maxEnd = selection.start + maxGapTime;
+      newTime = Math.min(Math.min(duration, maxEnd), Math.max(time, minEnd));
       onSelectionChange(selectedHandle.id, selection.start, newTime);
     }
     
@@ -283,12 +399,30 @@ export function MultiPortionTimeline({
     const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     const time = (percent / 100) * duration;
     
-    // Calculate drag offset for immediate visual feedback (no React re-render)
+    // Calculate constrained time first - enforce min (2 frames) and max gap limits
+    const minGapTime = fps ? 2 / fps : 0.1;
+    const maxGapTime = (fps && maxGapFrames) ? maxGapFrames / fps : duration;
+    
+    let newTime: number;
+    if (dragging.handle === 'start') {
+      // Start can't go past end - minGap, and can't go before end - maxGap
+      const minStart = selection.end - maxGapTime;
+      const maxStart = selection.end - minGapTime;
+      newTime = Math.max(Math.max(0, minStart), Math.min(time, maxStart));
+    } else {
+      // End can't go before start + minGap, and can't go past start + maxGap
+      const minEnd = selection.start + minGapTime;
+      const maxEnd = selection.start + maxGapTime;
+      newTime = Math.min(Math.min(duration, maxEnd), Math.max(time, minEnd));
+    }
+    
+    // Calculate drag offset based on CONSTRAINED position for accurate visual feedback
     const currentPercent = dragging.handle === 'start' 
       ? (selection.start / duration) * 100 
       : (selection.end / duration) * 100;
+    const constrainedPercent = (newTime / duration) * 100;
     const currentPx = (currentPercent / 100) * rect.width;
-    const newPx = ((percent / 100) * rect.width);
+    const newPx = (constrainedPercent / 100) * rect.width;
     const offsetPx = newPx - currentPx;
     
     // Store offset for immediate visual update via CSS transform
@@ -296,14 +430,6 @@ export function MultiPortionTimeline({
     
     // Trigger lightweight re-render to apply transform immediately
     setDragTick(t => t + 1);
-    
-    // Store pending update
-    let newTime: number;
-    if (dragging.handle === 'start') {
-      newTime = Math.min(time, selection.end - 0.1);
-    } else {
-      newTime = Math.max(time, selection.start + 0.1);
-    }
     pendingUpdateRef.current = { id: dragging.id, handle: dragging.handle, time: newTime };
     currentDragTimeRef.current = newTime;
     
@@ -392,15 +518,56 @@ export function MultiPortionTimeline({
     'bg-purple-500',
   ];
   
+  // Combined ref handler for both track operations
+  const setTrackRefs = useCallback((el: HTMLDivElement | null) => {
+    (trackRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    (scrubberRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+  }, []);
+  
+  // Handle click on track - differentiate between seeking and handle selection
+  const handleTrackClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    // If we're not in handle-select mode, seek to position
+    if (!selectedHandle) {
+      handleScrubberInteraction(e as React.MouseEvent);
+    } else {
+      handleTrackTap(e);
+    }
+  }, [selectedHandle, handleScrubberInteraction, handleTrackTap]);
+  
   return (
     <div className="relative pt-16 md:pt-12 pb-2 select-none">
       {/* Track */}
       <div 
-        ref={trackRef}
+        ref={setTrackRefs}
         className="relative h-8 md:h-6 bg-white/10 rounded cursor-pointer touch-none select-none"
-        onClick={handleTrackTap}
-        onTouchEnd={handleTrackTap}
+        onClick={handleTrackClick}
+        onTouchEnd={handleTrackClick}
+        onMouseDown={(e) => {
+          // Start playhead drag if clicking on empty area (not on a handle)
+          const target = e.target as HTMLElement;
+          if (!target.closest('[data-handle]')) {
+            startPlayheadDrag(e);
+          }
+        }}
+        onTouchStart={(e) => {
+          const target = e.target as HTMLElement;
+          if (!target.closest('[data-handle]')) {
+            startPlayheadDrag(e);
+          }
+        }}
       >
+        {/* Playhead - vertical line showing current position */}
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg pointer-events-none z-20"
+          style={{ 
+            left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          {/* Playhead top handle */}
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rounded-full shadow" />
+        </div>
+        
         {/* Render each selection */}
         {selections.map((selection, index) => {
           // Calculate base percentages
@@ -499,6 +666,7 @@ export function MultiPortionTimeline({
               
               {/* Start handle - larger touch target on mobile, prevent text selection on iPad */}
               <div
+                data-handle="start"
                 className={cn(
                   "absolute top-0 bottom-0 w-5 md:w-3 rounded-l cursor-ew-resize flex items-center justify-center z-10 touch-none select-none",
                   colorClass,
@@ -530,6 +698,7 @@ export function MultiPortionTimeline({
               
               {/* End handle - larger touch target on mobile, prevent text selection on iPad */}
               <div
+                data-handle="end"
                 className={cn(
                   "absolute top-0 bottom-0 w-5 md:w-3 rounded-r cursor-ew-resize flex items-center justify-center z-10 touch-none select-none",
                   colorClass,

@@ -460,7 +460,7 @@ export default function EditVideoPage() {
                   </div>
                 </div>
               ) : (
-                // Desktop: Match InlineEditVideoView desktop layout (flex-1 + w-[400px])
+                // Desktop: Match InlineEditVideoView desktop layout (60% video + 40% settings)
                 <div className="w-full h-full flex flex-row bg-transparent overflow-hidden">
                   {/* Left side: Video + Timeline stacked */}
                   <div className="flex-1 flex flex-col min-h-0 h-full">
@@ -487,8 +487,8 @@ export default function EditVideoPage() {
                       </div>
                     </div>
                   </div>
-                  {/* Right panel skeleton for controls - fixed 400px width */}
-                  <div className="w-[400px] bg-background border-l border-border p-4 overflow-y-auto">
+                  {/* Right panel skeleton for controls - 40% width */}
+                  <div className="w-[40%] bg-background border-l border-border p-4 overflow-y-auto">
                     <div className="space-y-4">
                       <Skeleton className="h-8 w-full" />
                       <Skeleton className="h-16 w-full" />

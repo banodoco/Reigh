@@ -6,11 +6,11 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
-import { Loader2, Check, Film, Wand2, AlertTriangle, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Loader2, Check, Film, Wand2, AlertTriangle, Trash2, ChevronDown, ChevronUp, X, Plus } from 'lucide-react';
 import { LoraManager } from '@/shared/components/LoraManager';
 import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
-import { PortionSelection } from '@/shared/components/VideoPortionTimeline';
+import { PortionSelection, formatTime } from '@/shared/components/VideoPortionTimeline';
 
 // Color palette for segments - matches VideoPortionTimeline colors
 const SEGMENT_COLORS = [
@@ -23,13 +23,17 @@ const SEGMENT_COLORS = [
 
 const getSegmentColor = (index: number) => SEGMENT_COLORS[index % SEGMENT_COLORS.length];
 
-// Tiny thumbnail component for segment preview
-function SegmentThumbnail({ videoUrl, time }: { videoUrl: string; time: number }) {
+// Thumbnail component for segment preview - supports different sizes
+function SegmentThumbnail({ videoUrl, time, size = 'small' }: { videoUrl: string; time: number; size?: 'small' | 'large' }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const loadedRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  
+  // Canvas dimensions based on size
+  const canvasWidth = size === 'large' ? 160 : 48;
+  const canvasHeight = size === 'large' ? 90 : 27;
   
   useEffect(() => {
     // Reset loaded state when videoUrl or time changes
@@ -134,10 +138,11 @@ function SegmentThumbnail({ videoUrl, time }: { videoUrl: string; time: number }
   return (
     <canvas 
       ref={canvasRef}
-      width={48}
-      height={27}
+      width={canvasWidth}
+      height={canvasHeight}
       className={cn(
-        "rounded border border-border/50 w-8 h-[18px]",
+        "rounded border border-border/50",
+        size === 'large' ? "w-full aspect-video" : "w-8 h-[18px]",
         !loaded && !error && "bg-muted/30 animate-pulse",
         error && "bg-destructive/20"
       )}
@@ -188,9 +193,13 @@ export interface VideoPortionEditorProps {
     
     // Per-segment settings
     selections?: PortionSelection[];
-    onUpdateSelectionSettings?: (id: string, updates: Partial<Pick<PortionSelection, 'gapFrameCount' | 'prompt'>>) => void;
+    onUpdateSelectionSettings?: (id: string, updates: Partial<Pick<PortionSelection, 'gapFrameCount' | 'prompt' | 'name'>>) => void;
     onRemoveSelection?: (id: string) => void;
+    onAddSelection?: () => void;
     videoUrl?: string; // For showing segment thumbnails
+    
+    // Video info for duration display
+    fps?: number | null;
     
     // LoRA props
     availableLoras: LoraModel[];
@@ -221,7 +230,9 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     selections = [],
     onUpdateSelectionSettings,
     onRemoveSelection,
+    onAddSelection,
     videoUrl,
+    fps,
     availableLoras,
     projectId,
     loraManager,
@@ -234,6 +245,17 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
 }) => {
     const enhancePromptValue = enhancePrompt ?? true;
     const [showAdvanced, setShowAdvanced] = useState(false);
+    
+    // Calculate total frames to generate across all segments
+    const totalFramesToGenerate = selections.reduce((sum, s) => sum + (s.gapFrameCount ?? gapFrames), 0);
+    
+    // Format duration from frames
+    const formatDuration = (frames: number, videoFps: number | null | undefined): string => {
+        if (!videoFps || videoFps <= 0) return '';
+        const seconds = frames / videoFps;
+        if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
+        return `${seconds.toFixed(1)}s`;
+    };
     
     // Handle context frames change with auto-adjustment of gap frames
     const handleContextFramesChange = (val: number) => {
@@ -284,66 +306,93 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
             
             {/* Per-Segment Settings - Show first! */}
             {selections.length > 0 && onUpdateSelectionSettings && (
-                <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-muted-foreground">Segments to Regenerate</h4>
-                    
+                <div className="space-y-2">
                     <div className="space-y-3">
                         {selections.sort((a, b) => a.start - b.start).map((selection, index) => {
                             const segmentColor = getSegmentColor(index);
+                            const segmentFrameCount = selection.gapFrameCount ?? gapFrames;
+                            const segmentDuration = formatDuration(segmentFrameCount, fps);
+                            
                             return (
                             <div 
                                 key={selection.id} 
-                                className={cn("border rounded-lg p-3 bg-muted/20 space-y-2", segmentColor.border)}
+                                className={cn("border rounded-lg p-3 bg-muted/20 space-y-3", segmentColor.border)}
                             >
-                                {/* Segment Header with thumbnails and slider */}
-                                <div className="flex items-center gap-2">
-                                    {/* Segment number - color matches timeline */}
-                                    <div className={cn("w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0", segmentColor.bgMuted, segmentColor.text)}>
-                                        {index + 1}
-                                    </div>
-                                    
-                                    {/* Start/End thumbnails */}
-                                    {videoUrl && (
-                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                            <SegmentThumbnail videoUrl={videoUrl} time={selection.start} />
-                                            <span className="text-[10px] text-muted-foreground">→</span>
-                                            <SegmentThumbnail videoUrl={videoUrl} time={selection.end} />
+                                {/* Segment Header - self-identifying with time range */}
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <div className={cn("w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0", segmentColor.bgMuted, segmentColor.text)}>
+                                            {index + 1}
                                         </div>
-                                    )}
-                                    
-                                    {/* Gap Frames slider */}
-                                    <div className="flex-1 flex items-center gap-2">
-                                        <Slider
-                                            min={1}
-                                            max={Math.max(1, 81 - (contextFrames * 2))}
-                                            step={4}
-                                            value={[Math.max(1, selection.gapFrameCount ?? gapFrames)]}
-                                            onValueChange={(values) => {
-                                                const quantizedGap = getQuantizedGap(values[0], contextFrames);
-                                                onUpdateSelectionSettings?.(selection.id, { gapFrameCount: quantizedGap });
-                                            }}
-                                            className="flex-1"
+                                        {/* Editable segment name or default */}
+                                        <Input
+                                            value={selection.name || ''}
+                                            onChange={(e) => onUpdateSelectionSettings?.(selection.id, { name: e.target.value })}
+                                            placeholder={`Segment ${index + 1}`}
+                                            className="h-6 text-xs font-medium border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-foreground"
                                         />
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <span className="text-xs font-mono text-muted-foreground w-8 text-right cursor-help">
-                                                    {selection.gapFrameCount ?? gapFrames}f
-                                                </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="z-[100001]">
-                                                <p>Frames to generate in the gap</p>
-                                            </TooltipContent>
-                                        </Tooltip>
                                     </div>
+                                    
+                                    {/* Time range badge */}
+                                    <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap flex-shrink-0">
+                                        {formatTime(selection.start)} → {formatTime(selection.end)}
+                                    </span>
                                     
                                     {/* Delete button - only show if more than 1 selection */}
                                     {selections.length > 1 && onRemoveSelection && (
                                         <button
                                             onClick={() => onRemoveSelection(selection.id)}
-                                            className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                            className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
                                         >
-                                            <Trash2 className="w-4 h-4" />
+                                            <Trash2 className="w-3.5 h-3.5" />
                                         </button>
+                                    )}
+                                </div>
+                                
+                                {/* Frame thumbnails with slider in between */}
+                                <div className="flex items-stretch gap-3">
+                                    {/* Start frame */}
+                                    {videoUrl && (
+                                        <div className="w-[30%] flex-shrink-0">
+                                            <SegmentThumbnail videoUrl={videoUrl} time={selection.start} size="large" />
+                                        </div>
+                                    )}
+                                    
+                                    {/* Middle: Slider controls */}
+                                    <div className="flex-1 flex flex-col justify-center items-center min-w-0">
+                                        <span className="text-sm font-mono font-medium">
+                                            {segmentFrameCount}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground mb-1">
+                                            Frames in-between
+                                        </span>
+                                        
+                                        {/* Slider */}
+                                        <Slider
+                                            min={1}
+                                            max={Math.max(1, 81 - (contextFrames * 2))}
+                                            step={4}
+                                            value={[Math.max(1, segmentFrameCount)]}
+                                            onValueChange={(values) => {
+                                                const quantizedGap = getQuantizedGap(values[0], contextFrames);
+                                                onUpdateSelectionSettings?.(selection.id, { gapFrameCount: quantizedGap });
+                                            }}
+                                            className="w-full"
+                                        />
+                                        
+                                        {/* Duration info */}
+                                        {fps && segmentDuration && (
+                                            <span className="text-[10px] text-muted-foreground mt-1">
+                                                = {segmentDuration} @ {fps}fps
+                                            </span>
+                                        )}
+                                    </div>
+                                    
+                                    {/* End frame */}
+                                    {videoUrl && (
+                                        <div className="w-[30%] flex-shrink-0">
+                                            <SegmentThumbnail videoUrl={videoUrl} time={selection.end} size="large" />
+                                        </div>
                                     )}
                                 </div>
                                 
@@ -352,7 +401,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                                     <Input
                                         value={selection.prompt || ''}
                                         onChange={(e) => onUpdateSelectionSettings?.(selection.id, { prompt: e.target.value })}
-                                        placeholder="Prompt for this segment (optional)..."
+                                        placeholder="Describe what should happen in this segment..."
                                         className="h-8 text-xs"
                                         clearable
                                         onClear={() => onUpdateSelectionSettings?.(selection.id, { prompt: '' })}
@@ -367,6 +416,17 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                         );
                         })}
                     </div>
+                    
+                    {/* Add selection button */}
+                    {onAddSelection && (
+                        <button
+                            onClick={onAddSelection}
+                            className="w-full flex items-center justify-center gap-1 py-1.5 text-xs text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 rounded-lg transition-colors -mt-1"
+                        >
+                            <Plus className="w-3 h-3" />
+                            Add selection
+                        </button>
+                    )}
                 </div>
             )}
             
@@ -483,7 +543,10 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                         <Film className="w-5 h-5" />
                     )}
                     <span className="font-medium">
-                        {generateSuccess ? 'Task Created' : selections.length > 1 ? 'Regenerate Portions' : 'Regenerate Portion'}
+                        {generateSuccess 
+                            ? 'Task Created' 
+                            : `Regenerate ${selections.length} segment${selections.length > 1 ? 's' : ''} (${totalFramesToGenerate} frames)`
+                        }
                     </span>
                 </Button>
             </div>
