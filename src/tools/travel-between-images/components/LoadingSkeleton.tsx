@@ -28,13 +28,13 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
               
               {/* Center: Navigation buttons with shot name - matching actual layout */}
               <div className="flex items-center justify-center">
-                <div className="flex items-center space-x-2">
-                  {/* ChevronLeft button - size="sm" is ~h-9 w-9 */}
-                  <Skeleton className="h-9 w-9 rounded-md" />
+              <div className="flex items-center space-x-2">
+                {/* ChevronLeft button - size="sm" is ~h-9 w-9 */}
+                <Skeleton className="h-9 w-9 rounded-md" />
                   {/* Shot name - text-xl font-semibold with py-2 px-4 border-2 = ~h-10 */}
                   <Skeleton className="h-10 w-[200px] rounded-md" />
-                  {/* ChevronRight button - size="sm" is ~h-9 w-9 */}
-                  <Skeleton className="h-9 w-9 rounded-md" />
+                {/* ChevronRight button - size="sm" is ~h-9 w-9 */}
+                <Skeleton className="h-9 w-9 rounded-md" />
                 </div>
               </div>
               
@@ -47,23 +47,23 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
             {/* Mobile skeleton - all in one row matching actual mobile Header */}
             <div className="sm:hidden">
               <div className="flex items-center justify-between">
-                {/* Back button - fixed width container matching Header */}
+              {/* Back button - fixed width container matching Header */}
                 {/* Mobile button only has icon, no text */}
-                <div className="w-[75px]">
-                  <Skeleton className="h-9 w-full rounded-md" />
-                </div>
-                
+              <div className="w-[75px]">
+                <Skeleton className="h-9 w-full rounded-md" />
+              </div>
+              
                 {/* Shot name with navigation buttons - matching space-x-1 */}
                 <div className="flex items-center space-x-1">
-                  <Skeleton className="h-9 w-9 rounded-md" />
+                <Skeleton className="h-9 w-9 rounded-md" />
                   {/* Shot name - text-base with px-1 = ~h-6 */}
                   <Skeleton className="h-6 w-[70px] rounded-md" />
-                  <Skeleton className="h-9 w-9 rounded-md" />
-                </div>
-                
-                {/* Aspect Ratio Selector - fixed width container matching Header */}
-                <div className="w-[75px]">
-                  <Skeleton className="h-9 w-full rounded-md" />
+                <Skeleton className="h-9 w-9 rounded-md" />
+              </div>
+              
+              {/* Aspect Ratio Selector - fixed width container matching Header */}
+              <div className="w-[75px]">
+                <Skeleton className="h-9 w-full rounded-md" />
                 </div>
               </div>
             </div>
@@ -88,10 +88,10 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
           
           {/* Mobile: Search icon button skeleton */}
           <Skeleton className="h-8 w-8 rounded-md sm:hidden" />
-          
+        
           {/* Desktop: Search input skeleton - w-28 sm:w-52 h-8 */}
           <Skeleton className="hidden sm:block h-8 w-28 sm:w-52 rounded-md" />
-          
+        
           {/* Sort button skeleton - ml-auto to push right */}
           <Skeleton className="h-8 w-28 sm:w-32 rounded-md ml-auto" />
         </div>
@@ -100,9 +100,9 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
       {/* Grid content with matching container - matches ShotListDisplay grid exactly */}
       {/* Breakpoints: 1 col default, 2 cols at lg (1024px), 3 cols at xl (1280px) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4">
-        {Array.from({ length: gridItemCount }).map((_, idx) => (
+          {Array.from({ length: gridItemCount }).map((_, idx) => (
           <Skeleton key={idx} className="h-32 rounded-lg" />
-        ))}
+          ))}
       </div>
     </>
   );

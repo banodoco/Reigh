@@ -251,7 +251,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           >
             <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
               {/* Subtitle */}
-              <div className="-mt-4 flex justify-center" style={getFadeStyle(4.5, -60, false)}>
+              <div className="mt-4 flex justify-center" style={getFadeStyle(4.5, -60, false)}>
                 <p className="subtitle-container font-theme text-2xl md:text-3xl font-theme-body text-[#ecede3]/90 leading-snug tracking-wide mb-8 md:mb-10">
                   <TooltipProvider>
                     <Tooltip open={openTipOpen} onOpenChange={setOpenTipOpen}>

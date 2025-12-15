@@ -414,7 +414,7 @@ const GenerationsPaneComponent: React.FC = () => {
             isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
           )}
         >
-          <div className="px-2 py-1 border-b border-zinc-800 overflow-hidden">
+          <div className="px-2 py-1 border-b border-zinc-800 overflow-x-hidden">
             <div className="flex items-center justify-between min-w-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <h2 className="text-xl font-light text-zinc-200 ml-2 truncate">Generations</h2>
