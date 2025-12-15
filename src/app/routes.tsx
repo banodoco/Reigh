@@ -15,9 +15,10 @@ import SegmentsPage from '@/tools/travel-between-images/pages/SegmentsPage';
 import CharacterAnimatePage from '@/tools/character-animate/pages/CharacterAnimatePage';
 // Import JoinClipsPage eagerly for consistency with other main tools
 import JoinClipsPage from '@/tools/join-clips/pages/JoinClipsPage';
+// Import EditVideoPage eagerly to avoid dynamic import issues (consistent with other main tools)
+import EditVideoPage from '@/tools/edit-video/pages/EditVideoPage';
 // Keep other heavy tools lazy-loaded to preserve bundle size
 const EditImagesPage = lazy(() => import('@/tools/edit-images/pages/EditImagesPage'));
-const EditVideoPage = lazy(() => import('@/tools/edit-video/pages/EditVideoPage'));
 import NotFoundPage from '@/pages/NotFoundPage';
 import ShotsPage from "@/pages/ShotsPage";
 import GenerationsPage from "@/pages/GenerationsPage"; // Import the new GenerationsPage
@@ -126,11 +127,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/tools/edit-video',
-        element: (
-          <Suspense fallback={<LazyLoadingFallback />}>
-            <EditVideoPage />
-          </Suspense>
-        ),
+        element: <EditVideoPage />, // No Suspense wrapper needed – component is loaded synchronously
       },
       {
         path: '/shots',
