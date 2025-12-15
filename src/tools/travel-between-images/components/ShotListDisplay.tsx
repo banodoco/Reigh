@@ -534,7 +534,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 'group min-h-32 p-4 border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer flex flex-col items-center justify-center gap-3',
                 isNewShotDropTarget 
                   ? 'border-green-500 bg-green-500/10 scale-105' 
-                  : 'border-zinc-600 hover:border-[hsl(40,55%,58%)]'
+                  : 'border-border hover:border-[hsl(40,55%,58%)]'
               )}
             >
               {isNewShotDropTarget ? (
@@ -546,8 +546,8 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 </>
               ) : (
                 <>
-                  <div className="plus-icon-container flex items-center justify-center w-8 h-8 rounded-full border-2 border-dashed border-zinc-500 group-hover:border-[hsl(40,55%,58%)] transition-all duration-200 group-hover:bg-[hsl(40,55%,58%,0.15)] group-hover:shadow-[0_0_16px_hsl(40,55%,58%,0.4)]">
-                    <Plus className="w-4 h-4 text-zinc-400 group-hover:text-[hsl(40,55%,58%)] transition-all duration-200" />
+                  <div className="plus-icon-container flex items-center justify-center w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/50 group-hover:border-[hsl(40,55%,58%)] transition-all duration-200 group-hover:bg-[hsl(40,55%,58%,0.15)] group-hover:shadow-[0_0_16px_hsl(40,55%,58%,0.4)]">
+                    <Plus className="w-4 h-4 text-muted-foreground group-hover:text-[hsl(40,55%,58%)] transition-all duration-200" />
                   </div>
                   <p className="text-muted-foreground text-center text-sm group-hover:text-[hsl(40,55%,58%)] transition-colors duration-200">
                     Create new shot

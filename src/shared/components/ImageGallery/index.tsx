@@ -390,6 +390,18 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     }
   }, [filtersHook.filteredImages, stateHook.state.pendingLightboxTarget, actionsHook.handleOpenLightbox, stateHook.setPendingLightboxTarget]);
 
+  // Listen for custom event to select a shot for adding images (from VideoShotDisplay)
+  useEffect(() => {
+    const handleSelectShotForAddition = (event: CustomEvent<{ shotId: string; shotName: string }>) => {
+      const { shotId, shotName } = event.detail;
+      console.log('[ImageGallery] Selecting shot for addition:', { shotId, shotName });
+      stateHook.setSelectedShotIdLocal(shotId);
+    };
+
+    window.addEventListener('selectShotForAddition', handleSelectShotForAddition as EventListener);
+    return () => window.removeEventListener('selectShotForAddition', handleSelectShotForAddition as EventListener);
+  }, [stateHook.setSelectedShotIdLocal]);
+
   // Create refs to store current values to avoid stale closures
   const navigationDataRef = useRef({
     activeLightboxMedia: stateHook.state.activeLightboxMedia,

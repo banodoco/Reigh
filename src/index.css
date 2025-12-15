@@ -94,9 +94,6 @@
   font-display: swap;
 }
 
-.mb-8 {
-    margin-top: 2rem;
-}
 /* Reigh App Styles */
 @layer base {
   :root {
@@ -1196,9 +1193,6 @@
   .dark .wes-header {
     border-bottom: 1px solid hsl(var(--wes-vintage-gold) / 0.3);
     box-shadow: 0 1px 4px hsl(0 0% 0% / 0.3);
-  }
-
-  .dark .wes-header {
     background: 
       linear-gradient(90deg, hsl(var(--background)) 0%, hsl(210 20% 18% / 0.6) 50%, hsl(var(--background)) 100%),
       repeating-linear-gradient(

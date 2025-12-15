@@ -8,7 +8,7 @@ import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
-import { ChevronLeft, ChevronRight, ArrowDown, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowDown, Search, X } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
@@ -40,6 +40,7 @@ import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloade
 import { useGenerations } from '@/shared/hooks/useGenerations';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { SKELETON_COLUMNS } from '@/shared/components/ImageGallery/utils';
+import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -958,7 +959,20 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   
   // Search functionality for shots
   const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Search toggle handler - matches ShotsPane pattern
+  const handleSearchToggle = useCallback(() => {
+    setIsSearchOpen(prev => {
+      const newValue = !prev;
+      if (!newValue) {
+        // Clear search when closing
+        setShotSearchQuery('');
+      }
+      return newValue;
+    });
+  }, []);
   
   // Sort mode for shots - persisted per project
   const shotSortMode = projectUISettings?.shotSortMode ?? 'newest';
@@ -2244,8 +2258,21 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                 </SegmentedControlItem>
               </SegmentedControl>
 
-              {/* Search - Shots view */}
-              {!showVideosView && (
+              {/* Mobile: Search icon button - Shots view */}
+              {isMobile && !showVideosView && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground hover:bg-muted p-1"
+                  onClick={handleSearchToggle}
+                  title={isSearchOpen ? "Close search" : "Search shots"}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Desktop: Search - Shots view */}
+              {!isMobile && !showVideosView && (
                 <div className="relative w-28 sm:w-52">
                   <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
                     <Search className="h-3.5 w-3.5" />
@@ -2308,6 +2335,42 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                 </Button>
               )}
             </div>
+            
+            {/* Mobile: Search box appears below full width when open */}
+            {isMobile && !showVideosView && (
+              <div 
+                className={cn(
+                  "overflow-hidden transition-all duration-200 ease-out w-full",
+                  isSearchOpen ? "max-h-14 opacity-100 mt-3" : "max-h-0 opacity-0"
+                )}
+              >
+                <div className="flex items-center space-x-2 border rounded-md px-3 py-1 h-8 bg-background w-full">
+                  <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search shots..."
+                    value={shotSearchQuery}
+                    onChange={(e) => setShotSearchQuery(e.target.value)}
+                    className="bg-transparent border-none outline-none text-base flex-1"
+                    style={{ fontSize: '16px' }} // Prevents iOS auto-zoom on focus
+                  />
+                  {shotSearchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShotSearchQuery('');
+                        setIsSearchOpen(false);
+                      }}
+                      className="h-auto p-0.5 flex-shrink-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Content Area - Videos: Constrained */}

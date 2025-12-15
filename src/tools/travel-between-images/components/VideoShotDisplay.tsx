@@ -3,7 +3,7 @@ import { Shot } from '../../../types/shots';
 import { useUpdateShotName, useDeleteShot, useDuplicateShot } from '../../../shared/hooks/useShots';
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
-import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2, Video, ChevronDown, ChevronUp } from 'lucide-react';
+import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2, Video, ChevronDown, ChevronUp, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
@@ -11,6 +11,7 @@ import { useClickRipple } from '@/shared/hooks/useClickRipple';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { isVideoGeneration, isPositioned } from '@/shared/lib/typeGuards';
 import { VideoGenerationModal } from '@/shared/components/VideoGenerationModal';
+import { usePanes } from '@/shared/contexts/PanesContext';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -52,6 +53,40 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   const updateShotNameMutation = useUpdateShotName();
   const deleteShotMutation = useDeleteShot();
   const duplicateShotMutation = useDuplicateShot();
+  
+  // Check if GenerationsPane is locked to show "Select this shot" button
+  const { isGenerationsPaneLocked } = usePanes();
+  const [isSelectedForAddition, setIsSelectedForAddition] = useState(false);
+  
+  // Handle selecting this shot as the target for adding images in GenerationsPane
+  const handleSelectShotForAddition = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Dispatch custom event that ImageGallery listens for to update its shot selector
+    window.dispatchEvent(new CustomEvent('selectShotForAddition', {
+      detail: { shotId: shot.id, shotName: shot.name }
+    }));
+    // Show success state
+    setIsSelectedForAddition(true);
+  };
+  
+  // Listen for other shots being selected to clear our success state
+  useEffect(() => {
+    const handleOtherShotSelected = (event: CustomEvent<{ shotId: string }>) => {
+      if (event.detail.shotId !== shot.id) {
+        setIsSelectedForAddition(false);
+      }
+    };
+    
+    window.addEventListener('selectShotForAddition', handleOtherShotSelected as EventListener);
+    return () => window.removeEventListener('selectShotForAddition', handleOtherShotSelected as EventListener);
+  }, [shot.id]);
+  
+  // Clear selection state when GenerationsPane is unlocked
+  useEffect(() => {
+    if (!isGenerationsPaneLocked) {
+      setIsSelectedForAddition(false);
+    }
+  }, [isGenerationsPaneLocked]);
 
   useEffect(() => {
     setEditableName(shot.name); // Reset editable name if shot prop changes
@@ -335,7 +370,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         </div>
         
         {/* Thumbnail mosaic area - matches ShotGroup style */}
-        <div className="flex-grow">
+        <div className="flex-grow relative">
           <div className="grid grid-cols-3 gap-2 relative">
             {positionedImages.length > 0 ? (
               <>
@@ -381,6 +416,41 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
               </div>
             )}
           </div>
+          
+          {/* Select this shot button - shows when GenerationsPane is locked */}
+          {isGenerationsPaneLocked && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isSelectedForAddition ? "default" : "secondary"}
+                    size="sm"
+                    onClick={handleSelectShotForAddition}
+                    className={`absolute bottom-1 left-1 h-7 px-2 text-xs shadow-sm z-10 transition-all duration-200 ${
+                      isSelectedForAddition 
+                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
+                        : 'bg-background/90 hover:bg-background border'
+                    }`}
+                  >
+                    {isSelectedForAddition ? (
+                      <>
+                        <Check className="h-3 w-3 mr-1" />
+                        Selected
+                      </>
+                    ) : (
+                      <>
+                        <Target className="h-3 w-3 mr-1" />
+                        Select
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isSelectedForAddition ? 'Images will be added to this shot' : 'Add images to this shot'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       </div>
 

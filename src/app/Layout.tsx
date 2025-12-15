@@ -159,8 +159,10 @@ const Layout: React.FC = () => {
   }
 
   // Redirect unauthenticated users to home page
+  // Use /home instead of / to avoid redirect loops in non-WEB environments
+  // where / is inside Layout
   if (!session) {
-    return <Navigate to="/" replace state={{ fromProtected: true }} />;
+    return <Navigate to="/home" replace state={{ fromProtected: true }} />;
   }
 
   // Footer style matches main content margins for side panes

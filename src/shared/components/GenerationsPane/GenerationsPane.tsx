@@ -338,6 +338,7 @@ const GenerationsPaneComponent: React.FC = () => {
     return () => window.removeEventListener('openGenerationsPane', handleOpenGenerationsPane);
   }, [openPane]);
 
+
   // Prevent immediate interaction after pane opens (especially on mobile)
   const [isInteractionDisabled, setIsInteractionDisabled] = useState(false);
   
@@ -413,10 +414,10 @@ const GenerationsPaneComponent: React.FC = () => {
             isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
           )}
         >
-          <div className="px-2 py-1 border-b border-zinc-800">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-light text-zinc-200 ml-2">Generations</h2>
+          <div className="px-2 py-1 border-b border-zinc-800 overflow-hidden">
+            <div className="flex items-center justify-between min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <h2 className="text-xl font-light text-zinc-200 ml-2 truncate">Generations</h2>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -435,7 +436,7 @@ const GenerationsPaneComponent: React.FC = () => {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <div className="flex items-center space-x-4 mr-2">
+                <div className="flex items-center space-x-2 sm:space-x-4 mr-2 flex-shrink-0">
                     {/* Star Filter - Button style matching ImageGalleryFilters */}
                     <div 
                       className={cn(
@@ -460,11 +461,11 @@ const GenerationsPaneComponent: React.FC = () => {
                     {/* Media Type Filter */}
                     <div 
                       className={cn(
-                        "flex items-center space-x-2 transition-all duration-200",
+                        "flex items-center space-x-1 sm:space-x-2 transition-all duration-200",
                         isInteractionDisabled && "pointer-events-none opacity-70"
                       )}
                     >
-                      <span className="text-xs text-zinc-400">Type:</span>
+                      <span className="text-xs text-zinc-400 hidden sm:inline">Type:</span>
                       <Select 
                         value={mediaTypeFilter} 
                         onValueChange={(value: 'all' | 'image' | 'video') => setMediaTypeFilter(value)}
@@ -492,10 +493,10 @@ const GenerationsPaneComponent: React.FC = () => {
             </div>
             
             {/* Shot filter + Pagination row */}
-            <div className="mt-1 mx-2 flex items-start justify-between">
+            <div className="mt-1 mx-2 flex items-start justify-between min-w-0 gap-2">
                 <div 
                   className={cn(
-                    "flex items-center gap-2",
+                    "flex items-center gap-2 min-w-0 flex-shrink",
                     "transition-all duration-200",
                     isInteractionDisabled && "pointer-events-none opacity-70"
                   )}
@@ -551,7 +552,7 @@ const GenerationsPaneComponent: React.FC = () => {
                 </div>
 
                 {totalCount > GENERATIONS_PER_PAGE && (
-                  <div className="flex items-center space-x-1 mt-1">
+                  <div className="flex items-center space-x-1 mt-1 flex-shrink-0">
                     <button
                       onClick={() => handleServerPageChange(Math.max(1, page - 1))}
                       disabled={page === 1}
@@ -559,8 +560,9 @@ const GenerationsPaneComponent: React.FC = () => {
                     >
                       <ChevronLeft className="h-4 w-4 text-zinc-400" />
                     </button>
-                    <span className="text-xs text-zinc-400 min-w-[120px] text-center">
-                      {((page - 1) * GENERATIONS_PER_PAGE) + 1}-{Math.min(page * GENERATIONS_PER_PAGE, totalCount)} (out of {totalCount})
+                    <span className="text-xs text-zinc-400 text-center whitespace-nowrap">
+                      <span className="hidden sm:inline">{((page - 1) * GENERATIONS_PER_PAGE) + 1}-{Math.min(page * GENERATIONS_PER_PAGE, totalCount)} (out of {totalCount})</span>
+                      <span className="sm:hidden">{page}/{Math.ceil(totalCount / GENERATIONS_PER_PAGE)}</span>
                     </span>
                     <button
                       onClick={() => handleServerPageChange(page + 1)}

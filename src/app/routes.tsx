@@ -1,6 +1,5 @@
 import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, redirect } from 'react-router-dom';
-import ToolSelectorPage from '@/pages/ToolSelectorPage';
 import HomePage from '@/pages/Home/HomePage';
 import ArtPage from '@/pages/ArtPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
@@ -19,8 +18,7 @@ import JoinClipsPage from '@/tools/join-clips/pages/JoinClipsPage';
 // Keep other heavy tools lazy-loaded to preserve bundle size
 const EditImagesPage = lazy(() => import('@/tools/edit-images/pages/EditImagesPage'));
 const EditVideoPage = lazy(() => import('@/tools/edit-video/pages/EditVideoPage'));
-import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will be moved here or created
-import { LastAffectedShotProvider } from '@/shared/contexts/LastAffectedShotContext';
+import NotFoundPage from '@/pages/NotFoundPage';
 import ShotsPage from "@/pages/ShotsPage";
 import GenerationsPage from "@/pages/GenerationsPage"; // Import the new GenerationsPage
 import Layout from './Layout'; // Import the new Layout component
@@ -36,8 +34,8 @@ const LazyLoadingFallback = () => (
   <ReighLoading />
 );
 
-// Loader function to check auth and redirect logged-in users to tools
-async function rootLoader() {
+// Loader to redirect logged-in users from landing page to tools
+async function authRedirectLoader() {
   const { data: { session } } = await supabase.auth.getSession();
   if (session) {
     return redirect('/tools/travel-between-images');
@@ -51,7 +49,7 @@ const router = createBrowserRouter([
   ...(currentEnv === AppEnv.WEB ? [{
     path: '/',
     element: <HomePage />,
-    loader: rootLoader,
+    loader: authRedirectLoader,
     errorElement: <NotFoundPage />,
   }] : []),
 
@@ -86,12 +84,11 @@ const router = createBrowserRouter([
     element: <Layout />,
     errorElement: <NotFoundPage />,
     children: [
-      // ToolSelectorPage at root for non-web environments
-      // Redirects logged-in users to /tools/travel-between-images
+      // In non-web (PWA) environments, `/` just redirects to tools
+      // Layout handles auth - unauthed users get sent to /home
       ...(currentEnv !== AppEnv.WEB ? [{
         path: '/',
-        element: <ToolSelectorPage />,
-        loader: rootLoader,
+        loader: () => redirect('/tools/travel-between-images'),
       }] : []),
       {
         path: '/tools',
