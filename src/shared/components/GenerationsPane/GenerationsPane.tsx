@@ -414,7 +414,7 @@ const GenerationsPaneComponent: React.FC = () => {
             isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
           )}
         >
-          <div className="px-2 pt-3 pb-0 border-b border-zinc-800/50">
+          <div className="px-2 pt-3 pb-0">
             <div className="flex items-center justify-between min-w-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <h2 className="text-xl font-light text-zinc-200 ml-2 truncate">Generations</h2>
@@ -583,9 +583,11 @@ const GenerationsPaneComponent: React.FC = () => {
                 <SkeletonGallery 
                     count={12}
                     columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
+                    gapClasses="gap-2 sm:gap-4"
                     whiteText={true}
                     showControls={false}
                     projectAspectRatio={projectAspectRatio}
+                    className="space-y-0 pb-4 pt-3"
                 />
             )}
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}
