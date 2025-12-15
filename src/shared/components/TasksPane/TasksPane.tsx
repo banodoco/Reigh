@@ -755,8 +755,11 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         thirdButton={{
           onClick: openPane,
           ariaLabel: `Open Tasks pane (${cancellableTaskCount} active tasks)`,
-          content: <span className="text-xs font-light">{cancellableTaskCount}</span>
+          content: <span className="text-xs font-light">{cancellableTaskCount}</span>,
+          tooltip: `${cancellableTaskCount} active task${cancellableTaskCount === 1 ? '' : 's'}`
         }}
+        paneIcon="tasks"
+        paneTooltip="View all tasks"
       />
       <div
         className="pointer-events-none"

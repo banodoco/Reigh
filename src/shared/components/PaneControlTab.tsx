@@ -1,10 +1,14 @@
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, ChevronUp, Square } from 'lucide-react';
+import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, ChevronUp, Square, LayoutGrid, Images, ListTodo } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 import { PANE_CONFIG, PaneSide, PanePosition } from '@/shared/config/panes';
 import { usePositionStrategy } from '@/shared/hooks/pane-positioning/usePositionStrategy';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+
+// Icon type for pane controls
+export type PaneIconType = 'chevron' | 'tools' | 'gallery' | 'tasks';
 
 interface PaneControlTabProps {
   side: PaneSide;
@@ -28,8 +32,45 @@ interface PaneControlTabProps {
     onClick: () => void;
     ariaLabel: string;
     content?: React.ReactNode; // Optional custom content, defaults to Square icon
+    tooltip?: string; // Tooltip text for this button
   };
+  /**
+   * Icon to show on the pane control tab instead of chevron.
+   * Defaults to 'chevron' for backward compatibility.
+   */
+  paneIcon?: PaneIconType;
+  /**
+   * Custom icon element to display. Takes precedence over paneIcon.
+   */
+  customIcon?: React.ReactNode;
+  /**
+   * Tooltip for the main pane open button.
+   */
+  paneTooltip?: string;
 }
+
+// Helper component to wrap buttons in tooltips (desktop only)
+const TooltipButton: React.FC<{
+  tooltip?: string;
+  children: React.ReactNode;
+  showTooltip: boolean;
+  side?: 'top' | 'bottom' | 'left' | 'right';
+}> = ({ tooltip, children, showTooltip, side = 'right' }) => {
+  if (!tooltip || !showTooltip) {
+    return <>{children}</>;
+  }
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side={side} className="text-xs">
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
+};
 
 const PaneControlTab: React.FC<PaneControlTabProps> = ({ 
   side, 
@@ -43,6 +84,9 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   handlePaneLeave, 
   thirdButton,
   horizontalOffset = 0,
+  paneIcon = 'chevron',
+  customIcon,
+  paneTooltip,
 }) => {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -50,6 +94,12 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   // On phones (small mobile), use simplified mobile behavior
   const useDesktopBehavior = !isMobile || isTablet;
   const [selectionActive, setSelectionActive] = React.useState(false);
+  
+  // Tooltips only show on desktop, not mobile/tablet (touch devices)
+  const showTooltips = !isMobile;
+  
+  // Determine tooltip side based on pane side
+  const tooltipSide = side === 'left' ? 'right' : side === 'right' ? 'left' : 'top';
 
   // Listen for selection events to hide controls
   React.useEffect(() => {
@@ -91,6 +141,21 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   };
 
   const getIcon = () => {
+    // If a custom icon element is provided, use it
+    if (customIcon) {
+      return customIcon;
+    }
+    
+    // If a custom pane icon type is specified, use it instead of chevrons
+    if (paneIcon !== 'chevron') {
+      switch (paneIcon) {
+        case 'tools': return <LayoutGrid className="h-4 w-4" />;
+        case 'gallery': return <Images className="h-4 w-4" />;
+        case 'tasks': return <ListTodo className="h-4 w-4" />;
+      }
+    }
+    
+    // Default chevron behavior
     switch (side) {
         case 'left': return <ChevronRight className="h-4 w-4" />;
         case 'right': return <ChevronLeft className="h-4 w-4" />;
@@ -132,18 +197,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           'opacity-100'
         )}
       >
-        <Button
-          variant="ghost"
-          size="icon"
-          onPointerUp={() => openPane()}
-          className={cn(
-            'text-zinc-300 hover:text-white hover:bg-zinc-700',
-            side === 'bottom' ? 'h-8 w-16' : 'h-16 w-8'
-          )}
-          aria-label="Open pane"
-        >
-          {getIcon()}
-        </Button>
+        {/* On mobile, show thirdButton (current tool) first/on top */}
         {thirdButton && (
           <Button
             variant="ghost"
@@ -151,13 +205,25 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             onPointerUp={thirdButton.onClick}
             className={cn(
               'text-zinc-300 hover:text-white hover:bg-zinc-700',
-              side === 'bottom' ? 'h-8 w-16' : 'h-16 w-8'
+              side === 'bottom' ? 'h-8 w-16' : 'h-8 w-8'
             )}
             aria-label={thirdButton.ariaLabel}
           >
             {thirdButton.content || <Square className="h-4 w-4" />}
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onPointerUp={() => openPane()}
+          className={cn(
+            'text-zinc-300 hover:text-white hover:bg-zinc-700',
+            side === 'bottom' ? 'h-8 w-16' : 'h-8 w-8'
+          )}
+          aria-label={paneTooltip || "Open pane"}
+        >
+          {getIcon()}
+        </Button>
       </div>
     );
   }
@@ -166,117 +232,137 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   // Show lock button at edge when pane is open but not locked
   if (isOpen && !isLocked) {
     return (
-      <div
-        data-pane-control
-        style={dynamicStyle}
-        className={cn(
-          `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
-          getFlexDirection()
-        )}
-        onMouseEnter={handlePaneEnter}
-        onMouseLeave={handlePaneLeave}
-      >
-        {thirdButton && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onPointerUp={thirdButton.onClick}
-            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-            aria-label={thirdButton.ariaLabel}
-          >
-            {thirdButton.content || <Square className="h-4 w-4" />}
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onPointerUp={() => toggleLock(true)}
-          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-          aria-label="Lock pane"
+      <TooltipProvider delayDuration={300}>
+        <div
+          data-pane-control
+          style={dynamicStyle}
+          className={cn(
+            `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+            getFlexDirection()
+          )}
+          onMouseEnter={handlePaneEnter}
+          onMouseLeave={handlePaneLeave}
         >
-          <LockIcon className="h-4 w-4" />
-        </Button>
-      </div>
+          {thirdButton && (
+            <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={thirdButton.onClick}
+                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label={thirdButton.ariaLabel}
+              >
+                {thirdButton.content || <Square className="h-4 w-4" />}
+              </Button>
+            </TooltipButton>
+          )}
+          <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onPointerUp={() => toggleLock(true)}
+              className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+              aria-label="Lock pane"
+            >
+              <LockIcon className="h-4 w-4" />
+            </Button>
+          </TooltipButton>
+        </div>
+      </TooltipProvider>
     );
   }
 
   if (isLocked) {
     return (
-      <div
-        data-pane-control
-        style={dynamicStyle}
-        className={cn(
-          `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
-          getFlexDirection()
-        )}
-      >
-        {thirdButton && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onPointerUp={thirdButton.onClick}
-            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-            aria-label={thirdButton.ariaLabel}
-          >
-            {thirdButton.content || <Square className="h-4 w-4" />}
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onPointerUp={() => toggleLock(false)}
-          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-          aria-label="Unlock pane"
+      <TooltipProvider delayDuration={300}>
+        <div
+          data-pane-control
+          style={dynamicStyle}
+          className={cn(
+            `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+            getFlexDirection()
+          )}
         >
-          <UnlockIcon className="h-4 w-4" />
-        </Button>
-      </div>
+          {thirdButton && (
+            <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={thirdButton.onClick}
+                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label={thirdButton.ariaLabel}
+              >
+                {thirdButton.content || <Square className="h-4 w-4" />}
+              </Button>
+            </TooltipButton>
+          )}
+          <TooltipButton tooltip="Unlock pane" showTooltip={showTooltips} side={tooltipSide}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onPointerUp={() => toggleLock(false)}
+              className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+              aria-label="Unlock pane"
+            >
+              <UnlockIcon className="h-4 w-4" />
+            </Button>
+          </TooltipButton>
+        </div>
+      </TooltipProvider>
     );
   }
 
   // Pane is closed (desktop)
   return (
-    <div
-      data-pane-control
-      style={dynamicStyle}
-      className={cn(
-        `fixed ${PANE_CONFIG.zIndex.CONTROL_UNLOCKED} flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
-        getPositionClasses(),
-        isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
-      )}
-    >
-      {thirdButton && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onPointerUp={thirdButton.onClick}
-          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-          aria-label={thirdButton.ariaLabel}
-        >
-          {thirdButton.content || <Square className="h-4 w-4" />}
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        size="icon"
-        onPointerUp={() => openPane()}
+    <TooltipProvider delayDuration={300}>
+      <div
+        data-pane-control
+        style={dynamicStyle}
         className={cn(
-          'text-zinc-300 hover:text-white hover:bg-zinc-700 h-8 w-8'
+          `fixed ${PANE_CONFIG.zIndex.CONTROL_UNLOCKED} flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+          getPositionClasses(),
+          isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
         )}
-        aria-label="Open pane"
       >
-        {getIcon()}
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        onPointerUp={() => toggleLock(true)}
-        className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-        aria-label="Lock pane"
-      >
-        <LockIcon className="h-4 w-4" />
-      </Button>
-    </div>
+        {thirdButton && (
+          <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onPointerUp={thirdButton.onClick}
+              className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+              aria-label={thirdButton.ariaLabel}
+            >
+              {thirdButton.content || <Square className="h-4 w-4" />}
+            </Button>
+          </TooltipButton>
+        )}
+        <TooltipButton tooltip={paneTooltip} showTooltip={showTooltips} side={tooltipSide}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerUp={() => openPane()}
+            className={cn(
+              'text-zinc-300 hover:text-white hover:bg-zinc-700 h-8 w-8'
+            )}
+            aria-label={paneTooltip || "Open pane"}
+          >
+            {getIcon()}
+          </Button>
+        </TooltipButton>
+        <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onPointerUp={() => toggleLock(true)}
+            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+            aria-label="Lock pane"
+          >
+            <LockIcon className="h-4 w-4" />
+          </Button>
+        </TooltipButton>
+      </div>
+    </TooltipProvider>
   );
 };
 

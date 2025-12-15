@@ -2220,103 +2220,94 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         <>
           {/* Shot List Header - Constrained */}
           <div className="px-4 max-w-7xl mx-auto pt-6 pb-4">
-            <div className="flex flex-col gap-2 sm:gap-4">
-              {/* Title row */}
-              <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
-              {/* Controls row - all on one line */}
-              <div className="flex items-center gap-2 sm:gap-3">
-                {/* Search and Sort */}
-                <div className="flex items-center gap-2 sm:gap-3">
-                  {/* Search and Sort - Only show in Shots view */}
-                  {!showVideosView && (
-                    <>
-                      <div className="relative w-28 sm:w-52">
-                        <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-                          <Search className="h-3.5 w-3.5" />
-                        </div>
-                        <Input
-                          ref={searchInputRef}
-                          placeholder="Search..."
-                          value={shotSearchQuery}
-                          onChange={(e) => setShotSearchQuery(e.target.value)}
-                          className="h-8 text-xs pl-8"
-                        />
-                      </div>
+            {/* Controls row - all on one line */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Left side: Shots vs Videos Toggle - styled as header */}
+              <SegmentedControl
+                value={showVideosView ? 'videos' : 'shots'}
+                onValueChange={(value) => {
+                  if ((value === 'videos') !== showVideosView) {
+                    // Create a synthetic event that satisfies the handler
+                    const syntheticEvent = { stopPropagation: () => {} } as unknown as React.MouseEvent<HTMLButtonElement>;
+                    handleToggleVideosView(syntheticEvent);
+                  }
+                }}
+                // Prevent clicks on the toggle from bubbling to parent click handlers
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="p-1"
+              >
+                <SegmentedControlItem value="shots" className="text-lg font-light px-5 py-0">
+                  Shots
+                </SegmentedControlItem>
+                <SegmentedControlItem value="videos" className="text-lg font-light px-5 py-0">
+                  Videos
+                </SegmentedControlItem>
+              </SegmentedControl>
 
-                      {/* TEMPORARILY DISABLED: Ordered mode and reordering (Task 20) */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => setShotSortMode(shotSortMode === 'oldest' ? 'newest' : 'oldest')}
-                        title={`Currently showing ${shotSortMode === 'ordered' ? 'newest' : shotSortMode} first. Click to toggle.`}
-                      >
-                        <ArrowDown className="h-3.5 w-3.5 mr-1" />
-                        {(shotSortMode === 'oldest') ? 'Oldest first' : 'Newest first'}
-                      </Button>
-                    </>
-                  )}
-
-                  {/* Search and Sort - Videos View */}
-                  {showVideosView && (
-                    <>
-                      <div className="relative w-28 sm:w-52">
-                        <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-                          <Search className="h-3.5 w-3.5" />
-                        </div>
-                        <Input
-                          placeholder="Search..."
-                          value={videoSearchTerm}
-                          onChange={(e) => {
-                            setVideoSearchTerm(e.target.value);
-                            setVideoPage(1);
-                          }}
-                          className="h-8 text-xs pl-8"
-                        />
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => {
-                          setVideoSortMode(videoSortMode === 'oldest' ? 'newest' : 'oldest');
-                          setVideoPage(1);
-                        }}
-                        title={`Currently showing ${videoSortMode} first. Click to toggle.`}
-                      >
-                        <ArrowDown className="h-3.5 w-3.5 mr-1" />
-                        {videoSortMode === 'oldest' ? 'Oldest first' : 'Newest first'}
-                      </Button>
-                    </>
-                  )}
-
+              {/* Search - Shots view */}
+              {!showVideosView && (
+                <div className="relative w-28 sm:w-52">
+                  <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                    <Search className="h-3.5 w-3.5" />
+                  </div>
+                  <Input
+                    ref={searchInputRef}
+                    placeholder="Search..."
+                    value={shotSearchQuery}
+                    onChange={(e) => setShotSearchQuery(e.target.value)}
+                    className="h-8 text-xs pl-8"
+                  />
                 </div>
-                
-                {/* Right side: Shots vs Videos Toggle - always right-aligned */}
-                <SegmentedControl
-                  value={showVideosView ? 'videos' : 'shots'}
-                  onValueChange={(value) => {
-                    if ((value === 'videos') !== showVideosView) {
-                      // Create a synthetic event that satisfies the handler
-                      const syntheticEvent = { stopPropagation: () => {} } as unknown as React.MouseEvent<HTMLButtonElement>;
-                      handleToggleVideosView(syntheticEvent);
-                    }
-                  }}
-                  // Prevent clicks on the toggle from bubbling to parent click handlers
-                  onClick={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
+              )}
+
+              {/* Search - Videos view */}
+              {showVideosView && (
+                <div className="relative w-28 sm:w-52">
+                  <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                    <Search className="h-3.5 w-3.5" />
+                  </div>
+                  <Input
+                    placeholder="Search..."
+                    value={videoSearchTerm}
+                    onChange={(e) => {
+                      setVideoSearchTerm(e.target.value);
+                      setVideoPage(1);
+                    }}
+                    className="h-8 text-xs pl-8"
+                  />
+                </div>
+              )}
+
+              {/* Right side: Sort toggle - always right-aligned */}
+              {!showVideosView && (
+                <Button
+                  variant="outline"
                   size="sm"
-                  className="ml-auto"
+                  className="h-8 text-xs ml-auto"
+                  onClick={() => setShotSortMode(shotSortMode === 'oldest' ? 'newest' : 'oldest')}
+                  title={`Currently showing ${shotSortMode === 'ordered' ? 'newest' : shotSortMode} first. Click to toggle.`}
                 >
-                  <SegmentedControlItem value="shots">
-                    Shots
-                  </SegmentedControlItem>
-                  <SegmentedControlItem value="videos">
-                    Videos
-                  </SegmentedControlItem>
-                </SegmentedControl>
-              </div>
+                  <ArrowDown className="h-3.5 w-3.5 mr-1" />
+                  {(shotSortMode === 'oldest') ? 'Oldest first' : 'Newest first'}
+                </Button>
+              )}
+
+              {showVideosView && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs ml-auto"
+                  onClick={() => {
+                    setVideoSortMode(videoSortMode === 'oldest' ? 'newest' : 'oldest');
+                    setVideoPage(1);
+                  }}
+                  title={`Currently showing ${videoSortMode} first. Click to toggle.`}
+                >
+                  <ArrowDown className="h-3.5 w-3.5 mr-1" />
+                  {videoSortMode === 'oldest' ? 'Oldest first' : 'Newest first'}
+                </Button>
+              )}
             </div>
           </div>
           

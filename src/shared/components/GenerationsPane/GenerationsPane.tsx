@@ -385,8 +385,11 @@ const GenerationsPaneComponent: React.FC = () => {
               setIsGenerationsPaneLocked(false); // Unlock and close the pane immediately
               navigate('/tools/image-generation?formCollapsed=true'); // Navigate with collapsed form parameter
             },
-            ariaLabel: "Open Image Generation Tool"
+            ariaLabel: "Open Image Generation Tool",
+            tooltip: "Go to Image Generation"
           }}
+          paneIcon="gallery"
+          paneTooltip="View generations gallery"
         />
       )}
       <div
@@ -409,7 +412,7 @@ const GenerationsPaneComponent: React.FC = () => {
             isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
           )}
         >
-          <div className="p-2 border-b border-zinc-800">
+          <div className="px-2 py-1 border-b border-zinc-800">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-light text-zinc-200 ml-2">Generations</h2>
@@ -488,7 +491,7 @@ const GenerationsPaneComponent: React.FC = () => {
             </div>
             
             {/* Shot filter + Pagination row */}
-            <div className="mt-2 mx-2 flex items-start justify-between">
+            <div className="mt-1 mx-2 flex items-start justify-between">
                 <div 
                   className={cn(
                     "flex items-center gap-2",
@@ -569,7 +572,7 @@ const GenerationsPaneComponent: React.FC = () => {
                 )}
             </div>
         </div>
-        <div className="flex-grow px-1 sm:px-3 pt-1 sm:pt-3 overflow-y-auto overscroll-contain flex flex-col">
+        <div className="flex-grow px-1 sm:px-3 overflow-y-auto overscroll-contain flex flex-col">
             {isLoading && (
                 <SkeletonGallery 
                     count={12}

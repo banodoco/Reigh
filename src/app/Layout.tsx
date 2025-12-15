@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { GlobalHeader } from '@/shared/components/GlobalHeader';
 import TasksPane from '@/shared/components/TasksPane/TasksPane';
-import ShotsPane from '@/shared/components/ShotsPane/ShotsPane';
+import ToolsPane from '@/shared/components/ToolsPane/ToolsPane';
 import GenerationsPane from '@/shared/components/GenerationsPane/GenerationsPane';
 import { cn } from '@/shared/lib/utils';
 import { usePanes } from '@/shared/contexts/PanesContext';
@@ -207,7 +207,7 @@ const Layout: React.FC = () => {
         </div>
         
         <TasksPane onOpenSettings={handleOpenSettings} />
-        <ShotsPane />
+        <ToolsPane />
         <GenerationsPane />
         
         {/* Social Icons Footer */}

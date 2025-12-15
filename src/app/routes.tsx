@@ -82,7 +82,7 @@ const router = createBrowserRouter([
       }] : []),
       {
         path: '/tools',
-        element: <ToolSelectorPage />,
+        loader: () => redirect('/tools/travel-between-images'),
       },
       {
         path: '/tools/image-generation',
