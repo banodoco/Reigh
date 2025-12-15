@@ -68,29 +68,35 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
     );
   }
 
-  // Grid type - with header matching the actual layout
+  // Grid type - with header matching the actual layout from useVideoTravelHeader
   return (
     <>
       {/* Header matching VideoTravelToolPage shot list header */}
-      <div className="px-4 max-w-7xl mx-auto pt-6 pb-4">
-        <div className="flex flex-col gap-3 sm:gap-4">
-          {/* Title row with New Shot button */}
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
-            {/* New Shot button skeleton */}
-            <Skeleton className="h-8 w-24 rounded-md" />
+      <div className="mb-2 sm:mb-4 mt-4 sm:mt-6">
+        {/* Title row with toggle link and New Shot button */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-end gap-4">
+            {/* Title skeleton - "Shots" or "Videos" - text-3xl sm:text-4xl */}
+            <Skeleton className="h-[30px] sm:h-[36px] w-20 sm:w-24 rounded-md" />
+            {/* Toggle link skeleton - "See all videos" - text-sm with mb-1.5 */}
+            <Skeleton className="h-5 w-24 rounded-md mb-1.5" />
           </div>
-          {/* Controls row */}
-          <div className="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
-            {/* Left side: Search and Sort */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Search skeleton */}
-              <Skeleton className="h-8 w-28 sm:w-52 rounded-md" />
-              {/* Sort dropdown skeleton */}
-              <Skeleton className="h-8 w-[90px] sm:w-[110px] rounded-md" />
-            </div>
-            {/* Right side: Shots vs Videos Toggle skeleton */}
-            <Skeleton className="h-8 w-28 sm:w-32 rounded-full" />
+          {/* New Shot button skeleton - always reserve space for layout consistency */}
+          <div className="flex items-center">
+            <Skeleton className="h-9 w-24 rounded-md" />
+          </div>
+        </div>
+        
+        {/* Search box skeleton - wrapped in div matching actual structure */}
+        <div>
+          {/* Search box skeleton - matching h-8 w-full max-w-xs */}
+          <Skeleton className="h-8 w-full max-w-xs rounded-md" />
+          
+          {/* Sort buttons row skeleton - matching text-base px-3 py-1 */}
+          <div className="flex items-center space-x-2 mt-4 mb-1">
+            <Skeleton className="h-8 w-20 rounded-md" />
+            <Skeleton className="h-8 w-28 rounded-md" />
+            <Skeleton className="h-8 w-24 rounded-md" />
           </div>
         </div>
       </div>

@@ -36,11 +36,22 @@ const LazyLoadingFallback = () => (
   <ReighLoading />
 );
 
+// Loader function to check auth and redirect logged-in users to tools
+async function rootLoader() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    return redirect('/tools/travel-between-images');
+  }
+  return null;
+}
+
 const router = createBrowserRouter([
   // HomePage route without Layout (no header) when in web environment
+  // Redirects logged-in users to /tools/travel-between-images
   ...(currentEnv === AppEnv.WEB ? [{
     path: '/',
     element: <HomePage />,
+    loader: rootLoader,
     errorElement: <NotFoundPage />,
   }] : []),
 
@@ -76,9 +87,11 @@ const router = createBrowserRouter([
     errorElement: <NotFoundPage />,
     children: [
       // ToolSelectorPage at root for non-web environments
+      // Redirects logged-in users to /tools/travel-between-images
       ...(currentEnv !== AppEnv.WEB ? [{
         path: '/',
         element: <ToolSelectorPage />,
+        loader: rootLoader,
       }] : []),
       {
         path: '/tools',

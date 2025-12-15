@@ -163,31 +163,6 @@ const Layout: React.FC = () => {
     return <Navigate to="/" replace state={{ fromProtected: true }} />;
   }
 
-  // Mobile split view styles for creating independent scroll region
-  const mobileSplitViewStyles: React.CSSProperties = isMobileSplitView ? {
-    height: `calc(100dvh - ${generationsPaneHeight}px)`,
-    overflowY: 'auto',
-    overscrollBehavior: 'contain',
-    WebkitOverflowScrolling: 'touch',
-  } : {};
-
-  const mainContentStyle = {
-    marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
-    marginLeft: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
-    // On mobile split view, don't use padding - use fixed height instead
-    paddingBottom: isMobileSplitView ? '0px' : ((isGenerationsPaneLocked || isGenerationsPaneOpen) ? `${generationsPaneHeight}px` : '0px'),
-    // CSS custom properties for content-responsive behavior
-    '--content-width': `${contentWidth}px`,
-    '--content-height': `${contentHeight}px`,
-    '--content-sm': isSm ? '1' : '0',
-    '--content-md': isMd ? '1' : '0', 
-    '--content-lg': isLg ? '1' : '0',
-    '--content-xl': isXl ? '1' : '0',
-    '--content-2xl': is2Xl ? '1' : '0',
-    willChange: 'margin, padding',
-    ...mobileSplitViewStyles,
-  } as React.CSSProperties;
-
   // Footer style matches main content margins for side panes
   const footerStyle = {
     marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
@@ -200,6 +175,53 @@ const Layout: React.FC = () => {
   // Reduce vertical padding on small screens to avoid excessive space above headers
   const containerSpacing = isLg ? 'py-1' : 'py-1';
 
+  // Style for the scroll wrapper when in mobile split view
+  // This wraps both header and content so they scroll together
+  const splitViewWrapperStyle: React.CSSProperties = isMobileSplitView ? {
+    height: `calc(100dvh - ${generationsPaneHeight}px)`,
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+    WebkitOverflowScrolling: 'touch',
+  } : {};
+
+  // When in split view, content doesn't need the scroll styles (wrapper handles it)
+  const mainContentStyleWithoutScroll = {
+    marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
+    marginLeft: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
+    paddingBottom: isMobileSplitView ? '0px' : ((isGenerationsPaneLocked || isGenerationsPaneOpen) ? `${generationsPaneHeight}px` : '0px'),
+    '--content-width': `${contentWidth}px`,
+    '--content-height': `${contentHeight}px`,
+    '--content-sm': isSm ? '1' : '0',
+    '--content-md': isMd ? '1' : '0', 
+    '--content-lg': isLg ? '1' : '0',
+    '--content-xl': isXl ? '1' : '0',
+    '--content-2xl': is2Xl ? '1' : '0',
+    willChange: 'margin, padding',
+  } as React.CSSProperties;
+
+  // Render content - same structure, just conditionally wrapped
+  const mainContent = (
+    <>
+      <GlobalHeader 
+        contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 16} 
+        contentOffsetLeft={isShotsPaneLocked ? shotsPaneWidth : 0}
+        onOpenSettings={handleOpenSettings}
+      />
+      
+      <div
+        className="relative z-10 transition-[margin,padding] duration-300 ease-smooth content-container"
+        style={mainContentStyleWithoutScroll}
+      >
+        <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
+
+        <main className={cn("container mx-auto", containerPadding, containerSpacing)}>
+          {header}
+          <Outlet /> 
+        </main>
+      </div>
+    </>
+  );
+
   return (
     <AIInputModeProvider>
       <div className="flex flex-col">
@@ -207,23 +229,14 @@ const Layout: React.FC = () => {
         {/* Theme-adaptive background gradient - subtle in dark mode */}
         <div className="fixed inset-0 bg-gradient-to-br from-background via-secondary/10 to-accent/5 opacity-40 dark:opacity-0 pointer-events-none"></div>
         
-        <GlobalHeader 
-          contentOffsetRight={isTasksPaneLocked ? tasksPaneWidth + 16 : 16} 
-          contentOffsetLeft={isShotsPaneLocked ? shotsPaneWidth : 0}
-          onOpenSettings={handleOpenSettings}
-        />
-        
-        <div
-          className="relative z-10 transition-[margin,padding] duration-300 ease-smooth content-container"
-          style={mainContentStyle}
-        >
-          <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
-
-          <main className={cn("container mx-auto", containerPadding, containerSpacing)}>
-            {header}
-            <Outlet /> 
-          </main>
-        </div>
+        {/* When in mobile split view, wrap header + content in a scroll container */}
+        {isMobileSplitView ? (
+          <div style={splitViewWrapperStyle}>
+            {mainContent}
+          </div>
+        ) : (
+          mainContent
+        )}
         
         <TasksPane onOpenSettings={handleOpenSettings} />
         <ToolsPane />
