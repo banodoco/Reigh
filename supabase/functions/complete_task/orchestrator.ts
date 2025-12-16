@@ -5,6 +5,7 @@
 
 import { extractOrchestratorTaskId, extractOrchestratorRunId } from './params.ts';
 import { createVariant } from './generation.ts';
+import { triggerCostCalculation } from './billing.ts';
 
 // ===== TYPES =====
 
@@ -289,44 +290,11 @@ async function markOrchestratorComplete(
   console.log(`[OrchestratorComplete] Successfully marked orchestrator ${orchestratorTaskId} as Complete`);
   
   // Trigger billing
-  await triggerCostCalculation(supabaseUrl, serviceKey, orchestratorTaskId);
+  await triggerCostCalculation(supabaseUrl, serviceKey, orchestratorTaskId, 'OrchestratorComplete');
   
   // Update parent_generation_id for join_clips_segment
   if (taskType === 'join_clips_segment') {
     await handleJoinClipsParentUpdate(supabase, orchestratorTask, publicUrl, thumbnailUrl, taskIdString, orchestratorTaskId);
-  }
-}
-
-/**
- * Trigger cost calculation for a task
- */
-async function triggerCostCalculation(
-  supabaseUrl: string,
-  serviceKey: string,
-  taskId: string
-): Promise<void> {
-  try {
-    console.log(`[OrchestratorComplete] Triggering cost calculation for ${taskId}...`);
-    const costResp = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${serviceKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ task_id: taskId })
-    });
-
-    if (costResp.ok) {
-      const costData = await costResp.json();
-      if (costData && typeof costData.cost === 'number') {
-        console.log(`[OrchestratorComplete] Cost calculation successful: $${costData.cost.toFixed(3)}`);
-      }
-    } else {
-      const errTxt = await costResp.text();
-      console.error(`[OrchestratorComplete] Cost calculation failed: ${errTxt}`);
-    }
-  } catch (costErr) {
-    console.error(`[OrchestratorComplete] Error triggering cost calculation:`, costErr);
   }
 }
 

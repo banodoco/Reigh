@@ -23,6 +23,7 @@ import {
 } from './generation.ts';
 import { checkOrchestratorCompletion } from './orchestrator.ts';
 import { validateAndCleanupShotId } from './shotValidation.ts';
+import { triggerCostCalculationIfNotSubTask } from './billing.ts';
 
 // Provide a loose Deno type for local tooling
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -270,7 +271,7 @@ export async function completeTaskHandler(req: Request, deps: CompleteTaskDeps =
 
     // 13) Calculate cost (service role only)
     if (isServiceRole) {
-      await triggerCostCalculation(supabaseAdmin, supabaseUrl, serviceKey, taskIdString);
+      await triggerCostCalculationIfNotSubTask(supabaseAdmin, supabaseUrl, serviceKey, taskIdString);
     }
 
     // 14) Return success
@@ -387,48 +388,3 @@ async function handleGenerationCreation(
   }
 }
 
-/**
- * Trigger cost calculation for a task
- */
-async function triggerCostCalculation(
-  supabase: any,
-  supabaseUrl: string,
-  serviceKey: string,
-  taskId: string
-): Promise<void> {
-  try {
-    const { data: taskForCostCheck } = await supabase
-      .from("tasks")
-      .select("params")
-      .eq("id", taskId)
-      .single();
-
-    const subTaskOrchestratorRef = extractOrchestratorTaskId(taskForCostCheck?.params, 'CostCalc');
-    if (subTaskOrchestratorRef) {
-      console.log(`[COMPLETE-TASK] Task ${taskId} is a sub-task, skipping cost calculation`);
-      return;
-    }
-
-    console.log(`[COMPLETE-TASK] Triggering cost calculation for task ${taskId}...`);
-    const costCalcResp = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${serviceKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ task_id: taskId })
-    });
-
-    if (costCalcResp.ok) {
-      const costData = await costCalcResp.json();
-      if (costData && typeof costData.cost === 'number') {
-        console.log(`[COMPLETE-TASK] Cost calculation successful: $${costData.cost.toFixed(3)}`);
-      }
-    } else {
-      const errTxt = await costCalcResp.text();
-      console.error(`[COMPLETE-TASK] Cost calculation failed: ${errTxt}`);
-    }
-  } catch (costErr) {
-    console.error("[COMPLETE-TASK] Error triggering cost calculation:", costErr);
-  }
-}

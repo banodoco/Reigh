@@ -10,7 +10,8 @@
 |-------|-------|-------------|----------|-------|
 | **LocalStorage** | 📱 Device | `usePersistentState` | Instant UI state | Falls back to RAM if blocked |
 | **Postgres JSONB** | 🌐 Cross-device | `useToolSettings`, `useUserUIState` | Settings sync | Source of truth |
-| **Shot Settings** | 🎯 Per-entity | `useToolSettings` with shot scope | Entity-specific state | Synced across devices |
+| **Shot Settings** | 🎯 Per-shot | `useAutoSaveSettings` | Per-shot prompts, configs | ⭐ Recommended for shot data |
+| **Project Settings** | 📂 Per-project | `usePersistentToolState` | Project-wide preferences | Binds useState to DB |
 | **Supabase Storage** | 📦 Assets | `imageUploader`, `useResources` | Media files | Images, videos, LoRAs |
 
 ---
@@ -33,14 +34,45 @@ const { settings, updateSettings, isLoading } = useToolSettings(toolId);
 ```
 
 ### `usePersistentToolState`
-Complete tool UI state management with debounced saves.
+Complete tool UI state management with debounced saves. Binds existing useState to DB.
 
 ```typescript
-const { state, updateState, markAsInteracted } = usePersistentToolState(
+const { ready, isSaving, markAsInteracted } = usePersistentToolState(
   toolId,
-  defaultState
+  { projectId },
+  {
+    myField: [myField, setMyField],  // Binds useState to DB
+  }
 );
 ```
+
+### `useAutoSaveSettings` ⭐ NEW
+**Recommended for per-shot/per-entity settings.** Self-contained hook with built-in state management.
+
+```typescript
+const settings = useAutoSaveSettings<MySettings>({
+  toolId: 'my-tool-settings',
+  shotId: selectedShotId,      // or projectId for project scope
+  scope: 'shot',               // 'shot' | 'project'
+  defaults: { prompt: '', mode: 'basic' },
+});
+
+// Status: 'idle' | 'loading' | 'ready' | 'saving' | 'error'
+if (settings.status !== 'ready') return <Loading />;
+
+// Read
+const prompt = settings.settings.prompt;
+
+// Update (auto-saves with debounce)
+settings.updateField('prompt', 'new value');
+settings.updateFields({ prompt: 'new', mode: 'advanced' });
+```
+
+**Key features:**
+- Self-contained state (no external useState needed)
+- Proper loading gates (updates during loading don't block DB values)
+- Automatic flush on unmount/navigation
+- Dirty tracking via `settings.isDirty`
 
 ### `useUserUIState`
 Global UI preferences stored in user profile.
@@ -48,6 +80,42 @@ Global UI preferences stored in user profile.
 ```typescript
 const { uiState, updateUIState } = useUserUIState();
 // Stores under users.settings.ui
+```
+
+---
+
+## 🧭 Which Hook Should I Use?
+
+| Scenario | Hook | Why |
+|----------|------|-----|
+| **Per-shot data** (prompts, configs) | `useAutoSaveSettings` | ⭐ Self-contained, proper loading gates |
+| **Project-wide settings** (model prefs) | `usePersistentToolState` | Binds existing useState |
+| **Device-only UI** (collapsed panels) | `usePersistentState` | Fast, localStorage |
+| **User global prefs** (theme) | `useUserUIState` | Stored in user profile |
+| **Low-level DB access** | `useToolSettings` | Direct Supabase calls |
+
+### Migration Guide: Map Pattern → Per-Shot
+
+**❌ Old pattern (don't use for new code):**
+```typescript
+// Stores a growing map at project level
+const [dataByShot, setDataByShot] = useState<Record<string, Data>>({});
+usePersistentToolState('my-tool', { projectId }, {
+  dataByShot: [dataByShot, setDataByShot]  // ← Grows unbounded
+});
+const data = dataByShot[shotId];
+```
+
+**✅ New pattern (recommended):**
+```typescript
+// Each shot has its own settings record
+const settings = useAutoSaveSettings<ShotData>({
+  toolId: 'my-tool-shot-data',
+  shotId: selectedShotId,
+  scope: 'shot',
+  defaults: { data: null },
+});
+const data = settings.settings.data;
 ```
 
 ---
