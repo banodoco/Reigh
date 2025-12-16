@@ -206,7 +206,7 @@ export const useAllShotGenerations = (
     // creates noisy refetch loops (especially in dev) and can cause large rerender cascades.
     refetchOnMount: false,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,  // Safety net after network drops
     // Prevent rapid refetches - data is considered fresh long enough to avoid churn.
     // Mutations/realtime invalidation still refetch immediately when needed.
     staleTime: 30_000,
