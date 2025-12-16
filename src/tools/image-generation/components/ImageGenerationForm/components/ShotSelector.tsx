@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
@@ -14,6 +14,7 @@ import { SectionHeader } from "./SectionHeader";
 interface Shot {
   id: string;
   name: string;
+  created_at?: string;
 }
 
 interface ShotSelectorProps {
@@ -37,6 +38,16 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   onOpenCreateShot,
   onJumpToShot,
 }) => {
+  // Sort shots by newest first (by created_at descending)
+  const sortedShots = useMemo(() => {
+    if (!shots) return [];
+    return [...shots].sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateB - dateA; // Newest first
+    });
+  }, [shots]);
+
   return (
     <div className="space-y-2 mt-6">
       <div className="flex items-center gap-2">
@@ -86,7 +97,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
             </SelectTrigger>
             <SelectContent variant="retro">
               <SelectItem variant="retro" value="none">None</SelectItem>
-              {shots?.map((shot) => (
+              {sortedShots.map((shot) => (
                 <SelectItem variant="retro" key={shot.id} value={shot.id}>
                   {shot.name}
                 </SelectItem>
