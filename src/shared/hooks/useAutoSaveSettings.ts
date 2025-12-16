@@ -105,6 +105,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
   const loadedSettingsRef = useRef<T | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingSettingsRef = useRef<T | null>(null);
+  const pendingEntityIdRef = useRef<string | null>(null);
   const currentEntityIdRef = useRef<string | null>(null);
   const isUnmountingRef = useRef(false);
 
@@ -121,7 +122,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
   // Dirty flag - has user changed anything since load?
   const isDirty = useMemo(
-    () => !deepEqual(settings, loadedSettingsRef.current),
+    () => (loadedSettingsRef.current ? !deepEqual(settings, loadedSettingsRef.current) : false),
     [settings]
   );
 
@@ -165,28 +166,43 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     }
   }, [entityId, settings, updateSettings, scope, toolId]);
 
-  // Ref to hold the latest saveImmediate for use in effects without causing re-runs
-  const saveImmediateRef = useRef(saveImmediate);
-  saveImmediateRef.current = saveImmediate;
-
-  // Flush pending saves - used on unmount/navigation
-  // Uses refs to avoid dependency on changing callbacks
-  const flushPendingSave = useCallback(async () => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
-
-    if (pendingSettingsRef.current && currentEntityIdRef.current) {
-      console.log('[useAutoSaveSettings] 🚿 Flushing pending save');
-      try {
-        await saveImmediateRef.current(pendingSettingsRef.current);
-      } catch (err) {
-        // Log but don't throw - we're likely unmounting
-        console.error('[useAutoSaveSettings] Flush failed:', err);
+  /**
+   * Flush pending settings on entity change/unmount.
+   *
+   * IMPORTANT: this runs in the *cleanup* for the previous entity render, so `updateSettings`
+   * is still bound to the previous `shotId/projectId`. This avoids accidentally saving shot A's
+   * pending settings into shot B when switching entities quickly.
+   */
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
       }
-    }
-  }, []); // No dependencies - uses refs
+
+      const pending = pendingSettingsRef.current;
+      const pendingForEntity = pendingEntityIdRef.current;
+
+      if (pending && pendingForEntity && pendingForEntity === entityId) {
+        console.log('[useAutoSaveSettings] 🚿 Flushing pending save in cleanup:', {
+          toolId,
+          entityId: pendingForEntity.substring(0, 8),
+        });
+
+        // Fire-and-forget; cleanup cannot be async.
+        updateSettings(scope, pending).catch(err => {
+          console.error('[useAutoSaveSettings] Cleanup flush failed:', err);
+        });
+      }
+
+      // Always clear pending refs for the entity we are leaving
+      if (pendingForEntity === entityId) {
+        pendingSettingsRef.current = null;
+        pendingEntityIdRef.current = null;
+      }
+    };
+    // Intentionally depends on entityId so cleanup runs per-entity.
+  }, [entityId, updateSettings, scope, toolId]);
 
   // Update single field
   const updateField = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
@@ -207,6 +223,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
       // Track pending settings for flush-on-navigation
       pendingSettingsRef.current = updated;
+      pendingEntityIdRef.current = entityId ?? null;
 
       // Trigger auto-save with debounce
       if (saveTimeoutRef.current) {
@@ -217,6 +234,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
         try {
           await saveImmediate(updated);
           pendingSettingsRef.current = null;
+          pendingEntityIdRef.current = null;
         } catch (err) {
           console.error('[useAutoSaveSettings] Debounced save failed:', err);
         }
@@ -224,7 +242,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
       return updated;
     });
-  }, [status, saveImmediate, debounceMs]);
+  }, [status, saveImmediate, debounceMs, entityId]);
 
   // Update multiple fields at once
   const updateFields = useCallback((updates: Partial<T>) => {
@@ -243,6 +261,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
       // Track pending settings for flush-on-navigation
       pendingSettingsRef.current = updated;
+      pendingEntityIdRef.current = entityId ?? null;
 
       // Trigger auto-save with debounce
       if (saveTimeoutRef.current) {
@@ -253,6 +272,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
         try {
           await saveImmediate(updated);
           pendingSettingsRef.current = null;
+          pendingEntityIdRef.current = null;
         } catch (err) {
           console.error('[useAutoSaveSettings] Debounced save failed:', err);
         }
@@ -260,7 +280,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
       return updated;
     });
-  }, [status, saveImmediate, debounceMs]);
+  }, [status, saveImmediate, debounceMs, entityId]);
 
   // Revert to last saved settings
   const revert = useCallback(() => {
@@ -279,18 +299,13 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     const previousEntityId = currentEntityIdRef.current;
 
     if (!entityId) {
-      // Entity became null (e.g., modal closed) - flush pending saves
-      if (previousEntityId && pendingSettingsRef.current) {
-        console.log('[useAutoSaveSettings] 🚪 Entity became null - flushing');
-        flushPendingSave();
-      }
-      
       // Reset state
       currentEntityIdRef.current = null;
       setSettings(defaults);
       setStatus('idle');
       loadedSettingsRef.current = null;
       pendingSettingsRef.current = null;
+      pendingEntityIdRef.current = null;
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
@@ -304,17 +319,13 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
         from: previousEntityId.substring(0, 8),
         to: entityId.substring(0, 8),
       });
-      
-      // Flush any pending saves for previous entity
-      if (pendingSettingsRef.current) {
-        flushPendingSave();
-      }
 
       // Reset for new entity
       setSettings(defaults);
       setStatus('idle');
       loadedSettingsRef.current = null;
       pendingSettingsRef.current = null;
+      pendingEntityIdRef.current = null;
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
@@ -322,7 +333,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     }
 
     currentEntityIdRef.current = entityId;
-  }, [entityId, defaults]); // flushPendingSave is now stable (uses refs)
+  }, [entityId, defaults]);
 
   // Load settings from DB when available
   useEffect(() => {
@@ -350,6 +361,14 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     // Deep clone to prevent React Query cache reference sharing
     const clonedSettings = JSON.parse(JSON.stringify(loadedSettings));
 
+    // Avoid setState loops when dbSettings identity changes but values don't.
+    if (loadedSettingsRef.current && deepEqual(clonedSettings, loadedSettingsRef.current)) {
+      if (status !== 'ready') {
+        setStatus('ready');
+      }
+      return;
+    }
+
     console.log('[useAutoSaveSettings] 📥 Loaded from DB:', {
       toolId,
       entityId: entityId.substring(0, 8),
@@ -360,37 +379,6 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     setStatus('ready');
     setError(null);
   }, [entityId, isLoading, dbSettings, defaults, enabled, status, toolId]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    isUnmountingRef.current = false;
-    
-    return () => {
-      isUnmountingRef.current = true;
-      
-      // Flush pending saves on unmount
-      if (pendingSettingsRef.current && currentEntityIdRef.current) {
-        // Note: We can't await here, but the save will complete in background
-        // because useToolSettings doesn't abort mutations on unmount
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-        
-        // Trigger immediate save (fire and forget)
-        const settingsToSave = pendingSettingsRef.current;
-        const entityToSave = currentEntityIdRef.current;
-        
-        console.log('[useAutoSaveSettings] 🚪 Unmounting - triggering save:', {
-          entityId: entityToSave.substring(0, 8),
-        });
-        
-        // Use the update function directly since we're unmounting
-        updateSettings(scope, settingsToSave).catch(err => {
-          console.error('[useAutoSaveSettings] Unmount save failed:', err);
-        });
-      }
-    };
-  }, [updateSettings, scope]);
 
   // Memoize return value to prevent object recreation on every render
   return useMemo(() => ({
