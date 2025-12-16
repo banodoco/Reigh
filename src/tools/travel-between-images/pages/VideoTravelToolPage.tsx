@@ -2614,7 +2614,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
               hasPrevious={hasPrevious}
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
-              settingsLoading={shotSettings.status === 'loading'}
+              settingsLoading={shotSettings.status !== 'ready'}
               getShotVideoCount={getShotVideoCount}
               invalidateVideoCountsCache={invalidateOnVideoChanges}
               // afterEachPromptText props removed - not in ShotEditorProps interface

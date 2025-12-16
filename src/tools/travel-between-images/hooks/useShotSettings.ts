@@ -441,16 +441,35 @@ export const useShotSettings = (
     // FIX: Don't overwrite user's changes while they're actively editing or have pending saves
     // NOTE: With optimistic cache updates, this protection is now less critical since saves
     // no longer trigger automatic refetches. However, it's still valuable for manual invalidations.
+    // 
+    // CRITICAL: Only apply this protection when status === 'ready' (we've already loaded once).
+    // During initial loading, some effects (like I2V/VACE auto-switch) may set pendingSettingsRef,
+    // but those are not real user edits and should NOT block the initial DB load.
+    const shouldProtectEdits = status === 'ready' && (
+      isUserEditingRef.current || saveTimeoutRef.current !== null || pendingSettingsRef.current !== null
+    );
     console.log('[GenerationModeDebug] 🔒 Checking edit protection:', {
       shotId: shotId.substring(0, 8),
+      status,
       isUserEditingRef: isUserEditingRef.current,
       hasSaveTimeout: saveTimeoutRef.current !== null,
       hasPendingSettings: pendingSettingsRef.current !== null,
-      willSkip: isUserEditingRef.current || saveTimeoutRef.current !== null || pendingSettingsRef.current !== null,
+      willSkip: shouldProtectEdits,
     });
-    if (isUserEditingRef.current || saveTimeoutRef.current !== null || pendingSettingsRef.current !== null) {
+    if (shouldProtectEdits) {
       console.log('[useShotSettings] ⚠️ Skipping load - user is actively editing or has pending changes');
       return;
+    }
+    
+    // Clear any pending state from before the load - these are stale
+    // This allows the fresh DB values to take precedence
+    if (status !== 'ready') {
+      isUserEditingRef.current = false;
+      pendingSettingsRef.current = null;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
     }
     
     // Don't overwrite settings that were just inherited from another shot
