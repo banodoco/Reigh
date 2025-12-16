@@ -602,29 +602,26 @@ export const useShotSettings = (
     key: K,
     value: VideoTravelSettings[K]
   ) => {
-    // Mark that user is actively editing - MUST happen BEFORE the early return
-    // so that DB load won't overwrite user's changes during loading state
-    isUserEditingRef.current = true;
-    console.log('[GenerationModeDebug] 🛡️ User editing - set protection flag', { key, status });
-    
-    // CRITICAL: Don't allow saves until we've loaded initial settings from DB
-    // Otherwise we might overwrite good data with default/empty settings
+    // CRITICAL: During loading, don't set tracking refs or pending state.
+    // Changes during loading are ephemeral (from auto-switch effects etc.) and will be 
+    // overwritten by DB values. Setting refs would block the DB load from applying.
     if (status !== 'ready' && status !== 'saving') {
-      // Still update local state for UI, but don't trigger save YET
-      // HOWEVER: We MUST set pendingSettingsRef so that flush-on-navigation will save!
-      setSettings(prev => {
-        const updated = { ...prev, [key]: value };
-        // Track pending settings for flush-on-navigation even during loading
-        pendingSettingsRef.current = updated;
-        console.log('[VTDebug] 📝 updateField during loading - set pendingSettingsRef:', {
-          key,
-          status,
-          timestamp: Date.now()
-        });
-        return updated;
+      // Still update local state for UI responsiveness, but:
+      // - Don't set isUserEditingRef (would block DB load)
+      // - Don't set pendingSettingsRef (would cause stale saves)
+      // - Don't trigger save (DB values will overwrite anyway)
+      console.log('[VTDebug] 📝 updateField during loading - updating UI only (no refs):', {
+        key,
+        status,
+        timestamp: Date.now()
       });
+      setSettings(prev => ({ ...prev, [key]: value }));
       return;
     }
+    
+    // Mark that user is actively editing (only when ready)
+    isUserEditingRef.current = true;
+    console.log('[GenerationModeDebug] 🛡️ User editing - set protection flag', { key, status });
     
     setSettings(prev => {
       const updated = { ...prev, [key]: value };
@@ -682,28 +679,25 @@ export const useShotSettings = (
       });
     }
     
-    // Mark that user is actively editing - MUST happen BEFORE the early return
-    // so that DB load won't overwrite user's changes during loading state
-    isUserEditingRef.current = true;
-    
-    // CRITICAL: Don't allow saves until we've loaded initial settings from DB
-    // Otherwise we might overwrite good data with default/empty settings
+    // CRITICAL: During loading, don't set tracking refs or pending state.
+    // Changes during loading are ephemeral (from auto-select/auto-switch effects) and will be 
+    // overwritten by DB values. Setting refs would block the DB load from applying.
     if (status !== 'ready' && status !== 'saving') {
-      // Still update local state for UI, but don't trigger save YET
-      // HOWEVER: We MUST set pendingSettingsRef so that flush-on-navigation will save!
-      setSettings(prev => {
-        const updated = { ...prev, ...updates };
-        // Track pending settings for flush-on-navigation even during loading
-        pendingSettingsRef.current = updated;
-        console.log('[VTDebug] 📝 updateFields during loading - set pendingSettingsRef:', {
-          motionMode: updated.motionMode,
-          status,
-          timestamp: Date.now()
-        });
-        return updated;
+      // Still update local state for UI responsiveness, but:
+      // - Don't set isUserEditingRef (would block DB load)
+      // - Don't set pendingSettingsRef (would cause stale saves)
+      // - Don't trigger save (DB values will overwrite anyway)
+      console.log('[VTDebug] 📝 updateFields during loading - updating UI only (no refs):', {
+        keys: Object.keys(updates),
+        status,
+        timestamp: Date.now()
       });
+      setSettings(prev => ({ ...prev, ...updates }));
       return;
     }
+    
+    // Mark that user is actively editing (only when ready)
+    isUserEditingRef.current = true;
     
     setSettings(prev => {
       const updated = { ...prev, ...updates };

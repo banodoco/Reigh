@@ -205,6 +205,14 @@ export const MotionControl: React.FC<MotionControlProps> = ({
 
   // Track if we've done initial auto-select
   const hasAutoSelectedRef = useRef(false);
+  
+  // Reset hasAutoSelectedRef when settings start loading (new shot navigation)
+  // This ensures auto-select can run for each shot, not just the first one visited
+  useEffect(() => {
+    if (settingsLoading) {
+      hasAutoSelectedRef.current = false;
+    }
+  }, [settingsLoading]);
 
   // Auto-select the built-in default preset when:
   // 1. Initial mount with no preset selected AND user is in basic mode

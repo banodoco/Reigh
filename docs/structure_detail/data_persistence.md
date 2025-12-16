@@ -248,6 +248,63 @@ const setAccelerated = useCallback((value: boolean) => {
    updateSettings({ key: value });
    ```
 
+### ⚠️ Tool-Specific Wrapper Hooks (e.g., `useShotSettings`)
+
+When building wrapper hooks around `useToolSettings` with features like debouncing, dirty tracking, or auto-save:
+
+1. **Don't set tracking refs during loading**
+   ```typescript
+   // ❌ Bad: Sets refs even when DB hasn't loaded yet
+   const updateField = (key, value) => {
+     isUserEditingRef.current = true; // Blocks DB load!
+     pendingSettingsRef.current = updated;
+     // ...
+   };
+   
+   // ✅ Good: Only track edits after initial load
+   const updateField = (key, value) => {
+     if (status !== 'ready') {
+       setSettings(prev => ({ ...prev, [key]: value })); // UI only
+       return;
+     }
+     isUserEditingRef.current = true; // Safe now
+     // ...
+   };
+   ```
+
+2. **Gate auto-initialization effects until settings are ready**
+   ```typescript
+   // ❌ Bad: Auto-select runs with default values before DB loads
+   useEffect(() => {
+     if (!selectedPreset) applyDefaultPreset();
+   }, [selectedPreset]);
+   
+   // ✅ Good: Wait for settings to load
+   useEffect(() => {
+     if (settingsLoading) return; // Skip until ready
+     if (!selectedPreset) applyDefaultPreset();
+   }, [settingsLoading, selectedPreset]);
+   ```
+
+3. **Reset component refs when entity changes**
+   ```typescript
+   // Reset tracking refs when loading new entity
+   useEffect(() => {
+     if (settingsLoading) {
+       hasAutoSelectedRef.current = false;
+     }
+   }, [settingsLoading]);
+   ```
+
+4. **Ensure `settingsLoading` is true during ALL loading states**
+   ```typescript
+   // ❌ Bad: Only true during 'loading', false during 'idle'
+   settingsLoading={status === 'loading'}
+   
+   // ✅ Good: True until settings are actually ready
+   settingsLoading={status !== 'ready'}
+   ```
+
 ---
 
 ## 🔧 Implementation Example
