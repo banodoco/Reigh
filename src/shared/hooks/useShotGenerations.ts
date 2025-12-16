@@ -191,19 +191,6 @@ export const useAllShotGenerations = (
     return !!stableShotId;
   }, [stableShotId, options?.disableRefetch]);
   
-  // Logging throttle
-  const lastLogRef = React.useRef(0);
-  const now = Date.now();
-  if (now - lastLogRef.current > 500) {
-    console.log('[ShotGenerations] useAllShotGenerations hook called:', { 
-      shotId: stableShotId, 
-      enabled: isEnabled,
-      disableRefetch: options?.disableRefetch,
-      timestamp: now 
-    });
-    lastLogRef.current = now;
-  }
-
   // Get queryClient for cache access in queryFn (for abort handling)
   const queryClient = useQueryClient();
   
@@ -439,16 +426,6 @@ export const useAllShotGenerations = (
   // ============================================================================
   // Return query result (simplified - single query, no phases)
   // ============================================================================
-  console.log('[ShotGenerations] Query result status:', {
-    shotId: stableShotId,
-    status: mainQuery.status,
-    fetchStatus: mainQuery.fetchStatus,
-    isLoading: mainQuery.isLoading,
-    isFetching: mainQuery.isFetching,
-    dataCount: mergedData?.length || 0,
-    error: mainQuery.error,
-  });
-
   return mainQuery as UseQueryResult<GenerationRow[]>;
 };
 

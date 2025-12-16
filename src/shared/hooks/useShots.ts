@@ -177,12 +177,103 @@ export const useDuplicateShot = () => {
       
       return shotData;
     },
-    onSuccess: (data, variables) => {
-      toast.success('Shot duplicated successfully');
-      // Invalidate queries to refresh list
-      queryClient.invalidateQueries({ queryKey: ['shots', variables.projectId] });
+    onMutate: async (variables) => {
+      const { shotId, projectId } = variables;
+      
+      // All cache key variants that might exist
+      const shotsCacheKeys = [
+        ['shots', projectId],
+        ['shots', projectId, 0],
+        ['shots', projectId, 2],
+        ['shots', projectId, 5],
+      ];
+      
+      // Cancel outgoing queries for all variants
+      await Promise.all(shotsCacheKeys.map(key => 
+        queryClient.cancelQueries({ queryKey: key })
+      ));
+      
+      // Find which cache key has data (ShotsContext uses ['shots', projectId, 0])
+      let previousShots: Shot[] | undefined;
+      for (const cacheKey of shotsCacheKeys) {
+        const data = queryClient.getQueryData<Shot[]>(cacheKey);
+        if (data && data.length > 0) {
+          previousShots = data;
+          break;
+        }
+      }
+      
+      // Find the original shot to duplicate
+      const originalShot = previousShots?.find(s => s.id === shotId);
+      
+      // Create temp ID outside the if block so it's in scope for return
+      let tempId: string | undefined;
+      
+      if (originalShot && previousShots) {
+        // Create optimistic duplicate with temp ID
+        tempId = `temp-duplicate-${Date.now()}`;
+        const duplicateShot: Shot = {
+          ...originalShot,
+          id: tempId,
+          name: `${originalShot.name || 'Shot'} (copy)`,
+          position: (originalShot.position || 0) + 1,
+          created_at: new Date().toISOString(),
+        };
+        
+        // Insert right after the original shot
+        const originalIndex = previousShots.findIndex(s => s.id === shotId);
+        const updatedShots = [...previousShots];
+        updatedShots.splice(originalIndex + 1, 0, duplicateShot);
+        
+        // Update ALL cache variants with the new data
+        shotsCacheKeys.forEach(cacheKey => {
+          queryClient.setQueryData(cacheKey, updatedShots);
+        });
+      }
+      
+      return { previousShots, projectId, tempId };
     },
-    onError: (error) => {
+    onSuccess: (data, variables, context) => {
+      // Replace the temp shot with the real one from the server
+      const { projectId } = variables;
+      const tempId = context?.tempId;
+      
+      if (tempId && data) {
+        const shotsCacheKeys = [
+          ['shots', projectId],
+          ['shots', projectId, 0],
+          ['shots', projectId, 2],
+          ['shots', projectId, 5],
+        ];
+        
+        shotsCacheKeys.forEach(cacheKey => {
+          const cachedShots = queryClient.getQueryData<Shot[]>(cacheKey);
+          if (cachedShots) {
+            const updatedShots = cachedShots.map(shot => 
+              shot.id === tempId ? { ...data, images: shot.images || [] } : shot
+            );
+            queryClient.setQueryData(cacheKey, updatedShots);
+          }
+        });
+      }
+      
+      // Still invalidate to ensure full data sync, but the UI won't flicker
+      // because we already replaced the temp shot with real data
+      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+    },
+    onError: (error, variables, context) => {
+      // Rollback optimistic updates on error
+      if (context?.previousShots && context.projectId) {
+        const shotsCacheKeys = [
+          ['shots', context.projectId],
+          ['shots', context.projectId, 0],
+          ['shots', context.projectId, 2],
+          ['shots', context.projectId, 5],
+        ];
+        shotsCacheKeys.forEach(cacheKey => {
+          queryClient.setQueryData(cacheKey, context.previousShots);
+        });
+      }
       console.error('Error duplicating shot:', error);
       toast.error(`Failed to duplicate shot: ${error.message}`);
     }
@@ -195,24 +286,90 @@ export const useDeleteShot = () => {
   
   return useMutation({
     mutationFn: async ({ shotId, projectId }: { shotId: string; projectId: string }) => {
+      console.log('[DeleteShot] 🗑️ mutationFn START', { shotId: shotId.substring(0, 8), projectId: projectId.substring(0, 8) });
       const { error } = await supabase
         .from('shots')
         .delete()
         .eq('id', shotId);
 
       if (error) throw error;
+      console.log('[DeleteShot] ✅ mutationFn SUCCESS - DB delete complete');
       return { shotId, projectId };
     },
-    onSuccess: ({ projectId }) => {
-      // Note: Success toast removed per project convention (only show error toasts)
-      // Invalidate queries to refresh list
-      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      // Also invalidate shot-specific queries
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations'] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta'] });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+    onMutate: async (variables) => {
+      const { shotId, projectId } = variables;
+      console.log('[DeleteShot] ⚡ onMutate START - optimistic update', { shotId: shotId.substring(0, 8), projectId: projectId.substring(0, 8) });
+      
+      // All cache key variants that might exist
+      const shotsCacheKeys = [
+        ['shots', projectId],
+        ['shots', projectId, 0],
+        ['shots', projectId, 2],
+        ['shots', projectId, 5],
+      ];
+      
+      // Cancel outgoing queries for all variants
+      await Promise.all(shotsCacheKeys.map(key => 
+        queryClient.cancelQueries({ queryKey: key })
+      ));
+      
+      // Find which cache key has data (ShotsContext uses ['shots', projectId, 0])
+      let previousShots: Shot[] | undefined;
+      for (const cacheKey of shotsCacheKeys) {
+        const data = queryClient.getQueryData<Shot[]>(cacheKey);
+        if (data && data.length > 0) {
+          previousShots = data;
+          console.log('[DeleteShot] 📦 Found cache at key:', { cacheKey, count: data.length });
+          break;
+        }
+      }
+      
+      console.log('[DeleteShot] 📦 Previous cache state:', { 
+        hasPreviousShots: !!previousShots, 
+        previousCount: previousShots?.length || 0,
+        shotToDeleteExists: previousShots?.some(s => s.id === shotId)
+      });
+      
+      // Optimistically remove the shot from cache
+      if (previousShots) {
+        const updatedShots = previousShots.filter(s => s.id !== shotId);
+        console.log('[DeleteShot] 🔄 Updating cache:', { previousCount: previousShots.length, newCount: updatedShots.length });
+        
+        // Update ALL cache variants with the new data
+        shotsCacheKeys.forEach(cacheKey => {
+          queryClient.setQueryData(cacheKey, updatedShots);
+        });
+        console.log('[DeleteShot] ✅ onMutate COMPLETE - cache updated optimistically');
+      } else {
+        console.log('[DeleteShot] ⚠️ No previous shots cache found!');
+      }
+      
+      return { previousShots, projectId, shotId };
     },
-    onError: (error) => {
+    onSuccess: ({ shotId, projectId }) => {
+      console.log('[DeleteShot] 🎉 onSuccess - mutation completed');
+      // Note: Success toast removed per project convention (only show error toasts)
+      // The optimistic update in onMutate already updated the UI, so we don't need
+      // to invalidate broad queries which causes re-render cascades.
+      // Only invalidate specific queries for the deleted shot and project-level unified generations.
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
+    },
+    onError: (error, variables, context) => {
+      console.error('[DeleteShot] ❌ onError - rolling back', { error: error.message });
+      // Rollback optimistic updates on error
+      if (context?.previousShots && context.projectId) {
+        const shotsCacheKeys = [
+          ['shots', context.projectId],
+          ['shots', context.projectId, 0],
+          ['shots', context.projectId, 2],
+          ['shots', context.projectId, 5],
+        ];
+        shotsCacheKeys.forEach(cacheKey => {
+          queryClient.setQueryData(cacheKey, context.previousShots);
+        });
+      }
       console.error('Error deleting shot:', error);
       toast.error(`Failed to delete shot: ${error.message}`);
     }

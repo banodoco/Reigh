@@ -43,18 +43,15 @@ const loadUserSettingsCached = async (userId: string) => {
   
   // Return fresh cached data
   if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-    console.log(`[useUserUIState] ⚡ Using cached settings for user ${userId} (saved DB call!)`);
     return cached.data;
   }
   
   // If there's already a loading request, wait for it
   if (cached?.loading) {
-    console.log(`[useUserUIState] Waiting for existing request for user ${userId}`);
     return await cached.loading;
   }
   
   // Make new database call and cache the promise
-  console.log(`[useUserUIState] Fetching fresh settings for user ${userId}`);
   const loadingPromise = supabase
     .from('users')
     .select('settings')

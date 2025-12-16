@@ -29,6 +29,9 @@ interface VideoShotDisplayProps {
 }
 
 const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false }) => {
+  // Check if this is a temp shot (optimistic duplicate waiting for real ID)
+  const isTempShot = shot.id.startsWith('temp-');
+  
   // Click ripple effect
   const { triggerRipple, rippleStyles, isRippleActive } = useClickRipple();
   
@@ -206,14 +209,20 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   const IMAGES_PER_ROW = 3;
   const hasMultipleRows = positionedImages.length > IMAGES_PER_ROW;
 
+  // Handle click - block if temp shot
+  const handleClick = () => {
+    if (isTempShot) return;
+    onSelectShot();
+  };
+
   return (
     <>
       <div 
         key={shot.id} 
-        className={`click-ripple group p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:border-primary/30 hover:scale-105 transition-all duration-700 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''} ${isHighlighted ? 'ring-4 ring-blue-500 ring-opacity-75 shadow-[0_0_30px_rgba(59,130,246,0.6)] scale-105 animate-pulse' : ''}`}
+        className={`click-ripple group p-4 border rounded-lg bg-card/50 transition-all duration-700 relative flex flex-col ${isRippleActive ? 'ripple-active' : ''} ${isHighlighted ? 'ring-4 ring-blue-500 ring-opacity-75 shadow-[0_0_30px_rgba(59,130,246,0.6)] scale-105 animate-pulse' : ''} ${isTempShot ? 'opacity-70 cursor-wait animate-pulse' : 'hover:bg-card/80 hover:shadow-wes-hover hover:border-primary/30 hover:scale-105 cursor-pointer'}`}
         style={rippleStyles}
-        onPointerDown={handleRippleTrigger}
-        onClick={onSelectShot}
+        onPointerDown={isTempShot ? undefined : handleRippleTrigger}
+        onClick={handleClick}
       >
           <div className="flex justify-between items-start mb-3">
           {isEditingName ? (
@@ -248,6 +257,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             </h3>
           )}
           <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {/* Show loading indicator for temp shots */}
+            {isTempShot && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mr-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Saving...</span>
+              </div>
+            )}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -256,13 +272,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                     size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (positionedImages.length > 0) {
+                      if (positionedImages.length > 0 && !isTempShot) {
                         setIsVideoModalOpen(true);
                       }
                     }}
-                    disabled={positionedImages.length === 0}
+                    disabled={positionedImages.length === 0 || isTempShot}
                     className={`h-8 w-8 ${
-                      positionedImages.length === 0 
+                      positionedImages.length === 0 || isTempShot
                         ? 'text-zinc-400 cursor-not-allowed opacity-50' 
                         : 'text-violet-600 hover:text-violet-500 hover:bg-violet-100 dark:hover:bg-violet-950'
                     }`}
@@ -271,13 +287,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{positionedImages.length === 0 ? 'Add images to generate video' : 'Generate Video'}</p>
+                  <p>{isTempShot ? 'Saving...' : positionedImages.length === 0 ? 'Add images to generate video' : 'Generate Video'}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            {/* Drag Handle Button */}
+            {/* Drag Handle Button - also disabled for temp shots */}
             {dragHandleProps && (
-              dragHandleProps.disabled && dragDisabledReason ? (
+              (dragHandleProps.disabled || isTempShot) && (dragDisabledReason || isTempShot) ? (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -293,7 +309,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{dragDisabledReason}</p>
+                      <p>{isTempShot ? 'Saving...' : dragDisabledReason}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -322,12 +338,12 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8">
+                    <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8" disabled={isTempShot}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Edit shot name</p>
+                    <p>{isTempShot ? 'Saving...' : 'Edit shot name'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -340,7 +356,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                     size="icon" 
                     onClick={handleDuplicateShot} 
                     className="h-8 w-8" 
-                    disabled={duplicateShotMutation.isPending}
+                    disabled={duplicateShotMutation.isPending || isTempShot}
                   >
                     {duplicateShotMutation.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -350,19 +366,19 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{duplicateShotMutation.isPending ? "Duplicating..." : "Duplicate shot"}</p>
+                  <p>{isTempShot ? 'Saving...' : duplicateShotMutation.isPending ? "Duplicating..." : "Duplicate shot"}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={handleDeleteShot} className="text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8">
+                  <Button variant="ghost" size="icon" onClick={handleDeleteShot} className="text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8" disabled={isTempShot}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Delete shot</p>
+                  <p>{isTempShot ? 'Saving...' : 'Delete shot'}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
