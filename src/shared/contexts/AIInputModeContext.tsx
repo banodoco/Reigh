@@ -23,13 +23,16 @@ export function AIInputModeProvider({ children }: { children: React.ReactNode })
     update({ mode: value.mode === 'voice' ? 'text' : 'voice' })
   }, [update, value.mode])
   
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const contextValue = React.useMemo(() => ({ 
+    mode: value.mode, 
+    setMode, 
+    toggleMode,
+    isLoading 
+  }), [value.mode, setMode, toggleMode, isLoading])
+  
   return (
-    <AIInputModeContext.Provider value={{ 
-      mode: value.mode, 
-      setMode, 
-      toggleMode,
-      isLoading 
-    }}>
+    <AIInputModeContext.Provider value={contextValue}>
       {children}
     </AIInputModeContext.Provider>
   )

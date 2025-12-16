@@ -128,81 +128,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Derive advancedMode from motionMode - single source of truth
   const advancedMode = motionMode === 'advanced';
   
-  // [ShotNavPerf] TEST LOG - Component is rendering
-  const renderStartTime = performance.now();
-  const renderCount = useRef(0);
-  renderCount.current += 1;
-  
-  console.log('[ShotNavPerf] 🚀 ShotEditor RENDERING START', {
-    selectedShotId: selectedShotId?.substring(0, 8),
-    renderNumber: renderCount.current,
-    timestamp: Date.now()
-  });
-  
-  // [PROFILING] Track which props changed to cause this render
-  const prevPropsRef = useRef<any>(null);
-  useEffect(() => {
-    if (prevPropsRef.current) {
-      const changedProps: string[] = [];
-      const changedCallbacks: string[] = [];
-      
-      // Check primitive props
-      if (prevPropsRef.current.selectedShotId !== selectedShotId) changedProps.push('selectedShotId');
-      if (prevPropsRef.current.projectId !== projectId) changedProps.push('projectId');
-      if (prevPropsRef.current.generationMode !== generationMode) changedProps.push('generationMode');
-      if (prevPropsRef.current.batchVideoFrames !== batchVideoFrames) changedProps.push('batchVideoFrames');
-      // if (prevPropsRef.current.batchVideoContext !== batchVideoContext) changedProps.push('batchVideoContext'); // Removed
-      if (prevPropsRef.current.enhancePrompt !== enhancePrompt) changedProps.push('enhancePrompt');
-      if (prevPropsRef.current.turboMode !== turboMode) changedProps.push('turboMode');
-      if (prevPropsRef.current.advancedMode !== advancedMode) changedProps.push('advancedMode');
-      if (prevPropsRef.current.settingsLoading !== settingsLoading) changedProps.push('settingsLoading');
-      
-      // Check callback props (these are the likely culprits)
-      if (prevPropsRef.current.onShotImagesUpdate !== onShotImagesUpdate) changedCallbacks.push('onShotImagesUpdate');
-      if (prevPropsRef.current.onBack !== onBack) changedCallbacks.push('onBack');
-      if (prevPropsRef.current.onGenerationModeChange !== onGenerationModeChange) changedCallbacks.push('onGenerationModeChange');
-      if (prevPropsRef.current.onBatchVideoFramesChange !== onBatchVideoFramesChange) changedCallbacks.push('onBatchVideoFramesChange');
-      // if (prevPropsRef.current.onBatchVideoContextChange !== onBatchVideoContextChange) changedCallbacks.push('onBatchVideoContextChange'); // Removed
-      if (prevPropsRef.current.onEnhancePromptChange !== onEnhancePromptChange) changedCallbacks.push('onEnhancePromptChange');
-      if (prevPropsRef.current.onTurboModeChange !== onTurboModeChange) changedCallbacks.push('onTurboModeChange');
-      // onAdvancedModeChange removed - advancedMode now derived from motionMode
-      if (prevPropsRef.current.onGenerateAllSegments !== onGenerateAllSegments) changedCallbacks.push('onGenerateAllSegments');
-      if (prevPropsRef.current.onPreviousShot !== onPreviousShot) changedCallbacks.push('onPreviousShot');
-      if (prevPropsRef.current.onNextShot !== onNextShot) changedCallbacks.push('onNextShot');
-      if (prevPropsRef.current.onUpdateShotName !== onUpdateShotName) changedCallbacks.push('onUpdateShotName');
-      if (prevPropsRef.current.getShotVideoCount !== getShotVideoCount) changedCallbacks.push('getShotVideoCount');
-      if (prevPropsRef.current.invalidateVideoCountsCache !== invalidateVideoCountsCache) changedCallbacks.push('invalidateVideoCountsCache');
-      
-      if (changedProps.length > 0 || changedCallbacks.length > 0) {
-        console.warn('[ShotEditor:Profiling] 🔄 Props changed causing ShotEditor rerender:', {
-          renderNumber: renderCount.current,
-          changedProps,
-          changedCallbacks,
-          callbackCount: changedCallbacks.length,
-          timestamp: Date.now()
-        });
-      } else {
-        console.warn('[ShotEditor:Profiling] ⚠️ ShotEditor rerendered with NO PROP CHANGES (parent rerender):', {
-          renderNumber: renderCount.current,
-          timestamp: Date.now()
-        });
-      }
-    }
-    
-    // Save current props for next comparison
-    prevPropsRef.current = {
-      selectedShotId, projectId, generationMode, batchVideoFrames,
-      // batchVideoContext, // Removed
-      enhancePrompt, turboMode, advancedMode, settingsLoading,
-      onShotImagesUpdate, onBack, onGenerationModeChange, onBatchVideoFramesChange,
-      // onBatchVideoContextChange, // Removed
-      onEnhancePromptChange, onTurboModeChange,
-      // onAdvancedModeChange, // Removed - advancedMode now derived from motionMode
-      onGenerateAllSegments, onPreviousShot, onNextShot,
-      onUpdateShotName, getShotVideoCount, invalidateVideoCountsCache
-    };
-  });
-  
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
@@ -1561,18 +1486,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             strength: lora.strength
         }))
     };
-    console.log('[PresetAutoPopulate] ShotEditor creating currentSettings:', settings);
     return settings;
   }, [textBeforePrompts, textAfterPrompts, batchVideoPrompt, steerableMotionSettings.negative_prompt, enhancePrompt, batchVideoFrames, lastVideoGeneration, loraManager.selectedLoras]);
-
-  // [ShotNavPerf] Log render completion time
-  const renderEndTime = performance.now();
-  const renderDuration = renderEndTime - renderStartTime;
-  console.log('[ShotNavPerf] ⏱️ ShotEditor RENDER COMPLETE', {
-    selectedShotId: selectedShotId?.substring(0, 8),
-    renderDuration: `${renderDuration.toFixed(2)}ms`,
-    timestamp: Date.now()
-  });
 
   if (!selectedShot) {
     return (

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { GenerationRow } from '@/types/shots';
 import { preloadGenerationTaskMappings, enhanceGenerationsWithTaskData } from '@/shared/lib/generationTaskBridge';
@@ -61,12 +61,13 @@ export function GenerationTaskProvider({
     return enhanceGenerationsWithTaskData(generations, queryClient);
   }, [queryClient]);
 
-  const contextValue: GenerationTaskContextValue = {
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const contextValue = useMemo<GenerationTaskContextValue>(() => ({
     preloadTaskMappings,
     enhanceWithTaskData,
     isPreloadingEnabled,
     setPreloadingEnabled,
-  };
+  }), [preloadTaskMappings, enhanceWithTaskData, isPreloadingEnabled, setPreloadingEnabled]);
 
   return (
     <GenerationTaskContext.Provider value={contextValue}>

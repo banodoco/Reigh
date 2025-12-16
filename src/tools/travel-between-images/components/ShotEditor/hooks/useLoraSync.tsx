@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { ShotLora } from '@/tools/travel-between-images/settings';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
@@ -84,14 +84,16 @@ export const useLoraSync = ({
   }, [batchVideoPrompt]);
   
   // Convert ShotLora[] to ActiveLora[] for UI compatibility
-  const selectedLoras: ActiveLora[] = selectedLorasFromProps.map(lora => ({
-    id: lora.id,
-    name: lora.name,
-    path: lora.path,
-    strength: lora.strength,
-    previewImageUrl: lora.previewImageUrl,
-    trigger_word: lora.trigger_word,
-  }));
+  // Memoized to prevent new array reference on every render
+  const selectedLoras: ActiveLora[] = useMemo(() => 
+    selectedLorasFromProps.map(lora => ({
+      id: lora.id,
+      name: lora.name,
+      path: lora.path,
+      strength: lora.strength,
+      previewImageUrl: lora.previewImageUrl,
+      trigger_word: lora.trigger_word,
+    })), [selectedLorasFromProps]);
   
   // Set selected loras - convert back to ShotLora[] and call parent
   const setSelectedLoras = useCallback((loras: ActiveLora[]) => {

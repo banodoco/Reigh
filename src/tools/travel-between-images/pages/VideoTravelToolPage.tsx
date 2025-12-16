@@ -985,10 +985,47 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   // DEPRECATED: videoPairConfigs removed - pair prompts now stored in shot_generations.metadata.pair_prompt
   
   // Add state for toggling between shots and videos view
-  const [showVideosView, setShowVideosView] = useState<boolean>(false);
+  const [showVideosViewRaw, setShowVideosViewRaw] = useState<boolean>(false);
+  
+  // Wrapper to log every state change
+  const setShowVideosView = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
+    console.log('[ViewToggleDebug] setShowVideosView called', { 
+      newValue: typeof value === 'function' ? 'function' : value,
+      stack: new Error().stack?.split('\n').slice(1, 4).join(' <- ')
+    });
+    setShowVideosViewRaw(value);
+  }, []);
+  const showVideosView = showVideosViewRaw;
   
   // Track when we've just switched to videos view to prevent empty state flash
   const [videosViewJustEnabled, setVideosViewJustEnabled] = useState<boolean>(false);
+  
+  // Debug: log whenever showVideosView actually changes
+  useEffect(() => {
+    console.log('[ViewToggleDebug] showVideosView STATE CHANGED to:', showVideosView);
+  }, [showVideosView]);
+  
+  // Reset to Shots view and scroll to top when navigating to the tool root (e.g., clicking logo)
+  // Uses location.key to detect actual navigation events (not just state changes)
+  const prevLocationKeyRef = useRef<string | undefined>(location.key);
+  useEffect(() => {
+    const hasHash = location.hash && location.hash.length > 1;
+    const isActualNavigation = prevLocationKeyRef.current !== location.key;
+    
+    // When navigating to tool root (no hash):
+    if (isActualNavigation && !hasHash) {
+      // Always scroll to top when clicking logo/nav to tool root
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Reset videos view to shots if currently in videos
+      if (showVideosViewRaw) {
+        console.log('[ViewToggleDebug] Resetting to Shots view (navigated to tool root)');
+        setShowVideosViewRaw(false);
+      }
+    }
+    
+    prevLocationKeyRef.current = location.key;
+  }, [location.key, location.hash, showVideosViewRaw]);
   
   // Search functionality for shots
   const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
@@ -1079,24 +1116,31 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     setShotSearchQuery('');
   }, []);
   
-  // Handle toggling between shots and videos view
-  const handleToggleVideosView = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    const willShowVideos = !showVideosView;
-    
-    console.log('[VideoSkeletonDebug] === TOGGLE START ===', {
-      from: showVideosView ? 'videos' : 'shots',
-      to: willShowVideos ? 'videos' : 'shots',
-      willShowVideos,
+  // View mode is a first-class concept (shots vs videos).
+  // Centralize side-effects here so every switch behaves the same.
+  const setViewMode = useCallback((mode: 'shots' | 'videos', opts?: { blurTarget?: HTMLElement | null }) => {
+    const willShowVideos = mode === 'videos';
+
+    console.log('[ViewToggleDebug] setViewMode called', {
+      requestedMode: mode,
       currentShowVideosView: showVideosView,
+      willShowVideos,
+      isNoOp: willShowVideos === showVideosView,
       timestamp: Date.now()
     });
-    
+
+    // Skip if already in the requested mode (but allow toggle logic to work)
+    // NOTE: We still call setShowVideosView even if same value - React will skip re-render
     setShowVideosView(willShowVideos);
-    
-    // Set flag when switching TO videos view to prevent empty state flash
+
+    // Scroll to top when switching views
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     if (willShowVideos) {
+      // Prevent empty state flash while the gallery query spins up
       setVideosViewJustEnabled(true);
       console.log('[VideoSkeletonDebug] Setting videosViewJustEnabled=true to show skeletons during transition');
+
       // Reset video filters when entering videos view
       setVideoPage(1);
       setVideoShotFilter('all');
@@ -1109,8 +1153,26 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
       // Clear shot search when switching to shots view
       setShotSearchQuery('');
     }
-    e.currentTarget.blur(); // Remove focus immediately after click
-  }, [showVideosView]);
+
+    opts?.blurTarget?.blur?.();
+  }, [
+    showVideosView,
+    setShowVideosView,
+    setVideosViewJustEnabled,
+    setVideoPage,
+    setVideoShotFilter,
+    setVideoExcludePositioned,
+    setVideoSearchTerm,
+    setVideoMediaTypeFilter,
+    setVideoToolTypeFilter,
+    setVideoStarredOnly,
+    setShotSearchQuery,
+  ]);
+
+  // Kept for callers that want "toggle" semantics.
+  const handleToggleVideosView = useCallback((e?: React.MouseEvent<HTMLElement>) => {
+    setViewMode(showVideosView ? 'shots' : 'videos', { blurTarget: (e?.currentTarget as HTMLElement | null) ?? null });
+  }, [setViewMode, showVideosView]);
   
   // Memoize create shot handler to prevent infinite loops in useVideoTravelHeader
   const handleCreateNewShot = useCallback(() => {
@@ -1403,7 +1465,6 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     // In this case, treat "no hash" as "back to shot list" and clear selection.
     if (!hashShotId && selectedShot && !viaShotClick) {
       setCurrentShotId(null);
-      setShowVideosView(false);
       return;
     }
 
@@ -1456,7 +1517,6 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     navigate,
     shotFromState,
     setCurrentShotId,
-    setShowVideosView,
   ]);
 
   // If we have a hashShotId but shots have loaded and shot doesn't exist, redirect
@@ -2260,21 +2320,39 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
               <SegmentedControl
                 value={showVideosView ? 'videos' : 'shots'}
                 onValueChange={(value) => {
-                  if ((value === 'videos') !== showVideosView) {
-                    // Create a synthetic event that satisfies the handler
-                    const syntheticEvent = { stopPropagation: () => {} } as unknown as React.MouseEvent<HTMLButtonElement>;
-                    handleToggleVideosView(syntheticEvent);
-                  }
+                  console.log('[ViewToggleDebug] onValueChange fired', { value, showVideosView });
+                  // Default behavior (e.g. keyboard): select the requested mode.
+                  setViewMode(value === 'videos' ? 'videos' : 'shots');
                 }}
                 // Prevent clicks on the toggle from bubbling to parent click handlers
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  console.log('[ViewToggleDebug] SegmentedControl onClick', { target: (e.target as HTMLElement)?.textContent });
+                  e.stopPropagation();
+                }}
                 onPointerDown={(e) => e.stopPropagation()}
                 className="p-1"
               >
-                <SegmentedControlItem value="shots" className="text-lg font-light px-5 py-0">
+                <SegmentedControlItem
+                  value="shots"
+                  className="text-lg font-light px-5 py-0"
+                  onClick={(e) => {
+                    console.log('[ViewToggleDebug] Shots item onClick FIRED', { showVideosView });
+                    e.stopPropagation();
+                    setViewMode('shots', { blurTarget: e.currentTarget });
+                  }}
+                >
                   Shots
                 </SegmentedControlItem>
-                <SegmentedControlItem value="videos" className="text-lg font-light px-5 py-0">
+                <SegmentedControlItem
+                  value="videos"
+                  className="text-lg font-light px-5 py-0"
+                  onClick={(e) => {
+                    console.log('[ViewToggleDebug] Videos item onClick FIRED', { showVideosView, willSwitchTo: showVideosView ? 'shots' : 'videos' });
+                    e.stopPropagation();
+                    // Special toggle: clicking "Videos" while already in videos returns to shots.
+                    setViewMode(showVideosView ? 'shots' : 'videos', { blurTarget: e.currentTarget });
+                  }}
+                >
                   Videos
                 </SegmentedControlItem>
               </SegmentedControl>

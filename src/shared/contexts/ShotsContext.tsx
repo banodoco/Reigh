@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo } from 'react';
 import { useListShots } from '@/shared/hooks/useShots';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Shot } from '@/types/shots';
@@ -74,12 +74,13 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
     return refetch();
   }, [refetch, selectedProjectId]);
 
-  const value: ShotsContextType = {
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo<ShotsContextType>(() => ({
     shots,
     isLoading,
     error,
     refetchShots: debugRefetch,
-  };
+  }), [shots, isLoading, error, debugRefetch]);
 
   return (
     <ShotsContext.Provider value={value}>

@@ -201,12 +201,15 @@ export const useAllShotGenerations = (
   const mainQuery = useQuery<GenerationRow[], Error>({
     queryKey: ['all-shot-generations', stableShotId],
     enabled: isEnabled,
-    refetchOnMount: !options?.disableRefetch,
-    refetchOnWindowFocus: !options?.disableRefetch,
-    refetchOnReconnect: !options?.disableRefetch,
-    // Prevent rapid refetches - data is considered fresh for 500ms
-    // This helps avoid abort errors when mutation + realtime both invalidate
-    staleTime: 500,
+    // IMPORTANT: Avoid automatic refetch triggers.
+    // This query is actively invalidated by realtime + mutations; refetch-on-mount/focus
+    // creates noisy refetch loops (especially in dev) and can cause large rerender cascades.
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    // Prevent rapid refetches - data is considered fresh long enough to avoid churn.
+    // Mutations/realtime invalidation still refetch immediately when needed.
+    staleTime: 30_000,
     // Don't retry aborted/cancelled requests or invalid IDs - they'll be refetched anyway
     retry: (failureCount, error) => {
       // Don't retry aborts or cancelled requests

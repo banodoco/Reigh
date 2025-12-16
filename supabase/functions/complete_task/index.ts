@@ -52,9 +52,10 @@ async function fetchTaskContext(
   supabase: any,
   taskId: string
 ): Promise<TaskContext | null> {
+  // Fetch task first
   const { data: task, error } = await supabase
     .from("tasks")
-    .select(`id, task_type, project_id, params, task_types!inner(tool_type, category, content_type)`)
+    .select(`id, task_type, project_id, params`)
     .eq("id", taskId)
     .single();
 
@@ -63,7 +64,19 @@ async function fetchTaskContext(
     return null;
   }
 
-  const taskTypeInfo = task.task_types as any;
+  // Fetch task_types metadata separately (no FK relationship exists)
+  let taskTypeInfo: { tool_type?: string; category?: string; content_type?: string } = {};
+  if (task.task_type) {
+    const { data: typeData } = await supabase
+      .from("task_types")
+      .select("tool_type, category, content_type")
+      .eq("name", task.task_type)
+      .single();
+    if (typeData) {
+      taskTypeInfo = typeData;
+    }
+  }
+
   return {
     id: task.id,
     task_type: task.task_type,

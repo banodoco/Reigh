@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo } from 'react';
 
 interface ToolPageHeaderContextType {
   setHeader: (header: ReactNode) => void;
@@ -25,11 +25,12 @@ export const ToolPageHeaderProvider: React.FC<ToolPageHeaderProviderProps> = ({ 
   const handleSetHeader = useCallback((newHeader: ReactNode) => setHeader(newHeader), []);
   const handleClearHeader = useCallback(() => setHeader(null), []);
 
-  const value = {
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo(() => ({
     header,
     setHeader: handleSetHeader,
     clearHeader: handleClearHeader,
-  };
+  }), [header, handleSetHeader, handleClearHeader]);
 
   return (
     <ToolPageHeaderContext.Provider value={value}>

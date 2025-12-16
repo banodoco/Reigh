@@ -668,7 +668,6 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
       />
 
       {/* Phase Config Preset Selector Modal (for loading/saving presets) */}
-      {(() => { console.log('[PresetAutoPopulate] PhaseConfigVertical passing currentSettings to Modal:', currentSettings); return null; })()}
       <PhaseConfigSelectorModal
         isOpen={isPresetModalOpen}
         onClose={() => setIsPresetModalOpen(false)}
