@@ -860,7 +860,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     disableAutoLoad: true, // Disable auto-load since we handle our own default logic
   });
 
-  // Default settings for shot prompts - memoized to prevent new object on every render
+  // Default settings for shot prompts - recomputed when shot changes to pick up fresh localStorage
   // New shots inherit from localStorage (last edited shot's settings)
   const shotPromptDefaults = useMemo<ImageGenShotSettings>(() => {
     // Try to load last active shot settings for inheritance
@@ -888,7 +888,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       beforeEachPromptText: '',
       afterEachPromptText: '',
     };
-  }, []);
+  }, [associatedShotId]); // Recompute when shot changes to pick up fresh localStorage
 
   // Shot-specific prompts using per-shot storage
   const shotPromptSettings = useAutoSaveSettings<ImageGenShotSettings>({
