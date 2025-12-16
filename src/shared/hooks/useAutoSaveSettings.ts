@@ -166,14 +166,21 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     }
   }, [entityId, settings, updateSettings, scope, toolId]);
 
+  // Ref to hold latest updateSettings to avoid effect dependency churn
+  const updateSettingsRef = useRef(updateSettings);
+  updateSettingsRef.current = updateSettings;
+
   /**
    * Flush pending settings on entity change/unmount.
    *
-   * IMPORTANT: this runs in the *cleanup* for the previous entity render, so `updateSettings`
-   * is still bound to the previous `shotId/projectId`. This avoids accidentally saving shot A's
-   * pending settings into shot B when switching entities quickly.
+   * IMPORTANT: this runs in the *cleanup* for the previous entity render.
+   * We use refs for updateSettings/scope/toolId to avoid the effect running
+   * on every render when those values have unstable references.
    */
   useEffect(() => {
+    // Capture entityId for this effect instance
+    const currentEntityId = entityId;
+    
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -183,26 +190,27 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       const pending = pendingSettingsRef.current;
       const pendingForEntity = pendingEntityIdRef.current;
 
-      if (pending && pendingForEntity && pendingForEntity === entityId) {
+      if (pending && pendingForEntity && pendingForEntity === currentEntityId) {
         console.log('[useAutoSaveSettings] 🚿 Flushing pending save in cleanup:', {
           toolId,
           entityId: pendingForEntity.substring(0, 8),
         });
 
         // Fire-and-forget; cleanup cannot be async.
-        updateSettings(scope, pending).catch(err => {
+        // Use ref to get latest updateSettings without dependency
+        updateSettingsRef.current(scope, pending).catch(err => {
           console.error('[useAutoSaveSettings] Cleanup flush failed:', err);
         });
       }
 
       // Always clear pending refs for the entity we are leaving
-      if (pendingForEntity === entityId) {
+      if (pendingForEntity === currentEntityId) {
         pendingSettingsRef.current = null;
         pendingEntityIdRef.current = null;
       }
     };
-    // Intentionally depends on entityId so cleanup runs per-entity.
-  }, [entityId, updateSettings, scope, toolId]);
+    // Only re-run when entityId changes - other deps accessed via refs
+  }, [entityId, scope, toolId]);
 
   // Update single field
   const updateField = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
