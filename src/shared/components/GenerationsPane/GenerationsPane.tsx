@@ -675,6 +675,7 @@ const GenerationsPaneComponent: React.FC = () => {
       <ImageGenerationModal
         isOpen={isGenerationModalOpen}
         onClose={() => setIsGenerationModalOpen(false)}
+        initialShotId={currentShotId}
       />
     </>
   );

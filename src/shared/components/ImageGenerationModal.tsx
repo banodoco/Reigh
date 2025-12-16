@@ -21,11 +21,14 @@ import { useNavigate } from 'react-router-dom';
 interface ImageGenerationModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Pre-select a specific shot when the modal opens */
+  initialShotId?: string | null;
 }
 
 export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   isOpen,
   onClose,
+  initialShotId,
 }) => {
   const modal = useExtraLargeModal();
   const formRef = useRef<ImageGenerationFormHandles>(null);
@@ -183,6 +186,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               openaiApiKey={openaiApiKey}
               justQueued={justQueued}
               stickyFooter={true}
+              initialShotId={initialShotId}
             />
           </Suspense>
         </div>

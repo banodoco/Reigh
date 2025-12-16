@@ -81,6 +81,11 @@ interface ImageGenerationFormProps {
    * at the bottom of the scroll container (for modal contexts)
    */
   stickyFooter?: boolean;
+  /**
+   * Pre-select a specific shot when the form mounts. This takes precedence over
+   * persisted settings on initial render only.
+   */
+  initialShotId?: string | null;
 }
 
 interface LoraDataEntry {
@@ -112,6 +117,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   justQueued = false,
   onShotChange,
   stickyFooter = false,
+  initialShotId,
 }, ref) => {
   
   // Debug logging for callback prop
@@ -944,6 +950,24 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       });
     }
   }, [ready, associatedShotId, promptsByShot, effectiveShotId, selectedProjectId]);
+
+  // Apply initialShotId once after hydration (takes precedence over persisted value)
+  const hasAppliedInitialShotId = useRef(false);
+  useEffect(() => {
+    // Only apply once, after hydration is complete, if initialShotId was provided
+    if (ready && initialShotId && !hasAppliedInitialShotId.current && shots) {
+      const shotExists = shots.some(shot => shot.id === initialShotId);
+      if (shotExists) {
+        console.log('[ImageGenerationForm] Applying initialShotId:', initialShotId);
+        setAssociatedShotId(initialShotId);
+        markAsInteracted();
+        hasAppliedInitialShotId.current = true;
+      } else {
+        console.log('[ImageGenerationForm] initialShotId not found in shots list:', initialShotId);
+        hasAppliedInitialShotId.current = true; // Mark as applied to prevent repeated attempts
+      }
+    }
+  }, [ready, initialShotId, shots, markAsInteracted]);
 
   // Reset associatedShotId if the selected shot no longer exists (e.g., was deleted)
   useEffect(() => {

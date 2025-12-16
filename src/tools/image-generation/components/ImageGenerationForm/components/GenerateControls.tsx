@@ -55,7 +55,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
                 value={imagesPerPrompt}
                 onChange={onChangeImagesPerPrompt}
                 min={1}
-                max={16}
+                max={32}
                 step={1}
                 disabled={!hasApiKey || isGenerating}
               />
@@ -91,7 +91,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
             value={imagesPerPrompt}
             onChange={onChangeImagesPerPrompt}
             min={1}
-            max={16}
+            max={32}
             step={1}
             disabled={!hasApiKey || isGenerating}
           />

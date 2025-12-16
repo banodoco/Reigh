@@ -574,7 +574,7 @@ const StyleReferenceSection: React.FC<{
         {/* Second Row: Settings in Two Columns */}
         <div className="flex gap-4 flex-col md:flex-row">
           {/* Left column - Reference Mode Selector */}
-          <div className="flex-[2] space-y-2">
+          <div className="flex-1 space-y-2">
             <Label className="text-sm font-medium">How would you like to use this reference?</Label>
             <RadioGroup 
               value={referenceMode} 
@@ -607,88 +607,74 @@ const StyleReferenceSection: React.FC<{
           </div>
 
           {/* Right column - Strength sliders and subject description */}
-          <div className="flex-[3] space-y-4">
+          <div className="flex-1 space-y-4">
             {/* Scene strength slider - only show in scene mode */}
             {referenceMode === 'scene' && (
-              <div className="flex gap-4">
-                <div className="flex-[0.5]">
-                  <SliderWithValue
-                    label="Scene strength"
-                    value={inThisSceneStrength}
-                    onChange={onInThisSceneStrengthChange}
-                    min={0.0}
-                    max={2.0}
-                    step={0.1}
-                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                    numberInputClassName="w-16"
-                  />
-                </div>
-              </div>
+              <SliderWithValue
+                label="Scene strength"
+                value={inThisSceneStrength}
+                onChange={onInThisSceneStrengthChange}
+                min={0.0}
+                max={2.0}
+                step={0.1}
+                disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                numberInputClassName="w-16"
+              />
             )}
             
-            {/* Style and Subject strength sliders - only show in custom mode */}
+            {/* Style, Subject, and Scene strength sliders - only show in custom mode */}
             {referenceMode === 'custom' && (
-              <>
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <SliderWithValue
-                      label="Style strength"
-                      value={styleReferenceStrength}
-                      onChange={(value) => {
-                        // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                        const newTotal = value + subjectStrength;
-                        if (newTotal < 0.5) {
-                          return;
-                        }
-                        onStyleStrengthChange(value);
-                      }}
-                      min={0.0}
-                      max={2.0}
-                      step={0.1}
-                      disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      numberInputClassName="w-16"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <SliderWithValue
-                      label="Subject strength"
-                      value={subjectStrength}
-                      onChange={(value) => {
-                        // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                        const newTotal = styleReferenceStrength + value;
-                        if (newTotal < 0.5) {
-                          return;
-                        }
-                        onSubjectStrengthChange(value);
-                      }}
-                      min={0.0}
-                      max={2.0}
-                      step={0.1}
-                      disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      numberInputClassName="w-16"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-[0.5]">
-                    <SliderWithValue
-                      label="Scene strength"
-                      value={inThisSceneStrength}
-                      onChange={onInThisSceneStrengthChange}
-                      min={0.0}
-                      max={2.0}
-                      step={0.1}
-                      disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      numberInputClassName="w-16"
-                    />
-                  </div>
-                </div>
-              </>
+              <div className="space-y-3">
+                <SliderWithValue
+                  label="Style strength"
+                  value={styleReferenceStrength}
+                  onChange={(value) => {
+                    // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                    const newTotal = value + subjectStrength;
+                    if (newTotal < 0.5) {
+                      return;
+                    }
+                    onStyleStrengthChange(value);
+                  }}
+                  min={0.0}
+                  max={2.0}
+                  step={0.1}
+                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                  numberInputClassName="w-16"
+                />
+                <SliderWithValue
+                  label="Subject strength"
+                  value={subjectStrength}
+                  onChange={(value) => {
+                    // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                    const newTotal = styleReferenceStrength + value;
+                    if (newTotal < 0.5) {
+                      return;
+                    }
+                    onSubjectStrengthChange(value);
+                  }}
+                  min={0.0}
+                  max={2.0}
+                  step={0.1}
+                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                  numberInputClassName="w-16"
+                />
+                <SliderWithValue
+                  label="Scene strength"
+                  value={inThisSceneStrength}
+                  onChange={onInThisSceneStrengthChange}
+                  min={0.0}
+                  max={2.0}
+                  step={0.1}
+                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                  numberInputClassName="w-16"
+                />
+              </div>
             )}
             
             {/* Show subject description and/or style-boost terms based on mode */}
             {styleReferenceImage && (referenceMode === 'style' || referenceMode === 'subject') && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 {/* Show subject description when subject strength > 0 (excludes scene mode and custom mode) */}
                 {subjectStrength > 0 && (
                   <div className="space-y-2">
@@ -704,7 +690,6 @@ const StyleReferenceSection: React.FC<{
                       onBlur={onSubjectDescriptionBlur}
                       placeholder="man, woman, cactus"
                       disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      className="flex-1"
                     />
                   </div>
                 )}
@@ -722,7 +707,6 @@ const StyleReferenceSection: React.FC<{
                       onChange={(e) => onStyleBoostTermsChange?.(e.target.value)}
                       placeholder="oil painting, impressionist"
                       disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      className="flex-1"
                     />
                   </div>
                 )}

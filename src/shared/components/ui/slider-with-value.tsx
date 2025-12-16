@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Slider } from "./slider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 interface SliderWithValueProps {
   label: string;
@@ -78,16 +79,44 @@ const SliderWithValue = ({
             {formatValue(value)}
           </div>
         ) : (
-          <input
-            type="number"
-            className={`border rounded ${numberInputClassName} h-10 flex items-center justify-center bg-card dark:bg-gray-800 text-center px-2`}
-            value={inputValue}
-            onChange={handleInputChange}
-            step={step}
-            min={min}
-            max={max}
-            disabled={disabled}
-          />
+          <div className={`flex items-center border border-border rounded ${numberInputClassName} h-10 bg-card dark:bg-gray-800 overflow-hidden`}>
+            <input
+              type="number"
+              className="flex-1 h-full bg-transparent text-center px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none"
+              value={inputValue}
+              onChange={handleInputChange}
+              step={step}
+              min={min}
+              max={max}
+              disabled={disabled}
+            />
+            <div className="flex flex-col h-full border-l border-border">
+              <button
+                type="button"
+                className="flex-1 px-1 hover:bg-muted/50 active:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => {
+                  const newVal = Math.min(max, value + step);
+                  onChange(newVal);
+                }}
+                disabled={disabled || value >= max}
+                tabIndex={-1}
+              >
+                <ChevronUp className="h-3 w-3 text-muted-foreground" />
+              </button>
+              <button
+                type="button"
+                className="flex-1 px-1 hover:bg-muted/50 active:bg-muted transition-colors border-t border-border disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => {
+                  const newVal = Math.max(min, value - step);
+                  onChange(newVal);
+                }}
+                disabled={disabled || value <= min}
+                tabIndex={-1}
+              >
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              </button>
+            </div>
+          </div>
         )}
         <Slider
           value={[value]}
