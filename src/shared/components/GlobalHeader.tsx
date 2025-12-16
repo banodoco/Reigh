@@ -288,7 +288,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                       "drop-shadow-lg dark:drop-shadow-none",
                       darkMode
                         ? "text-[#a098a8] animate-color-shift group-hover:animate-none group-hover:!text-wes-vintage-gold"
-                        : "text-white group-hover:!text-[#FFB84D]"
+                        : "text-white group-hover:!text-[#C9B896]"
                     )}
                   />
                 </div>
@@ -382,7 +382,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-12 w-12 wes-button-subtle gradient-icon-coral dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[1px] hover:translate-y-[1px] group disabled:cursor-not-allowed transition-all duration-300"
+                className="h-12 w-12 gradient-icon-coral dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[1px] hover:translate-y-[1px] group disabled:cursor-not-allowed transition-all duration-300"
                 disabled={isLoadingProjects || !selectedProject}
                 style={getDarkIconStyle(darkIconColors.coral)}
               >
@@ -465,7 +465,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                           "drop-shadow-lg dark:drop-shadow-none",
                           darkMode
                             ? "text-[#a098a8] animate-color-shift group-hover:animate-none group-hover:!text-wes-vintage-gold"
-                            : "text-white group-hover:!text-[#FFB84D]"
+                            : "text-white group-hover:!text-[#C9B896]"
                         )}
                       />
                     </div>
@@ -491,7 +491,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsProjectSettingsModalOpen(true)}
-                className="h-10 w-10 wes-button-subtle gradient-icon-coral dark:bg-none dark:border-2 rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group disabled:cursor-not-allowed transition-all duration-300"
+                className="h-10 w-10 gradient-icon-coral dark:bg-none dark:border-2 rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group disabled:cursor-not-allowed transition-all duration-300"
                 disabled={isLoadingProjects || !selectedProject}
                 style={getDarkIconStyle(darkIconColors.coral)}
               >

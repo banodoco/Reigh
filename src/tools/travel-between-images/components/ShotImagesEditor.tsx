@@ -803,7 +803,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   }
                 }}
                 disabled={readOnly}
-                size="sm"
               >
                 <SegmentedControlItem value="timeline">
                   Timeline

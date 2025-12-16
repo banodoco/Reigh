@@ -384,6 +384,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Auto-select reference if we have references but no valid selected reference for this shot
   // Uses the most recently added reference as default
+  // Note: Only updates project-level here; shot-level is synced via handleSelectReference or later effect
   useEffect(() => {
     if (hydratedReferences.length > 0 && projectImageSettings) {
       // Find the most recently added reference (by createdAt)
@@ -401,18 +402,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         const mostRecent = getMostRecentReference();
         console.log('[RefSettings] 🔄 Auto-selecting most recent reference for shot', effectiveShotId, mostRecent.id);
         
-        // Update both project-level and shot-level for consistency
+        // Update project-level per-shot mapping
         updateProjectImageSettings('project', {
           selectedReferenceIdByShot: {
             ...selectedReferenceIdByShot,
             [effectiveShotId]: mostRecent.id
           }
         });
-        
-        // Also update shot-level settings
-        if (associatedShotId) {
-          shotPromptSettings.updateField('selectedReferenceId', mostRecent.id);
-        }
       }
       // Case 2: selectedReferenceId exists but doesn't match any reference (stale/corrupted)
       else if (!selectedReference) {
@@ -425,14 +421,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             [effectiveShotId]: mostRecent.id
           }
         });
-        
-        // Also update shot-level settings
-        if (associatedShotId) {
-          shotPromptSettings.updateField('selectedReferenceId', mostRecent.id);
-        }
       }
     }
-  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings, associatedShotId, shotPromptSettings]);
+  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings]);
 
   // Check if database has caught up with pending mode update
   useEffect(() => {
