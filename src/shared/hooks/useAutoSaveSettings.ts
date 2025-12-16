@@ -405,8 +405,10 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     }
 
     // Don't overwrite if user has pending edits (debounce hasn't fired yet)
+    // BUT only if we've loaded at least once - for new entities, we must load first
     // This prevents React Query refetches from "unwriting" user input
-    if (pendingSettingsRef.current && pendingEntityIdRef.current === entityId) {
+    const hasLoadedOnce = loadedSettingsRef.current !== null;
+    if (hasLoadedOnce && pendingSettingsRef.current && pendingEntityIdRef.current === entityId) {
       console.log('[useAutoSaveSettings] ⏳ Skipping DB load - user has pending edits');
       // Still transition to ready and schedule save for pending edits
       if (status !== 'ready') {
@@ -444,16 +446,52 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       return;
     }
 
-    console.log('[useAutoSaveSettings] 📥 Loaded from DB:', {
-      toolId,
-      entityId: entityId.substring(0, 8),
-    });
+    // Check if user typed during loading (before we had loaded once)
+    // If so, merge their edits over the DB settings and schedule a save
+    const pendingEdits = pendingSettingsRef.current;
+    const hasPendingForThisEntity = pendingEdits && pendingEntityIdRef.current === entityId;
 
-    setSettings(clonedSettings);
-    loadedSettingsRef.current = JSON.parse(JSON.stringify(clonedSettings));
-    setStatus('ready');
-    setError(null);
-  }, [entityId, isLoading, dbSettings, defaults, enabled, status, toolId]);
+    if (hasPendingForThisEntity) {
+      console.log('[useAutoSaveSettings] 📥 Loaded from DB (merging with user edits during loading):', {
+        toolId,
+        entityId: entityId.substring(0, 8),
+      });
+
+      // Merge: DB settings as base, user edits on top
+      const mergedSettings = {
+        ...clonedSettings,
+        ...pendingEdits,
+      };
+
+      setSettings(mergedSettings);
+      loadedSettingsRef.current = JSON.parse(JSON.stringify(clonedSettings)); // Original DB state
+      pendingSettingsRef.current = mergedSettings; // Track merged as pending
+      setStatus('ready');
+      setError(null);
+
+      // Schedule save for the merged settings
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveTimeoutRef.current = setTimeout(async () => {
+        try {
+          await saveImmediateRef.current(mergedSettings);
+        } catch (err) {
+          console.error('[useAutoSaveSettings] Pending save failed:', err);
+        }
+      }, debounceMs);
+    } else {
+      console.log('[useAutoSaveSettings] 📥 Loaded from DB:', {
+        toolId,
+        entityId: entityId.substring(0, 8),
+      });
+
+      setSettings(clonedSettings);
+      loadedSettingsRef.current = JSON.parse(JSON.stringify(clonedSettings));
+      setStatus('ready');
+      setError(null);
+    }
+  }, [entityId, isLoading, dbSettings, defaults, enabled, status, toolId, debounceMs]);
 
   // Memoize return value to prevent object recreation on every render
   return useMemo(() => ({
