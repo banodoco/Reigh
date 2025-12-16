@@ -51,7 +51,8 @@ export interface PersistedFormSettings {
   // Kept for migration - will be removed after all users migrate
   promptsByShot?: Record<string, PromptEntry[]>;
   masterPromptByShot?: Record<string, string>;
-  masterPromptText?: string;
+  /** Master prompt when no shot is selected (project-level fallback) */
+  masterPrompt?: string;
 }
 
 /**

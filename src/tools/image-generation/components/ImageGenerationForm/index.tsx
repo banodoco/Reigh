@@ -913,7 +913,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
       associatedShotId: [associatedShotId, setAssociatedShotId],
       promptMode: [promptMode, setPromptMode],
-      masterPromptText: [noShotMasterPrompt, setNoShotMasterPrompt], // Persist no-shot master prompt
+      masterPrompt: [noShotMasterPrompt, setNoShotMasterPrompt], // Persist no-shot master prompt
     }
   );
 
@@ -1655,7 +1655,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const handleSelectReference = useCallback(async (referenceId: string) => {
     console.log('[RefSettings] 🔀 Selecting reference for shot', effectiveShotId, ':', referenceId);
     
-    // Optimistic UI update
+    // Also update shot-level settings for inheritance (stored in shotPromptSettings)
+    if (associatedShotId) {
+      shotPromptSettings.updateField('selectedReferenceId', referenceId);
+    }
+    
+    // Optimistic UI update for project-level per-shot mapping
     const optimisticUpdate = {
       ...selectedReferenceIdByShot,
       [effectiveShotId]: referenceId
@@ -1679,7 +1684,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       selectedReferenceIdByShot: optimisticUpdate
     });
     markAsInteracted();
-  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
+  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId, associatedShotId, shotPromptSettings]);
   
   // Handle deleting a reference
   const handleDeleteReference = useCallback(async (referenceId: string) => {
