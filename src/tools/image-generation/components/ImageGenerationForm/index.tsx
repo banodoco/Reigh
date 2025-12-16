@@ -868,17 +868,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   });
 
   // Default settings for shot prompts - recomputed when shot changes to pick up fresh localStorage
-  // New shots inherit promptMode and before/after prompts from localStorage (last edited shot)
+  // Inheritance chain: localStorage (last edited shot) → project-level settings → hardcoded defaults
   // Reference selection defaults to most-recent reference (handled in auto-select effect)
   const shotPromptDefaults = useMemo<ImageGenShotSettings>(() => {
-    // Try to load last active shot settings for inheritance (except reference - uses most-recent)
+    // Try to load last active shot settings for inheritance
     try {
       const stored = localStorage.getItem('image-gen-last-active-shot-settings');
       if (stored) {
         const parsed = JSON.parse(stored);
         return {
           prompts: [],
-          masterPrompt: '',
+          masterPrompt: parsed.masterPrompt || '',
           promptMode: parsed.promptMode || 'automated',
           selectedReferenceId: null, // Don't inherit - auto-select uses most-recent reference
           beforeEachPromptText: parsed.beforeEachPromptText || '',
@@ -888,15 +888,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } catch (e) {
       // Ignore localStorage errors
     }
+    // Fall back to project-level settings if localStorage is empty
     return { 
       prompts: [], 
-      masterPrompt: '',
-      promptMode: 'automated',
+      masterPrompt: noShotMasterPrompt || '',
+      promptMode: promptMode || 'automated',
       selectedReferenceId: null,
-      beforeEachPromptText: '',
-      afterEachPromptText: '',
+      beforeEachPromptText: beforeEachPromptText || '',
+      afterEachPromptText: afterEachPromptText || '',
     };
-  }, [associatedShotId]); // Recompute when shot changes to pick up fresh localStorage
+  }, [associatedShotId, noShotMasterPrompt, promptMode, beforeEachPromptText, afterEachPromptText]);
 
   // Shot-specific prompts using per-shot storage
   const shotPromptSettings = useAutoSaveSettings<ImageGenShotSettings>({
@@ -1057,12 +1058,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Save current shot settings to localStorage for inheritance by new shots
-  // Save current shot settings to localStorage for inheritance by new shots
-  // Note: selectedReferenceId is NOT inherited - new shots auto-select most-recent reference
+  // Note: prompts are NOT inherited, only masterPrompt and mode settings
   useEffect(() => {
     if (associatedShotId && shotPromptSettings.status === 'ready') {
       try {
         const settingsToSave = {
+          masterPrompt: shotPromptSettings.settings.masterPrompt || '',
           promptMode: shotPromptSettings.settings.promptMode || effectivePromptMode || 'automated',
           beforeEachPromptText: shotPromptSettings.settings.beforeEachPromptText || '',
           afterEachPromptText: shotPromptSettings.settings.afterEachPromptText || '',
@@ -1072,7 +1073,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         // Ignore localStorage errors
       }
     }
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, shotPromptSettings.settings.beforeEachPromptText, shotPromptSettings.settings.afterEachPromptText, effectivePromptMode]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, shotPromptSettings.settings.promptMode, shotPromptSettings.settings.beforeEachPromptText, shotPromptSettings.settings.afterEachPromptText, effectivePromptMode]);
 
   // Sync local style strength with project settings
   // Legacy sync effects removed to prevent overwriting user input
