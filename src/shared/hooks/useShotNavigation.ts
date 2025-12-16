@@ -43,6 +43,16 @@ export const useShotNavigation = (): ShotNavigationResult => {
     isNewlyCreated: false,
   };
 
+  // If we want an "already at top" feel, scroll BEFORE navigation.
+  // Only do this for non-animated (auto) scrolling to avoid a weird double-animation.
+  const preScrollToTopIfNeeded = (options: Required<ShotNavigationOptions>) => {
+    if (!options.scrollToTop) return;
+    if (options.scrollBehavior !== 'auto') return;
+    // Avoid delaying the "start at top" behavior.
+    if (options.scrollDelay !== 0) return;
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  };
+
   const performScroll = (options: Required<ShotNavigationOptions>) => {
     if (options.scrollToTop) {
       const scrollFn = () => {
@@ -80,6 +90,8 @@ export const useShotNavigation = (): ShotNavigationResult => {
       timestamp: Date.now()
     });
     
+    preScrollToTopIfNeeded(opts);
+
     // Update the current shot context
     console.log('[ShotNavPerf] 🎯 Setting current shot ID:', shot.id.substring(0, 8));
     const contextStart = Date.now();

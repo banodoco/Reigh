@@ -2028,7 +2028,8 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     });
     // Reset videos view when selecting a shot
     setShowVideosView(false);
-    navigateToShot(shot);
+    // Jump to top immediately (no smooth scroll) so the shot opens "starting at top".
+    navigateToShot(shot, { scrollBehavior: 'auto', scrollDelay: 0 });
   };
 
   // NOTE: The old "deselect if currentShotId cleared" effect is no longer needed
