@@ -68,6 +68,10 @@ export interface ImageGenShotSettings {
   promptMode?: PromptMode;
   /** Selected reference ID for this shot */
   selectedReferenceId?: string | null;
+  /** Text to prepend to every prompt */
+  beforeEachPromptText?: string;
+  /** Text to append to every prompt */
+  afterEachPromptText?: string;
 }
 
 // Reference mode type

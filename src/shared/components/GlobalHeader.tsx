@@ -282,7 +282,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
             >
               <div className="relative">
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:border-2 rounded-sm shadow-[-4px_4px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-4px_4px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-2px_2px_0_0_rgba(180,160,100,0.4)] dark:group-hover:!border-wes-vintage-gold group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-300" style={getDarkIconStyle(darkIconColors.palette)}>
-                  <Palette className={`h-8 w-8 group-hover:rotate-12 group-hover:text-wes-vintage-gold transition-all duration-300 drop-shadow-lg dark:drop-shadow-none ${darkMode ? 'animate-color-shift group-hover:animate-none' : 'text-white'}`} />
+                  <Palette
+                    className={`h-8 w-8 group-hover:rotate-12 group-hover:!text-wes-vintage-gold transition-all duration-300 drop-shadow-lg dark:drop-shadow-none ${darkMode ? 'text-[#a098a8] animate-color-shift group-hover:animate-none' : 'text-white'}`}
+                  />
                 </div>
                 <div className="absolute -inset-1 border border-wes-vintage-gold/20 rounded-2xl animate-rotate-slow opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
                 <div className="absolute -top-2 -right-2 pointer-events-none">
@@ -451,7 +453,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
                     <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-1px_1px_0_0_rgba(90,90,80,0.4)] dark:group-hover:!border-wes-vintage-gold group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-300" style={getDarkIconStyle(darkIconColors.palette)}>
-                      <Palette className={`h-6 w-6 group-hover:rotate-12 group-hover:text-wes-vintage-gold transition-all duration-300 drop-shadow-lg dark:drop-shadow-none ${darkMode ? 'animate-color-shift group-hover:animate-none' : 'text-white'}`} />
+                      <Palette
+                        className={`h-6 w-6 group-hover:rotate-12 group-hover:text-wes-vintage-gold group-hover:animate-none transition-all duration-300 drop-shadow-lg dark:drop-shadow-none ${darkMode ? 'animate-color-shift' : 'text-white'}`}
+                        style={{ color: darkMode ? darkIconColors.palette : undefined }}
+                      />
                     </div>
                     <div className="absolute -top-1 -right-1 pointer-events-none">
                       <Crown className="w-2.5 h-2.5 text-wes-vintage-gold animate-bounce-gentle opacity-60" />

@@ -2399,18 +2399,19 @@
 /* Subtle color shifting for logo icon */
 @keyframes color-shift {
   0%, 100% {
-    color: #a098a8; /* lavender faded */
+    filter: hue-rotate(0deg);
   }
   33% {
-    color: #b0a0a8; /* pink-ish faded */
+    filter: hue-rotate(35deg);
   }
   66% {
-    color: #8898a8; /* dusty-blue faded */
+    filter: hue-rotate(-35deg);
   }
 }
 
 .animate-color-shift {
   animation: color-shift 8s ease-in-out infinite;
+  will-change: filter;
 }
 
 .animate-paintbrush-stroke {

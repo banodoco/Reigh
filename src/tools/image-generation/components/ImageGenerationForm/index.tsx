@@ -873,6 +873,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           masterPrompt: '',
           promptMode: parsed.promptMode || 'automated',
           selectedReferenceId: parsed.selectedReferenceId || null,
+          beforeEachPromptText: parsed.beforeEachPromptText || '',
+          afterEachPromptText: parsed.afterEachPromptText || '',
         };
       }
     } catch (e) {
@@ -883,6 +885,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       masterPrompt: '',
       promptMode: 'automated',
       selectedReferenceId: null,
+      beforeEachPromptText: '',
+      afterEachPromptText: '',
     };
   }, []);
 
@@ -897,6 +901,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   });
 
   // Project-level settings (NOT shot-specific)
+  // Note: promptMode here is the fallback when no shot is selected
+  // beforeEachPromptText/afterEachPromptText here are fallbacks when no shot is selected
   const { ready, isSaving, markAsInteracted } = usePersistentToolState<PersistedFormSettings>(
     'image-generation',
     { projectId: selectedProjectId },
@@ -907,6 +913,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
       associatedShotId: [associatedShotId, setAssociatedShotId],
       promptMode: [promptMode, setPromptMode],
+      masterPromptText: [noShotMasterPrompt, setNoShotMasterPrompt], // Persist no-shot master prompt
     }
   );
 
@@ -1005,6 +1012,42 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     // (handled by existing handleReferenceSelection)
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
+  // Get current before prompt text - from shot settings if shot selected, otherwise project state
+  const currentBeforePromptText = useMemo(() => {
+    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+      return shotPromptSettings.settings.beforeEachPromptText ?? beforeEachPromptText;
+    }
+    return beforeEachPromptText;
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.beforeEachPromptText, beforeEachPromptText]);
+
+  // Helper to update before prompt text - routes to shot settings or project state
+  const setCurrentBeforePromptText = useCallback((newText: string) => {
+    if (associatedShotId) {
+      shotPromptSettings.updateField('beforeEachPromptText', newText);
+      markAsInteracted();
+    } else {
+      setBeforeEachPromptText(newText);
+    }
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+
+  // Get current after prompt text - from shot settings if shot selected, otherwise project state
+  const currentAfterPromptText = useMemo(() => {
+    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+      return shotPromptSettings.settings.afterEachPromptText ?? afterEachPromptText;
+    }
+    return afterEachPromptText;
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.afterEachPromptText, afterEachPromptText]);
+
+  // Helper to update after prompt text - routes to shot settings or project state
+  const setCurrentAfterPromptText = useCallback((newText: string) => {
+    if (associatedShotId) {
+      shotPromptSettings.updateField('afterEachPromptText', newText);
+      markAsInteracted();
+    } else {
+      setAfterEachPromptText(newText);
+    }
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+
   // Save current shot settings to localStorage for inheritance by new shots
   useEffect(() => {
     if (associatedShotId && shotPromptSettings.status === 'ready') {
@@ -1013,13 +1056,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           promptMode: shotPromptSettings.settings.promptMode || effectivePromptMode || 'automated',
           // Use the project-level per-shot reference selection for inheritance
           selectedReferenceId: selectedReferenceId || null,
+          beforeEachPromptText: shotPromptSettings.settings.beforeEachPromptText || '',
+          afterEachPromptText: shotPromptSettings.settings.afterEachPromptText || '',
         };
         localStorage.setItem('image-gen-last-active-shot-settings', JSON.stringify(settingsToSave));
       } catch (e) {
         // Ignore localStorage errors
       }
     }
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, effectivePromptMode, selectedReferenceId]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, shotPromptSettings.settings.beforeEachPromptText, shotPromptSettings.settings.afterEachPromptText, effectivePromptMode, selectedReferenceId]);
 
   // Sync local style strength with project settings
   // Legacy sync effects removed to prevent overwriting user input
@@ -2067,13 +2112,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     // Build the unified task creation parameters
     // Append styleBoostTerms to afterEachPromptText if present
     const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
-      ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
-      : afterEachPromptText;
+      ? `${currentAfterPromptText}${currentAfterPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+      : currentAfterPromptText;
     
     const batchTaskParams: BatchImageGenerationTaskParams = {
       project_id: selectedProjectId!,
       prompts: activePrompts.map(p => {
-        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
+        const combinedFull = `${currentBeforePromptText ? `${currentBeforePromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
         return {
           id: p.id,
           fullPrompt: combinedFull,
@@ -2121,8 +2166,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     selectedModel, 
     styleReferenceImageGeneration,
     selectedProjectId,
-    beforeEachPromptText,
-    afterEachPromptText,
+    currentBeforePromptText,
+    currentAfterPromptText,
     imagesPerPrompt,
     associatedShotId,
     isLocalGenerationEnabled,
@@ -2155,13 +2200,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     // Append styleBoostTerms to afterEachPromptText if present
     const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
-      ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
-      : afterEachPromptText;
+      ? `${currentAfterPromptText}${currentAfterPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+      : currentAfterPromptText;
 
     const batchTaskParams: BatchImageGenerationTaskParams = {
       project_id: selectedProjectId!,
       prompts: activePrompts.map(p => {
-        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
+        const combinedFull = `${currentBeforePromptText ? `${currentBeforePromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
         return {
           id: p.id,
           fullPrompt: combinedFull,
@@ -2204,8 +2249,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     prompts,
     styleReferenceImageGeneration,
     selectedProjectId,
-    beforeEachPromptText,
-    afterEachPromptText,
+    currentBeforePromptText,
+    currentAfterPromptText,
     currentStyleBoostTerms,
     associatedShotId,
     isLocalGenerationEnabled,
@@ -2268,13 +2313,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
       // Append styleBoostTerms to afterEachPromptText if present
       const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
-        ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
-        : afterEachPromptText;
+        ? `${currentAfterPromptText}${currentAfterPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+        : currentAfterPromptText;
 
       const batchTaskParams: BatchImageGenerationTaskParams = {
         project_id: selectedProjectId!,
         prompts: newPrompts.map(p => {
-          const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
+          const combinedFull = `${currentBeforePromptText ? `${currentBeforePromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
           return {
             id: p.id,
             fullPrompt: combinedFull,
@@ -2324,8 +2369,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     styleReferenceImageGeneration,
     selectedProjectId,
     imagesPerPrompt,
-    beforeEachPromptText,
-    afterEachPromptText,
+    currentBeforePromptText,
+    currentAfterPromptText,
     currentStyleBoostTerms,
     associatedShotId,
     isLocalGenerationEnabled,
@@ -2391,13 +2436,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         
         // Append styleBoostTerms to afterEachPromptText if present
         const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
-          ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
-          : afterEachPromptText;
+          ? `${currentAfterPromptText}${currentAfterPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+          : currentAfterPromptText;
         
         const batchTaskParams: BatchImageGenerationTaskParams = {
           project_id: selectedProjectId!,
           prompts: newPrompts.map(p => {
-            const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
+            const combinedFull = `${currentBeforePromptText ? `${currentBeforePromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
             return {
               id: p.id,
               fullPrompt: combinedFull,
@@ -2478,13 +2523,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     // Build the unified task creation parameters
     // Append styleBoostTerms to afterEachPromptText if present
     const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
-      ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
-      : afterEachPromptText;
+      ? `${currentAfterPromptText}${currentAfterPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+      : currentAfterPromptText;
     
     const batchTaskParams: BatchImageGenerationTaskParams = {
       project_id: selectedProjectId!, // We know it's not null due to validation
       prompts: activePrompts.map(p => {
-        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
+        const combinedFull = `${currentBeforePromptText ? `${currentBeforePromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
         return {
           id: p.id,
           fullPrompt: combinedFull,
@@ -2708,17 +2753,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               onRemovePrompt={handleRemovePrompt}
               onOpenPromptModal={() => setIsPromptModalOpen(true)}
               onOpenMagicPrompt={handleOpenMagicPrompt}
-              beforeEachPromptText={beforeEachPromptText}
-              afterEachPromptText={afterEachPromptText}
-              onBeforeEachPromptTextChange={handleTextChange(setBeforeEachPromptText)}
-              onAfterEachPromptTextChange={handleTextChange(setAfterEachPromptText)}
+              beforeEachPromptText={currentBeforePromptText}
+              afterEachPromptText={currentAfterPromptText}
+              onBeforeEachPromptTextChange={(e) => setCurrentBeforePromptText(e.target.value)}
+              onAfterEachPromptTextChange={(e) => setCurrentAfterPromptText(e.target.value)}
               onClearBeforeEachPromptText={() => {
                 markAsInteracted();
-                setBeforeEachPromptText('');
+                setCurrentBeforePromptText('');
               }}
               onClearAfterEachPromptText={() => {
                 markAsInteracted();
-                setAfterEachPromptText('');
+                setCurrentAfterPromptText('');
               }}
               onDeleteAllPrompts={handleDeleteAllPrompts}
               promptMode={effectivePromptMode}
