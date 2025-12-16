@@ -173,9 +173,12 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     }
   }, [entityId, settings, updateSettings, scope, toolId]);
 
-  // Ref to hold latest updateSettings to avoid effect dependency churn
+  // Refs to hold latest functions to avoid effect dependency churn
   const updateSettingsRef = useRef(updateSettings);
   updateSettingsRef.current = updateSettings;
+  
+  const saveImmediateRef = useRef(saveImmediate);
+  saveImmediateRef.current = saveImmediate;
 
   /**
    * Flush pending settings on entity change/unmount.
@@ -221,24 +224,22 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
   // Update single field
   const updateField = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
-    // CRITICAL: During loading, don't set tracking refs or pending state.
-    // Changes during loading are ephemeral (from auto-switch effects etc.) and will be 
-    // overwritten by DB values. Setting refs would block the DB load from applying.
-    if (status !== 'ready' && status !== 'saving') {
-      console.log('[useAutoSaveSettings] 📝 updateField during loading - UI only:', {
-        key,
-        status,
-      });
-      setSettings(prev => ({ ...prev, [key]: value }));
-      return;
-    }
-
     setSettings(prev => {
       const updated = { ...prev, [key]: value };
 
-      // Track pending settings for flush-on-navigation
+      // Always track pending settings - this protects user input from being overwritten by DB load
       pendingSettingsRef.current = updated;
       pendingEntityIdRef.current = entityId ?? null;
+
+      // During loading, don't schedule saves - just update local state
+      // The pending ref will prevent DB load from overwriting user input
+      if (status !== 'ready' && status !== 'saving') {
+        console.log('[useAutoSaveSettings] 📝 updateField during loading - UI only (protected):', {
+          key,
+          status,
+        });
+        return updated;
+      }
 
       // Trigger auto-save with debounce
       if (saveTimeoutRef.current) {
@@ -260,22 +261,21 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
   // Update multiple fields at once
   const updateFields = useCallback((updates: Partial<T>) => {
-    // CRITICAL: During loading, don't set tracking refs or pending state.
-    if (status !== 'ready' && status !== 'saving') {
-      console.log('[useAutoSaveSettings] 📝 updateFields during loading - UI only:', {
-        keys: Object.keys(updates),
-        status,
-      });
-      setSettings(prev => ({ ...prev, ...updates }));
-      return;
-    }
-
     setSettings(prev => {
       const updated = { ...prev, ...updates };
 
-      // Track pending settings for flush-on-navigation
+      // Always track pending settings - this protects user input from being overwritten by DB load
       pendingSettingsRef.current = updated;
       pendingEntityIdRef.current = entityId ?? null;
+
+      // During loading, don't schedule saves - just update local state
+      if (status !== 'ready' && status !== 'saving') {
+        console.log('[useAutoSaveSettings] 📝 updateFields during loading - UI only (protected):', {
+          keys: Object.keys(updates),
+          status,
+        });
+        return updated;
+      }
 
       // Trigger auto-save with debounce
       if (saveTimeoutRef.current) {
@@ -369,6 +369,22 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     // This prevents React Query refetches from "unwriting" user input
     if (pendingSettingsRef.current && pendingEntityIdRef.current === entityId) {
       console.log('[useAutoSaveSettings] ⏳ Skipping DB load - user has pending edits');
+      // Still transition to ready and schedule save for pending edits
+      if (status !== 'ready') {
+        setStatus('ready');
+        // Schedule save for input that happened during loading
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+        const toSave = pendingSettingsRef.current;
+        saveTimeoutRef.current = setTimeout(async () => {
+          try {
+            await saveImmediateRef.current(toSave);
+          } catch (err) {
+            console.error('[useAutoSaveSettings] Pending save failed:', err);
+          }
+        }, debounceMs);
+      }
       return;
     }
 
