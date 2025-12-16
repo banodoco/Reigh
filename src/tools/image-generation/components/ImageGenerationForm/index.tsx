@@ -10,6 +10,7 @@ import { fileToDataURL, dataURLtoFile } from "@/shared/lib/utils";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { useToolSettings } from "@/shared/hooks/useToolSettings";
+import { useAutoSaveSettings } from "@/shared/hooks/useAutoSaveSettings";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { ImageGenerationSettings } from "../../settings";
 import { VideoTravelSettings } from "@/tools/travel-between-images/settings";
@@ -47,6 +48,7 @@ import {
   HydratedReferenceImage,
   ReferenceMode,
   PromptMode,
+  ImageGenShotSettings,
 } from "./types";
 
 // Lazy load modals to improve initial bundle size and performance
@@ -146,8 +148,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } catch {}
     return 1;
   });
-  // Store prompts by shot ID (including 'none' for no shot)
-  const [promptsByShot, setPromptsByShot] = useState<Record<string, PromptEntry[]>>({});
+  // Legacy: promptsByShot removed - now using per-shot storage via useAutoSaveSettings
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
   const [openPromptModalWithAIExpanded, setOpenPromptModalWithAIExpanded] = useState(false);
   const [imagesPerPrompt, setImagesPerPrompt] = useState(8); // Default to 8 for automated mode
@@ -770,8 +771,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Prompt mode: automated vs managed (default to automated)
   const [promptMode, setPromptMode] = useState<PromptMode>('automated');
-  // Store master prompts by shot ID (including 'none' for no shot)
-  const [masterPromptByShot, setMasterPromptByShot] = useState<Record<string, string>>({});
+  // Local state for prompts when no shot is selected
+  const [noShotPrompts, setNoShotPrompts] = useState<PromptEntry[]>([]);
+  const [noShotMasterPrompt, setNoShotMasterPrompt] = useState('');
   const [isGeneratingAutomatedPrompts, setIsGeneratingAutomatedPrompts] = useState(false);
 
   // Removed unused currentShotId that was causing unnecessary re-renders
@@ -797,20 +799,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     console.log('[ImageGenerationForm] Project context - selectedProjectId:', selectedProjectId);
   }, [selectedProjectId]);
 
-  // Debug persistence hook inputs
+  // Debug persistence hook inputs (basic - detailed logging after hooks are initialized)
   useEffect(() => {
     console.log('[ImageGenerationForm] Persistence hook inputs:', {
       toolId: 'image-generation',
       context: { projectId: selectedProjectId },
       stateValues: {
-        promptsByShot: Object.keys(promptsByShot).length,
         associatedShotId,
         imagesPerPrompt,
-        beforeEachPromptText: beforeEachPromptText.substring(0, 20) + '...',
-        afterEachPromptText: afterEachPromptText.substring(0, 20) + '...',
       }
     });
-  }, [selectedProjectId, promptsByShot, associatedShotId, imagesPerPrompt, beforeEachPromptText, afterEachPromptText]);
+  }, [selectedProjectId, associatedShotId, imagesPerPrompt]);
 
   // Fetch public LoRAs from all users
   const { data: publicLorasData } = useListPublicResources('lora');
@@ -842,55 +841,79 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     disableAutoLoad: true, // Disable auto-load since we handle our own default logic
   });
 
-  // Get current prompts for the selected shot
-  const prompts = promptsByShot[effectiveShotId] || [];
-  
-  // Helper to update prompts for the current shot
-  const setPrompts = useCallback((newPrompts: PromptEntry[] | ((prev: PromptEntry[]) => PromptEntry[])) => {
-    console.log('[ImageGenerationForm] setPrompts called for shot:', effectiveShotId);
-    setPromptsByShot(prev => {
-      const currentPrompts = prev[effectiveShotId] || [];
-      const updatedPrompts = typeof newPrompts === 'function' ? newPrompts(currentPrompts) : newPrompts;
-      console.log('[ImageGenerationForm] Updating prompts from', currentPrompts.length, 'to', updatedPrompts.length, 'for shot:', effectiveShotId);
-      return {
-        ...prev,
-        [effectiveShotId]: updatedPrompts
-      };
-    });
-  }, [effectiveShotId]);
+  // Shot-specific prompts using per-shot storage
+  const shotPromptSettings = useAutoSaveSettings<ImageGenShotSettings>({
+    toolId: 'image-gen-prompts',
+    shotId: associatedShotId,
+    projectId: selectedProjectId,
+    scope: 'shot',
+    defaults: { prompts: [], masterPrompt: '' },
+    enabled: !!associatedShotId,
+  });
 
-  // Get current master prompt for the selected shot
-  const masterPromptText = masterPromptByShot[effectiveShotId] || '';
-  
-  // Helper to update master prompt for the current shot
-  // Matches React.Dispatch<React.SetStateAction<string>> signature
-  const setMasterPromptText: React.Dispatch<React.SetStateAction<string>> = useCallback((newTextOrUpdater) => {
-    console.log('[ImageGenerationForm] setMasterPromptText called for shot:', effectiveShotId);
-    setMasterPromptByShot(prev => {
-      const currentText = prev[effectiveShotId] || '';
-      const newText = typeof newTextOrUpdater === 'function' ? newTextOrUpdater(currentText) : newTextOrUpdater;
-      return {
-        ...prev,
-        [effectiveShotId]: newText
-      };
-    });
-  }, [effectiveShotId]);
-
+  // Project-level settings (NOT shot-specific)
   const { ready, isSaving, markAsInteracted } = usePersistentToolState<PersistedFormSettings>(
     'image-generation',
     { projectId: selectedProjectId },
     {
-      promptsByShot: [promptsByShot, setPromptsByShot],
       imagesPerPrompt: [imagesPerPrompt, setImagesPerPrompt],
       selectedLoras: [loraManager.selectedLoras, loraManager.setSelectedLoras],
       beforeEachPromptText: [beforeEachPromptText, setBeforeEachPromptText],
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
       associatedShotId: [associatedShotId, setAssociatedShotId],
       promptMode: [promptMode, setPromptMode],
-      masterPromptByShot: [masterPromptByShot, setMasterPromptByShot],
     }
-    // Remove enabled: !!selectedProjectId - let persistence work even without project to preserve state
   );
+
+  // Get current prompts - from shot settings if shot selected, otherwise local state
+  const prompts = useMemo(() => {
+    if (associatedShotId && shotPromptSettings.status === 'ready') {
+      return shotPromptSettings.settings.prompts;
+    }
+    return noShotPrompts;
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.prompts, noShotPrompts]);
+  
+  // Helper to update prompts - routes to shot settings or local state
+  const setPrompts = useCallback((newPrompts: PromptEntry[] | ((prev: PromptEntry[]) => PromptEntry[])) => {
+    if (associatedShotId) {
+      const currentPrompts = shotPromptSettings.settings.prompts || [];
+      const updatedPrompts = typeof newPrompts === 'function' ? newPrompts(currentPrompts) : newPrompts;
+      console.log('[ImageGenerationForm] setPrompts for shot:', associatedShotId.substring(0, 8), 'count:', updatedPrompts.length);
+      shotPromptSettings.updateField('prompts', updatedPrompts);
+      markAsInteracted();
+    } else {
+      console.log('[ImageGenerationForm] setPrompts for no-shot mode');
+      setNoShotPrompts(prev => {
+        const updatedPrompts = typeof newPrompts === 'function' ? newPrompts(prev) : newPrompts;
+        return updatedPrompts;
+      });
+    }
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+
+  // Get current master prompt - from shot settings if shot selected, otherwise local state
+  const masterPromptText = useMemo(() => {
+    if (associatedShotId && shotPromptSettings.status === 'ready') {
+      return shotPromptSettings.settings.masterPrompt || '';
+    }
+    return noShotMasterPrompt;
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, noShotMasterPrompt]);
+  
+  // Helper to update master prompt - routes to shot settings or local state
+  const setMasterPromptText: React.Dispatch<React.SetStateAction<string>> = useCallback((newTextOrUpdater) => {
+    if (associatedShotId) {
+      const currentText = shotPromptSettings.settings.masterPrompt || '';
+      const newText = typeof newTextOrUpdater === 'function' ? newTextOrUpdater(currentText) : newTextOrUpdater;
+      console.log('[ImageGenerationForm] setMasterPromptText for shot:', associatedShotId.substring(0, 8));
+      shotPromptSettings.updateField('masterPrompt', newText);
+      markAsInteracted();
+    } else {
+      console.log('[ImageGenerationForm] setMasterPromptText for no-shot mode');
+      setNoShotMasterPrompt(prev => {
+        const newText = typeof newTextOrUpdater === 'function' ? newTextOrUpdater(prev) : newTextOrUpdater;
+        return newText;
+      });
+    }
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
   
   // Sync local style strength with project settings
   // Legacy sync effects removed to prevent overwriting user input
@@ -939,15 +962,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     // Log what would be saved when isSaving becomes true
     if (isSaving) {
       console.log('[ImageGenerationForm] Currently saving settings:', {
-        promptsByShot: JSON.stringify(promptsByShot),
         associatedShotId,
         selectedProjectId,
         imagesPerPrompt,
-        beforeEachPromptText,
-        afterEachPromptText,
+        shotPromptStatus: shotPromptSettings.status,
+        promptsCount: prompts.length,
       });
     }
-  }, [ready, isSaving, associatedShotId, promptsByShot, selectedProjectId, imagesPerPrompt, beforeEachPromptText, afterEachPromptText]);
+  }, [ready, isSaving, associatedShotId, selectedProjectId, imagesPerPrompt, shotPromptSettings.status, prompts.length]);
 
   // Debug prompts changes
   useEffect(() => {
@@ -962,12 +984,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     if (ready) {
       console.log('[ImageGenerationForm] Settings hydrated:', {
         associatedShotId,
-        promptsByShot: JSON.stringify(promptsByShot, null, 2),
-        effectiveShotId,
+        promptsCount: prompts.length,
+        shotPromptStatus: shotPromptSettings.status,
         projectId: selectedProjectId,
       });
     }
-  }, [ready, associatedShotId, promptsByShot, effectiveShotId, selectedProjectId]);
+  }, [ready, associatedShotId, prompts.length, shotPromptSettings.status, selectedProjectId]);
 
   // Apply initialShotId once after hydration (takes precedence over persisted value)
   // If initialShotId is explicitly null, reset to None (opened from outside shot context)
@@ -1008,27 +1030,31 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [associatedShotId, shots, markAsInteracted]);
 
-  // Initialize prompts for a shot if they don't exist - debounced to prevent rapid resets during hydration
+  // Initialize prompts when empty - handles both shot and no-shot cases
   useEffect(() => {
-    if (ready && !promptsByShot[effectiveShotId]) {
-      // Add a small delay to prevent rapid resets during persistence hydration
+    // For shot mode: wait until shot settings are ready
+    if (associatedShotId && shotPromptSettings.status !== 'ready') {
+      return;
+    }
+    
+    // Check if we need to initialize
+    const currentPrompts = associatedShotId ? shotPromptSettings.settings.prompts : noShotPrompts;
+    if (!currentPrompts || currentPrompts.length === 0) {
+      // Add a small delay to prevent rapid resets during hydration
       const timeoutId = setTimeout(() => {
-        // Double-check that we still need to initialize after the delay
-        setPromptsByShot(prev => {
-          if (!prev[effectiveShotId] || prev[effectiveShotId].length === 0) {
-            console.log('[ImageGenerationForm] Initializing empty prompts for shot:', effectiveShotId);
-            return {
-              ...prev,
-              [effectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
-            };
-          }
-          return prev; // No change needed
-        });
-      }, 50); // 50ms delay to allow persistence hydration to complete
+        const emptyPrompt = { id: generatePromptId(), fullPrompt: "", shortPrompt: "" };
+        if (associatedShotId) {
+          console.log('[ImageGenerationForm] Initializing empty prompts for shot:', associatedShotId.substring(0, 8));
+          shotPromptSettings.updateField('prompts', [emptyPrompt]);
+        } else {
+          console.log('[ImageGenerationForm] Initializing empty prompts for no-shot mode');
+          setNoShotPrompts([emptyPrompt]);
+        }
+      }, 50);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [ready, effectiveShotId]); // Remove promptsByShot from dependencies to avoid infinite loops
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.prompts, noShotPrompts, generatePromptId]);
 
   const hasApiKey = true; // Always true for wan-local
 
@@ -2528,17 +2554,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.log('[ShotChangeDebug] ❌ No onShotChange callback provided');
     }
     
-    // Initialize prompts for the new shot if they don't exist
-    const newEffectiveShotId = newShotId || 'none';
-    if (!promptsByShot[newEffectiveShotId]) {
-      console.log('[ImageGenerationForm] Initializing prompts for shot:', newEffectiveShotId);
-      setPromptsByShot(prev => ({
-        ...prev,
-        [newEffectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
-      }));
-    } else {
-      console.log('[ImageGenerationForm] Shot', newEffectiveShotId, 'already has', promptsByShot[newEffectiveShotId]?.length, 'prompts');
-    }
+    // Note: Prompts for the new shot will be loaded automatically via useAutoSaveSettings
+    // and initialized if empty via the initialization effect
+    markAsInteracted();
   };
 
   // Note: Form fields are NOT automatically synced when selecting a reference
