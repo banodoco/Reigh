@@ -294,29 +294,11 @@ const VideoTravelToolPage: React.FC = () => {
   // This ensures useShotSettings reacts immediately when navigating to a new shot,
   // even before the shots array is updated and selectedShot is set.
   // This is critical for settings inheritance to work on newly created shots.
-  console.log('[ShotNavPerf] 📡 Calling useShotSettings with shotId:', currentShotId?.substring(0, 8) || 'none');
-  const shotSettingsStart = Date.now();
   const shotSettings = useShotSettings(currentShotId || undefined, selectedProjectId);
-  console.log('[ShotNavPerf] ✅ useShotSettings returned in', Date.now() - shotSettingsStart, 'ms', {
-    status: shotSettings.status,
-    hasSettings: !!shotSettings.settings
-  });
   
-  // [PROFILING] Track shotSettings object stability to verify Fix #1
-  const prevShotSettingsRef = useRef<any>(null);
-  useEffect(() => {
-    if (prevShotSettingsRef.current && prevShotSettingsRef.current !== shotSettings) {
-      console.warn('[VideoTravelToolPage:Profiling] 🔄 shotSettings object changed (should be stable after Fix #1)', {
-        updateFieldChanged: prevShotSettingsRef.current.updateField !== shotSettings.updateField,
-        updateFieldsChanged: prevShotSettingsRef.current.updateFields !== shotSettings.updateFields,
-        saveChanged: prevShotSettingsRef.current.save !== shotSettings.save,
-        settingsDataChanged: prevShotSettingsRef.current.settings !== shotSettings.settings,
-        statusChanged: prevShotSettingsRef.current.status !== shotSettings.status,
-        timestamp: Date.now()
-      });
-    }
-    prevShotSettingsRef.current = shotSettings;
-  });
+  // NOTE: previously this file had a profiling effect that logged on every render
+  // when `shotSettings` changed identity. That created massive console spam during
+  // normal navigation, so it has been removed.
   
   // Ref to always access latest shotSettings without triggering effects
   const shotSettingsRef = useRef(shotSettings);
@@ -335,12 +317,6 @@ const VideoTravelToolPage: React.FC = () => {
       console.log('[ShotSettingsInherit] phaseConfig:', shotSettings.settings.phaseConfig ? 'HAS DATA' : 'NULL');
       console.log('[ShotSettingsInherit] steerableMotionSettings:', shotSettings.settings.steerableMotionSettings);
       lastActiveShotSettingsRef.current = shotSettings.settings;
-    } else {
-      console.log('[ShotSettingsInherit] ⏸️ Not updating lastActiveShotSettingsRef:', {
-        hasSelectedShot: !!selectedShot?.id,
-        hasSettings: !!shotSettings.settings,
-        status: shotSettings.status
-      });
     }
   }, [selectedShot?.id, shotSettings.settings, shotSettings.status]);
 
