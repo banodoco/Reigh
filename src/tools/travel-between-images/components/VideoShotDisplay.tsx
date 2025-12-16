@@ -517,12 +517,14 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Video Generation Modal */}
-      <VideoGenerationModal
-        isOpen={isVideoModalOpen}
-        onClose={() => setIsVideoModalOpen(false)}
-        shot={shot}
-      />
+      {/* Video Generation Modal - only mount when open to avoid 24+ useShotSettings hook instances */}
+      {isVideoModalOpen && (
+        <VideoGenerationModal
+          isOpen={isVideoModalOpen}
+          onClose={() => setIsVideoModalOpen(false)}
+          shot={shot}
+        />
+      )}
     </>
   );
 };

@@ -411,8 +411,12 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                     step={0.1}
                     value={phase.guidance_scale}
                     onChange={(e) => {
-                      const newPhases = [...phaseConfig.phases];
-                      newPhases[phaseIdx].guidance_scale = parseFloat(e.target.value) || 0;
+                      // IMMUTABLE UPDATE: Create new phase object instead of mutating
+                      const newPhases = phaseConfig.phases.map((p, idx) =>
+                        idx === phaseIdx
+                          ? { ...p, guidance_scale: parseFloat(e.target.value) || 0 }
+                          : p
+                      );
                       onPhaseConfigChange({
                         ...phaseConfig,
                         phases: newPhases
@@ -465,17 +469,18 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                             <DropdownMenuItem
                               key={predefinedLora.url}
                               onClick={() => {
-                                const newPhases = [...phaseConfig.phases];
-                                // Shallow copy phase object before modifying
-                                newPhases[phaseIdx] = { 
-                                  ...newPhases[phaseIdx],
-                                  loras: newPhases[phaseIdx].loras.filter(l => l.url && l.url.trim() !== "")
-                                };
-
-                                newPhases[phaseIdx].loras.push({
-                                  url: predefinedLora.url,
-                                  multiplier: "1.0"
-                                });
+                                // IMMUTABLE UPDATE: Create new phase with filtered loras + new predefined one
+                                const newPhases = phaseConfig.phases.map((p, pIdx) =>
+                                  pIdx === phaseIdx
+                                    ? {
+                                        ...p,
+                                        loras: [
+                                          ...p.loras.filter(l => l.url && l.url.trim() !== ""),
+                                          { url: predefinedLora.url, multiplier: "1.0" }
+                                        ]
+                                      }
+                                    : p
+                                );
                                 onPhaseConfigChange({
                                   ...phaseConfig,
                                   phases: newPhases
@@ -502,8 +507,19 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                           placeholder="LoRA URL"
                           value={isFocused ? lora.url : getDisplayNameFromUrl(lora.url, availableLoras)}
                           onChange={(e) => {
-                            const newPhases = [...phaseConfig.phases];
-                            newPhases[phaseIdx].loras[loraIdx].url = e.target.value;
+                            // IMMUTABLE UPDATE: Create new lora and phase objects
+                            const newPhases = phaseConfig.phases.map((p, pIdx) =>
+                              pIdx === phaseIdx
+                                ? {
+                                    ...p,
+                                    loras: p.loras.map((l, lIdx) =>
+                                      lIdx === loraIdx
+                                        ? { ...l, url: e.target.value }
+                                        : l
+                                    )
+                                  }
+                                : p
+                            );
                             onPhaseConfigChange({
                               ...phaseConfig,
                               phases: newPhases
@@ -523,8 +539,12 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                             variant="ghost"
                             className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive"
                             onClick={() => {
-                              const newPhases = [...phaseConfig.phases];
-                              newPhases[phaseIdx].loras.splice(loraIdx, 1);
+                              // IMMUTABLE UPDATE: Filter out the lora instead of splice
+                              const newPhases = phaseConfig.phases.map((p, pIdx) =>
+                                pIdx === phaseIdx
+                                  ? { ...p, loras: p.loras.filter((_, lIdx) => lIdx !== loraIdx) }
+                                  : p
+                              );
                               onPhaseConfigChange({
                                 ...phaseConfig,
                                 phases: newPhases
@@ -544,8 +564,20 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                         max={2}
                         step={0.1}
                         onChange={(e) => {
-                          const newPhases = [...phaseConfig.phases];
-                          newPhases[phaseIdx].loras[loraIdx].multiplier = e.target.value;
+                          // IMMUTABLE UPDATE: Create new lora and phase objects
+                          // This prevents changes from affecting the same LoRA in other phases
+                          const newPhases = phaseConfig.phases.map((p, pIdx) =>
+                            pIdx === phaseIdx
+                              ? {
+                                  ...p,
+                                  loras: p.loras.map((l, lIdx) =>
+                                    lIdx === loraIdx
+                                      ? { ...l, multiplier: e.target.value }
+                                      : l
+                                  )
+                                }
+                              : p
+                          );
                           onPhaseConfigChange({
                             ...phaseConfig,
                             phases: newPhases
@@ -561,17 +593,18 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                 {/* Add LoRA button */}
                 <button
                   onClick={() => {
-                    const newPhases = [...phaseConfig.phases];
-                    // Shallow copy phase object before modifying
-                    newPhases[phaseIdx] = { 
-                      ...newPhases[phaseIdx],
-                      loras: newPhases[phaseIdx].loras.filter(l => l.url && l.url.trim() !== "")
-                    };
-
-                    newPhases[phaseIdx].loras.push({
-                      url: "",
-                      multiplier: "1.0"
-                    });
+                    // IMMUTABLE UPDATE: Create new phase with filtered loras + new one
+                    const newPhases = phaseConfig.phases.map((p, pIdx) =>
+                      pIdx === phaseIdx
+                        ? {
+                            ...p,
+                            loras: [
+                              ...p.loras.filter(l => l.url && l.url.trim() !== ""),
+                              { url: "", multiplier: "1.0" }
+                            ]
+                          }
+                        : p
+                    );
                     onPhaseConfigChange({
                       ...phaseConfig,
                       phases: newPhases
@@ -609,17 +642,18 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
               loraKeys: Object.keys(lora)
             });
             
-            const newPhases = [...phaseConfig.phases];
-            // Shallow copy phase object before modifying
-            newPhases[activePhaseForLoraSelection] = { 
-              ...newPhases[activePhaseForLoraSelection],
-              loras: newPhases[activePhaseForLoraSelection].loras.filter(l => l.url && l.url.trim() !== "")
-            };
-
-            newPhases[activePhaseForLoraSelection].loras.push({
-              url: loraUrl,
-              multiplier: "1.0"
-            });
+            // IMMUTABLE UPDATE: Create new phase with filtered loras + new searched one
+            const newPhases = phaseConfig.phases.map((p, pIdx) =>
+              pIdx === activePhaseForLoraSelection
+                ? {
+                    ...p,
+                    loras: [
+                      ...p.loras.filter(l => l.url && l.url.trim() !== ""),
+                      { url: loraUrl, multiplier: "1.0" }
+                    ]
+                  }
+                : p
+            );
             onPhaseConfigChange({
               ...phaseConfig,
               phases: newPhases

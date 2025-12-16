@@ -442,7 +442,7 @@ export function useToolSettings<T>(toolId: string, context?: { projectId?: strin
   settings: T | undefined;
   isLoading: boolean;
   error: Error | null;
-  update: (scope: SettingsScope, settings: Partial<T>) => void;
+  update: (scope: SettingsScope, settings: Partial<T>) => Promise<void>;
   isUpdating: boolean;
 };
 
@@ -465,18 +465,13 @@ export function useToolSettings<T>(
   const shotId: string | undefined = context?.shotId;
   const fetchEnabled: boolean = context?.enabled ?? true;
 
-  // Cleanup abort controllers and debounce timer on unmount
+  // Cleanup abort controllers on unmount
+  // NOTE: We intentionally do NOT abort active update mutations on unmount.
+  // Settings saves should complete even if the component unmounts (e.g., during navigation).
+  // The mutation will complete in the background and update the cache correctly.
   useEffect(() => {
     return () => {
-      // Cancel any pending debounced updates
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-      
-      // Abort all active update controllers
-      updateControllersRef.current.forEach(controller => {
-        controller.abort();
-      });
+      // Just clear the tracking set - mutations will complete on their own
       updateControllersRef.current.clear();
     };
   }, []);
@@ -627,39 +622,31 @@ export function useToolSettings<T>(
     },
   });
 
-  // Debounce ref to prevent rapid updates
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const update = (scope: SettingsScope, settings: Partial<T>) => {
-    // Clear any existing debounce timer
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    // Snapshot the target entity id NOW to prevent cross-project/shot overwrites when debounce fires
+  const update = async (scope: SettingsScope, settings: Partial<T>): Promise<void> => {
+    // Snapshot the target entity id NOW to prevent cross-project/shot overwrites
     const entityId = scope === 'project' ? projectId : (scope === 'shot' ? shotId : undefined);
 
-    // Debounce updates to prevent cascading requests
-    debounceTimeoutRef.current = setTimeout(() => {
-      // Create an AbortController for this update and track it
-      const controller = new AbortController();
-      updateControllersRef.current.add(controller);
-      
-      // Clean up controller when mutation completes
-      const cleanup = () => {
-        updateControllersRef.current.delete(controller);
-      };
-      
-      // Set up cleanup handlers
-      controller.signal.addEventListener('abort', cleanup);
+    // Create an AbortController for this update and track it
+    const controller = new AbortController();
+    updateControllersRef.current.add(controller);
+    
+    // Clean up controller when mutation completes
+    const cleanup = () => {
+      updateControllersRef.current.delete(controller);
+    };
+    
+    // Set up cleanup handlers
+    controller.signal.addEventListener('abort', cleanup);
 
-      updateMutation.mutate(
-        { scope, settings, signal: controller.signal, entityId },
-        {
-          onSettled: cleanup, // Clean up on both success and error
-        }
+    try {
+      // NOTE: No debounce here - callers (like useShotSettings) are responsible for debouncing.
+      // Using mutateAsync so callers can await the actual DB write completion.
+      await updateMutation.mutateAsync(
+        { scope, settings, signal: controller.signal, entityId }
       );
-    }, 300); // 300ms debounce
+    } finally {
+      cleanup();
+    }
   };
 
   return {

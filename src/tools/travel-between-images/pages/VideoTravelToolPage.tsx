@@ -188,24 +188,25 @@ const VideoTravelToolPage: React.FC = () => {
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudGenerationEnabled = generationMethods.inCloud;
   
-  const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
   
-  // [ShotNavPerf] Track when selectedShot changes
-  const prevSelectedShotRef = useRef<Shot | null>(null);
-  useEffect(() => {
-    if (prevSelectedShotRef.current?.id !== selectedShot?.id) {
-      console.log('[ShotNavPerf] 🔄 selectedShot CHANGED', {
-        timestamp: Date.now(),
-        from: prevSelectedShotRef.current?.name || 'none',
-        fromId: prevSelectedShotRef.current?.id?.substring(0, 8) || 'none',
-        to: selectedShot?.name || 'none',
-        toId: selectedShot?.id?.substring(0, 8) || 'none',
-        source: viaShotClick ? 'ShotListDisplay' : 'Navigation'
-      });
-      prevSelectedShotRef.current = selectedShot;
+  // Scroll to top on initial mount and when returning to main view (hash cleared)
+  const prevHashRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const hasHash = location.hash && location.hash.length > 1;
+    const hadHash = prevHashRef.current !== null && prevHashRef.current.length > 1;
+    
+    // Scroll to top:
+    // 1. On mount without a hash (handles redirects from / and /tools)
+    // 2. When hash is cleared (returning from shot view to main view)
+    if (!hasHash && (prevHashRef.current === null || hadHash)) {
+      window.scrollTo(0, 0);
     }
-  }, [selectedShot, viaShotClick]);
+    
+    prevHashRef.current = location.hash;
+  }, [location.hash]);
+  
+  // NOTE: selectedShot is derived below, after useVideoTravelData provides the shots array
   
   // Mobile detection for mode handling
   const isMobile = useIsMobile();
@@ -235,7 +236,8 @@ const VideoTravelToolPage: React.FC = () => {
   // Task queue notifier is now handled inside ShotEditor component
   
   // Use parallelized data fetching for better performance
-  console.log('[ShotNavPerf] 📡 Calling useVideoTravelData with shotId:', selectedShot?.id?.substring(0, 8) || 'none');
+  // NOTE: Using currentShotId instead of selectedShot?.id since currentShotId is the source of truth
+  console.log('[ShotNavPerf] 📡 Calling useVideoTravelData with shotId:', currentShotId?.substring(0, 8) || 'none');
   const videoTravelDataStart = Date.now();
   const {
     shots,
@@ -251,8 +253,41 @@ const VideoTravelToolPage: React.FC = () => {
     projectSettingsUpdating,
     projectUISettings,
     updateProjectUISettings,
-  } = useVideoTravelData(selectedShot?.id, selectedProjectId);
+  } = useVideoTravelData(currentShotId || undefined, selectedProjectId);
   console.log('[ShotNavPerf] ✅ useVideoTravelData returned in', Date.now() - videoTravelDataStart, 'ms');
+  
+  // CONSOLIDATION: selectedShot is now DERIVED from currentShotId + shots + shotFromState
+  // This eliminates sync issues between selectedShot and currentShotId
+  // Priority: 1) shots array (source of truth), 2) shotFromState (for optimistic updates)
+  const selectedShot = useMemo(() => {
+    if (!currentShotId) return null;
+    // First try shots array (the source of truth once cached)
+    if (shots) {
+      const found = shots.find(s => s.id === currentShotId);
+      if (found) return found;
+    }
+    // Fallback to shotFromState for newly created shots not yet in cache
+    if (shotFromState && shotFromState.id === currentShotId) {
+      return shotFromState as Shot;
+    }
+    return null;
+  }, [currentShotId, shots, shotFromState]);
+  
+  // [ShotNavPerf] Track when selectedShot changes
+  const prevSelectedShotRef = useRef<Shot | null>(null);
+  useEffect(() => {
+    if (prevSelectedShotRef.current?.id !== selectedShot?.id) {
+      console.log('[ShotNavPerf] 🔄 selectedShot CHANGED', {
+        timestamp: Date.now(),
+        from: prevSelectedShotRef.current?.name || 'none',
+        fromId: prevSelectedShotRef.current?.id?.substring(0, 8) || 'none',
+        to: selectedShot?.name || 'none',
+        toId: selectedShot?.id?.substring(0, 8) || 'none',
+        source: viaShotClick ? 'ShotListDisplay' : 'Navigation'
+      });
+      prevSelectedShotRef.current = selectedShot;
+    }
+  }, [selectedShot, viaShotClick]);
   
   // NEW: Modern settings management using dedicated hook
   // IMPORTANT: Use currentShotId (from context) instead of selectedShot?.id
@@ -454,15 +489,26 @@ const VideoTravelToolPage: React.FC = () => {
   }, [rebuildPhaseConfig]);
 
   const handleMotionModeChange = useCallback((mode: 'basic' | 'advanced') => {
-    // Prevent switching to advanced mode when turbo mode is on
-    if (mode === 'advanced' && shotSettingsRef.current.settings?.turboMode) {
-      console.log('[MotionMode] ⚠️ Cannot switch to advanced mode while turbo mode is active');
+    // CRITICAL: Guard against calls when no shot is selected
+    // This can happen during component unmount/remount cycles when Tabs triggers onValueChange
+    // Use currentShotId (same source as useShotSettings) not selectedShot which can be out of sync
+    if (!currentShotId) {
+      console.log('[VTDebug] ⚠️ handleMotionModeChange ignored - no currentShotId');
       return;
     }
     
-    console.log('[MotionMode] User changing motion mode:', {
+    // Prevent switching to advanced mode when turbo mode is on
+    if (mode === 'advanced' && shotSettingsRef.current.settings?.turboMode) {
+      console.log('[VTDebug] ⚠️ Cannot switch to advanced mode while turbo mode is active');
+      return;
+    }
+    
+    console.log('[VTDebug] 🔄 handleMotionModeChange called:', {
       from: shotSettingsRef.current.settings?.motionMode,
       to: mode,
+      currentShotId: currentShotId?.substring(0, 8),
+      hasPhaseConfig: !!shotSettingsRef.current.settings?.phaseConfig,
+      settingsStatus: shotSettingsRef.current.status,
       timestamp: Date.now()
     });
     
@@ -506,7 +552,7 @@ const VideoTravelToolPage: React.FC = () => {
         advancedMode: false
       });
     }
-  }, []);
+  }, [currentShotId]);
 
   const handleGenerationTypeModeChange = useCallback((mode: 'i2v' | 'vace') => {
     console.log('[GenerationTypeMode] Changing generation type mode:', {
@@ -564,10 +610,21 @@ const VideoTravelToolPage: React.FC = () => {
       timestamp: Date.now()
     });
     
+    // DEEP CLONE: Create completely new config to prevent shared references
+    // This ensures modifying LoRA strengths in one phase doesn't affect other phases
+    const deepClonedConfig: PhaseConfig = {
+      ...config,
+      steps_per_phase: [...config.steps_per_phase],
+      phases: config.phases.map(phase => ({
+        ...phase,
+        loras: phase.loras.map(lora => ({ ...lora })) // Deep clone each LoRA
+      }))
+    };
+    
     // Update preset ID, phase config, and generation type mode (if preset specifies one)
     const updates: Record<string, any> = {
       selectedPhasePresetId: presetId,
-      phaseConfig: config
+      phaseConfig: deepClonedConfig
     };
     
     // Also apply the preset's generation type mode if it has one
@@ -1369,7 +1426,6 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     //
     // In this case, treat "no hash" as "back to shot list" and clear selection.
     if (!hashShotId && selectedShot && !viaShotClick) {
-      setSelectedShot(null);
       setCurrentShotId(null);
       setShowVideosView(false);
       return;
@@ -1385,15 +1441,13 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
       
       if (matchingShot || matchingShotFromState) {
         console.log('[ShotFilterAutoSelectIssue] Setting shot from hash/state:', hashShotId);
-        // Use state version if not in array yet
-        setSelectedShot(matchingShot || matchingShotFromState);
+        // selectedShot is now derived from currentShotId + shots/shotFromState
         setCurrentShotId(hashShotId);
         // Return early to allow state update before sync
         return;
       } else {
         // Shot from hash doesn't exist - redirect to main view
         console.log(`[VideoTravelTool] Shot ${hashShotId} not found, redirecting to main view`);
-        setSelectedShot(null);
         setCurrentShotId(null);
         navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
         return;
@@ -1501,29 +1555,26 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   // Memoize the selected shot update logic to prevent unnecessary re-renders
   // Note: selectedShotRef is already declared earlier in the component
   
+  // Clear currentShotId if project changes or shot is removed from shots array
+  // selectedShot is now derived, so we only need to manage the ID
   useEffect(() => {
     if (!selectedProjectId) {
-      if (selectedShotRef.current) {
-        setSelectedShot(null);
+      if (currentShotId) {
         setCurrentShotId(null);
       }
       return;
     }
-    if (shots && selectedShotRef.current) {
-      const updatedShotFromList = shots.find(s => s.id === selectedShotRef.current!.id && s.project_id === selectedProjectId);
-      if (updatedShotFromList) {
-        if (!deepEqual(selectedShotRef.current, updatedShotFromList)) {
-          setSelectedShot(updatedShotFromList);
-        }
-      } else {
-        setSelectedShot(null);
+    // If we have a currentShotId but it's not in the shots array (and not loading),
+    // clear it - the shot was likely deleted
+    if (currentShotId && !isLoading && shots !== undefined) {
+      const shotStillExists = shots.find(s => s.id === currentShotId && s.project_id === selectedProjectId);
+      // Also check shotFromState for newly created shots not yet in cache
+      const inShotFromState = shotFromState && shotFromState.id === currentShotId;
+      if (!shotStillExists && !inShotFromState) {
         setCurrentShotId(null);
       }
-    } else if (!isLoading && shots !== undefined && selectedShotRef.current) {
-      setSelectedShot(null);
-      setCurrentShotId(null);
     }
-  }, [shots, selectedProjectId, isLoading, setCurrentShotId]);
+  }, [shots, selectedProjectId, isLoading, setCurrentShotId, currentShotId, shotFromState]);
 
   // Get full image data when editing a shot to avoid thumbnail limitation
   const contextImages = selectedShot?.images || [];
@@ -1650,71 +1701,42 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
       if (currentShotId) {
         setCurrentShotId(null);
       }
-      if (selectedShot) {
-        setSelectedShot(null);
-      }
     }
     // We only want this to run once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // CONSOLIDATED: Handle shot selection logic in one effect to prevent race conditions
+  // Safety timeout: If we have a currentShotId but it never appears in shots array,
+  // clear it and redirect (the shot may have been deleted)
+  // selectedShot is now derived, so we only need to manage currentShotId
   useEffect(() => {
-    // Only attempt to auto-select a shot if we navigated here via a shot click
-    if (!viaShotClick) {
+    // Only run safety check when navigating via shot click
+    if (!viaShotClick || !currentShotId || !shots) {
       return;
     }
 
-    // Case 0: Optimistically use shot data from navigation state if available
-    // This allows instant transition before the full shots list updates
-    if (shotFromState && shotFromState.id === currentShotId) {
-       // Only update if not already selected to avoid loops
-       if (selectedShot?.id !== currentShotId) {
-         console.log('[VideoTravelTool] 🚀 Optimistically using shot data from navigation state:', shotFromState.id);
-         setSelectedShot(shotFromState as Shot);
-       }
-       return;
+    // If shot exists in array or shotFromState, we're good
+    const shotExists = shots.find(s => s.id === currentShotId);
+    const inShotFromState = shotFromState && shotFromState.id === currentShotId;
+    if (shotExists || inShotFromState) {
+      return;
     }
 
-    // Case 1: No current shot ID - clear selection
-    if (!currentShotId) {
-      if (selectedShot) {
+    // Shot not found - wait a bit then redirect
+    console.log(`[VideoTravelTool] Shot ${currentShotId} not found in shots array, waiting...`);
+    const timeoutId = setTimeout(() => {
+      // Re-check in case it appeared
+      if (!shots.find(s => s.id === currentShotId)) {
+        console.log(`[VideoTravelTool] Shot ${currentShotId} still not found after timeout, redirecting`);
         startTransition(() => {
-          setSelectedShot(null);
+          setCurrentShotId(null);
         });
+        navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
       }
-      return;
-    }
+    }, 2000);
 
-    // Case 2: Wait for shots to load
-    if (!shots) {
-      return;
-    }
-
-    // Case 3: Only update if we need to select a different shot
-    if (selectedShot?.id !== currentShotId) {
-      const shotToSelect = shots.find(shot => shot.id === currentShotId);
-      if (shotToSelect) {
-        setSelectedShot(shotToSelect);
-      } else {
-        console.log(`[VideoTravelTool] Shot ${currentShotId} not found in shots array yet, waiting for update...`);
-        // Only redirect if the shots array is fully loaded and still doesn't contain the shot
-        // after a reasonable time (handled by React Query refetch)
-        
-        // Safety timeout to redirect if shot never appears
-        setTimeout(() => {
-          if (currentShotId && !shots.find(s => s.id === currentShotId)) {
-             console.log(`[VideoTravelTool] Shot ${currentShotId} still not found after timeout, redirecting`);
-             startTransition(() => {
-               setSelectedShot(null);
-               setCurrentShotId(null);
-             });
-             navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
-          }
-        }, 2000);
-      }
-    }
-  }, [currentShotId, shots, viaShotClick, navigate, location.pathname, selectedShot, setCurrentShotId]);
+    return () => clearTimeout(timeoutId);
+  }, [currentShotId, shots, viaShotClick, navigate, location.pathname, setCurrentShotId, shotFromState]);
 
   // ============================================================================
   // TARGET SHOT INFO FOR ADD TO SHOT BUTTONS (Videos Gallery)
@@ -1973,15 +1995,10 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     navigateToShot(shot);
   };
 
-  // Deselect the current shot if the global currentShotId is cleared elsewhere (e.g., "See All")
-  useEffect(() => {
-    if (!currentShotId && selectedShot) {
-      setSelectedShot(null);
-    }
-  }, [currentShotId, selectedShot]);
+  // NOTE: The old "deselect if currentShotId cleared" effect is no longer needed
+  // because selectedShot is now derived from currentShotId
 
   const handleBackToShotList = useCallback(() => {
-    setSelectedShot(null);
     setCurrentShotId(null);
     // Reset videos view when going back to shot list
     setShowVideosView(false);
@@ -2046,17 +2063,18 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
 
   // shouldShowShotEditor and shotToEdit are now memoized above
 
-  // Ensure selectedShot is set when shotToEdit is available
+  // Ensure currentShotId is set when shotToEdit is available (e.g., from hash or state)
+  // This syncs the context with the derived shotToEdit
   useEffect(() => {
-    if (shotToEdit && (!selectedShot || selectedShot.id !== shotToEdit.id)) {
-      console.log('[ShotNavPerf] ⚙️ Syncing selectedShot with shotToEdit', {
+    if (shotToEdit && currentShotId !== shotToEdit.id) {
+      console.log('[ShotNavPerf] ⚙️ Syncing currentShotId with shotToEdit', {
         shotToEditId: shotToEdit.id.substring(0, 8),
         shotToEditName: shotToEdit.name,
-        previousSelectedId: selectedShot?.id?.substring(0, 8) || 'none'
+        previousCurrentShotId: currentShotId?.substring(0, 8) || 'none'
       });
-      setSelectedShot(shotToEdit);
+      setCurrentShotId(shotToEdit.id);
     }
-  }, [shotToEdit, selectedShot]);
+  }, [shotToEdit, currentShotId, setCurrentShotId]);
 
   const handleModalSubmitCreateShot = async (name: string, files: File[], aspectRatio: string | null) => {
     if (!selectedProjectId) {
@@ -2128,7 +2146,8 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
       });
       
       // Select the newly created shot
-      setSelectedShot(newShot);
+      // selectedShot is now derived from currentShotId + shots
+      // The shot will appear in derived selectedShot once shots array updates
       setCurrentShotId(newShot.id);
       
       // Modal will auto-close on successful submission

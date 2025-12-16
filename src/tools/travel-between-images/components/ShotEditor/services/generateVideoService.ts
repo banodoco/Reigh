@@ -34,43 +34,48 @@ export function buildBasicModePhaseConfig(
   userLoras: Array<{ path: string; strength: number }>
 ): { model: string; phaseConfig: PhaseConfig } {
   
-  // Build additional LoRAs array (motion + user-selected)
-  const additionalLoras: PhaseLoraConfig[] = [];
-  
-  // Add motion LoRA if motion > 0 (strength scales with amount of motion)
-  if (amountOfMotion > 0) {
-    additionalLoras.push({
-      url: MOTION_LORA_URL,
-      multiplier: (amountOfMotion / 100).toFixed(2)
-    });
-  }
-  
-  // Add all user-selected LoRAs
-  userLoras.forEach(lora => {
-    if (lora.path) {
-      additionalLoras.push({
-        url: lora.path,
-        multiplier: lora.strength.toFixed(2)
-      });
-    }
-  });
-
   // Get base config from settings.ts (single source of truth)
   const baseConfig = hasStructureVideo ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
   const model = hasStructureVideo 
     ? 'wan_2_2_vace_lightning_baseline_2_2_2' 
     : 'wan_2_2_i2v_lightning_baseline_2_2_2';
 
-  // Deep clone and add additional LoRAs to each phase
+  // DEEP CLONE: Create completely new phase config with new LoRA objects
+  // This prevents shared references that cause strength changes to affect multiple phases
   const phaseConfig: PhaseConfig = {
     ...baseConfig,
-    phases: baseConfig.phases.map(phase => ({
-      ...phase,
-      loras: [
-        ...phase.loras,
-        ...additionalLoras
-      ]
-    }))
+    steps_per_phase: [...baseConfig.steps_per_phase], // Clone array
+    phases: baseConfig.phases.map(phase => {
+      // Build additional LoRAs for THIS phase (new objects for each phase!)
+      const additionalLoras: PhaseLoraConfig[] = [];
+      
+      // Add motion LoRA if motion > 0 (strength scales with amount of motion)
+      if (amountOfMotion > 0) {
+        additionalLoras.push({
+          url: MOTION_LORA_URL,
+          multiplier: (amountOfMotion / 100).toFixed(2)
+        });
+      }
+      
+      // Add all user-selected LoRAs (create NEW objects for each phase)
+      userLoras.forEach(lora => {
+        if (lora.path) {
+          additionalLoras.push({
+            url: lora.path,
+            multiplier: lora.strength.toFixed(2)
+          });
+        }
+      });
+
+      return {
+        ...phase,
+        // Deep clone each base LoRA object, then add new additional LoRAs
+        loras: [
+          ...phase.loras.map(l => ({ ...l })), // Deep clone base LoRAs
+          ...additionalLoras // These are already new objects per phase
+        ]
+      };
+    })
   };
 
   return { model, phaseConfig };

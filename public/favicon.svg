@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <!-- Light mode gradient (pink -> lavender -> dusty-blue) -->
+    <linearGradient id="lightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0d8e0" />
+      <stop offset="50%" stop-color="#e0d0ec" />
+      <stop offset="100%" stop-color="#d0dce8" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background - edge to edge -->
+  <rect fill="url(#lightGradient)" x="0" y="0" width="32" height="32" rx="4"/>
+  
+  <!-- Filled palette silhouette - white, scaled up -->
+  <path 
+    fill="white"
+    d="M16 3C9.4 3 4 8.4 4 15s5.4 12 12 12c1.3 0 2.4-1.1 2.4-2.4 0-.6-.2-1.1-.6-1.5-.4-.4-.6-.9-.6-1.4 0-1.3 1.1-2.4 2.4-2.4h2.9c4 0 7.3-3.3 7.3-7.3C29.8 7 23.6 3 16 3z"
+  />
+  
+  <!-- 4 paint dots - scaled up -->
+  <circle fill="url(#lightGradient)" cx="9" cy="15" r="2.5"/>
+  <circle fill="url(#lightGradient)" cx="12" cy="9" r="2.5"/>
+  <circle fill="url(#lightGradient)" cx="19" cy="9" r="2.5"/>
+  <circle fill="url(#lightGradient)" cx="24" cy="14" r="2.5"/>
+</svg>

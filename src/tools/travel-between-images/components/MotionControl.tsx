@@ -207,19 +207,57 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   const hasAutoSelectedRef = useRef(false);
 
   // Auto-select the built-in default preset when:
-  // 1. Initial mount with no preset selected
-  // 2. Structure video changes (switch to appropriate default)
+  // 1. Initial mount with no preset selected AND user is in basic mode
+  // 2. Structure video changes (switch to appropriate default) - only in basic mode
   useEffect(() => {
+    console.log('[VTDebug] 🔍 Auto-select effect running:', {
+      settingsLoading,
+      motionMode,
+      hasPhaseConfig: !!phaseConfig,
+      phaseConfigPhases: phaseConfig?.phases?.length,
+      selectedPhasePresetId,
+      hasAutoSelected: hasAutoSelectedRef.current,
+      hasStructureVideo,
+      prevHasStructureVideo: prevHasStructureVideoRef.current,
+      timestamp: Date.now()
+    });
+    
     // Skip if settings are still loading
     if (settingsLoading) {
+      console.log('[VTDebug] ⏳ Auto-select skipped - settings loading');
       return;
+    }
+    
+    // CRITICAL FIX: Skip auto-select when user is in advanced mode
+    // In advanced mode, user has explicitly chosen to configure phaseConfig manually
+    // Auto-selecting a preset would overwrite their custom configuration
+    if (motionMode === 'advanced') {
+      console.log('[VTDebug] ⏭️ Auto-select skipped - user is in advanced mode');
+      prevHasStructureVideoRef.current = hasStructureVideo;
+      return;
+    }
+    
+    // Also skip if phaseConfig already exists with valid data
+    // This prevents overwriting user's config when remounting
+    if (phaseConfig && phaseConfig.phases && phaseConfig.phases.length > 0) {
+      // Only auto-select if no preset is selected (user may have deselected preset but kept config)
+      // But still allow structure video change to trigger preset switch
+      const structureVideoChanged = prevHasStructureVideoRef.current !== undefined && 
+                                     prevHasStructureVideoRef.current !== hasStructureVideo;
+      
+      if (!structureVideoChanged) {
+        console.log('[VTDebug] ⏭️ Auto-select skipped - phaseConfig already exists');
+        prevHasStructureVideoRef.current = hasStructureVideo;
+        return;
+      }
     }
     
     const structureVideoChanged = prevHasStructureVideoRef.current !== undefined && 
                                    prevHasStructureVideoRef.current !== hasStructureVideo;
     
-    // When structure video changes, select appropriate default
+    // When structure video changes, select appropriate default (only in basic mode)
     if (structureVideoChanged) {
+      console.log('[MotionControl] Structure video changed - switching to appropriate default preset');
       onPhasePresetSelect(
         builtinDefaultPreset.id, 
         builtinDefaultPreset.metadata.phaseConfig, 
@@ -232,26 +270,44 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     // Initial auto-select: only if no preset selected and we haven't auto-selected yet
     if (!selectedPhasePresetId && !hasAutoSelectedRef.current) {
       hasAutoSelectedRef.current = true;
+      console.log('[VTDebug] ⚡ Auto-selecting default preset:', {
+        presetId: builtinDefaultPreset.id,
+        motionMode,
+        timestamp: Date.now()
+      });
       onPhasePresetSelect(
         builtinDefaultPreset.id, 
         builtinDefaultPreset.metadata.phaseConfig, 
         builtinDefaultPreset.metadata
       );
+    } else {
+      console.log('[VTDebug] ⏭️ No auto-select needed:', {
+        hasPreset: !!selectedPhasePresetId,
+        hasAutoSelected: hasAutoSelectedRef.current
+      });
     }
     
     prevHasStructureVideoRef.current = hasStructureVideo;
-  }, [hasStructureVideo, builtinDefaultId, builtinDefaultPreset, selectedPhasePresetId, onPhasePresetSelect, settingsLoading]);
+  }, [hasStructureVideo, builtinDefaultId, builtinDefaultPreset, selectedPhasePresetId, onPhasePresetSelect, settingsLoading, motionMode, phaseConfig]);
 
   // Handle mode change with validation
   // Parent keeps motionMode and advancedMode in sync, so we just call onMotionModeChange
   const handleModeChange = useCallback((newMode: string) => {
+    // GUARD: Ignore if the mode hasn't actually changed
+    // This prevents spurious calls from Radix Tabs on mount/remount
+    if (newMode === motionMode) {
+      console.log('[VTDebug] ⏭️ handleModeChange ignored - already in', newMode, 'mode');
+      return;
+    }
+    
     // Prevent switching to advanced when turbo mode is active
     if (turboMode && newMode === 'advanced') {
       return;
     }
     
+    console.log('[VTDebug] 🔄 handleModeChange:', { from: motionMode, to: newMode });
     onMotionModeChange(newMode as 'basic' | 'advanced');
-  }, [turboMode, onMotionModeChange]);
+  }, [turboMode, onMotionModeChange, motionMode]);
 
   // Handle switch to advanced for editing preset
   const handleSwitchToAdvanced = useCallback(() => {
@@ -271,6 +327,9 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     }
     setIsPresetModalOpen(false);
   }, [onPhasePresetSelect]);
+
+  // [VTDebug] Log what value is being passed to Tabs at render time
+  console.log('[VTDebug] 🎨 Rendering Tabs with value:', motionMode);
 
   return (
     <div className="space-y-4">

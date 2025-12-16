@@ -124,6 +124,17 @@ export const useShotSettings = (
       // When shotId becomes null (e.g., modal closes), flush any pending saves first
       const previousShotId = currentShotIdRef.current;
       
+      // Only log if there's actually something to flush (reduces spam from rapid remounts)
+      if (previousShotId || pendingSettingsRef.current) {
+        console.log('[VTDebug] 🚪 shotId became null (modal closing?):', {
+          previousShotId: previousShotId?.substring(0, 8),
+          hasPendingSave: !!saveTimeoutRef.current,
+          hasPendingSettings: !!pendingSettingsRef.current,
+          pendingMotionMode: pendingSettingsRef.current?.motionMode,
+          timestamp: Date.now()
+        });
+      }
+      
       if (previousShotId && pendingSettingsRef.current) {
         // Clear the timeout if exists
         if (saveTimeoutRef.current) {
@@ -164,6 +175,11 @@ export const useShotSettings = (
               if (updateError) {
                 console.error('[useShotSettings] Failed to flush save on modal close:', updateError);
               } else {
+                console.log('[VTDebug] ✅ Modal close flush successful:', {
+                  previousShotId: previousShotId.substring(0, 8),
+                  motionMode: settingsToFlush.motionMode,
+                  timestamp: Date.now()
+                });
                 // CRITICAL: Invalidate the React Query cache so ShotEditor loads fresh data
                 queryClient.invalidateQueries({ 
                   queryKey: ['toolSettings', 'travel-between-images'],
@@ -217,6 +233,15 @@ export const useShotSettings = (
             advancedMode: settingsToFlush.advancedMode,
             hasPhaseConfig: !!settingsToFlush.phaseConfig,
             selectedPhasePresetId: settingsToFlush.selectedPhasePresetId
+          });
+          
+          // [VTDebug] Log motionMode being flushed
+          console.log('[VTDebug] 💾 Flushing motionMode:', {
+            previousShotId: previousShotId.substring(0, 8),
+            motionMode: settingsToFlush.motionMode,
+            advancedMode: settingsToFlush.advancedMode,
+            oldMotionMode: oldLoadedSettings?.motionMode,
+            timestamp: Date.now()
           });
           
           // CRITICAL: Save directly to Supabase using previousShotId to avoid cross-shot contamination
@@ -476,6 +501,17 @@ export const useShotSettings = (
       dbSettings_raw: dbSettings
     });
     
+    // [VTDebug] Log motionMode specifically
+    console.log('[VTDebug] 📥 Loading motionMode from DB:', {
+      shotId: shotId.substring(0, 8),
+      motionMode: deepClonedSettings.motionMode,
+      advancedMode: deepClonedSettings.advancedMode,
+      hasPhaseConfig: !!deepClonedSettings.phaseConfig,
+      dbSettings_motionMode: dbSettings?.motionMode,
+      dbSettings_advancedMode: dbSettings?.advancedMode,
+      timestamp: Date.now()
+    });
+    
     setSettings(deepClonedSettings);
     loadedSettingsRef.current = JSON.parse(JSON.stringify(deepClonedSettings));
     setStatus('ready');
@@ -555,8 +591,19 @@ export const useShotSettings = (
     // CRITICAL: Don't allow saves until we've loaded initial settings from DB
     // Otherwise we might overwrite good data with default/empty settings
     if (status !== 'ready' && status !== 'saving') {
-      // Still update local state for UI, but don't trigger save
-      setSettings(prev => ({ ...prev, [key]: value }));
+      // Still update local state for UI, but don't trigger save YET
+      // HOWEVER: We MUST set pendingSettingsRef so that flush-on-navigation will save!
+      setSettings(prev => {
+        const updated = { ...prev, [key]: value };
+        // Track pending settings for flush-on-navigation even during loading
+        pendingSettingsRef.current = updated;
+        console.log('[VTDebug] 📝 updateField during loading - set pendingSettingsRef:', {
+          key,
+          status,
+          timestamp: Date.now()
+        });
+        return updated;
+      });
       return;
     }
     
@@ -604,6 +651,18 @@ export const useShotSettings = (
       batchVideoPrompt: updates.batchVideoPrompt ? (typeof updates.batchVideoPrompt === 'string' ? updates.batchVideoPrompt.substring(0, 50) : updates.batchVideoPrompt) : undefined
     });
     
+    // [VTDebug] Log motionMode changes specifically
+    if ('motionMode' in updates) {
+      console.log('[VTDebug] 📝 updateFields - motionMode change:', {
+        newMotionMode: updates.motionMode,
+        newAdvancedMode: updates.advancedMode,
+        hasPhaseConfig: !!updates.phaseConfig,
+        shotId: shotId?.substring(0, 8),
+        currentStatus: status,
+        timestamp: Date.now()
+      });
+    }
+    
     // Mark that user is actively editing - MUST happen BEFORE the early return
     // so that DB load won't overwrite user's changes during loading state
     isUserEditingRef.current = true;
@@ -611,8 +670,19 @@ export const useShotSettings = (
     // CRITICAL: Don't allow saves until we've loaded initial settings from DB
     // Otherwise we might overwrite good data with default/empty settings
     if (status !== 'ready' && status !== 'saving') {
-      // Still update local state for UI, but don't trigger save
-      setSettings(prev => ({ ...prev, ...updates }));
+      // Still update local state for UI, but don't trigger save YET
+      // HOWEVER: We MUST set pendingSettingsRef so that flush-on-navigation will save!
+      setSettings(prev => {
+        const updated = { ...prev, ...updates };
+        // Track pending settings for flush-on-navigation even during loading
+        pendingSettingsRef.current = updated;
+        console.log('[VTDebug] 📝 updateFields during loading - set pendingSettingsRef:', {
+          motionMode: updated.motionMode,
+          status,
+          timestamp: Date.now()
+        });
+        return updated;
+      });
       return;
     }
     
@@ -628,8 +698,18 @@ export const useShotSettings = (
       }
       
       saveTimeoutRef.current = setTimeout(async () => {
+        console.log('[VTDebug] ⏰ Debounce timeout fired, saving:', {
+          shotId: shotId?.substring(0, 8),
+          motionMode: updated.motionMode,
+          timestamp: Date.now()
+        });
         try {
           await saveImmediate(updated);
+          console.log('[VTDebug] ✅ Debounced save completed:', {
+            shotId: shotId?.substring(0, 8),
+            motionMode: updated.motionMode,
+            timestamp: Date.now()
+          });
           // Only clear pendingSettingsRef AFTER save succeeds
           pendingSettingsRef.current = null;
           saveTimeoutRef.current = null;
@@ -641,7 +721,7 @@ export const useShotSettings = (
       
       return updated;
     });
-  }, [saveImmediate, status]);
+  }, [saveImmediate, shotId, status]);
   
   // Public debounced save
   const save = useCallback(async () => {

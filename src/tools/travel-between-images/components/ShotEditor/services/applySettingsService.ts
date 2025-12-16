@@ -412,17 +412,32 @@ export const applyAdvancedModeSettings = async (
   settings: ExtractedSettings,
   context: ApplyContext
 ): Promise<ApplyResult> => {
+  // Helper to deep clone phase config to prevent shared references
+  const deepClonePhaseConfig = (config: typeof settings.phaseConfig) => {
+    if (!config) return undefined;
+    return {
+      ...config,
+      steps_per_phase: [...config.steps_per_phase],
+      phases: config.phases.map(phase => ({
+        ...phase,
+        loras: phase.loras.map(lora => ({ ...lora }))
+      }))
+    };
+  };
+  
   // Apply phase config
   if (settings.phaseConfig) {
-    console.log('[ApplySettings] ⚙️  Applying phase configuration:', {
-      num_phases: settings.phaseConfig.num_phases,
-      phases_count: settings.phaseConfig.phases?.length,
-      steps_per_phase: settings.phaseConfig.steps_per_phase,
-      flow_shift: settings.phaseConfig.flow_shift,
-      model_switch_phase: settings.phaseConfig.model_switch_phase,
-      sample_solver: settings.phaseConfig.sample_solver
+    // DEEP CLONE: Prevent shared references when applying task settings
+    const clonedConfig = deepClonePhaseConfig(settings.phaseConfig)!;
+    console.log('[ApplySettings] ⚙️  Applying phase configuration (deep cloned):', {
+      num_phases: clonedConfig.num_phases,
+      phases_count: clonedConfig.phases?.length,
+      steps_per_phase: clonedConfig.steps_per_phase,
+      flow_shift: clonedConfig.flow_shift,
+      model_switch_phase: clonedConfig.model_switch_phase,
+      sample_solver: clonedConfig.sample_solver
     });
-    context.onPhaseConfigChange(settings.phaseConfig);
+    context.onPhaseConfigChange(clonedConfig);
   } else {
     console.log('[ApplySettings] ⏭️  Skipping phase config (undefined)');
   }
@@ -434,7 +449,9 @@ export const applyAdvancedModeSettings = async (
     });
     
     if (settings.selectedPhasePresetId && context.onPhasePresetSelect && settings.phaseConfig) {
-      context.onPhasePresetSelect(settings.selectedPhasePresetId, settings.phaseConfig);
+      // Note: onPhasePresetSelect also deep clones, but we pass cloned config anyway for safety
+      const clonedConfig = deepClonePhaseConfig(settings.phaseConfig)!;
+      context.onPhasePresetSelect(settings.selectedPhasePresetId, clonedConfig);
     } else if (!settings.selectedPhasePresetId && context.onPhasePresetRemove) {
       console.log('[ApplySettings] 🗑️  Clearing preset (task had no preset selected)');
       context.onPhasePresetRemove();
