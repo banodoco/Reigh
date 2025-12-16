@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useToolSettings } from './useToolSettings';
+import { useToolSettings, updateToolSettingsSupabase } from './useToolSettings';
 import { deepEqual } from '@/shared/lib/deepEqual';
 
 // localStorage key prefix for pending saves that survive page close
@@ -184,10 +184,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     }
   }, [entityId, settings, updateSettings, scope, toolId]);
 
-  // Refs to hold latest functions to avoid effect dependency churn
-  const updateSettingsRef = useRef(updateSettings);
-  updateSettingsRef.current = updateSettings;
-  
+  // Ref to hold latest saveImmediate to avoid effect dependency churn
   const saveImmediateRef = useRef(saveImmediate);
   saveImmediateRef.current = saveImmediate;
 
@@ -195,12 +192,14 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
    * Flush pending settings on entity change/unmount.
    *
    * IMPORTANT: this runs in the *cleanup* for the previous entity render.
-   * We use refs for updateSettings/scope/toolId to avoid the effect running
-   * on every render when those values have unstable references.
+   * We call updateToolSettingsSupabase directly with the explicit entity ID
+   * to avoid drift issues when the hook's internal refs have already changed.
    */
   useEffect(() => {
-    // Capture entityId for this effect instance
+    // Capture values for this effect instance
     const currentEntityId = entityId;
+    const currentScope = scope;
+    const currentToolId = toolId;
     
     return () => {
       if (saveTimeoutRef.current) {
@@ -213,13 +212,19 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
       if (pending && pendingForEntity && pendingForEntity === currentEntityId) {
         console.log('[useAutoSaveSettings] 🚿 Flushing pending save in cleanup:', {
-          toolId,
+          toolId: currentToolId,
           entityId: pendingForEntity.substring(0, 8),
         });
 
         // Fire-and-forget; cleanup cannot be async.
-        // Use ref to get latest updateSettings without dependency
-        updateSettingsRef.current(scope, pending).catch(err => {
+        // Call updateToolSettingsSupabase directly with explicit entity ID
+        // to avoid drift issues with hook refs
+        updateToolSettingsSupabase({
+          scope: currentScope,
+          id: pendingForEntity,
+          toolId: currentToolId,
+          patch: pending,
+        }).catch(err => {
           console.error('[useAutoSaveSettings] Cleanup flush failed:', err);
         });
       }
@@ -230,7 +235,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
         pendingEntityIdRef.current = null;
       }
     };
-    // Only re-run when entityId changes - other deps accessed via refs
+    // Only re-run when entityId changes
   }, [entityId, scope, toolId]);
 
   /**
@@ -266,7 +271,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
   /**
    * On mount, check for pending saves from localStorage (from a previous session that closed).
-   * If found, flush them to the database.
+   * If found, flush them to the database directly (not through hooks, to avoid entity ID drift).
    */
   useEffect(() => {
     if (!entityId || !enabled) return;
@@ -288,22 +293,26 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
           // Update local state with the pending settings
           setSettings(pendingSettings);
-          pendingSettingsRef.current = pendingSettings;
-          pendingEntityIdRef.current = entityId;
-
-          // Schedule a save for the restored settings
-          if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-          }
-          saveTimeoutRef.current = setTimeout(async () => {
-            try {
-              await saveImmediateRef.current(pendingSettings);
-              // Clear localStorage after successful save
+          // Update loaded ref so it doesn't appear dirty
+          loadedSettingsRef.current = JSON.parse(JSON.stringify(pendingSettings));
+          // Don't set pending refs - we're saving directly below
+          
+          // Save directly to DB with explicit entity ID (don't go through hooks)
+          // This avoids entity ID drift issues if the hook state changes
+          const storedEntityId = entityId; // Capture for async
+          updateToolSettingsSupabase({
+            scope: storedScope || scope,
+            id: storedEntityId,
+            toolId,
+            patch: pendingSettings,
+          })
+            .then(() => {
+              console.log('[useAutoSaveSettings] ✅ Restored settings saved to DB');
               localStorage.removeItem(storageKey);
-            } catch (err) {
+            })
+            .catch((err) => {
               console.error('[useAutoSaveSettings] Failed to sync restored settings:', err);
-            }
-          }, 100); // Short delay to let other initialization settle
+            });
         } else {
           // Too old, remove it
           localStorage.removeItem(storageKey);
