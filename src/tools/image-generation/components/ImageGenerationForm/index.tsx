@@ -382,16 +382,35 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     return imageToDisplay;
   }, [styleReferenceOverride, rawStyleReferenceImageOriginal, rawStyleReferenceImage]);
 
-  // Auto-select first reference if we have references but no valid selected reference for this shot
+  // Auto-select reference if we have references but no valid selected reference for this shot
+  // Tries to inherit from last edited shot first, falls back to first available reference
   useEffect(() => {
     if (hydratedReferences.length > 0 && projectImageSettings) {
-      // Case 1: No selectedReferenceId for this shot
+      // Case 1: No selectedReferenceId for this shot - try to inherit from last edited shot
       if (!selectedReferenceId) {
-        console.log('[RefSettings] 🔄 Auto-selecting first reference for shot', effectiveShotId, '(no ID set)');
+        let inheritedRefId: string | null = null;
+        
+        // Try to inherit from localStorage (last edited shot's reference)
+        try {
+          const stored = localStorage.getItem('image-gen-last-active-shot-settings');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            // Check if the inherited reference still exists
+            if (parsed.selectedReferenceId && hydratedReferences.some(r => r.id === parsed.selectedReferenceId)) {
+              inheritedRefId = parsed.selectedReferenceId;
+            }
+          }
+        } catch (e) {
+          // Ignore localStorage errors
+        }
+        
+        const refIdToSelect = inheritedRefId || hydratedReferences[0].id;
+        console.log('[RefSettings] 🔄 Auto-selecting reference for shot', effectiveShotId, 
+          inheritedRefId ? '(inherited from last shot)' : '(no inheritance, using first)');
         updateProjectImageSettings('project', {
           selectedReferenceIdByShot: {
             ...selectedReferenceIdByShot,
-            [effectiveShotId]: hydratedReferences[0].id
+            [effectiveShotId]: refIdToSelect
           }
         });
       }
@@ -842,10 +861,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   });
 
   // Default settings for shot prompts - memoized to prevent new object on every render
-  const shotPromptDefaults = useMemo<ImageGenShotSettings>(() => ({ 
-    prompts: [], 
-    masterPrompt: '' 
-  }), []);
+  // New shots inherit from localStorage (last edited shot's settings)
+  const shotPromptDefaults = useMemo<ImageGenShotSettings>(() => {
+    // Try to load last active shot settings for inheritance
+    try {
+      const stored = localStorage.getItem('image-gen-last-active-shot-settings');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          prompts: [],
+          masterPrompt: '',
+          promptMode: parsed.promptMode || 'automated',
+          selectedReferenceId: parsed.selectedReferenceId || null,
+        };
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+    return { 
+      prompts: [], 
+      masterPrompt: '',
+      promptMode: 'automated',
+      selectedReferenceId: null,
+    };
+  }, []);
 
   // Shot-specific prompts using per-shot storage
   const shotPromptSettings = useAutoSaveSettings<ImageGenShotSettings>({
@@ -923,6 +962,65 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
   
+  // Get current prompt mode - from shot settings if shot selected, otherwise local state
+  const effectivePromptMode = useMemo<PromptMode>(() => {
+    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+      return shotPromptSettings.settings.promptMode || 'automated';
+    }
+    return promptMode;
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, promptMode]);
+
+  // Helper to update prompt mode - routes to shot settings or local state
+  const setEffectivePromptMode = useCallback((newMode: PromptMode) => {
+    if (associatedShotId) {
+      console.log('[ImageGenerationForm] setPromptMode for shot:', associatedShotId.substring(0, 8), newMode);
+      shotPromptSettings.updateField('promptMode', newMode);
+      markAsInteracted();
+    } else {
+      setPromptMode(newMode);
+    }
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+
+  // Get current selected reference ID - from shot settings if shot selected, otherwise project settings
+  const effectiveSelectedReferenceId = useMemo<string | null>(() => {
+    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+      // Shot-level reference takes precedence
+      const shotRefId = shotPromptSettings.settings.selectedReferenceId;
+      if (shotRefId !== undefined) {
+        return shotRefId;
+      }
+    }
+    // Fall back to project-level per-shot mapping
+    return selectedReferenceId;
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.selectedReferenceId, selectedReferenceId]);
+
+  // Helper to update selected reference ID - routes to shot settings
+  const setEffectiveSelectedReferenceId = useCallback((newRefId: string | null) => {
+    if (associatedShotId) {
+      console.log('[ImageGenerationForm] setSelectedReferenceId for shot:', associatedShotId.substring(0, 8), newRefId);
+      shotPromptSettings.updateField('selectedReferenceId', newRefId);
+      markAsInteracted();
+    }
+    // Also update the project-level per-shot mapping for backwards compatibility
+    // (handled by existing handleReferenceSelection)
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+
+  // Save current shot settings to localStorage for inheritance by new shots
+  useEffect(() => {
+    if (associatedShotId && shotPromptSettings.status === 'ready') {
+      try {
+        const settingsToSave = {
+          promptMode: shotPromptSettings.settings.promptMode || effectivePromptMode || 'automated',
+          // Use the project-level per-shot reference selection for inheritance
+          selectedReferenceId: selectedReferenceId || null,
+        };
+        localStorage.setItem('image-gen-last-active-shot-settings', JSON.stringify(settingsToSave));
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+    }
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, effectivePromptMode, selectedReferenceId]);
+
   // Sync local style strength with project settings
   // Legacy sync effects removed to prevent overwriting user input
   // The form state is now managed locally and only persisted to DB on change
@@ -2249,7 +2347,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     e.preventDefault();
     
     // Handle automated mode: generate prompts first, then images
-    if (promptMode === 'automated') {
+    if (effectivePromptMode === 'automated') {
       if (!masterPromptText.trim()) {
         toast.error("Please enter a master prompt.");
         return;
@@ -2623,10 +2721,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                 setAfterEachPromptText('');
               }}
               onDeleteAllPrompts={handleDeleteAllPrompts}
-              promptMode={promptMode}
+              promptMode={effectivePromptMode}
               onPromptModeChange={(mode) => {
                 markAsInteracted();
-                setPromptMode(mode);
+                setEffectivePromptMode(mode);
                 // Auto-set imagesPerPrompt based on mode
                 if (mode === 'automated') {
                   setImagesPerPrompt(8);
@@ -2705,7 +2803,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             steps={steps}
             onChangeSteps={setSteps}
             showStepsDropdown={isLocalGenerationEnabled}
-            promptMode={promptMode}
+            promptMode={effectivePromptMode}
             onUseExistingPrompts={handleUseExistingPrompts}
             onNewPromptsLikeExisting={handleNewPromptsLikeExisting}
           />

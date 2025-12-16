@@ -64,6 +64,10 @@ export interface ImageGenShotSettings {
   prompts: PromptEntry[];
   /** Master prompt for automated mode */
   masterPrompt: string;
+  /** Prompt mode: automated vs managed */
+  promptMode?: PromptMode;
+  /** Selected reference ID for this shot */
+  selectedReferenceId?: string | null;
 }
 
 // Reference mode type
