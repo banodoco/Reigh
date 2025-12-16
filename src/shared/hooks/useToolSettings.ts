@@ -156,9 +156,9 @@ async function getUserWithTimeout(timeoutMs = 15000) {
 
 async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContext, signal?: AbortSignal): Promise<unknown> {
   try {
-    // Check if request was cancelled before starting
+    // Check if request was cancelled before starting - return undefined gracefully
     if (signal?.aborted) {
-      throw new Error('Request was cancelled');
+      return undefined;
     }
     
     // Single-flight dedupe key for concurrent identical requests
@@ -207,9 +207,10 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
         throw new Error('Authentication required');
       }
       
-      // Check again after auth call
+      // Check again after auth call - return undefined instead of throwing
+      // This prevents noisy console errors when React Query cancels requests
       if (signal?.aborted) {
-        throw new Error('Request was cancelled');
+        return undefined;
       }
 
       const dbQueryStart = Date.now();
@@ -362,9 +363,10 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
   const { scope, id, toolId, patch } = params;
 
   try {
-    // Check if request was cancelled before starting
+    // Check if request was cancelled before starting - return gracefully
     if (signal?.aborted) {
-      throw new Error('Request was cancelled');
+      console.log('[useToolSettings] Update cancelled before start');
+      return;
     }
     
     let tableName: string;
@@ -395,9 +397,10 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
       throw new Error(`Failed to fetch current ${scope} settings: ${fetchError.message}`);
     }
     
-    // Check if request was cancelled after fetch
+    // Check if request was cancelled after fetch - return gracefully
     if (signal?.aborted) {
-      throw new Error('Request was cancelled');
+      console.log('[useToolSettings] Update cancelled after fetch');
+      return;
     }
 
     // Merge patch with current tool settings

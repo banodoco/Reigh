@@ -254,6 +254,9 @@ export async function completeTaskHandler(req: Request, deps: CompleteTaskDeps =
       if (needsParamsUpdate) {
         console.log(`[COMPLETE-TASK] Updating task parameters${thumbnailUrl ? ' with thumbnail_url' : ''}${shotValidation.needsUpdate ? ' with cleaned shot references' : ''}`);
         await supabaseAdmin.from("tasks").update({ params: updatedParams }).eq("id", taskIdString);
+        
+        // Keep in-memory context in sync so downstream steps (generation creation) use updated params
+        taskContext.params = updatedParams;
       }
     } catch (validationError) {
       console.error(`[COMPLETE-TASK] Error during validation:`, validationError);

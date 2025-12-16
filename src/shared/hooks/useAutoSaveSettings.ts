@@ -352,6 +352,13 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       return;
     }
 
+    // Don't overwrite if user has pending edits (debounce hasn't fired yet)
+    // This prevents React Query refetches from "unwriting" user input
+    if (pendingSettingsRef.current && pendingEntityIdRef.current === entityId) {
+      console.log('[useAutoSaveSettings] ⏳ Skipping DB load - user has pending edits');
+      return;
+    }
+
     // Apply settings from DB
     const loadedSettings: T = {
       ...defaults,
