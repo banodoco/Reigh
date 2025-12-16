@@ -7,6 +7,7 @@ import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2, Video, ChevronDo
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { isVideoGeneration, isPositioned } from '@/shared/lib/typeGuards';
@@ -28,9 +29,14 @@ interface VideoShotDisplayProps {
   isHighlighted?: boolean;
 }
 
+const SKIP_DELETE_CONFIRMATION_KEY = 'reigh-skip-delete-shot-confirmation';
+
 const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false }) => {
   // Check if this is a temp shot (optimistic duplicate waiting for real ID)
   const isTempShot = shot.id.startsWith('temp-');
+  
+  // State for "don't ask again" checkbox
+  const [skipConfirmationChecked, setSkipConfirmationChecked] = useState(false);
   
   // Click ripple effect
   const { triggerRipple, rippleStyles, isRippleActive } = useClickRipple();
@@ -150,36 +156,49 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       toast.error('Cannot delete shot: Project ID is missing.');
       return;
     }
-    // Open the delete confirmation dialog
-    setIsDeleteDialogOpen(true);
+    
+    // Check if user has opted to skip confirmation
+    const skipConfirmation = localStorage.getItem(SKIP_DELETE_CONFIRMATION_KEY) === 'true';
+    if (skipConfirmation) {
+      // Delete immediately without confirmation
+      await performDelete();
+    } else {
+      // Open the delete confirmation dialog
+      setIsDeleteDialogOpen(true);
+    }
   };
-
-  const handleConfirmDelete = async () => {
+  
+  const performDelete = async () => {
     if (!currentProjectId) {
       toast.error('Cannot delete shot: Project ID is missing.');
-      setIsDeleteDialogOpen(false);
       return;
     }
     
     try {
       await deleteShotMutation.mutateAsync(
-        { shotId: shot.id, projectId: currentProjectId }, // Pass projectId
+        { shotId: shot.id, projectId: currentProjectId },
         {
-          onSuccess: () => {
-      
-            // Optimistic update or query invalidation handles UI removal
-          },
           onError: (error) => {
             toast.error(`Failed to delete shot: ${error.message}`);
           },
         }
       );
     } catch (error) {
-      // This catch is likely redundant if mutation's onError is used, but good for safety
       console.error("Error during deleteShotMutation call:", error);
-    } finally {
-      setIsDeleteDialogOpen(false);
     }
+  };
+
+  const handleConfirmDelete = async () => {
+    // Save preference if checkbox was checked
+    if (skipConfirmationChecked) {
+      localStorage.setItem(SKIP_DELETE_CONFIRMATION_KEY, 'true');
+    }
+    
+    setIsDeleteDialogOpen(false);
+    await performDelete();
+    
+    // Reset checkbox state for next time
+    setSkipConfirmationChecked(false);
   };
 
   const handleDuplicateShot = async (e?: React.MouseEvent) => {
@@ -461,7 +480,10 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={(open) => {
+        setIsDeleteDialogOpen(open);
+        if (!open) setSkipConfirmationChecked(false); // Reset checkbox when dialog closes
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Shot</AlertDialogTitle>
@@ -469,6 +491,19 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
               Are you sure you want to delete shot "{shot.name}"? This will permanently remove the shot and all its associated data. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="flex items-center space-x-2 py-2">
+            <Checkbox 
+              id="skip-confirmation" 
+              checked={skipConfirmationChecked}
+              onCheckedChange={(checked) => setSkipConfirmationChecked(checked === true)}
+            />
+            <label 
+              htmlFor="skip-confirmation" 
+              className="text-sm text-muted-foreground cursor-pointer select-none"
+            >
+              Don't ask for confirmation
+            </label>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
