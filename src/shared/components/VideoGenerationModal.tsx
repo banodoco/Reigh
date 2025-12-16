@@ -264,7 +264,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
         justQueuedTimeoutRef.current = window.setTimeout(() => {
           setJustQueued(false);
           justQueuedTimeoutRef.current = null;
-        }, 3000);
+          onClose();
+        }, 1000);
         queryClient.invalidateQueries({ queryKey: ['shot-generations', shot.id] });
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
       } else {
@@ -276,7 +277,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedProjectId, shot, positionedImages, selectedLoras, settings, queryClient, effectiveAspectRatio, getModelName, randomSeed, updateField]);
+  }, [selectedProjectId, shot, positionedImages, selectedLoras, settings, queryClient, effectiveAspectRatio, getModelName, randomSeed, updateField, onClose]);
   
   const handleNavigateToShot = useCallback(() => {
     onClose();
@@ -531,7 +532,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
                 disabled={isDisabled}
               >
                 {justQueued
-                  ? "Added to queue!"
+                  ? "Submitted, closing modal..."
                   : isGenerating 
                     ? 'Creating Tasks...' 
                     : 'Generate Video'}

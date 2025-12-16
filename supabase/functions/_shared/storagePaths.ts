@@ -84,3 +84,4 @@ export const storagePaths = {
  */
 export const MEDIA_BUCKET = 'image_uploads';
 
+

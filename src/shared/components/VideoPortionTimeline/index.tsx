@@ -355,20 +355,17 @@ export function MultiPortionTimeline({
     const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     const time = (percent / 100) * duration;
     
-    // Enforce min (2 frames) and max gap limits
+    // Only enforce min gap (2 frames) - allow exceeding max, will show warning
     const minGapTime = fps ? 2 / fps : 0.1;
-    const maxGapTime = (fps && maxGapFrames) ? maxGapFrames / fps : duration;
     
     let newTime: number;
     if (selectedHandle.handle === 'start') {
-      const minStart = selection.end - maxGapTime;
       const maxStart = selection.end - minGapTime;
-      newTime = Math.max(Math.max(0, minStart), Math.min(time, maxStart));
+      newTime = Math.max(0, Math.min(time, maxStart));
       onSelectionChange(selectedHandle.id, newTime, selection.end);
     } else {
       const minEnd = selection.start + minGapTime;
-      const maxEnd = selection.start + maxGapTime;
-      newTime = Math.min(Math.min(duration, maxEnd), Math.max(time, minEnd));
+      newTime = Math.min(duration, Math.max(time, minEnd));
       onSelectionChange(selectedHandle.id, selection.start, newTime);
     }
     
@@ -399,30 +396,27 @@ export function MultiPortionTimeline({
     const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     const time = (percent / 100) * duration;
     
-    // Calculate constrained time first - enforce min (2 frames) and max gap limits
+    // Only enforce min gap (2 frames) - allow exceeding max, will show warning
     const minGapTime = fps ? 2 / fps : 0.1;
-    const maxGapTime = (fps && maxGapFrames) ? maxGapFrames / fps : duration;
     
     let newTime: number;
     if (dragging.handle === 'start') {
-      // Start can't go past end - minGap, and can't go before end - maxGap
-      const minStart = selection.end - maxGapTime;
+      // Start can't go past end - minGap
       const maxStart = selection.end - minGapTime;
-      newTime = Math.max(Math.max(0, minStart), Math.min(time, maxStart));
+      newTime = Math.max(0, Math.min(time, maxStart));
     } else {
-      // End can't go before start + minGap, and can't go past start + maxGap
+      // End can't go before start + minGap
       const minEnd = selection.start + minGapTime;
-      const maxEnd = selection.start + maxGapTime;
-      newTime = Math.min(Math.min(duration, maxEnd), Math.max(time, minEnd));
+      newTime = Math.min(duration, Math.max(time, minEnd));
     }
     
-    // Calculate drag offset based on CONSTRAINED position for accurate visual feedback
+    // Calculate drag offset based on new position for accurate visual feedback
     const currentPercent = dragging.handle === 'start' 
       ? (selection.start / duration) * 100 
       : (selection.end / duration) * 100;
-    const constrainedPercent = (newTime / duration) * 100;
+    const newPercent = (newTime / duration) * 100;
     const currentPx = (currentPercent / 100) * rect.width;
-    const newPx = (constrainedPercent / 100) * rect.width;
+    const newPx = (newPercent / 100) * rect.width;
     const offsetPx = newPx - currentPx;
     
     // Store offset for immediate visual update via CSS transform
@@ -456,7 +450,7 @@ export function MultiPortionTimeline({
         pendingUpdateRef.current = null;
       });
     }
-  }, [dragging, duration, onSelectionChange, videoRef]);
+  }, [dragging, duration, fps, onSelectionChange, videoRef]);
   
   const handleEnd = useCallback(() => {
     // Clear any pending RAF
@@ -523,6 +517,20 @@ export function MultiPortionTimeline({
     (trackRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
     (scrubberRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
   }, []);
+  
+  // Check if any selection exceeds the max gap frames limit
+  const exceedsMaxWarning = React.useMemo(() => {
+    if (!fps || !maxGapFrames) return null;
+    
+    for (const selection of selections) {
+      const gapTime = selection.end - selection.start;
+      const gapFrames = Math.round(gapTime * fps);
+      if (gapFrames > maxGapFrames) {
+        return { gapFrames, maxGapFrames };
+      }
+    }
+    return null;
+  }, [selections, fps, maxGapFrames]);
   
   // Handle click on track - differentiate between seeking and handle selection
   const handleTrackClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -737,6 +745,13 @@ export function MultiPortionTimeline({
         <span>0:00</span>
         <span>{formatTime(duration)}</span>
       </div>
+      
+      {/* Warning when selection exceeds max frames */}
+      {exceedsMaxWarning && (
+        <div className="mt-2 px-2 py-1.5 bg-amber-500/20 border border-amber-500/40 rounded text-amber-200 text-xs text-center">
+          You'll only be able to generate max {exceedsMaxWarning.maxGapFrames} frames in this gap
+        </div>
+      )}
     </div>
   );
 }
