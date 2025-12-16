@@ -29,7 +29,8 @@ export interface ImageGenerationSettings {
   afterEachPromptText?: string;
   associatedShotId?: string | null; // Last associated shot
   promptMode?: PromptMode;
-  masterPromptText?: string;
+  masterPromptByShot?: Record<string, string>; // Master prompt per shot ID
+  masterPromptText?: string; // Legacy - kept for migration
 }
 
 export const defaultImageGenerationSettings: ImageGenerationSettings = {
@@ -57,7 +58,8 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   softEdgeStrength: 20,
   generationMode: 'wan-local',
   promptMode: 'automated',
-  masterPromptText: '',
+  masterPromptByShot: {},
+  masterPromptText: '', // Legacy - kept for migration
 };
 
 export const imageGenerationSettings = {

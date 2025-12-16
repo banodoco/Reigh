@@ -770,7 +770,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Prompt mode: automated vs managed (default to automated)
   const [promptMode, setPromptMode] = useState<PromptMode>('automated');
-  const [masterPromptText, setMasterPromptText] = useState("");
+  // Store master prompts by shot ID (including 'none' for no shot)
+  const [masterPromptByShot, setMasterPromptByShot] = useState<Record<string, string>>({});
   const [isGeneratingAutomatedPrompts, setIsGeneratingAutomatedPrompts] = useState(false);
 
   // Removed unused currentShotId that was causing unnecessary re-renders
@@ -858,6 +859,23 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     });
   }, [effectiveShotId]);
 
+  // Get current master prompt for the selected shot
+  const masterPromptText = masterPromptByShot[effectiveShotId] || '';
+  
+  // Helper to update master prompt for the current shot
+  // Matches React.Dispatch<React.SetStateAction<string>> signature
+  const setMasterPromptText: React.Dispatch<React.SetStateAction<string>> = useCallback((newTextOrUpdater) => {
+    console.log('[ImageGenerationForm] setMasterPromptText called for shot:', effectiveShotId);
+    setMasterPromptByShot(prev => {
+      const currentText = prev[effectiveShotId] || '';
+      const newText = typeof newTextOrUpdater === 'function' ? newTextOrUpdater(currentText) : newTextOrUpdater;
+      return {
+        ...prev,
+        [effectiveShotId]: newText
+      };
+    });
+  }, [effectiveShotId]);
+
   const { ready, isSaving, markAsInteracted } = usePersistentToolState<PersistedFormSettings>(
     'image-generation',
     { projectId: selectedProjectId },
@@ -869,7 +887,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
       associatedShotId: [associatedShotId, setAssociatedShotId],
       promptMode: [promptMode, setPromptMode],
-      masterPromptText: [masterPromptText, setMasterPromptText],
+      masterPromptByShot: [masterPromptByShot, setMasterPromptByShot],
     }
     // Remove enabled: !!selectedProjectId - let persistence work even without project to preserve state
   );

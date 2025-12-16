@@ -1064,6 +1064,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 expectedFrames={childParams?.num_frames}
                                                 expectedPrompt={childParams?.base_prompt || childParams?.prompt}
                                                 isProcessing={true}
+                                                aspectRatio={effectiveAspectRatio}
                                             />
                                         );
                                     }
@@ -1076,6 +1077,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                             expectedPrompt={slot.expectedPrompt}
                                             startImage={slot.startImage}
                                             endImage={slot.endImage}
+                                            aspectRatio={effectiveAspectRatio}
                                         />
                                     );
                                 }
@@ -2061,6 +2063,7 @@ interface SegmentPlaceholderProps {
     startImage?: string;
     endImage?: string;
     isProcessing?: boolean; // True if child exists but output not ready yet
+    aspectRatio?: string; // Aspect ratio string like "16:9" for video container
 }
 
 const SegmentPlaceholder: React.FC<SegmentPlaceholderProps> = ({
@@ -2070,11 +2073,24 @@ const SegmentPlaceholder: React.FC<SegmentPlaceholderProps> = ({
     startImage,
     endImage,
     isProcessing = false,
+    aspectRatio,
 }) => {
+    // Calculate aspect ratio style for video container - same logic as SegmentCard
+    const aspectRatioStyle = useMemo(() => {
+        if (!aspectRatio) {
+            return { aspectRatio: '16/9' }; // Default to 16:9
+        }
+        const [width, height] = aspectRatio.split(':').map(Number);
+        if (width && height) {
+            return { aspectRatio: `${width}/${height}` };
+        }
+        return { aspectRatio: '16/9' }; // Fallback to 16:9
+    }, [aspectRatio]);
+
     return (
         <Card className={`overflow-hidden flex flex-col border-dashed ${isProcessing ? 'opacity-90 border-primary/50' : 'opacity-70'}`}>
             {/* Placeholder Video Area */}
-            <div className="relative aspect-video bg-muted/30 flex items-center justify-center">
+            <div className="relative bg-muted/30 flex items-center justify-center" style={aspectRatioStyle}>
                 {/* Show start/end images if available */}
                 {(startImage || endImage) ? (
                     <div className="absolute inset-0 flex">

@@ -48,7 +48,8 @@ export interface PersistedFormSettings {
   associatedShotId?: string | null;
   // Prompt mode and automated mode settings
   promptMode?: PromptMode;
-  masterPromptText?: string;
+  masterPromptByShot?: Record<string, string>; // Master prompt per shot ID
+  masterPromptText?: string; // Legacy - kept for migration
 }
 
 // Reference mode type
