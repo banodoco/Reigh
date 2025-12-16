@@ -2,9 +2,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useToolSettings, updateToolSettingsSupabase } from './useToolSettings';
 import { deepEqual } from '@/shared/lib/deepEqual';
 
-// localStorage key prefix for pending saves that survive page close
-const PENDING_SAVE_KEY_PREFIX = 'autosave-pending-';
-
 /**
  * Status states for the auto-save settings lifecycle
  */
@@ -162,14 +159,6 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       if (pendingSettingsRef.current && deepEqual(pendingSettingsRef.current, toSave)) {
         pendingSettingsRef.current = null;
         pendingEntityIdRef.current = null;
-        
-        // Also clear localStorage backup now that we've successfully saved
-        try {
-          const storageKey = `${PENDING_SAVE_KEY_PREFIX}${toolId}-${entityId}`;
-          localStorage.removeItem(storageKey);
-        } catch (err) {
-          // Ignore localStorage errors
-        }
       }
       
       setStatus('ready');
@@ -239,8 +228,10 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
   }, [entityId, scope, toolId]);
 
   /**
-   * Handle page close/navigation - save pending settings to localStorage.
-   * This ensures data isn't lost when browser closes before async save completes.
+   * Handle page close/navigation - save pending settings directly to DB.
+   * This is a best-effort save; browsers typically allow ~50-100ms for async ops.
+   * If the browser kills the request, we accept that minor data loss (user closed
+   * within the debounce window).
    */
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -248,82 +239,27 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       const pendingForEntity = pendingEntityIdRef.current;
 
       if (pending && pendingForEntity) {
-        const storageKey = `${PENDING_SAVE_KEY_PREFIX}${toolId}-${pendingForEntity}`;
-        try {
-          localStorage.setItem(storageKey, JSON.stringify({
-            settings: pending,
-            scope,
-            timestamp: Date.now(),
-          }));
-          console.log('[useAutoSaveSettings] 💾 Saved pending to localStorage on unload:', {
-            toolId,
-            entityId: pendingForEntity.substring(0, 8),
-          });
-        } catch (err) {
-          console.error('[useAutoSaveSettings] Failed to save to localStorage:', err);
-        }
+        console.log('[useAutoSaveSettings] 🚿 Flushing pending save on page unload:', {
+          toolId,
+          entityId: pendingForEntity.substring(0, 8),
+        });
+        
+        // Fire-and-forget save directly to DB
+        // Most browsers will wait a bit for this to complete
+        updateToolSettingsSupabase({
+          scope,
+          id: pendingForEntity,
+          toolId,
+          patch: pending,
+        }).catch(err => {
+          console.error('[useAutoSaveSettings] Unload flush failed:', err);
+        });
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [toolId, scope]);
-
-  /**
-   * On mount, check for pending saves from localStorage (from a previous session that closed).
-   * If found, flush them to the database directly (not through hooks, to avoid entity ID drift).
-   */
-  useEffect(() => {
-    if (!entityId || !enabled) return;
-
-    const storageKey = `${PENDING_SAVE_KEY_PREFIX}${toolId}-${entityId}`;
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const { settings: pendingSettings, scope: storedScope, timestamp } = JSON.parse(stored);
-        
-        // Only restore if less than 1 hour old
-        const ONE_HOUR = 60 * 60 * 1000;
-        if (Date.now() - timestamp < ONE_HOUR) {
-          console.log('[useAutoSaveSettings] 🔄 Restoring pending save from localStorage:', {
-            toolId,
-            entityId: entityId.substring(0, 8),
-            age: `${Math.round((Date.now() - timestamp) / 1000)}s ago`,
-          });
-
-          // Update local state with the pending settings
-          setSettings(pendingSettings);
-          // Update loaded ref so it doesn't appear dirty
-          loadedSettingsRef.current = JSON.parse(JSON.stringify(pendingSettings));
-          // Don't set pending refs - we're saving directly below
-          
-          // Save directly to DB with explicit entity ID (don't go through hooks)
-          // This avoids entity ID drift issues if the hook state changes
-          const storedEntityId = entityId; // Capture for async
-          updateToolSettingsSupabase({
-            scope: storedScope || scope,
-            id: storedEntityId,
-            toolId,
-            patch: pendingSettings,
-          })
-            .then(() => {
-              console.log('[useAutoSaveSettings] ✅ Restored settings saved to DB');
-              localStorage.removeItem(storageKey);
-            })
-            .catch((err) => {
-              console.error('[useAutoSaveSettings] Failed to sync restored settings:', err);
-            });
-        } else {
-          // Too old, remove it
-          localStorage.removeItem(storageKey);
-        }
-      }
-    } catch (err) {
-      console.error('[useAutoSaveSettings] Failed to read localStorage:', err);
-    }
-    // Only run on mount for this entity
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entityId, toolId, enabled]);
 
   // Update single field
   const updateField = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
