@@ -383,49 +383,56 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [styleReferenceOverride, rawStyleReferenceImageOriginal, rawStyleReferenceImage]);
 
   // Auto-select reference if we have references but no valid selected reference for this shot
-  // Tries to inherit from last edited shot first, falls back to first available reference
+  // Uses the most recently added reference as default
   useEffect(() => {
     if (hydratedReferences.length > 0 && projectImageSettings) {
-      // Case 1: No selectedReferenceId for this shot - try to inherit from last edited shot
+      // Find the most recently added reference (by createdAt)
+      const getMostRecentReference = () => {
+        const sorted = [...hydratedReferences].sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA; // Newest first
+        });
+        return sorted[0];
+      };
+      
+      // Case 1: No selectedReferenceId for this shot - use most recent reference
       if (!selectedReferenceId) {
-        let inheritedRefId: string | null = null;
+        const mostRecent = getMostRecentReference();
+        console.log('[RefSettings] 🔄 Auto-selecting most recent reference for shot', effectiveShotId, mostRecent.id);
         
-        // Try to inherit from localStorage (last edited shot's reference)
-        try {
-          const stored = localStorage.getItem('image-gen-last-active-shot-settings');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            // Check if the inherited reference still exists
-            if (parsed.selectedReferenceId && hydratedReferences.some(r => r.id === parsed.selectedReferenceId)) {
-              inheritedRefId = parsed.selectedReferenceId;
-            }
-          }
-        } catch (e) {
-          // Ignore localStorage errors
-        }
-        
-        const refIdToSelect = inheritedRefId || hydratedReferences[0].id;
-        console.log('[RefSettings] 🔄 Auto-selecting reference for shot', effectiveShotId, 
-          inheritedRefId ? '(inherited from last shot)' : '(no inheritance, using first)');
+        // Update both project-level and shot-level for consistency
         updateProjectImageSettings('project', {
           selectedReferenceIdByShot: {
             ...selectedReferenceIdByShot,
-            [effectiveShotId]: refIdToSelect
+            [effectiveShotId]: mostRecent.id
           }
         });
+        
+        // Also update shot-level settings
+        if (associatedShotId) {
+          shotPromptSettings.updateField('selectedReferenceId', mostRecent.id);
+        }
       }
       // Case 2: selectedReferenceId exists but doesn't match any reference (stale/corrupted)
       else if (!selectedReference) {
-        console.log('[RefSettings] 🔄 Auto-selecting first reference for shot', effectiveShotId, '(stale ID)');
+        const mostRecent = getMostRecentReference();
+        console.log('[RefSettings] 🔄 Auto-selecting most recent reference for shot', effectiveShotId, '(stale ID)');
+        
         updateProjectImageSettings('project', {
           selectedReferenceIdByShot: {
             ...selectedReferenceIdByShot,
-            [effectiveShotId]: hydratedReferences[0].id
+            [effectiveShotId]: mostRecent.id
           }
         });
+        
+        // Also update shot-level settings
+        if (associatedShotId) {
+          shotPromptSettings.updateField('selectedReferenceId', mostRecent.id);
+        }
       }
     }
-  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings]);
+  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings, associatedShotId, shotPromptSettings]);
 
   // Check if database has caught up with pending mode update
   useEffect(() => {
@@ -861,9 +868,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   });
 
   // Default settings for shot prompts - recomputed when shot changes to pick up fresh localStorage
-  // New shots inherit from localStorage (last edited shot's settings)
+  // New shots inherit promptMode and before/after prompts from localStorage (last edited shot)
+  // Reference selection defaults to most-recent reference (handled in auto-select effect)
   const shotPromptDefaults = useMemo<ImageGenShotSettings>(() => {
-    // Try to load last active shot settings for inheritance
+    // Try to load last active shot settings for inheritance (except reference - uses most-recent)
     try {
       const stored = localStorage.getItem('image-gen-last-active-shot-settings');
       if (stored) {
@@ -872,7 +880,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           prompts: [],
           masterPrompt: '',
           promptMode: parsed.promptMode || 'automated',
-          selectedReferenceId: parsed.selectedReferenceId || null,
+          selectedReferenceId: null, // Don't inherit - auto-select uses most-recent reference
           beforeEachPromptText: parsed.beforeEachPromptText || '',
           afterEachPromptText: parsed.afterEachPromptText || '',
         };
@@ -1049,13 +1057,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Save current shot settings to localStorage for inheritance by new shots
+  // Save current shot settings to localStorage for inheritance by new shots
+  // Note: selectedReferenceId is NOT inherited - new shots auto-select most-recent reference
   useEffect(() => {
     if (associatedShotId && shotPromptSettings.status === 'ready') {
       try {
         const settingsToSave = {
           promptMode: shotPromptSettings.settings.promptMode || effectivePromptMode || 'automated',
-          // Use the project-level per-shot reference selection for inheritance
-          selectedReferenceId: selectedReferenceId || null,
           beforeEachPromptText: shotPromptSettings.settings.beforeEachPromptText || '',
           afterEachPromptText: shotPromptSettings.settings.afterEachPromptText || '',
         };
@@ -1064,7 +1072,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         // Ignore localStorage errors
       }
     }
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, shotPromptSettings.settings.beforeEachPromptText, shotPromptSettings.settings.afterEachPromptText, effectivePromptMode, selectedReferenceId]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, shotPromptSettings.settings.beforeEachPromptText, shotPromptSettings.settings.afterEachPromptText, effectivePromptMode]);
 
   // Sync local style strength with project settings
   // Legacy sync effects removed to prevent overwriting user input
