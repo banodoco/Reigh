@@ -877,8 +877,8 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
             ))}
           </div>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-muted/20">
-            <span className="text-xs text-muted-foreground">
+          <div className="absolute inset-0 flex items-center justify-center bg-muted/50 dark:bg-muted-foreground/15 border border-border/30 rounded-sm">
+            <span className="text-xs text-muted-foreground font-medium">
               {isVideoReady ? 'Loading frames...' : 'Loading video...'}
             </span>
           </div>
