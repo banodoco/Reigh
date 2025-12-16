@@ -165,23 +165,28 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     }
   }, [entityId, settings, updateSettings, scope, toolId]);
 
+  // Ref to hold the latest saveImmediate for use in effects without causing re-runs
+  const saveImmediateRef = useRef(saveImmediate);
+  saveImmediateRef.current = saveImmediate;
+
   // Flush pending saves - used on unmount/navigation
+  // Uses refs to avoid dependency on changing callbacks
   const flushPendingSave = useCallback(async () => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
 
-    if (pendingSettingsRef.current && entityId) {
+    if (pendingSettingsRef.current && currentEntityIdRef.current) {
       console.log('[useAutoSaveSettings] 🚿 Flushing pending save');
       try {
-        await saveImmediate(pendingSettingsRef.current);
+        await saveImmediateRef.current(pendingSettingsRef.current);
       } catch (err) {
         // Log but don't throw - we're likely unmounting
         console.error('[useAutoSaveSettings] Flush failed:', err);
       }
     }
-  }, [entityId, saveImmediate]);
+  }, []); // No dependencies - uses refs
 
   // Update single field
   const updateField = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
@@ -317,7 +322,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     }
 
     currentEntityIdRef.current = entityId;
-  }, [entityId, defaults, flushPendingSave]);
+  }, [entityId, defaults]); // flushPendingSave is now stable (uses refs)
 
   // Load settings from DB when available
   useEffect(() => {
@@ -387,7 +392,8 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     };
   }, [updateSettings, scope]);
 
-  return {
+  // Memoize return value to prevent object recreation on every render
+  return useMemo(() => ({
     settings,
     status,
     isDirty,
@@ -396,5 +402,5 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     updateFields,
     saveImmediate: () => saveImmediate(),
     revert,
-  };
+  }), [settings, status, isDirty, error, updateField, updateFields, saveImmediate, revert]);
 }

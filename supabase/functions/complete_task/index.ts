@@ -30,6 +30,52 @@ import { triggerCostCalculationIfNotSubTask } from './billing.ts';
 declare const Deno: any;
 
 /**
+ * Task context containing all task data needed throughout the completion flow.
+ * Fetched once and passed to all functions that need it.
+ * Exported for use by orchestrator.ts and other modules.
+ */
+export interface TaskContext {
+  id: string;
+  task_type: string;
+  project_id: string;
+  params: Record<string, any>;
+  tool_type: string;
+  category: string;
+  content_type: 'image' | 'video';
+}
+
+/**
+ * Fetch task context with all required fields for the completion flow.
+ * Returns null if task not found or on error.
+ */
+async function fetchTaskContext(
+  supabase: any,
+  taskId: string
+): Promise<TaskContext | null> {
+  const { data: task, error } = await supabase
+    .from("tasks")
+    .select(`id, task_type, project_id, params, task_types!inner(tool_type, category, content_type)`)
+    .eq("id", taskId)
+    .single();
+
+  if (error || !task) {
+    console.error(`[TaskContext] Failed to fetch task ${taskId}:`, error);
+    return null;
+  }
+
+  const taskTypeInfo = task.task_types as any;
+  return {
+    id: task.id,
+    task_type: task.task_type,
+    project_id: task.project_id,
+    params: task.params || {},
+    tool_type: taskTypeInfo?.tool_type || 'unknown',
+    category: taskTypeInfo?.category || 'unknown',
+    content_type: taskTypeInfo?.content_type || 'image',
+  };
+}
+
+/**
  * Edge function: complete-task
  * 
  * Completes a task by uploading file data and updating task status.
@@ -173,56 +219,52 @@ export async function completeTaskHandler(req: Request, deps: CompleteTaskDeps =
       userId = callerId!;
     }
 
-    // 8) Handle storage operations
+    // 8) Fetch task context once (used by validation, generation creation, orchestrator check)
+    const taskContext = await fetchTaskContext(supabaseAdmin, taskIdString);
+    if (!taskContext) {
+      logger.error("Failed to fetch task context", { task_id: taskIdString });
+      await logger.flush();
+      return new Response("Task not found", { status: 404 });
+    }
+    console.log(`[COMPLETE-TASK] Task type: ${taskContext.task_type}, tool_type: ${taskContext.tool_type}`);
+
+    // 9) Handle storage operations
     const storageResult = await handleStorageOperations(supabaseAdmin, parsedRequest, userId, isServiceRole);
     const { publicUrl, objectPath, thumbnailUrl } = storageResult;
 
-    // 9) Validate shot references and update params if needed
+    // 10) Validate shot references and update params if needed
     console.log(`[COMPLETE-TASK] Validating shot references for task ${taskIdString}`);
     try {
-      const { data: currentTask, error: taskFetchError } = await supabaseAdmin
-        .from("tasks")
-        .select(`params, task_type, task_types!inner(tool_type, category)`)
-        .eq("id", taskIdString)
-        .single();
+      let updatedParams = { ...taskContext.params };
+      let needsParamsUpdate = false;
 
-      if (!taskFetchError && currentTask && currentTask.params) {
-        let updatedParams = { ...currentTask.params };
-        let needsParamsUpdate = false;
+      // Validate and cleanup invalid shot_id references
+      const shotValidation = await validateAndCleanupShotId(supabaseAdmin, updatedParams, taskContext.tool_type);
+      if (shotValidation.needsUpdate) {
+        needsParamsUpdate = true;
+        updatedParams = shotValidation.updatedParams;
+      }
 
-        // task_types is returned as object from !inner join with .single()
-        const taskTypeInfo = currentTask.task_types as any;
-        const toolType = taskTypeInfo?.tool_type as string | null;
-        console.log(`[COMPLETE-TASK] Task type: ${currentTask.task_type}, tool_type: ${toolType}`);
+      // Add thumbnail URL if available
+      if (thumbnailUrl) {
+        needsParamsUpdate = true;
+        updatedParams = setThumbnailInParams(updatedParams, taskContext.task_type, thumbnailUrl);
+      }
 
-        // Validate and cleanup invalid shot_id references
-        const shotValidation = await validateAndCleanupShotId(supabaseAdmin, updatedParams, toolType);
-        if (shotValidation.needsUpdate) {
-          needsParamsUpdate = true;
-          updatedParams = shotValidation.updatedParams;
-        }
-
-        // Add thumbnail URL if available
-        if (thumbnailUrl) {
-          needsParamsUpdate = true;
-          updatedParams = setThumbnailInParams(updatedParams, currentTask.task_type, thumbnailUrl);
-        }
-
-        if (needsParamsUpdate) {
-          console.log(`[COMPLETE-TASK] Updating task parameters${thumbnailUrl ? ' with thumbnail_url' : ''}${shotValidation.needsUpdate ? ' with cleaned shot references' : ''}`);
-          await supabaseAdmin.from("tasks").update({ params: updatedParams }).eq("id", taskIdString);
-        }
+      if (needsParamsUpdate) {
+        console.log(`[COMPLETE-TASK] Updating task parameters${thumbnailUrl ? ' with thumbnail_url' : ''}${shotValidation.needsUpdate ? ' with cleaned shot references' : ''}`);
+        await supabaseAdmin.from("tasks").update({ params: updatedParams }).eq("id", taskIdString);
       }
     } catch (validationError) {
       console.error(`[COMPLETE-TASK] Error during validation:`, validationError);
       // Continue anyway - don't fail task completion due to validation errors
     }
 
-    // 10) Create generation (if applicable)
+    // 11) Create generation (if applicable)
     const CREATE_GENERATION_IN_EDGE = Deno.env.get("CREATE_GENERATION_IN_EDGE") !== "false";
     if (CREATE_GENERATION_IN_EDGE) {
       try {
-        await handleGenerationCreation(supabaseAdmin, taskIdString, publicUrl, thumbnailUrl);
+        await handleGenerationCreation(supabaseAdmin, taskContext, publicUrl, thumbnailUrl);
       } catch (genErr: any) {
         const msg = genErr?.message || String(genErr);
         logger.error("Generation creation failed", { error: msg });
@@ -232,7 +274,7 @@ export async function completeTaskHandler(req: Request, deps: CompleteTaskDeps =
       }
     }
 
-    // 11) Update task to Complete
+    // 12) Update task to Complete
     console.log(`[COMPLETE-TASK] Updating task ${taskIdString} to Complete status`);
     const { error: dbError } = await supabaseAdmin.from("tasks").update({
       status: "Complete",
@@ -246,35 +288,27 @@ export async function completeTaskHandler(req: Request, deps: CompleteTaskDeps =
       return new Response(`Database update failed: ${dbError.message}`, { status: 500 });
     }
 
-    // 12) Check orchestrator completion (for segment tasks)
+    // 13) Check orchestrator completion (for segment tasks) - uses task context
     try {
-      const { data: completedTask } = await supabaseAdmin
-        .from("tasks")
-        .select("task_type, params, project_id")
-        .eq("id", taskIdString)
-        .single();
-
-      if (completedTask) {
-        await checkOrchestratorCompletion(
-          supabaseAdmin,
-          taskIdString,
-          completedTask,
-          publicUrl,
-          thumbnailUrl,
-          supabaseUrl,
-          serviceKey
-        );
-      }
+      await checkOrchestratorCompletion(
+        supabaseAdmin,
+        taskIdString,
+        taskContext, // Pass context instead of fetching again
+        publicUrl,
+        thumbnailUrl,
+        supabaseUrl,
+        serviceKey
+      );
     } catch (orchErr) {
       console.error("[COMPLETE-TASK] Error checking orchestrator completion:", orchErr);
     }
 
-    // 13) Calculate cost (service role only)
+    // 14) Calculate cost (service role only)
     if (isServiceRole) {
       await triggerCostCalculationIfNotSubTask(supabaseAdmin, supabaseUrl, serviceKey, taskIdString);
     }
 
-    // 14) Return success
+    // 15) Return success
     console.log(`[COMPLETE-TASK] Successfully completed task ${taskIdString}`);
     const responseData = {
       success: true,
@@ -314,46 +348,32 @@ if ((import.meta as any).main) {
 
 /**
  * Handle generation creation based on task type
+ * Uses pre-fetched TaskContext to avoid duplicate DB queries
  */
 async function handleGenerationCreation(
   supabase: any,
-  taskId: string,
+  taskContext: TaskContext,
   publicUrl: string,
   thumbnailUrl: string | null
 ): Promise<void> {
+  const taskId = taskContext.id;
   console.log(`[GenMigration] Checking if task ${taskId} should create generation...`);
+  console.log(`[GenMigration] Task ${taskId}: category=${taskContext.category}, tool_type=${taskContext.tool_type}, content_type=${taskContext.content_type}`);
 
-  const { data: taskData, error: taskError } = await supabase
-    .from("tasks")
-    .select("id, task_type, project_id, params")
-    .eq("id", taskId)
-    .single();
-
-  if (taskError || !taskData) {
-    console.error(`[GenMigration] Failed to fetch task:`, taskError);
-    return;
-  }
-
-  // Resolve tool_type
-  const toolTypeInfo = await resolveToolType(supabase, taskData.task_type, taskData.params);
-  if (!toolTypeInfo) {
-    console.error(`[GenMigration] Failed to resolve tool_type for task ${taskId}`);
-    return;
-  }
-
-  const { toolType, category: taskCategory, contentType } = toolTypeInfo;
-  console.log(`[GenMigration] Task ${taskId}: category=${taskCategory}, tool_type=${toolType}, content_type=${contentType}`);
-
+  // Build combined task data object expected by generation functions
   const combinedTaskData = {
-    ...taskData,
-    tool_type: toolType,
-    content_type: contentType
+    id: taskContext.id,
+    task_type: taskContext.task_type,
+    project_id: taskContext.project_id,
+    params: taskContext.params,
+    tool_type: taskContext.tool_type,
+    content_type: taskContext.content_type
   };
 
   // Check for based_on (edit/inpaint tasks)
-  const basedOnGenerationId = extractBasedOn(taskData.params);
-  const createAsGeneration = taskData.params?.create_as_generation === true;
-  const isSubTask = extractOrchestratorTaskId(taskData.params, 'GenMigration');
+  const basedOnGenerationId = extractBasedOn(taskContext.params);
+  const createAsGeneration = taskContext.params?.create_as_generation === true;
+  const isSubTask = extractOrchestratorTaskId(taskContext.params, 'GenMigration');
 
   if (basedOnGenerationId && !isSubTask && !createAsGeneration) {
     // Create variant on source generation
@@ -364,6 +384,9 @@ async function handleGenerationCreation(
   }
 
   // Handle different categories
+  const taskCategory = taskContext.category;
+  const contentType = taskContext.content_type;
+
   if (taskCategory === 'generation' || 
       (taskCategory === 'processing' && isSubTask) ||
       (taskCategory === 'processing' && contentType === 'image')) {

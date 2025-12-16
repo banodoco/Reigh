@@ -9,6 +9,12 @@ import {
   extractShotAndPosition,
   buildGenerationParams,
 } from './params.ts';
+import {
+  TASK_TYPES,
+  TOOL_TYPES,
+  VARIANT_TYPES,
+  getEditVariantType,
+} from './constants.ts';
 
 // ===== SEGMENT PARAM EXPANSION =====
 
@@ -328,7 +334,7 @@ export async function getOrCreateParentGeneration(
     const baseParams = orchTask?.params || segmentParams || {};
     const placeholderParams = {
       ...baseParams,
-      tool_type: baseParams.tool_type || 'travel-between-images'
+      tool_type: baseParams.tool_type || TOOL_TYPES.TRAVEL_BETWEEN_IMAGES
     };
     
     const placeholderRecord = {
@@ -521,7 +527,7 @@ export async function createGenerationFromTask(
     // ===== SPECIAL CASE HANDLERS =====
     
     // SPECIAL CASE 1: individual_travel_segment with child_generation_id
-    if (taskData.task_type === 'individual_travel_segment' && taskData.params?.child_generation_id) {
+    if (taskData.task_type === TASK_TYPES.INDIVIDUAL_TRAVEL_SEGMENT && taskData.params?.child_generation_id) {
       const childGenId = taskData.params.child_generation_id;
       console.log(`[GenMigration] individual_travel_segment - creating variant for child generation ${childGenId}`);
 
@@ -534,16 +540,16 @@ export async function createGenerationFromTask(
       if (!fetchError && childGen) {
         const variantParams = {
           ...taskData.params,
-          tool_type: 'travel-between-images',
+          tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES,
           source_task_id: taskId,
           created_from: 'individual_segment_regeneration',
         };
 
-        await createVariant(supabase, childGen.id, publicUrl, thumbnailUrl || null, variantParams, true, 'individual_segment', null);
+        await createVariant(supabase, childGen.id, publicUrl, thumbnailUrl || null, variantParams, true, VARIANT_TYPES.INDIVIDUAL_SEGMENT, null);
 
         await supabase
           .from('generations')
-          .update({ location: publicUrl, thumbnail_url: thumbnailUrl, type: 'video', params: { ...childGen.params, tool_type: 'travel-between-images' } })
+          .update({ location: publicUrl, thumbnail_url: thumbnailUrl, type: 'video', params: { ...childGen.params, tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES } })
           .eq('id', childGen.id);
 
         await supabase.from('tasks').update({ generation_created: true }).eq('id', taskId);
@@ -552,14 +558,14 @@ export async function createGenerationFromTask(
     }
 
     // SPECIAL CASE 2: travel_stitch with parent_generation_id
-    const travelStitchParentId = taskData.task_type === 'travel_stitch' 
+    const travelStitchParentId = taskData.task_type === TASK_TYPES.TRAVEL_STITCH 
       ? (taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id)
       : null;
     
     if (travelStitchParentId) {
       const result = await createVariantOnParent(
         supabase, travelStitchParentId, publicUrl, thumbnailUrl || null, taskData, taskId,
-        'travel_stitch', { tool_type: 'travel-between-images', created_from: 'travel_stitch_completion' }
+        VARIANT_TYPES.TRAVEL_STITCH, { tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, created_from: 'travel_stitch_completion' }
       );
       if (result) return result;
     }
@@ -586,7 +592,7 @@ export async function createGenerationFromTask(
 
           // SPECIAL CASE: join_clips_segment with single join (2 clips)
           // The segment output IS the final output - create variant on parent instead of child
-          if (taskData.task_type === 'join_clips_segment') {
+          if (taskData.task_type === TASK_TYPES.JOIN_CLIPS_SEGMENT) {
             const isSingleJoin = taskData.params?.is_first_join === true && taskData.params?.is_last_join === true;
             
             if (isSingleJoin && parentGenerationId) {
@@ -595,11 +601,11 @@ export async function createGenerationFromTask(
               // Determine tool_type from orchestrator params (could be 'join-clips' or 'edit-video')
               const toolType = taskData.params?.full_orchestrator_payload?.tool_type ||
                                taskData.params?.tool_type || 
-                               'join-clips';
+                               TOOL_TYPES.JOIN_CLIPS;
               
               const singleJoinResult = await createVariantOnParent(
                 supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
-                'join_clips_segment',
+                VARIANT_TYPES.JOIN_CLIPS_SEGMENT,
                 {
                   tool_type: toolType,
                   created_from: 'single_join_completion',
@@ -641,7 +647,7 @@ export async function createGenerationFromTask(
               // Note: We don't return early - child generation will be created below
               await createVariantOnParent(
                 supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
-                'travel_segment', { tool_type: 'travel-between-images', created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true }
+                VARIANT_TYPES.TRAVEL_SEGMENT, { tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true }
               );
               // Mark orchestrator task as having created a generation
               await supabase.from('tasks').update({ generation_created: true }).eq('id', orchestratorTaskId);
@@ -716,7 +722,7 @@ export async function createGenerationFromTask(
           parentGenerationId,
           publicUrl,
           thumbnailUrl || null,
-          { ...taskData.params, tool_type: 'travel-between-images', source_task_id: taskId, created_from: 'travel_segment', segment_index: childOrder, child_generation_id: newGeneration.id },
+          { ...taskData.params, tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, source_task_id: taskId, created_from: 'travel_segment', segment_index: childOrder, child_generation_id: newGeneration.id },
           false,
           'travel_segment',
           `Segment ${(childOrder ?? 0) + 1}`
@@ -779,10 +785,7 @@ export async function handleVariantCreation(
       content_type: taskData.content_type,
     };
 
-    let variantType = 'edit';
-    if (taskData.task_type === 'image_inpaint') variantType = 'inpaint';
-    else if (taskData.task_type === 'annotated_image_edit') variantType = 'annotated_edit';
-    else if (['qwen_image_edit', 'image_edit', 'magic_edit'].includes(taskData.task_type)) variantType = 'magic_edit';
+    const variantType = getEditVariantType(taskData.task_type);
 
     await createVariant(
       supabase,

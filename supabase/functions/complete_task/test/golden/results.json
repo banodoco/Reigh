@@ -6,6 +6,18 @@
     "expectedStatusCode": 200,
     "operations": [
       {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      },
+      {
         "type": "storage_upload",
         "bucket": "image_uploads",
         "path": "11111111-1111-1111-1111-111111111111/output.png",
@@ -22,7 +34,7 @@
       {
         "type": "storage_upload",
         "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214816_bsq0ak.jpg",
         "data": {
           "size": 631,
           "contentType": "image/jpeg"
@@ -31,19 +43,7 @@
       {
         "type": "storage_get_url",
         "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg"
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "33333333-3333-3333-3333-333333333333"
-          }
-        ]
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214816_bsq0ak.jpg"
       },
       {
         "type": "db_update",
@@ -51,7 +51,7 @@
         "data": {
           "params": {
             "prompt": "A beautiful sunset",
-            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg"
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214816_bsq0ak.jpg"
           }
         },
         "filters": [
@@ -59,30 +59,6 @@
             "type": "eq",
             "field": "id",
             "value": "33333333-3333-3333-3333-333333333333"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "33333333-3333-3333-3333-333333333333"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "single_image"
           }
         ]
       },
@@ -102,26 +78,25 @@
         "type": "db_insert",
         "table": "generations",
         "data": {
-          "id": "5127dc30-acd2-4078-9021-8e85a6d2f119",
+          "id": "75834262-c5b8-42a7-8a5a-fc511fbdc000",
           "tasks": [
             "33333333-3333-3333-3333-333333333333"
           ],
           "params": {
             "prompt": "A beautiful sunset",
-            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg",
             "tool_type": "image-generation",
             "content_type": "image",
-            "thumbnailUrl": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg"
+            "thumbnailUrl": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214816_bsq0ak.jpg"
           },
           "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png",
           "type": "image",
           "project_id": "22222222-2222-2222-2222-222222222222",
-          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214816_bsq0ak.jpg",
           "based_on": null,
           "parent_generation_id": null,
           "is_child": false,
           "child_order": null,
-          "created_at": "2025-12-14T23:06:10.380Z"
+          "created_at": "2025-12-16T20:33:34.818Z"
         },
         "filters": []
       },
@@ -145,7 +120,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png",
-          "generation_processed_at": "2025-12-14T23:06:10.383Z"
+          "generation_processed_at": "2025-12-16T20:33:34.820Z"
         },
         "filters": [
           {
@@ -159,7 +134,16 @@
             "value": "In Progress"
           }
         ]
-      },
+      }
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214816_bsq0ak.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
+  },
+  {
+    "scenario": "mode1_video_i2v",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
       {
         "type": "db_select",
         "table": "tasks",
@@ -168,19 +152,10 @@
           {
             "type": "eq",
             "field": "id",
-            "value": "33333333-3333-3333-3333-333333333333"
+            "value": "44444444-4444-4444-4444-444444444444"
           }
         ]
-      }
-    ],
-    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
-  },
-  {
-    "scenario": "mode1_video_i2v",
-    "passed": true,
-    "statusCode": 200,
-    "expectedStatusCode": 200,
-    "operations": [
+      },
       {
         "type": "storage_upload",
         "bucket": "image_uploads",
@@ -211,18 +186,6 @@
       },
       {
         "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "44444444-4444-4444-4444-444444444444"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
         "table": "shots",
         "data": null,
         "filters": [
@@ -256,30 +219,6 @@
       },
       {
         "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "44444444-4444-4444-4444-444444444444"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "wan_2_2_i2v"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
         "table": "generations",
         "data": null,
         "filters": [
@@ -306,7 +245,7 @@
         "type": "db_insert",
         "table": "generations",
         "data": {
-          "id": "34a8c828-2027-4568-baa4-08ecb84c916e",
+          "id": "b0a8a601-053f-4220-86ef-b59a308086c1",
           "tasks": [
             "44444444-4444-4444-4444-444444444444"
           ],
@@ -314,8 +253,7 @@
             "prompt": "Camera pans slowly",
             "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
             "orchestrator_details": {
-              "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-              "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb.png"
+              "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc"
             },
             "tool_type": "image-to-video",
             "content_type": "video",
@@ -330,7 +268,7 @@
           "parent_generation_id": null,
           "is_child": false,
           "child_order": null,
-          "created_at": "2025-12-14T23:06:10.385Z"
+          "created_at": "2025-12-16T20:33:34.822Z"
         },
         "filters": []
       },
@@ -339,7 +277,7 @@
         "table": "add_generation_to_shot",
         "data": {
           "p_shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-          "p_generation_id": "34a8c828-2027-4568-baa4-08ecb84c916e",
+          "p_generation_id": "b0a8a601-053f-4220-86ef-b59a308086c1",
           "p_with_position": false
         }
       },
@@ -363,7 +301,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.mp4",
-          "generation_processed_at": "2025-12-14T23:06:10.385Z"
+          "generation_processed_at": "2025-12-16T20:33:34.822Z"
         },
         "filters": [
           {
@@ -377,18 +315,6 @@
             "value": "In Progress"
           }
         ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "44444444-4444-4444-4444-444444444444"
-          }
-        ]
       }
     ],
     "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.mp4\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb.png\",\"message\":\"Task completed and file uploaded successfully\"}"
@@ -400,45 +326,21 @@
     "expectedStatusCode": 200,
     "operations": [
       {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "33333333-3333-3333-3333-333333333333"
+          }
+        ]
+      },
+      {
         "type": "storage_get_url",
         "bucket": "image_uploads",
         "path": "11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png"
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "33333333-3333-3333-3333-333333333333"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "33333333-3333-3333-3333-333333333333"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "single_image"
-          }
-        ]
       },
       {
         "type": "db_select",
@@ -456,12 +358,12 @@
         "type": "db_insert",
         "table": "generation_variants",
         "data": {
-          "generation_id": "5127dc30-acd2-4078-9021-8e85a6d2f119",
+          "generation_id": "75834262-c5b8-42a7-8a5a-fc511fbdc000",
           "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png",
           "thumbnail_url": null,
           "params": {
             "prompt": "A beautiful sunset",
-            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570376_vepvhi.jpg",
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214816_bsq0ak.jpg",
             "source_task_id": "33333333-3333-3333-3333-333333333333",
             "created_from": "task_completion",
             "tool_type": "image-generation"
@@ -469,7 +371,7 @@
           "is_primary": true,
           "variant_type": "regenerated",
           "name": null,
-          "created_at": "2025-12-14T23:06:10.385Z"
+          "created_at": "2025-12-16T20:33:34.822Z"
         },
         "filters": []
       },
@@ -484,7 +386,7 @@
           {
             "type": "eq",
             "field": "id",
-            "value": "5127dc30-acd2-4078-9021-8e85a6d2f119"
+            "value": "75834262-c5b8-42a7-8a5a-fc511fbdc000"
           }
         ]
       },
@@ -508,7 +410,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png",
-          "generation_processed_at": "2025-12-14T23:06:10.386Z"
+          "generation_processed_at": "2025-12-16T20:33:34.822Z"
         },
         "filters": [
           {
@@ -522,18 +424,6 @@
             "value": "In Progress"
           }
         ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "33333333-3333-3333-3333-333333333333"
-          }
-        ]
       }
     ],
     "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/33333333-3333-3333-3333-333333333333/output.png\",\"thumbnail_url\":null,\"message\":\"Task completed and file uploaded successfully\"}"
@@ -545,16 +435,6 @@
     "expectedStatusCode": 200,
     "operations": [
       {
-        "type": "storage_get_url",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4"
-      },
-      {
-        "type": "storage_get_url",
-        "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg"
-      },
-      {
         "type": "db_select",
         "table": "tasks",
         "data": null,
@@ -565,6 +445,16 @@
             "value": "44444444-4444-4444-4444-444444444444"
           }
         ]
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4"
+      },
+      {
+        "type": "storage_get_url",
+        "bucket": "image_uploads",
+        "path": "11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg"
       },
       {
         "type": "db_select",
@@ -601,30 +491,6 @@
       },
       {
         "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "44444444-4444-4444-4444-444444444444"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "wan_2_2_i2v"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
         "table": "generations",
         "data": null,
         "filters": [
@@ -639,7 +505,7 @@
         "type": "db_insert",
         "table": "generation_variants",
         "data": {
-          "generation_id": "34a8c828-2027-4568-baa4-08ecb84c916e",
+          "generation_id": "b0a8a601-053f-4220-86ef-b59a308086c1",
           "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4",
           "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg",
           "params": {
@@ -647,7 +513,7 @@
             "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
             "orchestrator_details": {
               "shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-              "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg"
+              "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb.png"
             },
             "source_task_id": "44444444-4444-4444-4444-444444444444",
             "created_from": "task_completion",
@@ -656,7 +522,7 @@
           "is_primary": true,
           "variant_type": "regenerated",
           "name": null,
-          "created_at": "2025-12-14T23:06:10.386Z"
+          "created_at": "2025-12-16T20:33:34.822Z"
         },
         "filters": []
       },
@@ -671,7 +537,7 @@
           {
             "type": "eq",
             "field": "id",
-            "value": "34a8c828-2027-4568-baa4-08ecb84c916e"
+            "value": "b0a8a601-053f-4220-86ef-b59a308086c1"
           }
         ]
       },
@@ -680,7 +546,7 @@
         "table": "add_generation_to_shot",
         "data": {
           "p_shot_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-          "p_generation_id": "34a8c828-2027-4568-baa4-08ecb84c916e",
+          "p_generation_id": "b0a8a601-053f-4220-86ef-b59a308086c1",
           "p_with_position": false
         }
       },
@@ -704,7 +570,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4",
-          "generation_processed_at": "2025-12-14T23:06:10.386Z"
+          "generation_processed_at": "2025-12-16T20:33:34.823Z"
         },
         "filters": [
           {
@@ -718,18 +584,6 @@
             "value": "In Progress"
           }
         ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "44444444-4444-4444-4444-444444444444"
-          }
-        ]
       }
     ],
     "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/output.mp4\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/tasks/44444444-4444-4444-4444-444444444444/thumbnails/thumb.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
@@ -740,6 +594,18 @@
     "statusCode": 200,
     "expectedStatusCode": 200,
     "operations": [
+      {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "77777777-7777-7777-7777-777777777777"
+          }
+        ]
+      },
       {
         "type": "storage_upload",
         "bucket": "image_uploads",
@@ -757,7 +623,7 @@
       {
         "type": "storage_upload",
         "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_luh203.jpg",
         "data": {
           "size": 631,
           "contentType": "image/jpeg"
@@ -766,19 +632,7 @@
       {
         "type": "storage_get_url",
         "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg"
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "77777777-7777-7777-7777-777777777777"
-          }
-        ]
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_luh203.jpg"
       },
       {
         "type": "db_update",
@@ -788,7 +642,7 @@
             "based_on": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             "prompt": "Remove the person",
             "mask": "base64mask...",
-            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg"
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_luh203.jpg"
           }
         },
         "filters": [
@@ -796,30 +650,6 @@
             "type": "eq",
             "field": "id",
             "value": "77777777-7777-7777-7777-777777777777"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "77777777-7777-7777-7777-777777777777"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "image_inpaint"
           }
         ]
       },
@@ -841,12 +671,11 @@
         "data": {
           "generation_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
           "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/inpainted.png",
-          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_luh203.jpg",
           "params": {
             "based_on": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             "prompt": "Remove the person",
             "mask": "base64mask...",
-            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg",
             "source_task_id": "77777777-7777-7777-7777-777777777777",
             "source_variant_id": null,
             "created_from": "image_inpaint",
@@ -856,7 +685,7 @@
           "is_primary": false,
           "variant_type": "inpaint",
           "name": "Edit: Remove the person...",
-          "created_at": "2025-12-14T23:06:10.387Z"
+          "created_at": "2025-12-16T20:33:34.823Z"
         },
         "filters": []
       },
@@ -880,7 +709,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/inpainted.png",
-          "generation_processed_at": "2025-12-14T23:06:10.387Z"
+          "generation_processed_at": "2025-12-16T20:33:34.823Z"
         },
         "filters": [
           {
@@ -894,7 +723,16 @@
             "value": "In Progress"
           }
         ]
-      },
+      }
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/inpainted.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_luh203.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
+  },
+  {
+    "scenario": "upscale_creates_primary_variant",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
       {
         "type": "db_select",
         "table": "tasks",
@@ -903,19 +741,10 @@
           {
             "type": "eq",
             "field": "id",
-            "value": "77777777-7777-7777-7777-777777777777"
+            "value": "88888888-8888-8888-8888-888888888888"
           }
         ]
-      }
-    ],
-    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/inpainted.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570386_7jurm1.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
-  },
-  {
-    "scenario": "upscale_creates_primary_variant",
-    "passed": true,
-    "statusCode": 200,
-    "expectedStatusCode": 200,
-    "operations": [
+      },
       {
         "type": "storage_upload",
         "bucket": "image_uploads",
@@ -933,7 +762,7 @@
       {
         "type": "storage_upload",
         "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_qw83z5.jpg",
         "data": {
           "size": 631,
           "contentType": "image/jpeg"
@@ -942,19 +771,7 @@
       {
         "type": "storage_get_url",
         "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg"
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "88888888-8888-8888-8888-888888888888"
-          }
-        ]
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_qw83z5.jpg"
       },
       {
         "type": "db_update",
@@ -964,7 +781,7 @@
             "generation_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             "image": "https://example.com/original.png",
             "model": "real-esrgan",
-            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg"
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_qw83z5.jpg"
           }
         },
         "filters": [
@@ -972,30 +789,6 @@
             "type": "eq",
             "field": "id",
             "value": "88888888-8888-8888-8888-888888888888"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "88888888-8888-8888-8888-888888888888"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "image_upscale"
           }
         ]
       },
@@ -1017,7 +810,7 @@
         "data": {
           "generation_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
           "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/upscaled.png",
-          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_qw83z5.jpg",
           "params": {
             "prompt": "Original image",
             "upscale_task_id": "88888888-8888-8888-8888-888888888888",
@@ -1028,7 +821,7 @@
           "is_primary": true,
           "variant_type": "upscaled",
           "name": "Upscaled",
-          "created_at": "2025-12-14T23:06:10.387Z"
+          "created_at": "2025-12-16T20:33:34.823Z"
         },
         "filters": []
       },
@@ -1038,7 +831,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/upscaled.png",
-          "generation_processed_at": "2025-12-14T23:06:10.387Z"
+          "generation_processed_at": "2025-12-16T20:33:34.823Z"
         },
         "filters": [
           {
@@ -1052,7 +845,16 @@
             "value": "In Progress"
           }
         ]
-      },
+      }
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/upscaled.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214823_qw83z5.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
+  },
+  {
+    "scenario": "travel_segment_creates_child",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
       {
         "type": "db_select",
         "table": "tasks",
@@ -1061,19 +863,10 @@
           {
             "type": "eq",
             "field": "id",
-            "value": "88888888-8888-8888-8888-888888888888"
+            "value": "55555555-5555-5555-5555-555555555555"
           }
         ]
-      }
-    ],
-    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/upscaled.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570387_jcj80r.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
-  },
-  {
-    "scenario": "travel_segment_creates_child",
-    "passed": true,
-    "statusCode": 200,
-    "expectedStatusCode": 200,
-    "operations": [
+      },
       {
         "type": "storage_upload",
         "bucket": "image_uploads",
@@ -1087,42 +880,6 @@
         "type": "storage_get_url",
         "bucket": "image_uploads",
         "path": "11111111-1111-1111-1111-111111111111/segment_0.mp4"
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "55555555-5555-5555-5555-555555555555"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "55555555-5555-5555-5555-555555555555"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "travel_segment"
-          }
-        ]
       },
       {
         "type": "db_select",
@@ -1164,7 +921,7 @@
         "type": "db_insert",
         "table": "generations",
         "data": {
-          "id": "343f7d9e-6f2b-426a-9d56-93376c0e4c89",
+          "id": "3eb912d0-6829-4de2-a11d-158d1ff80571",
           "tasks": [
             "55555555-5555-5555-5555-555555555555"
           ],
@@ -1188,7 +945,7 @@
           "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
           "is_child": true,
           "child_order": 0,
-          "created_at": "2025-12-14T23:06:10.390Z"
+          "created_at": "2025-12-16T20:33:34.824Z"
         },
         "filters": []
       },
@@ -1211,12 +968,12 @@
             "tool_type": "travel-between-images",
             "source_task_id": "55555555-5555-5555-5555-555555555555",
             "created_from": "travel_segment",
-            "child_generation_id": "343f7d9e-6f2b-426a-9d56-93376c0e4c89"
+            "child_generation_id": "3eb912d0-6829-4de2-a11d-158d1ff80571"
           },
           "is_primary": false,
           "variant_type": "travel_segment",
           "name": "Segment 1",
-          "created_at": "2025-12-14T23:06:10.390Z"
+          "created_at": "2025-12-16T20:33:34.824Z"
         },
         "filters": []
       },
@@ -1240,7 +997,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_0.mp4",
-          "generation_processed_at": "2025-12-14T23:06:10.390Z"
+          "generation_processed_at": "2025-12-16T20:33:34.824Z"
         },
         "filters": [
           {
@@ -1252,18 +1009,6 @@
             "type": "eq",
             "field": "status",
             "value": "In Progress"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "55555555-5555-5555-5555-555555555555"
           }
         ]
       },
@@ -1310,6 +1055,18 @@
     "expectedStatusCode": 200,
     "operations": [
       {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "99999999-9999-9999-9999-999999999999"
+          }
+        ]
+      },
+      {
         "type": "storage_upload",
         "bucket": "image_uploads",
         "path": "11111111-1111-1111-1111-111111111111/stitched.mp4",
@@ -1322,42 +1079,6 @@
         "type": "storage_get_url",
         "bucket": "image_uploads",
         "path": "11111111-1111-1111-1111-111111111111/stitched.mp4"
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "99999999-9999-9999-9999-999999999999"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "99999999-9999-9999-9999-999999999999"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "travel_stitch"
-          }
-        ]
       },
       {
         "type": "db_select",
@@ -1406,7 +1127,7 @@
           "is_primary": true,
           "variant_type": "travel_stitch",
           "name": null,
-          "created_at": "2025-12-14T23:06:10.391Z"
+          "created_at": "2025-12-16T20:33:34.824Z"
         },
         "filters": []
       },
@@ -1450,7 +1171,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/stitched.mp4",
-          "generation_processed_at": "2025-12-14T23:06:10.391Z"
+          "generation_processed_at": "2025-12-16T20:33:34.824Z"
         },
         "filters": [
           {
@@ -1462,18 +1183,6 @@
             "type": "eq",
             "field": "status",
             "value": "In Progress"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "99999999-9999-9999-9999-999999999999"
           }
         ]
       }
@@ -1511,6 +1220,18 @@
     "expectedStatusCode": 200,
     "operations": [
       {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
+          }
+        ]
+      },
+      {
         "type": "storage_upload",
         "bucket": "image_uploads",
         "path": "11111111-1111-1111-1111-111111111111/joined.mp4",
@@ -1523,42 +1244,6 @@
         "type": "storage_get_url",
         "bucket": "image_uploads",
         "path": "11111111-1111-1111-1111-111111111111/joined.mp4"
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "join_clips_segment"
-          }
-        ]
       },
       {
         "type": "db_select",
@@ -1636,7 +1321,7 @@
           "is_primary": true,
           "variant_type": "join_clips_segment",
           "name": null,
-          "created_at": "2025-12-14T23:06:10.398Z"
+          "created_at": "2025-12-16T20:33:34.827Z"
         },
         "filters": []
       },
@@ -1696,7 +1381,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/joined.mp4",
-          "generation_processed_at": "2025-12-14T23:06:10.398Z"
+          "generation_processed_at": "2025-12-16T20:33:34.827Z"
         },
         "filters": [
           {
@@ -1708,18 +1393,6 @@
             "type": "eq",
             "field": "status",
             "value": "In Progress"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "dddddddd-dddd-dddd-dddd-dddddddddddd"
           }
         ]
       },
@@ -1762,8 +1435,8 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/joined.mp4",
-          "generation_started_at": "2025-12-14T23:06:10.399Z",
-          "generation_processed_at": "2025-12-14T23:06:10.399Z"
+          "generation_started_at": "2025-12-16T20:33:34.827Z",
+          "generation_processed_at": "2025-12-16T20:33:34.827Z"
         },
         "filters": [
           {
@@ -1824,7 +1497,7 @@
           "is_primary": true,
           "variant_type": "clip_join",
           "name": null,
-          "created_at": "2025-12-14T23:06:10.399Z"
+          "created_at": "2025-12-16T20:33:34.828Z"
         },
         "filters": []
       },
@@ -1860,6 +1533,18 @@
     "expectedStatusCode": 200,
     "operations": [
       {
+        "type": "db_select",
+        "table": "tasks",
+        "data": null,
+        "filters": [
+          {
+            "type": "eq",
+            "field": "id",
+            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+          }
+        ]
+      },
+      {
         "type": "storage_upload",
         "bucket": "image_uploads",
         "path": "11111111-1111-1111-1111-111111111111/output.png",
@@ -1876,7 +1561,7 @@
       {
         "type": "storage_upload",
         "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg",
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214828_zdticp.jpg",
         "data": {
           "size": 631,
           "contentType": "image/jpeg"
@@ -1885,19 +1570,7 @@
       {
         "type": "storage_get_url",
         "bucket": "image_uploads",
-        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg"
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
-          }
-        ]
+        "path": "11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214828_zdticp.jpg"
       },
       {
         "type": "db_update",
@@ -1905,7 +1578,7 @@
         "data": {
           "params": {
             "prompt": "Image with invalid shot",
-            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg"
+            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214828_zdticp.jpg"
           }
         },
         "filters": [
@@ -1913,30 +1586,6 @@
             "type": "eq",
             "field": "id",
             "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "single_image"
           }
         ]
       },
@@ -1956,28 +1605,38 @@
         "type": "db_insert",
         "table": "generations",
         "data": {
-          "id": "478f5525-d640-4d31-a3f1-a61af9da8cb3",
+          "id": "6bfd282a-7f03-4d8e-a74a-be3cecd10677",
           "tasks": [
             "ffffffff-ffff-ffff-ffff-ffffffffffff"
           ],
           "params": {
             "prompt": "Image with invalid shot",
-            "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg",
+            "shot_id": "not-a-valid-uuid",
             "tool_type": "image-generation",
             "content_type": "image",
-            "thumbnailUrl": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg"
+            "shotId": "not-a-valid-uuid",
+            "thumbnailUrl": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214828_zdticp.jpg"
           },
           "location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png",
           "type": "image",
           "project_id": "22222222-2222-2222-2222-222222222222",
-          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg",
+          "thumbnail_url": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214828_zdticp.jpg",
           "based_on": null,
           "parent_generation_id": null,
           "is_child": false,
           "child_order": null,
-          "created_at": "2025-12-14T23:06:10.400Z"
+          "created_at": "2025-12-16T20:33:34.828Z"
         },
         "filters": []
+      },
+      {
+        "type": "db_rpc",
+        "table": "add_generation_to_shot",
+        "data": {
+          "p_shot_id": "not-a-valid-uuid",
+          "p_generation_id": "6bfd282a-7f03-4d8e-a74a-be3cecd10677",
+          "p_with_position": false
+        }
       },
       {
         "type": "db_update",
@@ -1999,7 +1658,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png",
-          "generation_processed_at": "2025-12-14T23:06:10.400Z"
+          "generation_processed_at": "2025-12-16T20:33:34.828Z"
         },
         "filters": [
           {
@@ -2013,7 +1672,16 @@
             "value": "In Progress"
           }
         ]
-      },
+      }
+    ],
+    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765917214828_zdticp.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
+  },
+  {
+    "scenario": "segment_uses_expanded_params",
+    "passed": true,
+    "statusCode": 200,
+    "expectedStatusCode": 200,
+    "operations": [
       {
         "type": "db_select",
         "table": "tasks",
@@ -2022,19 +1690,10 @@
           {
             "type": "eq",
             "field": "id",
-            "value": "ffffffff-ffff-ffff-ffff-ffffffffffff"
+            "value": "11111111-2222-3333-4444-555555555555"
           }
         ]
-      }
-    ],
-    "responseBody": "{\"success\":true,\"public_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/output.png\",\"thumbnail_url\":\"https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/thumbnails/thumb_1765753570400_0vcj61.jpg\",\"message\":\"Task completed and file uploaded successfully\"}"
-  },
-  {
-    "scenario": "segment_uses_expanded_params",
-    "passed": true,
-    "statusCode": 200,
-    "expectedStatusCode": 200,
-    "operations": [
+      },
       {
         "type": "storage_upload",
         "bucket": "image_uploads",
@@ -2048,42 +1707,6 @@
         "type": "storage_get_url",
         "bucket": "image_uploads",
         "path": "11111111-1111-1111-1111-111111111111/segment_1.mp4"
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "11111111-2222-3333-4444-555555555555"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "11111111-2222-3333-4444-555555555555"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "task_types",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "name",
-            "value": "travel_segment"
-          }
-        ]
       },
       {
         "type": "db_select",
@@ -2125,7 +1748,7 @@
         "type": "db_insert",
         "table": "generations",
         "data": {
-          "id": "3c1d6382-f8e7-4cc0-8587-d7cae79a501b",
+          "id": "e8465ae4-88ee-48d9-a37c-f7d61877eee2",
           "tasks": [
             "11111111-2222-3333-4444-555555555555"
           ],
@@ -2171,7 +1794,7 @@
           "parent_generation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
           "is_child": true,
           "child_order": 1,
-          "created_at": "2025-12-14T23:06:10.400Z"
+          "created_at": "2025-12-16T20:33:34.829Z"
         },
         "filters": []
       },
@@ -2216,12 +1839,12 @@
             "tool_type": "travel-between-images",
             "source_task_id": "11111111-2222-3333-4444-555555555555",
             "created_from": "travel_segment",
-            "child_generation_id": "3c1d6382-f8e7-4cc0-8587-d7cae79a501b"
+            "child_generation_id": "e8465ae4-88ee-48d9-a37c-f7d61877eee2"
           },
           "is_primary": false,
           "variant_type": "travel_segment",
           "name": "Segment 2",
-          "created_at": "2025-12-14T23:06:10.400Z"
+          "created_at": "2025-12-16T20:33:34.829Z"
         },
         "filters": []
       },
@@ -2245,7 +1868,7 @@
         "data": {
           "status": "Complete",
           "output_location": "https://mock-storage.supabase.co/storage/v1/object/public/image_uploads/11111111-1111-1111-1111-111111111111/segment_1.mp4",
-          "generation_processed_at": "2025-12-14T23:06:10.400Z"
+          "generation_processed_at": "2025-12-16T20:33:34.829Z"
         },
         "filters": [
           {
@@ -2257,18 +1880,6 @@
             "type": "eq",
             "field": "status",
             "value": "In Progress"
-          }
-        ]
-      },
-      {
-        "type": "db_select",
-        "table": "tasks",
-        "data": null,
-        "filters": [
-          {
-            "type": "eq",
-            "field": "id",
-            "value": "11111111-2222-3333-4444-555555555555"
           }
         ]
       },

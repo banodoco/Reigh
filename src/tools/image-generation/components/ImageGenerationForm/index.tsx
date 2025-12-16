@@ -841,13 +841,19 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     disableAutoLoad: true, // Disable auto-load since we handle our own default logic
   });
 
+  // Default settings for shot prompts - memoized to prevent new object on every render
+  const shotPromptDefaults = useMemo<ImageGenShotSettings>(() => ({ 
+    prompts: [], 
+    masterPrompt: '' 
+  }), []);
+
   // Shot-specific prompts using per-shot storage
   const shotPromptSettings = useAutoSaveSettings<ImageGenShotSettings>({
     toolId: 'image-gen-prompts',
     shotId: associatedShotId,
     projectId: selectedProjectId,
     scope: 'shot',
-    defaults: { prompts: [], masterPrompt: '' },
+    defaults: shotPromptDefaults,
     enabled: !!associatedShotId,
   });
 
@@ -868,7 +874,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Get current prompts - from shot settings if shot selected, otherwise local state
   const prompts = useMemo(() => {
     if (associatedShotId && shotPromptSettings.status === 'ready') {
-      return shotPromptSettings.settings.prompts;
+      return shotPromptSettings.settings.prompts || [];
     }
     return noShotPrompts;
   }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.prompts, noShotPrompts]);
@@ -1030,8 +1036,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [associatedShotId, shots, markAsInteracted]);
 
+  // Track which entities we've initialized to prevent infinite loops
+  const initializedEntitiesRef = useRef<Set<string>>(new Set());
+
   // Initialize prompts when empty - handles both shot and no-shot cases
   useEffect(() => {
+    const entityKey = associatedShotId || 'no-shot';
+    
+    // Skip if already initialized for this entity
+    if (initializedEntitiesRef.current.has(entityKey)) {
+      return;
+    }
+    
     // For shot mode: wait until shot settings are ready
     if (associatedShotId && shotPromptSettings.status !== 'ready') {
       return;
@@ -1040,6 +1056,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     // Check if we need to initialize
     const currentPrompts = associatedShotId ? shotPromptSettings.settings.prompts : noShotPrompts;
     if (!currentPrompts || currentPrompts.length === 0) {
+      // Mark as initialized BEFORE updating to prevent loops
+      initializedEntitiesRef.current.add(entityKey);
+      
       // Add a small delay to prevent rapid resets during hydration
       const timeoutId = setTimeout(() => {
         const emptyPrompt = { id: generatePromptId(), fullPrompt: "", shortPrompt: "" };
@@ -1053,8 +1072,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }, 50);
 
       return () => clearTimeout(timeoutId);
+    } else {
+      // Prompts exist, mark as initialized
+      initializedEntitiesRef.current.add(entityKey);
     }
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.prompts, noShotPrompts, generatePromptId]);
+  }, [associatedShotId, shotPromptSettings.status, generatePromptId]); // Removed settings.prompts and noShotPrompts to prevent loops
 
   const hasApiKey = true; // Always true for wan-local
 

@@ -6,29 +6,7 @@
 import { extractOrchestratorTaskId, extractOrchestratorRunId } from './params.ts';
 import { createVariant } from './generation.ts';
 import { triggerCostCalculation } from './billing.ts';
-
-// ===== TYPES =====
-
-interface SegmentTypeConfig {
-  segmentType: string;
-  runIdField: string;
-  expectedCountField: string;
-}
-
-// ===== CONFIGURATION =====
-
-const SEGMENT_TYPE_CONFIG: Record<string, SegmentTypeConfig> = {
-  'travel_segment': {
-    segmentType: 'travel_segment',
-    runIdField: 'orchestrator_run_id',
-    expectedCountField: 'num_new_segments_to_generate'
-  },
-  'join_clips_segment': {
-    segmentType: 'join_clips_segment',
-    runIdField: 'run_id',
-    expectedCountField: 'num_joins'
-  }
-};
+import { TASK_TYPES, SEGMENT_TYPE_CONFIG } from './constants.ts';
 
 // ===== ORCHESTRATOR COMPLETION =====
 
@@ -85,10 +63,10 @@ export async function checkOrchestratorCompletion(
   // Get expected segment count
   let expectedSegmentCount: number | null = null;
   
-  if (taskType === 'travel_segment') {
+  if (taskType === TASK_TYPES.TRAVEL_SEGMENT) {
     expectedSegmentCount = orchestratorTask.params?.orchestrator_details?.num_new_segments_to_generate ||
       orchestratorTask.params?.num_new_segments_to_generate || null;
-  } else if (taskType === 'join_clips_segment') {
+  } else if (taskType === TASK_TYPES.JOIN_CLIPS_SEGMENT) {
     const clipList = orchestratorTask.params?.orchestrator_details?.clip_list;
     if (Array.isArray(clipList) && clipList.length > 1) {
       expectedSegmentCount = clipList.length - 1;
@@ -293,7 +271,7 @@ async function markOrchestratorComplete(
   await triggerCostCalculation(supabaseUrl, serviceKey, orchestratorTaskId, 'OrchestratorComplete');
   
   // Update parent_generation_id for join_clips_segment
-  if (taskType === 'join_clips_segment') {
+  if (taskType === TASK_TYPES.JOIN_CLIPS_SEGMENT) {
     await handleJoinClipsParentUpdate(supabase, orchestratorTask, publicUrl, thumbnailUrl, taskIdString, orchestratorTaskId);
   }
 }
