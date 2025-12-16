@@ -153,7 +153,14 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
       // Update our "clean" reference
       loadedSettingsRef.current = JSON.parse(JSON.stringify(toSave));
-      pendingSettingsRef.current = null;
+      
+      // Only clear pending if it still matches what we just saved.
+      // User may have typed MORE while save was in progress.
+      if (pendingSettingsRef.current && deepEqual(pendingSettingsRef.current, toSave)) {
+        pendingSettingsRef.current = null;
+        pendingEntityIdRef.current = null;
+      }
+      
       setStatus('ready');
       setError(null);
 
@@ -240,9 +247,8 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
       saveTimeoutRef.current = setTimeout(async () => {
         try {
+          // saveImmediate handles clearing pendingSettingsRef if values match
           await saveImmediate(updated);
-          pendingSettingsRef.current = null;
-          pendingEntityIdRef.current = null;
         } catch (err) {
           console.error('[useAutoSaveSettings] Debounced save failed:', err);
         }
@@ -278,9 +284,8 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
       saveTimeoutRef.current = setTimeout(async () => {
         try {
+          // saveImmediate handles clearing pendingSettingsRef if values match
           await saveImmediate(updated);
-          pendingSettingsRef.current = null;
-          pendingEntityIdRef.current = null;
         } catch (err) {
           console.error('[useAutoSaveSettings] Debounced save failed:', err);
         }
