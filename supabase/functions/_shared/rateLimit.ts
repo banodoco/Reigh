@@ -34,11 +34,11 @@ export const RATE_LIMITS = {
   // Authenticated user actions - moderate  
   userAction: { maxRequests: 60, windowSeconds: 60, identifierType: 'user' as const },
   
-  // Expensive operations (AI, payments) - strict
-  expensive: { maxRequests: 20, windowSeconds: 60, identifierType: 'user' as const },
+  // Expensive operations (AI, payments)
+  expensive: { maxRequests: 30, windowSeconds: 60, identifierType: 'user' as const },
   
-  // Task creation - moderate (users create many tasks)
-  taskCreation: { maxRequests: 30, windowSeconds: 60, identifierType: 'user' as const },
+  // Task creation - lenient (users create many tasks in bursts)
+  taskCreation: { maxRequests: 120, windowSeconds: 60, identifierType: 'user' as const },
   
   // Read operations - lenient
   read: { maxRequests: 120, windowSeconds: 60, identifierType: 'user' as const },
