@@ -970,20 +970,29 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [ready, associatedShotId, promptsByShot, effectiveShotId, selectedProjectId]);
 
   // Apply initialShotId once after hydration (takes precedence over persisted value)
+  // If initialShotId is explicitly null, reset to None (opened from outside shot context)
   const hasAppliedInitialShotId = useRef(false);
   useEffect(() => {
-    // Only apply once, after hydration is complete, if initialShotId was provided
-    if (ready && initialShotId && !hasAppliedInitialShotId.current && shots) {
-      const shotExists = shots.some(shot => shot.id === initialShotId);
-      if (shotExists) {
-        console.log('[ImageGenerationForm] Applying initialShotId:', initialShotId);
-        setAssociatedShotId(initialShotId);
+    // Only apply once, after hydration is complete
+    if (ready && !hasAppliedInitialShotId.current && shots) {
+      if (initialShotId) {
+        // initialShotId was provided - set to that shot if it exists
+        const shotExists = shots.some(shot => shot.id === initialShotId);
+        if (shotExists) {
+          console.log('[ImageGenerationForm] Applying initialShotId:', initialShotId);
+          setAssociatedShotId(initialShotId);
+          markAsInteracted();
+        } else {
+          console.log('[ImageGenerationForm] initialShotId not found in shots list:', initialShotId);
+        }
+      } else if (initialShotId === null) {
+        // initialShotId is explicitly null - reset to None (opened from outside shot context)
+        console.log('[ImageGenerationForm] initialShotId is null, resetting to None');
+        setAssociatedShotId(null);
         markAsInteracted();
-        hasAppliedInitialShotId.current = true;
-      } else {
-        console.log('[ImageGenerationForm] initialShotId not found in shots list:', initialShotId);
-        hasAppliedInitialShotId.current = true; // Mark as applied to prevent repeated attempts
       }
+      // If initialShotId is undefined, keep the persisted value
+      hasAppliedInitialShotId.current = true;
     }
   }, [ready, initialShotId, shots, markAsInteracted]);
 
