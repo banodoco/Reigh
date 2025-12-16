@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useToolSettings } from './useToolSettings';
 import { deepEqual } from '@/shared/lib/deepEqual';
 
+// localStorage key prefix for pending saves that survive page close
+const PENDING_SAVE_KEY_PREFIX = 'autosave-pending-';
+
 /**
  * Status states for the auto-save settings lifecycle
  */
@@ -159,6 +162,14 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       if (pendingSettingsRef.current && deepEqual(pendingSettingsRef.current, toSave)) {
         pendingSettingsRef.current = null;
         pendingEntityIdRef.current = null;
+        
+        // Also clear localStorage backup now that we've successfully saved
+        try {
+          const storageKey = `${PENDING_SAVE_KEY_PREFIX}${toolId}-${entityId}`;
+          localStorage.removeItem(storageKey);
+        } catch (err) {
+          // Ignore localStorage errors
+        }
       }
       
       setStatus('ready');
@@ -221,6 +232,89 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     };
     // Only re-run when entityId changes - other deps accessed via refs
   }, [entityId, scope, toolId]);
+
+  /**
+   * Handle page close/navigation - save pending settings to localStorage.
+   * This ensures data isn't lost when browser closes before async save completes.
+   */
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const pending = pendingSettingsRef.current;
+      const pendingForEntity = pendingEntityIdRef.current;
+
+      if (pending && pendingForEntity) {
+        const storageKey = `${PENDING_SAVE_KEY_PREFIX}${toolId}-${pendingForEntity}`;
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({
+            settings: pending,
+            scope,
+            timestamp: Date.now(),
+          }));
+          console.log('[useAutoSaveSettings] 💾 Saved pending to localStorage on unload:', {
+            toolId,
+            entityId: pendingForEntity.substring(0, 8),
+          });
+        } catch (err) {
+          console.error('[useAutoSaveSettings] Failed to save to localStorage:', err);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [toolId, scope]);
+
+  /**
+   * On mount, check for pending saves from localStorage (from a previous session that closed).
+   * If found, flush them to the database.
+   */
+  useEffect(() => {
+    if (!entityId || !enabled) return;
+
+    const storageKey = `${PENDING_SAVE_KEY_PREFIX}${toolId}-${entityId}`;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const { settings: pendingSettings, scope: storedScope, timestamp } = JSON.parse(stored);
+        
+        // Only restore if less than 1 hour old
+        const ONE_HOUR = 60 * 60 * 1000;
+        if (Date.now() - timestamp < ONE_HOUR) {
+          console.log('[useAutoSaveSettings] 🔄 Restoring pending save from localStorage:', {
+            toolId,
+            entityId: entityId.substring(0, 8),
+            age: `${Math.round((Date.now() - timestamp) / 1000)}s ago`,
+          });
+
+          // Update local state with the pending settings
+          setSettings(pendingSettings);
+          pendingSettingsRef.current = pendingSettings;
+          pendingEntityIdRef.current = entityId;
+
+          // Schedule a save for the restored settings
+          if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+          }
+          saveTimeoutRef.current = setTimeout(async () => {
+            try {
+              await saveImmediateRef.current(pendingSettings);
+              // Clear localStorage after successful save
+              localStorage.removeItem(storageKey);
+            } catch (err) {
+              console.error('[useAutoSaveSettings] Failed to sync restored settings:', err);
+            }
+          }, 100); // Short delay to let other initialization settle
+        } else {
+          // Too old, remove it
+          localStorage.removeItem(storageKey);
+        }
+      }
+    } catch (err) {
+      console.error('[useAutoSaveSettings] Failed to read localStorage:', err);
+    }
+    // Only run on mount for this entity
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entityId, toolId, enabled]);
 
   // Update single field
   const updateField = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
