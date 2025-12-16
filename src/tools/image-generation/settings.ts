@@ -25,8 +25,8 @@ export interface ImageGenerationSettings {
   depthStrength?: number;
   softEdgeStrength?: number;
   generationMode?: GenerationMode;
-  beforeEachPromptText?: string;
-  afterEachPromptText?: string;
+  beforeEachPromptText?: string; // Text to prepend (defaults empty, not inherited)
+  afterEachPromptText?: string; // Text to append (defaults empty, not inherited)
   associatedShotId?: string | null; // Last associated shot
   promptMode?: PromptMode;
   masterPromptByShot?: Record<string, string>; // Master prompt per shot ID
@@ -43,8 +43,7 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   ],
   // Content fields (don't inherit to new projects) - explicit empty defaults
   promptsByShot: {},
-  beforeEachPromptText: '',
-  afterEachPromptText: '',
+  // Note: beforeEachPromptText/afterEachPromptText are NOT persisted
   associatedShotId: null,
   
   // Configuration fields (can inherit to new projects)

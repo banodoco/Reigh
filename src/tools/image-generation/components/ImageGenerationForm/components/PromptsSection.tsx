@@ -15,6 +15,7 @@ import {
   PopoverTrigger,
 } from "@/shared/components/ui/popover";
 import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
+import { CollapsibleSection } from "@/shared/components/ui/collapsible-section";
 import { PromptEntry, PromptMode } from "../types";
 import { PromptInputRow } from "./PromptInputRow";
 import { SectionHeader } from "./SectionHeader";
@@ -254,53 +255,55 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
         </div>
       )}
 
-      {/* Before / After prompt modifiers */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="beforeEachPromptText">
-            {prompts.length <= 1 ? "Before prompt" : "Before each prompt"}
-          </Label>
-          <Textarea
-            id="beforeEachPromptText"
-            value={beforeEachPromptText}
-            onChange={onBeforeEachPromptTextChange}
-            placeholder="Text to prepend"
-            disabled={!hasApiKey || isGenerating}
-            className="mt-1 h-16 resize-none"
-            rows={2}
-            clearable
-            onClear={onClearBeforeEachPromptText}
-            voiceInput
-            voiceContext="This is text that will be prepended to every image generation prompt. Keep it short - things like style prefixes, quality tags, or subject descriptions that apply to all images."
-            onVoiceResult={(result) => {
-              const text = result.prompt || result.transcription;
-              onBeforeEachPromptTextChange({ target: { value: text } } as React.ChangeEvent<HTMLTextAreaElement>);
-            }}
-          />
+      {/* Additional prompt settings (Before / After prompt modifiers) */}
+      <CollapsibleSection title="Additional prompt settings">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="beforeEachPromptText">
+              Before each prompt
+            </Label>
+            <Textarea
+              id="beforeEachPromptText"
+              value={beforeEachPromptText}
+              onChange={onBeforeEachPromptTextChange}
+              placeholder="Text to prepend"
+              disabled={!hasApiKey || isGenerating}
+              className="mt-1 h-16 resize-none"
+              rows={2}
+              clearable
+              onClear={onClearBeforeEachPromptText}
+              voiceInput
+              voiceContext="This is text that will be prepended to every image generation prompt. Keep it short - things like style prefixes, quality tags, or subject descriptions that apply to all images."
+              onVoiceResult={(result) => {
+                const text = result.prompt || result.transcription;
+                onBeforeEachPromptTextChange({ target: { value: text } } as React.ChangeEvent<HTMLTextAreaElement>);
+              }}
+            />
+          </div>
+          <div>
+            <Label htmlFor="afterEachPromptText">
+              After each prompt
+            </Label>
+            <Textarea
+              id="afterEachPromptText"
+              value={afterEachPromptText}
+              onChange={onAfterEachPromptTextChange}
+              placeholder="Text to append"
+              disabled={!hasApiKey || isGenerating}
+              className="mt-1 h-16 resize-none"
+              rows={2}
+              clearable
+              onClear={onClearAfterEachPromptText}
+              voiceInput
+              voiceContext="This is text that will be appended to every image generation prompt. Keep it short - things like quality suffixes, negative prompts, or technical parameters that apply to all images."
+              onVoiceResult={(result) => {
+                const text = result.prompt || result.transcription;
+                onAfterEachPromptTextChange({ target: { value: text } } as React.ChangeEvent<HTMLTextAreaElement>);
+              }}
+            />
+          </div>
         </div>
-        <div>
-          <Label htmlFor="afterEachPromptText">
-            {prompts.length <= 1 ? "After prompt" : "After each prompt"}
-          </Label>
-          <Textarea
-            id="afterEachPromptText"
-            value={afterEachPromptText}
-            onChange={onAfterEachPromptTextChange}
-            placeholder="Text to append"
-            disabled={!hasApiKey || isGenerating}
-            className="mt-1 h-16 resize-none"
-            rows={2}
-            clearable
-            onClear={onClearAfterEachPromptText}
-            voiceInput
-            voiceContext="This is text that will be appended to every image generation prompt. Keep it short - things like quality suffixes, negative prompts, or technical parameters that apply to all images."
-            onVoiceResult={(result) => {
-              const text = result.prompt || result.transcription;
-              onAfterEachPromptTextChange({ target: { value: text } } as React.ChangeEvent<HTMLTextAreaElement>);
-            }}
-          />
-        </div>
-      </div>
+      </CollapsibleSection>
     </div>
   );
 };

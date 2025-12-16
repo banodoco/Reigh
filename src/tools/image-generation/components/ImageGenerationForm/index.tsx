@@ -861,6 +861,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Default settings for shot prompts - recomputed when shot changes to pick up fresh localStorage
   // Inheritance chain: localStorage (last edited shot) → project-level settings → hardcoded defaults
   // Reference selection defaults to most-recent reference (handled in auto-select effect)
+  // Note: beforeEachPromptText/afterEachPromptText are persisted per-shot but NOT inherited (default empty)
   const shotPromptDefaults = useMemo<ImageGenShotSettings>(() => {
     // Try to load last active shot settings for inheritance
     try {
@@ -872,8 +873,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           masterPrompt: parsed.masterPrompt || '',
           promptMode: parsed.promptMode || 'automated',
           selectedReferenceId: null, // Don't inherit - auto-select uses most-recent reference
-          beforeEachPromptText: parsed.beforeEachPromptText || '',
-          afterEachPromptText: parsed.afterEachPromptText || '',
         };
       }
     } catch (e) {
@@ -885,10 +884,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       masterPrompt: noShotMasterPrompt || '',
       promptMode: promptMode || 'automated',
       selectedReferenceId: null,
-      beforeEachPromptText: beforeEachPromptText || '',
-      afterEachPromptText: afterEachPromptText || '',
     };
-  }, [associatedShotId, noShotMasterPrompt, promptMode, beforeEachPromptText, afterEachPromptText]);
+  }, [associatedShotId, noShotMasterPrompt, promptMode]);
 
   // Shot-specific prompts using per-shot storage
   const shotPromptSettings = useAutoSaveSettings<ImageGenShotSettings>({
@@ -902,7 +899,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Project-level settings (NOT shot-specific)
   // Note: promptMode here is the fallback when no shot is selected
-  // beforeEachPromptText/afterEachPromptText here are fallbacks when no shot is selected
+  // beforeEachPromptText/afterEachPromptText persist but default to empty (not inherited from other shots)
   const { ready, isSaving, markAsInteracted } = usePersistentToolState<PersistedFormSettings>(
     'image-generation',
     { projectId: selectedProjectId },
@@ -1013,9 +1010,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Get current before prompt text - from shot settings if shot selected, otherwise project state
+  // Defaults to empty string (not inherited from other shots)
   const currentBeforePromptText = useMemo(() => {
     if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
-      return shotPromptSettings.settings.beforeEachPromptText ?? beforeEachPromptText;
+      return shotPromptSettings.settings.beforeEachPromptText ?? '';
     }
     return beforeEachPromptText;
   }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.beforeEachPromptText, beforeEachPromptText]);
@@ -1031,9 +1029,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Get current after prompt text - from shot settings if shot selected, otherwise project state
+  // Defaults to empty string (not inherited from other shots)
   const currentAfterPromptText = useMemo(() => {
     if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
-      return shotPromptSettings.settings.afterEachPromptText ?? afterEachPromptText;
+      return shotPromptSettings.settings.afterEachPromptText ?? '';
     }
     return afterEachPromptText;
   }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.afterEachPromptText, afterEachPromptText]);
@@ -1049,22 +1048,20 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Save current shot settings to localStorage for inheritance by new shots
-  // Note: prompts are NOT inherited, only masterPrompt and mode settings
+  // Note: prompts and before/after prompt text are NOT inherited, only masterPrompt and mode settings
   useEffect(() => {
     if (associatedShotId && shotPromptSettings.status === 'ready') {
       try {
         const settingsToSave = {
           masterPrompt: shotPromptSettings.settings.masterPrompt || '',
           promptMode: shotPromptSettings.settings.promptMode || effectivePromptMode || 'automated',
-          beforeEachPromptText: shotPromptSettings.settings.beforeEachPromptText || '',
-          afterEachPromptText: shotPromptSettings.settings.afterEachPromptText || '',
         };
         localStorage.setItem('image-gen-last-active-shot-settings', JSON.stringify(settingsToSave));
       } catch (e) {
         // Ignore localStorage errors
       }
     }
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, shotPromptSettings.settings.promptMode, shotPromptSettings.settings.beforeEachPromptText, shotPromptSettings.settings.afterEachPromptText, effectivePromptMode]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, shotPromptSettings.settings.promptMode, effectivePromptMode]);
 
   // Sync local style strength with project settings
   // Legacy sync effects removed to prevent overwriting user input
@@ -1260,9 +1257,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       } else {
         loraManager.setSelectedLoras([]);
       }
-
-      if (settings.beforeEachPromptText !== undefined) setBeforeEachPromptText(settings.beforeEachPromptText);
-      if (settings.afterEachPromptText !== undefined) setAfterEachPromptText(settings.afterEachPromptText);
+      // Note: beforeEachPromptText/afterEachPromptText are NOT restored - they reset on page load
     },
     getAssociatedShotId: () => associatedShotId
   }));

@@ -377,6 +377,9 @@ export const useDeleteResource = () => {
             if (error) throw error;
         },
         onSuccess: (data, variables) => {
+            // Remove the individual resource cache entry
+            queryClient.removeQueries({ queryKey: ['resource', variables.id] });
+            // Also invalidate the list queries
             queryClient.invalidateQueries({ queryKey: ['resources', variables.type] });
             queryClient.invalidateQueries({ queryKey: ['public-resources', variables.type] });
         },

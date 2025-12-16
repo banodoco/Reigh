@@ -197,6 +197,9 @@ export function MultiPortionTimeline({
   // Store current drag time for video seeking (avoids closure issues)
   const currentDragTimeRef = useRef<number | null>(null);
   
+  // Track if current drag exceeds max gap (for showing warning only during active violation)
+  const [isDragExceedingMax, setIsDragExceedingMax] = useState(false);
+  
   // Keep a ref to selections so handleMove doesn't need to depend on it
   const selectionsRef = useRef(selections);
   selectionsRef.current = selections;
@@ -410,6 +413,15 @@ export function MultiPortionTimeline({
       newTime = Math.min(duration, Math.max(time, minEnd));
     }
     
+    // Check if this drag position would exceed max gap
+    if (fps && maxGapFrames) {
+      const newGapTime = dragging.handle === 'start' 
+        ? selection.end - newTime 
+        : newTime - selection.start;
+      const newGapFrames = Math.round(newGapTime * fps);
+      setIsDragExceedingMax(newGapFrames > maxGapFrames);
+    }
+    
     // Calculate drag offset based on new position for accurate visual feedback
     const currentPercent = dragging.handle === 'start' 
       ? (selection.start / duration) * 100 
@@ -450,7 +462,7 @@ export function MultiPortionTimeline({
         pendingUpdateRef.current = null;
       });
     }
-  }, [dragging, duration, fps, onSelectionChange, videoRef]);
+  }, [dragging, duration, fps, maxGapFrames, onSelectionChange, videoRef]);
   
   const handleEnd = useCallback(() => {
     // Clear any pending RAF
@@ -458,6 +470,9 @@ export function MultiPortionTimeline({
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
     }
+    
+    // Reset exceeding max warning
+    setIsDragExceedingMax(false);
     
     // Apply final pending update if any
     if (pendingUpdateRef.current && dragging) {
@@ -517,20 +532,6 @@ export function MultiPortionTimeline({
     (trackRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
     (scrubberRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
   }, []);
-  
-  // Check if any selection exceeds the max gap frames limit
-  const exceedsMaxWarning = React.useMemo(() => {
-    if (!fps || !maxGapFrames) return null;
-    
-    for (const selection of selections) {
-      const gapTime = selection.end - selection.start;
-      const gapFrames = Math.round(gapTime * fps);
-      if (gapFrames > maxGapFrames) {
-        return { gapFrames, maxGapFrames };
-      }
-    }
-    return null;
-  }, [selections, fps, maxGapFrames]);
   
   // Handle click on track - differentiate between seeking and handle selection
   const handleTrackClick = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -740,18 +741,18 @@ export function MultiPortionTimeline({
         })}
       </div>
       
+      {/* Warning when selection exceeds max frames - only show during active drag that exceeds limit */}
+      {isDragExceedingMax && maxGapFrames && (
+        <div className="mt-1 px-2 py-1 bg-amber-500/20 border border-amber-500/40 rounded text-amber-200 text-xs text-center">
+          You'll only be able to generate max {maxGapFrames} frames in this gap
+        </div>
+      )}
+      
       {/* Timeline markers */}
       <div className="flex justify-between text-[10px] text-white/40 mt-1 px-1">
         <span>0:00</span>
         <span>{formatTime(duration)}</span>
       </div>
-      
-      {/* Warning when selection exceeds max frames */}
-      {exceedsMaxWarning && (
-        <div className="mt-2 px-2 py-1.5 bg-amber-500/20 border border-amber-500/40 rounded text-amber-200 text-xs text-center">
-          You'll only be able to generate max {exceedsMaxWarning.maxGapFrames} frames in this gap
-        </div>
-      )}
     </div>
   );
 }

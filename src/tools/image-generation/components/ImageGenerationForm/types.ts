@@ -41,7 +41,9 @@ export interface PersistedFormSettings {
   selectedLoras?: ActiveLora[];
   depthStrength?: number;
   softEdgeStrength?: number;
+  /** Text to prepend to every prompt (defaults to empty, not inherited) */
   beforeEachPromptText?: string;
+  /** Text to append to every prompt (defaults to empty, not inherited) */
   afterEachPromptText?: string;
   selectedLorasByMode?: Record<GenerationMode, ActiveLora[]>;
   associatedShotId?: string | null;
@@ -69,9 +71,9 @@ export interface ImageGenShotSettings {
   promptMode?: PromptMode;
   /** Selected reference ID for this shot */
   selectedReferenceId?: string | null;
-  /** Text to prepend to every prompt */
+  /** Text to prepend to every prompt (defaults to empty, not inherited between shots) */
   beforeEachPromptText?: string;
-  /** Text to append to every prompt */
+  /** Text to append to every prompt (defaults to empty, not inherited between shots) */
   afterEachPromptText?: string;
 }
 

@@ -631,6 +631,11 @@ export function useToolSettings<T>(
     },
   });
 
+  // Get stable reference to mutateAsync - useMutation returns a new object each render
+  // but mutateAsync itself is stable
+  const mutateAsyncRef = useRef(updateMutation.mutateAsync);
+  mutateAsyncRef.current = updateMutation.mutateAsync;
+  
   // CRITICAL: Wrap in useCallback with stable deps to prevent cascading re-renders.
   // Use refs to access current projectId/shotId without recreating this function.
   // The entityId is snapshotted at call time via refs for correctness.
@@ -654,13 +659,14 @@ export function useToolSettings<T>(
     try {
       // NOTE: No debounce here - callers (like useShotSettings) are responsible for debouncing.
       // Using mutateAsync so callers can await the actual DB write completion.
-      await updateMutation.mutateAsync(
+      // Use ref to access stable mutateAsync without recreating this callback
+      await mutateAsyncRef.current(
         { scope, settings, signal: controller.signal, entityId }
       );
     } finally {
       cleanup();
     }
-  }, [updateMutation]);
+  }, []); // Empty deps - all values accessed via refs for stability
 
   return {
     settings: settings as T | undefined,
