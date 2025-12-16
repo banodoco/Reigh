@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -468,6 +468,12 @@ export function useToolSettings<T>(
   const shotId: string | undefined = context?.shotId;
   const fetchEnabled: boolean = context?.enabled ?? true;
 
+  // Refs to access current values in stable callbacks without recreating them
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
+  const shotIdRef = useRef(shotId);
+  shotIdRef.current = shotId;
+
   // Cleanup abort controllers on unmount
   // NOTE: We intentionally do NOT abort active update mutations on unmount.
   // Settings saves should complete even if the component unmounts (e.g., during navigation).
@@ -625,9 +631,13 @@ export function useToolSettings<T>(
     },
   });
 
-  const update = async (scope: SettingsScope, settings: Partial<T>): Promise<void> => {
+  // CRITICAL: Wrap in useCallback with stable deps to prevent cascading re-renders.
+  // Use refs to access current projectId/shotId without recreating this function.
+  // The entityId is snapshotted at call time via refs for correctness.
+  const update = useCallback(async (scope: SettingsScope, settings: Partial<T>): Promise<void> => {
     // Snapshot the target entity id NOW to prevent cross-project/shot overwrites
-    const entityId = scope === 'project' ? projectId : (scope === 'shot' ? shotId : undefined);
+    // Use refs to get current values without causing callback recreation
+    const entityId = scope === 'project' ? projectIdRef.current : (scope === 'shot' ? shotIdRef.current : undefined);
 
     // Create an AbortController for this update and track it
     const controller = new AbortController();
@@ -650,7 +660,7 @@ export function useToolSettings<T>(
     } finally {
       cleanup();
     }
-  };
+  }, [updateMutation]);
 
   return {
     settings: settings as T | undefined,
