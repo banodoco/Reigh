@@ -872,8 +872,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   );
 
   // Get current prompts - from shot settings if shot selected, otherwise local state
+  // Include 'saving' status to prevent flicker during save
   const prompts = useMemo(() => {
-    if (associatedShotId && shotPromptSettings.status === 'ready') {
+    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
       return shotPromptSettings.settings.prompts || [];
     }
     return noShotPrompts;
@@ -897,8 +898,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Get current master prompt - from shot settings if shot selected, otherwise local state
+  // Include 'saving' status to prevent flicker during save
   const masterPromptText = useMemo(() => {
-    if (associatedShotId && shotPromptSettings.status === 'ready') {
+    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
       return shotPromptSettings.settings.masterPrompt || '';
     }
     return noShotMasterPrompt;
