@@ -1597,12 +1597,12 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                   {isUploadingImage ? (
                     <div className="flex flex-col gap-1.5 min-w-[120px]">
                       <div className="text-xs text-muted-foreground">
-                        Uploading... {uploadProgress}%
+                        Uploading... {Math.round(uploadProgress)}%
                       </div>
                       <div className="w-full bg-muted rounded-full h-1.5">
                         <div 
                           className="bg-primary h-1.5 rounded-full transition-all duration-200"
-                          style={{ width: `${uploadProgress}%` }}
+                          style={{ width: `${Math.round(uploadProgress)}%` }}
                         />
                       </div>
                     </div>

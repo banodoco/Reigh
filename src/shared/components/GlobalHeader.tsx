@@ -13,7 +13,7 @@ import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 import { toast } from "sonner";
 import { useProjectContextDebug } from '@/shared/hooks/useProjectContextDebug';
 
-import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
+import { useIsTablet } from '@/shared/hooks/use-mobile';
 import { useDarkMode } from '@/shared/hooks/useDarkMode';
 
 interface GlobalHeaderProps {
@@ -30,7 +30,6 @@ interface ReferralStats {
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight = 0, contentOffsetLeft = 0, onOpenSettings }) => {
   const { projects, selectedProjectId, setSelectedProjectId, isLoadingProjects } = useProject();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const { darkMode } = useDarkMode();
   
@@ -48,8 +47,21 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     backgroundColor: `${color}0d` // 0d = ~5% opacity
   } : undefined;
   
-  // Tablets should have sticky header like desktop, only phones have scrolling header
-  const shouldHaveStickyHeader = !isMobile || isTablet;
+  // Sticky header on desktop/tablet, scrolling header only on phones
+  // Use viewport width check (md breakpoint = 768px) to avoid false positives
+  // from touch-enabled desktops triggering isMobile via coarsePointer
+  const [isWideViewport, setIsWideViewport] = React.useState(() => 
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : true
+  );
+  
+  React.useEffect(() => {
+    const handleResize = () => setIsWideViewport(window.innerWidth >= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Wide viewport OR tablet = sticky header
+  const shouldHaveStickyHeader = isWideViewport || isTablet;
 
   // [MobileStallFix] Enable debug monitoring
   useProjectContextDebug();
@@ -222,7 +234,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     }
 
     // Default text when no stats
-    return "You've referred 0 visitors :(";p
+    return "You've referred 0 visitors :(";
   };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);

@@ -54,12 +54,12 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
 
   // Color schemes matching timeline PairRegion
   const pairColorSchemes = [
-    { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700' },
-    { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-700' },
-    { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700' },
-    { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700' },
-    { bg: 'bg-rose-50', border: 'border-rose-300', text: 'text-rose-700' },
-    { bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-700' },
+    { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-300 dark:border-blue-700', text: 'text-blue-700 dark:text-gray-300' },
+    { bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-300 dark:border-emerald-700', text: 'text-emerald-700 dark:text-gray-300' },
+    { bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-300 dark:border-purple-700', text: 'text-purple-700 dark:text-gray-300' },
+    { bg: 'bg-orange-50 dark:bg-orange-950/40', border: 'border-orange-300 dark:border-orange-700', text: 'text-orange-700 dark:text-gray-300' },
+    { bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-300 dark:border-rose-700', text: 'text-rose-700 dark:text-gray-300' },
+    { bg: 'bg-teal-50 dark:bg-teal-950/40', border: 'border-teal-300 dark:border-teal-700', text: 'text-teal-700 dark:text-gray-300' },
   ];
   const colorScheme = pairColorSchemes[pairIndex % pairColorSchemes.length];
 
@@ -76,12 +76,12 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
               onPairClick();
             }}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200",
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all duration-200",
               "shadow-sm hover:shadow-md hover:scale-105",
               "bg-card/90 dark:bg-gray-800/90 hover:bg-card dark:hover:bg-gray-800",
               colorScheme.border,
               colorScheme.text,
-              "text-xs font-light cursor-pointer"
+              "text-[11px] font-light cursor-pointer"
             )}
           >
             <span className="whitespace-nowrap">
@@ -90,9 +90,8 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
             {!isMobile && (
               <MessageSquare 
                 className={cn(
-                  "h-3 w-3",
-                  hasCustomPrompt ? colorScheme.text : 'text-gray-400',
-                  hasCustomPrompt ? 'opacity-100' : 'opacity-60'
+                  "h-2.5 w-2.5",
+                  hasCustomPrompt ? 'opacity-100' : 'text-gray-400 dark:text-gray-500 opacity-60'
                 )}
               />
             )}

@@ -48,7 +48,9 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showBrowser, setShowBrowser] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const dropZoneRef = React.useRef<HTMLDivElement>(null);
   
   // Resource creation hook
   const createResource = useCreateResource();
@@ -176,10 +178,8 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     return () => video.removeEventListener('loadedmetadata', handleLoadedMetadata);
   }, [videoUrl, minFrame, drawTimelineFrame]);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  // Process uploaded file (shared by file input and drag-drop)
+  const processFile = async (file: File) => {
     // Validate file type
     const validTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
     if (!validTypes.includes(file.type)) {
@@ -254,6 +254,48 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     }
   };
 
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await processFile(file);
+  };
+
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isUploading) {
+      setIsDragging(true);
+    }
+  }, [isUploading]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set dragging to false if we're leaving the drop zone entirely
+    if (dropZoneRef.current && !dropZoneRef.current.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (isUploading) return;
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await processFile(files[0]);
+    }
+  }, [isUploading, processFile]);
+
   const handleRemoveVideo = () => {
     onVideoUploaded(null, null, undefined);
     if (fileInputRef.current) {
@@ -274,15 +316,28 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   }, [onVideoUploaded]);
 
   if (!videoUrl) {
-    // Upload prompt - responsive width
+    // Upload prompt - responsive width with drag-drop support
     return (
       <>
         <div className="mb-4">
-          <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
+          <div 
+            ref={dropZoneRef}
+            className={`w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border-2 border-dashed rounded-lg transition-colors ${
+              isDragging 
+                ? 'border-primary bg-primary/10' 
+                : 'border-border bg-muted/20 hover:border-muted-foreground/50'
+            }`}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
             <div className="flex flex-col items-center gap-3 text-center">
-              <Video className="h-8 w-8 text-muted-foreground" />
+              <Video className={`h-8 w-8 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
               <p className="text-xs text-muted-foreground">
-                Add a motion guidance video to control the animation
+                {isDragging 
+                  ? 'Drop video here' 
+                  : 'Add a motion guidance video to control the animation'}
               </p>
               
               <input
@@ -305,7 +360,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                     asChild
                   >
                     <span>
-                      {isUploading ? `Uploading... ${uploadProgress}%` : 'Upload'}
+                      {isUploading ? `Uploading... ${Math.round(uploadProgress)}%` : 'Upload'}
                     </span>
                   </Button>
                 </Label>
@@ -326,7 +381,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                 <div className="w-full bg-muted rounded-full h-2">
                   <div
                     className="bg-primary h-2 rounded-full transition-all"
-                    style={{ width: `${uploadProgress}%` }}
+                    style={{ width: `${Math.round(uploadProgress)}%` }}
                   />
                 </div>
               )}
