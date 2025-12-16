@@ -243,8 +243,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     <>
       <header 
         className={cn(
-          "wes-header z-50 w-full relative md:p-0",
-          shouldHaveStickyHeader ? "sticky top-0" : ""
+          "wes-header z-50 w-full md:p-0",
+          shouldHaveStickyHeader ? "sticky top-0" : "relative"
         )} 
       >
         {/* Enhanced background patterns */}

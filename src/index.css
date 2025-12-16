@@ -1176,7 +1176,8 @@
 
 @layer components {
   .wes-header {
-    @apply wes-symmetry backdrop-blur-md relative;
+    @apply wes-symmetry backdrop-blur-md;
+    /* Note: position (sticky/relative) is controlled by Tailwind classes in the component */
     background: 
       linear-gradient(90deg, hsl(var(--background)) 0%, hsl(var(--wes-dusty-lavender) / 0.3) 50%, hsl(var(--background)) 100%),
       repeating-linear-gradient(
@@ -1202,8 +1203,7 @@
         hsl(var(--wes-vintage-gold) / 0.04) 80px,
         hsl(var(--wes-vintage-gold) / 0.04) 82px
       );
-    /* Subtle noise texture for dark header */
-    position: relative;
+    /* Note: position is controlled by Tailwind classes (sticky/relative) - don't override here */
   }
   
   .dark .wes-header::after {
