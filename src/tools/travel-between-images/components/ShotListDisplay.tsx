@@ -433,10 +433,15 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   }, [currentShotIdsKey]);
 
   // Compute pending skeleton shot during render (no flicker)
+  // Only show skeleton if the new shot hasn't appeared in the data yet
   let pendingSkeletonShot: { imageCount: number } | null = null;
   if (pendingNewShotCountRef.current > 0 && baselineShotIdsRef.current) {
-    // Still waiting - show skeleton
-    pendingSkeletonShot = { imageCount: pendingNewShotCountRef.current };
+    const baseline = baselineShotIdsRef.current;
+    const newShotAlreadyInData = currentShotIds.some(id => !baseline.has(id));
+    if (!newShotAlreadyInData) {
+      // Still waiting - show skeleton
+      pendingSkeletonShot = { imageCount: pendingNewShotCountRef.current };
+    }
   }
 
   // Handle drag enter for new shot drop zone
