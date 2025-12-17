@@ -25,7 +25,7 @@ import { useCurrentProject } from '@/shared/hooks/useCurrentProject';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
-import { Plus, Upload } from 'lucide-react';
+import { Plus, Upload, Loader2 } from 'lucide-react';
 import { getDragType, getGenerationDropData, isFileDrag, type GenerationDropData, type DragType } from '@/shared/lib/dragDrop';
 
 interface ShotListDisplayProps {
@@ -40,6 +40,7 @@ interface ShotListDisplayProps {
   onGenerationDropForNewShot?: (data: GenerationDropData) => Promise<void>;
   // Drop handling for external files
   onFilesDropForNewShot?: (files: File[]) => Promise<void>;
+  onFilesDropOnShot?: (shotId: string, files: File[]) => Promise<void>;
 }
 
 
@@ -54,6 +55,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   onGenerationDropOnShot,
   onGenerationDropForNewShot,
   onFilesDropForNewShot,
+  onFilesDropOnShot,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -388,6 +390,8 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   // Drop state for "New Shot" drop zone
   const [isNewShotDropTarget, setIsNewShotDropTarget] = useState(false);
   const [newShotDropType, setNewShotDropType] = useState<DragType>('none');
+  // Processing state for showing loading during upload
+  const [isNewShotProcessing, setIsNewShotProcessing] = useState(false);
 
   // Handle drag enter for new shot drop zone
   const handleNewShotDragEnter = useCallback((e: React.DragEvent) => {
@@ -427,7 +431,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     setIsNewShotDropTarget(false);
     setNewShotDropType('none');
 
-    // Try generation drop first
+    // Try generation drop first (fast - no loading state needed)
     const generationData = getGenerationDropData(e);
     if (generationData && onGenerationDropForNewShot) {
       console.log('[ShotDrop] Dropping generation to create new shot:', {
@@ -460,11 +464,14 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         timestamp: Date.now()
       });
 
+      setIsNewShotProcessing(true);
       try {
         await onFilesDropForNewShot(validFiles);
       } catch (error) {
         console.error('[ShotDrop] Error creating new shot from files:', error);
         toast.error(`Failed to create shot: ${(error as Error).message}`);
+      } finally {
+        setIsNewShotProcessing(false);
       }
     }
   }, [onGenerationDropForNewShot, onFilesDropForNewShot]);
@@ -529,15 +536,24 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
               onDragOver={handleNewShotDragOver}
               onDragLeave={handleNewShotDragLeave}
               onDrop={handleNewShotDrop}
-              onClick={onCreateNewShot}
+              onClick={isNewShotProcessing ? undefined : onCreateNewShot}
               className={cn(
-                'group min-h-32 p-4 border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer flex flex-col items-center justify-center gap-3',
-                isNewShotDropTarget 
-                  ? 'border-green-500 bg-green-500/10 scale-105' 
-                  : 'border-border hover:border-[hsl(40,55%,58%)]'
+                'group min-h-32 p-4 border-2 border-dashed rounded-lg transition-all duration-200 flex flex-col items-center justify-center gap-3',
+                isNewShotProcessing
+                  ? 'border-primary/50 bg-primary/5 cursor-wait'
+                  : isNewShotDropTarget 
+                    ? 'border-green-500 bg-green-500/10 scale-105 cursor-pointer' 
+                    : 'border-border hover:border-[hsl(40,55%,58%)] cursor-pointer'
               )}
             >
-              {isNewShotDropTarget ? (
+              {isNewShotProcessing ? (
+                <>
+                  <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                  <span className="text-sm font-medium text-primary">
+                    Creating shot...
+                  </span>
+                </>
+              ) : isNewShotDropTarget ? (
                 <>
                   <Upload className="h-10 w-10 text-green-500 animate-bounce" />
                   <span className="text-sm font-medium text-green-500">
@@ -571,6 +587,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 projectAspectRatio={currentProject?.aspectRatio}
                 isHighlighted={highlightedShotId === shot.id}
                 onGenerationDrop={onGenerationDropOnShot}
+                onFilesDrop={onFilesDropOnShot}
               />
             );
           })}

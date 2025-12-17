@@ -4,7 +4,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { Shot } from '@/types/shots';
 import VideoShotDisplay from './VideoShotDisplay';
 import { cn } from '@/shared/lib/utils';
-import { isGenerationDrag, getGenerationDropData, type GenerationDropData } from '@/shared/lib/dragDrop';
+import { isValidDropTarget, getGenerationDropData, isFileDrag, type GenerationDropData } from '@/shared/lib/dragDrop';
+import { Loader2 } from 'lucide-react';
 
 interface SortableShotItemProps {
   shot: Shot;
@@ -18,6 +19,8 @@ interface SortableShotItemProps {
   isHighlighted?: boolean;
   // Drop handling for generations from GenerationsPane
   onGenerationDrop?: (shotId: string, data: GenerationDropData) => Promise<void>;
+  // Drop handling for external files
+  onFilesDrop?: (shotId: string, files: File[]) => Promise<void>;
 }
 
 const SortableShotItem: React.FC<SortableShotItemProps> = ({
@@ -31,6 +34,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   projectAspectRatio,
   isHighlighted = false,
   onGenerationDrop,
+  onFilesDrop,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -49,25 +53,32 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
 
   // Drop state for visual feedback
   const [isDropTarget, setIsDropTarget] = useState(false);
+  // Processing state for showing loading indicator during upload
+  const [isProcessingDrop, setIsProcessingDrop] = useState(false);
+
+  // Check if we can accept this drop (generation or file)
+  const canAcceptDrop = useCallback((e: React.DragEvent): boolean => {
+    return isValidDropTarget(e) && (!!onGenerationDrop || !!onFilesDrop);
+  }, [onGenerationDrop, onFilesDrop]);
 
   // Handle drag enter for drop feedback
   const handleDragEnter = useCallback((e: React.DragEvent) => {
-    if (isGenerationDrag(e) && onGenerationDrop) {
+    if (canAcceptDrop(e)) {
       e.preventDefault();
       e.stopPropagation();
       setIsDropTarget(true);
     }
-  }, [onGenerationDrop]);
+  }, [canAcceptDrop]);
 
   // Handle drag over to allow drop
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (isGenerationDrag(e) && onGenerationDrop) {
+    if (canAcceptDrop(e)) {
       e.preventDefault();
       e.stopPropagation();
       e.dataTransfer.dropEffect = 'copy';
       setIsDropTarget(true);
     }
-  }, [onGenerationDrop]);
+  }, [canAcceptDrop]);
 
   // Handle drag leave
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -83,24 +94,52 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
     e.stopPropagation();
     setIsDropTarget(false);
 
-    if (!onGenerationDrop) return;
+    // Try generation drop first (fast - no loading state needed)
+    const generationData = getGenerationDropData(e);
+    if (generationData && onGenerationDrop) {
+      console.log('[ShotDrop] Dropping generation onto shot:', {
+        shotId: shot.id.substring(0, 8),
+        shotName: shot.name,
+        generationId: generationData.generationId?.substring(0, 8),
+        timestamp: Date.now()
+      });
 
-    const data = getGenerationDropData(e);
-    if (!data) return;
-    
-    console.log('[ShotDrop] Dropping generation onto shot:', {
-      shotId: shot.id.substring(0, 8),
-      shotName: shot.name,
-      generationId: data.generationId?.substring(0, 8),
-      timestamp: Date.now()
-    });
-
-    try {
-      await onGenerationDrop(shot.id, data);
-    } catch (error) {
-      console.error('[ShotDrop] Error handling drop:', error);
+      try {
+        await onGenerationDrop(shot.id, generationData);
+      } catch (error) {
+        console.error('[ShotDrop] Error handling generation drop:', error);
+      }
+      return;
     }
-  }, [onGenerationDrop, shot.id, shot.name]);
+
+    // Try file drop
+    if (isFileDrag(e) && onFilesDrop) {
+      const files = Array.from(e.dataTransfer.files);
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      const validFiles = files.filter(file => validImageTypes.includes(file.type));
+      
+      if (validFiles.length === 0) {
+        console.warn('[ShotDrop] No valid image files in drop');
+        return;
+      }
+
+      console.log('[ShotDrop] Dropping files onto shot:', {
+        shotId: shot.id.substring(0, 8),
+        shotName: shot.name,
+        fileCount: validFiles.length,
+        timestamp: Date.now()
+      });
+
+      setIsProcessingDrop(true);
+      try {
+        await onFilesDrop(shot.id, validFiles);
+      } catch (error) {
+        console.error('[ShotDrop] Error handling file drop:', error);
+      } finally {
+        setIsProcessingDrop(false);
+      }
+    }
+  }, [onGenerationDrop, onFilesDrop, shot.id, shot.name]);
 
   // [ShotReorderDebug] Log dragging state changes (only when actually dragging to reduce noise)
   React.useEffect(() => {
@@ -131,8 +170,9 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        'transition-all duration-200',
-        isDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]'
+        'transition-all duration-200 relative',
+        isDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]',
+        isProcessingDrop && 'ring-2 ring-primary/50 ring-offset-2 ring-offset-background'
       )}
     >
       <VideoShotDisplay
@@ -152,6 +192,15 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
         projectAspectRatio={projectAspectRatio}
         isHighlighted={isHighlighted || isDropTarget}
       />
+      {/* Loading overlay during file upload */}
+      {isProcessingDrop && (
+        <div className="absolute inset-0 bg-background/60 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            <span className="text-sm text-muted-foreground">Uploading...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

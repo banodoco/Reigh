@@ -2026,6 +2026,36 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     }
   }, [selectedProjectId, shots, handleExternalImageDropMutation, refetchShots, setShotSortMode]);
 
+  // Handle dropping files onto an existing shot
+  const handleFilesDropOnShot = useCallback(async (shotId: string, files: File[]) => {
+    if (!selectedProjectId) {
+      toast.error('No project selected');
+      return;
+    }
+
+    console.log('[ShotDrop] Adding files to existing shot:', {
+      shotId: shotId.substring(0, 8),
+      fileCount: files.length,
+      fileNames: files.map(f => f.name),
+      timestamp: Date.now()
+    });
+
+    try {
+      await handleExternalImageDropMutation.mutateAsync({
+        imageFiles: files,
+        targetShotId: shotId, // Add to existing shot
+        currentProjectQueryKey: selectedProjectId,
+        currentShotCount: shots?.length ?? 0
+      });
+
+      // Refetch shots to update the list
+      refetchShots();
+    } catch (error) {
+      console.error('[ShotDrop] Failed to add files to shot:', error);
+      toast.error(`Failed to add images: ${(error as Error).message}`);
+    }
+  }, [selectedProjectId, shots, handleExternalImageDropMutation, refetchShots]);
+
   const handleShotSelect = (shot: Shot) => {
     console.log('[ShotNavPerf] === SHOT CLICKED FROM LIST ===', {
       timestamp: Date.now(),
@@ -2584,6 +2614,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                 onGenerationDropOnShot={handleGenerationDropOnShot}
                 onGenerationDropForNewShot={handleGenerationDropForNewShot}
                 onFilesDropForNewShot={handleFilesDropForNewShot}
+                onFilesDropOnShot={handleFilesDropOnShot}
               />
               </div>
             )
