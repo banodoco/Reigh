@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
+import { useRenderCount } from '@/shared/components/debug/RefactorMetricsCollector';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages, triggerImageGarbageCollection } from '@/shared/hooks/useAdjacentPagePreloading';
@@ -37,6 +38,9 @@ import { PANE_CONFIG } from '@/shared/config/panes';
 const GENERATIONS_PER_PAGE = 18;
 
 const GenerationsPaneComponent: React.FC = () => {
+  // [RefactorMetrics] Track render count for baseline measurements
+  useRenderCount('GenerationsPane');
+  
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();

@@ -22,6 +22,8 @@ import '@/shared/lib/mobileProjectDebug';
 import { getNetworkStatusManager } from '@/shared/lib/NetworkStatusManager';
 // [MobileHeatDebug] Import performance monitor for mobile heating issues
 import { perfMonitor } from '@/shared/utils/mobilePerformanceMonitor';
+// [RefactorMetrics] Temporary component for baseline measurements - remove after refactor
+import { RefactorMetricsCollector } from '@/shared/components/debug/RefactorMetricsCollector';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -264,6 +266,7 @@ function App() {
                 <LastAffectedShotProvider>
                   <CurrentShotProvider>
                     <ToolPageHeaderProvider>
+                      <RefactorMetricsCollector />
                       <AppInternalContent />
                     </ToolPageHeaderProvider>
                   </CurrentShotProvider>
