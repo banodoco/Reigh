@@ -45,6 +45,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   const [files, setFiles] = useState<File[]>([]);
   const [aspectRatio, setAspectRatio] = useState<string>('');
   const [updateProjectAspectRatio, setUpdateProjectAspectRatio] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); // Local state for cropping phase
   const isMobile = useIsMobile();
   const { updateProject } = useProject();
   
@@ -72,6 +73,8 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
     if (!finalShotName) {
       finalShotName = defaultShotName || 'Untitled Shot';
     }
+    
+    setIsProcessing(true);
     
     try {
       // Process files with cropping based on aspect ratio
@@ -107,16 +110,18 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
       // Start submission (don't await - parent handles async with skeleton)
       onSubmit(finalShotName, processedFiles, aspectRatio || null);
       
-      // Clear form and close immediately
+      // Clear form and close
       setShotName('');
       setFiles([]);
       setAspectRatio(projectAspectRatio || '3:2');
       setUpdateProjectAspectRatio(false);
+      setIsProcessing(false);
       onClose();
     } catch (error) {
       // Cropping failed - show error but don't close
       console.error('Shot creation failed:', error);
       toast.error('Failed to process images');
+      setIsProcessing(false);
     }
   };
 
@@ -169,7 +174,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
               <AspectRatioSelector
                 value={aspectRatio}
                 onValueChange={setAspectRatio}
-                disabled={isLoading}
+                disabled={isProcessing}
                 id="shot-aspect-ratio"
                 showVisualizer={true}
               />
@@ -181,7 +186,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
                     id="update-project-aspect-ratio"
                     checked={updateProjectAspectRatio}
                     onCheckedChange={(checked) => setUpdateProjectAspectRatio(checked === true)}
-                    disabled={isLoading}
+                    disabled={isProcessing}
                   />
                   <Label
                     htmlFor="update-project-aspect-ratio"
@@ -197,11 +202,11 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
         
         <div className={modal.footerClass}>
           <DialogFooter className={`${modal.isMobile ? 'px-4 pt-4 pb-0 flex-row justify-between' : 'px-6 pt-5 pb-0'} border-t`}>
-            <Button variant="retro-secondary" size="retro-sm" onClick={handleClose} disabled={isLoading} className={modal.isMobile ? '' : 'mr-auto'}>
+            <Button variant="retro-secondary" size="retro-sm" onClick={handleClose} disabled={isProcessing} className={modal.isMobile ? '' : 'mr-auto'}>
               Cancel
             </Button>
-            <Button variant="retro" size="retro-sm" type="submit" onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? 'Creating...' : 'New Shot'}
+            <Button variant="retro" size="retro-sm" type="submit" onClick={handleSubmit} disabled={isProcessing}>
+              {isProcessing ? 'Processing...' : 'New Shot'}
             </Button>
           </DialogFooter>
         </div>
