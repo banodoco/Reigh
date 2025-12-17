@@ -39,7 +39,7 @@ import {
 } from '../utils/validation';
 import { useJoinClipsSettings } from '../hooks/useJoinClipsSettings';
 import { generateUUID } from '@/shared/lib/taskCreation';
-import { JoinClipsSettingsForm, type ClipPairInfo } from '@/tools/join-clips/components/JoinClipsSettingsForm';
+import { JoinClipsSettingsForm, type ClipPairInfo, DEFAULT_JOIN_CLIPS_PHASE_CONFIG, buildJoinClipsPhaseConfig, BUILTIN_JOIN_CLIPS_DEFAULT_ID } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import {
   DndContext,
   closestCenter,
@@ -457,6 +457,10 @@ const JoinClipsPage: React.FC = () => {
     useInputVideoFps = false,
     noisedInputVideo = 0,
     loopFirstClip = false,
+    motionMode = 'basic',
+    phaseConfig,
+    randomSeed = true,
+    selectedPhasePresetId = BUILTIN_JOIN_CLIPS_DEFAULT_ID,
   } = joinSettings.settings;
   
   // Debug: Log enhancePrompt value
@@ -1306,10 +1310,18 @@ const JoinClipsPage: React.FC = () => {
         priority: joinSettings.settings.priority || 0,
         use_input_video_resolution: useInputVideoResolution,
         use_input_video_fps: useInputVideoFps,
-        ...(lorasForTask.length > 0 && { loras: lorasForTask }),
+        // In advanced mode, pass the phaseConfig directly
+        // In basic mode, pass LoRAs (they'll be merged into default phaseConfig)
+        ...(motionMode === 'advanced' && phaseConfig
+          ? { phase_config: phaseConfig }
+          : lorasForTask.length > 0 && { loras: lorasForTask }
+        ),
         ...(resolutionTuple && { resolution: resolutionTuple }),
         ...(noisedInputVideo > 0 && { vid2vid_init_strength: noisedInputVideo }),
         ...(isLooping && { loop_first_clip: true }),
+        // Motion settings for UI state restoration
+        motion_mode: motionMode,
+        selected_phase_preset_id: selectedPhasePresetId,
       };
       
       console.log('[JoinClips] Creating task with params:', taskParams);
@@ -1605,12 +1617,32 @@ const JoinClipsPage: React.FC = () => {
                                 useInputVideoResolution: false,
                                 useInputVideoFps: false,
                                 noisedInputVideo: 0,
+                                // Reset motion settings to basic mode with default phaseConfig
+                                motionMode: 'basic',
+                                phaseConfig: DEFAULT_JOIN_CLIPS_PHASE_CONFIG,
+                                selectedPhasePresetId: BUILTIN_JOIN_CLIPS_DEFAULT_ID,
                               });
                               // Clear LoRAs
                               loraManager.setSelectedLoras([]);
                             }}
                             shortestClipFrames={validationResult?.shortestClipFrames}
                             clipPairs={clipPairs}
+                            motionMode={motionMode as 'basic' | 'advanced'}
+                            onMotionModeChange={(mode) => joinSettings.updateField('motionMode', mode)}
+                            phaseConfig={phaseConfig ?? DEFAULT_JOIN_CLIPS_PHASE_CONFIG}
+                            onPhaseConfigChange={(config) => joinSettings.updateField('phaseConfig', config)}
+                            randomSeed={randomSeed}
+                            onRandomSeedChange={(val) => joinSettings.updateField('randomSeed', val)}
+                            selectedPhasePresetId={selectedPhasePresetId}
+                            onPhasePresetSelect={(presetId, config, _metadata) => {
+                              joinSettings.updateFields({
+                                selectedPhasePresetId: presetId,
+                                phaseConfig: config,
+                              });
+                            }}
+                            onPhasePresetRemove={() => {
+                              joinSettings.updateField('selectedPhasePresetId', null);
+                            }}
                           />
         </Card>
 

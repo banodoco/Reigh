@@ -277,7 +277,9 @@ async function markOrchestratorComplete(
 }
 
 /**
- * Handle parent generation update for join_clips completion
+ * Handle variant creation for join_clips completion
+ * Note: We only create a variant - we do NOT update the parent generation's location
+ * Each task output has its own unique URL via the variant system
  */
 async function handleJoinClipsParentUpdate(
   supabase: any,
@@ -297,12 +299,6 @@ async function handleJoinClipsParentUpdate(
   console.log(`[OrchestratorComplete] Creating variant for parent generation ${parentGenId}`);
   
   try {
-    const { data: parentGen } = await supabase
-      .from('generations')
-      .select('params')
-      .eq('id', parentGenId)
-      .single();
-    
     const variantParams = {
       ...orchestratorTask.params,
       tool_type: orchestratorTask.params?.tool_type || orchestratorTask.params?.orchestrator_details?.tool_type || 'join-clips',
@@ -312,29 +308,10 @@ async function handleJoinClipsParentUpdate(
     };
 
     await createVariant(supabase, parentGenId, publicUrl, thumbnailUrl, variantParams, true, 'clip_join', null);
-
-    const updatedParams = {
-      ...(parentGen?.params || {}),
-      tool_type: orchestratorTask.params?.tool_type || 'join-clips',
-    };
     
-    const { error: updateGenError } = await supabase
-      .from('generations')
-      .update({
-        location: publicUrl,
-        thumbnail_url: thumbnailUrl,
-        type: 'video',
-        params: updatedParams
-      })
-      .eq('id', parentGenId);
-    
-    if (updateGenError) {
-      console.error(`[OrchestratorComplete] Failed to update parent generation ${parentGenId}:`, updateGenError);
-    } else {
-      console.log(`[OrchestratorComplete] Successfully updated parent generation ${parentGenId}`);
-    }
+    console.log(`[OrchestratorComplete] Successfully created variant for parent generation ${parentGenId}`);
   } catch (genUpdateErr) {
-    console.error(`[OrchestratorComplete] Exception updating parent generation:`, genUpdateErr);
+    console.error(`[OrchestratorComplete] Exception creating variant:`, genUpdateErr);
   }
 }
 

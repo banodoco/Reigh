@@ -31,8 +31,10 @@ import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { MotionControl } from '@/tools/travel-between-images/components/MotionControl';
-import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
+import { MotionPresetSelector, type BuiltinPreset } from '@/shared/components/MotionPresetSelector';
+import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
+import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
+import { PhaseConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
 import { quantizeFrameCount, framesToSeconds } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
 import { createMobileTapHandler, deriveInputImages } from '../utils/gallery-utils';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
@@ -45,6 +47,40 @@ declare global {
     mobileVideoPreloadMap?: Map<number, () => void>;
   }
 }
+
+// =============================================================================
+// BUILT-IN PRESETS FOR SEGMENT REGENERATION
+// Uses the same defaults as Video Travel Tool (I2V and VACE modes)
+// =============================================================================
+
+const BUILTIN_I2V_PRESET_ID = '__builtin_segment_i2v_default__';
+const BUILTIN_VACE_PRESET_ID = '__builtin_segment_vace_default__';
+
+const BUILTIN_I2V_PRESET: BuiltinPreset = {
+  id: BUILTIN_I2V_PRESET_ID,
+  metadata: {
+    name: 'Basic',
+    description: 'Standard I2V generation',
+    phaseConfig: DEFAULT_PHASE_CONFIG,
+    generationTypeMode: 'i2v',
+  }
+};
+
+const BUILTIN_VACE_PRESET: BuiltinPreset = {
+  id: BUILTIN_VACE_PRESET_ID,
+  metadata: {
+    name: 'Basic',
+    description: 'Standard VACE generation with structure video',
+    phaseConfig: DEFAULT_VACE_PHASE_CONFIG,
+    generationTypeMode: 'vace',
+  }
+};
+
+// Helper to detect generation mode from model name
+const detectGenerationMode = (modelName?: string): 'i2v' | 'vace' => {
+  if (!modelName) return 'i2v';
+  return modelName.toLowerCase().includes('vace') ? 'vace' : 'i2v';
+};
 
 interface ChildGenerationsViewProps {
     parentGenerationId: string;
@@ -1413,10 +1449,28 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         };
     }, [segmentGenerationIds, freshGenerationUrls, index]);
     
+    // Detect generation mode from model name (I2V vs VACE)
+    const generationMode = useMemo(() => {
+        const modelName = params.model_name || params.orchestrator_details?.model_name;
+        return detectGenerationMode(modelName);
+    }, [params.model_name, params.orchestrator_details?.model_name]);
+    
+    // Get the appropriate built-in preset based on generation mode
+    const builtinPreset = useMemo(() => {
+        return generationMode === 'vace' ? BUILTIN_VACE_PRESET : BUILTIN_I2V_PRESET;
+    }, [generationMode]);
+    
+    const builtinPresetId = useMemo(() => {
+        return generationMode === 'vace' ? BUILTIN_VACE_PRESET_ID : BUILTIN_I2V_PRESET_ID;
+    }, [generationMode]);
+    
     // Motion control state - derived from params
     const [motionMode, setMotionMode] = useState<'basic' | 'advanced'>(() => {
         const orchestrator = params.orchestrator_details || {};
         if (orchestrator.advanced_mode || params.advanced_mode) return 'advanced';
+        // Check motion_mode from params (may have been saved from previous regeneration)
+        const savedMotionMode = orchestrator.motion_mode || params.motion_mode;
+        if (savedMotionMode === 'advanced') return 'advanced';
         return 'basic';
     });
     // Derive advancedMode from motionMode - single source of truth
@@ -1433,8 +1487,17 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         if (params.phase_config) return params.phase_config;
         return undefined;
     });
-    const [selectedPhasePresetId, setSelectedPhasePresetId] = useState<string | null>(null);
-    const [randomSeed, setRandomSeed] = useState(true);
+    const [selectedPhasePresetId, setSelectedPhasePresetId] = useState<string | null>(() => {
+        // Try to restore preset ID from params (if previously saved)
+        const orchestrator = params.orchestrator_details || {};
+        return orchestrator.selected_phase_preset_id || params.selected_phase_preset_id || null;
+    });
+    const [randomSeed, setRandomSeed] = useState(() => {
+        // Try to restore random seed setting from params
+        const orchestrator = params.orchestrator_details || {};
+        const savedRandomSeed = orchestrator.random_seed ?? params.random_seed;
+        return savedRandomSeed !== undefined ? savedRandomSeed : true;
+    });
     
     // LoRA state - derived from params.additional_loras
     const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>(() => {
@@ -1450,15 +1513,15 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         });
     });
     
-    // Handlers for motion control
+    // Handlers for motion control (aligned with MotionPresetSelector API)
     const handleMotionModeChange = useCallback((mode: 'basic' | 'advanced') => {
         setMotionMode(mode);
         setIsDirty(true);
-        // Initialize phaseConfig when switching to advanced
+        // Initialize phaseConfig when switching to advanced using appropriate default
         if (mode === 'advanced' && !phaseConfig) {
-            setPhaseConfig(DEFAULT_PHASE_CONFIG);
+            setPhaseConfig(builtinPreset.metadata.phaseConfig);
         }
-    }, [phaseConfig]);
+    }, [phaseConfig, builtinPreset]);
     
     const handleAmountOfMotionChange = useCallback((value: number) => {
         setAmountOfMotion(value);
@@ -1470,7 +1533,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         setIsDirty(true);
     }, []);
     
-    const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig) => {
+    const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, _metadata?: any) => {
         setSelectedPhasePresetId(presetId);
         setPhaseConfig(config);
         setIsDirty(true);
@@ -1498,6 +1561,23 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
     
     const handleLoraStrengthChange = useCallback((loraId: string, strength: number) => {
         setSelectedLoras(prev => prev.map(l => l.id === loraId ? { ...l, strength } : l));
+        setIsDirty(true);
+    }, []);
+    
+    // Handle LoRA selection from modal
+    const handleLoraSelect = useCallback((lora: LoraModel) => {
+        setSelectedLoras(prev => {
+            // Check if already selected
+            if (prev.some(l => l.id === lora.id || l.path === lora.path)) {
+                return prev;
+            }
+            return [...prev, {
+                id: lora.id || lora.path,
+                name: lora.name,
+                path: lora.path,
+                strength: lora.default_strength || 1.0,
+            }];
+        });
         setIsDirty(true);
     }, []);
 
@@ -1654,15 +1734,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         toast
     ]);
     
-    // Current settings for MotionControl
-    const currentMotionSettings = useMemo(() => ({
-        basePrompt: params.base_prompt || params.prompt || '',
-        negativePrompt: params.negative_prompt || '',
-        enhancePrompt: params.enhancePrompt || params.orchestrator_details?.enhance_prompt || false,
-        durationFrames: quantizeFrameCount(params.num_frames || 61, 9), // Quantize to 4N+1 format
-        selectedLoras: selectedLoras.map(l => ({ id: l.id, name: l.name, strength: l.strength })),
-    }), [params, selectedLoras]);
-
     // Update local state when child prop changes
     useEffect(() => {
         setParams(child.params || {});
@@ -2004,23 +2075,47 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                             </div>
                         </div>
 
-                        {/* Motion Control - Same component as main page */}
-                        <MotionControl
-                            motionMode={motionMode === 'presets' ? 'basic' : motionMode}
-                            onMotionModeChange={handleMotionModeChange}
-                            selectedLoras={selectedLoras}
-                            availableLoras={availableLoras}
-                            onAddLoraClick={handleAddLoraClick}
-                            onRemoveLora={handleRemoveLora}
-                            onLoraStrengthChange={handleLoraStrengthChange}
+                        {/* Motion Settings - Using shared MotionPresetSelector */}
+                        <MotionPresetSelector
+                            builtinPreset={builtinPreset}
+                            featuredPresetIds={[]}
+                            generationTypeMode={generationMode}
                             selectedPhasePresetId={selectedPhasePresetId}
-                            onPhasePresetSelect={handlePhasePresetSelect}
-                            onPhasePresetRemove={handlePhasePresetRemove}
-                            currentSettings={currentMotionSettings}
-                            phaseConfig={phaseConfig}
+                            phaseConfig={phaseConfig ?? builtinPreset.metadata.phaseConfig}
+                            motionMode={motionMode}
+                            onPresetSelect={handlePhasePresetSelect}
+                            onPresetRemove={handlePhasePresetRemove}
+                            onModeChange={handleMotionModeChange}
                             onPhaseConfigChange={handlePhaseConfigChange}
+                            availableLoras={availableLoras}
                             randomSeed={randomSeed}
                             onRandomSeedChange={handleRandomSeedChange}
+                            queryKeyPrefix={`segment-${index}-presets`}
+                            renderBasicModeContent={() => (
+                                <div className="space-y-3">
+                                    <ActiveLoRAsDisplay
+                                        selectedLoras={selectedLoras}
+                                        onRemoveLora={handleRemoveLora}
+                                        onLoraStrengthChange={handleLoraStrengthChange}
+                                        availableLoras={availableLoras}
+                                    />
+                                    <button
+                                        onClick={handleAddLoraClick}
+                                        className="w-full text-sm text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 rounded-lg py-2 transition-colors"
+                                    >
+                                        Add or manage LoRAs
+                                    </button>
+                                </div>
+                            )}
+                        />
+                        
+                        {/* LoRA Selector Modal */}
+                        <LoraSelectorModal
+                            isOpen={isLoraModalOpen}
+                            onClose={() => setIsLoraModalOpen(false)}
+                            onSelect={handleLoraSelect}
+                            availableLoras={availableLoras}
+                            selectedLoras={selectedLoras.map(l => l.id)}
                         />
                     </CollapsibleContent>
                 </Collapsible>

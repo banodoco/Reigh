@@ -3,25 +3,7 @@ import {
   TaskValidationError,
   resolveProjectResolution 
 } from "../taskCreation";
-
-/**
- * Phase configuration for advanced motion control
- */
-export interface PhaseConfig {
-  num_phases: number;
-  steps_per_phase: number[];
-  flow_shift: number;
-  sample_solver: string;
-  model_switch_phase: number;
-  phases: Array<{
-    phase: number;
-    guidance_scale: number;
-    loras: Array<{
-      url: string;
-      multiplier: string;
-    }>;
-  }>;
-}
+import { PhaseConfig } from '@/tools/travel-between-images/settings';
 
 /**
  * Interface for individual travel segment regeneration task parameters

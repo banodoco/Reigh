@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { generateUUID, generateRunId, createTask } from '@/shared/lib/taskCreation';
 import { MultiPortionTimeline, formatTime, PortionSelection } from '@/shared/components/VideoPortionTimeline';
+import { DEFAULT_VACE_PHASE_CONFIG, buildPhaseConfigWithLoras, BUILTIN_VACE_DEFAULT_ID } from '@/shared/lib/vaceDefaults';
 
 // PortionSelection is now imported from shared component
 
@@ -183,6 +184,10 @@ export function InlineEditVideoView({
     contextFrameCount = 8,
     gapFrameCount = 12,
     enhancePrompt = true,
+    motionMode = 'basic',
+    phaseConfig: savedPhaseConfig,
+    randomSeed = true,
+    selectedPhasePresetId,
   } = editSettings.settings;
   
   // Hardcoded settings
@@ -532,57 +537,13 @@ export function InlineEditVideoView({
         }
       }
       
-      // Build phase config for lightning model (same as join clips)
-      // Default motion scale LoRA that's always included
-      const defaultLora = {
-        url: "https://huggingface.co/peteromallet/random_junk/resolve/main/motion_scale_000006500_high_noise.safetensors",
-        multiplier: "1.25"
-      };
-
-      // Convert user LoRAs to phase config format
-      const additionalLoras = lorasForTask
-        .filter(lora => lora.path)
-        .map(lora => ({
-          url: lora.path,
-          multiplier: lora.strength.toFixed(2)
-        }));
-
-      const phaseConfig = {
-        phases: [
-          { 
-            phase: 1, 
-            guidance_scale: 3.0, 
-            loras: [
-              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "0.75" },
-              defaultLora,
-              ...additionalLoras
-            ]
-          },
-          { 
-            phase: 2, 
-            guidance_scale: 1.0, 
-            loras: [
-              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "1.0" },
-              defaultLora,
-              ...additionalLoras
-            ]
-          },
-          { 
-            phase: 3, 
-            guidance_scale: 1.0, 
-            loras: [
-              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors", multiplier: "1.0" },
-              defaultLora,
-              ...additionalLoras
-            ]
-          }
-        ],
-        flow_shift: 5.0,
-        num_phases: 3,
-        sample_solver: "euler",
-        steps_per_phase: [2, 2, 5],
-        model_switch_phase: 2
-      };
+      // Build phase config based on motion mode
+      // In Advanced mode: use the saved phaseConfig directly
+      // In Basic mode: use saved/default config with additional user LoRAs merged in
+      const baseConfig = savedPhaseConfig || DEFAULT_VACE_PHASE_CONFIG;
+      const phaseConfig = motionMode === 'advanced' 
+        ? baseConfig 
+        : buildPhaseConfigWithLoras(lorasForTask, baseConfig);
       
       // Calculate the minimum keeper clip length to cap context_frame_count
       // Keeper clips are the segments BETWEEN the portions being regenerated
@@ -658,6 +619,10 @@ export function InlineEditVideoView({
         num_inference_steps: editSettings.settings.numInferenceSteps || 6,
         guidance_scale: editSettings.settings.guidanceScale || 3,
         phase_config: phaseConfig,
+        
+        // Motion settings for UI state restoration
+        motion_mode: motionMode,
+        selected_phase_preset_id: selectedPhasePresetId,
         
         // Parent generation for tracking
         parent_generation_id: media.id,
@@ -913,6 +878,24 @@ export function InlineEditVideoView({
             availableLoras={availableLoras}
             projectId={selectedProjectId}
             loraManager={loraManager}
+            // Motion settings
+            motionMode={motionMode as 'basic' | 'advanced'}
+            onMotionModeChange={(mode) => editSettings.updateField('motionMode', mode)}
+            phaseConfig={savedPhaseConfig ?? DEFAULT_VACE_PHASE_CONFIG}
+            onPhaseConfigChange={(config) => editSettings.updateField('phaseConfig', config)}
+            randomSeed={randomSeed}
+            onRandomSeedChange={(val) => editSettings.updateField('randomSeed', val)}
+            selectedPhasePresetId={selectedPhasePresetId ?? BUILTIN_VACE_DEFAULT_ID}
+            onPhasePresetSelect={(presetId, config) => {
+              editSettings.updateFields({
+                selectedPhasePresetId: presetId,
+                phaseConfig: config,
+              });
+            }}
+            onPhasePresetRemove={() => {
+              editSettings.updateField('selectedPhasePresetId', null);
+            }}
+            // Actions
             onGenerate={handleGenerate}
             isGenerating={generateMutation.isPending}
             generateSuccess={showSuccessState}

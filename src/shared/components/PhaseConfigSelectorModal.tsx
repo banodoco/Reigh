@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { Switch } from "@/shared/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/shared/components/ui/alert-dialog";
-import { Info, X, Layers, Zap, Settings2, Trash2, Pencil, RotateCcw, Search, Download } from 'lucide-react';
+import { Info, X, Layers, Zap, Settings2, Trash2, Pencil, RotateCcw, Search, Download, Copy, Check } from 'lucide-react';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -61,6 +61,46 @@ interface PhaseConfigSelectorModalProps {
   };
 }
 
+type ModelTypeFilter = 'all' | 'i2v' | 'vace';
+
+// Small component to copy preset ID to clipboard
+const CopyIdButton: React.FC<{ id: string }> = ({ id }) => {
+  const [copied, setCopied] = React.useState(false);
+  
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy ID:', err);
+    }
+  };
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={handleCopy}
+          className="p-1 rounded text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-colors"
+          title="Copy preset ID"
+        >
+          {copied ? (
+            <Check className="h-3 w-3 text-green-500" />
+          ) : (
+            <Copy className="h-3 w-3" />
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-xs">{copied ? 'Copied!' : 'Copy preset ID'}</p>
+        {!copied && <p className="text-xs text-muted-foreground font-mono">{id.substring(0, 8)}...</p>}
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
 interface BrowsePresetsTabProps {
   onSelectPreset: (preset: Resource & { metadata: PhaseConfigMetadata }) => void;
   onRemovePreset: () => void;
@@ -80,6 +120,8 @@ interface BrowsePresetsTabProps {
   onPageChange?: (page: number, totalPages: number, setPage: (page: number) => void) => void;
   intent?: 'load' | 'overwrite';
   onOverwrite?: (preset: Resource & { metadata: PhaseConfigMetadata }) => void;
+  // Model type filter
+  initialModelTypeFilter?: ModelTypeFilter;
 }
 
 const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({ 
@@ -100,11 +142,13 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
   onProcessedPresetsLengthChange,
   onPageChange,
   intent = 'load',
-  onOverwrite
+  onOverwrite,
+  initialModelTypeFilter = 'all'
 }) => {
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>('newest');
+  const [modelTypeFilter, setModelTypeFilter] = useState<ModelTypeFilter>(initialModelTypeFilter);
   const [page, setPage] = useState(0);
   const ITEMS_PER_PAGE = 12;
   
@@ -196,6 +240,14 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
       filtered = filtered.filter(preset => preset.id === selectedPresetId);
     }
     
+    // Filter by model type (I2V vs VACE)
+    if (modelTypeFilter !== 'all') {
+      filtered = filtered.filter(preset => {
+        const presetMode = preset.metadata.generationTypeMode || 'i2v'; // Default to i2v if not set
+        return presetMode === modelTypeFilter;
+      });
+    }
+    
     // Search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -228,7 +280,7 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
         break;
     }
     return sorted;
-  }, [allPresets, searchTerm, sortOption, showMyPresetsOnly, showSelectedPresetOnly, selectedPresetId]);
+  }, [allPresets, searchTerm, sortOption, showMyPresetsOnly, showSelectedPresetOnly, selectedPresetId, modelTypeFilter]);
 
   // Update parent with processed presets length
   React.useEffect(() => {
@@ -236,7 +288,7 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
   }, [processedPresets.length, onProcessedPresetsLengthChange]);
 
   // Reset page when filter/sort changes
-  React.useEffect(() => { setPage(0); }, [searchTerm, sortOption, showMyPresetsOnly, showSelectedPresetOnly]);
+  React.useEffect(() => { setPage(0); }, [searchTerm, sortOption, showMyPresetsOnly, showSelectedPresetOnly, modelTypeFilter]);
 
   const totalPages = Math.ceil(processedPresets.length / ITEMS_PER_PAGE);
   const paginatedPresets = useMemo(() => processedPresets.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE), [processedPresets, page]);
@@ -252,16 +304,26 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
 
   return (
     <div className="relative flex flex-col h-full min-h-0 px-0 sm:px-4">
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <Input
           type="text"
           placeholder="Search presets..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="flex-grow"
+          className="flex-grow min-w-[150px]"
         />
+        <Select value={modelTypeFilter} onValueChange={(value) => setModelTypeFilter(value as ModelTypeFilter)}>
+          <SelectTrigger variant="retro" className="w-[120px]">
+            <SelectValue placeholder="Model" />
+          </SelectTrigger>
+          <SelectContent variant="retro">
+            <SelectItem variant="retro" value="all">All Models</SelectItem>
+            <SelectItem variant="retro" value="i2v">I2V</SelectItem>
+            <SelectItem variant="retro" value="vace">VACE</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={sortOption} onValueChange={(value) => setSortOption(value as SortOption)}>
-          <SelectTrigger variant="retro" className="w-[180px]">
+          <SelectTrigger variant="retro" className="w-[140px]">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent variant="retro">
@@ -313,6 +375,8 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
                                 Selected
                               </Badge>
                             )}
+                            {/* Copy ID button */}
+                            <CopyIdButton id={preset.id} />
                           </div>
                           {/* Mobile buttons */}
                           <div className={`flex gap-2 flex-shrink-0 ${isMobile ? '' : 'hidden'}`}>
@@ -2132,7 +2196,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
           <div className="flex-1 flex flex-col min-h-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
               <TabsContent value="browse" className="flex-1 flex flex-col min-h-0">
-                <BrowsePresetsTab 
+                <BrowsePresetsTab
                   onSelectPreset={onSelectPreset}
                   onRemovePreset={onRemovePreset}
                   selectedPresetId={selectedPresetId}
@@ -2151,6 +2215,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                   setShowSelectedPresetOnly={setShowSelectedPresetOnly}
                   onProcessedPresetsLengthChange={setProcessedPresetsLength}
                   onPageChange={handlePageChange}
+                  initialModelTypeFilter={generationTypeMode || 'all'}
                 />
               </TabsContent>
               <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">

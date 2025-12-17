@@ -5,39 +5,7 @@ import {
   validateRequiredFields,
   TaskValidationError
 } from "../taskCreation";
-
-// ============================================================================
-// PHASE CONFIG TYPES FOR JOIN CLIPS
-// ============================================================================
-
-/**
- * LoRA configuration for a phase
- */
-interface PhaseLoraConfig {
-  url: string;
-  multiplier: string;
-}
-
-/**
- * Settings for a single phase
- */
-interface PhaseSettings {
-  phase: number;
-  guidance_scale: number;
-  loras: PhaseLoraConfig[];
-}
-
-/**
- * Complete phase configuration
- */
-interface PhaseConfig {
-  num_phases: number;
-  steps_per_phase: number[];
-  flow_shift: number;
-  sample_solver: string;
-  model_switch_phase: number;
-  phases: PhaseSettings[];
-}
+import { PhaseConfig, PhaseLoraConfig } from '@/tools/travel-between-images/settings';
 
 // ============================================================================
 
@@ -111,7 +79,10 @@ export interface JoinClipsTaskParams {
   fps?: number;
   negative_prompt?: string;
   priority?: number;
-  loras?: Array<{ path: string; strength: number }>; // LoRA models to apply
+  loras?: Array<{ path: string; strength: number }>; // LoRA models to apply (for basic mode)
+  phase_config?: PhaseConfig; // Custom phase config (for advanced mode - overrides loras)
+  motion_mode?: 'basic' | 'advanced'; // Motion control mode for UI state restoration
+  selected_phase_preset_id?: string | null; // Selected preset ID for UI state restoration
   parent_generation_id?: string;
   tool_type?: string; // Tool type identifier for filtering results
   use_input_video_resolution?: boolean; // Use first input video's resolution instead of project resolution
@@ -298,8 +269,8 @@ function buildJoinClipsPayload(
   runId: string,
   orchestratorTaskId: string
 ): Record<string, unknown> {
-  // Build phase config with user's LoRAs merged in
-  const phaseConfig = buildJoinClipsPhaseConfig(params.loras || []);
+  // Use provided phase config (advanced mode) or build from LoRAs (basic mode)
+  const phaseConfig = params.phase_config || buildJoinClipsPhaseConfig(params.loras || []);
   
   const orchestratorDetails: Record<string, unknown> = {
     orchestrator_task_id: orchestratorTaskId,
@@ -324,6 +295,9 @@ function buildJoinClipsPayload(
     // UNIFIED: Always include phase_config and advanced_mode for consistent backend processing
     phase_config: phaseConfig,
     advanced_mode: true,
+    // Motion settings for UI state restoration
+    motion_mode: params.motion_mode ?? 'basic',
+    selected_phase_preset_id: params.selected_phase_preset_id ?? null,
   };
 
   if (params.resolution) {

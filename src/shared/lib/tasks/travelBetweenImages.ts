@@ -8,6 +8,7 @@ import {
   TaskValidationError, 
   safeParseJson 
 } from "../taskCreation";
+import { PhaseConfig } from '@/tools/travel-between-images/settings';
 
 /**
  * Interface for travel between images (steerable motion) task parameters
@@ -55,21 +56,7 @@ export interface TravelBetweenImagesTaskParams {
   // Variant naming
   generation_name?: string;                          // Optional variant name for the generation
   // Advanced phase configuration
-  phase_config?: {
-    num_phases: number;
-    steps_per_phase: number[];
-    flow_shift: number;
-    sample_solver: string;
-    model_switch_phase: number;
-    phases: Array<{
-      phase: number;
-      guidance_scale: number;
-      loras: Array<{
-        url: string;
-        multiplier: string;
-      }>;
-    }>;
-  };
+  phase_config?: PhaseConfig;
   // Selected phase config preset ID (for UI state restoration)
   selected_phase_preset_id?: string | null;
   independent_segments?: boolean;

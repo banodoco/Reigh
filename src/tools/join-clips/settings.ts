@@ -1,3 +1,8 @@
+import { PhaseConfig } from '@/tools/travel-between-images/settings';
+
+// Builtin preset ID (must match the one in JoinClipsSettingsForm.tsx)
+const BUILTIN_JOIN_CLIPS_DEFAULT_ID = '__builtin_join_clips_default__';
+
 // Join Clips Tool Settings
 export const joinClipsSettings = {
   id: 'join-clips',
@@ -21,6 +26,12 @@ export const joinClipsSettings = {
     useInputVideoFps: false, // Use first input video's FPS instead of downsampling to 16fps
     noisedInputVideo: 0, // vid2vid init strength - adds noise to input video (0 = disabled)
     loopFirstClip: false, // Loop first clip - use first clip as both start and end
+    // Motion settings mode (Basic = LoRAs, Advanced = Phase Config)
+    motionMode: 'basic' as 'basic' | 'advanced',
+    // Phase config for advanced mode (undefined = use default)
+    phaseConfig: undefined as PhaseConfig | undefined,
+    // Selected phase preset ID (for tracking which preset is active)
+    selectedPhasePresetId: BUILTIN_JOIN_CLIPS_DEFAULT_ID as string | null,
     // Legacy two-video format (kept for backward compatibility)
     startingVideoUrl: undefined as string | undefined,
     startingVideoPosterUrl: undefined as string | undefined,

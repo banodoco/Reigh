@@ -928,8 +928,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     motion_mode: motionMode, // Motion control mode (basic/presets/advanced) - for UI state
     phase_config: effectivePhaseConfig, // Always send phase config (computed or user-defined)
     regenerate_anchors: false, // Always false
-    // Include selected phase preset ID for UI state restoration (only if in advanced mode)
-    selected_phase_preset_id: advancedMode && selectedPhasePresetId ? selectedPhasePresetId : undefined,
+    // Include selected phase preset ID for UI state restoration (saved in all modes)
+    selected_phase_preset_id: selectedPhasePresetId || undefined,
     // Add generation name if provided
     generation_name: variantNameParam.trim() || undefined,
     // Text before/after prompts

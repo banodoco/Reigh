@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Input } from '@/shared/components/ui/input';
@@ -16,6 +16,26 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
+import { PhaseConfig } from '@/tools/travel-between-images/settings';
+import { MotionPresetSelector } from '@/shared/components/MotionPresetSelector';
+import { 
+  DEFAULT_VACE_PHASE_CONFIG, 
+  BUILTIN_VACE_PRESET, 
+  BUILTIN_VACE_DEFAULT_ID,
+  VACE_FEATURED_PRESET_IDS,
+  buildPhaseConfigWithLoras,
+} from '@/shared/lib/vaceDefaults';
+
+// =============================================================================
+// EXPORTS FOR BACKWARDS COMPATIBILITY
+// =============================================================================
+
+// Re-export shared defaults with Join Clips aliases for backwards compatibility
+export const DEFAULT_JOIN_CLIPS_PHASE_CONFIG = DEFAULT_VACE_PHASE_CONFIG;
+export const BUILTIN_JOIN_CLIPS_DEFAULT_ID = BUILTIN_VACE_DEFAULT_ID;
+export const BUILTIN_JOIN_CLIPS_PRESET = BUILTIN_VACE_PRESET;
+export const JOIN_CLIPS_FEATURED_PRESET_IDS = VACE_FEATURED_PRESET_IDS;
+export const buildJoinClipsPhaseConfig = buildPhaseConfigWithLoras;
 
 /**
  * Quantize total generation frames to 4N+1 format (required by Wan models)
@@ -134,6 +154,26 @@ export interface JoinClipsSettingsFormProps {
     
     // Clip pairs for visualization (optional - if provided, enables pair selector)
     clipPairs?: ClipPairInfo[];
+    
+    // Motion settings mode (Basic/Advanced tabs)
+    motionMode?: 'basic' | 'advanced';
+    onMotionModeChange?: (mode: 'basic' | 'advanced') => void;
+    
+    // Phase config for advanced mode
+    phaseConfig?: PhaseConfig;
+    onPhaseConfigChange?: (config: PhaseConfig) => void;
+    
+    // Random seed toggle (for PhaseConfigVertical)
+    randomSeed?: boolean;
+    onRandomSeedChange?: (val: boolean) => void;
+    
+    // Phase preset selection (for Basic mode preset chips)
+    selectedPhasePresetId?: string | null;
+    onPhasePresetSelect?: (presetId: string, config: PhaseConfig, presetMetadata?: any) => void;
+    onPhasePresetRemove?: () => void;
+    
+    // Featured preset IDs for quick-select chips (provided by parent, or uses default)
+    featuredPresetIds?: string[];
 }
 
 const Visualization: React.FC<{
@@ -668,11 +708,21 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     headerContent,
     shortestClipFrames,
     clipPairs,
+    motionMode = 'basic',
+    onMotionModeChange,
+    phaseConfig,
+    onPhaseConfigChange,
+    randomSeed = true,
+    onRandomSeedChange,
+    selectedPhasePresetId,
+    onPhasePresetSelect,
+    onPhasePresetRemove,
+    featuredPresetIds = JOIN_CLIPS_FEATURED_PRESET_IDS,
 }) => {
     // Handle undefined values (defensive fallback)
     const keepBridgingImagesValue = keepBridgingImages ?? false;
     const enhancePromptValue = enhancePrompt ?? true;
-    
+
     // Advanced section state
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
     
@@ -1174,19 +1224,35 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                     </div>
                 </div>
 
-                {/* LoRA Manager */}
-                <div className="space-y-2">
-                    <LoraManager
-                        availableLoras={availableLoras}
-                        projectId={projectId || undefined}
-                        persistenceScope="project"
-                        enableProjectPersistence={true}
-                        persistenceKey={loraPersistenceKey}
-                        externalLoraManager={loraManager}
-                        title="LoRA Models (Optional)"
-                        addButtonText="Add or manage LoRAs"
-                    />
-                </div>
+                {/* Motion Settings - Using shared MotionPresetSelector */}
+                <MotionPresetSelector
+                    builtinPreset={BUILTIN_JOIN_CLIPS_PRESET}
+                    featuredPresetIds={featuredPresetIds}
+                    generationTypeMode="vace"
+                    selectedPhasePresetId={selectedPhasePresetId ?? null}
+                    phaseConfig={phaseConfig}
+                    motionMode={motionMode}
+                    onPresetSelect={onPhasePresetSelect || (() => {})}
+                    onPresetRemove={onPhasePresetRemove || (() => {})}
+                    onModeChange={onMotionModeChange || (() => {})}
+                    onPhaseConfigChange={onPhaseConfigChange || (() => {})}
+                    availableLoras={availableLoras}
+                    randomSeed={randomSeed}
+                    onRandomSeedChange={onRandomSeedChange}
+                    queryKeyPrefix="join-clips-presets"
+                    renderBasicModeContent={() => (
+                        <LoraManager
+                            availableLoras={availableLoras}
+                            projectId={projectId || undefined}
+                            persistenceScope="project"
+                            enableProjectPersistence={true}
+                            persistenceKey={loraPersistenceKey}
+                            externalLoraManager={loraManager}
+                            title="Additional LoRA Models (Optional)"
+                            addButtonText="Add or manage LoRAs"
+                        />
+                    )}
+                />
             </div>
 
             {/* Generate Button */}

@@ -426,27 +426,7 @@ async function createVariantOnParent(
       variantName || null
     );
 
-    // Update the parent generation with the new location
-    const updatedParams = {
-      ...(parentGen.params || {}),
-      ...extraParams,
-    };
-    
-    const { error: updateError } = await supabase
-      .from('generations')
-      .update({
-        location: publicUrl,
-        thumbnail_url: thumbnailUrl,
-        type: 'video',
-        params: updatedParams
-      })
-      .eq('id', parentGen.id);
-
-    if (updateError) {
-      console.error(`[GenMigration] Error updating parent generation:`, updateError);
-    } else {
-      console.log(`[GenMigration] Successfully created ${variantType} variant and updated parent generation ${parentGen.id}`);
-    }
+    console.log(`[GenMigration] Successfully created ${variantType} variant for parent generation ${parentGen.id}`);
 
     // Mark task as generation_created
     await supabase
@@ -499,17 +479,7 @@ export async function createGenerationFromTask(
         null
       );
 
-      const { error: updateError } = await supabase
-        .from('generations')
-        .update({
-          location: publicUrl,
-          thumbnail_url: thumbnailUrl,
-        })
-        .eq('id', existingGeneration.id);
-
-      if (updateError) {
-        console.error(`[GenMigration] Failed to update generation with new variant:`, updateError);
-      }
+      console.log(`[GenMigration] Successfully created regenerated variant for generation ${existingGeneration.id}`);
 
       const { shotId, addInPosition } = extractShotAndPosition(taskData.params);
       if (shotId) {
@@ -546,11 +516,8 @@ export async function createGenerationFromTask(
         };
 
         await createVariant(supabase, childGen.id, publicUrl, thumbnailUrl || null, variantParams, true, VARIANT_TYPES.INDIVIDUAL_SEGMENT, null);
-
-        await supabase
-          .from('generations')
-          .update({ location: publicUrl, thumbnail_url: thumbnailUrl, type: 'video', params: { ...childGen.params, tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES } })
-          .eq('id', childGen.id);
+        
+        console.log(`[GenMigration] Successfully created variant for child generation ${childGenId}`);
 
         await supabase.from('tasks').update({ generation_created: true }).eq('id', taskId);
         return childGen;

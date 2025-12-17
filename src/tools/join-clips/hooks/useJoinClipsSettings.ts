@@ -1,5 +1,6 @@
 import { useToolPageSettings } from '@/shared/hooks/useToolPageSettings';
 import { JoinClipsSettings } from '../settings';
+import { DEFAULT_JOIN_CLIPS_PHASE_CONFIG, BUILTIN_JOIN_CLIPS_DEFAULT_ID } from '../components/JoinClipsSettingsForm';
 
 const DEFAULT_JOIN_CLIPS_SETTINGS: JoinClipsSettings = {
   contextFrameCount: 8,
@@ -20,6 +21,10 @@ const DEFAULT_JOIN_CLIPS_SETTINGS: JoinClipsSettings = {
   useInputVideoFps: false,
   noisedInputVideo: 0,
   loopFirstClip: false,
+  // Motion settings (Basic/Advanced mode)
+  motionMode: 'basic',
+  phaseConfig: DEFAULT_JOIN_CLIPS_PHASE_CONFIG,
+  selectedPhasePresetId: BUILTIN_JOIN_CLIPS_DEFAULT_ID,
   // Legacy two-video format
   startingVideoUrl: undefined,
   startingVideoPosterUrl: undefined,

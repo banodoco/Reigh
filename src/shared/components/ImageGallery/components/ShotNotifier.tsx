@@ -91,11 +91,11 @@ export const ShotNotifier: React.FC<ShotNotifierProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200">
       <span className="text-sm">
         <strong>{currentShotDisplayText}</strong>
       </span>
-      <div className="flex items-center gap-2 ml-3">
+      <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
         {/* Switch to Associated Shot button (when there's a form mismatch) */}
         {switchButtonText && (
           <Button

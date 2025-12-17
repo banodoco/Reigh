@@ -1,5 +1,9 @@
 // Edit Video Tool Settings
 // For regenerating portions of videos using AI
+
+import { PhaseConfig } from '@/tools/travel-between-images/settings';
+import { BUILTIN_VACE_DEFAULT_ID, DEFAULT_VACE_PHASE_CONFIG } from '@/shared/lib/vaceDefaults';
+
 export const editVideoSettings = {
   id: 'edit-video',
   scope: ['project'] as const,
@@ -19,6 +23,11 @@ export const editVideoSettings = {
     randomSeed: true,
     enhancePrompt: true,
     
+    // Motion settings (Basic/Advanced mode with presets)
+    motionMode: 'basic' as 'basic' | 'advanced',
+    phaseConfig: undefined as PhaseConfig | undefined, // undefined = use default
+    selectedPhasePresetId: BUILTIN_VACE_DEFAULT_ID as string | null,
+    
     // Selected video info
     selectedVideoUrl: undefined as string | undefined,
     selectedVideoPosterUrl: undefined as string | undefined,
@@ -28,7 +37,7 @@ export const editVideoSettings = {
     portionStartTime: 0,
     portionEndTime: 0,
     
-    // LoRAs
+    // LoRAs (for basic mode - additional loras on top of preset)
     loras: [] as Array<{ id: string; strength: number }>,
     hasEverSetLoras: false as boolean,
   },
@@ -36,4 +45,7 @@ export const editVideoSettings = {
 
 // TypeScript type for settings
 export type EditVideoSettings = typeof editVideoSettings.defaults;
+
+// Re-export shared defaults for convenience
+export { BUILTIN_VACE_DEFAULT_ID, DEFAULT_VACE_PHASE_CONFIG } from '@/shared/lib/vaceDefaults';
 

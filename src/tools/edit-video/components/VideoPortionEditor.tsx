@@ -11,6 +11,9 @@ import { LoraManager } from '@/shared/components/LoraManager';
 import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
 import { PortionSelection, formatTime } from '@/shared/components/VideoPortionTimeline';
+import { MotionPresetSelector, type BuiltinPreset } from '@/shared/components/MotionPresetSelector';
+import { PhaseConfig } from '@/tools/travel-between-images/settings';
+import { BUILTIN_VACE_PRESET, VACE_FEATURED_PRESET_IDS } from '@/shared/lib/vaceDefaults';
 
 // Color palette for segments - matches VideoPortionTimeline colors
 const SEGMENT_COLORS = [
@@ -206,6 +209,17 @@ export interface VideoPortionEditorProps {
     projectId: string | null;
     loraManager?: UseLoraManagerReturn;
     
+    // Motion settings (Basic/Advanced mode with presets)
+    motionMode: 'basic' | 'advanced';
+    onMotionModeChange: (mode: 'basic' | 'advanced') => void;
+    phaseConfig: PhaseConfig;
+    onPhaseConfigChange: (config: PhaseConfig) => void;
+    randomSeed: boolean;
+    onRandomSeedChange: (val: boolean) => void;
+    selectedPhasePresetId: string | null;
+    onPhasePresetSelect: (presetId: string, config: PhaseConfig, metadata?: any) => void;
+    onPhasePresetRemove: () => void;
+    
     // Actions
     onGenerate: () => void;
     isGenerating: boolean;
@@ -236,6 +250,17 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     availableLoras,
     projectId,
     loraManager,
+    // Motion settings
+    motionMode,
+    onMotionModeChange,
+    phaseConfig,
+    onPhaseConfigChange,
+    randomSeed,
+    onRandomSeedChange,
+    selectedPhasePresetId,
+    onPhasePresetSelect,
+    onPhasePresetRemove,
+    // Actions
     onGenerate,
     isGenerating,
     generateSuccess,
@@ -494,19 +519,35 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                         />
                     </div>
 
-                    {/* LoRA Manager */}
-                    <div className="space-y-2">
-                        <LoraManager
-                            availableLoras={availableLoras}
-                            projectId={projectId || undefined}
-                            persistenceScope="project"
-                            enableProjectPersistence={true}
-                            persistenceKey="edit-video"
-                            externalLoraManager={loraManager}
-                            title="LoRA Models (Optional)"
-                            addButtonText="Add LoRAs"
-                        />
-                    </div>
+                    {/* Motion Settings - Basic/Advanced with Presets */}
+                    <MotionPresetSelector
+                        builtinPreset={BUILTIN_VACE_PRESET}
+                        featuredPresetIds={VACE_FEATURED_PRESET_IDS}
+                        generationTypeMode="vace"
+                        selectedPhasePresetId={selectedPhasePresetId}
+                        phaseConfig={phaseConfig}
+                        motionMode={motionMode}
+                        onPresetSelect={onPhasePresetSelect}
+                        onPresetRemove={onPhasePresetRemove}
+                        onModeChange={onMotionModeChange}
+                        onPhaseConfigChange={onPhaseConfigChange}
+                        availableLoras={availableLoras}
+                        randomSeed={randomSeed}
+                        onRandomSeedChange={onRandomSeedChange}
+                        queryKeyPrefix="edit-video-presets"
+                        renderBasicModeContent={() => (
+                            <LoraManager
+                                availableLoras={availableLoras}
+                                projectId={projectId || undefined}
+                                persistenceScope="project"
+                                enableProjectPersistence={true}
+                                persistenceKey="edit-video"
+                                externalLoraManager={loraManager}
+                                title="Additional LoRA Models (Optional)"
+                                addButtonText="Add or manage LoRAs"
+                            />
+                        )}
+                    />
                 </div>
             )}
 
