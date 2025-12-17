@@ -1050,10 +1050,20 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     });
   }, []);
   
-  // Sort mode for shots - persisted per project
-  const shotSortMode = projectUISettings?.shotSortMode ?? 'newest';
+  // Sort mode for shots - local state for immediate updates, synced with persisted settings
+  const [localShotSortMode, setLocalShotSortMode] = useState<'ordered' | 'newest' | 'oldest'>('newest');
+  
+  // Sync local state with persisted settings when they load
+  useEffect(() => {
+    if (projectUISettings?.shotSortMode) {
+      setLocalShotSortMode(projectUISettings.shotSortMode);
+    }
+  }, [projectUISettings?.shotSortMode]);
+  
+  const shotSortMode = localShotSortMode;
   const setShotSortMode = useCallback((mode: 'ordered' | 'newest' | 'oldest') => {
-    updateProjectUISettings?.('project', { shotSortMode: mode });
+    setLocalShotSortMode(mode); // Immediate local update
+    updateProjectUISettings?.('project', { shotSortMode: mode }); // Persist async
   }, [updateProjectUISettings]);
   
   // Video gallery filter state
