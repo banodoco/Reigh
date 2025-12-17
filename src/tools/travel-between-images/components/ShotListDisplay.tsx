@@ -603,7 +603,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         strategy={rectSortingStrategy}
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4 pb-2">
-          {/* New Shot Drop Zone - simple centered content */}
+          {/* New Shot Drop Zone - matches collapsed shot card structure for consistent height */}
           {(onGenerationDropForNewShot || onFilesDropForNewShot) && (
             <div
               onDragEnter={handleNewShotDragEnter}
@@ -612,7 +612,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
               onDrop={handleNewShotDrop}
               onClick={isNewShotProcessing ? undefined : onCreateNewShot}
               className={cn(
-                'group p-4 border-2 border-dashed rounded-lg transition-all duration-200 flex items-center justify-center self-start',
+                'group p-4 border-2 border-dashed rounded-lg transition-all duration-200 flex flex-col self-start relative',
                 isNewShotProcessing
                   ? 'border-primary/50 bg-primary/5 cursor-wait'
                   : isNewShotDropTarget 
@@ -620,30 +620,37 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                     : 'border-border hover:border-[hsl(40,55%,58%)] cursor-pointer'
               )}
             >
-              {isNewShotProcessing ? (
-                <div className="flex flex-col items-center gap-2 py-4">
-                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                  <span className="text-sm font-medium text-primary">
-                    Creating shot...
-                  </span>
-                </div>
-              ) : isNewShotDropTarget ? (
-                <div className="flex flex-col items-center gap-2 py-4">
-                  <Upload className="h-8 w-8 text-green-500 animate-bounce" />
-                  <span className="text-sm font-medium text-green-500">
-                    {newShotDropType === 'file' ? 'Drop files to create new shot' : 'Drop to create new shot'}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2 py-4">
-                  <div className="plus-icon-container flex items-center justify-center w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/50 group-hover:border-[hsl(40,55%,58%)] transition-all duration-200 group-hover:bg-[hsl(40,55%,58%,0.15)] group-hover:shadow-[0_0_16px_hsl(40,55%,58%,0.4)]">
-                    <Plus className="w-4 h-4 text-muted-foreground group-hover:text-[hsl(40,55%,58%)] transition-all duration-200" />
+              {/* Invisible structure to match shot card height */}
+              <div className="h-8 mb-3" aria-hidden="true" /> {/* Header row height */}
+              <div className="aspect-[3/1]" aria-hidden="true" /> {/* Image area height */}
+              
+              {/* Centered content overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                {isNewShotProcessing ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                    <span className="text-sm font-medium text-primary">
+                      Creating shot...
+                    </span>
                   </div>
-                  <p className="text-muted-foreground text-center text-sm group-hover:text-[hsl(40,55%,58%)] transition-colors duration-200">
-                    Create new shot
-                  </p>
-                </div>
-              )}
+                ) : isNewShotDropTarget ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Upload className="h-8 w-8 text-green-500 animate-bounce" />
+                    <span className="text-sm font-medium text-green-500">
+                      {newShotDropType === 'file' ? 'Drop files to create new shot' : 'Drop to create new shot'}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="plus-icon-container flex items-center justify-center w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/50 group-hover:border-[hsl(40,55%,58%)] transition-all duration-200 group-hover:bg-[hsl(40,55%,58%,0.15)] group-hover:shadow-[0_0_16px_hsl(40,55%,58%,0.4)]">
+                      <Plus className="w-4 h-4 text-muted-foreground group-hover:text-[hsl(40,55%,58%)] transition-all duration-200" />
+                    </div>
+                    <p className="text-muted-foreground text-center text-sm group-hover:text-[hsl(40,55%,58%)] transition-colors duration-200">
+                      Create new shot
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           
