@@ -1,7 +1,8 @@
 import { PhaseConfig } from '@/tools/travel-between-images/settings';
+import { BUILTIN_VACE_DEFAULT_ID } from '@/shared/lib/vaceDefaults';
 
-// Builtin preset ID (must match the one in JoinClipsSettingsForm.tsx)
-const BUILTIN_JOIN_CLIPS_DEFAULT_ID = '__builtin_join_clips_default__';
+// Use the shared VACE default ID (matches JoinClipsSettingsForm and MotionPresetSelector)
+const BUILTIN_JOIN_CLIPS_DEFAULT_ID = BUILTIN_VACE_DEFAULT_ID;
 
 // Join Clips Tool Settings
 export const joinClipsSettings = {
