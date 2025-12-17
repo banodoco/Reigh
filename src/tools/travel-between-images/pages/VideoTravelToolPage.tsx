@@ -2248,8 +2248,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
           shots: shots || []
         });
         
-        // Select the newly created shot
-        setCurrentShotId(newShot.id);
+        // Don't auto-navigate into the shot - user stays on shot list
       } catch (error) {
         console.error("[VideoTravelToolPage] Error creating shot:", error);
         toast.error(`Failed to create shot: ${(error as Error).message}`);
