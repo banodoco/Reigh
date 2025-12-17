@@ -108,6 +108,9 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
   const pendingEntityIdRef = useRef<string | null>(null);
   const currentEntityIdRef = useRef<string | null>(null);
   const isUnmountingRef = useRef(false);
+  
+  // Edit version counter - increments on each edit, used to detect if newer edits happened during save
+  const editVersionRef = useRef<number>(0);
 
   // Fetch settings from database
   const {
@@ -154,12 +157,8 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       // Update our "clean" reference
       loadedSettingsRef.current = JSON.parse(JSON.stringify(toSave));
       
-      // Only clear pending if it still matches what we just saved.
-      // User may have typed MORE while save was in progress.
-      if (pendingSettingsRef.current && deepEqual(pendingSettingsRef.current, toSave)) {
-        pendingSettingsRef.current = null;
-        pendingEntityIdRef.current = null;
-      }
+      // NOTE: Don't clear pendingSettingsRef here - it's now handled in the timeout callback
+      // with edit version checking to avoid race conditions when user types fast
       
       setStatus('ready');
       setError(null);
@@ -263,6 +262,10 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
   // Update single field
   const updateField = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
+    // Increment edit version - allows detecting if newer edits happened during save
+    editVersionRef.current += 1;
+    const editVersionAtStart = editVersionRef.current;
+    
     setSettings(prev => {
       const updated = { ...prev, [key]: value };
 
@@ -285,14 +288,29 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
         clearTimeout(saveTimeoutRef.current);
       }
 
-      saveTimeoutRef.current = setTimeout(async () => {
+      const timeoutId = setTimeout(async () => {
         try {
-          // saveImmediate handles clearing pendingSettingsRef if values match
-          await saveImmediate(updated);
+          // Get the LATEST settings at save time (not the captured 'updated' which could be stale)
+          const latestSettings = await new Promise<T>((resolve) => {
+            setSettings(current => {
+              resolve(current);
+              return current; // Don't modify, just read
+            });
+          });
+          
+          await saveImmediate(latestSettings);
+          
+          // CRITICAL: Only clear pending if no newer edits happened during the save
+          // This prevents race conditions when user types fast
+          if (editVersionRef.current === editVersionAtStart) {
+            pendingSettingsRef.current = null;
+            pendingEntityIdRef.current = null;
+          }
         } catch (err) {
           console.error('[useAutoSaveSettings] Debounced save failed:', err);
         }
       }, debounceMs);
+      saveTimeoutRef.current = timeoutId;
 
       return updated;
     });
@@ -300,6 +318,10 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
   // Update multiple fields at once
   const updateFields = useCallback((updates: Partial<T>) => {
+    // Increment edit version - allows detecting if newer edits happened during save
+    editVersionRef.current += 1;
+    const editVersionAtStart = editVersionRef.current;
+    
     setSettings(prev => {
       const updated = { ...prev, ...updates };
 
@@ -321,14 +343,29 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
         clearTimeout(saveTimeoutRef.current);
       }
 
-      saveTimeoutRef.current = setTimeout(async () => {
+      const timeoutId = setTimeout(async () => {
         try {
-          // saveImmediate handles clearing pendingSettingsRef if values match
-          await saveImmediate(updated);
+          // Get the LATEST settings at save time (not the captured 'updated' which could be stale)
+          const latestSettings = await new Promise<T>((resolve) => {
+            setSettings(current => {
+              resolve(current);
+              return current; // Don't modify, just read
+            });
+          });
+          
+          await saveImmediate(latestSettings);
+          
+          // CRITICAL: Only clear pending if no newer edits happened during the save
+          // This prevents race conditions when user types fast
+          if (editVersionRef.current === editVersionAtStart) {
+            pendingSettingsRef.current = null;
+            pendingEntityIdRef.current = null;
+          }
         } catch (err) {
           console.error('[useAutoSaveSettings] Debounced save failed:', err);
         }
       }, debounceMs);
+      saveTimeoutRef.current = timeoutId;
 
       return updated;
     });
@@ -358,6 +395,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       loadedSettingsRef.current = null;
       pendingSettingsRef.current = null;
       pendingEntityIdRef.current = null;
+      editVersionRef.current = 0;
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
@@ -378,6 +416,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       loadedSettingsRef.current = null;
       pendingSettingsRef.current = null;
       pendingEntityIdRef.current = null;
+      editVersionRef.current = 0;
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
