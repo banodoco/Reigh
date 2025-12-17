@@ -18,7 +18,7 @@ import { Card, CardContent } from '@/shared/components/ui/card';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
+import { JoinClipsSettingsForm, DEFAULT_JOIN_CLIPS_PHASE_CONFIG, BUILTIN_JOIN_CLIPS_DEFAULT_ID } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import { useJoinClipsSettings } from '@/tools/join-clips/hooks/useJoinClipsSettings';
 import { 
     validateClipsForJoin, 
@@ -290,6 +290,11 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         keepBridgingImages = false,
         useIndividualPrompts = false,
         loras: joinLoras = [],
+        // Motion preset settings
+        motionMode: joinMotionMode = 'basic',
+        phaseConfig: joinPhaseConfig,
+        selectedPhasePresetId: joinSelectedPhasePresetId,
+        randomSeed: joinRandomSeed = true,
     } = joinSettings.settings;
     
     // Calculate validation result for join clips based on segment frame counts
@@ -1163,6 +1168,23 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             generateSuccess={joinClipsSuccess}
                             generateButtonText="Create Joined Video"
                             shortestClipFrames={joinValidationResult?.shortestClipFrames}
+                            // Motion preset settings
+                            motionMode={joinMotionMode}
+                            onMotionModeChange={(mode) => joinSettings.updateField('motionMode', mode)}
+                            phaseConfig={joinPhaseConfig ?? DEFAULT_JOIN_CLIPS_PHASE_CONFIG}
+                            onPhaseConfigChange={(config) => joinSettings.updateField('phaseConfig', config)}
+                            randomSeed={joinRandomSeed}
+                            onRandomSeedChange={(val) => joinSettings.updateField('randomSeed', val)}
+                            selectedPhasePresetId={joinSelectedPhasePresetId ?? BUILTIN_JOIN_CLIPS_DEFAULT_ID}
+                            onPhasePresetSelect={(presetId, config) => {
+                                joinSettings.updateFields({
+                                    selectedPhasePresetId: presetId,
+                                    phaseConfig: config,
+                                });
+                            }}
+                            onPhasePresetRemove={() => {
+                                joinSettings.updateField('selectedPhasePresetId', null);
+                            }}
                         />
                     </div>
                 </div>

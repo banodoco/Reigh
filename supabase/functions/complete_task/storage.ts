@@ -7,6 +7,7 @@
 import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
 import { getContentType } from './params.ts';
 import type { ParsedRequest } from './request.ts';
+import { storagePaths, MEDIA_BUCKET } from '../_shared/storagePaths.ts';
 
 // ===== TYPES =====
 
@@ -35,24 +36,25 @@ export async function handleStorageOperations(
   if (parsedRequest.storagePath) {
     // MODE 3/4: File already in storage
     objectPath = parsedRequest.storagePath;
-    const { data: urlData } = supabase.storage.from('image_uploads').getPublicUrl(objectPath);
+    const { data: urlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(objectPath);
     publicUrl = urlData.publicUrl;
     console.log(`[Storage] MODE 3/4: Retrieved public URL: ${publicUrl}`);
 
     // Get thumbnail URL if path provided
     if (parsedRequest.thumbnailStoragePath) {
-      const { data: thumbnailUrlData } = supabase.storage.from('image_uploads').getPublicUrl(parsedRequest.thumbnailStoragePath);
+      const { data: thumbnailUrlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(parsedRequest.thumbnailStoragePath);
       thumbnailUrl = thumbnailUrlData.publicUrl;
       console.log(`[Storage] MODE 3/4: Retrieved thumbnail URL: ${thumbnailUrl}`);
     }
   } else {
     // MODE 1: Upload file from base64
     const effectiveContentType = parsedRequest.fileContentType || getContentType(parsedRequest.filename);
-    objectPath = `${userId}/${parsedRequest.filename}`;
+    // Use standardized task output path: {userId}/tasks/{taskId}/{filename}
+    objectPath = storagePaths.taskOutput(userId, parsedRequest.taskId, parsedRequest.filename);
 
     console.log(`[Storage] MODE 1: Uploading to ${objectPath}`);
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('image_uploads')
+      .from(MEDIA_BUCKET)
       .upload(objectPath, parsedRequest.fileData as any, {
         contentType: effectiveContentType,
         upsert: true
@@ -64,7 +66,7 @@ export async function handleStorageOperations(
     }
 
     // Get public URL
-    const { data: urlData } = supabase.storage.from('image_uploads').getPublicUrl(objectPath);
+    const { data: urlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(objectPath);
     publicUrl = urlData.publicUrl;
     console.log(`[Storage] MODE 1: Upload successful: ${publicUrl}`);
 
@@ -73,6 +75,7 @@ export async function handleStorageOperations(
       supabase,
       parsedRequest,
       userId,
+      parsedRequest.taskId,
       publicUrl
     );
   }
@@ -87,15 +90,17 @@ async function handleThumbnail(
   supabase: any,
   parsedRequest: ParsedRequest,
   userId: string,
+  taskId: string,
   mainFileUrl: string
 ): Promise<string | null> {
   // If thumbnail was provided, upload it
   if (parsedRequest.thumbnailData && parsedRequest.thumbnailFilename) {
     console.log(`[Storage] Uploading provided thumbnail`);
     try {
-      const thumbnailPath = `${userId}/thumbnails/${parsedRequest.thumbnailFilename}`;
+      // Use standardized task thumbnail path: {userId}/tasks/{taskId}/thumbnails/{filename}
+      const thumbnailPath = storagePaths.taskThumbnail(userId, taskId, parsedRequest.thumbnailFilename);
       const { error: thumbnailUploadError } = await supabase.storage
-        .from('image_uploads')
+        .from(MEDIA_BUCKET)
         .upload(thumbnailPath, parsedRequest.thumbnailData as any, {
           contentType: parsedRequest.thumbnailContentType || getContentType(parsedRequest.thumbnailFilename),
           upsert: true
@@ -106,7 +111,7 @@ async function handleThumbnail(
         return null;
       }
 
-      const { data: thumbnailUrlData } = supabase.storage.from('image_uploads').getPublicUrl(thumbnailPath);
+      const { data: thumbnailUrlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(thumbnailPath);
       console.log(`[Storage] Thumbnail uploaded: ${thumbnailUrlData.publicUrl}`);
       return thumbnailUrlData.publicUrl;
     } catch (thumbnailError) {
@@ -119,7 +124,7 @@ async function handleThumbnail(
   const contentType = getContentType(parsedRequest.filename);
   if (contentType.startsWith("image/") && parsedRequest.fileData) {
     // Match legacy behavior: if auto-thumbnail generation fails, fall back to main image URL
-    return await generateThumbnail(supabase, parsedRequest.fileData, userId, mainFileUrl);
+    return await generateThumbnail(supabase, parsedRequest.fileData, userId, taskId, mainFileUrl);
   }
 
   return null;
@@ -132,6 +137,7 @@ async function generateThumbnail(
   supabase: any,
   sourceBytes: Uint8Array,
   userId: string,
+  taskId: string,
   fallbackUrl: string
 ): Promise<string | null> {
   console.log(`[ThumbnailGen] Starting auto-thumbnail generation`);
@@ -151,14 +157,14 @@ async function generateThumbnail(
     const thumbBytes = await image.encodeJPEG(jpegQuality);
     console.log(`[ThumbnailGen] Encoded JPEG: ${thumbBytes.length} bytes`);
 
-    // Upload thumbnail
+    // Upload thumbnail using standardized task thumbnail path
     const ts = Date.now();
     const rand = Math.random().toString(36).substring(2, 8);
     const thumbFilename = `thumb_${ts}_${rand}.jpg`;
-    const thumbPath = `${userId}/thumbnails/${thumbFilename}`;
+    const thumbPath = storagePaths.taskThumbnail(userId, taskId, thumbFilename);
 
     const { error: uploadErr } = await supabase.storage
-      .from('image_uploads')
+      .from(MEDIA_BUCKET)
       .upload(thumbPath, thumbBytes, { contentType: 'image/jpeg', upsert: true });
 
     if (uploadErr) {
@@ -167,7 +173,7 @@ async function generateThumbnail(
       return fallbackUrl;
     }
 
-    const { data: thumbUrlData } = supabase.storage.from('image_uploads').getPublicUrl(thumbPath);
+    const { data: thumbUrlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(thumbPath);
     console.log(`[ThumbnailGen] ✅ Auto-generated thumbnail: ${thumbUrlData.publicUrl}`);
     return thumbUrlData.publicUrl;
 
@@ -185,7 +191,7 @@ export async function verifyFileExists(
   storagePath: string
 ): Promise<{ exists: boolean; publicUrl?: string }> {
   try {
-    const { data: urlData } = supabase.storage.from('image_uploads').getPublicUrl(storagePath);
+    const { data: urlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(storagePath);
     if (!urlData?.publicUrl) {
       return { exists: false };
     }
@@ -204,7 +210,7 @@ export async function cleanupFile(
   objectPath: string
 ): Promise<void> {
   try {
-    await supabase.storage.from('image_uploads').remove([objectPath]);
+    await supabase.storage.from(MEDIA_BUCKET).remove([objectPath]);
     console.log(`[Storage] Cleaned up file: ${objectPath}`);
   } catch (error) {
     console.error(`[Storage] Failed to cleanup file:`, error);

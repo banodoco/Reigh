@@ -138,7 +138,7 @@ export const MotionPresetSelector: React.FC<MotionPresetSelectorProps> = ({
     <div className="space-y-4">
       <Tabs value={motionMode} onValueChange={handleModeChange}>
         <div className="flex items-center justify-between mb-3">
-          <Label className="text-sm font-medium">Motion Settings:</Label>
+          <Label className="text-sm font-medium">Motion Settings</Label>
           <TabsList className="grid w-40 grid-cols-2">
             <TabsTrigger value="basic">Basic</TabsTrigger>
             <TabsTrigger 
