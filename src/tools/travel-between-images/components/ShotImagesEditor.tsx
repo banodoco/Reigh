@@ -1480,32 +1480,51 @@ const arePropsEqual = (prevProps: ShotImagesEditorProps, nextProps: ShotImagesEd
   const nextMeta = nextProps.structureVideoMetadata;
   if (prevMeta !== nextMeta) {
     if (!prevMeta || !nextMeta) return false;
-    if (prevMeta.duration_seconds !== nextMeta.duration_seconds || 
-        prevMeta.width !== nextMeta.width || 
-        prevMeta.height !== nextMeta.height) {
+    if (
+      prevMeta.duration_seconds !== nextMeta.duration_seconds ||
+      prevMeta.frame_rate !== nextMeta.frame_rate ||
+      prevMeta.total_frames !== nextMeta.total_frames ||
+      prevMeta.width !== nextMeta.width ||
+      prevMeta.height !== nextMeta.height ||
+      prevMeta.file_size !== nextMeta.file_size
+    ) {
       return false;
     }
   }
 
-  // Compare arrays by length and first/last item IDs (fast approximation)
+  // Compare images by content that affects rendering (order + timeline_frame).
+  // NOTE: This is intentionally O(n) to avoid incorrect "skips" on reorder.
   const prevImages = prevProps.preloadedImages || [];
   const nextImages = nextProps.preloadedImages || [];
   if (prevImages.length !== nextImages.length) return false;
-  if (prevImages.length > 0) {
-    if (prevImages[0]?.id !== nextImages[0]?.id || 
-        prevImages[prevImages.length - 1]?.id !== nextImages[nextImages.length - 1]?.id) {
-      return false;
-    }
+  for (let i = 0; i < prevImages.length; i++) {
+    const prevImg: any = prevImages[i];
+    const nextImg: any = nextImages[i];
+    if (!prevImg || !nextImg) return false;
+    if (prevImg.id !== nextImg.id) return false;
+    if ((prevImg.timeline_frame ?? null) !== (nextImg.timeline_frame ?? null)) return false;
   }
 
-  // Compare allShots by length only
-  const prevShots = prevProps.allShots || [];
-  const nextShots = nextProps.allShots || [];
+  // Compare allShots by stable identity + display-relevant properties (id + name).
+  const prevShots: any[] = prevProps.allShots || [];
+  const nextShots: any[] = nextProps.allShots || [];
   if (prevShots.length !== nextShots.length) return false;
+  for (let i = 0; i < prevShots.length; i++) {
+    const prevShot = prevShots[i];
+    const nextShot = nextShots[i];
+    if (!prevShot || !nextShot) return false;
+    if (prevShot.id !== nextShot.id) return false;
+    if ((prevShot.name ?? '') !== (nextShot.name ?? '')) return false;
+  }
 
-  // Compare pendingPositions map by size
-  if ((prevProps.pendingPositions?.size || 0) !== (nextProps.pendingPositions?.size || 0)) {
-    return false;
+  // Compare pendingPositions map by entries (size alone is not sufficient).
+  const prevPending = prevProps.pendingPositions;
+  const nextPending = nextProps.pendingPositions;
+  if ((prevPending?.size || 0) !== (nextPending?.size || 0)) return false;
+  if (prevPending && nextPending) {
+    for (const [key, value] of prevPending.entries()) {
+      if (nextPending.get(key) !== value) return false;
+    }
   }
 
   // SKIP these props intentionally:
