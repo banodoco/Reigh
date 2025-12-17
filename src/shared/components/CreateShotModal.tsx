@@ -142,7 +142,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
           <div className="grid gap-3 py-3">
             <div className="space-y-2">
               <Label htmlFor="shot-name">
-                Name
+                Name:
               </Label>
               <Input 
                 id="shot-name" 
@@ -157,7 +157,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
               onFileChange={setFiles}
               multiple
               acceptTypes={['image']}
-              label="Starting Images (Optional)"
+              label="Starting Images: (Optional)"
             />
             
             {/* Aspect Ratio Selection */}

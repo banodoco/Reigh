@@ -1186,7 +1186,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
             {/* Prompts */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="join-prompt">Prompt (Optional)</Label>
+                <Label htmlFor="join-prompt">Prompt: (Optional)</Label>
                 <Textarea
                   id="join-prompt"
                   value={joinPrompt}
@@ -1205,7 +1205,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="join-negative-prompt">Negative Prompt (Optional)</Label>
+                <Label htmlFor="join-negative-prompt">Negative Prompt: (Optional)</Label>
                 <Textarea
                   id="join-negative-prompt"
                   value={joinNegativePrompt}

@@ -198,7 +198,7 @@ export const ProjectSelectorModal: React.FC<ProjectSelectorModalProps> = ({
 
               {showNewProjectInput && (
                 <div className="space-y-3">
-                  <Label htmlFor="project-name">New Project Name</Label>
+                  <Label htmlFor="project-name">New Project Name:</Label>
                   <div className="flex gap-2">
                     <Input
                       id="project-name"

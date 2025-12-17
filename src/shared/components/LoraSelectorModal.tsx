@@ -480,7 +480,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                         {/* Strength slider - below buttons when selected */}
                         {isSelectedOnGenerator && (
                           <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-green-200 dark:border-green-800">
-                            <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-[11px] flex-shrink-0 text-green-700 dark:text-green-300">Strength</Label>
+                            <Label htmlFor={`lora-strength-${lora['Model ID']}`} className="text-[11px] flex-shrink-0 text-green-700 dark:text-green-300">Strength:</Label>
                             <Slider
                               id={`lora-strength-${lora['Model ID']}`}
                               value={[strength ?? 1]}
@@ -995,7 +995,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 <CardContent className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                            <Label htmlFor="lora-name">Name *</Label>
+                            <Label htmlFor="lora-name">Name: *</Label>
                             <Input 
                                 id="lora-name" 
                                 placeholder="My Awesome LoRA" 
@@ -1006,7 +1006,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         </div>
                         
                         <div className="space-y-1">
-                            <Label htmlFor="lora-trigger-word">Trigger Word</Label>
+                            <Label htmlFor="lora-trigger-word">Trigger Word:</Label>
                             <Input 
                                 id="lora-trigger-word" 
                                 placeholder="e.g., ohwx, sks, xyz style" 
@@ -1017,7 +1017,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     </div>
                     
                     <div className="space-y-1">
-                        <Label htmlFor="lora-description">Description (optional)</Label>
+                        <Label htmlFor="lora-description">Description: (optional)</Label>
                         <Textarea 
                             id="lora-description" 
                             placeholder="Describe what this LoRA does..." 
@@ -1037,7 +1037,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     <div className="space-y-1">
                         <TooltipProvider>
                             <div className="flex items-center gap-2">
-                                <Label htmlFor="lora-url">HuggingFace Direct Download URL *</Label>
+                                <Label htmlFor="lora-url">HuggingFace Direct Download URL: *</Label>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -1074,7 +1074,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     </div>
 
                     <div className="space-y-1">
-                        <Label>Base Model</Label>
+                        <Label>Base Model:</Label>
                         <Select 
                             value={addForm.base_model} 
                             onValueChange={(value) => handleFormChange('base_model', value)}
@@ -1098,7 +1098,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     </div>
 
                     <div className="space-y-1">
-                        <Label>Created By</Label>
+                        <Label>Created By:</Label>
                         <div className="flex items-center space-x-2 mb-2">
                             <Checkbox 
                                 id="created-by-you" 
@@ -1121,7 +1121,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         {/* Display existing samples when editing */}
                         {isEditMode && editingLora?.metadata.sample_generations && editingLora.metadata.sample_generations.length > 0 && (
                             <div className="space-y-2 mb-3">
-                                <Label className="text-sm font-light">Existing Samples ({editingLora.metadata.sample_generations.filter(s => !deletedExistingSampleUrls.includes(s.url)).length})</Label>
+                                <Label className="text-sm font-light">Existing Samples: ({editingLora.metadata.sample_generations.filter(s => !deletedExistingSampleUrls.includes(s.url)).length})</Label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     {editingLora.metadata.sample_generations
                                         .filter(sample => !deletedExistingSampleUrls.includes(sample.url))
@@ -1203,7 +1203,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         {/* Display uploaded files */}
                         {sampleFiles.length > 0 && (
                             <div className="space-y-2 mt-3">
-                                <Label className="text-sm font-light">Uploaded Files ({sampleFiles.length})</Label>
+                                <Label className="text-sm font-light">Uploaded Files: ({sampleFiles.length})</Label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     {sampleFiles.map((file, index) => (
                                         <div key={index} className="relative group">

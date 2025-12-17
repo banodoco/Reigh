@@ -536,7 +536,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             {/* Motion strength */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Strength of motion guidance</Label>
+                <Label className="text-sm">Strength of motion guidance:</Label>
                 <span className="text-sm font-medium">{motionStrength.toFixed(1)}x</span>
               </div>
               <Slider

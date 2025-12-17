@@ -254,7 +254,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
         {!isMobile || !mobileInlineEditing ? (
           <div className="flex items-center gap-1.5">
             <Label htmlFor={`fullPrompt-${promptEntry.id}`} className="text-xs font-medium text-muted-foreground">
-              {totalPrompts === 1 ? 'Prompt' : `Prompt #${index + 1}`}
+              {totalPrompts === 1 ? 'Prompt:' : `Prompt #${index + 1}:`}
             </Label>
             {canRemove && !hideRemoveButton && (
               <TooltipProvider>

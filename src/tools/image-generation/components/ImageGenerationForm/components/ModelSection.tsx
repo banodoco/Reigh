@@ -698,7 +698,7 @@ const StyleReferenceSection: React.FC<{
                 {referenceMode === 'style' && (
                   <div className="space-y-2">
                     <Label htmlFor="style-boost-terms" className="text-sm font-medium">
-                      Include any style-boost terms here
+                      Style-boost terms:
                     </Label>
                     <Input
                       id="style-boost-terms"

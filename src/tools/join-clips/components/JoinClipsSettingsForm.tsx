@@ -811,7 +811,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                     {/* Gap Frames */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                                <Label htmlFor="join-gap-frames" className="text-sm font-medium">Gap Frames</Label>
+                                <Label htmlFor="join-gap-frames" className="text-sm font-medium">Gap Frames:</Label>
                                 <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{gapFrames}</span>
                         </div>
                         <Slider
@@ -830,7 +830,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                     {/* Context Frames */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <Label htmlFor="join-context-frames" className="text-sm font-medium">Context Frames</Label>
+                                <Label htmlFor="join-context-frames" className="text-sm font-medium">Context Frames:</Label>
                                 <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{contextFrames}</span>
                             </div>
                             <Slider
@@ -849,7 +849,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                     {/* Replace Mode */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between h-5">
-                                <Label className="text-sm font-medium">Transition Mode</Label>
+                                <Label className="text-sm font-medium">Transition Mode:</Label>
                             </div>
                             <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
                                 <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Insert</span>
@@ -865,7 +865,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                         {/* Keep Bridge Images */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between h-5">
-                                <Label className={cn("text-sm font-medium", gapFrames <= 8 && "text-muted-foreground")}>Bridge Anchors</Label>
+                                <Label className={cn("text-sm font-medium", gapFrames <= 8 && "text-muted-foreground")}>Bridge Anchors:</Label>
                             </div>
                             <TooltipProvider>
                                 <Tooltip>
@@ -928,7 +928,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                             {showResolutionToggle && (
                                                 <div className="space-y-3">
                                                     <div className="flex items-center justify-between h-5">
-                                                        <Label className="text-sm font-medium">Output Resolution</Label>
+                                                        <Label className="text-sm font-medium">Output Resolution:</Label>
                                                     </div>
                                                     <TooltipProvider>
                                                         <Tooltip>
@@ -960,7 +960,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                             {showFpsToggle && (
                                                 <div className="space-y-3">
                                                     <div className="flex items-center justify-between h-5">
-                                                        <Label className="text-sm font-medium">Output FPS</Label>
+                                                        <Label className="text-sm font-medium">Output FPS:</Label>
                                                     </div>
                                                     <TooltipProvider>
                                                         <Tooltip>
@@ -996,7 +996,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                                             <Tooltip>
                                                                 <TooltipTrigger asChild>
                                                                     <Label className="text-sm font-medium flex items-center gap-1 cursor-help">
-                                                                        Noised Input Video
+                                                                        Noised Input Video:
                                                                         <Info className="w-3 h-3 text-muted-foreground" />
                                                                     </Label>
                                                                 </TooltipTrigger>
@@ -1087,7 +1087,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                     {/* Global Prompt */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <Label htmlFor="join-prompt">Global Prompt</Label>
+                            <Label htmlFor="join-prompt">Global Prompt:</Label>
                             {/* Only show "Set individually" when there are more than 2 clips */}
                             {setUseIndividualPrompts && clipCount > 2 && (
                                 <div className="flex items-center gap-2">
@@ -1155,7 +1155,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
 
                     {/* Negative Prompt */}
                     <div className="space-y-2">
-                        <Label htmlFor="join-negative-prompt">Negative Prompt</Label>
+                        <Label htmlFor="join-negative-prompt">Negative Prompt:</Label>
                         <Textarea
                             id="join-negative-prompt"
                             value={negativePrompt}

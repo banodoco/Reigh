@@ -1846,7 +1846,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 {/* Input Images - Clickable thumbnails */}
                 {segmentImages.hasImages && (
                     <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-muted-foreground">Input Images</Label>
+                        <Label className="text-xs font-medium text-muted-foreground">Input Images:</Label>
                         <div className="flex gap-2">
                             {segmentImages.start && (
                                 <button
@@ -1895,7 +1895,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 )}
 
                 <div className="space-y-2 flex-1">
-                    <Label className="text-xs font-medium">Prompt</Label>
+                    <Label className="text-xs font-medium">Prompt:</Label>
                     <Textarea
                         value={params.base_prompt || params.prompt || ''}
                         onChange={(e) => {
@@ -1929,7 +1929,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
 
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                        <Label className="text-xs font-medium">Frames</Label>
+                        <Label className="text-xs font-medium">Frames:</Label>
                         <span className="text-xs text-muted-foreground">
                             {params.num_frames || 0} ({framesToSeconds(params.num_frames || 0)})
                         </span>
@@ -1959,11 +1959,11 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                     <CollapsibleContent className="space-y-4 pt-3">
                         {/* Generation Settings Section */}
                         <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
-                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Generation Settings</Label>
+                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Generation Settings:</Label>
                             
                             {/* Negative Prompt */}
                             <div className="space-y-1.5">
-                                <Label className="text-xs font-medium">Negative Prompt</Label>
+                                <Label className="text-xs font-medium">Negative Prompt:</Label>
                                 <Textarea
                                     value={params.negative_prompt || ''}
                                     onChange={(e) => handleChange('negative_prompt', e.target.value)}

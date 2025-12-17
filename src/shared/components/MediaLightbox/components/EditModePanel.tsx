@@ -326,7 +326,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         
         {/* Prompt Field */}
         <div className={generationsSpacing}>
-          <label className={`${labelSize} font-medium`}>Prompt</label>
+          <label className={`${labelSize} font-medium`}>Prompt:</label>
           <Textarea
             value={inpaintPrompt}
             onChange={(e) => setInpaintPrompt(e.target.value)}
@@ -356,7 +356,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           {/* LoRA Selector */}
           <div className={cn(isMobile ? "" : "flex-1")}>
             <div className="flex items-center gap-3">
-              <label className={`${labelSize} font-medium whitespace-nowrap`}>LoRA</label>
+              <label className={`${labelSize} font-medium whitespace-nowrap`}>LoRA:</label>
               <div className="flex items-center gap-1 flex-1">
                 <Select value={loraMode} onValueChange={setLoraMode}>
                   <SelectTrigger variant="retro" className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
@@ -404,7 +404,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           {/* Number of Generations Slider */}
           <div className={cn(isMobile ? "" : "flex-1")}>
             <div className="flex items-center justify-between">
-              <label className={`${labelSize} font-medium`}>{isMobile ? 'Generations' : 'Number of Generations'}</label>
+              <label className={`${labelSize} font-medium`}>{isMobile ? 'Generations:' : 'Number of Generations:'}</label>
               <span className={`${sliderTextSize} text-muted-foreground`}>{inpaintNumGenerations}</span>
             </div>
             <input

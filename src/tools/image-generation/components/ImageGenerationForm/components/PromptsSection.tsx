@@ -114,7 +114,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
         <div className="mt-2">
           <div className="relative">
             <Label htmlFor="masterPromptText" className="text-sm font-light block mb-1.5">
-              Master Prompt
+              Master Prompt:
             </Label>
             {isMobile ? (
               <Popover>
@@ -260,7 +260,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="beforeEachPromptText">
-              Before each prompt
+              Before each prompt:
             </Label>
             <Textarea
               id="beforeEachPromptText"
@@ -282,7 +282,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
           </div>
           <div>
             <Label htmlFor="afterEachPromptText">
-              After each prompt
+              After each prompt:
             </Label>
             <Textarea
               id="afterEachPromptText"

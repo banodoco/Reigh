@@ -2912,3 +2912,19 @@
 .animate-burst-and-flash {
   animation: burstAndFlash 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
+
+/* Touch-friendly hover: only apply hover on devices that support it, use active for touch */
+@media (hover: hover) {
+  .group:hover .touch-hover-gold {
+    color: #C9B896 !important;
+  }
+  .dark .group:hover .touch-hover-gold {
+    color: hsl(var(--wes-vintage-gold)) !important;
+  }
+
+  .dark .group:hover .touch-border-gold {
+    border-color: hsl(var(--wes-vintage-gold)) !important;
+  }
+}
+
+/* Note: mobile tap "flash" is handled in React to avoid sticky :hover */

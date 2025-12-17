@@ -190,7 +190,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
           <div className="grid gap-4 py-3">
             <div className="space-y-1.5">
               <Label htmlFor="project-name-settings">
-                Name
+                Name:
               </Label>
               <Input
                 id="project-name-settings"
@@ -203,7 +203,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="aspect-ratio-settings">
-                Aspect Ratio
+                Aspect Ratio:
               </Label>
               <AspectRatioSelector
                 value={aspectRatio}

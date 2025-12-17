@@ -458,7 +458,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                     {/* Context Frames - Global setting */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <Label htmlFor="context-frames" className="text-sm">Context Frames</Label>
+                            <Label htmlFor="context-frames" className="text-sm">Context Frames:</Label>
                             <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{contextFrames}</span>
                         </div>
                         <Slider
@@ -476,7 +476,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                     
                     {/* Negative Prompt */}
                     <div className="space-y-2">
-                        <Label htmlFor="negative-prompt">Negative Prompt</Label>
+                        <Label htmlFor="negative-prompt">Negative Prompt:</Label>
                         <Textarea
                             id="negative-prompt"
                             value={negativePrompt}

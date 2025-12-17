@@ -1204,7 +1204,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
-            <Label htmlFor="preset-name">Name *</Label>
+            <Label htmlFor="preset-name">Name: *</Label>
             <Input 
               id="preset-name" 
               placeholder="My Custom Phase Config" 
@@ -1215,7 +1215,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
           </div>
           
           <div className="space-y-1">
-            <Label htmlFor="preset-description">Description (optional)</Label>
+            <Label htmlFor="preset-description">Description: (optional)</Label>
             <Textarea 
               id="preset-description" 
               placeholder="Describe what this preset does and when to use it..." 
@@ -1266,7 +1266,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="preset-base-prompt">Base Prompt</Label>
+                <Label htmlFor="preset-base-prompt">Base Prompt:</Label>
                 <Textarea 
                   id="preset-base-prompt" 
                   placeholder="Enter the main prompt for this preset..." 
@@ -1284,7 +1284,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="preset-negative-prompt">Negative Prompt</Label>
+                <Label htmlFor="preset-negative-prompt">Negative Prompt:</Label>
                 <Textarea 
                   id="preset-negative-prompt" 
                   placeholder="Enter negative prompt..." 
@@ -1317,7 +1317,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="preset-text-before">Text Before Prompts</Label>
+                <Label htmlFor="preset-text-before">Text Before Prompts:</Label>
                 <Input 
                   id="preset-text-before" 
                   placeholder="Prefix text..." 
@@ -1327,7 +1327,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="preset-text-after">Text After Prompts</Label>
+                <Label htmlFor="preset-text-after">Text After Prompts:</Label>
                 <Input 
                   id="preset-text-after" 
                   placeholder="Suffix text..." 
@@ -1338,7 +1338,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="preset-duration">Suggested duration</Label>
+              <Label htmlFor="preset-duration">Suggested duration:</Label>
               <div className="flex items-center gap-3">
                 <Slider
                   id="preset-duration"
@@ -1375,7 +1375,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             {/* Model Type Toggle (I2V vs VACE) */}
             <div className="space-y-2 p-3 bg-muted/30 rounded-lg border">
               <div className="flex items-center gap-2">
-                <Label className="text-sm font-light">Model Type</Label>
+                <Label className="text-sm font-light">Model Type:</Label>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1414,7 +1414,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Number of Phases */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-light">Number of Phases</Label>
+                    <Label className="text-sm font-light">Number of Phases:</Label>
                     <RadioGroup
                       value={String(editablePhaseConfig.num_phases)}
                       onValueChange={(value) => {
@@ -1460,7 +1460,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
 
                   {/* Sample Solver */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-light">Sample Solver</Label>
+                    <Label className="text-sm font-light">Sample Solver:</Label>
                     <RadioGroup
                       value={editablePhaseConfig.sample_solver}
                       onValueChange={(value) => setEditablePhaseConfig({
@@ -1543,7 +1543,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
 
                       {/* Guidance Scale */}
                       <div className="space-y-1.5">
-                        <Label className="text-sm font-light">Guidance Scale</Label>
+                        <Label className="text-sm font-light">Guidance Scale:</Label>
                         <Input
                           type="number"
                           min={0}
@@ -1567,7 +1567,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
 
                     {/* Right: LoRAs (spans 2 columns) */}
                     <div className="sm:col-span-2">
-                      <Label className="text-sm font-medium mb-1.5 block">LoRAs</Label>
+                      <Label className="text-sm font-medium mb-1.5 block">LoRAs:</Label>
                       <div className="grid grid-cols-2 gap-2 mb-1.5 w-full">
                         <Button
                           size="sm"
@@ -1767,7 +1767,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             {/* Display existing samples when editing */}
             {isEditMode && editingPreset?.metadata.sample_generations && editingPreset.metadata.sample_generations.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-sm font-light">Existing Samples ({editingPreset.metadata.sample_generations.filter(s => !deletedExistingSampleUrls.includes(s.url)).length})</Label>
+                <Label className="text-sm font-light">Existing Samples: ({editingPreset.metadata.sample_generations.filter(s => !deletedExistingSampleUrls.includes(s.url)).length})</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {editingPreset.metadata.sample_generations
                     .filter(sample => !deletedExistingSampleUrls.includes(sample.url))
@@ -1836,7 +1836,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             {/* Display initial video sample from last generation (when not editing OR overwriting) */}
             {(!isEditMode || isOverwriting) && initialVideoSample && !initialVideoDeleted && (
               <div className="space-y-2">
-                <Label className="text-sm font-light">Last Generated Video (auto-included)</Label>
+                <Label className="text-sm font-light">Last Generated Video: (auto-included)</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   <div className="relative group">
                     <div className="relative rounded-lg border-2 border-blue-500 bg-blue-50 dark:bg-blue-950/30 overflow-hidden">
@@ -1893,7 +1893,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             {/* Display uploaded files */}
             {sampleFiles.length > 0 && (
               <div className="space-y-2 mt-3">
-                <Label className="text-sm font-light">Uploaded Files ({sampleFiles.length})</Label>
+                <Label className="text-sm font-light">Uploaded Files: ({sampleFiles.length})</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {sampleFiles.map((file, index) => (
                     <div key={index} className="relative group">

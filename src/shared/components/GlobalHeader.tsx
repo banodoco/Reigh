@@ -32,6 +32,22 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const navigate = useNavigate();
   const isTablet = useIsTablet();
   const { darkMode } = useDarkMode();
+
+  // Mobile Safari keeps :hover "stuck" after taps. For the brand icon we explicitly
+  // flash the highlight briefly on touch/click, then clear it.
+  const [isBrandFlash, setIsBrandFlash] = useState(false);
+  const brandFlashTimeoutRef = React.useRef<number | null>(null);
+  const triggerBrandFlash = React.useCallback(() => {
+    setIsBrandFlash(true);
+    if (brandFlashTimeoutRef.current != null) window.clearTimeout(brandFlashTimeoutRef.current);
+    brandFlashTimeoutRef.current = window.setTimeout(() => setIsBrandFlash(false), 220);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (brandFlashTimeoutRef.current != null) window.clearTimeout(brandFlashTimeoutRef.current);
+    };
+  }, []);
   
   // Dark mode icon colors (very muted/faded versions)
   const darkIconColors = {
@@ -276,19 +292,34 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               role="link"
               tabIndex={0}
               aria-label="Go to homepage"
+              onPointerDown={triggerBrandFlash}
               onPointerUp={() => navigate("/")}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate("/"); }}
               className="group flex items-center space-x-4 relative p-2 -m-2 cursor-pointer z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-2xl"
             >
               <div className="relative">
-                <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:border-2 rounded-sm shadow-[-4px_4px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-4px_4px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-2px_2px_0_0_rgba(180,160,100,0.4)] dark:group-hover:!border-wes-vintage-gold group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-300" style={getDarkIconStyle(darkIconColors.palette)}>
+                <div
+                  className={cn(
+                    "flex items-center justify-center w-16 h-16 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue",
+                    "dark:bg-none dark:border-2 rounded-sm",
+                    "shadow-[-4px_4px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-4px_4px_0_0_rgba(90,90,80,0.4)]",
+                    "group-hover:shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-2px_2px_0_0_rgba(180,160,100,0.4)]",
+                    "group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-300",
+                    "touch-border-gold",
+                    isBrandFlash && darkMode ? "!border-wes-vintage-gold" : null
+                  )}
+                  style={getDarkIconStyle(darkIconColors.palette)}
+                >
                   <Palette
                     className={cn(
                       "h-8 w-8 group-hover:rotate-12 transition-all duration-300",
-                      "drop-shadow-lg dark:drop-shadow-none",
+                      "drop-shadow-lg dark:drop-shadow-none touch-hover-gold",
                       darkMode
-                        ? "text-[#a098a8] animate-color-shift group-hover:animate-none group-hover:!text-wes-vintage-gold"
-                        : "text-white group-hover:!text-[#C9B896]"
+                        ? "text-[#a098a8] animate-color-shift group-hover:animate-none"
+                        : "text-white",
+                      isBrandFlash
+                        ? (darkMode ? "animate-none !text-wes-vintage-gold" : "!text-[#C9B896]")
+                        : null
                     )}
                   />
                 </div>
@@ -452,20 +483,35 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 role="link"
                 tabIndex={0}
                 aria-label="Go to homepage"
+                onPointerDown={triggerBrandFlash}
                 onPointerUp={() => navigate("/")}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate("/"); }}
                 className="group relative cursor-pointer z-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-wes-vintage-gold/50 rounded-xl"
               >
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
-                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] group-hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-1px_1px_0_0_rgba(90,90,80,0.4)] dark:group-hover:!border-wes-vintage-gold group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-300" style={getDarkIconStyle(darkIconColors.palette)}>
+                    <div
+                      className={cn(
+                        "flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue",
+                        "dark:bg-none dark:border-2 rounded-sm",
+                        "shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)]",
+                        "group-hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:group-hover:shadow-[-1px_1px_0_0_rgba(90,90,80,0.4)]",
+                        "group-hover:translate-x-[1px] group-hover:translate-y-[1px] transition-all duration-300",
+                        "touch-border-gold",
+                        isBrandFlash && darkMode ? "!border-wes-vintage-gold" : null
+                      )}
+                      style={getDarkIconStyle(darkIconColors.palette)}
+                    >
                       <Palette
                         className={cn(
                           "h-6 w-6 group-hover:rotate-12 transition-all duration-300",
-                          "drop-shadow-lg dark:drop-shadow-none",
+                          "drop-shadow-lg dark:drop-shadow-none touch-hover-gold",
                           darkMode
-                            ? "text-[#a098a8] animate-color-shift group-hover:animate-none group-hover:!text-wes-vintage-gold"
-                            : "text-white group-hover:!text-[#C9B896]"
+                            ? "text-[#a098a8] animate-color-shift group-hover:animate-none"
+                            : "text-white",
+                          isBrandFlash
+                            ? (darkMode ? "animate-none !text-wes-vintage-gold" : "!text-[#C9B896]")
+                            : null
                         )}
                       />
                     </div>

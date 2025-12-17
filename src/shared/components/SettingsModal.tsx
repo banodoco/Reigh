@@ -564,7 +564,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">Appearance</h3>
                 <div className={`${isMobile ? 'p-3' : 'p-4'} bg-muted/30 rounded-lg space-y-2`}>
                   <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
-                    <span className="font-medium">Theme</span>
+                    <span className="font-medium">Theme:</span>
                     <div className="flex items-center gap-0">
                       <button
                         onClick={() => setDarkMode(false)}
@@ -623,7 +623,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     {/* Resources Toggle */}
                     <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
                       <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
-                        <span className="font-medium">Resources</span>
+                        <span className="font-medium">Resources:</span>
                         <PrivacyToggle
                           isPublic={privacyDefaults.resourcesPublic}
                           onValueChange={(isPublic) => updatePrivacyDefaults({ resourcesPublic: isPublic })}
@@ -639,7 +639,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     {/* Generations Toggle */}
                     <div className={`${isMobile ? 'p-3' : 'p-4'} bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-2`}>
                       <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
-                        <span className="font-medium">Generations</span>
+                        <span className="font-medium">Generations:</span>
                         <PrivacyToggle
                           isPublic={privacyDefaults.generationsPublic}
                           onValueChange={(isPublic) => updatePrivacyDefaults({ generationsPublic: isPublic })}
@@ -782,7 +782,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
                       {/* Computer Type */}
                       <div>
-                        <Label className="text-xs text-blue-600 dark:text-blue-400 mb-1 block">Computer</Label>
+                        <Label className="text-xs text-blue-600 dark:text-blue-400 mb-1 block">Computer:</Label>
                         <Select value={computerType} onValueChange={setComputerType}>
                           <SelectTrigger variant="retro" size="sm" colorScheme="blue" className="w-full h-9">
                             <SelectValue />
@@ -797,7 +797,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                       {/* GPU Type */}
                       <div>
-                        <Label className="text-xs text-violet-600 dark:text-violet-400 mb-1 block">GPU</Label>
+                        <Label className="text-xs text-violet-600 dark:text-violet-400 mb-1 block">GPU:</Label>
                         <Select value={gpuType} onValueChange={setGpuType} disabled={computerType === "mac"}>
                           <SelectTrigger variant="retro" size="sm" colorScheme="violet" className="w-full h-9">
                             <SelectValue />
@@ -812,7 +812,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                       {/* Memory Profile */}
                       <div>
-                        <Label className="text-xs text-emerald-600 dark:text-emerald-400 mb-1 block">Memory</Label>
+                        <Label className="text-xs text-emerald-600 dark:text-emerald-400 mb-1 block">Memory:</Label>
                         <Select value={memoryProfile} onValueChange={setMemoryProfile}>
                           <SelectTrigger variant="retro" size="sm" colorScheme="emerald" className="w-full h-9">
                             <SelectValue />
@@ -866,7 +866,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                       {/* Debug Logs Toggle */}
                       <div>
-                        <Label className="text-xs text-amber-600 dark:text-amber-400 mb-1 block">Debug</Label>
+                        <Label className="text-xs text-amber-600 dark:text-amber-400 mb-1 block">Debug:</Label>
                         <button
                           onClick={() => setShowDebugLogs(!showDebugLogs)}
                           className={`w-full h-9 px-3 text-sm rounded-md border transition-colors flex items-center justify-between ${

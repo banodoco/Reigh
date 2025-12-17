@@ -9,6 +9,7 @@ import { Input } from "@/shared/components/ui/input";
 import { Info, Plus, Sparkles, Eraser } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
+import { CollapsibleSection } from "@/shared/components/ui/collapsible-section";
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from './ShotEditor/state/types';
 import { Project } from '@/types/project';
@@ -193,7 +194,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   <div className="relative">
                     <Label htmlFor="batchVideoPrompt" className="text-sm font-light block mb-1.5">
                       {(isTimelineMode || enhancePrompt)
-                        ? 'Default/Base Prompt:'
+                        ? 'Base Prompt:'
                         : 'Prompt:'
                       }
                     </Label>
@@ -321,50 +322,54 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </div>
             )}
             
-            {/* Text Before/After Prompts - Always visible */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="textBeforePrompts" className="text-sm font-light block mb-1.5">
-                  Before each prompt:
-                </Label>
-                <Input
-                  id="textBeforePrompts"
-                  value={textBeforePrompts}
-                  onChange={(e) => onTextBeforePromptsChange?.(e.target.value)}
-                  onBlur={() => onBlurSave?.()}
-                  placeholder="Text to prepend to each prompt..."
-                  className="w-full"
-                  clearable
-                  onClear={() => onTextBeforePromptsChange?.('')}
-                  voiceInput
-                  voiceContext="This is text that will be prepended to every video generation prompt. Keep it short - things like style prefixes or descriptions that apply to all video segments."
-                  onVoiceResult={(result) => {
-                    onTextBeforePromptsChange?.(result.prompt || result.transcription);
-                  }}
-                />
+            {/* Additional prompt settings */}
+            <CollapsibleSection title="Additional prompt settings">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="textBeforePrompts" className="text-sm font-light block mb-1.5">
+                    Before each prompt:
+                  </Label>
+                  <Textarea
+                    id="textBeforePrompts"
+                    value={textBeforePrompts}
+                    onChange={(e) => onTextBeforePromptsChange?.(e.target.value)}
+                    onBlur={() => onBlurSave?.()}
+                    placeholder="Text to prepend to each prompt..."
+                    className="min-h-[60px] resize-none"
+                    rows={2}
+                    clearable
+                    onClear={() => onTextBeforePromptsChange?.('')}
+                    voiceInput
+                    voiceContext="This is text that will be prepended to every video generation prompt. Keep it short - things like style prefixes or descriptions that apply to all video segments."
+                    onVoiceResult={(result) => {
+                      onTextBeforePromptsChange?.(result.prompt || result.transcription);
+                    }}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="textAfterPrompts" className="text-sm font-light block mb-1.5">
+                    After each prompt:
+                  </Label>
+                  <Textarea
+                    id="textAfterPrompts"
+                    value={textAfterPrompts}
+                    onChange={(e) => onTextAfterPromptsChange?.(e.target.value)}
+                    onBlur={() => onBlurSave?.()}
+                    placeholder="Text to append to each prompt..."
+                    className="min-h-[60px] resize-none"
+                    rows={2}
+                    clearable
+                    onClear={() => onTextAfterPromptsChange?.('')}
+                    voiceInput
+                    voiceContext="This is text that will be appended to every video generation prompt. Keep it short - things like quality suffixes or parameters that apply to all video segments."
+                    onVoiceResult={(result) => {
+                      onTextAfterPromptsChange?.(result.prompt || result.transcription);
+                    }}
+                  />
+                </div>
               </div>
-              
-              <div>
-                <Label htmlFor="textAfterPrompts" className="text-sm font-light block mb-1.5">
-                  After each prompt:
-                </Label>
-                <Input
-                  id="textAfterPrompts"
-                  value={textAfterPrompts}
-                  onChange={(e) => onTextAfterPromptsChange?.(e.target.value)}
-                  onBlur={() => onBlurSave?.()}
-                  placeholder="Text to append to each prompt..."
-                  className="w-full"
-                  clearable
-                  onClear={() => onTextAfterPromptsChange?.('')}
-                  voiceInput
-                  voiceContext="This is text that will be appended to every video generation prompt. Keep it short - things like quality suffixes or parameters that apply to all video segments."
-                  onVoiceResult={(result) => {
-                    onTextAfterPromptsChange?.(result.prompt || result.transcription);
-                  }}
-                />
-              </div>
-            </div>
+            </CollapsibleSection>
             
 
             {/* Turbo Mode Toggle - DISABLED - keeping code for potential future use

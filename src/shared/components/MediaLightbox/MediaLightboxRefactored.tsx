@@ -3054,7 +3054,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           {editMode === 'inpaint' && (
                             <div className="space-y-0.5">
                               <div className="flex items-center justify-between">
-                                <label className="text-xs font-medium text-foreground">Size</label>
+                                <label className="text-xs font-medium text-foreground">Size:</label>
                                 <span className="text-xs text-muted-foreground">{brushSize}px</span>
                               </div>
                               <input

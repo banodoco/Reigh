@@ -5,8 +5,8 @@ import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { Info, Library, Pencil, Settings, X } from 'lucide-react';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '../settings';
-import { LoraModel, ActiveLora } from '@/shared/components/LoraSelectorModal';
-import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
+import { LoraModel } from '@/shared/components/LoraSelectorModal';
+import { ActiveLoRAsDisplay, type ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { PhaseConfigVertical } from './PhaseConfigVertical';
 import { PhaseConfigSelectorModal } from '@/shared/components/PhaseConfigSelectorModal';
 import { Card } from '@/shared/components/ui/card';
@@ -360,7 +360,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
                 {/* Header with label, tooltip, and Browse button */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Label className="text-sm font-medium">Motion Preset</Label>
+                    <Label className="text-sm font-medium">Motion Preset:</Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -417,19 +417,18 @@ export const MotionControl: React.FC<MotionControlProps> = ({
                             />
                           </div>
                         )}
-                        <div className="flex flex-col items-start">
-                          <span className="text-sm font-medium">
-                            {metadata?.name || 'Preset'}
-                          </span>
-                          {isBuiltinDefault && !isSelected && (
-                            <span className="text-xs text-muted-foreground">Default</span>
+                        <div className="flex min-w-0 flex-col items-start">
+                          {isBuiltinDefault ? (
+                            <span className="text-sm font-medium whitespace-nowrap">
+                              {metadata?.name || 'Preset'}{' '}
+                              <span className="font-normal text-muted-foreground">(default)</span>
+                            </span>
+                          ) : (
+                            <span className="text-sm font-medium truncate">
+                              {metadata?.name || 'Preset'}
+                            </span>
                           )}
                         </div>
-                        {isSelected && (
-                          <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300">
-                            Active
-                          </Badge>
-                        )}
                       </button>
                     );
                   })}
@@ -447,11 +446,6 @@ export const MotionControl: React.FC<MotionControlProps> = ({
                   >
                     <Settings className="h-4 w-4" />
                     <span className="text-sm font-medium">Custom</span>
-                    {isCustomConfig && (
-                      <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-700 dark:text-blue-300">
-                        Active
-                      </Badge>
-                    )}
                   </button>
                 </div>
               </div>

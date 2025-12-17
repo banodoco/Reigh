@@ -366,7 +366,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
               <div className="w-full lg:w-80 space-y-4 bg-accent/30 border border-accent-foreground/10 rounded-lg p-4 lg:hidden">
                 {/* Rules/Constraints - moved into advanced */}
                 <div>
-          <Label htmlFor="gen_rulesToRememberText" className="mb-2 block">Rules/Constraints</Label>
+          <Label htmlFor="gen_rulesToRememberText" className="mb-2 block">Rules/Constraints:</Label>
           <Textarea
             id="gen_rulesToRememberText"
             value={rulesToRememberText}
@@ -597,7 +597,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           <div className="hidden lg:block w-80 space-y-4 bg-accent/30 border border-accent-foreground/10 rounded-lg p-4">
               {/* Rules/Constraints - moved into advanced */}
               <div>
-                <Label htmlFor="gen_rulesToRememberText" className="mb-2 block">Rules/Constraints</Label>
+                <Label htmlFor="gen_rulesToRememberText" className="mb-2 block">Rules/Constraints:</Label>
                 <Textarea
                   id="gen_rulesToRememberText"
                   value={rulesToRememberText}

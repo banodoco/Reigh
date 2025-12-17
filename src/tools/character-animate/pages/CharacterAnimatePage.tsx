@@ -641,7 +641,7 @@ const CharacterAnimatePage: React.FC = () => {
         
         {/* Mode Selection - First */}
         <div className="space-y-2">
-          <Label>Mode</Label>
+          <Label>Mode:</Label>
           <div className="flex items-center gap-4">
             <div className="flex space-x-2 flex-1">
               <Button
@@ -901,7 +901,7 @@ const CharacterAnimatePage: React.FC = () => {
         <div className="space-y-5">
           {/* Prompt */}
           <div className="space-y-2">
-            <Label htmlFor="prompt">Prompt (Optional)</Label>
+            <Label htmlFor="prompt">Prompt: (Optional)</Label>
             <Textarea
               id="prompt"
               value={prompt}

@@ -186,7 +186,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
       {onGenerationTypeModeChange && (
         <div className="space-y-2 p-3 bg-muted/30 rounded-lg border">
           <div className="flex items-center gap-2">
-            <Label className="text-sm font-light">Model Type</Label>
+            <Label className="text-sm font-light">Model Type:</Label>
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -240,7 +240,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
               {/* Number of Phases */}
               <div>
                 <Label htmlFor="num_phases" className="text-sm font-light block mb-1.5">
-                  Number of Phases
+                  Number of Phases:
                 </Label>
                 <RadioGroup
                   value={String(phaseConfig.num_phases)}
@@ -290,7 +290,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
 
               {/* Sample Solver */}
               <div>
-                <Label htmlFor="sample_solver" className="text-sm font-light block mb-1.5">Sample Solver</Label>
+                <Label htmlFor="sample_solver" className="text-sm font-light block mb-1.5">Sample Solver:</Label>
                 <RadioGroup
                   value={phaseConfig.sample_solver}
                   onValueChange={(value) => onPhaseConfigChange({
@@ -357,7 +357,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                   checked={randomSeed}
                   onCheckedChange={onRandomSeedChange}
                 />
-                <Label htmlFor="random-seed" className="text-sm">Random Seed</Label>
+                <Label htmlFor="random-seed" className="text-sm">Random Seed:</Label>
               </div>
             </div>
           </div>
@@ -401,7 +401,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                 {/* Guidance Scale */}
                 <div>
                   <Label htmlFor={`guidance_scale_${phaseIdx}`} className="text-sm font-light block mb-1.5">
-                    Guidance Scale
+                    Guidance Scale:
                   </Label>
                   <Input
                     id={`guidance_scale_${phaseIdx}`}
@@ -428,7 +428,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
 
               {/* Right Column - LoRAs (2/3) */}
               <div className="col-span-2">
-                <Label className="text-sm font-medium mb-1.5 block">LoRAs</Label>
+                <Label className="text-sm font-medium mb-1.5 block">LoRAs:</Label>
                 <div className="grid grid-cols-2 gap-2 mb-1.5 w-full">
                   <Button
                     size="sm"

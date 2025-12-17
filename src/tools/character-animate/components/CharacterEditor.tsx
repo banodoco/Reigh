@@ -337,7 +337,7 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Character Image */}
         <div className="space-y-3">
-          <Label className="text-lg font-medium">Input Image</Label>
+          <Label className="text-lg font-medium">Input Image:</Label>
           <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
             {characterImage ? (
               <img
@@ -383,7 +383,7 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
 
         {/* Motion Video */}
         <div className="space-y-3">
-          <Label className="text-lg font-medium">Input Video</Label>
+          <Label className="text-lg font-medium">Input Video:</Label>
           <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
             {selectedMotionVideo ? (
               <video
@@ -443,7 +443,7 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
       <div className="space-y-5">
         {/* Prompt */}
         <div className="space-y-2">
-          <Label htmlFor="prompt">Prompt (Optional)</Label>
+          <Label htmlFor="prompt">Prompt: (Optional)</Label>
           <Textarea
             id="prompt"
             value={prompt}
@@ -465,7 +465,7 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Mode Selection */}
           <div className="space-y-2">
-            <Label>Mode</Label>
+            <Label>Mode:</Label>
             <div className="flex space-x-2">
               <Button
                 variant={settings.mode === 'replace' ? 'default' : 'outline'}
@@ -486,7 +486,7 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
 
           {/* Resolution */}
           <div className="space-y-2">
-            <Label>Resolution</Label>
+            <Label>Resolution:</Label>
             <div className="flex space-x-2">
               <Button
                 variant={settings.resolution === '480p' ? 'default' : 'outline'}
@@ -508,7 +508,7 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
 
         {/* Seed Control */}
         <div className="space-y-2">
-          <Label htmlFor="seed">Seed</Label>
+          <Label htmlFor="seed">Seed:</Label>
           <div className="flex items-center space-x-2">
             <Input
               id="seed"

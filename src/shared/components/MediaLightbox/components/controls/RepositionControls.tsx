@@ -107,7 +107,7 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
         <div className="flex items-center gap-1.5">
           <MoveHorizontal className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
           <div className="flex-1 flex items-center justify-between">
-            <label className={cn("font-medium text-foreground", textSize)}>X</label>
+            <label className={cn("font-medium text-foreground", textSize)}>X:</label>
             <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.translateX.toFixed(0)}%</span>
           </div>
         </div>
@@ -126,7 +126,7 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
         <div className="flex items-center gap-1.5">
           <MoveVertical className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
           <div className="flex-1 flex items-center justify-between">
-            <label className={cn("font-medium text-foreground", textSize)}>Y</label>
+            <label className={cn("font-medium text-foreground", textSize)}>Y:</label>
             <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.translateY.toFixed(0)}%</span>
           </div>
         </div>
@@ -145,7 +145,7 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
         <div className="flex items-center gap-1.5">
           <Maximize2 className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
           <div className="flex-1 flex items-center justify-between">
-            <label className={cn("font-medium text-foreground", textSize)}>Scale</label>
+            <label className={cn("font-medium text-foreground", textSize)}>Scale:</label>
             <span className={cn("text-muted-foreground tabular-nums", textSize)}>{(transform.scale * 100).toFixed(0)}%</span>
           </div>
         </div>
@@ -164,7 +164,7 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
         <div className="flex items-center gap-1.5">
           <RotateCw className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
           <div className="flex-1 flex items-center justify-between">
-            <label className={cn("font-medium text-foreground", textSize)}>Rotate</label>
+            <label className={cn("font-medium text-foreground", textSize)}>Rotate:</label>
             <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.rotation}°</span>
           </div>
         </div>
