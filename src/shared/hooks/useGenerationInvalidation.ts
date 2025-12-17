@@ -109,7 +109,7 @@ function performInvalidation(
  */
 export function useInvalidateGenerations() {
   const queryClient = useQueryClient();
-  const timeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const timeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   
   return useCallback((shotId: string, options: InvalidationOptions) => {
     const { delayMs } = options;
