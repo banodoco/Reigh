@@ -2771,7 +2771,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         isOpen={isCreateShotModalOpen}
         onClose={() => setIsCreateShotModalOpen(false)}
         onSubmit={handleModalSubmitCreateShot}
-        isLoading={isCreatingShot || createShotMutation.isPending || handleExternalImageDropMutation.isPending}
+        isLoading={false} // Modal closes instantly, no loading state needed
         defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
         projectAspectRatio={projectAspectRatio}
         initialAspectRatio={null}

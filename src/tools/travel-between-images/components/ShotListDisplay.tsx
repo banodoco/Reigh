@@ -412,8 +412,9 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   
   // If a new shot appears, transfer expected image count to that shot card.
   // (Must be in an effect—never set state during render.)
+  // Note: pendingNewShotCountRef can be 0 for empty shots, so only check baselineShotIdsRef
   React.useEffect(() => {
-    if (pendingNewShotCountRef.current <= 0 || !baselineShotIdsRef.current) return;
+    if (!baselineShotIdsRef.current) return;
     const baseline = baselineShotIdsRef.current;
     const newShotId = currentShotIds.find(id => !baseline.has(id));
     if (!newShotId) return;
@@ -439,8 +440,9 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
 
   // Compute pending skeleton shot during render (no flicker)
   // Only show skeleton if the new shot hasn't appeared in the data yet
+  // Note: pendingNewShotCountRef can be 0 for empty shots, so check baselineShotIdsRef instead
   let pendingSkeletonShot: { imageCount: number } | null = null;
-  if (pendingNewShotCountRef.current > 0 && baselineShotIdsRef.current) {
+  if (baselineShotIdsRef.current) {
     const baseline = baselineShotIdsRef.current;
     const newShotAlreadyInData = currentShotIds.some(id => !baseline.has(id));
     if (!newShotAlreadyInData) {
