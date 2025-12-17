@@ -64,6 +64,19 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   const expectedNewCountRef = useRef(0);
   const baselineNonVideoIdsRef = useRef<Set<string> | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // "Latch" the initial pending uploads so we don't lose track when parent clears state
+  // Once we receive initialPendingUploads > 0, we store it and track progress locally
+  const latchedInitialPendingRef = useRef(0);
+  const initialBaselineCountRef = useRef(0);
+  
+  // Latch the initial pending count when we first receive it
+  if (initialPendingUploads > 0 && latchedInitialPendingRef.current === 0) {
+    latchedInitialPendingRef.current = initialPendingUploads;
+    // Snapshot current image count at the time we receive the pending count
+    const currentCount = (shot.images || []).filter(img => !isVideoGeneration(img)).length;
+    initialBaselineCountRef.current = currentCount;
+  }
 
   // Get current non-video image IDs
   const nonVideoImageIds = (shot.images || [])
@@ -74,7 +87,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   // Compute pending skeleton count DURING RENDER (no state delay = no flicker)
   let pendingSkeletonCount = 0;
   
-  // First check if we have our own drop-initiated pending uploads
+  // First check if we have our own drop-initiated pending uploads (from drops on existing shot)
   if (expectedNewCountRef.current > 0 && baselineNonVideoIdsRef.current) {
     const baseline = baselineNonVideoIdsRef.current;
     const newlyAppearedCount = nonVideoImageIds.filter(id => !baseline.has(id)).length;
@@ -90,19 +103,32 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
       }
     }
   }
-  // Otherwise, check for initial pending uploads (from newly created shot)
-  else if (initialPendingUploads > 0) {
-    // Show skeletons for images that haven't appeared yet
-    pendingSkeletonCount = Math.max(0, initialPendingUploads - nonVideoImageCount);
+  // Otherwise, check for latched initial pending uploads (from newly created shot)
+  else if (latchedInitialPendingRef.current > 0) {
+    // How many images have appeared since we latched?
+    const newlyAppearedCount = nonVideoImageCount - initialBaselineCountRef.current;
+    pendingSkeletonCount = Math.max(0, latchedInitialPendingRef.current - newlyAppearedCount);
+    
+    // If all images have appeared, clear the latch
+    if (pendingSkeletonCount === 0) {
+      latchedInitialPendingRef.current = 0;
+      initialBaselineCountRef.current = 0;
+    }
   }
 
   // If initial pending uploads are fully satisfied, notify parent (in an effect, not during render)
+  const wasLatchedRef = useRef(false);
   useEffect(() => {
-    if (!onInitialPendingUploadsConsumed) return;
-    if (initialPendingUploads <= 0) return;
-    if (nonVideoImageCount < initialPendingUploads) return;
-    onInitialPendingUploadsConsumed();
-  }, [initialPendingUploads, nonVideoImageCount, onInitialPendingUploadsConsumed]);
+    // Track if we ever had a latched value
+    if (latchedInitialPendingRef.current > 0) {
+      wasLatchedRef.current = true;
+    }
+    // Only notify once: when we HAD a latch and now it's cleared
+    if (wasLatchedRef.current && latchedInitialPendingRef.current === 0 && onInitialPendingUploadsConsumed) {
+      wasLatchedRef.current = false;
+      onInitialPendingUploadsConsumed();
+    }
+  }, [nonVideoImageCount, onInitialPendingUploadsConsumed]);
 
   // Check if we can accept this drop (generation or file)
   const canAcceptDrop = useCallback((e: React.DragEvent): boolean => {
