@@ -401,6 +401,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   // Track newly created shot to transfer pending count to it
   const [newlyCreatedShotId, setNewlyCreatedShotId] = useState<string | null>(null);
   const [newlyCreatedShotExpectedImages, setNewlyCreatedShotExpectedImages] = useState(0);
+  const [newlyCreatedShotBaselineNonVideoCount, setNewlyCreatedShotBaselineNonVideoCount] = useState(0);
   
   // Get current shot IDs
   const currentShotIds = shots?.map(s => s.id) || [];
@@ -422,6 +423,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
 
     setNewlyCreatedShotId(newShotId);
     setNewlyCreatedShotExpectedImages(remainingExpectedImages);
+    setNewlyCreatedShotBaselineNonVideoCount(existingNonVideoCount);
 
     // Clear skeleton-shot refs
     pendingNewShotCountRef.current = 0;
@@ -707,9 +709,11 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 onGenerationDrop={onGenerationDropOnShot}
                 onFilesDrop={onFilesDropOnShot}
                 initialPendingUploads={shot.id === newlyCreatedShotId ? newlyCreatedShotExpectedImages : 0}
+                initialPendingBaselineNonVideoCount={shot.id === newlyCreatedShotId ? newlyCreatedShotBaselineNonVideoCount : undefined}
                 onInitialPendingUploadsConsumed={shot.id === newlyCreatedShotId ? () => {
                   setNewlyCreatedShotId(null);
                   setNewlyCreatedShotExpectedImages(0);
+                  setNewlyCreatedShotBaselineNonVideoCount(0);
                 } : undefined}
               />
             );

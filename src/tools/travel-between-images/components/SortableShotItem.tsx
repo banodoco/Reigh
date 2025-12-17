@@ -23,6 +23,9 @@ interface SortableShotItemProps {
   onFilesDrop?: (shotId: string, files: File[]) => Promise<void>;
   // Initial pending uploads (for newly created shots from drop)
   initialPendingUploads?: number;
+  // Baseline non-video image count at the moment the new shot appeared
+  // (used to avoid latching after some images already arrived)
+  initialPendingBaselineNonVideoCount?: number;
   // Callback when initial pending uploads are consumed
   onInitialPendingUploadsConsumed?: () => void;
 }
@@ -40,6 +43,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   onGenerationDrop,
   onFilesDrop,
   initialPendingUploads = 0,
+  initialPendingBaselineNonVideoCount,
   onInitialPendingUploadsConsumed,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
@@ -80,7 +84,10 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   // IMPORTANT: `initialPendingUploads` is now "remaining" uploads, so baseline is the *current* count.
   if (initialPendingUploads > 0 && latchedInitialPendingRef.current === 0) {
     latchedInitialPendingRef.current = initialPendingUploads;
-    initialBaselineCountRef.current = nonVideoImageCount;
+    initialBaselineCountRef.current =
+      typeof initialPendingBaselineNonVideoCount === 'number'
+        ? initialPendingBaselineNonVideoCount
+        : nonVideoImageCount;
   }
 
   // Compute pending skeleton count DURING RENDER (no state delay = no flicker)
