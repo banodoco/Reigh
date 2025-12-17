@@ -120,20 +120,41 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
     e.stopPropagation();
     setIsDropTarget(false);
 
-    // Try generation drop first (fast - no loading state needed)
+    // Try generation drop first
     const generationData = getGenerationDropData(e);
     if (generationData && onGenerationDrop) {
       console.log('[ShotDrop] Dropping generation onto shot:', {
         shotId: shot.id.substring(0, 8),
         shotName: shot.name,
         generationId: generationData.generationId?.substring(0, 8),
+        currentImageCount: nonVideoImageIds.length,
         timestamp: Date.now()
       });
 
+      // Snapshot IDs at drop time - skeleton count computed during render
+      baselineNonVideoIdsRef.current = new Set(nonVideoImageIds);
+      expectedNewCountRef.current = 1; // Generation drop adds 1 image
+      
+      // Safety timeout - clear after 5s (generation drops are fast)
+      if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = setTimeout(() => {
+        expectedNewCountRef.current = 0;
+        baselineNonVideoIdsRef.current = null;
+        safetyTimeoutRef.current = null;
+      }, 5000);
+
       try {
         await onGenerationDrop(shot.id, generationData);
+        // Don't clear here - the render-time computation will clear it when image appears
       } catch (error) {
         console.error('[ShotDrop] Error handling generation drop:', error);
+        // On error, clear immediately
+        expectedNewCountRef.current = 0;
+        baselineNonVideoIdsRef.current = null;
+        if (safetyTimeoutRef.current) {
+          clearTimeout(safetyTimeoutRef.current);
+          safetyTimeoutRef.current = null;
+        }
       }
       return;
     }
