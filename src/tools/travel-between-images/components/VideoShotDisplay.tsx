@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { isVideoGeneration, isPositioned } from '@/shared/lib/typeGuards';
+import { isVideoGeneration } from '@/shared/lib/typeGuards';
 import { VideoGenerationModal } from '@/shared/components/VideoGenerationModal';
 import { usePanes } from '@/shared/contexts/PanesContext';
 
@@ -27,11 +27,12 @@ interface VideoShotDisplayProps {
   shotIndex?: number;
   projectAspectRatio?: string;
   isHighlighted?: boolean;
+  pendingUploads?: number; // Number of images currently being uploaded
 }
 
 const SKIP_DELETE_CONFIRMATION_KEY = 'reigh-skip-delete-shot-confirmation';
 
-const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false }) => {
+const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false, pendingUploads = 0 }) => {
   // Check if this is a temp shot (optimistic duplicate waiting for real ID)
   const isTempShot = shot.id.startsWith('temp-');
   
@@ -218,15 +219,21 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     }
   };
 
-  // Match ShotEditor/ShotsPane: show only positioned, non-video images sorted by timeline_frame
-  // Uses canonical filters from typeGuards
-  const positionedImages = (shot.images || [])
-    .filter(img => isPositioned(img) && !isVideoGeneration(img))
-    .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+  // Thumbnail mosaic: show non-video images; sort positioned first by timeline_frame,
+  // then unpositioned (uploads can arrive unpositioned).
+  const displayImages = (shot.images || [])
+    .filter(img => !isVideoGeneration(img))
+    .sort((a, b) => {
+      const fa = a.timeline_frame ?? Number.POSITIVE_INFINITY;
+      const fb = b.timeline_frame ?? Number.POSITIVE_INFINITY;
+      return fa - fb;
+    });
 
   // Grid layout: 3 images per row, show first row by default, expand to show all
   const IMAGES_PER_ROW = 3;
-  const hasMultipleRows = positionedImages.length > IMAGES_PER_ROW;
+  // Total count includes pending uploads for immediate feedback
+  const totalImageCount = displayImages.length + pendingUploads;
+  const hasMultipleRows = totalImageCount > IMAGES_PER_ROW;
 
   // Handle click - block if temp shot
   const handleClick = () => {
@@ -291,13 +298,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                     size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (positionedImages.length > 0 && !isTempShot) {
+                      if (displayImages.length > 0 && !isTempShot) {
                         setIsVideoModalOpen(true);
                       }
                     }}
-                    disabled={positionedImages.length === 0 || isTempShot}
+                    disabled={displayImages.length === 0 || isTempShot}
                     className={`h-8 w-8 ${
-                      positionedImages.length === 0 || isTempShot
+                      displayImages.length === 0 || isTempShot
                         ? 'text-zinc-400 cursor-not-allowed opacity-50' 
                         : 'text-violet-600 hover:text-violet-500 hover:bg-violet-100 dark:hover:bg-violet-950'
                     }`}
@@ -306,7 +313,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{isTempShot ? 'Saving...' : positionedImages.length === 0 ? 'Add images to generate video' : 'Generate Video'}</p>
+                  <p>{isTempShot ? 'Saving...' : displayImages.length === 0 ? 'Add images to generate video' : 'Generate Video'}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -407,10 +414,11 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         {/* Thumbnail mosaic area - matches ShotGroup style */}
         <div className="flex-grow relative">
           <div className="grid grid-cols-3 gap-2 relative">
-            {positionedImages.length > 0 ? (
+            {displayImages.length > 0 || pendingUploads > 0 ? (
               <>
-                {/* Only show first row when collapsed, all images when expanded */}
-                {(isImagesExpanded ? positionedImages : positionedImages.slice(0, IMAGES_PER_ROW)).map((image, index) => (
+                {/* When collapsed: show first row of existing images */}
+                {/* When expanded: show all existing images */}
+                {(isImagesExpanded ? displayImages : displayImages.slice(0, IMAGES_PER_ROW)).map((image, index) => (
                   <img
                     key={`${image.thumbUrl || image.imageUrl || image.location || 'img'}-${index}`}
                     src={getDisplayUrl(image.thumbUrl || image.imageUrl || image.location)}
@@ -419,6 +427,20 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                     title={`Image ${index + 1}`}
                   />
                 ))}
+                
+                {/* Skeleton items for pending uploads - always appended at end, only visible when expanded */}
+                {pendingUploads > 0 && isImagesExpanded && (
+                  <>
+                    {Array.from({ length: pendingUploads }).map((_, index) => (
+                      <div
+                        key={`pending-${index}`}
+                        className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
+                      >
+                        <Loader2 className="h-5 w-5 text-primary/60 animate-spin" />
+                      </div>
+                    ))}
+                  </>
+                )}
 
                 {hasMultipleRows && !isImagesExpanded && (
                   <button
@@ -428,7 +450,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                       setIsImagesExpanded(true);
                     }}
                   >
-                    Show All ({positionedImages.length}) <ChevronDown className="w-3 h-3" />
+                    Show All ({totalImageCount}) <ChevronDown className="w-3 h-3" />
                   </button>
                 )}
 

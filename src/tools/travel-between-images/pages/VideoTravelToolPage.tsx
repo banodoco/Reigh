@@ -2048,7 +2048,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         currentShotCount: shots?.length ?? 0
       });
 
-      // Refetch shots to update the list
+      // Refetch shots - skeleton clears when new images appear in data
       refetchShots();
     } catch (error) {
       console.error('[ShotDrop] Failed to add files to shot:', error);

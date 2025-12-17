@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Shot } from '@/types/shots';
 import VideoShotDisplay from './VideoShotDisplay';
 import { cn } from '@/shared/lib/utils';
 import { isValidDropTarget, getGenerationDropData, isFileDrag, type GenerationDropData } from '@/shared/lib/dragDrop';
-import { Loader2 } from 'lucide-react';
+import { isVideoGeneration } from '@/shared/lib/typeGuards';
 
 interface SortableShotItemProps {
   shot: Shot;
@@ -53,8 +53,34 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
 
   // Drop state for visual feedback
   const [isDropTarget, setIsDropTarget] = useState(false);
-  // Processing state for showing loading indicator during upload
-  const [isProcessingDrop, setIsProcessingDrop] = useState(false);
+  
+  // Track uploads using refs so we can compute skeleton count during render (no flicker)
+  const expectedNewCountRef = useRef(0);
+  const baselineNonVideoIdsRef = useRef<Set<string> | null>(null);
+  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get current non-video image IDs
+  const nonVideoImageIds = (shot.images || [])
+    .filter(img => !isVideoGeneration(img))
+    .map(img => img.id);
+
+  // Compute pending skeleton count DURING RENDER (no state delay = no flicker)
+  let pendingSkeletonCount = 0;
+  if (expectedNewCountRef.current > 0 && baselineNonVideoIdsRef.current) {
+    const baseline = baselineNonVideoIdsRef.current;
+    const newlyAppearedCount = nonVideoImageIds.filter(id => !baseline.has(id)).length;
+    pendingSkeletonCount = Math.max(0, expectedNewCountRef.current - newlyAppearedCount);
+    
+    // If all images have appeared, clear the refs
+    if (pendingSkeletonCount === 0) {
+      expectedNewCountRef.current = 0;
+      baselineNonVideoIdsRef.current = null;
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+        safetyTimeoutRef.current = null;
+      }
+    }
+  }
 
   // Check if we can accept this drop (generation or file)
   const canAcceptDrop = useCallback((e: React.DragEvent): boolean => {
@@ -127,19 +153,37 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
         shotId: shot.id.substring(0, 8),
         shotName: shot.name,
         fileCount: validFiles.length,
+        currentImageCount: nonVideoImageIds.length,
         timestamp: Date.now()
       });
 
-      setIsProcessingDrop(true);
+      // Snapshot IDs at drop time - skeleton count computed during render
+      baselineNonVideoIdsRef.current = new Set(nonVideoImageIds);
+      expectedNewCountRef.current = validFiles.length;
+      
+      // Safety timeout - clear after 10s if images don't appear
+      if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = setTimeout(() => {
+        expectedNewCountRef.current = 0;
+        baselineNonVideoIdsRef.current = null;
+        safetyTimeoutRef.current = null;
+      }, 10000);
+      
       try {
         await onFilesDrop(shot.id, validFiles);
+        // Don't clear here - the render-time computation will clear it when images appear
       } catch (error) {
         console.error('[ShotDrop] Error handling file drop:', error);
-      } finally {
-        setIsProcessingDrop(false);
+        // On error, clear immediately
+        expectedNewCountRef.current = 0;
+        baselineNonVideoIdsRef.current = null;
+        if (safetyTimeoutRef.current) {
+          clearTimeout(safetyTimeoutRef.current);
+          safetyTimeoutRef.current = null;
+        }
       }
     }
-  }, [onGenerationDrop, onFilesDrop, shot.id, shot.name]);
+  }, [onGenerationDrop, onFilesDrop, shot.id, shot.name, nonVideoImageIds]);
 
   // [ShotReorderDebug] Log dragging state changes (only when actually dragging to reduce noise)
   React.useEffect(() => {
@@ -171,8 +215,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
       onDrop={handleDrop}
       className={cn(
         'transition-all duration-200 relative',
-        isDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]',
-        isProcessingDrop && 'ring-2 ring-primary/50 ring-offset-2 ring-offset-background'
+        isDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]'
       )}
     >
       <VideoShotDisplay
@@ -191,16 +234,8 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
         shotIndex={shotIndex}
         projectAspectRatio={projectAspectRatio}
         isHighlighted={isHighlighted || isDropTarget}
+        pendingUploads={pendingSkeletonCount}
       />
-      {/* Loading overlay during file upload */}
-      {isProcessingDrop && (
-        <div className="absolute inset-0 bg-background/60 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="h-8 w-8 text-primary animate-spin" />
-            <span className="text-sm text-muted-foreground">Uploading...</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
