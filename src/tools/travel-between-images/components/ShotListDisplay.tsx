@@ -397,6 +397,9 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   const pendingNewShotCountRef = useRef(0); // Number of images expected in new shot
   const baselineShotIdsRef = useRef<Set<string> | null>(null); // Shot IDs at drop time
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track newly created shot to transfer pending count to it
+  const [newlyCreatedShotId, setNewlyCreatedShotId] = useState<string | null>(null);
+  const [newlyCreatedShotExpectedImages, setNewlyCreatedShotExpectedImages] = useState(0);
   
   // Get current shot IDs
   const currentShotIds = shots?.map(s => s.id) || [];
@@ -405,10 +408,15 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   let pendingSkeletonShot: { imageCount: number } | null = null;
   if (pendingNewShotCountRef.current > 0 && baselineShotIdsRef.current) {
     const baseline = baselineShotIdsRef.current;
-    const newShotAppeared = currentShotIds.some(id => !baseline.has(id));
+    const newShotId = currentShotIds.find(id => !baseline.has(id));
     
-    if (newShotAppeared) {
-      // New shot appeared - clear refs
+    if (newShotId) {
+      // New shot appeared - transfer pending count to that shot
+      const expectedImages = pendingNewShotCountRef.current;
+      setNewlyCreatedShotId(newShotId);
+      setNewlyCreatedShotExpectedImages(expectedImages);
+      
+      // Clear skeleton shot refs
       pendingNewShotCountRef.current = 0;
       baselineShotIdsRef.current = null;
       if (safetyTimeoutRef.current) {
@@ -676,6 +684,11 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 isHighlighted={highlightedShotId === shot.id}
                 onGenerationDrop={onGenerationDropOnShot}
                 onFilesDrop={onFilesDropOnShot}
+                initialPendingUploads={shot.id === newlyCreatedShotId ? newlyCreatedShotExpectedImages : 0}
+                onInitialPendingUploadsConsumed={shot.id === newlyCreatedShotId ? () => {
+                  setNewlyCreatedShotId(null);
+                  setNewlyCreatedShotExpectedImages(0);
+                } : undefined}
               />
             );
           })}

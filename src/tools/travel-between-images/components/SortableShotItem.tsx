@@ -21,6 +21,10 @@ interface SortableShotItemProps {
   onGenerationDrop?: (shotId: string, data: GenerationDropData) => Promise<void>;
   // Drop handling for external files
   onFilesDrop?: (shotId: string, files: File[]) => Promise<void>;
+  // Initial pending uploads (for newly created shots from drop)
+  initialPendingUploads?: number;
+  // Callback when initial pending uploads are consumed
+  onInitialPendingUploadsConsumed?: () => void;
 }
 
 const SortableShotItem: React.FC<SortableShotItemProps> = ({
@@ -35,6 +39,8 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   isHighlighted = false,
   onGenerationDrop,
   onFilesDrop,
+  initialPendingUploads = 0,
+  onInitialPendingUploadsConsumed,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -63,9 +69,12 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   const nonVideoImageIds = (shot.images || [])
     .filter(img => !isVideoGeneration(img))
     .map(img => img.id);
+  const nonVideoImageCount = nonVideoImageIds.length;
 
   // Compute pending skeleton count DURING RENDER (no state delay = no flicker)
   let pendingSkeletonCount = 0;
+  
+  // First check if we have our own drop-initiated pending uploads
   if (expectedNewCountRef.current > 0 && baselineNonVideoIdsRef.current) {
     const baseline = baselineNonVideoIdsRef.current;
     const newlyAppearedCount = nonVideoImageIds.filter(id => !baseline.has(id)).length;
@@ -79,6 +88,17 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
         clearTimeout(safetyTimeoutRef.current);
         safetyTimeoutRef.current = null;
       }
+    }
+  }
+  // Otherwise, check for initial pending uploads (from newly created shot)
+  else if (initialPendingUploads > 0) {
+    // Show skeletons for images that haven't appeared yet
+    pendingSkeletonCount = Math.max(0, initialPendingUploads - nonVideoImageCount);
+    
+    // If all images have loaded, notify parent
+    if (pendingSkeletonCount === 0 && onInitialPendingUploadsConsumed) {
+      // Use setTimeout to avoid updating parent state during render
+      setTimeout(() => onInitialPendingUploadsConsumed(), 0);
     }
   }
 
