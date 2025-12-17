@@ -660,6 +660,14 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   const invalidateGenerations = useInvalidateGenerations();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
+  
+  // Skeleton setup functions from ShotListDisplay (for instant modal close)
+  const skeletonSetupRef = useRef<((imageCount: number) => void) | null>(null);
+  const skeletonClearRef = useRef<(() => void) | null>(null);
+  const handleSkeletonSetupReady = useCallback((setup: (imageCount: number) => void, clear: () => void) => {
+    skeletonSetupRef.current = setup;
+    skeletonClearRef.current = clear;
+  }, []);
   // const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   // const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
   
@@ -2165,81 +2173,93 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
       return;
     }
 
-    setIsCreatingShot(true);
-    try {
-      let newShot: Shot;
-      
-      if (files.length > 0) {
-        // Use the multi-purpose hook if there are files
-        const result = await handleExternalImageDropMutation.mutateAsync({
-          imageFiles: files, 
-          targetShotId: null, 
-          currentProjectQueryKey: selectedProjectId, 
-          currentShotCount: shots?.length ?? 0
-        });
+    // Show skeleton immediately (modal will close right after this returns)
+    const imageCount = files.length > 0 ? files.length : 0;
+    if (imageCount > 0 && skeletonSetupRef.current) {
+      skeletonSetupRef.current(imageCount);
+    }
+    
+    // Switch to "Newest First" so the new shot appears at the top
+    setShotSortMode('newest');
+
+    // Run creation in background (don't await - modal closes immediately)
+    (async () => {
+      setIsCreatingShot(true);
+      try {
+        let newShot: Shot;
         
-        if (result?.shotId) {
-          // Refetch shots and use fresh query cache to locate the new shot
-          await refetchShots();
-          const updatedShots = queryClient.getQueryData<Shot[]>(['shots', selectedProjectId]);
-          const createdShot = updatedShots?.find(s => s.id === result.shotId);
-          if (createdShot) {
-            newShot = createdShot;
+        if (files.length > 0) {
+          // Use the multi-purpose hook if there are files
+          const result = await handleExternalImageDropMutation.mutateAsync({
+            imageFiles: files, 
+            targetShotId: null, 
+            currentProjectQueryKey: selectedProjectId, 
+            currentShotCount: shots?.length ?? 0
+          });
+          
+          if (result?.shotId) {
+            // Refetch shots and use fresh query cache to locate the new shot
+            await refetchShots();
+            const updatedShots = queryClient.getQueryData<Shot[]>(['shots', selectedProjectId]);
+            const createdShot = updatedShots?.find(s => s.id === result.shotId);
+            if (createdShot) {
+              newShot = createdShot;
+            } else {
+              throw new Error("Created shot not found after refetch");
+            }
           } else {
-            throw new Error("Created shot not found after refetch");
+            throw new Error("Failed to create shot with files");
           }
         } else {
-          throw new Error("Failed to create shot with files");
+          // Otherwise, just create an empty shot
+          const result = await createShotMutation.mutateAsync({
+            name,
+            projectId: selectedProjectId,
+            aspectRatio: aspectRatio || undefined,
+          } as any);
+          
+          // Transform the database response to match Shot interface
+          newShot = {
+            ...result.shot,
+            images: [], // New shot starts with no images
+            position: 0 // New shots start at position 0, will be updated by the backend
+          } as Shot;
+          
+          // Refetch shots to update the list
+          await refetchShots();
         }
-      } else {
-        // Otherwise, just create an empty shot
-        const result = await createShotMutation.mutateAsync({
-          name,
+        
+        // Update shot with aspect ratio if created via file upload
+        if (files.length > 0 && aspectRatio && newShot.id) {
+          await supabase
+            .from('shots')
+            .update({ aspect_ratio: aspectRatio } as any)
+            .eq('id', newShot.id);
+          
+          // Update local shot object
+          newShot.aspect_ratio = aspectRatio;
+        }
+        
+        // Apply standardized settings inheritance
+        await inheritSettingsForNewShot({
+          newShotId: newShot.id,
           projectId: selectedProjectId,
-          aspectRatio: aspectRatio || undefined,
-        } as any);
+          shots: shots || []
+        });
         
-        // Transform the database response to match Shot interface
-        newShot = {
-          ...result.shot,
-          images: [], // New shot starts with no images
-          position: 0 // New shots start at position 0, will be updated by the backend
-        } as Shot;
-        
-        // Refetch shots to update the list
-        await refetchShots();
+        // Select the newly created shot
+        setCurrentShotId(newShot.id);
+      } catch (error) {
+        console.error("[VideoTravelToolPage] Error creating shot:", error);
+        toast.error(`Failed to create shot: ${(error as Error).message}`);
+        // Clear skeleton on error
+        if (skeletonClearRef.current) {
+          skeletonClearRef.current();
+        }
+      } finally {
+        setIsCreatingShot(false);
       }
-      
-      // Update shot with aspect ratio if created via file upload
-      if (files.length > 0 && aspectRatio && newShot.id) {
-        await supabase
-          .from('shots')
-          .update({ aspect_ratio: aspectRatio } as any)
-          .eq('id', newShot.id);
-        
-        // Update local shot object
-        newShot.aspect_ratio = aspectRatio;
-      }
-      
-      // Apply standardized settings inheritance
-      await inheritSettingsForNewShot({
-        newShotId: newShot.id,
-        projectId: selectedProjectId,
-        shots: shots || []
-      });
-      
-      // Select the newly created shot
-      // selectedShot is now derived from currentShotId + shots
-      // The shot will appear in derived selectedShot once shots array updates
-      setCurrentShotId(newShot.id);
-      
-      // Modal will auto-close on successful submission
-    } catch (error) {
-      console.error("[VideoTravelToolPage] Error creating shot:", error);
-      throw error; // Re-throw so modal can handle error state
-    } finally {
-      setIsCreatingShot(false);
-    }
+    })();
   };
 
   const handleShotImagesUpdate = useCallback(async () => {
@@ -2625,6 +2645,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                 onGenerationDropForNewShot={handleGenerationDropForNewShot}
                 onFilesDropForNewShot={handleFilesDropForNewShot}
                 onFilesDropOnShot={handleFilesDropOnShot}
+                onSkeletonSetupReady={handleSkeletonSetupReady}
               />
               </div>
             )

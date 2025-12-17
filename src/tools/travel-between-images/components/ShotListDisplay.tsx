@@ -42,6 +42,8 @@ interface ShotListDisplayProps {
   // Drop handling for external files
   onFilesDropForNewShot?: (files: File[]) => Promise<void>;
   onFilesDropOnShot?: (shotId: string, files: File[]) => Promise<void>;
+  // Expose skeleton setup for modal-based shot creation
+  onSkeletonSetupReady?: (setup: (imageCount: number) => void, clear: () => void) => void;
 }
 
 
@@ -57,6 +59,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   onGenerationDropForNewShot,
   onFilesDropForNewShot,
   onFilesDropOnShot,
+  onSkeletonSetupReady,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -499,6 +502,13 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
       safetyTimeoutRef.current = null;
     }
   }, []);
+
+  // Expose skeleton setup/clear to parent for modal-based shot creation
+  React.useEffect(() => {
+    if (onSkeletonSetupReady) {
+      onSkeletonSetupReady(setupPendingNewShot, clearPendingNewShot);
+    }
+  }, [onSkeletonSetupReady, setupPendingNewShot, clearPendingNewShot]);
 
   // Handle drop for new shot
   const handleNewShotDrop = useCallback(async (e: React.DragEvent) => {

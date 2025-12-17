@@ -99,21 +99,24 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
         }
       }
       
-      // Update project aspect ratio if checkbox is checked
+      // Update project aspect ratio if checkbox is checked (don't await - do in background)
       if (updateProjectAspectRatio && projectId && aspectRatio && aspectRatio !== projectAspectRatio) {
-        await updateProject(projectId, { aspectRatio });
+        updateProject(projectId, { aspectRatio });
       }
       
-      await onSubmit(finalShotName, processedFiles, aspectRatio || null);
-      // Only clear the form and close if submission was successful
+      // Start submission (don't await - parent handles async with skeleton)
+      onSubmit(finalShotName, processedFiles, aspectRatio || null);
+      
+      // Clear form and close immediately
       setShotName('');
       setFiles([]);
       setAspectRatio(projectAspectRatio || '3:2');
       setUpdateProjectAspectRatio(false);
       onClose();
     } catch (error) {
-      // Let the parent component handle the error display
+      // Cropping failed - show error but don't close
       console.error('Shot creation failed:', error);
+      toast.error('Failed to process images');
     }
   };
 
