@@ -29,6 +29,7 @@ interface CreateShotModalProps {
   projectAspectRatio?: string;
   initialAspectRatio?: string | null;
   projectId?: string;
+  cropToProjectSize?: boolean; // Whether to crop uploaded images (from project settings)
 }
 
 const CreateShotModal: React.FC<CreateShotModalProps> = ({ 
@@ -39,7 +40,8 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   defaultShotName,
   projectAspectRatio,
   initialAspectRatio,
-  projectId
+  projectId,
+  cropToProjectSize = true, // Default to true if not specified
 }) => {
   const [shotName, setShotName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -77,13 +79,14 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
     setIsProcessing(true);
     
     try {
-      // Process files with cropping based on aspect ratio
+      // Process files with cropping based on aspect ratio (if cropping is enabled)
       let processedFiles = files;
       
-      if (files.length > 0 && aspectRatio) {
+      if (cropToProjectSize && files.length > 0 && aspectRatio) {
         const targetAspectRatio = parseRatio(aspectRatio);
         
         if (!isNaN(targetAspectRatio)) {
+          console.log(`[CreateShotModal] Cropping ${files.length} images to aspect ratio: ${aspectRatio}`);
           const cropPromises = files.map(async (file) => {
             try {
               const result = await cropImageToProjectAspectRatio(file, targetAspectRatio);
@@ -100,6 +103,8 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
           
           processedFiles = await Promise.all(cropPromises);
         }
+      } else if (!cropToProjectSize && files.length > 0) {
+        console.log(`[CreateShotModal] Cropping disabled - uploading ${files.length} images at original size`);
       }
       
       // Update project aspect ratio if checkbox is checked (don't await - do in background)

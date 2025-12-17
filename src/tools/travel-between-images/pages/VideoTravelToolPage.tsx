@@ -91,6 +91,14 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
     enabled: !!projectId 
   });
 
+  // Upload settings (for cropToProjectSize)
+  const uploadSettingsQuery = useToolSettings<{
+    cropToProjectSize?: boolean;
+  }>('upload', { 
+    projectId: projectId || null, 
+    enabled: !!projectId 
+  });
+
   // NOTE: shotLoraSettings query removed - LoRAs are now part of main settings (selectedLoras field)
   // and are inherited via useShotSettings along with all other settings
 
@@ -122,6 +130,9 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
     // Project UI settings data
     projectUISettings: projectUISettingsQuery.settings,
     updateProjectUISettings: projectUISettingsQuery.update,
+    
+    // Upload settings (cropToProjectSize)
+    uploadSettings: uploadSettingsQuery.settings,
   };
 };
 
@@ -258,6 +269,7 @@ const VideoTravelToolPage: React.FC = () => {
     projectSettingsUpdating,
     projectUISettings,
     updateProjectUISettings,
+    uploadSettings,
   } = useVideoTravelData(currentShotId || undefined, selectedProjectId);
   console.log('[ShotNavPerf] ✅ useVideoTravelData returned in', Date.now() - videoTravelDataStart, 'ms');
   
@@ -2766,7 +2778,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         </div>
       )}
 
-      <CreateShotModal 
+      <CreateShotModal
         isOpen={isCreateShotModalOpen}
         onClose={() => setIsCreateShotModalOpen(false)}
         onSubmit={handleModalSubmitCreateShot}
@@ -2775,6 +2787,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         projectAspectRatio={projectAspectRatio}
         initialAspectRatio={null}
         projectId={selectedProjectId}
+        cropToProjectSize={uploadSettings?.cropToProjectSize ?? true}
       />
       
       {/* ============================================================================ */}

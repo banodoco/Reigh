@@ -1772,12 +1772,13 @@ export const useHandleExternalImageDrop = () => {
     
     let targetAspectRatio: number | null = null;
     let aspectRatioSource = 'none';
+    let shouldCrop = true; // Default to cropping enabled
 
     try {
-        // Fetch project details
+        // Fetch project details including settings for cropToProjectSize
         const { data: projectData } = await supabase
             .from('projects')
-            .select('aspect_ratio')
+            .select('aspect_ratio, settings')
             .eq('id', projectIdForOperation)
             .single();
             
@@ -1791,6 +1792,13 @@ export const useHandleExternalImageDrop = () => {
                 .single();
             shotData = data;
         }
+
+        // Check cropToProjectSize setting from project upload settings
+        // Path: settings -> 'upload' -> 'cropToProjectSize'
+        const uploadSettings = (projectData?.settings as any)?.upload;
+        shouldCrop = uploadSettings?.cropToProjectSize ?? true; // Default to true if not set
+        
+        console.log(`[ImageDrop] Crop setting: ${shouldCrop ? 'enabled' : 'disabled'}`);
 
         // Determine aspect ratio: Shot > Project > Default
         const shotRatioStr = shotData?.aspect_ratio;
@@ -1806,9 +1814,9 @@ export const useHandleExternalImageDrop = () => {
         console.warn('Error fetching aspect ratio settings:', err);
     }
 
-    // 2. Crop images if we have a valid aspect ratio
+    // 2. Crop images if cropping is enabled and we have a valid aspect ratio
     let processedFiles = imageFiles;
-    if (targetAspectRatio && !isNaN(targetAspectRatio)) {
+    if (shouldCrop && targetAspectRatio && !isNaN(targetAspectRatio)) {
         console.log(`[ImageDrop] Cropping ${imageFiles.length} images to ${aspectRatioSource} aspect ratio: ${targetAspectRatio}`);
         
         try {
