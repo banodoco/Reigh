@@ -545,7 +545,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                     <span className="font-medium">
                         {generateSuccess 
                             ? 'Task Created' 
-                            : `Regenerate ${selections.length} segment${selections.length > 1 ? 's' : ''} (${totalFramesToGenerate} frames)`
+                            : `Regenerate ${selections.length} segment${selections.length > 1 ? 's' : ''}`
                         }
                     </span>
                 </Button>

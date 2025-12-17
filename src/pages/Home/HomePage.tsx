@@ -483,7 +483,7 @@ export default function HomePage() {
         className="fixed inset-0 w-full h-full object-cover"
         style={{ zIndex: -1 }}
       >
-        <source src="/hero-background-mobile.mp4" type="video/mp4" />
+        <source src="/hero-background-interpolated.mp4" type="video/mp4" />
       </video>
       {/* Overlay to darken video for readability */}
       <div className="fixed inset-0 bg-black/50" style={{ zIndex: 0 }} />

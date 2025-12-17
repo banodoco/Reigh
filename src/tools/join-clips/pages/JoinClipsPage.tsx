@@ -1565,7 +1565,7 @@ const JoinClipsPage: React.FC = () => {
                                 return 'Generate Loop';
                               }
                               const transitionCount = Math.max(0, validClipsCount - 1);
-                              return `Generate (${transitionCount} transition${transitionCount !== 1 ? 's' : ''})`;
+                              return `Generate ${transitionCount} transition${transitionCount !== 1 ? 's' : ''}`;
                             })()}
                             isGenerateDisabled={(() => {
                               const validClipsCount = clips.filter(c => c.url).length;
