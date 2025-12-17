@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -390,8 +390,36 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   // Drop state for "New Shot" drop zone
   const [isNewShotDropTarget, setIsNewShotDropTarget] = useState(false);
   const [newShotDropType, setNewShotDropType] = useState<DragType>('none');
-  // Processing state for showing loading during upload
+  // Processing state for showing loading during upload (legacy - kept for generation drops)
   const [isNewShotProcessing, setIsNewShotProcessing] = useState(false);
+  
+  // Optimistic skeleton shot state (computed during render like SortableShotItem)
+  const pendingNewShotCountRef = useRef(0); // Number of images expected in new shot
+  const baselineShotIdsRef = useRef<Set<string> | null>(null); // Shot IDs at drop time
+  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Get current shot IDs
+  const currentShotIds = shots?.map(s => s.id) || [];
+  
+  // Compute pending skeleton shot during render (no flicker)
+  let pendingSkeletonShot: { imageCount: number } | null = null;
+  if (pendingNewShotCountRef.current > 0 && baselineShotIdsRef.current) {
+    const baseline = baselineShotIdsRef.current;
+    const newShotAppeared = currentShotIds.some(id => !baseline.has(id));
+    
+    if (newShotAppeared) {
+      // New shot appeared - clear refs
+      pendingNewShotCountRef.current = 0;
+      baselineShotIdsRef.current = null;
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+        safetyTimeoutRef.current = null;
+      }
+    } else {
+      // Still waiting - show skeleton
+      pendingSkeletonShot = { imageCount: pendingNewShotCountRef.current };
+    }
+  }
 
   // Handle drag enter for new shot drop zone
   const handleNewShotDragEnter = useCallback((e: React.DragEvent) => {
@@ -424,6 +452,29 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     }
   }, []);
 
+  // Helper to setup optimistic skeleton shot
+  const setupPendingNewShot = useCallback((imageCount: number) => {
+    baselineShotIdsRef.current = new Set(currentShotIds);
+    pendingNewShotCountRef.current = imageCount;
+    
+    // Safety timeout - clear after 15s
+    if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+    safetyTimeoutRef.current = setTimeout(() => {
+      pendingNewShotCountRef.current = 0;
+      baselineShotIdsRef.current = null;
+      safetyTimeoutRef.current = null;
+    }, 15000);
+  }, [currentShotIds]);
+  
+  const clearPendingNewShot = useCallback(() => {
+    pendingNewShotCountRef.current = 0;
+    baselineShotIdsRef.current = null;
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = null;
+    }
+  }, []);
+
   // Handle drop for new shot
   const handleNewShotDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
@@ -431,7 +482,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     setIsNewShotDropTarget(false);
     setNewShotDropType('none');
 
-    // Try generation drop first (fast - no loading state needed)
+    // Try generation drop first
     const generationData = getGenerationDropData(e);
     if (generationData && onGenerationDropForNewShot) {
       console.log('[ShotDrop] Dropping generation to create new shot:', {
@@ -439,11 +490,15 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         timestamp: Date.now()
       });
 
+      // Show skeleton shot with 1 image
+      setupPendingNewShot(1);
+      
       try {
         await onGenerationDropForNewShot(generationData);
       } catch (error) {
         console.error('[ShotDrop] Error creating new shot from generation:', error);
         toast.error(`Failed to create shot: ${(error as Error).message}`);
+        clearPendingNewShot();
       }
       return;
     }
@@ -464,17 +519,18 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         timestamp: Date.now()
       });
 
-      setIsNewShotProcessing(true);
+      // Show skeleton shot with N images
+      setupPendingNewShot(validFiles.length);
+      
       try {
         await onFilesDropForNewShot(validFiles);
       } catch (error) {
         console.error('[ShotDrop] Error creating new shot from files:', error);
         toast.error(`Failed to create shot: ${(error as Error).message}`);
-      } finally {
-        setIsNewShotProcessing(false);
+        clearPendingNewShot();
       }
     }
-  }, [onGenerationDropForNewShot, onFilesDropForNewShot]);
+  }, [onGenerationDropForNewShot, onFilesDropForNewShot, setupPendingNewShot, clearPendingNewShot]);
 
   // Show loading skeleton while data is being fetched
   if (shotsLoading || shots === undefined) {
@@ -570,6 +626,38 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                   </p>
                 </>
               )}
+            </div>
+          )}
+          
+          {/* Skeleton shot card - appears when creating new shot via drop */}
+          {pendingSkeletonShot && (
+            <div className="p-4 border rounded-lg bg-card/50 opacity-70 animate-pulse">
+              {/* Header skeleton */}
+              <div className="flex justify-between items-start mb-3">
+                <div className="h-7 w-32 bg-muted rounded" />
+                <div className="flex items-center space-x-1">
+                  <div className="h-8 w-8 bg-muted rounded" />
+                  <div className="h-8 w-8 bg-muted rounded" />
+                  <div className="h-8 w-8 bg-muted rounded" />
+                </div>
+              </div>
+              {/* Image grid skeleton */}
+              <div className="grid grid-cols-3 gap-2 relative">
+                {Array.from({ length: Math.min(3, pendingSkeletonShot.imageCount) }).map((_, idx) => (
+                  <div
+                    key={`skeleton-img-${idx}`}
+                    className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
+                  >
+                    <Loader2 className="h-5 w-5 text-primary/60 animate-spin" />
+                  </div>
+                ))}
+                {/* Show "Show All" badge if more than 3 images */}
+                {pendingSkeletonShot.imageCount > 3 && (
+                  <div className="absolute bottom-1 right-1 text-xs bg-black/60 text-white px-2 py-0.5 rounded flex items-center gap-1">
+                    Show All ({pendingSkeletonShot.imageCount})
+                  </div>
+                )}
+              </div>
             </div>
           )}
           
