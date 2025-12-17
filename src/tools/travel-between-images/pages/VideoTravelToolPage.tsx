@@ -2174,8 +2174,9 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     }
 
     // Show skeleton immediately (modal will close right after this returns)
-    const imageCount = files.length > 0 ? files.length : 0;
-    if (imageCount > 0 && skeletonSetupRef.current) {
+    // Even for empty shots (0 images), show skeleton so user sees immediate feedback
+    const imageCount = files.length;
+    if (skeletonSetupRef.current) {
       skeletonSetupRef.current(imageCount);
     }
     

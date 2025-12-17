@@ -671,7 +671,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
             </div>
           )}
           
-          {/* Skeleton shot card - appears when creating new shot via drop */}
+          {/* Skeleton shot card - appears when creating new shot via drop/modal */}
           {pendingSkeletonShot && (
             <div className="p-4 border rounded-lg bg-card/50 opacity-70 animate-pulse self-start">
               {/* Header skeleton */}
@@ -685,18 +685,28 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
               </div>
               {/* Image grid skeleton */}
               <div className="grid grid-cols-3 gap-2 relative">
-                {Array.from({ length: Math.min(3, pendingSkeletonShot.imageCount) }).map((_, idx) => (
-                  <div
-                    key={`skeleton-img-${idx}`}
-                    className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
-                  >
-                    <Loader2 className="h-5 w-5 text-primary/60 animate-spin" />
-                  </div>
-                ))}
-                {/* Show "Show All" badge if more than 3 images */}
-                {pendingSkeletonShot.imageCount > 3 && (
-                  <div className="absolute bottom-1 right-1 text-xs bg-black/60 text-white px-2 py-0.5 rounded flex items-center gap-1">
-                    Show All ({pendingSkeletonShot.imageCount})
+                {pendingSkeletonShot.imageCount > 0 ? (
+                  <>
+                    {Array.from({ length: Math.min(3, pendingSkeletonShot.imageCount) }).map((_, idx) => (
+                      <div
+                        key={`skeleton-img-${idx}`}
+                        className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
+                      >
+                        <Loader2 className="h-5 w-5 text-primary/60 animate-spin" />
+                      </div>
+                    ))}
+                    {/* Show "Show All" badge if more than 3 images */}
+                    {pendingSkeletonShot.imageCount > 3 && (
+                      <div className="absolute bottom-1 right-1 text-xs bg-black/60 text-white px-2 py-0.5 rounded flex items-center gap-1">
+                        Show All ({pendingSkeletonShot.imageCount})
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Empty shot placeholder - matches VideoShotDisplay empty state */
+                  <div className="col-span-3 aspect-[3/1] flex items-center justify-center text-sm text-muted-foreground border-2 border-dashed border-border rounded">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creating...
                   </div>
                 )}
               </div>
