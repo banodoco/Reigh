@@ -19,6 +19,7 @@ const DEFAULT_JOIN_CLIPS_SETTINGS: JoinClipsSettings = {
   useInputVideoResolution: false,
   useInputVideoFps: false,
   noisedInputVideo: 0,
+  loopFirstClip: false,
   // Legacy two-video format
   startingVideoUrl: undefined,
   startingVideoPosterUrl: undefined,

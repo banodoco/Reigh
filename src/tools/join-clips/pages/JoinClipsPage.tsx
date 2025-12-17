@@ -6,6 +6,7 @@ import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Upload, Film, X, Play, Plus, GripVertical, Trash2 } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -105,6 +106,9 @@ interface SortableClipProps {
   fileInputRefs: React.MutableRefObject<{ [clipId: string]: HTMLInputElement | null }>;
   transitionPrompts: TransitionPrompt[];
   useIndividualPrompts: boolean;
+  loopFirstClip: boolean;
+  firstClipFinalFrameUrl?: string;
+  onLoopFirstClipChange: (checked: boolean) => void;
   onRemoveClip: (clipId: string) => void;
   onClearVideo: (clipId: string) => void;
   onVideoUpload: (e: React.ChangeEvent<HTMLInputElement>, clipId: string) => void;
@@ -128,6 +132,9 @@ const SortableClip: React.FC<SortableClipProps> = ({
   fileInputRefs,
   transitionPrompts,
   useIndividualPrompts,
+  loopFirstClip,
+  firstClipFinalFrameUrl,
+  onLoopFirstClipChange,
   onRemoveClip,
   onClearVideo,
   onVideoUpload,
@@ -141,7 +148,8 @@ const SortableClip: React.FC<SortableClipProps> = ({
   // Check if this is the last clip and it's empty
   const isLastClip = index === clips.length - 1;
   const isEmptyClip = !clip.url;
-  const isAddAnotherClip = isLastClip && isEmptyClip;
+  const isLoopedSecondClip = loopFirstClip && index === 1 && isEmptyClip;
+  const isAddAnotherClip = isLastClip && isEmptyClip && !isLoopedSecondClip;
   
   const {
     attributes,
@@ -178,7 +186,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
               </div>
             )}
             <div className="text-sm font-medium text-muted-foreground">
-              {isAddAnotherClip ? 'Add another clip' : `Clip #${index + 1}`}
+              {isAddAnotherClip ? 'Add another clip' : isLoopedSecondClip ? 'Clip #2 (Looped)' : `Clip #${index + 1}`}
             </div>
           </div>
           {clip.url && !isAddAnotherClip && (
@@ -197,6 +205,22 @@ const SortableClip: React.FC<SortableClipProps> = ({
               <Trash2 className="h-3 w-3" />
             </Button>
           )}
+          {/* Loop First Clip Checkbox - show on second slot when first clip has video */}
+          {index === 1 && clips[0]?.url && !clip.url && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={`loop-first-clip-${clip.id}`}
+                checked={loopFirstClip}
+                onCheckedChange={(checked) => onLoopFirstClipChange(checked === true)}
+              />
+              <label 
+                htmlFor={`loop-first-clip-${clip.id}`}
+                className="text-xs text-muted-foreground cursor-pointer select-none"
+              >
+                Just loop first clip
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Video Container */}
@@ -207,13 +231,25 @@ const SortableClip: React.FC<SortableClipProps> = ({
               draggingOverClipId === clip.id 
                 ? 'border-primary bg-primary/10' 
                 : 'border-border hover:border-primary/50',
-              !clip.url && uploadingClipId !== clip.id ? 'cursor-pointer' : ''
+              !clip.url && uploadingClipId !== clip.id && !(loopFirstClip && index === 1) ? 'cursor-pointer' : ''
             )}
-            onDragOver={(e) => onDragOver(e, clip.id)}
-            onDragEnter={(e) => onDragEnter(e, clip.id)}
-            onDragLeave={(e) => onDragLeave(e, clip.id)}
-            onDrop={(e) => onDrop(e, clip.id)}
-            onClick={() => !clip.url && uploadingClipId !== clip.id && fileInputRefs.current[clip.id]?.click()}
+            onDragOver={(e) => !(loopFirstClip && index === 1) && onDragOver(e, clip.id)}
+            onDragEnter={(e) => !(loopFirstClip && index === 1) && onDragEnter(e, clip.id)}
+            onDragLeave={(e) => !(loopFirstClip && index === 1) && onDragLeave(e, clip.id)}
+            onDrop={(e) => {
+              if (loopFirstClip && index === 1) {
+                e.preventDefault();
+                return;
+              }
+              onDrop(e, clip.id);
+            }}
+            onClick={() => {
+              // Don't allow upload on second clip when loop mode is enabled
+              const isLoopingSecondSlot = loopFirstClip && index === 1;
+              if (!clip.url && uploadingClipId !== clip.id && !isLoopingSecondSlot) {
+                fileInputRefs.current[clip.id]?.click();
+              }
+            }}
           >
             {uploadingClipId === clip.id ? (
               <UploadingVideoState />
@@ -286,6 +322,13 @@ const SortableClip: React.FC<SortableClipProps> = ({
               </>
             ) : !settingsLoaded ? (
               <VideoContainerSkeleton />
+            ) : loopFirstClip && index === 1 && firstClipFinalFrameUrl ? (
+              // Show first clip's final frame when looping
+              <img
+                src={firstClipFinalFrameUrl}
+                alt="First clip final frame (looping)"
+                className="absolute inset-0 w-full h-full object-contain"
+              />
             ) : (
               <div className="text-center p-4 pointer-events-none">
                 <Film className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
@@ -413,6 +456,7 @@ const JoinClipsPage: React.FC = () => {
     useInputVideoResolution = false,
     useInputVideoFps = false,
     noisedInputVideo = 0,
+    loopFirstClip = false,
   } = joinSettings.settings;
   
   // Debug: Log enhancePrompt value
@@ -1054,6 +1098,12 @@ const JoinClipsPage: React.FC = () => {
   
   // Clear video content from a clip (keeps the slot)
   const handleClearVideo = (clipId: string) => {
+    // If clearing the first clip, reset loop mode
+    const clipIndex = clips.findIndex(c => c.id === clipId);
+    if (clipIndex === 0 && loopFirstClip) {
+      joinSettings.updateField('loopFirstClip', false);
+    }
+    
     setClips(prev => prev.map(clip => 
       clip.id === clipId
         ? { ...clip, url: '', posterUrl: undefined, finalFrameUrl: undefined, file: undefined, loaded: false, playing: false }
@@ -1178,15 +1228,19 @@ const JoinClipsPage: React.FC = () => {
   const generateJoinClipsMutation = useMutation({
     mutationFn: async () => {
       if (!selectedProjectId) throw new Error('No project selected');
-      if (clips.length < 2) throw new Error('At least 2 clips required');
       
       const validClips = clips.filter(c => c.url);
-      if (validClips.length < 2) throw new Error('At least 2 clips with videos required');
       
-      // Build clips array
-      const clipsForTask = validClips.map(clip => ({
-        url: clip.url
-      }));
+      // Handle loop first clip mode
+      const isLooping = loopFirstClip && validClips.length === 1;
+      if (!isLooping && validClips.length < 2) {
+        throw new Error('At least 2 clips with videos required');
+      }
+      
+      // Build clips array - duplicate first clip if looping
+      const clipsForTask = isLooping 
+        ? [{ url: validClips[0].url }, { url: validClips[0].url }]
+        : validClips.map(clip => ({ url: clip.url }));
       
       // Build per-join settings (one for each transition)
       const perJoinSettings = validClips.slice(1).map((clip, index) => {
@@ -1255,6 +1309,7 @@ const JoinClipsPage: React.FC = () => {
         ...(lorasForTask.length > 0 && { loras: lorasForTask }),
         ...(resolutionTuple && { resolution: resolutionTuple }),
         ...(noisedInputVideo > 0 && { vid2vid_init_strength: noisedInputVideo }),
+        ...(isLooping && { loop_first_clip: true }),
       };
       
       console.log('[JoinClips] Creating task with params:', taskParams);
@@ -1290,8 +1345,9 @@ const JoinClipsPage: React.FC = () => {
   
   const handleGenerate = () => {
     const validClips = clips.filter(c => c.url);
+    const isLooping = loopFirstClip && validClips.length === 1;
     
-    if (validClips.length < 2) {
+    if (!isLooping && validClips.length < 2) {
       toast({
         title: 'Need at least 2 clips',
         description: 'Please upload at least 2 videos to join',
@@ -1445,6 +1501,9 @@ const JoinClipsPage: React.FC = () => {
                     fileInputRefs={fileInputRefs}
                     transitionPrompts={transitionPrompts}
                     useIndividualPrompts={useIndividualPrompts}
+                    loopFirstClip={loopFirstClip}
+                    firstClipFinalFrameUrl={clips[0]?.finalFrameUrl}
+                    onLoopFirstClipChange={(checked) => joinSettings.updateField('loopFirstClip', checked)}
                     onRemoveClip={handleRemoveClip}
                     onClearVideo={handleClearVideo}
                     onVideoUpload={handleVideoUpload}
@@ -1501,10 +1560,19 @@ const JoinClipsPage: React.FC = () => {
                             generateSuccess={showSuccessState}
                             generateButtonText={(() => {
                               const validClipsCount = clips.filter(c => c.url).length;
+                              const isLooping = loopFirstClip && validClipsCount === 1;
+                              if (isLooping) {
+                                return 'Generate Loop';
+                              }
                               const transitionCount = Math.max(0, validClipsCount - 1);
                               return `Generate (${transitionCount} transition${transitionCount !== 1 ? 's' : ''})`;
                             })()}
-                            isGenerateDisabled={clips.filter(c => c.url).length < 2 || clips.some(c => c.url && c.metadataLoading)}
+                            isGenerateDisabled={(() => {
+                              const validClipsCount = clips.filter(c => c.url).length;
+                              const isLooping = loopFirstClip && validClipsCount === 1;
+                              const hasEnoughClips = isLooping ? validClipsCount >= 1 : validClipsCount >= 2;
+                              return !hasEnoughClips || clips.some(c => c.url && c.metadataLoading);
+                            })()}
                             onRestoreDefaults={() => {
                               // Default values (scaled for 16fps)
                               let context = 10;

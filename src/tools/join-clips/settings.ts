@@ -20,6 +20,7 @@ export const joinClipsSettings = {
     useInputVideoResolution: false, // Use first input video's resolution instead of project resolution
     useInputVideoFps: false, // Use first input video's FPS instead of downsampling to 16fps
     noisedInputVideo: 0, // vid2vid init strength - adds noise to input video (0 = disabled)
+    loopFirstClip: false, // Loop first clip - use first clip as both start and end
     // Legacy two-video format (kept for backward compatibility)
     startingVideoUrl: undefined as string | undefined,
     startingVideoPosterUrl: undefined as string | undefined,
