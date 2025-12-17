@@ -70,19 +70,18 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   const latchedInitialPendingRef = useRef(0);
   const initialBaselineCountRef = useRef(0);
   
-  // Latch the initial pending count when we first receive it
-  if (initialPendingUploads > 0 && latchedInitialPendingRef.current === 0) {
-    latchedInitialPendingRef.current = initialPendingUploads;
-    // Snapshot current image count at the time we receive the pending count
-    const currentCount = (shot.images || []).filter(img => !isVideoGeneration(img)).length;
-    initialBaselineCountRef.current = currentCount;
-  }
-
   // Get current non-video image IDs
   const nonVideoImageIds = (shot.images || [])
     .filter(img => !isVideoGeneration(img))
     .map(img => img.id);
   const nonVideoImageCount = nonVideoImageIds.length;
+
+  // Latch the initial pending count when we first receive it.
+  // IMPORTANT: `initialPendingUploads` is now "remaining" uploads, so baseline is the *current* count.
+  if (initialPendingUploads > 0 && latchedInitialPendingRef.current === 0) {
+    latchedInitialPendingRef.current = initialPendingUploads;
+    initialBaselineCountRef.current = nonVideoImageCount;
+  }
 
   // Compute pending skeleton count DURING RENDER (no state delay = no flicker)
   let pendingSkeletonCount = 0;
@@ -116,16 +115,15 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
     }
   }
 
-  // If initial pending uploads are fully satisfied, notify parent (in an effect, not during render)
-  const wasLatchedRef = useRef(false);
+  // If initial pending uploads are fully satisfied, notify parent (effect; avoids forever-skeleton)
   useEffect(() => {
-    // Track if we ever had a latched value
-    if (latchedInitialPendingRef.current > 0) {
-      wasLatchedRef.current = true;
-    }
-    // Only notify once: when we HAD a latch and now it's cleared
-    if (wasLatchedRef.current && latchedInitialPendingRef.current === 0 && onInitialPendingUploadsConsumed) {
-      wasLatchedRef.current = false;
+    if (!onInitialPendingUploadsConsumed) return;
+    if (latchedInitialPendingRef.current <= 0) return;
+    const baseline = initialBaselineCountRef.current;
+    const expected = latchedInitialPendingRef.current;
+    if (nonVideoImageCount >= baseline + expected) {
+      latchedInitialPendingRef.current = 0;
+      initialBaselineCountRef.current = 0;
       onInitialPendingUploadsConsumed();
     }
   }, [nonVideoImageCount, onInitialPendingUploadsConsumed]);
