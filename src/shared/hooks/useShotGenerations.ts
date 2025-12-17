@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
 import { GenerationRow, TimelineGenerationRow, Shot } from '@/types/shots';
 import { isTimelineGeneration } from '@/shared/lib/typeGuards';
+import { QUERY_PRESETS, STANDARD_RETRY, STANDARD_RETRY_DELAY } from '@/shared/lib/queryDefaults';
 import React from 'react';
 
 interface ShotGenerationsPage {
@@ -80,19 +81,10 @@ export const useShotGenerations = (
       };
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    retry: (failureCount, error) => {
-      // Don't retry cancelled requests or 400 errors
-      if (error?.message?.includes('Request was cancelled') || 
-          (error as any)?.code === 'PGRST116' || 
-          error?.message?.includes('Invalid')) {
-        return false;
-      }
-      // Retry up to 2 times for other errors
-      return failureCount < 2;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 3000),
+    // Use realtimeBacked preset - data freshness from realtime + mutations
+    ...QUERY_PRESETS.realtimeBacked,
+    retry: STANDARD_RETRY,
+    retryDelay: STANDARD_RETRY_DELAY,
   });
 };
 
@@ -201,27 +193,10 @@ export const useAllShotGenerations = (
   const mainQuery = useQuery<GenerationRow[], Error>({
     queryKey: ['all-shot-generations', stableShotId],
     enabled: isEnabled,
-    // IMPORTANT: Avoid automatic refetch triggers.
-    // This query is actively invalidated by realtime + mutations; refetch-on-mount/focus
-    // creates noisy refetch loops (especially in dev) and can cause large rerender cascades.
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,  // Safety net after network drops
-    // Prevent rapid refetches - data is considered fresh long enough to avoid churn.
-    // Mutations/realtime invalidation still refetch immediately when needed.
-    staleTime: 30_000,
-    // Don't retry aborted/cancelled requests or invalid IDs - they'll be refetched anyway
-    retry: (failureCount, error) => {
-      // Don't retry aborts or cancelled requests
-      if (error?.message?.includes('abort') || 
-          error?.message?.includes('Request was cancelled') ||
-          (error as any)?.code === 'PGRST116' ||
-          error?.message?.includes('Invalid')) {
-        return false;
-      }
-      // Otherwise retry up to 2 times
-      return failureCount < 2;
-    },
+    // Use realtimeBacked preset - data freshness from realtime + mutations
+    // (invalidated by SimpleRealtimeProvider + useGenerationInvalidation)
+    ...QUERY_PRESETS.realtimeBacked,
+    retry: STANDARD_RETRY,
     // NOTE: Removed placeholderData: (previousData) => previousData
     // This was causing cross-shot data leakage - when navigating to a new shot,
     // the previous shot's images would briefly appear as "placeholder" data
@@ -351,8 +326,7 @@ export const useAllShotGenerations = (
 
       return result;
     },
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 3000),
+    retryDelay: STANDARD_RETRY_DELAY,
   });
 
   // Use the query data directly (no merging needed)

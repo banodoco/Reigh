@@ -279,7 +279,11 @@ export async function fetchGenerations(
   let totalCount = 0; // Total count of matching items
 
   // Apply shot filter if provided - using JSONB shot_data column
-  if (filters?.shotId) {
+  if (filters?.shotId === 'no-shot') {
+    // Special filter: only show generations that don't belong to ANY shot
+    // shot_data will be null or empty {} for these generations
+    countQuery = countQuery.or('shot_data.is.null,shot_data.eq.{}');
+  } else if (filters?.shotId) {
 
     // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
     // shot_data->'shot_id' checks if the key exists (returns the value or null if key missing)
@@ -380,7 +384,10 @@ export async function fetchGenerations(
   }
 
   // Apply shot filter to data query - using JSONB shot_data column
-  if (filters?.shotId) {
+  if (filters?.shotId === 'no-shot') {
+    // Special filter: only show generations that don't belong to ANY shot
+    dataQuery = dataQuery.or('shot_data.is.null,shot_data.eq.{}');
+  } else if (filters?.shotId) {
     // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
     dataQuery = dataQuery.not(`shot_data->${filters.shotId}`, 'is', null);
 

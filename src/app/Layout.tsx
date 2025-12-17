@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { GlobalHeader } from '@/shared/components/GlobalHeader';
 import TasksPane from '@/shared/components/TasksPane/TasksPane';
@@ -54,6 +54,70 @@ const Layout: React.FC = () => {
   
   // On small mobile with locked generations pane, create split-view scroll behavior
   const isMobileSplitView = isSmallMobile && isGenerationsPaneLocked;
+  
+  // Ref to the split view scroll wrapper
+  const splitViewWrapperRef = useRef<HTMLDivElement>(null);
+  
+  // Continuously track scroll positions so we have them BEFORE transitions happen
+  const lastWindowScrollRef = useRef<number>(0);
+  const lastWrapperScrollRef = useRef<number>(0);
+  const wasSplitViewRef = useRef<boolean>(false);
+  
+  // Track window scroll position continuously when NOT in split view
+  useEffect(() => {
+    if (isMobileSplitView) return; // Don't track window scroll when in split view
+    
+    const handleScroll = () => {
+      lastWindowScrollRef.current = window.scrollY;
+    };
+    
+    // Capture initial position
+    lastWindowScrollRef.current = window.scrollY;
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isMobileSplitView]);
+  
+  // Track wrapper scroll position continuously when IN split view
+  useEffect(() => {
+    if (!isMobileSplitView) return; // Don't track wrapper scroll when not in split view
+    
+    const wrapper = splitViewWrapperRef.current;
+    if (!wrapper) return;
+    
+    const handleScroll = () => {
+      lastWrapperScrollRef.current = wrapper.scrollTop;
+    };
+    
+    // Capture initial position
+    lastWrapperScrollRef.current = wrapper.scrollTop;
+    
+    wrapper.addEventListener('scroll', handleScroll, { passive: true });
+    return () => wrapper.removeEventListener('scroll', handleScroll);
+  }, [isMobileSplitView]);
+  
+  // Handle transitions to/from split view - use useLayoutEffect for synchronous DOM updates
+  useLayoutEffect(() => {
+    if (isMobileSplitView && !wasSplitViewRef.current) {
+      // Transitioning TO split view - use the last tracked window scroll position
+      const scrollToRestore = lastWindowScrollRef.current;
+      console.log('[SplitViewScroll] Transitioning TO split view, restoring scroll:', scrollToRestore);
+      // Synchronously set scroll on the wrapper (it should exist by now in useLayoutEffect)
+      if (splitViewWrapperRef.current) {
+        splitViewWrapperRef.current.scrollTop = scrollToRestore;
+        // Also update wrapper tracking
+        lastWrapperScrollRef.current = scrollToRestore;
+      }
+    } else if (!isMobileSplitView && wasSplitViewRef.current) {
+      // Transitioning FROM split view - use the last tracked wrapper scroll position
+      const scrollToRestore = lastWrapperScrollRef.current;
+      console.log('[SplitViewScroll] Transitioning FROM split view, restoring scroll:', scrollToRestore);
+      window.scrollTo(0, scrollToRestore);
+      // Also update window tracking
+      lastWindowScrollRef.current = scrollToRestore;
+    }
+    wasSplitViewRef.current = isMobileSplitView;
+  }, [isMobileSplitView]);
   
   // Track page visibility for debugging polling issues
   // TEMPORARILY DISABLED to avoid conflicts with RealtimeBoundary
@@ -233,7 +297,7 @@ const Layout: React.FC = () => {
         
         {/* When in mobile split view, wrap header + content in a scroll container */}
         {isMobileSplitView ? (
-          <div style={splitViewWrapperStyle}>
+          <div ref={splitViewWrapperRef} style={splitViewWrapperStyle}>
             {mainContent}
           </div>
         ) : (

@@ -36,7 +36,7 @@ The current data fetching architecture has accumulated complexity that causes:
 | 19 invalidation points | Scattered, hard to trace | ✅ Centralized into `useGenerationInvalidation.ts` |
 | Inline data transforms | Break memoization | Selector pattern with memoized derived views |
 | Debug logging | Scattered, no toggle | ✅ `debugConfig` system exists |
-| Query configs | Inconsistent | Standardized presets |
+| Query configs | Inconsistent | ✅ Standardized via `QUERY_PRESETS` in `queryDefaults.ts` |
 
 ---
 
@@ -74,34 +74,51 @@ Enable invalidation logging: `debugConfig.enable('invalidation')`
 
 ---
 
-### Phase 2: Standardize Query Configuration
+### Phase 2: Standardize Query Configuration ✅ COMPLETE
 **Effort**: 1 day | **Impact**: Medium (consistency for future code)
 
-Create presets that encode best practices:
+**Implemented (Dec 17, 2025):**
+
+Created `src/shared/lib/queryDefaults.ts` with four presets:
 
 ```typescript
-// src/shared/lib/queryDefaults.ts
-export const QUERY_DEFAULTS = {
-  // For queries backed by realtime (generations, tasks)
-  // Invalidation comes from realtime + mutations, not auto-refetch
-  realtimeBacked: {
-    staleTime: 30_000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-  },
-  
-  // For mostly-static data (resources, presets, user settings)
-  static: {
-    staleTime: 5 * 60 * 1000,
-    gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  },
-  
-  // For queries needing smart polling fallback
-  polled: (queryKey: string[]) => useSmartPollingConfig(queryKey),
-};
+import { QUERY_PRESETS } from '@/shared/lib/queryDefaults';
+
+// For queries backed by realtime (generations, tasks, shots)
+// 30s staleTime, no auto-refetch on mount/focus
+...QUERY_PRESETS.realtimeBacked
+
+// For mostly-static data (resources, presets, tool settings)
+// 5min staleTime, no refetch on focus
+...QUERY_PRESETS.static
+
+// For immutable data (completed tasks, historical data)
+// Infinite staleTime, never refetches
+...QUERY_PRESETS.immutable
+
+// For user configuration (preferences, credits, account settings)
+// 2min staleTime, no refetch on focus
+...QUERY_PRESETS.userConfig
 ```
+
+Also exported `STANDARD_RETRY` and `STANDARD_RETRY_DELAY` for consistent error handling.
+
+**Override pattern** (when needed):
+```typescript
+useQuery({
+  ...QUERY_PRESETS.realtimeBacked,
+  staleTime: 60_000, // Override specific value
+})
+```
+
+**Files migrated to use presets:**
+- ✅ `useShotGenerations.ts` - `realtimeBacked` for generation queries
+- ✅ `useTasks.ts` - `static` for task types, `realtimeBacked` for paginated tasks
+- ✅ `useToolSettings.ts` - `static` (with 10min override)
+- ✅ `useResources.ts` - `static` for resources
+- ✅ `useCredits.ts` - `userConfig` for balance and ledger
+
+**Decision note**: `useShotGenerations` (infinite query) changed from `staleTime: 60s` to `30s` and added `refetchOnMount: false`. This is intentional - realtime + smart polling handle freshness, so auto-refetch on mount is redundant. If paginated shot data ever appears stale, this is the place to check.
 
 **Why this helps**: New queries get correct config by default. Code review can verify "is this using the right preset?"
 
@@ -217,8 +234,8 @@ Baseline testing revealed 20 callback props being recreated on every render in `
 
 1. ~~**Phase 5 first** - Quick win, immediately reduces render cascades (0.5 day)~~ ✅ DONE
 2. ~~**Phase 1 next** - Gives visibility into invalidation patterns (1-2 days)~~ ✅ DONE
-3. **Phase 4** - Reduces noise while working on other phases (0.5 day) - *Note: `debugConfig` already exists, just need adoption*
-4. **Phase 2** - Apply to new code immediately, retrofit existing queries incrementally (1 day)
+3. ~~**Phase 2** - Apply to new code immediately, retrofit existing queries incrementally (1 day)~~ ✅ DONE
+4. **Phase 4** - Reduces noise while working on other phases (0.5 day) - *Note: `debugConfig` already exists, just need adoption*
 5. **Phase 3 last** - Biggest code change, do after patterns are stable (2-3 days)
 
 ---
@@ -227,7 +244,7 @@ Baseline testing revealed 20 callback props being recreated on every render in `
 
 - [x] Single file (`useGenerationInvalidation.ts`) contains all invalidation logic
 - [ ] Zero `console.log` in production (all behind DEBUG flags)
-- [ ] New queries use preset from `queryDefaults.ts`
+- [x] New queries use preset from `queryDefaults.ts` (created with 4 presets + 6 hooks migrated)
 - [ ] No inline `.filter()` on generation arrays in components
 - [x] Re-render count measurably reduced (31+ → only legitimate renders)
 - [x] No "Callback props changed (UNSTABLE)" warnings in RenderProfile logs (still shows on first render, expected)

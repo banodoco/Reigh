@@ -2799,7 +2799,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         <div
           className="fixed z-50 animate-in fade-in slide-in-from-top-2"
           style={{
-            top: `${(isMobile ? 60 : 96) + (isMobile ? 8 : 8)}px`,
+            top: `${isMobile ? 52 : 114}px`,
             left: stickyHeader.stableBounds.width > 0 
               ? `${stickyHeader.stableBounds.left}px` 
               : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
@@ -2816,7 +2816,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
           }}
         >
           <div className="flex-shrink-0 pb-2 sm:pb-1">
-            <div className="flex justify-center items-center px-2">
+            <div className="flex flex-col items-center px-2">
               <div className="flex items-center justify-center">
                 <div className="flex items-center space-x-1 sm:space-x-2 bg-background/80 backdrop-blur-md shadow-xl rounded-lg border border-border p-1" style={{ pointerEvents: 'auto' }}>
                   <Button
@@ -2858,6 +2858,18 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                   </Button>
                 </div>
               </div>
+              
+              {/* Mobile: Back to shot list button */}
+              {isMobile && (
+                <button
+                  onClick={handleBackToShotList}
+                  className="mt-0.5 px-3 py-1 text-xs text-muted-foreground hover:text-foreground bg-background/80 backdrop-blur-md rounded-b-lg border border-t-0 border-border flex items-center"
+                  style={{ pointerEvents: 'auto' }}
+                >
+                  <ChevronLeft className="h-3 w-3 mr-0.5" />
+                  Back to shots
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toolsManifest } from '@/tools';
+import { QUERY_PRESETS, STANDARD_RETRY_DELAY } from '@/shared/lib/queryDefaults';
 
 export type SettingsScope = 'user' | 'project' | 'shot';
 
@@ -516,27 +517,23 @@ export function useToolSettings<T>(
       }
     },
     enabled: !!toolId && fetchEnabled,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
-    refetchOnWindowFocus: false,
-      // Mobile-specific optimizations
-  retry: (failureCount, error) => {
-    // Don't retry auth errors, cancelled requests, or abort errors
-    if (error?.message?.includes('Authentication required') || 
-        error?.message?.includes('Request was cancelled') ||
-        error?.name === 'AbortError' ||
-        error?.message?.includes('signal is aborted')) {
-      return false;
-    }
-    // Retry up to 3 times for network errors on mobile
-    return failureCount < 3;
-  },
-  retryDelay: (attemptIndex) => {
-    // Faster retry schedule for settings: 500ms, 1s, 2s
-    return Math.min(500 * Math.pow(2, attemptIndex), 2000);
-  },
-  // Shorter timeout for critical settings data
-  networkMode: 'online',
+    // Use static preset - tool settings rarely change, mutation invalidates on save
+    ...QUERY_PRESETS.static,
+    staleTime: 10 * 60 * 1000, // Override: 10 minutes (longer than static default)
+    // Mobile-specific optimizations
+    retry: (failureCount, error) => {
+      // Don't retry auth errors, cancelled requests, or abort errors
+      if (error?.message?.includes('Authentication required') || 
+          error?.message?.includes('Request was cancelled') ||
+          error?.name === 'AbortError' ||
+          error?.message?.includes('signal is aborted')) {
+        return false;
+      }
+      // Retry up to 3 times for network errors on mobile
+      return failureCount < 3;
+    },
+    retryDelay: STANDARD_RETRY_DELAY,
+    networkMode: 'online',
   });
 
   // Log errors for debugging (except expected cancellations)

@@ -538,8 +538,20 @@ const GenerationsPaneComponent: React.FC = () => {
                     }}
                   />
                   
-                  {/* Show CTA to toggle between current shot and all images */}
-                  {currentShotId && (
+                  {/* Show CTA buttons based on filter state */}
+                  {selectedShotFilter === 'no-shot' ? (
+                    // When viewing "Items without shots", show button to go back to all
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedShotFilter('all')}
+                      className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      <span className="hidden sm:inline">View all items</span>
+                    </Button>
+                  ) : currentShotId ? (
+                    // When user is on a shot, toggle between that shot and all
                     selectedShotFilter === currentShotId ? (
                       <Button
                         variant="ghost"
@@ -561,7 +573,18 @@ const GenerationsPaneComponent: React.FC = () => {
                         <span className="hidden sm:inline">View my shot</span>
                       </Button>
                     )
-                  )}
+                  ) : selectedShotFilter === 'all' ? (
+                    // When viewing "All shots" and not on a specific shot, show "Items without shots" button
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedShotFilter('no-shot')}
+                      className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      <span className="hidden sm:inline">Items without shots</span>
+                    </Button>
+                  ) : null}
                 </div>
 
                 {totalCount > GENERATIONS_PER_PAGE && (

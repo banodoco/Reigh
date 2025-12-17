@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { invokeWithTimeout } from '@/shared/lib/invokeWithTimeout';
+import { QUERY_PRESETS } from '@/shared/lib/queryDefaults';
 
 interface CreditBalance {
   balance: number;
@@ -133,8 +134,9 @@ export function useCredits() {
   } = useQuery<CreditBalance>({
     queryKey: ['credits', 'balance'],
     queryFn: fetchCreditBalance,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 10, // 10 minutes
+    // Use userConfig preset - balance changes after purchases/spend
+    ...QUERY_PRESETS.userConfig,
+    staleTime: 1000 * 60 * 5, // Override: 5 minutes (balance doesn't need 2min checks)
   });
 
   // Fetch credit ledger with pagination using Supabase
@@ -142,7 +144,8 @@ export function useCredits() {
     return useQuery<CreditLedgerResponse>({
       queryKey: ['credits', 'ledger', limit, offset],
       queryFn: () => fetchCreditLedger(limit, offset),
-      staleTime: 1000 * 60 * 2, // 2 minutes
+      // Use userConfig preset - ledger updates after transactions
+      ...QUERY_PRESETS.userConfig,
     });
   };
 

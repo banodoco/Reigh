@@ -157,6 +157,9 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   };
 
   const getIcon = () => {
+    // Larger icons on mobile for better touch targets
+    const iconSize = isMobile ? "h-5 w-5" : "h-4 w-4";
+    
     // If a custom icon element is provided, use it
     if (customIcon) {
       return customIcon;
@@ -165,17 +168,17 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
     // If a custom pane icon type is specified, use it instead of chevrons
     if (paneIcon !== 'chevron') {
       switch (paneIcon) {
-        case 'tools': return <LayoutGrid className="h-4 w-4" />;
-        case 'gallery': return <Images className="h-4 w-4" />;
-        case 'tasks': return <ListTodo className="h-4 w-4" />;
+        case 'tools': return <LayoutGrid className={iconSize} />;
+        case 'gallery': return <Images className={iconSize} />;
+        case 'tasks': return <ListTodo className={iconSize} />;
       }
     }
     
     // Default chevron behavior
     switch (side) {
-        case 'left': return <ChevronRight className="h-4 w-4" />;
-        case 'right': return <ChevronLeft className="h-4 w-4" />;
-        case 'bottom': return <ChevronUp className="h-4 w-4" />;
+        case 'left': return <ChevronRight className={iconSize} />;
+        case 'right': return <ChevronLeft className={iconSize} />;
+        case 'bottom': return <ChevronUp className={iconSize} />;
         default: return null;
     }
   };
@@ -220,30 +223,30 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
                 variant="ghost"
                 size="icon"
                 onPointerUp={thirdButton.onClick}
-                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
                 aria-label={thirdButton.ariaLabel}
               >
-                {thirdButton.content || <Square className="h-4 w-4" />}
+                {thirdButton.content || <Square className="h-5 w-5" />}
               </Button>
             )}
             <Button
               variant="ghost"
               size="icon"
               onPointerUp={() => toggleLock(false)}
-              className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+              className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
               aria-label="Unlock pane"
             >
-              <UnlockIcon className="h-4 w-4" />
+              <UnlockIcon className="h-5 w-5" />
             </Button>
             {fourthButton && (
               <Button
                 variant="ghost"
                 size="icon"
                 onPointerUp={fourthButton.onClick}
-                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
                 aria-label={fourthButton.ariaLabel}
               >
-                {fourthButton.content || <Square className="h-4 w-4" />}
+                {fourthButton.content || <Square className="h-5 w-5" />}
               </Button>
             )}
           </div>
@@ -266,26 +269,26 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
               variant="ghost"
               size="icon"
               onPointerUp={thirdButton.onClick}
-              className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+              className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
               aria-label={thirdButton.ariaLabel}
             >
-              {thirdButton.content || <Square className="h-4 w-4" />}
+              {thirdButton.content || <Square className="h-5 w-5" />}
             </Button>
           )}
           <Button
             variant="ghost"
             size="icon"
             onPointerUp={() => toggleLock(true)}
-            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+            className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
             aria-label="Lock pane open"
           >
-            <LockIcon className="h-4 w-4" />
+            <LockIcon className="h-5 w-5" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onPointerUp={() => openPane()}
-            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+            className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
             aria-label={paneTooltip || "Open pane"}
           >
             {getIcon()}
@@ -317,17 +320,17 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             variant="ghost"
             size="icon"
             onPointerUp={thirdButton.onClick}
-            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+            className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
             aria-label={thirdButton.ariaLabel}
           >
-            {thirdButton.content || <Square className="h-4 w-4" />}
+            {thirdButton.content || <Square className="h-5 w-5" />}
           </Button>
         )}
         <Button
           variant="ghost"
           size="icon"
           onPointerUp={() => openPane()}
-          className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+          className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
           aria-label={paneTooltip || "Open pane"}
         >
           {getIcon()}

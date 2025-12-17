@@ -7,6 +7,7 @@ import { useProject } from '../contexts/ProjectContext';
 import { filterVisibleTasks, isTaskVisible, getTaskDisplayName, getTaskConfig, getVisibleTaskTypes } from '@/shared/lib/taskConfig';
 // Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
 import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
+import { QUERY_PRESETS } from '@/shared/lib/queryDefaults';
 
 const TASKS_QUERY_KEY = 'tasks';
 
@@ -117,10 +118,8 @@ export const useDistinctTaskTypes = (projectId?: string | null) => {
         .sort((a, b) => a.label.localeCompare(b.label));
     },
     enabled: !!effectiveProjectId,
-    // Long cache time - task types don't change often
-    staleTime: 5 * 60 * 1000, // 5 minutes before considered stale
-    gcTime: 30 * 60 * 1000, // 30 minutes in cache
-    refetchOnWindowFocus: false,
+    // Use static preset - task types rarely change, only on new task creation
+    ...QUERY_PRESETS.static,
   });
 };
 
@@ -320,11 +319,9 @@ export const useListTasks = (params: ListTasksParams) => {
       return tasks;
     },
     enabled: !!projectId,
-    // CRITICAL: Prevent excessive background refetches
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    // Use static preset - task list is invalidated by realtime/mutations
+    ...QUERY_PRESETS.static,
+    refetchOnReconnect: false, // Override: realtime handles this
   });
 };
 
@@ -500,12 +497,10 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       return result;
     },
     enabled: !!effectiveProjectId,
-    // CRITICAL: Gallery cache settings - prevent background refetches
     // Keep previous page's data visible during refetches to avoid UI blanks
     placeholderData: (previousData: PaginatedTasksResponse | undefined) => previousData,
-    gcTime: 5 * 60 * 1000, // 5 minutes  
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    // Use realtimeBacked preset - tasks updated via realtime + mutations
+    ...QUERY_PRESETS.realtimeBacked,
     // 🎯 SMART POLLING: Intelligent polling based on realtime health
     ...smartPollingConfig,
     refetchIntervalInBackground: true // Enable background polling
@@ -904,7 +899,8 @@ export const useAllTaskTypes = (_projectId: string | null) => {
       console.log('[TaskTypeFilterDebug] Using hardcoded visible task types:', visibleTypes);
       return visibleTypes;
     },
-    staleTime: Infinity, // Never stale - it's a static list
-    gcTime: Infinity,
+    // Use immutable preset - hardcoded list never changes at runtime
+    ...QUERY_PRESETS.immutable,
+    gcTime: Infinity, // Keep forever
   });
 };

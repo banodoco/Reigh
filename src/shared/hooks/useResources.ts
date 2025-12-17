@@ -4,6 +4,7 @@ import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { PhaseConfig } from '@/tools/travel-between-images/settings';
 import { supabase } from '@/integrations/supabase/client';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
+import { QUERY_PRESETS } from '@/shared/lib/queryDefaults';
 
 export interface PhaseConfigMetadata {
     name: string;
@@ -133,9 +134,10 @@ export const useListPublicResources = (type: ResourceType) => {
             
             return allData;
         },
-        staleTime: 15 * 60 * 1000, // 15 minutes
-        gcTime: 30 * 60 * 1000, // keep in cache for 30 minutes
-        refetchOnWindowFocus: false,
+        // Use static preset - public resources change infrequently
+        ...QUERY_PRESETS.static,
+        staleTime: 15 * 60 * 1000, // Override: 15 minutes (public resources are very stable)
+        gcTime: 30 * 60 * 1000, // Keep in cache longer
     });
 };
 
@@ -180,6 +182,8 @@ export const useListResources = (type: ResourceType) => {
 
             return allData;
         },
+        // Use static preset - user resources change only via mutations (which invalidate)
+        ...QUERY_PRESETS.static,
     });
 };
 

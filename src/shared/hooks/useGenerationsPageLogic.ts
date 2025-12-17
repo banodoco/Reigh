@@ -278,7 +278,8 @@ export function useGenerationsPageLogic({
     mediaType,
     toolType,
     shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
-    excludePositioned: selectedShotFilter !== 'all' ? excludePositioned : undefined,
+    // Only apply excludePositioned for specific shots (not 'all' or 'no-shot')
+    excludePositioned: (selectedShotFilter !== 'all' && selectedShotFilter !== 'no-shot') ? excludePositioned : undefined,
     starredOnly
   }), [mediaType, toolType, selectedShotFilter, excludePositioned, starredOnly]);
 

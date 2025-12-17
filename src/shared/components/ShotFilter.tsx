@@ -81,6 +81,7 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
             ref={contentRef}
           >
             <SelectItem variant={whiteText ? "zinc" : "default"} value="all">All Shots</SelectItem>
+            <SelectItem variant={whiteText ? "zinc" : "default"} value="no-shot">Items without shots</SelectItem>
             {shots?.map(shot => (
               <SelectItem variant={whiteText ? "zinc" : "default"} key={shot.id} value={shot.id}>
                 {shot.name}
@@ -90,8 +91,8 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
         </Select>
       </div>
       
-      {/* Position filter checkbox - only show when a specific shot is selected */}
-      {showPositionFilter && selectedShotId !== 'all' && onExcludePositionedChange && (
+      {/* Position filter checkbox - only show when a specific shot is selected (not 'all' or 'no-shot') */}
+      {showPositionFilter && selectedShotId !== 'all' && selectedShotId !== 'no-shot' && onExcludePositionedChange && (
         <div className="flex items-center space-x-2 mt-2">
           <Checkbox 
             id={checkboxId}

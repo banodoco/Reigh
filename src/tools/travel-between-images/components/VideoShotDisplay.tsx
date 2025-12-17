@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shar
 import { isVideoGeneration } from '@/shared/lib/typeGuards';
 import { VideoGenerationModal } from '@/shared/components/VideoGenerationModal';
 import { usePanes } from '@/shared/contexts/PanesContext';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -64,8 +65,9 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   const deleteShotMutation = useDeleteShot();
   const duplicateShotMutation = useDuplicateShot();
   
-  // Check if GenerationsPane is locked to show "Select this shot" button
+  // Check if GenerationsPane is locked to show "Select this shot" button (mobile only)
   const { isGenerationsPaneLocked } = usePanes();
+  const isMobile = useIsMobile();
   const [isSelectedForAddition, setIsSelectedForAddition] = useState(false);
   
   // Handle selecting this shot as the target for adding images in GenerationsPane
@@ -495,8 +497,8 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             )}
           </div>
           
-          {/* Select this shot button - shows when GenerationsPane is locked */}
-          {isGenerationsPaneLocked && (
+          {/* Select this shot button - shows when GenerationsPane is locked (mobile/tablet only) */}
+          {isGenerationsPaneLocked && isMobile && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
