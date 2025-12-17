@@ -10,6 +10,7 @@ import React from 'react';
 import { log } from '@/shared/lib/logger';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
+import { invalidateGenerationsSync } from '@/shared/hooks/useGenerationInvalidation';
 
 // Define the type for the new shot data returned by Supabase
 // This should align with your 'shots' table structure from `supabase/types.ts`
@@ -352,9 +353,12 @@ export const useDeleteShot = () => {
       // The optimistic update in onMutate already updated the UI, so we don't need
       // to invalidate broad queries which causes re-render cascades.
       // Only invalidate specific queries for the deleted shot and project-level unified generations.
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
+      invalidateGenerationsSync(queryClient, shotId, {
+        reason: 'delete-shot',
+        scope: 'all',
+        includeProjectUnified: true,
+        projectId
+      });
     },
     onError: (error, variables, context) => {
       console.error('[DeleteShot] ❌ onError - rolling back', { error: error.message });
@@ -1292,11 +1296,13 @@ export const useRemoveImageFromShot = () => {
 
       // Invalidate queries to refresh the view
       // The image is now unpositioned but still in the shot
-      queryClient.invalidateQueries({ queryKey: ['shots', data.projectId] });
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });
-      // Invalidate unified-generations to refresh Generations pane when filtering by shot
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', data.projectId] });
+      invalidateGenerationsSync(queryClient, data.shotId, {
+        reason: 'unposition-image',
+        scope: 'all',
+        includeShots: true,
+        includeProjectUnified: true,
+        projectId: data.projectId
+      });
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
     },
   });
@@ -1406,10 +1412,12 @@ export const usePositionExistingGenerationInShot = () => {
     onSuccess: (data) => {
       // Invalidate all-shot-generations to ensure the generation appears immediately
       // This is needed because realtime may skip invalidating for INSERT-only batches
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shot_id] });
-      queryClient.invalidateQueries({ queryKey: ['shots', data.project_id] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shot_id] });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shot_id] });
+      invalidateGenerationsSync(queryClient, data.shot_id, {
+        reason: 'add-image-to-shot',
+        scope: 'all',
+        includeShots: true,
+        projectId: data.project_id
+      });
     },
     onError: (error: Error) => {
       console.error('Error positioning existing generation in shot:', error);
@@ -1590,10 +1598,11 @@ export const useDuplicateImageInShot = () => {
     onSuccess: (data) => {
       // Invalidate all relevant caches to ensure UI updates immediately
       queryClient.invalidateQueries({ queryKey: ['shots', data.project_id] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shot_id] });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shot_id] });
       // CRITICAL: Also invalidate all-shot-generations - this is what ShotEditor uses!
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shot_id] });
+      invalidateGenerationsSync(queryClient, data.shot_id, {
+        reason: 'duplicate-image-in-shot',
+        scope: 'all'
+      });
     },
     onError: (error: Error) => {
       console.error('Error duplicating image in shot:', error);
@@ -1709,11 +1718,11 @@ export const useCreateShotWithImage = () => {
       if (data.shotId) {
         // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
         console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create shot with image operation (100ms delay)');
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
-          queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shotId] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });
-        }, 100);
+        invalidateGenerationsSync(queryClient, data.shotId, {
+          reason: 'create-shot-with-image',
+          scope: 'all',
+          delayMs: 100
+        });
       }
     },
     onError: (error: Error) => {

@@ -70,6 +70,7 @@ import { calculateMaxGap, validateGaps } from "./Timeline/utils/timeline-utils";
 import { quantizeGap } from "./Timeline/utils/time-utils";
 import { useExternalGenerations } from "@/shared/components/ShotImageManager/hooks/useExternalGenerations";
 import { useDerivedNavigation } from "@/shared/hooks/useDerivedNavigation";
+import { useRenderCount } from "@/shared/components/debug/RefactorMetricsCollector";
 
 // Import components
 import TimelineControls from "./Timeline/TimelineControls";
@@ -208,6 +209,9 @@ const Timeline: React.FC<TimelineProps> = ({
   onAddToShotWithoutPosition,
   onCreateShot
 }) => {
+  // [RefactorMetrics] Track render count for baseline measurements
+  useRenderCount('Timeline');
+  
   // [ZoomDebug] Track Timeline mounts to detect unwanted remounts
   const timelineMountRef = React.useRef(0);
   React.useEffect(() => {
@@ -969,4 +973,6 @@ const Timeline: React.FC<TimelineProps> = ({
   );
 };
 
-export default Timeline; 
+// 🎯 PERF FIX: Wrap in React.memo to prevent re-renders when props haven't changed
+// Timeline receives many callback props from ShotImagesEditor that are now stable (via refs)
+export default React.memo(Timeline);

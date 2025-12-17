@@ -28,6 +28,7 @@ import {
   createPositionMap,
   persistTimelinePositions
 } from './timelineDropHelpers';
+import { invalidateGenerationsSync } from '@/shared/hooks/useGenerationInvalidation';
 
 interface UseGenerationActionsProps {
   state: ShotEditorState;
@@ -80,32 +81,97 @@ export const useGenerationActions = ({
   // Upload settings
   const { settings: uploadSettings } = useToolSettings<{ cropToProjectSize?: boolean }>('upload', { projectId });
 
+  // 🎯 STABILITY FIX: Use refs for data that changes reference frequently but callbacks 
+  // only need the latest value. This prevents callback recreation when data refetches.
+  const orderedShotImagesRef = useRef(orderedShotImages);
+  orderedShotImagesRef.current = orderedShotImages;
+  
+  const onShotImagesUpdateRef = useRef(onShotImagesUpdate);
+  onShotImagesUpdateRef.current = onShotImagesUpdate;
+  
+  // These are used in handleTimelineImageDrop - stabilize to prevent recreation
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
+  
+  const uploadSettingsRef = useRef(uploadSettings);
+  uploadSettingsRef.current = uploadSettings;
+  
+  // 🎯 STABILITY FIX: selectedShot object changes reference when React Query cache updates
+  // even if the shot ID hasn't changed. Use ref to prevent callback recreation.
+  const selectedShotRef = useRef(selectedShot);
+  selectedShotRef.current = selectedShot;
+  
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
+  
+  const batchVideoFramesRef = useRef(batchVideoFrames);
+  batchVideoFramesRef.current = batchVideoFrames;
+  
+  // 🎯 STABILITY FIX: React Query mutation objects change reference when mutation state changes
+  // (pending → success → idle). Use refs to access stable mutateAsync functions.
+  const addImageToShotMutationRef = useRef(addImageToShotMutation);
+  addImageToShotMutationRef.current = addImageToShotMutation;
+  
+  const removeImageFromShotMutationRef = useRef(removeImageFromShotMutation);
+  removeImageFromShotMutationRef.current = removeImageFromShotMutation;
+  
+  const deleteGenerationMutationRef = useRef(deleteGenerationMutation);
+  deleteGenerationMutationRef.current = deleteGenerationMutation;
+  
+  const createGenerationMutationRef = useRef(createGenerationMutation);
+  createGenerationMutationRef.current = createGenerationMutation;
+  
+  const duplicateImageInShotMutationRef = useRef(duplicateImageInShotMutation);
+  duplicateImageInShotMutationRef.current = duplicateImageInShotMutation;
+  
+  const handleExternalImageDropMutationRef = useRef(handleExternalImageDropMutation);
+  handleExternalImageDropMutationRef.current = handleExternalImageDropMutation;
+  
+  const updateGenerationLocationMutationRef = useRef(updateGenerationLocationMutation);
+  updateGenerationLocationMutationRef.current = updateGenerationLocationMutation;
+  
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
+  
+  // 🎯 STABILITY FIX: Even though actions from useShotEditorState should be stable,
+  // use a ref to be absolutely certain callbacks won't recreate
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+
   const handleImageUploadToShot = useCallback(async (files: File[]) => {
     if (!files || files.length === 0) return;
-    if (!projectId || !selectedShot?.id) {
+    
+    // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
+    const currentProjectId = projectIdRef.current;
+    const currentShot = selectedShotRef.current;
+    
+    if (!currentProjectId || !currentShot?.id) {
       toast.error("Cannot upload image: Project or Shot ID is missing.");
       return;
     }
 
-    actions.setUploadingImage(true);
+    actionsRef.current.setUploadingImage(true);
 
     // Determine if cropping is enabled via project settings (toolSettings)
-    const cropToProjectSize = (uploadSettings?.cropToProjectSize ?? true);
+    // 🎯 STABILITY FIX: Use refs to access latest data without causing callback recreation
+    const currentUploadSettings = uploadSettingsRef.current;
+    const currentProjects = projectsRef.current;
+    const cropToProjectSize = (currentUploadSettings?.cropToProjectSize ?? true);
     let projectAspectRatio: number | null = null;
     if (cropToProjectSize) {
       // Prioritize shot aspect ratio over project aspect ratio
-      const currentProject = projects.find(p => p.id === projectId);
-      const aspectRatioStr = selectedShot?.aspect_ratio || currentProject?.aspectRatio || (currentProject as any)?.settings?.aspectRatio;
+      const currentProject = currentProjects.find(p => p.id === currentProjectId);
+      const aspectRatioStr = currentShot?.aspect_ratio || currentProject?.aspectRatio || (currentProject as any)?.settings?.aspectRatio;
       if (aspectRatioStr) {
         projectAspectRatio = parseRatio(aspectRatioStr);
         if (isNaN(projectAspectRatio)) {
           toast.error(`Invalid aspect ratio: ${aspectRatioStr}`);
-          actions.setUploadingImage(false);
+          actionsRef.current.setUploadingImage(false);
           return;
         }
       } else {
         toast.error("Cannot crop: No aspect ratio found for shot or project.");
-        actions.setUploadingImage(false);
+        actionsRef.current.setUploadingImage(false);
         return;
       }
     }
@@ -214,10 +280,10 @@ export const useGenerationActions = ({
         }
 
         // Save link in DB (ignore returned shotImageEntryId for UI key stability)
-        await addImageToShotMutation.mutateAsync({
-          shot_id: selectedShot.id,
+        await addImageToShotMutationRef.current.mutateAsync({
+          shot_id: currentShot.id,
           generation_id: newGeneration.id,
-          project_id: projectId,
+          project_id: currentProjectId,
           imageUrl: finalImageUrl,
           thumbUrl: thumbnailUrl, // Use the generated thumbnail URL
         });
@@ -246,56 +312,57 @@ export const useGenerationActions = ({
 
     // REMOVED: Local state updates - two-phase loading will refetch automatically
     
-    actions.setFileInputKey(Date.now());
-    actions.setUploadingImage(false);
+    actionsRef.current.setFileInputKey(Date.now());
+    actionsRef.current.setUploadingImage(false);
   }, [
-    actions,
-    projectId,
-    selectedShot?.id,
-    projects,
-    uploadSettings?.cropToProjectSize,
-    addImageToShotMutation,
-    createGenerationMutation,
-    queryClient,
-    skipNextSyncRef
+    // actions, mutations, projectId, selectedShot, projects, uploadSettings accessed via refs
   ]);
 
   const handleDeleteVideoOutput = useCallback(async (generationId: string) => {
-    if (!selectedShot || !projectId) {
+    // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
+    const currentShot = selectedShotRef.current;
+    const currentProjectId = projectIdRef.current;
+    
+    if (!currentShot || !currentProjectId) {
       toast.error("No shot or project selected.");
       return;
     }
-    actions.setDeletingVideoId(generationId);
+    actionsRef.current.setDeletingVideoId(generationId);
     
     try {
       // REMOVED: Optimistic local state - two-phase loading handles updates
       
       // Delete the generation (this will show success/error toasts automatically)
-      await deleteGenerationMutation.mutateAsync(generationId);
+      await deleteGenerationMutationRef.current.mutateAsync(generationId);
       
       // Refresh the shot data
-      onShotImagesUpdate(); 
+      // 🎯 STABILITY FIX: Use ref to access latest callback without causing callback recreation
+      onShotImagesUpdateRef.current(); 
     } catch (error) {
       // Error handled by mutation
     } finally {
-      actions.setDeletingVideoId(null);
+      actionsRef.current.setDeletingVideoId(null);
     }
-  }, [selectedShot?.id, projectId, actions, deleteGenerationMutation, onShotImagesUpdate]);
+  }, []); // actions, mutations, selectedShot, projectId, onShotImagesUpdate accessed via refs
 
   const handleDeleteImageFromShot = useCallback(async (shotImageEntryId: string) => {
+    // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
+    const currentShot = selectedShotRef.current;
+    const currentProjectId = projectIdRef.current;
+    
     console.log('[DeleteDebug] 🗑️ STEP 1: handleDeleteImageFromShot called', {
       shotImageEntryId: shotImageEntryId?.substring(0, 8),
-      shotId: selectedShot?.id?.substring(0, 8),
-      projectId: projectId?.substring(0, 8),
-      hasSelectedShot: !!selectedShot,
-      hasProjectId: !!projectId,
+      shotId: currentShot?.id?.substring(0, 8),
+      projectId: currentProjectId?.substring(0, 8),
+      hasSelectedShot: !!currentShot,
+      hasProjectId: !!currentProjectId,
       timestamp: Date.now()
     });
 
-    if (!selectedShot || !projectId) {
+    if (!currentShot || !currentProjectId) {
       console.error('[DeleteDebug] ❌ Missing shot or project', {
-        hasSelectedShot: !!selectedShot,
-        hasProjectId: !!projectId
+        hasSelectedShot: !!currentShot,
+        hasProjectId: !!currentProjectId
       });
       toast.error("Cannot remove image: No shot or project selected.");
       return;
@@ -312,7 +379,9 @@ export const useGenerationActions = ({
 
     // Find the image by its id (shot_generations.id)
     // shotImageEntryId param IS the id (same value now)
-    const imageToDelete = orderedShotImages.find(img => img.id === shotImageEntryId);
+    // 🎯 STABILITY FIX: Use ref to access latest data without causing callback recreation
+    const currentOrderedImages = orderedShotImagesRef.current;
+    const imageToDelete = currentOrderedImages.find(img => img.id === shotImageEntryId);
     
     // The actual generation ID is now stored in generation_id
     const actualGenerationId = imageToDelete?.generation_id;
@@ -323,13 +392,13 @@ export const useGenerationActions = ({
       actualGenerationId: actualGenerationId?.substring(0, 8),
       imageId: imageToDelete?.id?.substring(0, 8), // shot_generations.id
       generation_id: imageToDelete?.generation_id?.substring(0, 8),
-      totalImages: orderedShotImages.length
+      totalImages: currentOrderedImages.length
     });
 
     if (!actualGenerationId) {
       console.error('[DeleteDebug] ❌ Could not find generation ID for shotImageEntryId', {
         shotImageEntryId: shotImageEntryId.substring(0, 8),
-        availableIds: orderedShotImages.map(img => ({
+        availableIds: currentOrderedImages.map(img => ({
           id: img.id?.substring(0, 8), // shot_generations.id
           generation_id: img.generation_id?.substring(0, 8)
         }))
@@ -340,7 +409,7 @@ export const useGenerationActions = ({
 
     // Check if we're deleting the first positioned item on the timeline
     // If so, we need to shift all remaining items back proportionally
-    const positionedImages = orderedShotImages
+    const positionedImages = currentOrderedImages
       .filter(img => img.timeline_frame != null && img.timeline_frame >= 0 && !isGenerationVideo(img))
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
     
@@ -377,25 +446,25 @@ export const useGenerationActions = ({
     }
 
     console.log('[DeleteDebug] 📤 STEP 3: Calling removeImageFromShotMutation', {
-      shotId: selectedShot.id.substring(0, 8),
+      shotId: currentShot.id.substring(0, 8),
       shotGenerationId: shotImageEntryId.substring(0, 8), // This is the shot_generations.id
-      projectId: projectId.substring(0, 8),
+      projectId: currentProjectId.substring(0, 8),
       isDeletingFirstItem,
       frameOffset
     });
 
     // Emit event to lock timeline positions during mutation + refetch
     window.dispatchEvent(new CustomEvent('shot-mutation-start', {
-      detail: { shotId: selectedShot.id, type: 'delete' }
+      detail: { shotId: currentShot.id, type: 'delete' }
     }));
     
     try {
       // CRITICAL: Pass shotGenerationId (shot_generations.id), NOT generationId (generations.id)
       // This ensures only this specific entry is deleted, not all duplicates of the same generation
-      await removeImageFromShotMutation.mutateAsync({
-        shotId: selectedShot.id,
+      await removeImageFromShotMutationRef.current.mutateAsync({
+        shotId: currentShot.id,
         shotGenerationId: shotImageEntryId, // The unique shot_generations.id
-        projectId: projectId,
+        projectId: currentProjectId,
       });
       
       // If we deleted the first item, shift all remaining items back
@@ -422,19 +491,27 @@ export const useGenerationActions = ({
         ));
         
         console.log('[DeleteDebug] ✅ STEP 5: Timeline frames shifted successfully');
-        
+
         // Invalidate queries to refresh the UI
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', selectedShot.id] });
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        invalidateGenerationsSync(queryClientRef.current, currentShot.id, {
+          reason: 'delete-image-frame-shift',
+          scope: 'all',
+          includeShots: true,
+          projectId: currentProjectId
+        });
       }
     } catch (error) {
       console.error('[DeleteDebug] ❌ Error during deletion or frame shift:', error);
       // Error handling is done by the mutation itself
     }
-  }, [selectedShot?.id, projectId, removeImageFromShotMutation, orderedShotImages, queryClient]);
+  }, []); // mutations, queryClient, selectedShot, projectId, orderedShotImages accessed via refs
 
   const handleBatchDeleteImages = useCallback(async (shotImageEntryIds: string[]) => {
-    if (!selectedShot || !projectId || shotImageEntryIds.length === 0) {
+    // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
+    const currentShot = selectedShotRef.current;
+    const currentProjectId = projectIdRef.current;
+    
+    if (!currentShot || !currentProjectId || shotImageEntryIds.length === 0) {
       return;
     }
 
@@ -447,10 +524,10 @@ export const useGenerationActions = ({
     
     // Execute all timeline removals
     const removePromises = shotImageEntryIds.map(id => 
-      removeImageFromShotMutation.mutateAsync({
-        shotId: selectedShot.id,
+      removeImageFromShotMutationRef.current.mutateAsync({
+        shotId: currentShot.id,
         shotGenerationId: id,
-        projectId: projectId,
+        projectId: currentProjectId,
       })
     );
 
@@ -460,9 +537,13 @@ export const useGenerationActions = ({
     } catch (error) {
       toast.error('Failed to remove some images from timeline');
     }
-  }, [selectedShot?.id, projectId, removeImageFromShotMutation]);
+  }, []); // mutations, selectedShot, projectId accessed via refs
 
   const handleDuplicateImage = useCallback(async (shotImageEntryId: string, timeline_frame: number) => {
+    // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
+    const currentShot = selectedShotRef.current;
+    const currentProjectId = projectIdRef.current;
+    
     console.log('[DUPLICATE_DEBUG] 🚀 DUPLICATE BUTTON CLICKED:', {
       shotImageEntryId: shotImageEntryId.substring(0, 8),
       timeline_frame,
@@ -470,7 +551,7 @@ export const useGenerationActions = ({
       source: 'timeline_duplicate_button'
     });
 
-    if (!selectedShot || !projectId) {
+    if (!currentShot || !currentProjectId) {
       toast.error("Cannot duplicate image: No shot or project selected.");
       return;
     }
@@ -485,7 +566,9 @@ export const useGenerationActions = ({
     }
 
     // shotImageEntryId param is the shot_generations.id which matches img.id
-    const originalImage = orderedShotImages.find(img => img.id === shotImageEntryId);
+    // 🎯 STABILITY FIX: Use ref to access latest data without causing callback recreation
+    const currentOrderedImages = orderedShotImagesRef.current;
+    const originalImage = currentOrderedImages.find(img => img.id === shotImageEntryId);
     if (!originalImage) {
       toast.error("Original image not found for duplication.");
       return;
@@ -511,16 +594,16 @@ export const useGenerationActions = ({
       timeline_frame_from_button: timeline_frame,
       timeline_frame_from_image: (originalImage as any).timeline_frame,
       imageUrl: originalImage.imageUrl?.substring(0, 50) + '...',
-      totalImagesInShot: orderedShotImages.length
+      totalImagesInShot: currentOrderedImages.length
     });
 
     // Emit event to lock timeline positions during mutation + refetch
     window.dispatchEvent(new CustomEvent('shot-mutation-start', {
-      detail: { shotId: selectedShot.id, type: 'duplicate' }
+      detail: { shotId: currentShot.id, type: 'duplicate' }
     }));
 
     // Start loading state targeting the specific shotImageEntryId
-    actions.setDuplicatingImageId(shotImageEntryId);
+    actionsRef.current.setDuplicatingImageId(shotImageEntryId);
 
     // OPTIMISTIC UPDATE: Create a temporary duplicate for immediate feedback
     const tempDuplicateId = nanoid();
@@ -536,7 +619,7 @@ export const useGenerationActions = ({
 
     // Calculate the next image's frame from UI data (more reliable than database query)
     // Sort images by their timeline_frame and find the one after the current
-    const sortedImages = [...orderedShotImages]
+    const sortedImages = [...currentOrderedImages]
       .filter(img => (img as any).timeline_frame !== undefined && (img as any).timeline_frame !== null)
       .sort((a, b) => ((a as any).timeline_frame ?? 0) - ((b as any).timeline_frame ?? 0));
     
@@ -555,10 +638,10 @@ export const useGenerationActions = ({
       totalSortedImages: sortedImages.length
     });
 
-    duplicateImageInShotMutation.mutate({
-      shot_id: selectedShot.id,
+    duplicateImageInShotMutationRef.current.mutate({
+      shot_id: currentShot.id,
       generation_id: generationId,
-      project_id: projectId,
+      project_id: currentProjectId,
       shot_generation_id: shotImageEntryId, // Use the unique shot_generation ID for precise lookup
       timeline_frame: timeline_frame, // Pass the timeline_frame directly to avoid query
       next_timeline_frame: nextTimelineFrame, // Pass the next frame from UI for accurate midpoint
@@ -571,7 +654,7 @@ export const useGenerationActions = ({
         if (result.new_shot_generation_id && result.timeline_frame !== undefined) {
           const newPendingPositions = new Map(state.pendingFramePositions);
           newPendingPositions.set(result.new_shot_generation_id, result.timeline_frame);
-          actions.setPendingFramePositions(newPendingPositions);
+          actionsRef.current.setPendingFramePositions(newPendingPositions);
           
           console.log('[DUPLICATE] Added to pending positions:', {
             id: result.new_shot_generation_id.substring(0, 8),
@@ -580,9 +663,9 @@ export const useGenerationActions = ({
         }
         
         // Show success state
-        actions.setDuplicateSuccessImageId(shotImageEntryId);
+        actionsRef.current.setDuplicateSuccessImageId(shotImageEntryId);
         // Clear success state after 2 seconds
-        setTimeout(() => actions.setDuplicateSuccessImageId(null), 2000);
+        setTimeout(() => actionsRef.current.setDuplicateSuccessImageId(null), 2000);
       },
       onError: (error) => {
         console.error('[DUPLICATE] Duplicate mutation failed:', error);
@@ -592,10 +675,10 @@ export const useGenerationActions = ({
       },
       onSettled: () => {
         // Clear loading state
-        actions.setDuplicatingImageId(null);
+        actionsRef.current.setDuplicatingImageId(null);
       }
     });
-  }, [orderedShotImages, selectedShot?.id, projectId, actions, duplicateImageInShotMutation, skipNextSyncRef]);
+  }, []); // actions, mutations, selectedShot, projectId, orderedShotImages accessed via refs
 
   /**
    * Handle dropping external image files onto the timeline
@@ -608,51 +691,57 @@ export const useGenerationActions = ({
    * This eliminates the race conditions that caused shaky behavior.
    */
   const handleTimelineImageDrop = useCallback(async (files: File[], targetFrame?: number) => {
+    // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
+    const currentShot = selectedShotRef.current;
+    const currentProjectId = projectIdRef.current;
+    const currentBatchVideoFrames = batchVideoFramesRef.current;
+    
     console.log('[TimelineDrop] 🎯 Starting drop:', {
       filesCount: files.length,
       targetFrame,
-      shotId: selectedShot?.id?.substring(0, 8)
+      shotId: currentShot?.id?.substring(0, 8)
     });
 
-    if (!selectedShot?.id || !projectId) {
+    if (!currentShot?.id || !currentProjectId) {
       toast.error("Cannot add images: No shot or project selected.");
       return;
     }
 
     try {
-      actions.setUploadingImage(true);
+      actionsRef.current.setUploadingImage(true);
       
       // 1. Calculate target positions BEFORE upload
       const calculatedTargetFrame = await calculateNextAvailableFrame(
-        selectedShot.id,
+        currentShot.id,
         targetFrame
       );
       
       // 2. Crop images to shot aspect ratio
+      // 🎯 STABILITY FIX: Use refs to access latest data without causing callback recreation
       const processedFiles = await cropImagesToShotAspectRatio(
         files,
-        selectedShot,
-        projectId,
-        projects,
-        uploadSettings
+        currentShot,
+        currentProjectId,
+        projectsRef.current,
+        uploadSettingsRef.current
       );
       
       // 3. Calculate positions for each file
       const positions = processedFiles.map((_, index) => 
-        calculatedTargetFrame + (index * batchVideoFrames)
+        calculatedTargetFrame + (index * currentBatchVideoFrames)
       );
       
       console.log('[TimelineDrop] 📍 Pre-calculated positions:', {
         startFrame: calculatedTargetFrame,
-        spacing: batchVideoFrames,
+        spacing: currentBatchVideoFrames,
         positions
       });
       
       // 4. Upload with positions (single round trip to database)
-      const result = await handleExternalImageDropMutation.mutateAsync({
+      const result = await handleExternalImageDropMutationRef.current.mutateAsync({
         imageFiles: processedFiles,
-        targetShotId: selectedShot.id,
-        currentProjectQueryKey: projectId,
+        targetShotId: currentShot.id,
+        currentProjectQueryKey: currentProjectId,
         currentShotCount: 0,
         skipAutoPosition: false, // Let server use our calculated positions
         positions: positions, // Pass pre-calculated positions
@@ -679,7 +768,7 @@ export const useGenerationActions = ({
           const { data } = await supabase
             .from('shot_generations')
             .select('id, timeline_frame')
-            .eq('shot_id', selectedShot.id)
+            .eq('shot_id', currentShot.id)
             .in('generation_id', result.generationIds)
             .limit(1);
           
@@ -689,10 +778,10 @@ export const useGenerationActions = ({
         if (needsPositionUpdate) {
           console.log('[TimelineDrop] 🔄 Setting positions (fallback path)...');
           await persistTimelinePositions(
-            selectedShot.id,
+            currentShot.id,
             result.generationIds,
             calculatedTargetFrame,
-            batchVideoFrames
+            currentBatchVideoFrames
           );
         }
       }
@@ -710,18 +799,10 @@ export const useGenerationActions = ({
       toast.error(`Failed to add images: ${(error as Error).message}`);
       throw error;
     } finally {
-      actions.setUploadingImage(false);
+      actionsRef.current.setUploadingImage(false);
     }
   }, [
-    selectedShot?.id, 
-    selectedShot?.aspect_ratio, 
-    projectId, 
-    projects, 
-    uploadSettings, 
-    batchVideoFrames, 
-    actions, 
-    handleExternalImageDropMutation, 
-    onShotImagesUpdate
+    // actions, mutations, selectedShot, projectId, batchVideoFrames, projects, uploadSettings, onShotImagesUpdate accessed via refs
   ]);
 
   /**
@@ -734,18 +815,22 @@ export const useGenerationActions = ({
     thumbUrl: string | undefined, 
     targetFrame?: number
   ) => {
+    // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
+    const currentShot = selectedShotRef.current;
+    const currentProjectId = projectIdRef.current;
+    
     console.log('[PATH_COMPARE] 🟢 DRAG PATH START - handleTimelineGenerationDrop:', {
       generationId: generationId?.substring(0, 8),
       imageUrl: imageUrl?.substring(0, 60),
       thumbUrl: thumbUrl?.substring(0, 60),
       targetFrame,
       targetFrameProvided: targetFrame !== undefined,
-      shotId: selectedShot?.id?.substring(0, 8),
-      projectId: projectId?.substring(0, 8),
+      shotId: currentShot?.id?.substring(0, 8),
+      projectId: currentProjectId?.substring(0, 8),
       timestamp: Date.now()
     });
 
-    if (!selectedShot?.id || !projectId) {
+    if (!currentShot?.id || !currentProjectId) {
       toast.error("Cannot add generation: No shot or project selected.");
       return;
     }
@@ -756,17 +841,17 @@ export const useGenerationActions = ({
     }
 
     try {
-      console.log('[PATH_COMPARE] 🟢 DRAG PATH - calling addImageToShotMutation.mutateAsync');
+      console.log('[PATH_COMPARE] 🟢 DRAG PATH - calling addImageToShotMutationRef.current.mutateAsync');
       
       // Add the generation to the shot using the existing mutation
       // The addImageToShot API will handle creating the shot_image_entry
-      await addImageToShotMutation.mutateAsync({
+      await addImageToShotMutationRef.current.mutateAsync({
         generation_id: generationId,
-        shot_id: selectedShot.id,
+        shot_id: currentShot.id,
         imageUrl: imageUrl,
         thumbUrl: thumbUrl,
         timelineFrame: targetFrame, // Position on timeline if provided
-        project_id: projectId
+        project_id: currentProjectId
       });
       
       // Note: Don't call onShotImagesUpdate() here - the mutation's onSuccess 
@@ -777,7 +862,7 @@ export const useGenerationActions = ({
       toast.error(`Failed to add generation: ${(error as Error).message}`);
       throw error;
     }
-  }, [selectedShot?.id, selectedShot?.name, projectId, addImageToShotMutation, onShotImagesUpdate]);
+  }, []); // mutations, selectedShot, projectId accessed via refs
 
   /**
    * Handle dropping external images onto batch mode grid
@@ -790,13 +875,17 @@ export const useGenerationActions = ({
     targetPosition?: number,
     framePosition?: number
   ) => {
+    // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
+    const currentShot = selectedShotRef.current;
+    const currentProjectId = projectIdRef.current;
+    
     console.log('[BatchDrop] 🎯 Starting drop:', {
       filesCount: files.length,
       framePosition,
-      shotId: selectedShot?.id?.substring(0, 8)
+      shotId: currentShot?.id?.substring(0, 8)
     });
 
-    if (!selectedShot?.id || !projectId) {
+    if (!currentShot?.id || !currentProjectId) {
       toast.error("Cannot add images: No shot or project selected.");
       return;
     }
@@ -806,15 +895,15 @@ export const useGenerationActions = ({
     const localUrls: string[] = [];
 
     try {
-      actions.setUploadingImage(true);
+      actionsRef.current.setUploadingImage(true);
       
       // 1. Calculate target frame positions with collision detection
       // First get the start frame (already collision-checked by calculateNextAvailableFrame)
-      const startFrame = framePosition ?? await calculateNextAvailableFrame(selectedShot.id, undefined);
+      const startFrame = framePosition ?? await calculateNextAvailableFrame(currentShot.id, undefined);
       
       // For multiple files, we need to ensure each position is unique
       // Get existing frames from cache for quick collision detection
-      const existingGens = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', selectedShot.id]) || [];
+      const existingGens = queryClientRef.current.getQueryData<GenerationRow[]>(['all-shot-generations', currentShot.id]) || [];
       const existingFrames = existingGens
         .filter(g => g.timeline_frame != null && g.timeline_frame !== -1)
         .map(g => g.timeline_frame as number);
@@ -840,7 +929,7 @@ export const useGenerationActions = ({
       });
       
       // 2. Create optimistic entries immediately using local file URLs
-      const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', selectedShot.id]) || [];
+      const previousFastGens = queryClientRef.current.getQueryData<GenerationRow[]>(['all-shot-generations', currentShot.id]) || [];
       
       const optimisticItems = files.map((file, index) => {
         const localUrl = URL.createObjectURL(file);
@@ -864,34 +953,35 @@ export const useGenerationActions = ({
           name: file.name,
           based_on: null,
           params: {},
-          shot_data: { [selectedShot.id]: positions[index] },
+          shot_data: { [currentShot.id]: positions[index] },
           _optimistic: true,
           _uploading: true // Extra flag to show upload indicator
         };
       });
       
       // Add optimistic items to cache
-      queryClient.setQueryData(
-        ['all-shot-generations', selectedShot.id], 
+      queryClientRef.current.setQueryData(
+        ['all-shot-generations', currentShot.id], 
         [...previousFastGens, ...optimisticItems]
       );
       
       // 3. Crop images
+      // 🎯 STABILITY FIX: Use refs to access latest data without causing callback recreation
       const processedFiles = await cropImagesToShotAspectRatio(
         files,
-        selectedShot,
-        projectId,
-        projects,
-        uploadSettings
+        currentShot,
+        currentProjectId,
+        projectsRef.current,
+        uploadSettingsRef.current
       );
       
       // 4. Upload with positions
       // Pass skipOptimistic: true so we don't create DUPLICATE optimistic items
       // Our manual ones will persist until the real items come back from the server (after cache invalidation)
-      const result = await handleExternalImageDropMutation.mutateAsync({
+      const result = await handleExternalImageDropMutationRef.current.mutateAsync({
         imageFiles: processedFiles,
-        targetShotId: selectedShot.id,
-        currentProjectQueryKey: projectId,
+        targetShotId: currentShot.id,
+        currentProjectQueryKey: currentProjectId,
         currentShotCount: 0,
         skipAutoPosition: false,
         positions: positions,
@@ -907,14 +997,14 @@ export const useGenerationActions = ({
       const { data: checkData } = await supabase
         .from('shot_generations')
         .select('id, timeline_frame')
-        .eq('shot_id', selectedShot.id)
+        .eq('shot_id', currentShot.id)
         .in('generation_id', result.generationIds)
         .limit(1);
       
       if (checkData?.[0]?.timeline_frame === null) {
         console.log('[BatchDrop] 🔄 Setting positions (fallback)...');
         await persistTimelinePositions(
-          selectedShot.id,
+          currentShot.id,
           result.generationIds,
           startFrame,
           1 // Use 1 frame spacing for batch mode
@@ -928,20 +1018,20 @@ export const useGenerationActions = ({
       toast.error(`Failed to add images: ${(error as Error).message}`);
       
       // Remove optimistic items on error
-      const currentCache = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', selectedShot.id]) || [];
-      queryClient.setQueryData(
-        ['all-shot-generations', selectedShot.id],
+      const currentCache = queryClientRef.current.getQueryData<GenerationRow[]>(['all-shot-generations', currentShot.id]) || [];
+      queryClientRef.current.setQueryData(
+        ['all-shot-generations', currentShot.id],
         currentCache.filter(item => !optimisticIds.includes(item.id))
       );
       
       throw error;
     } finally {
-      actions.setUploadingImage(false);
+      actionsRef.current.setUploadingImage(false);
       
       // Clean up local URLs to prevent memory leaks
       localUrls.forEach(url => URL.revokeObjectURL(url));
     }
-  }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, actions, handleExternalImageDropMutation, queryClient]);
+  }, []); // actions, mutations, queryClient, selectedShot, projectId, projects, uploadSettings accessed via refs
 
   /**
    * Handle dropping a generation from GenerationsPane onto batch mode grid
@@ -954,7 +1044,11 @@ export const useGenerationActions = ({
     targetPosition?: number,
     framePosition?: number
   ) => {
-    if (!selectedShot?.id || !projectId) {
+    // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
+    const currentShot = selectedShotRef.current;
+    const currentProjectId = projectIdRef.current;
+    
+    if (!currentShot?.id || !currentProjectId) {
       toast.error("Cannot add generation: No shot or project selected.");
       return;
     }
@@ -968,12 +1062,12 @@ export const useGenerationActions = ({
       // Use framePosition (calculated timeline_frame) or fall back to targetPosition
       const timelineFrame = framePosition ?? targetPosition;
       
-      await addImageToShotMutation.mutateAsync({
+      await addImageToShotMutationRef.current.mutateAsync({
         generation_id: generationId,
-        shot_id: selectedShot.id,
+        shot_id: currentShot.id,
         imageUrl: imageUrl,
         thumbUrl: thumbUrl,
-        project_id: projectId,
+        project_id: currentProjectId,
         timelineFrame: timelineFrame,
       });
     } catch (error) {
@@ -981,11 +1075,14 @@ export const useGenerationActions = ({
       toast.error(`Failed to add generation: ${(error as Error).message}`);
       throw error;
     }
-  }, [selectedShot?.id, projectId, addImageToShotMutation]);
+  }, []); // mutations, selectedShot, projectId accessed via refs
 
   // 🎯 FIX #3: Memoize the return object to prevent callback instability in parent components
   // Without this, every render creates a new object, causing ShotImagesEditor to rerender
   // even when the individual callbacks haven't changed
+  // 
+  // CRITICAL: All callbacks have empty dependency arrays and use refs internally.
+  // The mutation is accessed via ref to prevent the useMemo from recreating on mutation state changes.
   return useMemo(() => ({
     handleImageUploadToShot,
     handleDeleteVideoOutput,
@@ -999,9 +1096,12 @@ export const useGenerationActions = ({
     isEnqueuing,
     justQueued,
     enqueueTasks,
-    // Expose mutation for direct use (e.g., for image flipping)
-    updateGenerationLocationMutation,
+    // Expose mutation via ref getter - prevents useMemo recreation on mutation state changes
+    get updateGenerationLocationMutation() {
+      return updateGenerationLocationMutationRef.current;
+    },
   }), [
+    // All callbacks use refs internally and have empty deps, so they're stable
     handleImageUploadToShot,
     handleDeleteVideoOutput,
     handleDeleteImageFromShot,
@@ -1011,9 +1111,10 @@ export const useGenerationActions = ({
     handleTimelineGenerationDrop,
     handleBatchImageDrop,
     handleBatchGenerationDrop,
+    // Static values that never change
     isEnqueuing,
     justQueued,
     enqueueTasks,
-    updateGenerationLocationMutation,
+    // updateGenerationLocationMutation removed - accessed via getter from ref
   ]);
 }; 

@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { ShotGeneration } from '@/shared/hooks/useEnhancedShotPositions';
 import { quantizePositions } from '../utils/timeline-utils';
+import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 // ============================================================================
 // TYPES
@@ -108,6 +109,7 @@ export function useTimelinePositions({
 }: UseTimelinePositionsProps): UseTimelinePositionsReturn {
   
   const queryClient = useQueryClient();
+  const invalidateGenerations = useInvalidateGenerations();
   const [isPending, startTransition] = useTransition();
   
   // -------------------------------------------------------------------------
@@ -523,13 +525,13 @@ export function useTimelinePositions({
       // clearPendingUpdates(changes.map(c => c.id));
       
       console.log(`[TimelinePositions] ✅ Operation ${operationId} completed successfully`);
-      
+
       // Invalidate cache after a short delay to allow UI to settle
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-      }, 100);
+      invalidateGenerations(shotId, {
+        reason: 'timeline-position-batch-persist',
+        scope: 'all',
+        delayMs: 100
+      });
       
     } catch (error) {
       console.error(`[TimelinePositions] ❌ Operation ${operationId} failed:`, error);

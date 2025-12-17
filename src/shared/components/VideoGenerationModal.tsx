@@ -28,6 +28,7 @@ import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { isPositioned, isVideoGeneration } from '@/shared/lib/typeGuards';
 import { findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 import { DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
+import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 import { BUILTIN_DEFAULT_I2V_ID, BUILTIN_DEFAULT_VACE_ID, FEATURED_PRESET_IDS } from '@/tools/travel-between-images/components/MotionControl';
 
 interface VideoGenerationModalProps {
@@ -49,8 +50,9 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
   const modal = useExtraLargeModal();
   const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
+  const invalidateGenerations = useInvalidateGenerations();
   const { navigateToShot } = useShotNavigation();
-  
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [justQueued, setJustQueued] = useState(false);
   const justQueuedTimeoutRef = useRef<number | null>(null);
@@ -266,8 +268,12 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
           justQueuedTimeoutRef.current = null;
           onClose();
         }, 1000);
-        queryClient.invalidateQueries({ queryKey: ['shot-generations', shot.id] });
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+        invalidateGenerations(shot.id, {
+          reason: 'video-generation-modal-success',
+          scope: 'all',
+          includeProjectUnified: true,
+          projectId: selectedProjectId ?? undefined
+        });
       } else {
         toast.error(result.error || 'Failed to generate video');
       }

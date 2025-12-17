@@ -35,6 +35,7 @@ import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
 import { useProjectGenerationModesCache } from '@/shared/hooks/useProjectGenerationModesCache';
 import { useShotSettings } from '../hooks/useShotSettings';
+import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useGenerations } from '@/shared/hooks/useGenerations';
@@ -48,6 +49,7 @@ import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { useFloatingCTA } from '../hooks/useFloatingCTA';
 import { useStickyHeader } from '../hooks/useStickyHeader';
 import { GenerateVideoCTA } from '../components/GenerateVideoCTA';
+import { useRenderCount } from '@/shared/components/debug/RefactorMetricsCollector';
 
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
@@ -126,6 +128,9 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
 // ShotEditor is imported eagerly to avoid dynamic import issues on certain mobile browsers.
 
 const VideoTravelToolPage: React.FC = () => {
+  // [RefactorMetrics] Track render count for baseline measurements
+  useRenderCount('VideoTravelToolPage');
+  
   // [VideoTravelDebug] Reduced logging - only log first few renders and major milestones
   const VIDEO_DEBUG_TAG = '[VideoTravelDebug]';
   const videoRenderCount = useRef(0);
@@ -652,6 +657,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const [isCreatingShot, setIsCreatingShot] = useState(false);
   const queryClient = useQueryClient();
+  const invalidateGenerations = useInvalidateGenerations();
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   // const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
@@ -2200,20 +2206,19 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     if (selectedProjectId && selectedShot?.id) {
       // Invalidate both the main shots list (context) AND the detailed generations for this shot
       // This ensures all views (Timeline, ShotList, etc.) get fresh data
-      const promises = [
-        queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] }),
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', selectedShot.id] })
-      ];
+      invalidateGenerations(selectedShot.id, {
+        reason: 'shot-operation-complete',
+        scope: 'all',
+        includeShots: true,
+        projectId: selectedProjectId
+      });
       
       // STAGE 2: Signal that a shot operation occurred
       // This prevents the shot-specific query from refetching immediately
       // Gives timeline time to complete position updates without interference
       signalShotOperation();
-      
-      // Return promise so callers can await the refresh (prevents flicker)
-      await Promise.all(promises);
     }
-  }, [selectedProjectId, selectedShot?.id, queryClient, signalShotOperation]);
+  }, [selectedProjectId, selectedShot?.id, invalidateGenerations, signalShotOperation]);
   
   // Debug: Manual refresh function
   // const handleManualRefresh = () => {

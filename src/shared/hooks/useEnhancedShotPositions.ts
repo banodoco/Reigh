@@ -6,6 +6,7 @@ import { GenerationRow } from '@/types/shots';
 import { transformForTimeline, type RawShotGeneration } from '@/shared/lib/generationTransformers';
 import { timelineDebugger } from '@/tools/travel-between-images/components/Timeline/utils/timeline-debug';
 import { isVideoGeneration, isVideoShotGeneration, isPositioned, type ShotGenerationLike } from '@/shared/lib/typeGuards';
+import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 
 export interface ShotGeneration {
@@ -50,6 +51,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isPersistingPositions, setIsPersistingPositions] = useState(false);
   const queryClient = useQueryClient();
+  const invalidateGenerations = useInvalidateGenerations();
   const [error, setError] = useState<string | null>(null);
 
   // Load all shot_generations data for the shot
@@ -352,11 +354,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       });
 
       // Invalidate cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
-      // IMPORTANT: Also invalidate two-phase cache keys
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
+      invalidateGenerations(shotId, { reason: 'clear-enhanced-prompts-for-generations', scope: 'all' });
     } catch (err) {
       console.error('[clearEnhancedPromptsForGenerations] Error:', err);
       // Don't throw - position changes should still succeed even if prompt clearing fails
@@ -1078,13 +1076,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
       // CRITICAL: Invalidate query cache to ensure other components see the update
       // This prevents stale data from being loaded when other operations trigger cache invalidation
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
-      // IMPORTANT: Also invalidate two-phase cache keys
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
-      
-      console.log('[PairPrompts] ✅ Cache invalidated, all components will see the updated pair prompt');
+      invalidateGenerations(shotId, { reason: 'update-pair-prompts', scope: 'all' });
     } catch (err) {
       console.error('[updatePairPrompts] Error:', err);
       throw err;
@@ -1323,11 +1315,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       });
 
       // Invalidate cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
-      // IMPORTANT: Also invalidate two-phase cache keys
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
+      invalidateGenerations(shotId, { reason: 'clear-all-enhanced-prompts', scope: 'all' });
     } catch (err) {
       console.error('[PromptClearLog] ❌ CLEAR ALL - Error clearing enhanced prompts:', err);
       throw err;

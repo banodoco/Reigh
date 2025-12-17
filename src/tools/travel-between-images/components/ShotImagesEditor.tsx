@@ -351,8 +351,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     });
     
     if (changedCallbacks.length > 0) {
-      console.warn(`[RenderProfile] 🔄 ShotImagesEditor RENDER #${renderCount.current} - Callback props changed (UNSTABLE):`, {
-        changedCallbacks,
+      console.warn(`[RenderProfile] 🔄 ShotImagesEditor RENDER #${renderCount.current} - Callback props changed (UNSTABLE): [${changedCallbacks.join(', ')}]`, {
+        count: changedCallbacks.length,
         hint: 'Parent should wrap these in useCallback',
         timestamp: Date.now()
       });
@@ -1442,6 +1442,78 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   );
 };
 
-// [PERFORMANCE] Wrap in React.memo to prevent re-renders when props haven't meaningfully changed
+// [PERFORMANCE] Custom comparison function for React.memo
 // This is critical because parent (ShotEditor) re-renders frequently due to settings queries
-export default React.memo(ShotImagesEditor);
+// Default shallow comparison fails because arrays get new references on each render
+const arePropsEqual = (prevProps: ShotImagesEditorProps, nextProps: ShotImagesEditorProps): boolean => {
+  // Compare primitive props
+  if (
+    prevProps.isModeReady !== nextProps.isModeReady ||
+    prevProps.settingsError !== nextProps.settingsError ||
+    prevProps.isMobile !== nextProps.isMobile ||
+    prevProps.generationMode !== nextProps.generationMode ||
+    prevProps.selectedShotId !== nextProps.selectedShotId ||
+    prevProps.projectId !== nextProps.projectId ||
+    prevProps.shotName !== nextProps.shotName ||
+    prevProps.batchVideoFrames !== nextProps.batchVideoFrames ||
+    prevProps.readOnly !== nextProps.readOnly ||
+    prevProps.columns !== nextProps.columns ||
+    prevProps.unpositionedGenerationsCount !== nextProps.unpositionedGenerationsCount ||
+    prevProps.fileInputKey !== nextProps.fileInputKey ||
+    prevProps.isUploadingImage !== nextProps.isUploadingImage ||
+    prevProps.uploadProgress !== nextProps.uploadProgress ||
+    prevProps.duplicatingImageId !== nextProps.duplicatingImageId ||
+    prevProps.duplicateSuccessImageId !== nextProps.duplicateSuccessImageId ||
+    prevProps.projectAspectRatio !== nextProps.projectAspectRatio ||
+    prevProps.defaultPrompt !== nextProps.defaultPrompt ||
+    prevProps.defaultNegativePrompt !== nextProps.defaultNegativePrompt ||
+    prevProps.structureVideoPath !== nextProps.structureVideoPath ||
+    prevProps.structureVideoTreatment !== nextProps.structureVideoTreatment ||
+    prevProps.structureVideoMotionStrength !== nextProps.structureVideoMotionStrength ||
+    prevProps.structureVideoType !== nextProps.structureVideoType
+  ) {
+    return false;
+  }
+
+  // Compare structureVideoMetadata by key properties (object reference changes frequently)
+  const prevMeta = prevProps.structureVideoMetadata;
+  const nextMeta = nextProps.structureVideoMetadata;
+  if (prevMeta !== nextMeta) {
+    if (!prevMeta || !nextMeta) return false;
+    if (prevMeta.duration_seconds !== nextMeta.duration_seconds || 
+        prevMeta.width !== nextMeta.width || 
+        prevMeta.height !== nextMeta.height) {
+      return false;
+    }
+  }
+
+  // Compare arrays by length and first/last item IDs (fast approximation)
+  const prevImages = prevProps.preloadedImages || [];
+  const nextImages = nextProps.preloadedImages || [];
+  if (prevImages.length !== nextImages.length) return false;
+  if (prevImages.length > 0) {
+    if (prevImages[0]?.id !== nextImages[0]?.id || 
+        prevImages[prevImages.length - 1]?.id !== nextImages[nextImages.length - 1]?.id) {
+      return false;
+    }
+  }
+
+  // Compare allShots by length only
+  const prevShots = prevProps.allShots || [];
+  const nextShots = nextProps.allShots || [];
+  if (prevShots.length !== nextShots.length) return false;
+
+  // Compare pendingPositions map by size
+  if ((prevProps.pendingPositions?.size || 0) !== (nextProps.pendingPositions?.size || 0)) {
+    return false;
+  }
+
+  // SKIP these props intentionally:
+  // - skeleton: inline JSX that changes reference every render (visual only)
+  // - callbacks: stable via refs in parent
+  // - onFramePositionsChange: callback
+
+  return true;
+};
+
+export default React.memo(ShotImagesEditor, arePropsEqual);

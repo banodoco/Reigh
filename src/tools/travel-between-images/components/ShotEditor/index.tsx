@@ -46,6 +46,7 @@ import { SectionHeader } from '@/tools/image-generation/components/ImageGenerati
 import * as ApplySettingsService from './services/applySettingsService';
 import { generateVideo } from './services/generateVideoService';
 import { GenerateVideoCTA } from '../GenerateVideoCTA';
+import { useRenderCount } from '@/shared/components/debug/RefactorMetricsCollector';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -125,6 +126,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   getShotVideoCount,
   invalidateVideoCountsCache,
 }) => {
+  // [RefactorMetrics] Track render count for baseline measurements
+  useRenderCount('ShotEditor');
+  
   // Derive advancedMode from motionMode - single source of truth
   const advancedMode = motionMode === 'advanced';
   
@@ -159,11 +163,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotRef.current = selectedShot;
   const projectIdRef = useRef(projectId);
   projectIdRef.current = projectId;
-  
+
   // Shot management hooks for external generation viewing
   const { mutateAsync: createShotMutation } = useCreateShot();
   const { mutateAsync: addToShotMutation } = useAddImageToShot();
   const { mutateAsync: addToShotWithoutPositionMutation } = useAddImageToShotWithoutPosition();
+
+  // 🎯 PERF FIX: Refs for mutation functions to prevent callback recreation
+  // React Query mutations change reference on state changes (idle → pending → success)
+  const createShotMutationRef = useRef(createShotMutation);
+  createShotMutationRef.current = createShotMutation;
+  const addToShotMutationRef = useRef(addToShotMutation);
+  addToShotMutationRef.current = addToShotMutation;
+  const addToShotWithoutPositionMutationRef = useRef(addToShotWithoutPositionMutation);
+  addToShotWithoutPositionMutationRef.current = addToShotWithoutPositionMutation;
+
+  // 🎯 PERF FIX: Refs for parent callbacks to prevent child callback recreation
+  const parentOnSelectionChangeRef = useRef(parentOnSelectionChange);
+  parentOnSelectionChangeRef.current = parentOnSelectionChange;
+  const onSteerableMotionSettingsChangeRef = useRef(onSteerableMotionSettingsChange);
+  onSteerableMotionSettingsChangeRef.current = onSteerableMotionSettingsChange;
   
   // Compute effective aspect ratio: prioritize shot-level over project-level
   // This ensures videos in VideoOutputsGallery, items in Timeline, and other components
@@ -593,6 +612,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use the new modular state management
   const { state, actions } = useShotEditorState();
 
+  // 🎯 PERF FIX: Refs for context/hook values to prevent callback recreation
+  const setIsGenerationsPaneLockedRef = useRef(setIsGenerationsPaneLocked);
+  setIsGenerationsPaneLockedRef.current = setIsGenerationsPaneLocked;
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+  const updateShotGenerationsPaneSettingsRef = useRef(updateShotGenerationsPaneSettings);
+  updateShotGenerationsPaneSettingsRef.current = updateShotGenerationsPaneSettings;
+
   // REMOVED: localOrderedShotImages layer - no longer needed with fast two-phase loading
   // Two-phase loading (~300ms) is fast enough that we don't need local caching
   // ShotImageManager's optimisticOrder handles drag operations
@@ -612,9 +639,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const generateVideosCardRef = useRef<HTMLDivElement>(null);
   
   // Selection state (forwarded to parent for floating button control)
+  // 🎯 PERF FIX: Uses ref to prevent callback recreation
   const handleSelectionChange = useCallback((hasSelection: boolean) => {
-    parentOnSelectionChange?.(hasSelection);
-  }, [parentOnSelectionChange]);
+    parentOnSelectionChangeRef.current?.(hasSelection);
+  }, []);
 
   // STICKY HEADER & FLOATING CTA LOGIC MOVED TO PARENT (VideoTravelToolPage)
   // Parent manages:
@@ -688,17 +716,23 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // REMOVED: Local optimistic list sync - no longer needed with two-phase loading
 
   // Function to update GenerationsPane settings for current shot
-  const updateGenerationsPaneSettings = (settings: Partial<GenerationsPaneSettings>) => {
-    if (selectedShotId) {
+  // 🎯 STABILITY FIX: Wrap in useCallback to prevent recreation on every render
+  const selectedShotIdRef = useRef(selectedShotId);
+  selectedShotIdRef.current = selectedShotId;
+  
+  // 🎯 PERF FIX: Uses ref to prevent callback recreation
+  const updateGenerationsPaneSettings = useCallback((settings: Partial<GenerationsPaneSettings>) => {
+    const shotId = selectedShotIdRef.current;
+    if (shotId) {
       const updatedSettings: GenerationsPaneSettings = {
-        selectedShotFilter: settings.selectedShotFilter || selectedShotId,
+        selectedShotFilter: settings.selectedShotFilter || shotId,
         excludePositioned: settings.excludePositioned ?? true,
         userHasCustomized: true // Mark as customized since this is being called programmatically
       };
       console.log('[ShotEditor] Updating GenerationsPane settings:', updatedSettings);
-      updateShotGenerationsPaneSettings('shot', updatedSettings);
+      updateShotGenerationsPaneSettingsRef.current('shot', updatedSettings);
     }
-  };
+  }, []); // Uses refs for all dependencies
 
     // Enhanced settings loading timeout with mobile-specific recovery
   useEffect(() => {
@@ -914,17 +948,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [updateShotUISettings]);
 
   // Handle random seed changes
+  // 🎯 PERF FIX: Uses ref to prevent callback recreation
   const handleRandomSeedChange = useCallback((value: boolean) => {
     setRandomSeed(value);
     if (value) {
       // Generate a random seed
       const newSeed = Math.floor(Math.random() * 1000000);
-      onSteerableMotionSettingsChange({ seed: newSeed });
+      onSteerableMotionSettingsChangeRef.current({ seed: newSeed });
     } else {
       // Set to default seed
-      onSteerableMotionSettingsChange({ seed: DEFAULT_STEERABLE_MOTION_SETTINGS.seed });
+      onSteerableMotionSettingsChangeRef.current({ seed: DEFAULT_STEERABLE_MOTION_SETTINGS.seed });
     }
-  }, [setRandomSeed, onSteerableMotionSettingsChange]);
+  }, [setRandomSeed]);
 
   // Handle accelerated mode changes
   const handleAcceleratedChange = useCallback((value: boolean) => {
@@ -1254,14 +1289,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     });
   }, []); // Empty deps - uses refs
 
+  // 🎯 PERF FIX: Use ref to avoid unstable dependency on pendingFramePositions Map
+  const pendingFramePositionsRef = useRef(state.pendingFramePositions);
+  pendingFramePositionsRef.current = state.pendingFramePositions;
+  
+  // 🎯 PERF FIX: Uses ref to prevent callback recreation
   const handlePendingPositionApplied = useCallback((generationId: string) => {
-    const newMap = new Map(state.pendingFramePositions);
+    const newMap = new Map(pendingFramePositionsRef.current);
     if (newMap.has(generationId)) {
       newMap.delete(generationId);
       console.log(`[ShotEditor] Cleared pending position for gen ${generationId}`);
     }
-    actions.setPendingFramePositions(newMap);
-  }, [actions, state.pendingFramePositions]);
+    actionsRef.current.setPendingFramePositions(newMap);
+  }, []);
 
   // Local state for steerable motion task creation
   const [isSteerableMotionEnqueuing, setIsSteerableMotionEnqueuing] = useState(false);
@@ -1378,16 +1418,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [parentNameClickRef, handleNameClick]);
 
   // Opens the Generations pane focused on un-positioned images for the current shot
+  // 🎯 PERF FIX: Use selectedShotRef to avoid recreation when shot data changes
+  // 🎯 PERF FIX: Uses refs to prevent callback recreation
   const openUnpositionedGenerationsPane = useCallback(() => {
-    console.log('[ShotFilterAutoSelectIssue] Opening generations pane for shot:', selectedShot?.id);
+    const shotId = selectedShotRef.current?.id;
+    console.log('[ShotFilterAutoSelectIssue] Opening generations pane for shot:', shotId);
     
-    if (selectedShot?.id) {
+    if (shotId) {
       console.log('[ShotFilterAutoSelectIssue] Updating generations pane settings:', {
-        selectedShotFilter: selectedShot.id,
+        selectedShotFilter: shotId,
         excludePositioned: true,
       });
       updateGenerationsPaneSettings({
-        selectedShotFilter: selectedShot.id,
+        selectedShotFilter: shotId,
         excludePositioned: true,
       });
     }
@@ -1398,28 +1441,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       window.dispatchEvent(new CustomEvent('openGenerationsPane'));
     } else {
       console.log('[ShotFilterAutoSelectIssue] Setting generations pane locked (desktop)');
-      setIsGenerationsPaneLocked(true);
+      setIsGenerationsPaneLockedRef.current(true);
     }
-      }, [selectedShot, isMobile, updateGenerationsPaneSettings, setIsGenerationsPaneLocked]);
+  }, [isMobile, updateGenerationsPaneSettings]);
   
   // 🎯 PERF FIX: Refs for stable callbacks  
   const onShotImagesUpdateRef = useRef(onShotImagesUpdate);
   onShotImagesUpdateRef.current = onShotImagesUpdate;
 
+  // 🎯 PERF FIX: Uses ref to prevent callback recreation
   const handleSelectionChangeLocal = useCallback((hasSelection: boolean) => {
     // Track selection state - forward to parent for floating CTA control
-    parentOnSelectionChange?.(hasSelection);
-  }, [parentOnSelectionChange]);
+    parentOnSelectionChangeRef.current?.(hasSelection);
+  }, []);
 
+  // 🎯 PERF FIX: Uses ref to prevent callback recreation
   const handleDefaultNegativePromptChange = useCallback((value: string) => {
-    onSteerableMotionSettingsChange({ negative_prompt: value });
-  }, [onSteerableMotionSettingsChange]);
+    onSteerableMotionSettingsChangeRef.current({ negative_prompt: value });
+  }, []);
 
   const handleShotChange = useCallback((shotId: string) => {
     console.log('[ShotEditor] Shot change requested to:', shotId);
     // Shot change will be handled by parent navigation
   }, []);
 
+  // 🎯 PERF FIX: Uses refs to prevent callback recreation
   const handleAddToShot = useCallback(async (shotId: string, generationId: string, position?: number) => {
     // If position is 0, undefined, or we're adding to a different shot than currently viewed,
     // let the mutation calculate the correct position by querying the target shot
@@ -1433,27 +1479,28 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       note: shouldAutoPosition ? 'Letting mutation query target shot for position' : 'Using provided position'
     });
     
-    await addToShotMutation({ 
+    await addToShotMutationRef.current({ 
       shot_id: shotId, 
       generation_id: generationId, 
       // Only pass timelineFrame if we have a valid position, otherwise let mutation auto-calculate
       timelineFrame: shouldAutoPosition ? undefined : position, 
-      project_id: projectId 
+      project_id: projectIdRef.current 
     });
-  }, [addToShotMutation, projectId]);
+  }, []);
 
+  // 🎯 PERF FIX: Uses refs to prevent callback recreation
   const handleAddToShotWithoutPosition = useCallback(async (shotId: string, generationId: string) => {
     console.log('[AddWithoutPosDebug] 🎯 ShotEditor.handleAddToShotWithoutPosition CALLED');
     console.log('[AddWithoutPosDebug] shotId:', shotId?.substring(0, 8));
     console.log('[AddWithoutPosDebug] generationId:', generationId?.substring(0, 8));
-    console.log('[AddWithoutPosDebug] projectId:', projectId?.substring(0, 8));
+    console.log('[AddWithoutPosDebug] projectId:', projectIdRef.current?.substring(0, 8));
     
     try {
       console.log('[AddWithoutPosDebug] 🚀 Calling addToShotWithoutPositionMutation...');
-      await addToShotWithoutPositionMutation({ 
+      await addToShotWithoutPositionMutationRef.current({ 
         shot_id: shotId, 
         generation_id: generationId, 
-        project_id: projectId 
+        project_id: projectIdRef.current 
       });
       console.log('[AddWithoutPosDebug] ✅ Mutation completed successfully');
       return true; // Signal success so the caller can show tick and enable navigation
@@ -1461,13 +1508,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.error('[AddWithoutPosDebug] ❌ Mutation failed:', error);
       throw error;
     }
-  }, [addToShotWithoutPositionMutation, projectId]);
+  }, []);
 
+  // 🎯 PERF FIX: Uses refs to prevent callback recreation
   const handleCreateShot = useCallback(async (name: string) => {
     console.log('[ShotEditor] Creating new shot', { name });
-    const result = await createShotMutation({ name, projectId });
+    const result = await createShotMutationRef.current({ name, projectId: projectIdRef.current });
     return result.shot.id;
-  }, [createShotMutation, projectId]);
+  }, []);
   
 
   // Calculate current settings for MotionControl
@@ -1557,7 +1605,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             // batchVideoContext={batchVideoContext} // Removed
             preloadedImages={orderedShotImages}
             onImageReorder={handleReorderImagesInShot}
-            onContextFramesChange={() => {}} // No-op as context frames removed
             onFramePositionsChange={undefined}
             onImageDrop={generationActions.handleTimelineImageDrop}
             onGenerationDrop={generationActions.handleTimelineGenerationDrop}

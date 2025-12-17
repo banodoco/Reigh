@@ -1654,4 +1654,5 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   );
 };
 
-export default TimelineContainer;
+// 🎯 PERF FIX: Wrap in React.memo to prevent re-renders when props haven't changed
+export default React.memo(TimelineContainer);

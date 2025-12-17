@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { GenerationRow } from '@/types/shots';
 import type { ShotGeneration, PositionMetadata } from './useEnhancedShotPositions';
 import { isVideoGeneration } from '@/shared/lib/typeGuards';
+import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 // Re-export types for convenience
 export type { ShotGeneration, PositionMetadata };
@@ -26,6 +27,7 @@ interface UseTimelinePositionUtilsOptions {
 
 export function useTimelinePositionUtils({ shotId, generations, projectId }: UseTimelinePositionUtilsOptions) {
   const queryClient = useQueryClient();
+  const invalidateGenerations = useInvalidateGenerations();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   
@@ -131,14 +133,12 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
       await queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
       
       // Invalidate other related caches (these can be background)
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
-      
-      // Also invalidate shots list so ShotsPane preview updates
-      if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      }
+      invalidateGenerations(shotId, {
+        reason: 'timeline-position-utils-reload',
+        scope: 'all',
+        includeShots: !!projectId,
+        projectId: projectId ?? undefined
+      });
 
       setIsLoading(false);
     } catch (err) {

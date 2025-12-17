@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 export interface ShotGenerationMetadata {
   magicEditPrompts?: Array<{
@@ -35,6 +36,7 @@ export function useShotGenerationMetadata({
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const queryClient = useQueryClient();
+  const invalidateGenerations = useInvalidateGenerations();
 
   // Load metadata from database
   useEffect(() => {
@@ -185,18 +187,10 @@ export function useShotGenerationMetadata({
 
       // Invalidate related queries to trigger UI updates (only if shotId is available)
       if (shotId) {
-        console.log('[MagicEditPromptPersist] 🔄 Invalidating queries:', {
-          shotId: shotId.substring(0, 8),
-          queryKeys: [
-            ['unified-generations', 'shot', shotId],
-            ['shot-generations', shotId],
-            ['all-shot-generations', shotId]
-          ],
-          timestamp: Date.now()
+        invalidateGenerations(shotId, {
+          reason: 'magic-edit-prompt-persist',
+          scope: 'all'
         });
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-        queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
       }
 
       console.log('[MagicEditPromptPersist] ✅ DB UPDATE SUCCESS:', {

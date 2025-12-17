@@ -570,4 +570,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   );
 };
 
-export default TimelineItem; 
+// 🎯 PERF FIX: Wrap in React.memo to prevent re-renders when props haven't changed
+// TimelineItem is rendered for each image, so memoization is important for performance
+export default React.memo(TimelineItem); 

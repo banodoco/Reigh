@@ -14,6 +14,7 @@ import * as ApplySettingsService from '../services/applySettingsService';
 import { GenerationRow, Shot } from '@/types/shots';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { SteerableMotionSettings, PhaseConfig } from '../state/types';
+import { invalidateGenerationsSync } from '@/shared/hooks/useGenerationInvalidation';
 
 interface ApplySettingsContext {
   // IDs
@@ -77,7 +78,7 @@ interface ApplySettingsContext {
 
 export function useApplySettingsHandler(context: ApplySettingsContext) {
   const queryClient = useQueryClient();
-  
+
   // Store all context values in a ref that updates silently
   const contextRef = useRef(context);
   
@@ -216,17 +217,13 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
         console.log('[ApplySettings] - queryClient.invalidateQueries type:', typeof queryClient?.invalidateQueries);
         
         try {
-          // Invalidate cache
-          console.log('[ApplySettings] - About to invalidate unified-generations query...');
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', ctx.selectedShot?.id] });
-          console.log('[ApplySettings] - unified-generations invalidated');
-          
-          console.log('[ApplySettings] - About to invalidate shot-generations query...');
-          queryClient.invalidateQueries({ queryKey: ['shot-generations', ctx.selectedShot?.id] });
-          queryClient.invalidateQueries({ queryKey: ['all-shot-generations', ctx.selectedShot?.id] });
-          console.log('[ApplySettings] - shot-generations invalidated');
-          
-          console.log('[ApplySettings] - Both queries invalidated successfully');
+          // Invalidate cache using centralized hook
+          if (ctx.selectedShot?.id) {
+            invalidateGenerationsSync(queryClient, ctx.selectedShot.id, {
+              reason: 'apply-settings-from-task',
+              scope: 'all'
+            });
+          }
         } catch (invalidateError) {
           console.error('[ApplySettings] ❌ Error during query invalidation:', invalidateError);
           throw invalidateError;
@@ -342,9 +339,13 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
       
       // Force reload
       console.log('[ApplySettings] Step 7: Force reload...');
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', ctx.selectedShot?.id] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations', ctx.selectedShot?.id] });
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', ctx.selectedShot?.id] });
+      if (ctx.selectedShot?.id) {
+        invalidateGenerationsSync(queryClient, ctx.selectedShot.id, {
+          reason: 'apply-settings-force-reload',
+          scope: 'all',
+          delayMs: 200
+        });
+      }
       await new Promise(resolve => setTimeout(resolve, 200));
       await ctx.loadPositions({ silent: true });
       

@@ -33,46 +33,44 @@ The current data fetching architecture has accumulated complexity that causes:
 | Component | Issue | Fix |
 |-----------|-------|-----|
 | `useAllShotGenerations` | Was outlier with 500ms staleTime, aggressive refetch | ✅ Fixed (30s staleTime, refetch disabled) |
-| 19 invalidation points | Scattered, hard to trace | Centralize into single hook |
+| 19 invalidation points | Scattered, hard to trace | ✅ Centralized into `useGenerationInvalidation.ts` |
 | Inline data transforms | Break memoization | Selector pattern with memoized derived views |
-| Debug logging | Scattered, no toggle | Central debug utility |
+| Debug logging | Scattered, no toggle | ✅ `debugConfig` system exists |
 | Query configs | Inconsistent | Standardized presets |
 
 ---
 
 ## Phased Refactor Plan
 
-### Phase 1: Centralize Invalidation
+### Phase 1: Centralize Invalidation ✅ COMPLETE
 **Effort**: 1-2 days | **Impact**: High (visibility + consistency)
 
-Create single hook that all invalidation flows through:
+**Implemented (Dec 17, 2025):**
 
-```typescript
-// src/shared/hooks/useGenerationInvalidation.ts
-export function useInvalidateGenerations() {
-  const queryClient = useQueryClient();
-  
-  return useCallback((shotId: string, reason: string) => {
-    if (DEBUG.invalidation) {
-      console.log(`[Invalidation] ${reason}`, { shotId });
-    }
-    queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
-    queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shotId] });
-  }, [queryClient]);
-}
-```
+Created `src/shared/hooks/useGenerationInvalidation.ts` with:
+- `useInvalidateGenerations()` - hook for React components
+- `invalidateGenerationsSync()` - for use outside React (event handlers, callbacks with refs)
+- `invalidateAllShotGenerations()` - for global invalidation events (with warning log)
+- Scopes: `all`, `images`, `metadata`, `counts`, `unified`
+- Debug logging via `debugConfig.isEnabled('invalidation')`
+- Delay/debounce support via `delayMs` option
+- Optional `includeShots` and `includeProjectUnified` for related queries
 
-**Why this helps**: Single grep-able location for all invalidation. Easy to add logging, debouncing, or batch invalidation later.
+**Files migrated** (20 invalidation sites → centralized hook):
+- ✅ `SimpleRealtimeProvider.tsx` (5 calls)
+- ✅ `useShots.ts` (5 calls)
+- ✅ `useEnhancedShotPositions.ts` (3 calls)
+- ✅ `VideoTravelToolPage.tsx` (1 call)
+- ✅ `useApplySettingsHandler.ts` (2 calls)
+- ✅ `useGenerationActions.ts` (1 call)
+- ✅ `useTimelinePositions.ts` (1 call)
+- ✅ `useShotGenerationMetadata.ts` (1 call)
+- ✅ `useTimelinePositionUtils.ts` (1 call)
+- ✅ `VideoGenerationModal.tsx` (1 call)
 
-**Files to update**: All 19 files currently calling `invalidateQueries({ queryKey: ['all-shot-generations', ...] })`:
-- `SimpleRealtimeProvider.tsx` (5 calls)
-- `useShots.ts` (4 calls)
-- `useEnhancedShotPositions.ts` (3 calls)
-- `VideoTravelToolPage.tsx` (1 call)
-- `useApplySettingsHandler.ts` (2 calls)
-- `useGenerationActions.ts` (1 call)
-- `useTimelinePositions.ts` (1 call)
-- `useShotGenerationMetadata.ts` (1 call)
+**Note**: One direct `shot-generations` call remains in `SimpleRealtimeProvider.tsx` for INSERT-only batches (documented - hook doesn't support "shot-generations only without all-shot-generations" scope).
+
+Enable invalidation logging: `debugConfig.enable('invalidation')`
 
 ---
 
@@ -159,50 +157,82 @@ export const useVideoGenerations = (shotId: string | null) => {
 
 ---
 
-### Phase 4: Debug Mode Toggle
+### Phase 4: Debug Mode Toggle ✅ INFRASTRUCTURE EXISTS
 **Effort**: 0.5 day | **Impact**: Low (quality of life)
 
-Central debug configuration:
+**Already implemented** at `src/shared/lib/debugConfig.ts`:
 
 ```typescript
-// src/shared/lib/debug.ts
-const getDebugFlag = (key: string) => 
-  typeof window !== 'undefined' && localStorage.getItem(key) === 'true';
-
-export const DEBUG = {
-  generations: getDebugFlag('DEBUG_GENERATIONS'),
-  queries: getDebugFlag('DEBUG_QUERIES'),
-  realtime: getDebugFlag('DEBUG_REALTIME'),
-  invalidation: getDebugFlag('DEBUG_INVALIDATION'),
-};
-
-export const debugLog = (category: keyof typeof DEBUG, tag: string, ...args: any[]) => {
-  if (DEBUG[category]) {
-    console.log(`[${tag}]`, ...args);
-  }
-};
+// Enable at runtime via console:
+debugConfig.enable('invalidation')  // See all cache invalidations
+debugConfig.enable('realtime')      // See realtime events
+debugConfig.status()                // Show all flags
+debugConfig.setQuietMode()          // Disable all logging
 ```
 
-**Why this helps**: Console quiet by default. Enable specific categories via localStorage when debugging.
+**Categories available**: `reactProfiler`, `renderLogging`, `progressiveImage`, `imageLoading`, `shotImageDebug`, `autoplayDebugger`, `tasksPaneDebug`, `galleryPollingDebug`, `dragDebug`, `skeletonDebug`, `videoDebug`, `realtimeDebug`, `reconnectionDebug`, `invalidation`, `devMode`
+
+**Remaining work**: Migrate remaining scattered `console.log` calls to use `conditionalLog()` or `throttledLog()` from debugConfig.
+
+---
+
+### Phase 5: Fix Unstable Callback Props ✅ COMPLETE
+**Effort**: 0.5-1 day | **Impact**: High (fixes forced re-renders)
+
+Baseline testing revealed 20 callback props being recreated on every render in `ShotEditor` → `ShotImagesEditor`, causing 31+ re-renders for simple operations.
+
+**Solution implemented (Dec 17, 2025):**
+
+1. **Stabilized callbacks via `useRef` pattern** in:
+   - `ShotEditor/index.tsx` - refs for mutations, parent callbacks, context values
+   - `useGenerationActions.ts` - ref for `updateGenerationLocationMutation`, getter in `useMemo` return
+   - `useStructureVideo.ts` - refs for `updateStructureVideoSettings` and `shotId`
+
+2. **Added `React.memo` to child components**:
+   - `Timeline.tsx`
+   - `TimelineContainer.tsx`
+   - `TimelineItem.tsx`
+   - `PairRegion.tsx`
+
+3. **Custom `arePropsEqual` for `ShotImagesEditor`** - the key fix:
+   ```typescript
+   // Default React.memo shallow comparison fails because:
+   // - Arrays get new references when React Query refetches
+   // - Inline JSX (skeleton prop) changes every render
+   // - Object props change reference even when content is same
+   
+   const arePropsEqual = (prev, next) => {
+     // Compare primitives by value
+     // Compare arrays by length + first/last IDs (fast approximation)
+     // Compare objects by key properties, not reference
+     // SKIP: skeleton (inline JSX), callbacks (now stable via refs)
+   };
+   ```
+
+**Result**: Reduced from **31+ re-renders** to **only legitimate re-renders** (when actual data changes). The `[arePropsEqual] Props equal - SKIPPING render` logs confirmed dozens of spurious renders now blocked.
 
 ---
 
 ## Execution Order
 
-1. **Phase 1 first** - Gives immediate visibility into invalidation patterns
-2. **Phase 4 next** - Quick win, reduces noise while working on other phases
-3. **Phase 2** - Apply to new code immediately, retrofit existing queries incrementally
-4. **Phase 3 last** - Biggest code change, do after patterns are stable
+1. ~~**Phase 5 first** - Quick win, immediately reduces render cascades (0.5 day)~~ ✅ DONE
+2. ~~**Phase 1 next** - Gives visibility into invalidation patterns (1-2 days)~~ ✅ DONE
+3. **Phase 4** - Reduces noise while working on other phases (0.5 day) - *Note: `debugConfig` already exists, just need adoption*
+4. **Phase 2** - Apply to new code immediately, retrofit existing queries incrementally (1 day)
+5. **Phase 3 last** - Biggest code change, do after patterns are stable (2-3 days)
 
 ---
 
 ## Success Criteria
 
-- [ ] Single file (`useGenerationInvalidation.ts`) contains all invalidation logic
+- [x] Single file (`useGenerationInvalidation.ts`) contains all invalidation logic
 - [ ] Zero `console.log` in production (all behind DEBUG flags)
 - [ ] New queries use preset from `queryDefaults.ts`
 - [ ] No inline `.filter()` on generation arrays in components
-- [ ] Re-render count measurably reduced (verify with React DevTools Profiler)
+- [x] Re-render count measurably reduced (31+ → only legitimate renders)
+- [x] No "Callback props changed (UNSTABLE)" warnings in RenderProfile logs (still shows on first render, expected)
+- [x] Invalidation calls centralized and traceable via `debugConfig.enable('invalidation')`
+- [x] Custom `arePropsEqual` blocks spurious re-renders from array/object reference changes
 
 ---
 

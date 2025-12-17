@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
@@ -91,6 +91,14 @@ export function useStructureVideo({
     }
   }, [structureVideoSettings, isStructureVideoSettingsLoading, shotId, hasInitializedStructureVideo]);
 
+  // 🎯 PERF FIX: Use refs to avoid callback instability
+  const structureVideoTypeRef = useRef(structureVideoType);
+  structureVideoTypeRef.current = structureVideoType;
+  const updateStructureVideoSettingsRef = useRef(updateStructureVideoSettings);
+  updateStructureVideoSettingsRef.current = updateStructureVideoSettings;
+  const shotIdRef = useRef(shotId);
+  shotIdRef.current = shotId;
+
   // Handler for structure video changes with auto-save
   const handleStructureVideoChange = useCallback((
     videoPath: string | null,
@@ -108,7 +116,7 @@ export function useStructureVideo({
       motionStrength,
       structureType,
       resourceId: resourceId?.substring(0, 8),
-      previousStructureType: structureVideoType // Show what it was before
+      previousStructureType: structureVideoTypeRef.current // Use ref instead of state
     });
     
     console.error('[StructureVideoDebug] 🔄 Setting state values:', {
@@ -142,9 +150,9 @@ export function useStructureVideo({
         resourceId: resourceId?.substring(0, 8),
         toolId: 'travel-structure-video',
         scope: 'shot',
-        shotId: shotId?.substring(0, 8)
+        shotId: shotIdRef.current?.substring(0, 8)
       });
-      updateStructureVideoSettings('shot', {
+      updateStructureVideoSettingsRef.current('shot', {
         path: videoPath,
         metadata: metadata || null,
         treatment,
@@ -156,7 +164,7 @@ export function useStructureVideo({
     } else {
       // Clear structure video - explicitly set fields to null to ensure deletion
       console.error('[useStructureVideo] 🗑️  CLEARING structure video from database');
-      updateStructureVideoSettings('shot', {
+      updateStructureVideoSettingsRef.current('shot', {
         path: null,
         metadata: null,
         treatment: null,
@@ -166,7 +174,7 @@ export function useStructureVideo({
       });
       console.error('[useStructureVideo] ✅ Structure video clear requested');
     }
-  }, [updateStructureVideoSettings, structureVideoType, shotId]);
+  }, []); // 🎯 PERF FIX: All dependencies accessed via refs for stable callback
 
   return {
     structureVideoPath,
