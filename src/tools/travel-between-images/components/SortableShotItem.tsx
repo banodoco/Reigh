@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Shot } from '@/types/shots';
@@ -94,13 +94,15 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   else if (initialPendingUploads > 0) {
     // Show skeletons for images that haven't appeared yet
     pendingSkeletonCount = Math.max(0, initialPendingUploads - nonVideoImageCount);
-    
-    // If all images have loaded, notify parent
-    if (pendingSkeletonCount === 0 && onInitialPendingUploadsConsumed) {
-      // Use setTimeout to avoid updating parent state during render
-      setTimeout(() => onInitialPendingUploadsConsumed(), 0);
-    }
   }
+
+  // If initial pending uploads are fully satisfied, notify parent (in an effect, not during render)
+  useEffect(() => {
+    if (!onInitialPendingUploadsConsumed) return;
+    if (initialPendingUploads <= 0) return;
+    if (nonVideoImageCount < initialPendingUploads) return;
+    onInitialPendingUploadsConsumed();
+  }, [initialPendingUploads, nonVideoImageCount, onInitialPendingUploadsConsumed]);
 
   // Check if we can accept this drop (generation or file)
   const canAcceptDrop = useCallback((e: React.DragEvent): boolean => {

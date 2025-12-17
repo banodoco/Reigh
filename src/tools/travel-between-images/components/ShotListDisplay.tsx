@@ -403,30 +403,34 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   
   // Get current shot IDs
   const currentShotIds = shots?.map(s => s.id) || [];
+  const currentShotIdsKey = React.useMemo(() => currentShotIds.join('|'), [currentShotIds]);
   
+  // If a new shot appears, transfer expected image count to that shot card.
+  // (Must be in an effect—never set state during render.)
+  React.useEffect(() => {
+    if (pendingNewShotCountRef.current <= 0 || !baselineShotIdsRef.current) return;
+    const baseline = baselineShotIdsRef.current;
+    const newShotId = currentShotIds.find(id => !baseline.has(id));
+    if (!newShotId) return;
+
+    const expectedImages = pendingNewShotCountRef.current;
+    setNewlyCreatedShotId(newShotId);
+    setNewlyCreatedShotExpectedImages(expectedImages);
+
+    // Clear skeleton-shot refs
+    pendingNewShotCountRef.current = 0;
+    baselineShotIdsRef.current = null;
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = null;
+    }
+  }, [currentShotIdsKey]);
+
   // Compute pending skeleton shot during render (no flicker)
   let pendingSkeletonShot: { imageCount: number } | null = null;
   if (pendingNewShotCountRef.current > 0 && baselineShotIdsRef.current) {
-    const baseline = baselineShotIdsRef.current;
-    const newShotId = currentShotIds.find(id => !baseline.has(id));
-    
-    if (newShotId) {
-      // New shot appeared - transfer pending count to that shot
-      const expectedImages = pendingNewShotCountRef.current;
-      setNewlyCreatedShotId(newShotId);
-      setNewlyCreatedShotExpectedImages(expectedImages);
-      
-      // Clear skeleton shot refs
-      pendingNewShotCountRef.current = 0;
-      baselineShotIdsRef.current = null;
-      if (safetyTimeoutRef.current) {
-        clearTimeout(safetyTimeoutRef.current);
-        safetyTimeoutRef.current = null;
-      }
-    } else {
-      // Still waiting - show skeleton
-      pendingSkeletonShot = { imageCount: pendingNewShotCountRef.current };
-    }
+    // Still waiting - show skeleton
+    pendingSkeletonShot = { imageCount: pendingNewShotCountRef.current };
   }
 
   // Handle drag enter for new shot drop zone

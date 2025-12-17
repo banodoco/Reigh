@@ -234,6 +234,8 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   // Total count includes pending uploads for immediate feedback
   const totalImageCount = displayImages.length + pendingUploads;
   const hasMultipleRows = totalImageCount > IMAGES_PER_ROW;
+  const shouldShowCollapsedSkeletons =
+    pendingUploads > 0 && displayImages.length === 0 && !isImagesExpanded;
 
   // Handle click - block if temp shot
   const handleClick = () => {
@@ -427,6 +429,20 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                     title={`Image ${index + 1}`}
                   />
                 ))}
+
+                {/* If there are no real images yet, show skeletons even when collapsed (up to 3) */}
+                {shouldShowCollapsedSkeletons && (
+                  <>
+                    {Array.from({ length: Math.min(IMAGES_PER_ROW, pendingUploads) }).map((_, index) => (
+                      <div
+                        key={`pending-collapsed-${index}`}
+                        className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
+                      >
+                        <Loader2 className="h-5 w-5 text-primary/60 animate-spin" />
+                      </div>
+                    ))}
+                  </>
+                )}
                 
                 {/* Skeleton items for pending uploads - always appended at end, only visible when expanded */}
                 {pendingUploads > 0 && isImagesExpanded && (
