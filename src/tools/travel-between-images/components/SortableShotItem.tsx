@@ -283,7 +283,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        'transition-all duration-200 relative',
+        'transition-all duration-200 relative self-start',
         isDropTarget && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]'
       )}
     >

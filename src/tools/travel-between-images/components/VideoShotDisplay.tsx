@@ -234,8 +234,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   // Total count includes pending uploads for immediate feedback
   const totalImageCount = displayImages.length + pendingUploads;
   const hasMultipleRows = totalImageCount > IMAGES_PER_ROW;
-  const shouldShowCollapsedSkeletons =
-    pendingUploads > 0 && displayImages.length === 0 && !isImagesExpanded;
+  
+  // When collapsed: how many real images do we show? (up to 3)
+  const collapsedRealImages = Math.min(displayImages.length, IMAGES_PER_ROW);
+  // How many skeleton slots should fill the remaining first row?
+  const collapsedSkeletonCount = !isImagesExpanded 
+    ? Math.min(pendingUploads, IMAGES_PER_ROW - collapsedRealImages)
+    : 0;
 
   // Handle click - block if temp shot
   const handleClick = () => {
@@ -430,10 +435,10 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
                   />
                 ))}
 
-                {/* If there are no real images yet, show skeletons even when collapsed (up to 3) */}
-                {shouldShowCollapsedSkeletons && (
+                {/* Show skeletons to fill first row when collapsed */}
+                {collapsedSkeletonCount > 0 && (
                   <>
-                    {Array.from({ length: Math.min(IMAGES_PER_ROW, pendingUploads) }).map((_, index) => (
+                    {Array.from({ length: collapsedSkeletonCount }).map((_, index) => (
                       <div
                         key={`pending-collapsed-${index}`}
                         className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
