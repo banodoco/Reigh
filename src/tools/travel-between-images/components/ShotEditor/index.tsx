@@ -21,7 +21,7 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import ShotImagesEditor from '../ShotImagesEditor';
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
-import { useAllShotGenerations, useTimelineImages, useUnpositionedImages } from '@/shared/hooks/useShotGenerations';
+import { useAllShotGenerations, useTimelineImages, useUnpositionedImages, useVideoOutputs } from '@/shared/hooks/useShotGenerations';
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import SettingsModal from '@/shared/components/SettingsModal';
@@ -353,88 +353,51 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // CRITICAL FIX: Always use full images when available in editor mode to ensure consistency
   // This prevents video pair config mismatches between VideoTravelToolPage and ShotEditor
   
-  // [OptimisticUpdates] Selector hooks provide stable, filtered views of shot data.
-  // When mutations update the cache optimistically, selectors automatically reflect the change.
-  // No event-based coordination or ref-caching needed.
-
-  // [OptimisticUpdates] Simplified data flow:
-  // - Optimistic updates in mutations update the React Query cache immediately
-  // - Selectors (useTimelineImages, useUnpositionedImages) derive from that cache
-  // - No component-level caching or event coordination needed
-  const orderedShotImages = React.useMemo(() => {
-    // Priority: fullImages > contextImages (for fast navigation) > empty
-    const hasValidFullImages = fullShotImages.length > 0;
-    const hasValidContextImages = contextImages.length > 0;
-    const isQueryFetchingNewData = fullImagesQueryResult.isFetching && !fullImagesQueryResult.data;
-    
-    let result: typeof contextImages = [];
-    let dataSource: string;
-    
-    if (hasValidFullImages) {
-      result = fullShotImages;
-      dataSource = 'fullImages (query)';
-    } else if (hasValidContextImages && (isQueryFetchingNewData || fullImagesQueryResult.isLoading)) {
-      result = contextImages;
-      dataSource = 'contextImages (query pending)';
-    } else if (hasValidContextImages) {
-      result = contextImages;
-      dataSource = 'contextImages';
-    } else {
-      result = fullShotImages;
-      dataSource = 'fullImages (fallback)';
-    }
-    
-    console.log('[OptimisticUpdates] orderedShotImages:', {
-      shotId: selectedShotId?.substring(0, 8),
-      dataSource,
-      count: result.length,
-      positioned: result.filter(r => r.timeline_frame != null && r.timeline_frame >= 0).length,
-      unpositioned: result.filter(r => r.timeline_frame == null).length,
-    });
-    
-    return result;
-  }, [
-    fullShotImages,
-    contextImages,
-    fullImagesQueryResult.isFetching,
-    fullImagesQueryResult.isLoading,
-    fullImagesQueryResult.data,
-    selectedShotId
-  ]);
+  // [SelectorPattern] Use selector hooks for filtered views of shot data.
+  // Cache is primed by VideoTravelToolPage, so selectors have data immediately.
+  // Optimistic updates in mutations update the cache; selectors automatically reflect changes.
+  const timelineImagesQuery = useTimelineImages(selectedShotId);
+  const unpositionedImagesQuery = useUnpositionedImages(selectedShotId);
+  const videoOutputsQuery = useVideoOutputs(selectedShotId);
+  
+  // Selector data (or empty arrays while loading)
+  const timelineImages = timelineImagesQuery.data || [];
+  const unpositionedImages = unpositionedImagesQuery.data || [];
+  const videoOutputs = videoOutputsQuery.data || [];
+  
+  // All shot images - with cache priming, fullShotImages has data immediately
+  // This is passed to children that need all data (not just filtered views)
+  const allShotImages = fullShotImages;
+  
+  console.log('[SelectorPattern] Shot data from selectors:', {
+    shotId: selectedShotId?.substring(0, 8),
+    allImages: allShotImages.length,
+    timelineImages: timelineImages.length,
+    unpositionedImages: unpositionedImages.length,
+    videoOutputs: videoOutputs.length,
+    cacheStatus: fullImagesQueryResult.isFetching ? 'fetching' : 'ready',
+  });
 
   // Refs for stable access inside callbacks (avoid callback recreation on data changes)
-  const orderedShotImagesRef = useRef<GenerationRow[]>(orderedShotImages);
-  orderedShotImagesRef.current = orderedShotImages;
+  const allShotImagesRef = useRef<GenerationRow[]>(allShotImages);
+  allShotImagesRef.current = allShotImages;
   const batchVideoFramesRef = useRef(batchVideoFrames);
   batchVideoFramesRef.current = batchVideoFrames;
 
   
-  // [VideoLoadSpeedIssue] Track image data loading progress
+  // [SelectorPattern] Track image data loading progress
   React.useEffect(() => {
-    console.log('[VideoLoadSpeedIssue] ShotEditor image data update:', {
+    console.log('[SelectorPattern] ShotEditor image data update:', {
       selectedShotId,
-      contextImagesCount: contextImages.length,
-      fullShotImagesCount: fullShotImages.length,
-      orderedShotImagesCount: orderedShotImages.length,
+      allShotImagesCount: allShotImages.length,
+      timelineImagesCount: timelineImages.length,
+      unpositionedImagesCount: unpositionedImages.length,
+      videoOutputsCount: videoOutputs.length,
       isLoadingFullImages,
       hasContextData,
-      shouldLoadDetailedData,
       timestamp: Date.now(),
-      dataSource: hasContextData ? 'context' : 'detailed_query',
-      optimizationActive: hasContextData,
-      // [VideoLoadSpeedIssue] DEBUG: Check if context images are being filtered somewhere
-      contextImagesSample: contextImages.slice(0, 3).map(img => ({
-        id: img.id,
-        position: Math.floor(((img as any).timeline_frame ?? 0) / 50),
-        imageUrl: !!img.imageUrl
-      })),
-      orderedImagesSample: orderedShotImages.slice(0, 3).map(img => ({
-        id: img.id,
-        position: Math.floor(((img as any).timeline_frame ?? 0) / 50),
-        imageUrl: !!img.imageUrl
-      }))
     });
-  }, [selectedShotId, contextImages.length, fullShotImages.length, orderedShotImages.length, isLoadingFullImages, hasContextData, shouldLoadDetailedData]);
+  }, [selectedShotId, allShotImages.length, timelineImages.length, unpositionedImages.length, videoOutputs.length, isLoadingFullImages, hasContextData]);
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
   
   // Flag to skip next prop sync after successful operations
@@ -556,10 +519,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const updateShotGenerationsPaneSettingsRef = useRef(updateShotGenerationsPaneSettings);
   updateShotGenerationsPaneSettingsRef.current = updateShotGenerationsPaneSettings;
 
-  // REMOVED: localOrderedShotImages layer - no longer needed with fast two-phase loading
-  // Two-phase loading (~300ms) is fast enough that we don't need local caching
-  // ShotImageManager's optimisticOrder handles drag operations
-  const timelineReadyImages = orderedShotImages;
+  // [SelectorPattern] Timeline-ready images come directly from selector
+  // Cache priming ensures instant data; optimistic updates keep it fresh
+  const timelineReadyImages = timelineImages;
 
   // Sticky header visibility similar to ImageGenerationToolPage
   // ============================================================================
@@ -645,7 +607,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     projectId,
     batchVideoFrames,
     onShotImagesUpdate,
-    orderedShotImages,
+    orderedShotImages: allShotImages, // Pass all images; hook uses ref for stability
     skipNextSyncRef,
   });
 
@@ -981,101 +943,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [handleNameSave, handleNameCancel]);
 
-  // REMOVED: localOrderedShotImages - redundant with two-phase loading + ShotImageManager's optimisticOrder
-  
-  // [VideoLoadSpeedIssue] OPTIMIZED: Only log significant data flow changes
-  const dataFlowKey = `${selectedShotId}-${orderedShotImages.length}`;
-  const lastDataFlowKeyRef = React.useRef('');
-  const lastProcessingKeyRef = React.useRef('');
-  const lastFilteringKeyRef = React.useRef('');
-  
-  React.useEffect(() => {
-    if (dataFlowKey !== lastDataFlowKeyRef.current) {
-      console.log('[VideoLoadSpeedIssue] ShotEditor data flow change:', {
-        selectedShotId,
-        orderedShotImagesCount: orderedShotImages.length,
-        timestamp: Date.now()
-      });
-      lastDataFlowKeyRef.current = dataFlowKey;
-    }
-  }, [dataFlowKey, selectedShotId, orderedShotImages.length]);
-  
-  // Remove debug logs for production
-
-  // [VideoLoadSpeedIssue] CRITICAL FIX: Use EXACT same logic as ShotsPane
-  // Apply both position filtering AND video filtering like ShotsPane
-  const simpleFilteredImages = useMemo(() => {
-    // CRITICAL FIX: Always use orderedShotImages for consistency with VideoTravelToolPage
-    // This ensures timeline positions and video generation use the same dataset
-    const sourceImages = orderedShotImages || [];
-    
-    // OPTIMIZED: Only log when significant changes occur
-    const processingKey = `${selectedShotId}-${sourceImages.length}`;
-    if (processingKey !== lastProcessingKeyRef.current) {
-      console.log('[PROFILING] ShotEditor - Image processing decision:', {
-        selectedShotId,
-        sourceImagesCount: sourceImages.length,
-        contextImagesCount: contextImages.length,
-        isModeReady: state.isModeReady,
-        timestamp: Date.now()
-      });
-      lastProcessingKeyRef.current = processingKey;
-    }
-    
-    // EXACT same logic as ShotsPane:
-    // 1. Filter by position (has valid position)
-    // 2. Filter out videos (like ShotsPane does)
-    // 3. Sort by position
-    const filtered = sourceImages
-      .filter(img => {
-        // NOTE: -1 is used as sentinel for unpositioned items in useTimelinePositionUtils
-        const frame = (img as any).timeline_frame;
-        const hasTimelineFrame = frame !== null && frame !== undefined && frame >= 0;
-        
-        // [MagicEditTaskDebug] Log magic edit generations to see their timeline_frame values
-        if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
-          console.log('[MagicEditTaskDebug] Magic edit generation filtering:', {
-            id: img.id.substring(0, 8), // shot_generations.id
-            generation_id: img.generation_id?.substring(0, 8),
-            timeline_frame: frame,
-            hasTimelineFrame,
-            willBeIncludedInTimeline: hasTimelineFrame,
-            type: img.type,
-            tool_type: (img as any).params?.tool_type
-          });
-        }
-        
-        return hasTimelineFrame;
-      })
-      // Use canonical isVideoGeneration from typeGuards
-      .filter(img => !isVideoGeneration(img))
-      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
-    
-    // OPTIMIZED: Only log filtering results when they change significantly
-    const filteringKey = `${selectedShotId}-${sourceImages.length}-${filtered.length}`;
-    if (filteringKey !== lastFilteringKeyRef.current) {
-      console.log('[VideoLoadSpeedIssue] EXACT ShotsPane filtering results:', {
-        selectedShotId,
-        sourceCount: sourceImages.length,
-        filteredCount: filtered.length,
-        timestamp: Date.now()
-      });
-      lastFilteringKeyRef.current = filteringKey;
-    }
-    
-    return filtered;
-  }, [orderedShotImages, selectedShotId]);
-  
-  // Calculate unpositioned images count locally to match "Input Images" logic
-  // 1. Must be unpositioned (no timeline_frame)
-  // 2. Must be an image (not video)
-  const unpositionedImagesCount = useMemo(() => {
-    const sourceImages = orderedShotImages || [];
-    return sourceImages
-      .filter(img => !isPositioned(img))
-      .filter(img => !isVideoGeneration(img))
-      .length;
-  }, [orderedShotImages]);
+  // [SelectorPattern] Filtered views now come from selector hooks defined above.
+  // simpleFilteredImages is replaced by timelineImages (same filtering logic)
+  // unpositionedImagesCount is replaced by unpositionedImages.length
+  const simpleFilteredImages = timelineImages;
+  const unpositionedImagesCount = unpositionedImages.length;
 
   // Auto-disable turbo mode when there are more than 2 images
   useEffect(() => {
@@ -1127,10 +999,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   };
 
   // Mode synchronization removed - now hardcoded to use specific model
-  
-  const videoOutputs = useMemo(() => {
-    return getVideoOutputs(orderedShotImages);
-  }, [orderedShotImages]);
+  // videoOutputs now comes from useVideoOutputs selector (defined above)
 
   // Mutations for applying settings/images from a task
   const addImageToShotMutation = useAddImageToShot();
@@ -1220,7 +1089,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Our IDs here are shot_generations.id, so we must look up generation_id from current data.
       shot_id: shot.id,
       generation_id: (() => {
-        const img = orderedShotImagesRef.current?.find((i: any) => i.id === shotGenerationId);
+        const img = allShotImagesRef.current?.find((i: any) => i.id === shotGenerationId);
         return (img as any)?.generation_id ?? (img as any)?.generationId ?? shotGenerationId;
       })(),
       timeline_frame: index * batchVideoFramesRef.current,
@@ -1552,7 +1421,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             shotName={selectedShot.name}
             batchVideoFrames={batchVideoFrames}
             // batchVideoContext={batchVideoContext} // Removed
-            preloadedImages={orderedShotImages}
+            preloadedImages={allShotImages}
             onImageReorder={handleReorderImagesInShot}
             onFramePositionsChange={undefined}
             onImageDrop={generationActions.handleTimelineImageDrop}

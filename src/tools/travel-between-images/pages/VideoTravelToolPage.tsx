@@ -31,7 +31,7 @@ import { timeEnd } from '@/shared/lib/logger';
 
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import ShotEditor from '../components/ShotEditor';
-import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
+import { useAllShotGenerations, usePrimeShotGenerationsCache } from '@/shared/hooks/useShotGenerations';
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
 import { useProjectGenerationModesCache } from '@/shared/hooks/useProjectGenerationModesCache';
 import { useShotSettings } from '../hooks/useShotSettings';
@@ -1643,6 +1643,11 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     timestamp: Date.now()
   });
   
+  // [CachePrime] Prime the shot generations cache from ShotsContext for instant selector data.
+  // This enables selectors to have data immediately when switching shots, eliminating
+  // the need for dual-source fallback logic in components.
+  usePrimeShotGenerationsCache(selectedShot?.id ?? null, contextImages);
+  
   // STAGE 2: Track when shot operations are in progress to prevent query race conditions
   // This flag is set when mutations complete and cleared after a safe period
   // Prevents timeline position resets and "signal is aborted" errors
@@ -1716,9 +1721,8 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     }
   });
   
-  // Use full images if available AND needed, otherwise fall back to context images
-  // This ensures consistency with ShotEditor's image selection logic
-  const shotImagesForCalculation = needsFullImageData && fullShotImages.length > 0 ? fullShotImages : contextImages;
+  // [REMOVED] shotImagesForCalculation was dead code (never used)
+  // Cache priming now handles fast navigation; selectors read from primed cache
 
   // DEPRECATED: videoPairConfigs computation removed
   // Pair prompts are now stored directly in shot_generations.metadata.pair_prompt

@@ -547,3 +547,45 @@ export const useVideoOutputs = (
   
   return { ...baseQuery, data: filtered } as UseQueryResult<GenerationRow[]>;
 };
+
+// ============================================================================
+// CACHE PRIMING - Enable instant selector data during shot navigation
+// ============================================================================
+
+/**
+ * Primes the all-shot-generations cache with data from ShotsContext.
+ * 
+ * Call at the top-level component (VideoTravelToolPage) to enable instant selector data.
+ * When a shot is selected, this seeds the cache so selectors immediately have data
+ * to display, eliminating the need for dual-source fallback logic in components.
+ * 
+ * NOTE: Primed data from ShotsContext does NOT include `metadata` (pair prompts).
+ * This is fine because selectors filter on `timeline_frame` and `type` which are present.
+ * Full metadata arrives when the useAllShotGenerations query completes (~300ms).
+ * 
+ * @param shotId - The shot ID to prime cache for
+ * @param contextImages - Images from ShotsContext (selectedShot.images)
+ */
+export const usePrimeShotGenerationsCache = (
+  shotId: string | null,
+  contextImages: GenerationRow[] | undefined
+) => {
+  const queryClient = useQueryClient();
+  
+  React.useEffect(() => {
+    if (!shotId || !contextImages || contextImages.length === 0) return;
+    
+    // Only prime if cache is empty for this shot
+    const existingData = queryClient.getQueryData(['all-shot-generations', shotId]);
+    if (existingData && (existingData as any[]).length > 0) return;
+    
+    // Prime the cache with context data
+    queryClient.setQueryData(['all-shot-generations', shotId], contextImages);
+    
+    console.log('[CachePrime] Primed shot generations cache from context:', {
+      shotId: shotId.substring(0, 8),
+      imageCount: contextImages.length,
+      note: 'Selectors now have instant data'
+    });
+  }, [shotId, contextImages, queryClient]);
+};
