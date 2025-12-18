@@ -1322,6 +1322,18 @@ export const useUpdateShotImageOrder = () => {
       projectId: string,
       shotId: string
     }) => {
+      // [SelectorDebug] Log reorder mutation start
+      console.log('[SelectorDebug] 🔄 useUpdateShotImageOrder mutationFn:', {
+        shotId: shotId?.substring(0, 8),
+        projectId: projectId?.substring(0, 8),
+        updatesCount: updates.length,
+        updates: updates.map(u => ({
+          shot_id: u.shot_id?.substring(0, 8),
+          generation_id: u.generation_id?.substring(0, 8),
+          timeline_frame: u.timeline_frame,
+        })),
+      });
+      
       // We need to update each record. Supabase upsert matches on primary key.
       // shot_generations PK is (shot_id, generation_id) usually? 
       // Actually it has an 'id' column usually.
@@ -1338,7 +1350,21 @@ export const useUpdateShotImageOrder = () => {
           .eq('generation_id', update.generation_id)
       );
 
-      await Promise.all(promises);
+      const results = await Promise.all(promises);
+      
+      // [SelectorDebug] Log database update results
+      const errors = results.filter(r => r.error);
+      console.log('[SelectorDebug] 🔄 useUpdateShotImageOrder DB results:', {
+        shotId: shotId?.substring(0, 8),
+        successCount: results.filter(r => !r.error).length,
+        errorCount: errors.length,
+        errors: errors.map(r => r.error?.message),
+      });
+      
+      if (errors.length > 0) {
+        throw new Error(`Reorder failed: ${errors.map(e => e.error?.message).join(', ')}`);
+      }
+      
       return { projectId, shotId, updates };
     },
     onMutate: async (variables) => {
@@ -1349,11 +1375,31 @@ export const useUpdateShotImageOrder = () => {
       
       const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', shotId]);
       
+      // [SelectorDebug] Log optimistic update attempt
+      console.log('[SelectorDebug] 🔄 useUpdateShotImageOrder onMutate:', {
+        shotId: shotId?.substring(0, 8),
+        previousFastGensCount: previousFastGens?.length ?? 0,
+        previousIds: previousFastGens?.slice(0, 5).map(g => ({
+          id: g.id?.substring(0, 8),
+          generation_id: g.generation_id?.substring(0, 8),
+          frame: g.timeline_frame,
+        })),
+        updatesLookingFor: updates.map(u => u.generation_id?.substring(0, 8)),
+      });
+      
       // Optimistic update
       if (previousFastGens) {
         const updatedGens = previousFastGens.map(gen => {
-          const update = updates.find(u => u.generation_id === gen.id);
+          // NOTE: updates use generation_id (from generations table)
+          // but gen.id is shot_generations.id, gen.generation_id is the actual generation ID
+          const update = updates.find(u => u.generation_id === gen.generation_id);
           if (update) {
+            console.log('[SelectorDebug] 🔄 Found match for optimistic update:', {
+              genId: gen.id?.substring(0, 8),
+              generationId: gen.generation_id?.substring(0, 8),
+              oldFrame: gen.timeline_frame,
+              newFrame: update.timeline_frame,
+            });
             return { ...gen, timeline_frame: update.timeline_frame };
           }
           return gen;
@@ -1363,17 +1409,33 @@ export const useUpdateShotImageOrder = () => {
         updatedGens.sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
         
         queryClient.setQueryData(['all-shot-generations', shotId], updatedGens);
+        
+        console.log('[SelectorDebug] 🔄 Optimistic update applied:', {
+          shotId: shotId?.substring(0, 8),
+          updatedCount: updatedGens.length,
+        });
       }
       
       return { previousFastGens, shotId };
     },
     onError: (err, variables, context) => {
+      console.error('[SelectorDebug] ❌ useUpdateShotImageOrder onError:', {
+        errorMessage: err.message,
+        shotId: variables.shotId?.substring(0, 8),
+        hadPreviousData: !!context?.previousFastGens,
+      });
+      
       if (context?.previousFastGens) {
         queryClient.setQueryData(['all-shot-generations', context.shotId], context.previousFastGens);
       }
       toast.error("Failed to reorder images");
     },
     onSuccess: (data) => {
+      console.log('[SelectorDebug] ✅ useUpdateShotImageOrder onSuccess:', {
+        shotId: data.shotId?.substring(0, 8),
+        updatesCount: data.updates.length,
+      });
+      
       // Don't invalidate all-shot-generations - the optimistic update already applied the changes
       // and realtime will confirm. Invalidating here causes flicker.
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });

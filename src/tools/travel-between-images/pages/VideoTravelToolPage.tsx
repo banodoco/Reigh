@@ -1405,6 +1405,14 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     enabled: shouldShowShotEditor && headerReady
   });
 
+  // ============================================================================
+  // FLOATING UI COORDINATION
+  // ============================================================================
+  // Rule: CTA takes priority - when floating CTA is visible, hide sticky header
+  // This prevents visual clutter from having both floating elements on screen
+  const shouldShowFloatingCTA = floatingCTA.showElement && floatingCTA.isFloating;
+  const shouldShowStickyHeader = stickyHeader.isSticky && !shouldShowFloatingCTA;
+
   // Reset selection tracking whenever the active shot changes
   useEffect(() => {
     setHasActiveSelection(false);
@@ -1615,6 +1623,9 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   useEffect(() => {
     if (!selectedProjectId) {
       if (currentShotId) {
+        console.log('[SelectorDebug] ⚠️ Clearing currentShotId - no selectedProjectId:', {
+          currentShotId: currentShotId?.substring(0, 8),
+        });
         setCurrentShotId(null);
       }
       return;
@@ -1625,7 +1636,21 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
       const shotStillExists = shots.find(s => s.id === currentShotId && s.project_id === selectedProjectId);
       // Also check shotFromState for newly created shots not yet in cache
       const inShotFromState = shotFromState && shotFromState.id === currentShotId;
+      
+      // [SelectorDebug] Log shot existence check
+      console.log('[SelectorDebug] 🔍 Shot existence check:', {
+        currentShotId: currentShotId?.substring(0, 8),
+        shotStillExists: !!shotStillExists,
+        inShotFromState: !!inShotFromState,
+        shotsCount: shots?.length,
+        willClear: !shotStillExists && !inShotFromState,
+      });
+      
       if (!shotStillExists && !inShotFromState) {
+        console.log('[SelectorDebug] ⚠️ Clearing currentShotId - shot not found in shots array:', {
+          currentShotId: currentShotId?.substring(0, 8),
+          shotsInArray: shots?.map(s => s.id?.substring(0, 8)),
+        });
         setCurrentShotId(null);
       }
     }

@@ -339,6 +339,13 @@ export const useAllShotGenerations = (
   React.useEffect(() => {
     if (!mergedData || !stableShotId || mergedData.length === 0) return;
     
+    // [SelectorDebug] Log cache sync trigger
+    console.log('[SelectorDebug] 🔄 Cache sync triggered (shots ← all-shot-generations):', {
+      shotId: stableShotId?.substring(0, 8),
+      mergedDataCount: mergedData.length,
+      mergedDataIds: mergedData.slice(0, 5).map(d => d.id?.substring(0, 8)),
+    });
+    
     // Find all shots caches and update this shot's images array
     // This uses React Query's fuzzy matching - ['shots'] matches all shots queries
     const allQueries = queryClient.getQueriesData<Shot[]>({ queryKey: ['shots'] });
@@ -487,14 +494,37 @@ export const useTimelineImages = (
   const filtered = React.useMemo(() => {
     if (!baseQuery.data) return undefined;
     
-    return baseQuery.data
+    const result = baseQuery.data
       .filter(g => 
         g.timeline_frame != null && 
         g.timeline_frame >= 0 && 
         !g.type?.includes('video')
       )
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
-  }, [baseQuery.data]);
+    
+    // [SelectorDebug] Log filtering results with WHY items were filtered
+    const filtered = baseQuery.data.filter(g => 
+      g.timeline_frame == null || g.timeline_frame < 0 || g.type?.includes('video')
+    );
+    console.log('[SelectorDebug] useTimelineImages filtered:', {
+      shotId: shotId?.substring(0, 8),
+      inputCount: baseQuery.data.length,
+      outputCount: result.length,
+      outputIds: result.slice(0, 5).map(r => r.id?.substring(0, 8)),
+      frames: result.slice(0, 5).map(r => r.timeline_frame),
+      // Show WHY items were filtered out
+      filteredOutCount: filtered.length,
+      filteredOutReasons: filtered.slice(0, 5).map(g => ({
+        id: g.id?.substring(0, 8),
+        timeline_frame: g.timeline_frame,
+        isNull: g.timeline_frame == null,
+        isNegative: g.timeline_frame != null && g.timeline_frame < 0,
+        isVideo: g.type?.includes('video'),
+      })),
+    });
+    
+    return result;
+  }, [baseQuery.data, shotId]);
   
   return { ...baseQuery, data: filtered } as UseQueryResult<GenerationRow[]>;
 };
@@ -573,19 +603,38 @@ export const usePrimeShotGenerationsCache = (
   const queryClient = useQueryClient();
   
   React.useEffect(() => {
+    // [SelectorDebug] Log every priming attempt
+    const existingData = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', shotId]);
+    
+    console.log('[SelectorDebug] usePrimeShotGenerationsCache check:', {
+      shotId: shotId?.substring(0, 8),
+      contextImagesCount: contextImages?.length ?? 0,
+      existingCacheCount: existingData?.length ?? 0,
+      willPrime: shotId && contextImages && contextImages.length > 0 && (!existingData || existingData.length === 0),
+      contextImageIds: contextImages?.slice(0, 3).map(i => i.id?.substring(0, 8)),
+      contextImageFrames: contextImages?.slice(0, 5).map(i => i.timeline_frame),
+      existingCacheIds: existingData?.slice(0, 3).map(i => i.id?.substring(0, 8)),
+      existingCacheFrames: existingData?.slice(0, 5).map(i => i.timeline_frame),
+    });
+    
     if (!shotId || !contextImages || contextImages.length === 0) return;
     
     // Only prime if cache is empty for this shot
-    const existingData = queryClient.getQueryData(['all-shot-generations', shotId]);
-    if (existingData && (existingData as any[]).length > 0) return;
+    if (existingData && existingData.length > 0) {
+      console.log('[SelectorDebug] Cache NOT primed - already has data:', {
+        shotId: shotId.substring(0, 8),
+        existingCount: existingData.length,
+      });
+      return;
+    }
     
     // Prime the cache with context data
     queryClient.setQueryData(['all-shot-generations', shotId], contextImages);
     
-    console.log('[CachePrime] Primed shot generations cache from context:', {
+    console.log('[SelectorDebug] ✅ Cache PRIMED from context:', {
       shotId: shotId.substring(0, 8),
       imageCount: contextImages.length,
-      note: 'Selectors now have instant data'
+      imageIds: contextImages.slice(0, 5).map(i => i.id?.substring(0, 8)),
     });
   }, [shotId, contextImages, queryClient]);
 };

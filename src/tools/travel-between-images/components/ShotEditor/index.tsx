@@ -157,6 +157,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Only use cache fallback if shots is undefined/null (loading), not if it's an empty array (loaded but missing)
   const selectedShot = foundShot || optimisticShotData || (shots === undefined ? lastValidShotRef.current : undefined);
   
+  // [SelectorDebug] Track shot selection changes
+  React.useEffect(() => {
+    console.log('[SelectorDebug] 🎯 Shot selection state:', {
+      selectedShotId: selectedShotId?.substring(0, 8),
+      foundShotId: foundShot?.id?.substring(0, 8),
+      optimisticShotId: optimisticShotData?.id?.substring(0, 8),
+      lastValidShotId: lastValidShotRef.current?.id?.substring(0, 8),
+      resolvedShotId: selectedShot?.id?.substring(0, 8),
+      shotsArrayLength: shots?.length,
+      shotsUndefined: shots === undefined,
+      foundShotImagesCount: foundShot?.images?.length,
+    });
+  }, [selectedShotId, foundShot, optimisticShotData, selectedShot, shots]);
+  
   // 🎯 PERF FIX: Create refs for values that are used in callbacks but shouldn't cause callback recreation
   // This prevents the cascade of 22+ callback recreations on every shot/settings change
   const selectedShotRef = useRef(selectedShot);
