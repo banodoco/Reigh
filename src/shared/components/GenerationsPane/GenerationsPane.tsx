@@ -427,7 +427,7 @@ const GenerationsPaneComponent: React.FC = () => {
             isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
           )}
         >
-          <div className="px-2 pt-3 pb-0">
+          <div className="px-2 pt-3 pb-2">
             <div className="flex items-center justify-between min-w-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <h2 className="text-xl font-light text-zinc-200 ml-2 truncate">Generations</h2>
@@ -596,10 +596,30 @@ const GenerationsPaneComponent: React.FC = () => {
                     >
                       <ChevronLeft className="h-4 w-4 text-zinc-400" />
                     </button>
-                    <span className="text-xs text-zinc-400 text-center whitespace-nowrap">
-                      <span className="hidden sm:inline">{((page - 1) * GENERATIONS_PER_PAGE) + 1}-{Math.min(page * GENERATIONS_PER_PAGE, totalCount)} (out of {totalCount})</span>
-                      <span className="sm:hidden">{page}/{Math.ceil(totalCount / GENERATIONS_PER_PAGE)}</span>
-                    </span>
+                    
+                    {/* Page selector */}
+                    <div className="flex items-center gap-1">
+                      <Select 
+                        value={page.toString()} 
+                        onValueChange={(value) => handleServerPageChange(parseInt(value))}
+                      >
+                        <SelectTrigger variant="retro-dark" colorScheme="zinc" size="sm" className="h-6 w-12 text-xs px-1" hideIcon>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent variant="zinc">
+                          {Array.from({ length: Math.ceil(totalCount / GENERATIONS_PER_PAGE) }, (_, i) => (
+                            <SelectItem variant="zinc" key={i + 1} value={(i + 1).toString()} className="text-xs">
+                              {i + 1}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-zinc-400">
+                        <span className="hidden sm:inline">of {Math.ceil(totalCount / GENERATIONS_PER_PAGE)} ({totalCount})</span>
+                        <span className="sm:hidden">/ {Math.ceil(totalCount / GENERATIONS_PER_PAGE)}</span>
+                      </span>
+                    </div>
+                    
                     <button
                       onClick={() => handleServerPageChange(page + 1)}
                       disabled={page * GENERATIONS_PER_PAGE >= totalCount}
@@ -623,7 +643,7 @@ const GenerationsPaneComponent: React.FC = () => {
                     whiteText={true}
                     showControls={false}
                     projectAspectRatio={projectAspectRatio}
-                    className="space-y-0 pb-4 pt-3"
+                    className="space-y-0 pb-4 pt-1"
                 />
             )}
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}

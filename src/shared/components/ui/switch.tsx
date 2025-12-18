@@ -8,7 +8,7 @@ const switchVariants = cva(
   {
     variants: {
       variant: {
-        default: "rounded-full border-2 border-transparent data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
+        default: "rounded-full border-2 border-transparent data-[state=checked]:bg-primary data-[state=unchecked]:bg-input dark:data-[state=unchecked]:bg-zinc-600",
         // Retro style - squared, blocky shadow
         retro: "rounded-sm border-2 border-[#6a8a8a] dark:border-[#6a7a7a] data-[state=checked]:bg-[#5a7a7a] data-[state=checked]:dark:bg-[#6a8a8a] data-[state=unchecked]:bg-[#e8e4db] data-[state=unchecked]:dark:bg-[#3a4a4a] shadow-[-1px_1px_0_0_rgba(106,138,138,0.2)] dark:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)]",
         // Retro dark - for always-dark contexts
