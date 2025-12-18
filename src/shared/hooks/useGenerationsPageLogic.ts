@@ -164,9 +164,12 @@ export function useGenerationsPageLogic({
       return;
     }
     
+    const previousShotId = lastAppliedShotIdRef.current;
+    
     console.log('[StableFilter] Shot changed:', {
-      from: lastAppliedShotIdRef.current?.substring(0, 8),
-      to: currentShotId?.substring(0, 8)
+      from: previousShotId?.substring(0, 8),
+      to: currentShotId?.substring(0, 8),
+      currentFilter: selectedShotFilter
     });
     
     lastAppliedShotIdRef.current = currentShotId;
@@ -176,6 +179,16 @@ export function useGenerationsPageLogic({
       console.log('[StableFilter] No current shot, showing all');
       setSelectedShotFilter('all');
       setExcludePositioned(true);
+      return;
+    }
+    
+    // IMPORTANT: When navigating between shots (shot-to-shot), preserve "all" filter
+    // This prevents the dropdown from briefly flashing to the specific shot
+    const isNavigatingBetweenShots = previousShotId !== null && currentShotId !== null;
+    if (isNavigatingBetweenShots && selectedShotFilter === 'all') {
+      console.log('[StableFilter] Preserving "all" filter during shot-to-shot navigation');
+      // Keep filter at "all", just update lastAffectedShotId for targeting
+      setLastAffectedShotId(currentShotId);
       return;
     }
     
@@ -203,7 +216,7 @@ export function useGenerationsPageLogic({
     // Sync the dropdown selection to the current shot
     setLastAffectedShotId(currentShotId);
     
-  }, [currentShotId, getFilterStateForShot, setFilterStateForShot, setLastAffectedShotId]);
+  }, [currentShotId, selectedShotFilter, getFilterStateForShot, setFilterStateForShot, setLastAffectedShotId]);
 
   // ============================================================================
   // UPDATE DEFAULTS WHEN SHOT IMAGE COUNTS CHANGE
