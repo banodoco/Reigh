@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { ShotGeneration } from '@/shared/hooks/useEnhancedShotPositions';
 import { quantizePositions } from '../utils/timeline-utils';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
+import { DEFAULT_FRAME_SPACING } from '@/shared/utils/timelinePositionCalculator';
 
 // ============================================================================
 // TYPES
@@ -93,7 +94,6 @@ interface UpdateOptions {
 // CONSTANTS
 // ============================================================================
 
-const DEFAULT_FRAME_SPACING = 50;
 const OPERATION_TIMEOUT_MS = 10000; // 10 seconds max for any operation
 
 // ============================================================================
