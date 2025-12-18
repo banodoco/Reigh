@@ -21,7 +21,7 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import ShotImagesEditor from '../ShotImagesEditor';
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
-import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
+import { useAllShotGenerations, useTimelineImages, useUnpositionedImages } from '@/shared/hooks/useShotGenerations';
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import SettingsModal from '@/shared/components/SettingsModal';
@@ -353,184 +353,60 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // CRITICAL FIX: Always use full images when available in editor mode to ensure consistency
   // This prevents video pair config mismatches between VideoTravelToolPage and ShotEditor
   
-  // [FlickerFix] Persist last valid images list to prevent empty flashes during refetches
-  const lastValidImagesRef = useRef<GenerationRow[]>([]);
-  // [FlickerFix] Track pending deletions so cache fallbacks can't resurrect deleted items
-  const pendingDeletedShotGenerationIdsRef = useRef<Set<string>>(new Set());
+  // [OptimisticUpdates] Selector hooks provide stable, filtered views of shot data.
+  // When mutations update the cache optimistically, selectors automatically reflect the change.
+  // No event-based coordination or ref-caching needed.
 
-  // Listen for delete mutations so we can suppress re-adding deleted items via cached fallbacks
-  useEffect(() => {
-    const onMutationStart = (event: Event) => {
-      const e = event as CustomEvent<any>;
-      const detail = e.detail;
-      if (!detail || detail.shotId !== selectedShotId) return;
-
-      if (detail.type === 'delete' && typeof detail.shotGenerationId === 'string') {
-        pendingDeletedShotGenerationIdsRef.current.add(detail.shotGenerationId);
-      }
-
-      if (detail.type === 'batch-delete' && Array.isArray(detail.shotGenerationIds)) {
-        for (const id of detail.shotGenerationIds) {
-          if (typeof id === 'string') pendingDeletedShotGenerationIdsRef.current.add(id);
-        }
-      }
-    };
-
-    const onMutationEnd = (event: Event) => {
-      const e = event as CustomEvent<any>;
-      const detail = e.detail;
-      if (!detail || detail.shotId !== selectedShotId) return;
-
-      if (detail.type === 'delete' && typeof detail.shotGenerationId === 'string') {
-        pendingDeletedShotGenerationIdsRef.current.delete(detail.shotGenerationId);
-      }
-
-      if (detail.type === 'batch-delete' && Array.isArray(detail.shotGenerationIds)) {
-        for (const id of detail.shotGenerationIds) {
-          if (typeof id === 'string') pendingDeletedShotGenerationIdsRef.current.delete(id);
-        }
-      }
-    };
-
-    window.addEventListener('shot-mutation-start' as any, onMutationStart as any);
-    window.addEventListener('shot-mutation-end' as any, onMutationEnd as any);
-    return () => {
-      window.removeEventListener('shot-mutation-start' as any, onMutationStart as any);
-      window.removeEventListener('shot-mutation-end' as any, onMutationEnd as any);
-    };
-  }, [selectedShotId]);
-
-  // Clear any pending deletion markers when switching shots
-  useEffect(() => {
-    pendingDeletedShotGenerationIdsRef.current.clear();
-  }, [selectedShotId]);
-
+  // [OptimisticUpdates] Simplified data flow:
+  // - Optimistic updates in mutations update the React Query cache immediately
+  // - Selectors (useTimelineImages, useUnpositionedImages) derive from that cache
+  // - No component-level caching or event coordination needed
   const orderedShotImages = React.useMemo(() => {
-    // [ShotNavPerf] PERFORMANCE FIX: Prioritize showing content immediately
-    // Use context images when query is fetching to prevent blank screen during navigation
+    // Priority: fullImages > contextImages (for fast navigation) > empty
     const hasValidFullImages = fullShotImages.length > 0;
     const hasValidContextImages = contextImages.length > 0;
     const isQueryFetchingNewData = fullImagesQueryResult.isFetching && !fullImagesQueryResult.data;
     
-    // Priority: fullImages > contextImages (while fetching) > empty
-    // This ensures instant display when navigating via arrows
     let result: typeof contextImages = [];
     let dataSource: string;
     
     if (hasValidFullImages) {
       result = fullShotImages;
-      dataSource = 'fullImages (query complete)';
+      dataSource = 'fullImages (query)';
     } else if (hasValidContextImages && (isQueryFetchingNewData || fullImagesQueryResult.isLoading)) {
       result = contextImages;
       dataSource = 'contextImages (query pending)';
     } else if (hasValidContextImages) {
       result = contextImages;
-      dataSource = 'contextImages (no query)';
+      dataSource = 'contextImages';
     } else {
-      result = fullShotImages; // Fallback to query result even if empty
+      result = fullShotImages;
       dataSource = 'fullImages (fallback)';
     }
-
-    // [FlickerFix] Never allow deleted items to reappear due to cached fallbacks / context fallbacks
-    const pendingDeletedIds = pendingDeletedShotGenerationIdsRef.current;
-    if (pendingDeletedIds.size > 0 && result.length > 0) {
-      const beforeCount = result.length;
-      result = result.filter((img: any) => !pendingDeletedIds.has(img.id));
-      if (result.length !== beforeCount) {
-        dataSource = `${dataSource} + filtered(pending-delete)`;
-      }
-    }
-
-    // [FlickerFix] Persist last valid state if result is empty OR PARTIAL during refetch
-    // This prevents the timeline from disappearing or showing incomplete data during duplications/updates
-    const isRefetching = fullImagesQueryResult.isFetching || fullImagesQueryResult.isLoading;
     
-    console.log('[AddFlicker] 7️⃣ ShotEditor orderedShotImages computing:', {
-      resultCount: result.length,
-      cachedCount: lastValidImagesRef.current.length,
-      isRefetching,
-      dataSource,
-      fullImagesCount: fullShotImages.length,
-      contextImagesCount: contextImages.length,
-      queryStatus: fullImagesQueryResult.status,
-      queryFetchStatus: fullImagesQueryResult.fetchStatus,
-      hasOptimistic: result.some((r: any) => r._optimistic),
-      lastItems: result.slice(-2).map(r => ({
-        id: r.id?.substring(0, 8),
-        _optimistic: (r as any)._optimistic
-      })),
-      timestamp: Date.now()
-    });
-    
-    if (result.length > 0 && !isRefetching) {
-      // Only update cache when we have data AND are not currently refetching
-      // This prevents caching partial/transitional data
-      console.log('[DUPLICATE_UI] 💾 Updating lastValidImagesRef cache');
-      lastValidImagesRef.current = result;
-    } else if (lastValidImagesRef.current.length > 0 && isRefetching) {
-       // If we are refetching and result is LESS than cache, it's likely partial/stale data
-       // Use cached data to maintain stability
-       const cachedFiltered = lastValidImagesRef.current.filter((img: any) => !pendingDeletedIds.has(img.id));
-       if (result.length < cachedFiltered.length || result.length === 0) {
-         console.log('[DUPLICATE_UI] ⚠️ Partial/empty result during refetch - using cached images', {
-           resultCount: result.length,
-           cachedCount: cachedFiltered.length,
-           isRefetching,
-           dataSource: dataSource,
-           difference: cachedFiltered.length - result.length
-         });
-         result = cachedFiltered;
-         dataSource = 'cached (partial data prevention)';
-       }
-    }
-    
-    console.log('[ShotNavPerf] 🔄 Data source decision:', {
-      hasValidFullImages,
-      hasValidContextImages,
-      isQueryFetchingNewData,
-      isQueryLoading: fullImagesQueryResult.isLoading,
-      contextImagesCount: contextImages.length,
-      fullImagesCount: fullShotImages.length,
-      resultCount: result.length,
-      dataSource
-    });
-    
-    // Check for duplicates by ID
-    const idCounts = new Map<string, number>();
-    result.forEach(img => {
-      const count = idCounts.get(img.id) || 0;
-      idCounts.set(img.id, count + 1);
-    });
-    const duplicates = Array.from(idCounts.entries()).filter(([id, count]) => count > 1);
-    
-    console.log('[UnifiedDataFlow] ShotEditor data preparation:', {
-      selectedShotId: selectedShotId?.substring(0, 8),
-      fullShotImagesCount: fullShotImages.length,
-      contextImagesCount: contextImages.length,
-      resultCount: result.length,
-      usingTwoPhase: fullShotImages.length > 0,
-      willPassToChildren: true,
-      hasDuplicateIds: duplicates.length > 0,
-      duplicateIds: duplicates.length > 0 ? duplicates.map(([id, count]) => ({ id: id.substring(0, 8), count })) : [],
-    });
-    
-    console.log('[DataTrace] 📤 ShotEditor → passing to children:', {
+    console.log('[OptimisticUpdates] orderedShotImages:', {
       shotId: selectedShotId?.substring(0, 8),
-      total: result.length,
+      dataSource,
+      count: result.length,
       positioned: result.filter(r => r.timeline_frame != null && r.timeline_frame >= 0).length,
       unpositioned: result.filter(r => r.timeline_frame == null).length,
-      duplicates: duplicates.length,
     });
     
     return result;
   }, [
-    fullShotImages, // Need full array for the actual data
-    contextImages,  // Need full array for the actual data
+    fullShotImages,
+    contextImages,
     fullImagesQueryResult.isFetching,
     fullImagesQueryResult.isLoading,
     fullImagesQueryResult.data,
     selectedShotId
   ]);
+
+  // Refs for stable access inside callbacks (avoid callback recreation on data changes)
+  const orderedShotImagesRef = useRef<GenerationRow[]>(orderedShotImages);
+  orderedShotImagesRef.current = orderedShotImages;
+  const batchVideoFramesRef = useRef(batchVideoFrames);
+  batchVideoFramesRef.current = batchVideoFrames;
 
   
   // [VideoLoadSpeedIssue] Track image data loading progress
@@ -1337,10 +1213,23 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     });
 
     // Update the order on the server
+    // NOTE: useUpdateShotImageOrder expects `updates`, not `orderedShotGenerationIds`.
+    // Convert ordered IDs into timeline_frame updates using existing frame spacing rules.
+    const updates = orderedShotGenerationIds.map((shotGenerationId, index) => ({
+      // useUpdateShotImageOrder's mutationFn matches on shot_id + generation_id (see useShots.ts).
+      // Our IDs here are shot_generations.id, so we must look up generation_id from current data.
+      shot_id: shot.id,
+      generation_id: (() => {
+        const img = orderedShotImagesRef.current?.find((i: any) => i.id === shotGenerationId);
+        return (img as any)?.generation_id ?? (img as any)?.generationId ?? shotGenerationId;
+      })(),
+      timeline_frame: index * batchVideoFramesRef.current,
+    }));
+
     updateShotImageOrderMutationRef.current.mutate({
       shotId: shot.id,
-      orderedShotGenerationIds: orderedShotGenerationIds,
-      projectId: projId
+      projectId: projId,
+      updates,
     }, {
       onError: (error) => {
         console.error('[ShotEditor] Failed to reorder images:', error);
@@ -1783,7 +1672,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             <SectionHeader title="Motion" theme="purple" />
                         </div>
                         <MotionControl
-                            motionMode={motionMode === 'presets' ? 'basic' : motionMode || 'basic'}
+                            // motionMode is typed as 'basic' | 'advanced'. Older code used a 'presets' branch.
+                            motionMode={motionMode || 'basic'}
                             onMotionModeChange={onMotionModeChange || (() => {})}
                             generationTypeMode={generationTypeMode}
                             onGenerationTypeModeChange={onGenerationTypeModeChange}

@@ -1127,51 +1127,8 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     setVideoPage(1);
   }, [selectedProjectId]);
   
-  // Track highlighted shot for duplication feedback
-  const [highlightedShotId, setHighlightedShotId] = useState<string | null>(null);
-  
-  // Listen for shot duplication to provide visual feedback
-  useEffect(() => {
-    const handleShotDuplicated = (event: CustomEvent) => {
-      try {
-        const { shotId, shotName } = event.detail || {};
-        console.log('[ShotDuplicate] Shot duplicated, providing visual feedback:', { shotId: shotId?.substring(0, 8), shotName });
-        
-        if (!shotId) {
-          console.warn('[ShotDuplicate] No shotId provided in event');
-          return;
-        }
-        
-        // 1. Switch to "Newest First" to show the new shot at the top
-        setShotSortMode('newest');
-        
-        // 2. After DOM updates, scroll to top and apply highlight
-        setTimeout(() => {
-          // Scroll to top
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-          
-          if (mainContainerRef.current) {
-            mainContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-          }
-          
-          document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
-          
-          // 3. Apply highlight immediately after scroll starts (shot is now in position)
-          setHighlightedShotId(shotId);
-          setTimeout(() => {
-            setHighlightedShotId(null);
-          }, 2000);
-        }, 100); // Wait for cache updates and sort mode to apply
-      } catch (error) {
-        console.error('[ShotDuplicate] Error handling shot-duplicated event:', error);
-      }
-    };
-    
-    window.addEventListener('shot-duplicated' as any, handleShotDuplicated as EventListener);
-    return () => {
-      window.removeEventListener('shot-duplicated' as any, handleShotDuplicated as EventListener);
-    };
-  }, []);
+  // [REMOVED] shot-duplicated listener was dead code - event was never dispatched
+  // Shot duplication feedback now handled via optimistic cache updates
   
   // Search helper functions
   const clearSearch = useCallback(() => {
@@ -1724,32 +1681,8 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     };
   }, []);
   
-  // STAGE 2 ENHANCEMENT: Listen for mutations from OTHER components (like GenerationsPane)
-  // When mutations complete in other parts of the app, we need to know about them too
-  useEffect(() => {
-    if (!selectedShot?.id) return;
-    
-    const handleMutationEvent = (event: CustomEvent) => {
-      const { shotId, mutationType } = event.detail || {};
-      
-      // Only react to mutations affecting the currently selected shot
-      if (shotId === selectedShot.id) {
-        console.log('[OperationTracking] External mutation detected for current shot:', {
-          shotId: shotId.substring(0, 8),
-          mutationType,
-          source: 'CustomEvent'
-        });
-        signalShotOperation();
-      }
-    };
-    
-    // Listen for custom events fired by mutations
-    window.addEventListener('shot-mutation-complete' as any, handleMutationEvent as EventListener);
-    
-    return () => {
-      window.removeEventListener('shot-mutation-complete' as any, handleMutationEvent as EventListener);
-    };
-  }, [selectedShot?.id, signalShotOperation]);
+  // [REMOVED] shot-mutation-complete listener was dead code - event was never dispatched
+  // React Query cache + optimistic updates handle cross-component synchronization
   
   // CRITICAL FIX: Use same logic as ShotEditor to prevent data inconsistency
   // Always load full data when in ShotEditor mode to ensure pair configs match generation logic
@@ -2678,7 +2611,6 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                 shots={filteredShots}
                 sortMode={shotSortMode}
                 onSortModeChange={setShotSortMode}
-                highlightedShotId={highlightedShotId}
                 onGenerationDropOnShot={handleGenerationDropOnShot}
                 onGenerationDropForNewShot={handleGenerationDropForNewShot}
                 onFilesDropForNewShot={handleFilesDropForNewShot}

@@ -453,14 +453,8 @@ export const useGenerationActions = ({
       frameOffset
     });
 
-    // Emit event to lock timeline positions during mutation + refetch
-    window.dispatchEvent(new CustomEvent('shot-mutation-start', {
-      detail: {
-        shotId: currentShot.id,
-        type: 'delete',
-        shotGenerationId: shotImageEntryId, // shot_generations.id
-      }
-    }));
+    // [OptimisticUpdates] No event coordination needed - the mutation's optimistic update
+    // immediately updates the React Query cache, and selectors automatically reflect the change.
     
     try {
       // CRITICAL: Pass shotGenerationId (shot_generations.id), NOT generationId (generations.id)
@@ -507,25 +501,6 @@ export const useGenerationActions = ({
     } catch (error) {
       console.error('[DeleteDebug] ❌ Error during deletion or frame shift:', error);
       // Error handling is done by the mutation itself
-    } finally {
-      // CRITICAL: Wait for query to refetch before clearing pending delete tracking.
-      // Otherwise cached data can briefly resurrect the deleted item during the refetch window.
-      // The mutation's onSuccess invalidates queries, so we wait for that to settle.
-      await queryClientRef.current.refetchQueries({ 
-        queryKey: ['all-shot-generations', currentShot.id],
-        exact: true 
-      }).catch(() => {
-        // Ignore refetch errors - the item is still deleted
-      });
-      
-      // Now it's safe to clear the pending delete - fresh data is loaded
-      window.dispatchEvent(new CustomEvent('shot-mutation-end', {
-        detail: {
-          shotId: currentShot.id,
-          type: 'delete',
-          shotGenerationId: shotImageEntryId, // shot_generations.id
-        }
-      }));
     }
   }, []); // mutations, queryClient, selectedShot, projectId, orderedShotImages accessed via refs
 
@@ -543,16 +518,8 @@ export const useGenerationActions = ({
       totalCount: shotImageEntryIds.length,
     });
 
-    // Emit event so ShotEditor can prevent deleted items from "resurrecting" via cache fallbacks.
-    window.dispatchEvent(new CustomEvent('shot-mutation-start', {
-      detail: {
-        shotId: currentShot.id,
-        type: 'batch-delete',
-        shotGenerationIds: shotImageEntryIds, // shot_generations.id[]
-      }
-    }));
-
-    // REMOVED: Optimistic local state - two-phase loading handles updates
+    // [OptimisticUpdates] No event coordination needed - each mutation's optimistic update
+    // immediately updates the React Query cache, and selectors automatically reflect the change.
     
     // Execute all timeline removals
     const removePromises = shotImageEntryIds.map(id => 
@@ -568,24 +535,6 @@ export const useGenerationActions = ({
       console.log('[BATCH_DELETE] Batch removal completed successfully');
     } catch (error) {
       toast.error('Failed to remove some images from timeline');
-    } finally {
-      // CRITICAL: Wait for query to refetch before clearing pending delete tracking.
-      // Otherwise cached data can briefly resurrect deleted items during the refetch window.
-      await queryClientRef.current.refetchQueries({ 
-        queryKey: ['all-shot-generations', currentShot.id],
-        exact: true 
-      }).catch(() => {
-        // Ignore refetch errors - items are still deleted
-      });
-      
-      // Now it's safe to clear the pending deletes - fresh data is loaded
-      window.dispatchEvent(new CustomEvent('shot-mutation-end', {
-        detail: {
-          shotId: currentShot.id,
-          type: 'batch-delete',
-          shotGenerationIds: shotImageEntryIds, // shot_generations.id[]
-        }
-      }));
     }
   }, []); // mutations, selectedShot, projectId accessed via refs
 
@@ -647,10 +596,8 @@ export const useGenerationActions = ({
       totalImagesInShot: currentOrderedImages.length
     });
 
-    // Emit event to lock timeline positions during mutation + refetch
-    window.dispatchEvent(new CustomEvent('shot-mutation-start', {
-      detail: { shotId: currentShot.id, type: 'duplicate' }
-    }));
+    // [OptimisticUpdates] No event coordination needed - the mutation's optimistic update
+    // immediately updates the React Query cache, and selectors automatically reflect the change.
 
     // Start loading state targeting the specific shotImageEntryId
     actionsRef.current.setDuplicatingImageId(shotImageEntryId);

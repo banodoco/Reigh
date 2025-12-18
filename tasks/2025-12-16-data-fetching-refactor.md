@@ -124,53 +124,32 @@ useQuery({
 
 ---
 
-### Phase 3: Selector Pattern for Derived Data
+### Phase 3: Selector Pattern for Derived Data ✅ COMPLETE
 **Effort**: 2-3 days | **Impact**: High (fixes re-render cascades)
 
-Replace inline filtering with memoized selector hooks:
+**Implemented (Dec 18, 2025):**
 
-```typescript
-// In useShotGenerations.ts
+Created selector hooks in `src/shared/hooks/useShotGenerations.ts`:
+- `useTimelineImages(shotId)` - positioned, non-video images, sorted by timeline_frame
+- `useUnpositionedImages(shotId)` - items with `timeline_frame == null`, non-video
+- `useVideoOutputs(shotId)` - video generations
 
-// Raw query - never transform, just fetch
-const useRawShotGenerations = (shotId: string | null) => 
-  useQuery({ queryKey: ['all-shot-generations', shotId], ... });
+Also fixed the **delete flicker bug** by:
+1. Removing component-level ref caching (`lastValidImagesRef`, `pendingDeletedShotGenerationIdsRef`)
+2. Removing event-based coordination (`shot-mutation-start/end` events)
+3. Simplifying `orderedShotImages` memo in ShotEditor
 
-// Selectors - derive views with stable references
-export const useTimelineGenerations = (shotId: string | null) => {
-  const { data, ...rest } = useRawShotGenerations(shotId);
-  const filtered = useMemo(() => 
-    data?.filter(g => g.timeline_frame != null && !g.type?.includes('video')),
-    [data]
-  );
-  return { data: filtered, ...rest };
-};
+The existing mutation optimistic updates in `useRemoveImageFromShot` now handle everything - no workaround code needed.
 
-export const useUnpositionedGenerations = (shotId: string | null) => {
-  const { data, ...rest } = useRawShotGenerations(shotId);
-  const filtered = useMemo(() => 
-    data?.filter(g => g.timeline_frame == null),
-    [data]
-  );
-  return { data: filtered, ...rest };
-};
+**Files changed:**
+- `src/shared/hooks/useShotGenerations.ts` - Added 3 selector hooks
+- `src/tools/travel-between-images/components/ShotEditor/index.tsx` - Removed ~100 lines of workaround code
+- `src/tools/travel-between-images/components/ShotEditor/hooks/useGenerationActions.ts` - Removed event dispatching
+- `src/tools/travel-between-images/pages/VideoTravelToolPage.tsx` - Removed ~70 lines of dead event listeners (`shot-mutation-complete`, `shot-duplicated`)
 
-export const useVideoGenerations = (shotId: string | null) => {
-  const { data, ...rest } = useRawShotGenerations(shotId);
-  const filtered = useMemo(() => 
-    data?.filter(g => g.type?.includes('video')),
-    [data]
-  );
-  return { data: filtered, ...rest };
-};
-```
-
-**Why this helps**: 
-- Filtering happens once, not in every consumer
-- `useMemo` ensures stable references when underlying data unchanged
-- Consumers get exactly the data shape they need
-
-**Migration**: Find all `.filter()` calls on generation data in components, replace with appropriate selector.
+**Remaining optional work** (documented in `optimistic_updates_pattern_07283e0b.plan.md`):
+- Migrate Timeline/ShotImageManager to use selectors directly (currently receive filtered data via props)
+- Clean up similar `lastValid*Ref` patterns in other files (ImageGenerationForm, etc.)
 
 ---
 
@@ -236,7 +215,7 @@ Baseline testing revealed 20 callback props being recreated on every render in `
 2. ~~**Phase 1 next** - Gives visibility into invalidation patterns (1-2 days)~~ ✅ DONE
 3. ~~**Phase 2** - Apply to new code immediately, retrofit existing queries incrementally (1 day)~~ ✅ DONE
 4. **Phase 4** - Reduces noise while working on other phases (0.5 day) - *Note: `debugConfig` already exists, just need adoption*
-5. **Phase 3 last** - Biggest code change, do after patterns are stable (2-3 days)
+5. ~~**Phase 3 last** - Biggest code change, do after patterns are stable (2-3 days)~~ ✅ DONE
 
 ---
 
@@ -245,11 +224,12 @@ Baseline testing revealed 20 callback props being recreated on every render in `
 - [x] Single file (`useGenerationInvalidation.ts`) contains all invalidation logic
 - [ ] Zero `console.log` in production (all behind DEBUG flags)
 - [x] New queries use preset from `queryDefaults.ts` (created with 4 presets + 6 hooks migrated)
-- [ ] No inline `.filter()` on generation arrays in components
+- [x] ~~No inline `.filter()` on generation arrays in components~~ Selector hooks created, ShotEditor workarounds removed
 - [x] Re-render count measurably reduced (31+ → only legitimate renders)
 - [x] No "Callback props changed (UNSTABLE)" warnings in RenderProfile logs (still shows on first render, expected)
 - [x] Invalidation calls centralized and traceable via `debugConfig.enable('invalidation')`
 - [x] Custom `arePropsEqual` blocks spurious re-renders from array/object reference changes
+- [x] Delete flicker bug fixed (optimistic updates work without event coordination)
 
 ---
 

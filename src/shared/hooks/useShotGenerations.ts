@@ -460,4 +460,90 @@ export const useTimelineShotGenerations = (
     ...baseQuery,
     data: timelineData
   } as UseQueryResult<TimelineGenerationRow[]>;
-}; 
+};
+
+// ============================================================================
+// SELECTOR HOOKS - Centralized filtering for different views
+// These provide stable, memoized views of shot data. When mutations update
+// the cache with optimistic data, all selectors automatically see the change.
+// ============================================================================
+
+/**
+ * Selector: Timeline images (positioned, non-video)
+ * 
+ * Returns images that should appear on the timeline:
+ * - Has valid timeline_frame (not null, >= 0)
+ * - Is not a video generation
+ * - Sorted by timeline_frame ascending
+ * 
+ * @param shotId - The shot ID to get timeline images for
+ * @returns Query result with filtered GenerationRow[] data
+ */
+export const useTimelineImages = (
+  shotId: string | null
+): UseQueryResult<GenerationRow[]> => {
+  const baseQuery = useAllShotGenerations(shotId);
+  
+  const filtered = React.useMemo(() => {
+    if (!baseQuery.data) return undefined;
+    
+    return baseQuery.data
+      .filter(g => 
+        g.timeline_frame != null && 
+        g.timeline_frame >= 0 && 
+        !g.type?.includes('video')
+      )
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+  }, [baseQuery.data]);
+  
+  return { ...baseQuery, data: filtered } as UseQueryResult<GenerationRow[]>;
+};
+
+/**
+ * Selector: Unpositioned images (no timeline_frame, non-video)
+ * 
+ * Returns images that are in the shot but not positioned on timeline:
+ * - Has null timeline_frame
+ * - Is not a video generation
+ * 
+ * @param shotId - The shot ID to get unpositioned images for
+ * @returns Query result with filtered GenerationRow[] data
+ */
+export const useUnpositionedImages = (
+  shotId: string | null
+): UseQueryResult<GenerationRow[]> => {
+  const baseQuery = useAllShotGenerations(shotId);
+  
+  const filtered = React.useMemo(() => {
+    if (!baseQuery.data) return undefined;
+    
+    return baseQuery.data.filter(g => 
+      g.timeline_frame == null && 
+      !g.type?.includes('video')
+    );
+  }, [baseQuery.data]);
+  
+  return { ...baseQuery, data: filtered } as UseQueryResult<GenerationRow[]>;
+};
+
+/**
+ * Selector: Video outputs
+ * 
+ * Returns video generations in the shot.
+ * 
+ * @param shotId - The shot ID to get video outputs for
+ * @returns Query result with filtered GenerationRow[] data
+ */
+export const useVideoOutputs = (
+  shotId: string | null
+): UseQueryResult<GenerationRow[]> => {
+  const baseQuery = useAllShotGenerations(shotId);
+  
+  const filtered = React.useMemo(() => {
+    if (!baseQuery.data) return undefined;
+    
+    return baseQuery.data.filter(g => g.type?.includes('video'));
+  }, [baseQuery.data]);
+  
+  return { ...baseQuery, data: filtered } as UseQueryResult<GenerationRow[]>;
+};
