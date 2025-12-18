@@ -439,7 +439,7 @@ export const TEST_SCENARIOS: TestScenario[] = [
       'upload segment video',
       'get or create parent generation',
       'create child generation with parent_generation_id',
-      'create variant on parent for segment',
+      // NOTE: We no longer create variants for child segments - children are tracked via parent_generation_id
       'check if all siblings complete',
     ],
   },

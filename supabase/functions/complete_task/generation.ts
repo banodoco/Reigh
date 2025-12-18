@@ -604,21 +604,26 @@ export async function createGenerationFromTask(
             console.log(`[GenMigration] Extracting specific params for child segment ${childOrder}`);
 
           // SPECIAL CASE: For travel orchestrators with only 1 segment, the segment IS the final output
-          // We create a variant on parent to update parent.location, but DON'T return early
-          // The child generation is still needed for consistency (variant selector, segment management, etc.)
+          // We create a variant on parent (like travel_stitch would) and RETURN EARLY
+          // No child generation needed - the single segment output becomes the parent's primary content
           if (childOrder === 0) {
             const numSegments = orchDetails.num_new_segments_to_generate;
             if (numSegments === 1 && parentGenerationId) {
-              console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent AND child generation`);
-              // Create variant on parent to update parent.location immediately
-              // Note: We don't return early - child generation will be created below
-              await createVariantOnParent(
+              console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent (no child generation)`);
+              
+              const singleSegmentResult = await createVariantOnParent(
                 supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
                 VARIANT_TYPES.TRAVEL_SEGMENT, { tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true }
               );
+              
               // Mark orchestrator task as having created a generation
               await supabase.from('tasks').update({ generation_created: true }).eq('id', orchestratorTaskId);
-              // Continue to create child generation below (don't return early)
+              
+              // Return early - single segment output IS the final output, no child needed
+              if (singleSegmentResult) {
+                console.log(`[TravelSingleSegment] Successfully created variant, returning parent generation`);
+                return singleSegmentResult;
+              }
             }
           }
 
@@ -680,24 +685,10 @@ export async function createGenerationFromTask(
     const newGeneration = await insertGeneration(supabase, generationRecord);
     console.log(`[GenMigration] Created generation ${newGeneration.id} for task ${taskId}`);
 
-    // For child generations, also create a variant on parent
-    if (isChild && parentGenerationId) {
-      console.log(`[GenMigration] Creating variant on parent ${parentGenerationId} for child segment ${childOrder}`);
-      try {
-        await createVariant(
-          supabase,
-          parentGenerationId,
-          publicUrl,
-          thumbnailUrl || null,
-          { ...taskData.params, tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, source_task_id: taskId, created_from: 'travel_segment', segment_index: childOrder, child_generation_id: newGeneration.id },
-          false,
-          'travel_segment',
-          `Segment ${(childOrder ?? 0) + 1}`
-        );
-      } catch (variantErr) {
-        console.error(`[GenMigration] Error creating variant for child segment:`, variantErr);
-      }
-    }
+    // NOTE: Child generations (travel segments) are tracked via parent_generation_id and is_child fields.
+    // They should NOT also be created as variants on the parent - that causes them to appear
+    // in the variant selector when viewing the parent, which is incorrect behavior.
+    // The ChildGenerationsView component fetches children correctly using the parent_generation_id relationship.
 
     // Link to shot if applicable (not for child generations)
     if (shotId && !isChild) {
