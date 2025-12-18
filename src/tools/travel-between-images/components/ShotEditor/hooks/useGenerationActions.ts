@@ -139,11 +139,22 @@ export const useGenerationActions = ({
   actionsRef.current = actions;
 
   const handleImageUploadToShot = useCallback(async (files: File[]) => {
-    if (!files || files.length === 0) return;
+    console.log('[AddDebug] 📤 handleImageUploadToShot CALLED:', {
+      filesCount: files?.length || 0,
+      timestamp: Date.now(),
+    });
     
+    if (!files || files.length === 0) return;
+
     // 🎯 STABILITY FIX: Use refs to access latest values without causing callback recreation
     const currentProjectId = projectIdRef.current;
     const currentShot = selectedShotRef.current;
+    
+    console.log('[AddDebug] 📤 handleImageUploadToShot refs:', {
+      currentProjectId: currentProjectId?.substring(0, 8),
+      currentShotId: currentShot?.id?.substring(0, 8),
+      timestamp: Date.now(),
+    });
     
     if (!currentProjectId || !currentShot?.id) {
       toast.error("Cannot upload image: Project or Shot ID is missing.");
@@ -280,12 +291,23 @@ export const useGenerationActions = ({
         }
 
         // Save link in DB (ignore returned shotImageEntryId for UI key stability)
-        await addImageToShotMutationRef.current.mutateAsync({
+        console.log('[AddDebug] 🔗 CALLING addImageToShotMutation.mutateAsync:', {
+          shot_id: currentShot.id?.substring(0, 8),
+          generation_id: newGeneration.id?.substring(0, 8),
+          project_id: currentProjectId?.substring(0, 8),
+          timestamp: Date.now(),
+        });
+        const addResult = await addImageToShotMutationRef.current.mutateAsync({
           shot_id: currentShot.id,
           generation_id: newGeneration.id,
           project_id: currentProjectId,
           imageUrl: finalImageUrl,
           thumbUrl: thumbnailUrl, // Use the generated thumbnail URL
+        });
+        console.log('[AddDebug] ✅ addImageToShotMutation COMPLETED:', {
+          result: addResult?.id?.substring(0, 8),
+          timeline_frame: addResult?.timeline_frame,
+          timestamp: Date.now(),
         });
 
         const finalImage: GenerationRow = {
