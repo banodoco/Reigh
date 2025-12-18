@@ -160,7 +160,7 @@ export function useDragAndDrop({
         
         // img.id is shot_generations.id - unique per entry
         const orderedIds = newOrder.map((img) => img.id);
-        const draggedItemId = active.id as string;
+        // draggedItemId is already defined at function scope (line 97)
         console.log('[DataTrace] 🎯 Drag complete - calling onImageReorder:', {
           idsCount: orderedIds.length,
           ids: orderedIds.map(id => id?.substring(0, 8)),
@@ -208,8 +208,7 @@ export function useDragAndDrop({
     
     console.log('[DragDebug:ShotImageManager] Calling onImageReorder for multi-drag');
     const reorderedIds = newItems.map((img) => img.id);
-    // For multi-drag, pass the active item as the "primary" dragged item
-    const draggedItemId = active.id as string;
+    // draggedItemId is already defined at function scope (line 97)
     console.log('[DataTrace] 🎯 Multi-drag complete - calling onImageReorder:', {
       idsCount: reorderedIds.length,
       ids: reorderedIds.map(id => id?.substring(0, 8)),
