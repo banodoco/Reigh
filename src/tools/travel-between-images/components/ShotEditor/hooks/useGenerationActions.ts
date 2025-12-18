@@ -508,7 +508,17 @@ export const useGenerationActions = ({
       console.error('[DeleteDebug] ❌ Error during deletion or frame shift:', error);
       // Error handling is done by the mutation itself
     } finally {
-      // Always emit end so UI can stop suppressing deleted items even on error.
+      // CRITICAL: Wait for query to refetch before clearing pending delete tracking.
+      // Otherwise cached data can briefly resurrect the deleted item during the refetch window.
+      // The mutation's onSuccess invalidates queries, so we wait for that to settle.
+      await queryClientRef.current.refetchQueries({ 
+        queryKey: ['all-shot-generations', currentShot.id],
+        exact: true 
+      }).catch(() => {
+        // Ignore refetch errors - the item is still deleted
+      });
+      
+      // Now it's safe to clear the pending delete - fresh data is loaded
       window.dispatchEvent(new CustomEvent('shot-mutation-end', {
         detail: {
           shotId: currentShot.id,
@@ -559,6 +569,16 @@ export const useGenerationActions = ({
     } catch (error) {
       toast.error('Failed to remove some images from timeline');
     } finally {
+      // CRITICAL: Wait for query to refetch before clearing pending delete tracking.
+      // Otherwise cached data can briefly resurrect deleted items during the refetch window.
+      await queryClientRef.current.refetchQueries({ 
+        queryKey: ['all-shot-generations', currentShot.id],
+        exact: true 
+      }).catch(() => {
+        // Ignore refetch errors - items are still deleted
+      });
+      
+      // Now it's safe to clear the pending deletes - fresh data is loaded
       window.dispatchEvent(new CustomEvent('shot-mutation-end', {
         detail: {
           shotId: currentShot.id,

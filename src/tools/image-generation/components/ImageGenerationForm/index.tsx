@@ -248,6 +248,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     const shotChanged = prevEffectiveShotId.current !== effectiveShotId;
     
     if (selectionChanged || shotChanged) {
+      // Get stack trace to see what triggered this change
+      const stack = new Error().stack?.split('\n').slice(2, 6).map(s => s.trim()).join(' <- ');
       console.log('[RefJumpDebug] 🔄 ' + (shotChanged ? 'SHOT CHANGED' : 'SELECTION CHANGED') + ':', {
         shotChanged,
         shotFrom: prevEffectiveShotId.current?.substring(0, 8) || 'null',
@@ -265,10 +267,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         hasCachedSettings: !!cachedProjectSettings,
         timestamp: Date.now()
       });
+      // Log the actual full IDs for easier debugging
+      if (selectionChanged) {
+        console.log('[RefJumpDebug] 📍 Selection IDs:', {
+          from: prevSelectedRefId.current,
+          to: selectedReferenceId,
+          allSelectionsForShots: Object.entries(selectedReferenceIdByShot).map(([k, v]) => `${k.substring(0,8)}:${v?.substring(0,8)}`).join(', ')
+        });
+      }
       prevSelectedRefId.current = selectedReferenceId;
       prevEffectiveShotId.current = effectiveShotId;
     }
-  }, [selectedReferenceId, effectiveShotId, projectImageSettings, cachedProjectSettings, isLoadingProjectSettings, associatedShotId, initialShotId]);
+  }, [selectedReferenceId, effectiveShotId, projectImageSettings, cachedProjectSettings, isLoadingProjectSettings, associatedShotId, initialShotId, selectedReferenceIdByShot]);
   
   // Debug log for reference selection tracking
   useEffect(() => {
@@ -313,7 +323,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Show loading state only if we don't have enough references hydrated yet
   // This prevents flickering when background queries (like isLoadingReferences) run but we already have data
   const hasEnoughReferences = referenceCount > 0 && hydratedReferences.length >= Math.floor(referenceCount * 0.9);
-  const isReferenceDataLoading = (isLoadingProjectSettings || isLoadingReferences) && !hasEnoughReferences;
+  
+  // Also consider "loading" if:
+  // 1. We have a selection ID but can't find it (stale ID, auto-selection will kick in)
+  // 2. We have a selection ID but references aren't loaded yet (can't verify if valid)
+  const hasStaleSelection = selectedReferenceId && !currentSelectedReference && hydratedReferences.length > 0;
+  const selectionPendingValidation = selectedReferenceId && hydratedReferences.length === 0 && referenceCount > 0;
+  
+  const isReferenceDataLoading = 
+    ((isLoadingProjectSettings || isLoadingReferences) && !hasEnoughReferences) ||
+    hasStaleSelection ||  // Wait for auto-selection to correct stale IDs
+    selectionPendingValidation;  // Wait for references to load so we can validate selection
   
   // Debug logging for reference loading state
   useEffect(() => {
@@ -327,18 +347,24 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       threshold,
       needsMoreRefs: hydratedReferences.length < threshold,
       isReferenceDataLoading,
+      hasStaleSelection,
+      selectionPendingValidation,
       calculationBreakdown: {
         condition1_loadingSettings: isLoadingProjectSettings,
         condition2_loadingReferences: isLoadingReferences,
         condition3_notEnoughHydrated: !hasEnoughReferences,
-        finalResult: (isLoadingProjectSettings || isLoadingReferences) && !hasEnoughReferences
+        condition4_staleSelection: hasStaleSelection,
+        condition5_pendingValidation: selectionPendingValidation,
+        selectedReferenceId: selectedReferenceId?.substring(0, 8),
+        hasCurrentSelectedReference: !!currentSelectedReference,
+        hydratedReferencesLength: hydratedReferences.length,
       },
       cachedReferenceCount: referenceCountFromCache,
       hasCachedSettings: !!cachedProjectSettings,
       hasProjectSettings: !!projectImageSettings,
       timestamp: Date.now()
     });
-  }, [isLoadingProjectSettings, referenceCount, hydratedReferences.length, referencePointers.length, isReferenceDataLoading, isLoadingReferences, referenceCountFromCache, cachedProjectSettings, projectImageSettings]);
+  }, [isLoadingProjectSettings, referenceCount, hydratedReferences.length, referencePointers.length, isReferenceDataLoading, isLoadingReferences, referenceCountFromCache, cachedProjectSettings, projectImageSettings, hasStaleSelection, currentSelectedReference, selectedReferenceId, selectionPendingValidation]);
   
   // Resource mutation hooks
   const createStyleReference = useCreateResource();
@@ -907,7 +933,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           prompts: [],
           masterPrompt: parsed.masterPrompt || '',
           promptMode: parsed.promptMode || 'automated',
-          selectedReferenceId: null, // Don't inherit - auto-select uses most-recent reference
+          // IMPORTANT: Do NOT default this to null.
+          // null is treated as an explicit override and would suppress the project-level
+          // per-shot selection mapping (selectedReferenceIdByShot), leading to "no selection"
+          // and jitter/jumps when the user clicks.
+          // Leave undefined so we can fall back to project-level mapping until the user picks one.
         };
       }
     } catch (e) {
@@ -918,7 +948,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       prompts: [], 
       masterPrompt: noShotMasterPrompt || '',
       promptMode: promptMode || 'automated',
-      selectedReferenceId: null,
     };
   }, [associatedShotId, noShotMasterPrompt, promptMode]);
 
@@ -1209,17 +1238,27 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         // initialShotId was provided - set to that shot if it exists
         const shotExists = shots.some(shot => shot.id === initialShotId);
         if (shotExists) {
-          console.log('[RefJumpDebug] ✅ Applying initialShotId:', initialShotId.substring(0, 8), 'from:', associatedShotId?.substring(0, 8) || 'null');
-          setAssociatedShotId(initialShotId);
-          markAsInteracted();
+          // Skip if already set to the correct value (persistence may have loaded it faster)
+          if (associatedShotId === initialShotId) {
+            console.log('[RefJumpDebug] ⏭️ Skipping initialShotId - already set to:', initialShotId.substring(0, 8));
+          } else {
+            console.log('[RefJumpDebug] ✅ Applying initialShotId:', initialShotId.substring(0, 8), 'from:', associatedShotId?.substring(0, 8) || 'null');
+            setAssociatedShotId(initialShotId);
+            markAsInteracted();
+          }
         } else {
           console.log('[RefJumpDebug] ⚠️ initialShotId not found in shots list:', initialShotId);
         }
       } else if (initialShotId === null) {
         // initialShotId is explicitly null - reset to None (opened from outside shot context)
-        console.log('[RefJumpDebug] 🔄 initialShotId is null, resetting from:', associatedShotId?.substring(0, 8) || 'null', 'to None');
-        setAssociatedShotId(null);
-        markAsInteracted();
+        // Skip if already null
+        if (associatedShotId !== null) {
+          console.log('[RefJumpDebug] 🔄 initialShotId is null, resetting from:', associatedShotId?.substring(0, 8) || 'null', 'to None');
+          setAssociatedShotId(null);
+          markAsInteracted();
+        } else {
+          console.log('[RefJumpDebug] ⏭️ Skipping initialShotId null - already None');
+        }
       }
       // If initialShotId is undefined, keep the persisted value
       hasAppliedInitialShotId.current = true;
