@@ -126,7 +126,9 @@ export function useGenerationsPageLogic({
 
   // ============================================================================
   // INITIALIZE FILTER STATE FROM PERSISTED SETTINGS
-  // When shot settings load, restore the user's previous choice if they had one.
+  // When shot settings load, populate the map with user's previous choice.
+  // The main effect below reads from the map and applies the filter.
+  // This avoids races where both effects try to setSelectedShotFilter.
   // ============================================================================
   
   useEffect(() => {
@@ -139,15 +141,17 @@ export function useGenerationsPageLogic({
       return;
     }
     
-    // Restore from persisted settings if user had customized
+    // Populate map from persisted settings if user had customized
+    // NOTE: We only update the map here, NOT setSelectedShotFilter.
+    // The main effect below is the single source of truth for applying filters.
     if (shotSettings?.userHasCustomized && shotSettings.selectedShotFilter) {
-      console.log('[StableFilter] Restoring from persisted settings:', {
+      console.log('[StableFilter] Populating map from persisted settings:', {
         shotId: currentShotId?.substring(0, 8),
         filter: shotSettings.selectedShotFilter === 'all' ? 'all' : shotSettings.selectedShotFilter?.substring(0, 8)
       });
       
       setFilterStateForShot(currentShotId, shotSettings.selectedShotFilter, true);
-      setSelectedShotFilter(shotSettings.selectedShotFilter);
+      // Also restore excludePositioned preference
       setExcludePositioned(shotSettings.excludePositioned ?? true);
     }
   }, [currentShotId, isLoadingShotSettings, shotSettings, setFilterStateForShot]);
@@ -159,7 +163,17 @@ export function useGenerationsPageLogic({
   // ============================================================================
   
   useEffect(() => {
-    // Only run when the shot actually changes
+    // Don't apply defaults while per-shot settings are still loading.
+    // If we apply a shotsData-based default first, then apply settings a moment later,
+    // the dropdown can "flip" (all -> shot -> all) or get stuck (all -> stays all).
+    if (currentShotId && isLoadingShotSettings) {
+      console.log('[StableFilter] Shot changed but settings still loading - deferring filter apply:', {
+        shotId: currentShotId.substring(0, 8),
+      });
+      return;
+    }
+
+    // Only run when the shot actually changes (or when we deferred previously and settings finished loading)
     if (currentShotId === lastAppliedShotIdRef.current) {
       return;
     }
@@ -172,23 +186,12 @@ export function useGenerationsPageLogic({
       currentFilter: selectedShotFilter
     });
     
-    lastAppliedShotIdRef.current = currentShotId;
-    
     if (!currentShotId) {
       // No shot selected - show all
       console.log('[StableFilter] No current shot, showing all');
       setSelectedShotFilter('all');
       setExcludePositioned(true);
-      return;
-    }
-    
-    // IMPORTANT: When navigating between shots (shot-to-shot), preserve "all" filter
-    // This prevents the dropdown from briefly flashing to the specific shot
-    const isNavigatingBetweenShots = previousShotId !== null && currentShotId !== null;
-    if (isNavigatingBetweenShots && selectedShotFilter === 'all') {
-      console.log('[StableFilter] Preserving "all" filter during shot-to-shot navigation');
-      // Keep filter at "all", just update lastAffectedShotId for targeting
-      setLastAffectedShotId(currentShotId);
+      lastAppliedShotIdRef.current = currentShotId;
       return;
     }
     
@@ -215,8 +218,17 @@ export function useGenerationsPageLogic({
     
     // Sync the dropdown selection to the current shot
     setLastAffectedShotId(currentShotId);
+
+    // Mark as applied only after we actually apply the filter for this shot
+    lastAppliedShotIdRef.current = currentShotId;
     
-  }, [currentShotId, selectedShotFilter, getFilterStateForShot, setFilterStateForShot, setLastAffectedShotId]);
+  }, [
+    currentShotId,
+    isLoadingShotSettings,
+    getFilterStateForShot,
+    setFilterStateForShot,
+    setLastAffectedShotId,
+  ]);
 
   // ============================================================================
   // UPDATE DEFAULTS WHEN SHOT IMAGE COUNTS CHANGE
