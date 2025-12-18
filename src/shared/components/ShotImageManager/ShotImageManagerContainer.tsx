@@ -133,6 +133,7 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
       <EmptyState
         onImageUpload={props.onImageUpload}
         isUploadingImage={props.isUploadingImage}
+        shotId={props.selectedShotId}
       />
     );
   }

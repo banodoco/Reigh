@@ -1,17 +1,15 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/shared/components/ui/button';
-import { Label } from '@/shared/components/ui/label';
 import { Image } from 'lucide-react';
+import { ImageUploadActions } from '@/shared/components/ImageUploadActions';
 
 interface EmptyStateProps {
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
+  /** Optional shot ID to pre-select in the generation modal */
+  shotId?: string;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ onImageUpload, isUploadingImage }) => {
-  const navigate = useNavigate();
-  
+export const EmptyState: React.FC<EmptyStateProps> = ({ onImageUpload, isUploadingImage, shotId }) => {
   return (
     <div className="space-y-4">
       {onImageUpload && (
@@ -22,46 +20,13 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onImageUpload, isUploadi
               Add images to start building your animation
             </p>
             
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                if (files.length > 0) {
-                  onImageUpload(files);
-                  e.target.value = ''; // Reset input
-                }
-              }}
-              className="hidden"
-              id="empty-shot-image-upload"
-              disabled={isUploadingImage}
+            <ImageUploadActions
+              onImageUpload={onImageUpload}
+              isUploadingImage={isUploadingImage}
+              shotId={shotId}
+              inputId="empty-shot-image-upload"
+              buttonSize="sm"
             />
-            
-            <div className="flex gap-2 w-full">
-              <Label htmlFor="empty-shot-image-upload" className="m-0 cursor-pointer flex-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isUploadingImage}
-                  className="w-full"
-                  asChild
-                >
-                  <span>
-                    {isUploadingImage ? 'Uploading...' : 'Upload Images'}
-                  </span>
-                </Button>
-              </Label>
-              
-              <Button
-                variant="retro"
-                size="retro-sm"
-                onClick={() => navigate("/tools/image-generation")}
-                className="flex-1"
-              >
-                Start generating
-              </Button>
-            </div>
           </div>
         </div>
       )}

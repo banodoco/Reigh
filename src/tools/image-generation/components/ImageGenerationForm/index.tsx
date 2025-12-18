@@ -233,8 +233,42 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const referenceCount = Math.max(currentCount, lastKnownReferenceCount.current);
   
   const referencePointers = projectImageSettings?.references ?? cachedProjectSettings?.references ?? [];
-  const selectedReferenceIdByShot = projectImageSettings?.selectedReferenceIdByShot ?? {};
+  // Use cache fallback for selection too, so selection is stable during loading
+  const selectedReferenceIdByShot = projectImageSettings?.selectedReferenceIdByShot ?? cachedProjectSettings?.selectedReferenceIdByShot ?? {};
   const selectedReferenceId = selectedReferenceIdByShot[effectiveShotId] ?? null;
+  
+  // [RefJumpDebug] Detailed logging to track selection source and changes
+  const prevSelectedRefId = useRef<string | null>(null);
+  const prevEffectiveShotId = useRef<string | null>(null);
+  useEffect(() => {
+    const fromProjectSettings = projectImageSettings?.selectedReferenceIdByShot?.[effectiveShotId];
+    const fromCache = cachedProjectSettings?.selectedReferenceIdByShot?.[effectiveShotId];
+    const source = fromProjectSettings !== undefined ? 'projectSettings' : (fromCache !== undefined ? 'cache' : 'default(null)');
+    const selectionChanged = prevSelectedRefId.current !== selectedReferenceId;
+    const shotChanged = prevEffectiveShotId.current !== effectiveShotId;
+    
+    if (selectionChanged || shotChanged) {
+      console.log('[RefJumpDebug] 🔄 ' + (shotChanged ? 'SHOT CHANGED' : 'SELECTION CHANGED') + ':', {
+        shotChanged,
+        shotFrom: prevEffectiveShotId.current?.substring(0, 8) || 'null',
+        shotTo: effectiveShotId?.substring(0, 8),
+        associatedShotId: associatedShotId?.substring(0, 8) || 'null',
+        initialShotId: initialShotId?.substring(0, 8) || 'null/undefined',
+        selectionChanged,
+        selectionFrom: prevSelectedRefId.current?.substring(0, 8) || 'null',
+        selectionTo: selectedReferenceId?.substring(0, 8) || 'null',
+        source,
+        fromProjectSettings: fromProjectSettings?.substring(0, 8) || 'undefined',
+        fromCache: fromCache?.substring(0, 8) || 'undefined',
+        isLoadingProjectSettings,
+        hasProjectSettings: !!projectImageSettings,
+        hasCachedSettings: !!cachedProjectSettings,
+        timestamp: Date.now()
+      });
+      prevSelectedRefId.current = selectedReferenceId;
+      prevEffectiveShotId.current = effectiveShotId;
+    }
+  }, [selectedReferenceId, effectiveShotId, projectImageSettings, cachedProjectSettings, isLoadingProjectSettings, associatedShotId, initialShotId]);
   
   // Debug log for reference selection tracking
   useEffect(() => {
@@ -385,8 +419,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Auto-select reference if we have references but no valid selected reference for this shot
   // Uses the most recently added reference as default
   // Note: Only updates project-level here; shot-level is synced via handleSelectReference or later effect
+  // IMPORTANT: Skip while loading to prevent "jumping" - wait for actual saved selection to load
   useEffect(() => {
-    if (hydratedReferences.length > 0 && projectImageSettings) {
+    if (hydratedReferences.length > 0 && projectImageSettings && !isLoadingProjectSettings) {
       // Find the most recently added reference (by createdAt)
       const getMostRecentReference = () => {
         const sorted = [...hydratedReferences].sort((a, b) => {
@@ -423,7 +458,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         });
       }
     }
-  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings]);
+  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings, isLoadingProjectSettings]);
 
   // Check if database has caught up with pending mode update
   useEffect(() => {
@@ -1157,28 +1192,39 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // If initialShotId is explicitly null, reset to None (opened from outside shot context)
   const hasAppliedInitialShotId = useRef(false);
   useEffect(() => {
+    console.log('[RefJumpDebug] 🎯 initialShotId effect check:', {
+      ready,
+      hasAppliedInitialShotId: hasAppliedInitialShotId.current,
+      hasShots: !!shots,
+      shotsCount: shots?.length,
+      initialShotId: initialShotId?.substring(0, 8) || String(initialShotId),
+      currentAssociatedShotId: associatedShotId?.substring(0, 8) || 'null',
+      willApply: ready && !hasAppliedInitialShotId.current && !!shots,
+      timestamp: Date.now()
+    });
+    
     // Only apply once, after hydration is complete
     if (ready && !hasAppliedInitialShotId.current && shots) {
       if (initialShotId) {
         // initialShotId was provided - set to that shot if it exists
         const shotExists = shots.some(shot => shot.id === initialShotId);
         if (shotExists) {
-          console.log('[ImageGenerationForm] Applying initialShotId:', initialShotId);
+          console.log('[RefJumpDebug] ✅ Applying initialShotId:', initialShotId.substring(0, 8), 'from:', associatedShotId?.substring(0, 8) || 'null');
           setAssociatedShotId(initialShotId);
           markAsInteracted();
         } else {
-          console.log('[ImageGenerationForm] initialShotId not found in shots list:', initialShotId);
+          console.log('[RefJumpDebug] ⚠️ initialShotId not found in shots list:', initialShotId);
         }
       } else if (initialShotId === null) {
         // initialShotId is explicitly null - reset to None (opened from outside shot context)
-        console.log('[ImageGenerationForm] initialShotId is null, resetting to None');
+        console.log('[RefJumpDebug] 🔄 initialShotId is null, resetting from:', associatedShotId?.substring(0, 8) || 'null', 'to None');
         setAssociatedShotId(null);
         markAsInteracted();
       }
       // If initialShotId is undefined, keep the persisted value
       hasAppliedInitialShotId.current = true;
     }
-  }, [ready, initialShotId, shots, markAsInteracted]);
+  }, [ready, initialShotId, shots, markAsInteracted, associatedShotId]);
 
   // Reset associatedShotId if the selected shot no longer exists (e.g., was deleted)
   useEffect(() => {

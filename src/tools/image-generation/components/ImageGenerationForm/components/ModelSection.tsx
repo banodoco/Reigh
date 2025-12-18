@@ -331,7 +331,8 @@ isSelected
           })()
         )}
         
-        {/* Add reference button with search button */}
+        {/* Add reference button with search button - hide during loading since skeletons fill the space */}
+        {!(isLoadingReferenceData && referenceCount > 0) && (
         <div className="relative aspect-square">
           <label
             className={cn(
@@ -424,6 +425,7 @@ isSelected
             </button>
           )}
         </div>
+        )}
       </div>
     </div>
   );

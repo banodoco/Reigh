@@ -455,7 +455,11 @@ export const useGenerationActions = ({
 
     // Emit event to lock timeline positions during mutation + refetch
     window.dispatchEvent(new CustomEvent('shot-mutation-start', {
-      detail: { shotId: currentShot.id, type: 'delete' }
+      detail: {
+        shotId: currentShot.id,
+        type: 'delete',
+        shotGenerationId: shotImageEntryId, // shot_generations.id
+      }
     }));
     
     try {
@@ -503,6 +507,15 @@ export const useGenerationActions = ({
     } catch (error) {
       console.error('[DeleteDebug] ❌ Error during deletion or frame shift:', error);
       // Error handling is done by the mutation itself
+    } finally {
+      // Always emit end so UI can stop suppressing deleted items even on error.
+      window.dispatchEvent(new CustomEvent('shot-mutation-end', {
+        detail: {
+          shotId: currentShot.id,
+          type: 'delete',
+          shotGenerationId: shotImageEntryId, // shot_generations.id
+        }
+      }));
     }
   }, []); // mutations, queryClient, selectedShot, projectId, orderedShotImages accessed via refs
 
@@ -520,6 +533,15 @@ export const useGenerationActions = ({
       totalCount: shotImageEntryIds.length,
     });
 
+    // Emit event so ShotEditor can prevent deleted items from "resurrecting" via cache fallbacks.
+    window.dispatchEvent(new CustomEvent('shot-mutation-start', {
+      detail: {
+        shotId: currentShot.id,
+        type: 'batch-delete',
+        shotGenerationIds: shotImageEntryIds, // shot_generations.id[]
+      }
+    }));
+
     // REMOVED: Optimistic local state - two-phase loading handles updates
     
     // Execute all timeline removals
@@ -536,6 +558,14 @@ export const useGenerationActions = ({
       console.log('[BATCH_DELETE] Batch removal completed successfully');
     } catch (error) {
       toast.error('Failed to remove some images from timeline');
+    } finally {
+      window.dispatchEvent(new CustomEvent('shot-mutation-end', {
+        detail: {
+          shotId: currentShot.id,
+          type: 'batch-delete',
+          shotGenerationIds: shotImageEntryIds, // shot_generations.id[]
+        }
+      }));
     }
   }, []); // mutations, selectedShot, projectId accessed via refs
 

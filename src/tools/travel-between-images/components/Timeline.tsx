@@ -47,8 +47,6 @@ import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useDeviceDetection } from "@/shared/hooks/useDeviceDetection";
-import { Button } from "@/shared/components/ui/button";
-import { Label } from "@/shared/components/ui/label";
 import { Image, Upload } from "lucide-react";
 import { transformForTimeline, type RawShotGeneration } from "@/shared/lib/generationTransformers";
 import { isVideoGeneration } from "@/shared/lib/typeGuards";
@@ -75,6 +73,7 @@ import { useRenderCount } from "@/shared/components/debug/RefactorMetricsCollect
 // Import components
 import TimelineControls from "./Timeline/TimelineControls";
 import TimelineContainer from "./Timeline/TimelineContainer";
+import { ImageUploadActions } from "@/shared/components/ImageUploadActions";
 
 // Main Timeline component props
 export interface TimelineProps {
@@ -774,48 +773,13 @@ const Timeline: React.FC<TimelineProps> = ({
                         <h3 className="font-medium mb-2">No images on timeline</h3>
                       </div>
                       
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || []);
-                          if (files.length > 0) {
-                            onImageUpload(files);
-                            e.target.value = ''; // Reset input
-                          }
-                        }}
-                        className="hidden"
-                        id="timeline-empty-image-upload"
-                        disabled={isUploadingImage}
+                      <ImageUploadActions
+                        onImageUpload={onImageUpload}
+                        isUploadingImage={isUploadingImage}
+                        shotId={shotId}
+                        inputId="timeline-empty-image-upload"
+                        buttonSize="default"
                       />
-                      <div className="flex gap-2 w-full">
-                        <Label htmlFor="timeline-empty-image-upload" className="m-0 cursor-pointer flex-1">
-                          <Button
-                            variant="outline"
-                            size="default"
-                            disabled={isUploadingImage}
-                            className="w-full"
-                            asChild
-                          >
-                            <span>
-                              {isUploadingImage ? 'Uploading...' : 'Upload Images'}
-                            </span>
-                          </Button>
-                        </Label>
-                        
-                        <Button
-                          variant="retro"
-                          size="retro-sm"
-                          onClick={() => {
-                            // Open image generation in a new tab to preserve context in travel tool
-                            window.open('/tools/image-generation', '_blank', 'noopener,noreferrer');
-                          }}
-                          className="flex-1"
-                        >
-                          Start generating
-                        </Button>
-                      </div>
                       
                       {/* Subtle drag and drop hint */}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground/60">

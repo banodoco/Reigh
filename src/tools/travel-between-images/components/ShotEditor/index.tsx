@@ -355,6 +355,55 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // [FlickerFix] Persist last valid images list to prevent empty flashes during refetches
   const lastValidImagesRef = useRef<GenerationRow[]>([]);
+  // [FlickerFix] Track pending deletions so cache fallbacks can't resurrect deleted items
+  const pendingDeletedShotGenerationIdsRef = useRef<Set<string>>(new Set());
+
+  // Listen for delete mutations so we can suppress re-adding deleted items via cached fallbacks
+  useEffect(() => {
+    const onMutationStart = (event: Event) => {
+      const e = event as CustomEvent<any>;
+      const detail = e.detail;
+      if (!detail || detail.shotId !== selectedShotId) return;
+
+      if (detail.type === 'delete' && typeof detail.shotGenerationId === 'string') {
+        pendingDeletedShotGenerationIdsRef.current.add(detail.shotGenerationId);
+      }
+
+      if (detail.type === 'batch-delete' && Array.isArray(detail.shotGenerationIds)) {
+        for (const id of detail.shotGenerationIds) {
+          if (typeof id === 'string') pendingDeletedShotGenerationIdsRef.current.add(id);
+        }
+      }
+    };
+
+    const onMutationEnd = (event: Event) => {
+      const e = event as CustomEvent<any>;
+      const detail = e.detail;
+      if (!detail || detail.shotId !== selectedShotId) return;
+
+      if (detail.type === 'delete' && typeof detail.shotGenerationId === 'string') {
+        pendingDeletedShotGenerationIdsRef.current.delete(detail.shotGenerationId);
+      }
+
+      if (detail.type === 'batch-delete' && Array.isArray(detail.shotGenerationIds)) {
+        for (const id of detail.shotGenerationIds) {
+          if (typeof id === 'string') pendingDeletedShotGenerationIdsRef.current.delete(id);
+        }
+      }
+    };
+
+    window.addEventListener('shot-mutation-start' as any, onMutationStart as any);
+    window.addEventListener('shot-mutation-end' as any, onMutationEnd as any);
+    return () => {
+      window.removeEventListener('shot-mutation-start' as any, onMutationStart as any);
+      window.removeEventListener('shot-mutation-end' as any, onMutationEnd as any);
+    };
+  }, [selectedShotId]);
+
+  // Clear any pending deletion markers when switching shots
+  useEffect(() => {
+    pendingDeletedShotGenerationIdsRef.current.clear();
+  }, [selectedShotId]);
 
   const orderedShotImages = React.useMemo(() => {
     // [ShotNavPerf] PERFORMANCE FIX: Prioritize showing content immediately
@@ -380,6 +429,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     } else {
       result = fullShotImages; // Fallback to query result even if empty
       dataSource = 'fullImages (fallback)';
+    }
+
+    // [FlickerFix] Never allow deleted items to reappear due to cached fallbacks / context fallbacks
+    const pendingDeletedIds = pendingDeletedShotGenerationIdsRef.current;
+    if (pendingDeletedIds.size > 0 && result.length > 0) {
+      const beforeCount = result.length;
+      result = result.filter((img: any) => !pendingDeletedIds.has(img.id));
+      if (result.length !== beforeCount) {
+        dataSource = `${dataSource} + filtered(pending-delete)`;
+      }
     }
 
     // [FlickerFix] Persist last valid state if result is empty OR PARTIAL during refetch
@@ -411,15 +470,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     } else if (lastValidImagesRef.current.length > 0 && isRefetching) {
        // If we are refetching and result is LESS than cache, it's likely partial/stale data
        // Use cached data to maintain stability
-       if (result.length < lastValidImagesRef.current.length || result.length === 0) {
+       const cachedFiltered = lastValidImagesRef.current.filter((img: any) => !pendingDeletedIds.has(img.id));
+       if (result.length < cachedFiltered.length || result.length === 0) {
          console.log('[DUPLICATE_UI] ⚠️ Partial/empty result during refetch - using cached images', {
            resultCount: result.length,
-           cachedCount: lastValidImagesRef.current.length,
+           cachedCount: cachedFiltered.length,
            isRefetching,
            dataSource: dataSource,
-           difference: lastValidImagesRef.current.length - result.length
+           difference: cachedFiltered.length - result.length
          });
-         result = lastValidImagesRef.current;
+         result = cachedFiltered;
          dataSource = 'cached (partial data prevention)';
        }
     }
