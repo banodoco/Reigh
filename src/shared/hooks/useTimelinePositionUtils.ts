@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { GenerationRow } from '@/types/shots';
 import type { ShotGeneration, PositionMetadata } from './useEnhancedShotPositions';
 import { isVideoGeneration } from '@/shared/lib/typeGuards';
+import { calculateAverageSpacing, DEFAULT_FRAME_SPACING } from '@/shared/utils/timelinePositionCalculator';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 // Re-export types for convenience
@@ -86,36 +87,14 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
   /**
    * Load positions from database (refresh)
    */
-  // Helper to sync shot_data in generations table (critical for Phase 1 fast loading stability)
-  const syncShotData = useCallback(async (generationId: string, targetShotId: string, frame: number) => {
-    try {
-      // 1. Fetch current shot_data
-      const { data: genData, error: fetchError } = await supabase
-        .from('generations')
-        .select('shot_data')
-        .eq('id', generationId)
-        .single();
-        
-      if (fetchError || !genData) {
-        return;
-      }
-
-      // 2. Update shot_data map
-      const currentShotData = (genData.shot_data as Record<string, number>) || {};
-      // Only update if changed
-      if (currentShotData[targetShotId] === frame) return;
-      
-      const newShotData = { ...currentShotData, [targetShotId]: frame };
-
-      // 3. Write back
-      await supabase
-        .from('generations')
-        .update({ shot_data: newShotData })
-        .eq('id', generationId);
-        
-    } catch (err) {
-      console.warn('[TimelinePositionUtils] Background sync of shot_data failed:', err);
-    }
+  // Helper to sync shot_data in generations table
+  // NOTE: With the new array format, the database trigger sync_shot_to_generation()
+  // rebuilds the entire shot_data array from shot_generations on every change.
+  // Manual sync is no longer needed - the trigger handles everything correctly.
+  const syncShotData = useCallback(async (_generationId: string, _targetShotId: string, _frame: number) => {
+    // No-op: Let database trigger handle shot_data sync
+    // The trigger rebuilds the full array from shot_generations, which is the source of truth
+    return;
   }, []);
 
   const loadPositions = useCallback(async (opts?: { silent?: boolean; reason?: string }) => {
@@ -234,10 +213,10 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
       if (oldSecondItem?.timeline_frame != null) {
         displacedNewFrame = Math.floor((0 + oldSecondItem.timeline_frame) / 2);
       } else if (displacedFirstItem.timeline_frame != null) {
-        // No second item, use displaced item's current frame or 60
-        displacedNewFrame = Math.max(60, displacedFirstItem.timeline_frame);
+        // No second item, use displaced item's current frame or default spacing
+        displacedNewFrame = Math.max(DEFAULT_FRAME_SPACING, displacedFirstItem.timeline_frame);
       } else {
-        displacedNewFrame = 60;
+        displacedNewFrame = DEFAULT_FRAME_SPACING;
       }
       
       console.log('[DataTrace] 🎯 Displaced first item new position:', {
@@ -289,14 +268,20 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
       });
       
     } else if (predecessor && predecessor.timeline_frame != null) {
-      // At end - extend timeline by 60 frames per item
+      // At end - extend timeline using average spacing of existing items
+      const existingFrames = allItems
+        .filter(item => item.timeline_frame != null)
+        .map(item => item.timeline_frame!);
+      const spacing = calculateAverageSpacing(existingFrames, DEFAULT_FRAME_SPACING);
+      
       console.log('[DataTrace] 🎯 Distribution calculation (at end):', {
         predecessorFrame: predecessor.timeline_frame,
         numItems: draggedItemIds.length,
+        spacing,
       });
       
       draggedShotGens.forEach((sg, i) => {
-        const newFrame = predecessor.timeline_frame! + (60 * (i + 1));
+        const newFrame = predecessor.timeline_frame! + (spacing * (i + 1));
         pushUpdate(sg.id, newFrame, `Extend at end (${i + 1}/${draggedItemIds.length})`);
       });
       
@@ -319,13 +304,14 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
       });
       
     } else {
-      // First items in timeline - start at 0 and space by 60
+      // First items in timeline - start at 0 and space by default
       console.log('[DataTrace] 🎯 Distribution calculation (first items):', {
         numItems: draggedItemIds.length,
+        spacing: DEFAULT_FRAME_SPACING,
       });
       
       draggedShotGens.forEach((sg, i) => {
-        const newFrame = 60 * i;
+        const newFrame = DEFAULT_FRAME_SPACING * i;
         pushUpdate(sg.id, newFrame, `Initial placement (${i + 1}/${draggedItemIds.length})`);
       });
     }

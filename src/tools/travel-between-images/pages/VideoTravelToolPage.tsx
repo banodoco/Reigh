@@ -1934,7 +1934,8 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   // Handle dropping a generation onto an existing shot
   const handleGenerationDropOnShot = useCallback(async (
     shotId: string,
-    data: { generationId: string; imageUrl: string; thumbUrl?: string; metadata?: any }
+    data: { generationId: string; imageUrl: string; thumbUrl?: string; metadata?: any },
+    options?: { withoutPosition?: boolean }
   ) => {
     if (!selectedProjectId) {
       toast.error('No project selected');
@@ -1942,26 +1943,41 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     }
 
     const targetShot = shots?.find(s => s.id === shotId);
+    const withoutPosition = options?.withoutPosition ?? false;
+    
     console.log('[ShotDrop] Adding generation to shot:', {
       shotId: shotId.substring(0, 8),
       shotName: targetShot?.name,
       generationId: data.generationId?.substring(0, 8),
+      withoutPosition,
       timestamp: Date.now()
     });
 
     try {
-      await addImageToShotMutation.mutateAsync({
-        shot_id: shotId,
-        generation_id: data.generationId,
-        project_id: selectedProjectId,
-        imageUrl: data.imageUrl,
-        thumbUrl: data.thumbUrl,
-      });
+      if (withoutPosition) {
+        // Add without timeline position
+        await addImageToShotWithoutPositionMutation.mutateAsync({
+          shot_id: shotId,
+          generation_id: data.generationId,
+          project_id: selectedProjectId,
+          imageUrl: data.imageUrl,
+          thumbUrl: data.thumbUrl,
+        });
+      } else {
+        // Add with automatic position assignment
+        await addImageToShotMutation.mutateAsync({
+          shot_id: shotId,
+          generation_id: data.generationId,
+          project_id: selectedProjectId,
+          imageUrl: data.imageUrl,
+          thumbUrl: data.thumbUrl,
+        });
+      }
     } catch (error) {
       console.error('[ShotDrop] Failed to add to shot:', error);
       toast.error(`Failed to add to shot: ${(error as Error).message}`);
     }
-  }, [selectedProjectId, shots, addImageToShotMutation]);
+  }, [selectedProjectId, shots, addImageToShotMutation, addImageToShotWithoutPositionMutation]);
 
   // Handle dropping a generation to create a new shot
   const handleGenerationDropForNewShot = useCallback(async (
@@ -2045,16 +2061,23 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   }, [selectedProjectId, shots, handleExternalImageDropMutation, refetchShots, setShotSortMode]);
 
   // Handle dropping files onto an existing shot
-  const handleFilesDropOnShot = useCallback(async (shotId: string, files: File[]) => {
+  const handleFilesDropOnShot = useCallback(async (
+    shotId: string,
+    files: File[],
+    options?: { withoutPosition?: boolean }
+  ) => {
     if (!selectedProjectId) {
       toast.error('No project selected');
       return;
     }
 
+    const withoutPosition = options?.withoutPosition ?? false;
+
     console.log('[ShotDrop] Adding files to existing shot:', {
       shotId: shotId.substring(0, 8),
       fileCount: files.length,
       fileNames: files.map(f => f.name),
+      withoutPosition,
       timestamp: Date.now()
     });
 
@@ -2063,7 +2086,8 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         imageFiles: files,
         targetShotId: shotId, // Add to existing shot
         currentProjectQueryKey: selectedProjectId,
-        currentShotCount: shots?.length ?? 0
+        currentShotCount: shots?.length ?? 0,
+        skipAutoPosition: withoutPosition, // Use skipAutoPosition to add without timeline position
       });
 
       // Refetch shots - skeleton clears when new images appear in data

@@ -140,9 +140,11 @@ async function fetchShotSpecificGenerations({
     dataQuery = dataQuery.not('type', 'like', '%video%');
   }
   
-  // Apply exclude positioned filter - check if the timeline_frame value is null
+  // Apply exclude positioned filter - check if array contains null (has unpositioned entry)
+  // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
   if (filters?.excludePositioned) {
-    dataQuery = dataQuery.is(`shot_data->>${shotId}`, null);
+    // Use PostgREST 'cs.' operator (contains) to check if array contains null
+    dataQuery = dataQuery.filter(`shot_data->${shotId}`, 'cs', '[null]');
   }
 
   // Apply starred filter at DB level
@@ -187,6 +189,7 @@ async function fetchShotSpecificGenerations({
   }
   
   // Transform data - extract timeline_frame from shot_data JSONB
+  // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
   let items = (data || [])
     .map((gen: any) => {
       // Transform generation data
@@ -194,7 +197,9 @@ async function fetchShotSpecificGenerations({
       const metadata = gen.params || {};
       
       // Extract timeline_frame from shot_data JSONB for this specific shot
-      const timelineFrame = gen.shot_data?.[shotId] ?? null;
+      // New format is array, get first value (or handle old single-value format)
+      const shotFrames = gen.shot_data?.[shotId];
+      const timelineFrame = Array.isArray(shotFrames) ? shotFrames[0] : (shotFrames ?? null);
       
       return {
         id: gen.id,

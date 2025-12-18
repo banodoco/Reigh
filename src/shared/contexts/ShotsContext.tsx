@@ -1,5 +1,5 @@
 import React, { createContext, useContext, ReactNode, useMemo } from 'react';
-import { useListShots } from '@/shared/hooks/useShots';
+import { useListShots, useProjectImageStats } from '@/shared/hooks/useShots';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Shot } from '@/types/shots';
 
@@ -8,6 +8,9 @@ interface ShotsContextType {
   isLoading: boolean;
   error: Error | null;
   refetchShots: () => void;
+  // Stats for 'all' and 'no-shot' filters
+  allImagesCount?: number;
+  noShotImagesCount?: number;
 }
 
 const ShotsContext = createContext<ShotsContextType | undefined>(undefined);
@@ -26,44 +29,26 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
   // Previously limited to 2 on mobile for performance, but this broke expand/collapse UI
   const maxImagesPerShot = 0;
 
-  const { data: shots, isLoading, error, refetch } = useListShots(selectedProjectId, { maxImagesPerShot });
+  const { data: shots, isLoading: isShotsLoading, error: shotsError, refetch } = useListShots(selectedProjectId, { maxImagesPerShot });
+  
+  // Load project-wide image stats
+  const { data: projectStats, isLoading: isStatsLoading } = useProjectImageStats(selectedProjectId);
+
+  const isLoading = isShotsLoading || isStatsLoading;
+  const error = shotsError;
 
   // [ShotReorderDebug] Log shots context data changes
   React.useEffect(() => {
     console.log(`${REORDER_DEBUG_TAG} ShotsContext data updated:`, {
       selectedProjectId,
       shotsCount: shots?.length || 0,
+      allImagesCount: projectStats?.allCount,
+      noShotImagesCount: projectStats?.noShotCount,
       isLoading,
       error: error?.message,
-      shotsData: shots?.map(s => ({ 
-        id: s.id.substring(0, 8), 
-        position: s.position, 
-        name: s.name,
-        imagesCount: s.images?.length || 0,
-        hasImages: !!s.images && s.images.length > 0
-      })) || [],
       timestamp: Date.now()
     });
-    
-    // [ShotImageDebug] Log detailed image data for first few shots
-    if (shots && shots.length > 0) {
-      console.log('[ShotImageDebug] First 3 shots with image details:', 
-        shots.slice(0, 3).map(shot => ({
-          shotId: shot.id.substring(0, 8),
-          shotName: shot.name,
-          imagesCount: shot.images?.length || 0,
-          sampleImages: shot.images?.slice(0, 2).map(img => ({
-            id: img.id, // shot_generations.id
-            hasImageUrl: !!img.imageUrl,
-            hasThumbUrl: !!img.thumbUrl,
-            hasLocation: !!img.location,
-            type: img.type,
-            timeline_frame: (img as any).timeline_frame
-          })) || []
-        }))
-      );
-    }
-  }, [shots, selectedProjectId, isLoading, error]);
+  }, [shots, projectStats, selectedProjectId, isLoading, error]);
 
   // [ShotReorderDebug] Log refetch calls
   const debugRefetch = React.useCallback(() => {
@@ -80,7 +65,9 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
     isLoading,
     error,
     refetchShots: debugRefetch,
-  }), [shots, isLoading, error, debugRefetch]);
+    allImagesCount: projectStats?.allCount,
+    noShotImagesCount: projectStats?.noShotCount,
+  }), [shots, isLoading, error, debugRefetch, projectStats]);
 
   return (
     <ShotsContext.Provider value={value}>

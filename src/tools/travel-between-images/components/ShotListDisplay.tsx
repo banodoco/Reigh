@@ -16,7 +16,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { Shot } from '@/types/shots';
-import SortableShotItem from './SortableShotItem';
+import SortableShotItem, { type DropOptions } from './SortableShotItem';
 import { Button } from '@/shared/components/ui/button';
 import { useReorderShots } from '@/shared/hooks/useShots';
 import { useShots } from '@/shared/contexts/ShotsContext';
@@ -37,11 +37,11 @@ interface ShotListDisplayProps {
   onSortModeChange?: (mode: 'ordered' | 'newest' | 'oldest') => void; // Callback to change sort mode
   highlightedShotId?: string | null; // Shot to highlight for visual feedback
   // Drop handling for generations from GenerationsPane
-  onGenerationDropOnShot?: (shotId: string, data: GenerationDropData) => Promise<void>;
+  onGenerationDropOnShot?: (shotId: string, data: GenerationDropData, options?: DropOptions) => Promise<void>;
   onGenerationDropForNewShot?: (data: GenerationDropData) => Promise<void>;
   // Drop handling for external files
   onFilesDropForNewShot?: (files: File[]) => Promise<void>;
-  onFilesDropOnShot?: (shotId: string, files: File[]) => Promise<void>;
+  onFilesDropOnShot?: (shotId: string, files: File[], options?: DropOptions) => Promise<void>;
   // Expose skeleton setup for modal-based shot creation
   onSkeletonSetupReady?: (setup: (imageCount: number) => void, clear: () => void) => void;
 }

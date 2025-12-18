@@ -156,20 +156,15 @@ const ShotsPage: React.FC = () => {
         shotId: currentShotId.substring(0, 8)
       });
 
-      // Get the next available position
-      const maxPosition = managedImages.reduce((max, img) => {
-        const pos = (img as any).timeline_frame ?? 0;
-        return Math.max(max, pos);
-      }, -1);
-      const nextPosition = maxPosition + 1;
-
+      // Let the mutation calculate the next available position using centralized function
+      // Don't pass timelineFrame - mutation will query DB and use calculateNextAvailableFrame
       await addImageToShotMutation.mutateAsync({
         shot_id: currentShotId,
         generation_id: generationId,
         imageUrl: imageUrl,
         thumbUrl: thumbUrl,
         project_id: selectedProjectId,
-        timelineFrame: nextPosition,
+        // timelineFrame not passed - mutation calculates using centralized calculateNextAvailableFrame
       });
 
       toast.success('Added to shot with position');

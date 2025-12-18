@@ -81,13 +81,12 @@ const SelectScrollUpButton = React.forwardRef<
   <SelectPrimitive.ScrollUpButton
     ref={ref}
     className={cn(
-      "flex cursor-default items-center justify-center py-2 touch-none",
+      "flex cursor-default items-center justify-center py-2",
       className
     )}
     // Custom attribute for detection in global click handlers
     data-select-scroll-button="up"
-    // Prevent tap from passing through to elements behind on mobile
-    onPointerDown={(e) => e.stopPropagation()}
+    // Only stop click propagation, not pointer/touch events
     onClick={(e) => e.stopPropagation()}
     {...props}
   >
@@ -103,13 +102,12 @@ const SelectScrollDownButton = React.forwardRef<
   <SelectPrimitive.ScrollDownButton
     ref={ref}
     className={cn(
-      "flex cursor-default items-center justify-center py-2 touch-none",
+      "flex cursor-default items-center justify-center py-2",
       className
     )}
     // Custom attribute for detection in global click handlers
     data-select-scroll-button="down"
-    // Prevent tap from passing through to elements behind on mobile
-    onPointerDown={(e) => e.stopPropagation()}
+    // Only stop click propagation, not pointer/touch events
     onClick={(e) => e.stopPropagation()}
     {...props}
   >
@@ -163,8 +161,7 @@ const SelectContent = React.forwardRef<
       )}
       position={position}
       onPointerDownOutside={onPointerDownOutside}
-      // Prevent all pointer events from passing through to elements behind
-      onPointerDown={(e) => e.stopPropagation()}
+      // NOTE: Don't stop propagation on pointerdown - it interferes with touch scroll gestures on mobile
       onClick={(e) => e.stopPropagation()}
       {...props}
     >
@@ -174,11 +171,15 @@ const SelectContent = React.forwardRef<
         className={cn(
           isCompact ? "py-1" : "p-1",
           position === "popper" &&
-            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]",
-          // Enable touch scrolling on mobile
-          "overflow-y-auto overscroll-contain touch-pan-y"
+            "h-full w-full min-w-[var(--radix-select-trigger-width)] max-h-[var(--radix-select-content-available-height)]",
+          // Enable touch scrolling on mobile - touch-action tells browser to handle scrolling natively
+          "overflow-y-auto overscroll-contain"
         )}
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          // Critical for mobile scroll: let browser handle vertical pan gestures
+          touchAction: 'pan-y',
+        }}
         // Prevent viewport click from passing through, but allow scroll gestures
         onClick={(e) => e.stopPropagation()}
       >
@@ -238,24 +239,15 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(selectItemVariants({ variant, className }))}
-    // Prevent all events from propagating to elements behind the dropdown
-    // Compose with any passed handlers
-    onPointerDown={(e) => {
-      e.stopPropagation();
-      onPointerDown?.(e);
-    }}
+    // NOTE: Don't stop propagation on pointerDown/touchStart - it breaks scroll gestures on mobile
+    // Only stop propagation on click (final selection) to prevent it bubbling to elements behind
+    onPointerDown={onPointerDown}
     onClick={(e) => {
       e.stopPropagation();
       onClick?.(e);
     }}
-    onTouchStart={(e) => {
-      e.stopPropagation();
-      onTouchStart?.(e);
-    }}
-    onTouchEnd={(e) => {
-      e.stopPropagation();
-      onTouchEnd?.(e);
-    }}
+    onTouchStart={onTouchStart}
+    onTouchEnd={onTouchEnd}
     {...props}
   >
     {/* Hide checkmark indicator for compact variants - selected value shown in trigger */}

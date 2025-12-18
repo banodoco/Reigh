@@ -11,6 +11,7 @@ import { log } from '@/shared/lib/logger';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
 import { invalidateGenerationsSync } from '@/shared/hooks/useGenerationInvalidation';
+import { calculateNextAvailableFrame, ensureUniqueFrame } from '@/shared/utils/timelinePositionCalculator';
 
 // Define the type for the new shot data returned by Supabase
 // This should align with your 'shots' table structure from `supabase/types.ts`
@@ -604,16 +605,101 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         imagesByShot[shotId] = images;
       });
       
-      // Attach images to shots
-      return shots.map(shot => ({
-        ...shot,
-        images: imagesByShot[shot.id] || []
-      }));
+      // Attach images to shots with pre-computed stats
+      // These stats are used by GenerationsPane to determine default filter state
+      // without needing to compute reactively (which causes flicker)
+      return shots.map(shot => {
+        const images = imagesByShot[shot.id] || [];
+        
+        // IMPORTANT: Count UNIQUE generation_ids, not shot_generations records
+        // The same generation can appear multiple times in a shot (duplicates on timeline)
+        // But the query filters by unique generations, so stats must match
+        const uniqueGenIds = new Set<string>();
+        const unpositionedGenIds = new Set<string>();
+        const positionedGenIds = new Set<string>();
+        
+        images.forEach(img => {
+          const genId = img.generation_id || img.id;
+          uniqueGenIds.add(genId);
+          if (img.timeline_frame == null) {
+            unpositionedGenIds.add(genId);
+          } else {
+            positionedGenIds.add(genId);
+          }
+        });
+        
+        // For unpositioned count, we want generations that have AT LEAST ONE unpositioned entry
+        // (matching the query: shot_data->'shot_id' @> '[null]')
+        const unpositionedCount = unpositionedGenIds.size;
+        
+        // [SkeletonCountDebug] Log the stats calculation
+        console.log('[SkeletonCountDebug] 📊 Computing stats for shot:', {
+          shotId: shot.id?.substring(0, 8),
+          shotName: shot.name,
+          totalRecords: images.length,
+          uniqueGenerations: uniqueGenIds.size,
+          positionedCount: positionedGenIds.size,
+          unpositionedCount: unpositionedCount,
+        });
+        
+        return {
+          ...shot,
+          images,
+          // Pre-computed stats for stable filter decisions (unique generations, not records)
+          imageCount: uniqueGenIds.size,
+          positionedImageCount: positionedGenIds.size,
+          unpositionedImageCount: unpositionedCount,
+          hasUnpositionedImages: unpositionedCount > 0,
+        };
+      });
     },
     enabled: !!projectId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     // Keep previous data while fetching new data to prevent flashing
     placeholderData: (previousData) => previousData,
+  });
+};
+
+// Hook to fetch project-wide image stats (total images, images without shots)
+export const useProjectImageStats = (projectId?: string | null) => {
+  return useQuery({
+    queryKey: ['project-image-stats', projectId],
+    queryFn: async () => {
+      if (!projectId) return { allCount: 0, noShotCount: 0 };
+
+      // 1. Get total unique generations in project
+      const { count: allCount, error: allErr } = await supabase
+        .from('generations')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .not('location', 'is', null); // Only count valid images
+
+      if (allErr) throw allErr;
+
+      // 2. Get count of generations without ANY shot
+      // defined as shot_data being null or empty
+      const { count: noShotCount, error: noShotErr } = await supabase
+        .from('generations')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .not('location', 'is', null)
+        .or('shot_data.is.null,shot_data.eq.{}');
+
+      if (noShotErr) throw noShotErr;
+
+      console.log('[SkeletonCountDebug] 📊 Project-wide stats:', {
+        allCount,
+        noShotCount,
+        projectId: projectId?.substring(0, 8)
+      });
+
+      return { 
+        allCount: allCount || 0, 
+        noShotCount: noShotCount || 0 
+      };
+    },
+    enabled: !!projectId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 };
 
@@ -716,15 +802,12 @@ export const useAddImageToShot = () => {
         .map(g => g.timeline_frame)
         .filter((f): f is number => f != null && f !== -1);
       
-      // Calculate frame with collision detection
+      // Calculate frame using centralized position calculator
       let resolvedFrame: number;
       
       if (timelineFrame !== undefined) {
-        // Explicit frame provided - ensure it's unique
-        resolvedFrame = timelineFrame;
-        while (existingFrames.includes(resolvedFrame)) {
-          resolvedFrame += 1;
-        }
+        // Explicit frame provided - ensure it's unique using centralized function
+        resolvedFrame = ensureUniqueFrame(timelineFrame, existingFrames);
         if (resolvedFrame !== timelineFrame) {
           console.log('[AddDebug] 🔄 Adjusted provided frame:', {
             original: timelineFrame,
@@ -733,9 +816,8 @@ export const useAddImageToShot = () => {
           });
         }
       } else {
-        // No frame specified - append at end
-        const maxFrame = existingFrames.length > 0 ? Math.max(...existingFrames) : -60;
-        resolvedFrame = maxFrame + 60;
+        // No frame specified - append at end using centralized function (50 frames after highest)
+        resolvedFrame = calculateNextAvailableFrame(existingFrames);
       }
 
       console.log('[AddDebug] 🎯 Resolved frame for new item:', {
@@ -839,19 +921,14 @@ export const useAddImageToShot = () => {
             .filter(img => img.timeline_frame != null && img.timeline_frame !== -1)
             .map(img => img.timeline_frame as number);
           
+          // Use centralized position calculator
           let resolvedFrame: number;
           if (timelineFrame !== undefined) {
             // Explicit frame provided - ensure it's unique
-            resolvedFrame = timelineFrame;
-            while (existingFrames.includes(resolvedFrame)) {
-              resolvedFrame += 1;
-            }
+            resolvedFrame = ensureUniqueFrame(timelineFrame, existingFrames);
           } else {
-            // No frame provided - append at end
-            const maxFrame = existingFrames.length > 0 
-              ? Math.max(...existingFrames) 
-              : -60; // Start at 0 ( -60 + 60 )
-            resolvedFrame = maxFrame + 60;
+            // No frame provided - append at end (50 frames after highest)
+            resolvedFrame = calculateNextAvailableFrame(existingFrames);
           }
 
           // CRITICAL: Use tempId for the item's id, NOT generation_id!
@@ -874,7 +951,7 @@ export const useAddImageToShot = () => {
             name: null,
             based_on: null,
             params: {},
-            shot_data: { [shot_id]: resolvedFrame },  // Include shot_data for consistency
+            shot_data: { [shot_id]: [resolvedFrame] },  // Array format: { shot_id: [frame] }
             _optimistic: true
           };
         };

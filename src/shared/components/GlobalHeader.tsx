@@ -365,7 +365,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                         )}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent variant="retro">
+                  <SelectContent 
+                    variant="retro"
+                    className="z-[9999] max-h-60 overflow-y-auto"
+                  >
                       {projects.map(project => (
                         <SelectItem 
                           variant="retro"
@@ -619,7 +622,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                       )}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent variant="retro">
+                  <SelectContent 
+                    variant="retro"
+                    className="z-[9999] max-h-60 overflow-y-auto"
+                  >
                     {projects.map(project => (
                       <SelectItem 
                         variant="retro"

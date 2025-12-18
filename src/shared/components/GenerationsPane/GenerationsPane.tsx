@@ -99,6 +99,7 @@ const GenerationsPaneComponent: React.FC = () => {
     handleDeleteGeneration,
     handleAddToShot,
     handleAddToShotWithoutPosition,
+    expectedItemCount, // Pre-computed count for instant skeleton display
   } = useGenerationsPageLogic({
     itemsPerPage: GENERATIONS_PER_PAGE,
     mediaType: mediaTypeFilter,
@@ -636,18 +637,18 @@ const GenerationsPaneComponent: React.FC = () => {
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
             {isLoading && (
-                <SkeletonGallery 
-                    count={12}
+                <SkeletonGallery
+                    count={expectedItemCount ?? 12}
                     columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
                     gapClasses="gap-2 sm:gap-4"
                     whiteText={true}
                     showControls={false}
                     projectAspectRatio={projectAspectRatio}
-                    className="space-y-0 pb-4 pt-1"
+                    className="space-y-0 pb-4 pt-2"
                 />
             )}
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}
-            {paginatedData.items.length > 0 && (
+            {!isLoading && paginatedData.items.length > 0 && (
                 <>
                   {console.log('[GenerationsPane] Rendering ImageGallery with:', {
                     selectedShotFilter,

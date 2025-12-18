@@ -7,6 +7,7 @@ import { transformForTimeline, type RawShotGeneration } from '@/shared/lib/gener
 import { timelineDebugger } from '@/tools/travel-between-images/components/Timeline/utils/timeline-debug';
 import { isVideoGeneration, isVideoShotGeneration, isPositioned, type ShotGenerationLike } from '@/shared/lib/typeGuards';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
+import { calculateNextAvailableFrame, extractExistingFrames, DEFAULT_FRAME_SPACING } from '@/shared/utils/timelinePositionCalculator';
 
 
 export interface ShotGeneration {
@@ -39,8 +40,6 @@ export interface PositionMetadata {
   pair_negative_prompt?: string;
   enhanced_prompt?: string;
 }
-
-const DEFAULT_FRAME_SPACING = 60;
 
 /**
  * Enhanced hook for managing shot positions with unified timeline and batch support
@@ -698,9 +697,18 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
     const { position, timelineFrame, metadata } = options;
     
-    // Calculate next available positions if not provided
-    const nextPosition = position ?? Math.floor(Math.max(...shotGenerations.map(sg => sg.timeline_frame ?? 0)) / 50) + 1;
-    const nextFrame = timelineFrame ?? (nextPosition * DEFAULT_FRAME_SPACING);
+    // Calculate next available frame using centralized function if not provided
+    let nextFrame: number;
+    if (timelineFrame !== undefined) {
+      nextFrame = timelineFrame;
+    } else if (position !== undefined) {
+      // Legacy: convert position to frame
+      nextFrame = position * DEFAULT_FRAME_SPACING;
+    } else {
+      // Use centralized calculator - extracts existing frames and calculates next available
+      const existingFrames = extractExistingFrames(shotGenerations);
+      nextFrame = calculateNextAvailableFrame(existingFrames);
+    }
 
 
     try {

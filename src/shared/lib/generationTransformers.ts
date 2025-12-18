@@ -36,8 +36,10 @@ export interface RawGeneration {
   tasks?: any[] | any | null;
   based_on?: string | null;
   name?: string | null;
-  // JSONB column mapping shot_id -> timeline_frame
-  shot_data?: Record<string, number | null>;
+  // JSONB column mapping shot_id -> array of timeline_frames
+  // Each generation can appear multiple times in the same shot (different positions)
+  // Example: { "shot_id_123": [120, 420, null] } means 3 entries: at frame 120, 420, and one unpositioned
+  shot_data?: Record<string, (number | null)[]>;
   // DEPRECATED: Old join format (for backwards compatibility)
   shot_generations?: Array<{
     shot_id: string;
@@ -185,12 +187,19 @@ export function transformGeneration(
   // Handle shot associations - prefer JSONB shot_data over JOIN shot_generations
   let shotGenerations: Array<{ shot_id: string; timeline_frame: number | null }> = [];
   
-  // Convert JSONB shot_data to array format (NEW approach)
+  // Convert JSONB shot_data to flat array format
+  // shot_data is now { shot_id: [frame1, frame2, ...] } (array per shot)
   if (item.shot_data && Object.keys(item.shot_data).length > 0) {
-    shotGenerations = Object.entries(item.shot_data).map(([shotId, frame]) => ({
-      shot_id: shotId,
-      timeline_frame: frame,
-    }));
+    for (const [shotId, frames] of Object.entries(item.shot_data)) {
+      // Handle both old format (single value) and new format (array)
+      const frameArray = Array.isArray(frames) ? frames : [frames];
+      for (const frame of frameArray) {
+        shotGenerations.push({
+          shot_id: shotId,
+          timeline_frame: frame,
+        });
+      }
+    }
   } 
   // Fall back to shot_generations join (OLD approach, for backwards compatibility)
   else if (item.shot_generations) {

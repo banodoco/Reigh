@@ -5,7 +5,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
 import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2, Video, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
-import { getDisplayUrl } from '@/shared/lib/utils';
+import { getDisplayUrl, cn } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
@@ -29,11 +29,13 @@ interface VideoShotDisplayProps {
   projectAspectRatio?: string;
   isHighlighted?: boolean;
   pendingUploads?: number; // Number of images currently being uploaded
+  imagesOverlay?: React.ReactNode; // Optional overlay to render over the images area
+  dropLoadingState?: 'idle' | 'loading' | 'success'; // Loading state for drops with position
 }
 
 const SKIP_DELETE_CONFIRMATION_KEY = 'reigh-skip-delete-shot-confirmation';
 
-const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false, pendingUploads = 0 }) => {
+const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false, pendingUploads = 0, imagesOverlay, dropLoadingState = 'idle' }) => {
   // Check if this is a temp shot (optimistic duplicate waiting for real ID)
   const isTempShot = shot.id.startsWith('temp-');
   
@@ -422,6 +424,33 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
         
         {/* Thumbnail mosaic area - matches ShotGroup style */}
         <div className="flex-grow relative">
+          {/* Optional overlay for loading states etc. */}
+          {imagesOverlay}
+          {/* Built-in loading indicator for drops - only show when collapsed with >3 images */}
+          {dropLoadingState !== 'idle' && displayImages.length > IMAGES_PER_ROW && !isImagesExpanded && (
+            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+              <div
+                className={cn(
+                  'px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg',
+                  dropLoadingState === 'loading' && 'bg-primary text-primary-foreground',
+                  dropLoadingState === 'success' && 'bg-green-600 text-white'
+                )}
+              >
+                {dropLoadingState === 'loading' && (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                )}
+                {dropLoadingState === 'success' && (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Added
+                  </>
+                )}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2 relative">
             {displayImages.length > 0 || pendingUploads > 0 ? (
               <>

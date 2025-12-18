@@ -80,8 +80,34 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
             className="w-[var(--radix-select-trigger-width)] max-h-60 overflow-y-auto"
             ref={contentRef}
           >
-            <SelectItem variant={whiteText ? "zinc" : "default"} value="all">All Shots</SelectItem>
-            <SelectItem variant={whiteText ? "zinc" : "default"} value="no-shot">Items without shots</SelectItem>
+            {/* System filters - use consistent muted styling */}
+            <SelectItem 
+              variant={whiteText ? "zinc" : "default"} 
+              value="all"
+              className={whiteText 
+                ? "text-zinc-400 font-medium data-[state=checked]:text-zinc-100" 
+                : "text-slate-500 font-medium data-[state=checked]:text-slate-900"
+              }
+            >
+              All Shots
+            </SelectItem>
+            <SelectItem 
+              variant={whiteText ? "zinc" : "default"} 
+              value="no-shot"
+              className={whiteText 
+                ? "text-zinc-400 font-medium data-[state=checked]:text-zinc-100" 
+                : "text-slate-500 font-medium data-[state=checked]:text-slate-900"
+              }
+            >
+              Items without shots
+            </SelectItem>
+            {/* Separator before user shots */}
+            {shots?.length > 0 && (
+              <div className={whiteText 
+                ? "h-px bg-zinc-700 my-1.5 mx-2" 
+                : "h-px bg-slate-300 my-1.5 mx-2"
+              } />
+            )}
             {shots?.map(shot => (
               <SelectItem variant={whiteText ? "zinc" : "default"} key={shot.id} value={shot.id}>
                 {shot.name}

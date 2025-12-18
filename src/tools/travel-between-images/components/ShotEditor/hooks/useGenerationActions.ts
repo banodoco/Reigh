@@ -972,7 +972,7 @@ export const useGenerationActions = ({
           name: file.name,
           based_on: null,
           params: {},
-          shot_data: { [currentShot.id]: positions[index] },
+          shot_data: { [currentShot.id]: [positions[index]] },  // Array format
           _optimistic: true,
           _uploading: true // Extra flag to show upload indicator
         };

@@ -9,6 +9,10 @@ import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
 import { supabase } from "@/integrations/supabase/client";
 import { isVideoShotGenerations, type ShotGenerationsLike } from '@/shared/lib/typeGuards';
+import { 
+  ensureUniqueFrame, 
+  calculateNextAvailableFrame as calculateNextAvailableFrameSync 
+} from '@/shared/utils/timelinePositionCalculator';
 
 // ============================================================================
 // Types
@@ -109,42 +113,7 @@ export const cropImagesToShotAspectRatio = async (
 // Position Calculation
 // ============================================================================
 
-/**
- * Calculate the next available frame position for new images
- * Queries the database to find the max position and adds spacing
- */
-/**
- * Helper to ensure a frame is unique among existing frames
- */
-const ensureUniqueFrame = (
-  targetFrame: number,
-  existingFrames: number[]
-): number => {
-  let frame = Math.max(0, Math.round(targetFrame));
-  
-  // If no collision, return as-is
-  if (!existingFrames.includes(frame)) {
-    return frame;
-  }
-  
-  // Find nearest available position
-  let offset = 1;
-  while (offset < 1000) {
-    const higher = frame + offset;
-    if (!existingFrames.includes(higher)) {
-      console.log('[UniqueFrame] 🔄 Collision resolved:', {
-        original: targetFrame,
-        resolved: higher,
-        offset
-      });
-      return higher;
-    }
-    offset += 1;
-  }
-  
-  // Fallback
-  return existingFrames.length > 0 ? Math.max(...existingFrames) + 60 : 0;
-};
+// Note: ensureUniqueFrame is now imported from @/shared/utils/timelinePositionCalculator
 
 export const calculateNextAvailableFrame = async (
   shotId: string,
@@ -225,21 +194,15 @@ export const calculateNextAvailableFrame = async (
     return uniqueFrame;
   }
 
-  if (existingPositions.length > 0) {
-    const maxPosition = Math.max(...existingPositions);
-    const calculatedTargetFrame = maxPosition + 50; // Add 50 to the highest position
-    console.log('[AddImagesDebug] ✅ Calculated target frame from database positions:', {
-      maxPosition,
-      calculatedTargetFrame,
-      existingPositionsCount: existingPositions.length,
-      allPositions: existingPositions
-    });
-    return calculatedTargetFrame;
-  }
-
-  // No existing positions, start at 0
-  console.log('[AddImagesDebug] 🆕 No existing positions in database, starting at 0');
-  return 0;
+  // Use centralized function to calculate next available frame (50 frames after highest)
+  const calculatedTargetFrame = calculateNextAvailableFrameSync(existingPositions);
+  console.log('[AddImagesDebug] ✅ Calculated target frame using centralized function:', {
+    maxPosition: existingPositions.length > 0 ? Math.max(...existingPositions) : 'none',
+    calculatedTargetFrame,
+    existingPositionsCount: existingPositions.length,
+    allPositions: existingPositions
+  });
+  return calculatedTargetFrame;
 };
 
 /**

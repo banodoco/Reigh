@@ -6,7 +6,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { Label } from "@/shared/components/ui/label";
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
-import { Info, Plus, Sparkles, Eraser } from 'lucide-react';
+import { Info, Plus, Sparkles, Eraser, Check } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { CollapsibleSection } from "@/shared/components/ui/collapsible-section";
@@ -152,6 +152,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
     // Check if turbo mode should be disabled due to too many images
     const hasTooManyImages = imageCount > 2;
     const isTurboModeDisabled = hasTooManyImages;
+
+    // State for clear enhanced prompts success feedback
+    const [clearSuccess, setClearSuccess] = React.useState(false);
 
     // Debug logging for toggle visibility
     console.log("[BatchSettingsForm] Toggle visibility:", {
@@ -319,6 +322,33 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     Enhance/Create Prompts
                   </Label>
                 </div>
+                {onClearEnhancedPrompts && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setClearSuccess(true);
+                      setTimeout(() => setClearSuccess(false), 2000);
+                      onClearEnhancedPrompts();
+                    }}
+                    className={clearSuccess 
+                      ? "text-green-500 hover:text-green-500" 
+                      : "text-muted-foreground hover:text-foreground"
+                    }
+                  >
+                    {clearSuccess ? (
+                      <>
+                        <Check className="h-4 w-4 mr-1" />
+                        Cleared!
+                      </>
+                    ) : (
+                      <>
+                        <Eraser className="h-4 w-4 mr-1" />
+                        Clear enhanced
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             )}
             

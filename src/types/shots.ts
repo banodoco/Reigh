@@ -96,6 +96,12 @@ export interface Shot {
   project_id?: string; // Add project_id here
   aspect_ratio?: string | null; // Aspect ratio for shot video generation
   position: number; // Position for manual ordering
+  
+  // Pre-computed stats (computed in useListShots, used to avoid reactive flicker)
+  imageCount?: number;
+  positionedImageCount?: number;
+  unpositionedImageCount?: number;
+  hasUnpositionedImages?: boolean;
 }
 
 export interface ShotImage {

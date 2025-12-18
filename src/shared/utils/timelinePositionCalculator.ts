@@ -12,6 +12,42 @@
  * - handleBatchImageDrop / handleBatchGenerationDrop
  */
 
+/** Default/max spacing when no existing items to calculate average from */
+export const DEFAULT_FRAME_SPACING = 81;
+
+/** Minimum spacing to use even if average is lower (prevents overly tight timelines) */
+export const MIN_FRAME_SPACING = 10;
+
+/**
+ * Calculate the average spacing between existing frames in a timeline.
+ * Returns the default spacing if there aren't enough items to calculate an average.
+ * 
+ * @param existingFrames - Array of existing frame positions
+ * @param defaultSpacing - Fallback spacing if average can't be calculated
+ * @returns The average spacing, clamped between MIN_FRAME_SPACING and DEFAULT_FRAME_SPACING
+ */
+export const calculateAverageSpacing = (
+  existingFrames: number[],
+  defaultSpacing: number = DEFAULT_FRAME_SPACING
+): number => {
+  // Need at least 2 items to calculate spacing
+  if (existingFrames.length < 2) {
+    return defaultSpacing;
+  }
+  
+  const sortedFrames = [...existingFrames].sort((a, b) => a - b);
+  const minFrame = sortedFrames[0];
+  const maxFrame = sortedFrames[sortedFrames.length - 1];
+  
+  // Calculate average: total span divided by number of gaps
+  const totalSpan = maxFrame - minFrame;
+  const numGaps = sortedFrames.length - 1;
+  const averageSpacing = Math.round(totalSpan / numGaps);
+  
+  // Clamp between min (10) and max (81) to prevent outliers from causing huge gaps
+  return Math.min(DEFAULT_FRAME_SPACING, Math.max(MIN_FRAME_SPACING, averageSpacing));
+};
+
 /**
  * Calculate a unique timeline frame that doesn't collide with existing frames.
  * 
@@ -70,7 +106,7 @@ export const ensureUniqueFrame = (
   
   // Fallback: append at end (should never reach here)
   const maxFrame = existingFrames.length > 0 ? Math.max(...existingFrames) : 0;
-  const fallback = maxFrame + 60;
+  const fallback = maxFrame + DEFAULT_FRAME_SPACING;
   console.warn('[UniqueFrame] ⚠️ Fallback used:', {
     original: targetFrame,
     fallback,
@@ -120,16 +156,17 @@ export const calculateUniqueFramesForBatch = (
 /**
  * Calculate frame position for inserting at a given index, with collision detection.
  * This is an enhanced version of getFramePositionForIndex that ensures uniqueness.
+ * Uses average spacing of existing items when appending at end.
  * 
  * @param index - The grid index where the item is being inserted
  * @param existingFrames - Array of existing frame positions (sorted by timeline_frame)
- * @param defaultSpacing - Default spacing between frames (used when calculating midpoint)
+ * @param explicitSpacing - Optional explicit spacing (overrides average calculation for end insertion)
  * @returns A unique frame position
  */
 export const calculateFrameForIndex = (
   index: number,
   existingFrames: number[],
-  defaultSpacing: number = 60
+  explicitSpacing?: number
 ): number => {
   // Sort frames to ensure correct neighbor calculation
   const sortedFrames = [...existingFrames].sort((a, b) => a - b);
@@ -144,9 +181,10 @@ export const calculateFrameForIndex = (
     const firstFrame = sortedFrames[0];
     targetFrame = Math.max(0, Math.floor(firstFrame / 2));
   } else if (index >= sortedFrames.length) {
-    // Inserting at end - add spacing to last frame
+    // Inserting at end - use average spacing or explicit
+    const spacing = explicitSpacing ?? calculateAverageSpacing(sortedFrames);
     const lastFrame = sortedFrames[sortedFrames.length - 1];
-    targetFrame = lastFrame + defaultSpacing;
+    targetFrame = lastFrame + spacing;
   } else {
     // Inserting in middle - use midpoint between neighbors
     const prevFrame = sortedFrames[index - 1];
@@ -160,19 +198,22 @@ export const calculateFrameForIndex = (
 
 /**
  * Calculate the next available frame for appending to a timeline.
- * Used when no specific target frame is provided.
+ * Uses the average spacing of existing items to maintain consistent spacing.
  * 
  * @param existingFrames - Array of existing frame positions
- * @param spacing - Spacing to add after the last frame (default: 60)
+ * @param explicitSpacing - Optional explicit spacing (overrides average calculation)
  * @returns A unique frame position at the end of the timeline
  */
 export const calculateNextAvailableFrame = (
   existingFrames: number[],
-  spacing: number = 60
+  explicitSpacing?: number
 ): number => {
   if (existingFrames.length === 0) {
     return 0;
   }
+  
+  // Use explicit spacing if provided, otherwise calculate average
+  const spacing = explicitSpacing ?? calculateAverageSpacing(existingFrames);
   
   const maxFrame = Math.max(...existingFrames);
   const targetFrame = maxFrame + spacing;

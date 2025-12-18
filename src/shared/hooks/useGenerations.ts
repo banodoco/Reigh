@@ -279,22 +279,22 @@ export async function fetchGenerations(
   let totalCount = 0; // Total count of matching items
 
   // Apply shot filter if provided - using JSONB shot_data column
+  // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
   if (filters?.shotId === 'no-shot') {
     // Special filter: only show generations that don't belong to ANY shot
     // shot_data will be null or empty {} for these generations
     countQuery = countQuery.or('shot_data.is.null,shot_data.eq.{}');
   } else if (filters?.shotId) {
-
     // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
-    // shot_data->'shot_id' checks if the key exists (returns the value or null if key missing)
+    // shot_data->'shot_id' checks if the key exists (returns the array or null if key missing)
     // We want: WHERE shot_data->'shot_id' IS NOT NULL (meaning key exists)
     countQuery = countQuery.not(`shot_data->${filters.shotId}`, 'is', null);
 
     // Add positioned filter if needed
     if (filters.excludePositioned) {
-      // Filter to only unpositioned: shot_data->>'shot_id' IS NULL
-      // ->> returns as text, and JSON null becomes SQL NULL
-      countQuery = countQuery.is(`shot_data->>${filters.shotId}`, null);
+      // Filter to only show generations with at least one unpositioned entry in this shot
+      // Use PostgREST 'cs.' operator (contains) to check if array contains null
+      countQuery = countQuery.filter(`shot_data->${filters.shotId}`, 'cs', '[null]');
     }
   }
 
@@ -384,6 +384,7 @@ export async function fetchGenerations(
   }
 
   // Apply shot filter to data query - using JSONB shot_data column
+  // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
   if (filters?.shotId === 'no-shot') {
     // Special filter: only show generations that don't belong to ANY shot
     dataQuery = dataQuery.or('shot_data.is.null,shot_data.eq.{}');
@@ -393,7 +394,9 @@ export async function fetchGenerations(
 
     // Add positioned filter if needed
     if (filters.excludePositioned) {
-      dataQuery = dataQuery.is(`shot_data->>${filters.shotId}`, null);
+      // Filter to only show generations with at least one unpositioned entry in this shot
+      // Use PostgREST 'cs.' operator (contains) to check if array contains null
+      dataQuery = dataQuery.filter(`shot_data->${filters.shotId}`, 'cs', '[null]');
     }
   }
 

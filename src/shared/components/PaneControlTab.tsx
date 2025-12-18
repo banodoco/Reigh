@@ -111,6 +111,15 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   const useDesktopBehavior = !isMobile || isTablet;
   const [selectionActive, setSelectionActive] = React.useState(false);
   
+  // Prevent clicks from passing through to elements behind the control
+  const handleButtonClick = React.useCallback((callback: () => void) => {
+    return (e: React.PointerEvent | React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      callback();
+    };
+  }, []);
+  
   // Tooltips only show on desktop, not mobile/tablet (touch devices)
   const showTooltips = !isMobile;
   
@@ -208,91 +217,179 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
     if (allowMobileLock) {
       // Pane is locked on mobile - show unlock button
       if (isLocked) {
+        // Bottom pane: horizontal layout (Lock, Open, Third, Fourth)
+        // Left/Right panes: vertical layout (Open, Third, Lock)
+        const isBottom = side === 'bottom';
         return (
           <div
             data-pane-control
             style={dynamicStyle}
             className={cn(
-              `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex flex-col items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+              `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
               getPositionClasses(),
               'opacity-100'
             )}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
-            {thirdButton && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onPointerUp={thirdButton.onClick}
-                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                aria-label={thirdButton.ariaLabel}
-              >
-                {thirdButton.content || <Square className="h-5 w-5" />}
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onPointerUp={() => toggleLock(false)}
-              className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
-              aria-label="Unlock pane"
-            >
-              <UnlockIcon className="h-5 w-5" />
-            </Button>
-            {fourthButton && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onPointerUp={fourthButton.onClick}
-                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                aria-label={fourthButton.ariaLabel}
-              >
-                {fourthButton.content || <Square className="h-5 w-5" />}
-              </Button>
+            {isBottom ? (
+              <>
+                {/* Bottom (mobile locked): Third, Unlock, Fourth */}
+                {thirdButton && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(thirdButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={thirdButton.ariaLabel}
+                  >
+                    {thirdButton.content || <Square className="h-5 w-5" />}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(() => toggleLock(false))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label="Unlock pane"
+                >
+                  <UnlockIcon className="h-5 w-5" />
+                </Button>
+                {fourthButton && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(fourthButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={fourthButton.ariaLabel}
+                  >
+                    {fourthButton.content || <Square className="h-5 w-5" />}
+                  </Button>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Left/Right: Third, Lock (Open pane button hidden when locked) */}
+                {thirdButton && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(thirdButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={thirdButton.ariaLabel}
+                  >
+                    {thirdButton.content || <Square className="h-5 w-5" />}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(() => toggleLock(false))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label="Unlock pane"
+                >
+                  <UnlockIcon className="h-5 w-5" />
+                </Button>
+              </>
             )}
           </div>
         );
       }
 
       // Pane is closed on mobile with lock enabled - show open button AND lock button
+      // Bottom pane: horizontal layout (Lock, Open, Third, Fourth)
+      // Left/Right panes: vertical layout (Open, Third, Lock)
+      const isBottom = side === 'bottom';
       return (
         <div
           data-pane-control
           style={dynamicStyle}
           className={cn(
-            `fixed ${mobileZIndex} flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+            `fixed ${mobileZIndex} flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
             getPositionClasses(),
             'opacity-100'
           )}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
-          {thirdButton && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onPointerUp={thirdButton.onClick}
-              className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
-              aria-label={thirdButton.ariaLabel}
-            >
-              {thirdButton.content || <Square className="h-5 w-5" />}
-            </Button>
+          {isBottom ? (
+            <>
+              {/* Bottom (mobile unlocked): Third, Lock, Open - Third always on left */}
+              {thirdButton && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(thirdButton.onClick)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label={thirdButton.ariaLabel}
+                >
+                  {thirdButton.content || <Square className="h-5 w-5" />}
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={handleButtonClick(() => toggleLock(true))}
+                onClick={(e) => e.stopPropagation()}
+                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label="Lock pane open"
+              >
+                <LockIcon className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={handleButtonClick(() => openPane())}
+                onClick={(e) => e.stopPropagation()}
+                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label={paneTooltip || "Open pane"}
+              >
+                {getIcon()}
+              </Button>
+            </>
+          ) : (
+            <>
+              {/* Left/Right: Open, Third, Lock */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={handleButtonClick(() => openPane())}
+                onClick={(e) => e.stopPropagation()}
+                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label={paneTooltip || "Open pane"}
+              >
+                {getIcon()}
+              </Button>
+              {thirdButton && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(thirdButton.onClick)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label={thirdButton.ariaLabel}
+                >
+                  {thirdButton.content || <Square className="h-5 w-5" />}
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={handleButtonClick(() => toggleLock(true))}
+                onClick={(e) => e.stopPropagation()}
+                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label="Lock pane open"
+              >
+                <LockIcon className="h-5 w-5" />
+              </Button>
+            </>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onPointerUp={() => toggleLock(true)}
-            className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
-            aria-label="Lock pane open"
-          >
-            <LockIcon className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onPointerUp={() => openPane()}
-            className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
-            aria-label={paneTooltip || "Open pane"}
-          >
-            {getIcon()}
-          </Button>
         </div>
       );
     }
@@ -304,6 +401,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
     }
 
     // Pane is closed on mobile - show open button only
+    // Left/Right panes: vertical layout (Open on top, Third below)
     return (
       <div
         data-pane-control
@@ -313,34 +411,42 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           getPositionClasses(),
           'opacity-100'
         )}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
-        {/* On mobile, show thirdButton (current tool) first/on top */}
+        {/* Left/Right: Open pane at top, then thirdButton (current tool) */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onPointerUp={handleButtonClick(() => openPane())}
+          onClick={(e) => e.stopPropagation()}
+          className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+          aria-label={paneTooltip || "Open pane"}
+        >
+          {getIcon()}
+        </Button>
         {thirdButton && (
           <Button
             variant="ghost"
             size="icon"
-            onPointerUp={thirdButton.onClick}
+            onPointerUp={handleButtonClick(thirdButton.onClick)}
+            onClick={(e) => e.stopPropagation()}
             className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
             aria-label={thirdButton.ariaLabel}
           >
             {thirdButton.content || <Square className="h-5 w-5" />}
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onPointerUp={() => openPane()}
-          className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
-          aria-label={paneTooltip || "Open pane"}
-        >
-          {getIcon()}
-        </Button>
       </div>
     );
   }
 
   // Desktop behavior (original)
   // Show lock button at edge when pane is open but not locked
+  // Bottom pane: horizontal (Lock, Third, Fourth)
+  // Left/Right panes: vertical (Third, Lock)
+  const isBottom = side === 'bottom';
+  
   if (isOpen && !isLocked) {
     return (
       <TooltipProvider delayDuration={300}>
@@ -348,48 +454,86 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           data-pane-control
           style={dynamicStyle}
           className={cn(
-            `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+            `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
             getFlexDirection()
           )}
           onMouseEnter={handlePaneEnter}
           onMouseLeave={handlePaneLeave}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
-          {thirdButton && (
-            <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onPointerUp={thirdButton.onClick}
-                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                aria-label={thirdButton.ariaLabel}
-              >
-                {thirdButton.content || <Square className="h-4 w-4" />}
-              </Button>
-            </TooltipButton>
-          )}
-          <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
-            <Button
-              variant="ghost"
-              size="icon"
-              onPointerUp={() => toggleLock(true)}
-              className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-              aria-label="Lock pane"
-            >
-              <LockIcon className="h-4 w-4" />
-            </Button>
-          </TooltipButton>
-          {fourthButton && (
-            <TooltipButton tooltip={fourthButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onPointerUp={fourthButton.onClick}
-                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                aria-label={fourthButton.ariaLabel}
-              >
-                {fourthButton.content || <Square className="h-4 w-4" />}
-              </Button>
-            </TooltipButton>
+          {isBottom ? (
+            <>
+              {/* Bottom (open not locked): Third, Lock, Open - Third always on left */}
+              {thirdButton && (
+                <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(thirdButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={thirdButton.ariaLabel}
+                  >
+                    {thirdButton.content || <Square className="h-4 w-4" />}
+                  </Button>
+                </TooltipButton>
+              )}
+              <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(() => toggleLock(true))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label="Lock pane"
+                >
+                  <LockIcon className="h-4 w-4" />
+                </Button>
+              </TooltipButton>
+              <TooltipButton tooltip={paneTooltip} showTooltip={showTooltips} side={tooltipSide}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(() => openPane())}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label={paneTooltip || "Open pane"}
+                >
+                  {getIcon()}
+                </Button>
+              </TooltipButton>
+            </>
+          ) : (
+            <>
+              {/* Left/Right: Third, Lock */}
+              {thirdButton && (
+                <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(thirdButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={thirdButton.ariaLabel}
+                  >
+                    {thirdButton.content || <Square className="h-4 w-4" />}
+                  </Button>
+                </TooltipButton>
+              )}
+              <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(() => toggleLock(true))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label="Lock pane"
+                >
+                  <LockIcon className="h-4 w-4" />
+                </Button>
+              </TooltipButton>
+            </>
           )}
         </div>
       </TooltipProvider>
@@ -403,46 +547,86 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           data-pane-control
           style={dynamicStyle}
           className={cn(
-            `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+            `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
             getFlexDirection()
           )}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
-          {thirdButton && (
-            <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onPointerUp={thirdButton.onClick}
-                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                aria-label={thirdButton.ariaLabel}
-              >
-                {thirdButton.content || <Square className="h-4 w-4" />}
-              </Button>
-            </TooltipButton>
-          )}
-          <TooltipButton tooltip="Unlock pane" showTooltip={showTooltips} side={tooltipSide}>
-            <Button
-              variant="ghost"
-              size="icon"
-              onPointerUp={() => toggleLock(false)}
-              className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-              aria-label="Unlock pane"
-            >
-              <UnlockIcon className="h-4 w-4" />
-            </Button>
-          </TooltipButton>
-          {fourthButton && (
-            <TooltipButton tooltip={fourthButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onPointerUp={fourthButton.onClick}
-                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                aria-label={fourthButton.ariaLabel}
-              >
-                {fourthButton.content || <Square className="h-4 w-4" />}
-              </Button>
-            </TooltipButton>
+          {isBottom ? (
+            <>
+              {/* Bottom (locked): Third, Unlock, Fourth */}
+              {thirdButton && (
+                <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(thirdButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={thirdButton.ariaLabel}
+                  >
+                    {thirdButton.content || <Square className="h-4 w-4" />}
+                  </Button>
+                </TooltipButton>
+              )}
+              <TooltipButton tooltip="Unlock pane" showTooltip={showTooltips} side={tooltipSide}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(() => toggleLock(false))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label="Unlock pane"
+                >
+                  <UnlockIcon className="h-4 w-4" />
+                </Button>
+              </TooltipButton>
+              {fourthButton && (
+                <TooltipButton tooltip={fourthButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(fourthButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={fourthButton.ariaLabel}
+                  >
+                    {fourthButton.content || <Square className="h-4 w-4" />}
+                  </Button>
+                </TooltipButton>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Left/Right: Third, Unlock */}
+              {thirdButton && (
+                <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(thirdButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={thirdButton.ariaLabel}
+                  >
+                    {thirdButton.content || <Square className="h-4 w-4" />}
+                  </Button>
+                </TooltipButton>
+              )}
+              <TooltipButton tooltip="Unlock pane" showTooltip={showTooltips} side={tooltipSide}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(() => toggleLock(false))}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label="Unlock pane"
+                >
+                  <UnlockIcon className="h-4 w-4" />
+                </Button>
+              </TooltipButton>
+            </>
           )}
         </div>
       </TooltipProvider>
@@ -450,6 +634,8 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   }
 
   // Pane is closed (desktop)
+  // Bottom pane: horizontal (Lock, Open, Third, Fourth)
+  // Left/Right panes: vertical (Open, Third, Lock)
   return (
     <TooltipProvider delayDuration={300}>
       <div
@@ -460,44 +646,94 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           getPositionClasses(),
           isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
         )}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
-        {thirdButton && (
-          <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
-            <Button
-              variant="ghost"
-              size="icon"
-              onPointerUp={thirdButton.onClick}
-              className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-              aria-label={thirdButton.ariaLabel}
-            >
-              {thirdButton.content || <Square className="h-4 w-4" />}
-            </Button>
-          </TooltipButton>
-        )}
-        <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
-          <Button
-            variant="ghost"
-            size="icon"
-            onPointerUp={() => toggleLock(true)}
-            className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-            aria-label="Lock pane"
-          >
-            <LockIcon className="h-4 w-4" />
-          </Button>
-        </TooltipButton>
-        <TooltipButton tooltip={paneTooltip} showTooltip={showTooltips} side={tooltipSide}>
-          <Button
-            variant="ghost"
-            size="icon"
-            onPointerUp={() => openPane()}
-            className={cn(
-              'text-zinc-300 hover:text-white hover:bg-zinc-700 h-8 w-8'
+        {isBottom ? (
+          <>
+            {/* Bottom (closed): Third, Lock, Open - Third always on left */}
+            {thirdButton && (
+              <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(thirdButton.onClick)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label={thirdButton.ariaLabel}
+                >
+                  {thirdButton.content || <Square className="h-4 w-4" />}
+                </Button>
+              </TooltipButton>
             )}
-            aria-label={paneTooltip || "Open pane"}
-          >
-            {getIcon()}
-          </Button>
-        </TooltipButton>
+            <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={handleButtonClick(() => toggleLock(true))}
+                onClick={(e) => e.stopPropagation()}
+                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label="Lock pane"
+              >
+                <LockIcon className="h-4 w-4" />
+              </Button>
+            </TooltipButton>
+            <TooltipButton tooltip={paneTooltip} showTooltip={showTooltips} side={tooltipSide}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={handleButtonClick(() => openPane())}
+                onClick={(e) => e.stopPropagation()}
+                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label={paneTooltip || "Open pane"}
+              >
+                {getIcon()}
+              </Button>
+            </TooltipButton>
+          </>
+        ) : (
+          <>
+            {/* Left/Right: Open, Third, Lock */}
+            <TooltipButton tooltip={paneTooltip} showTooltip={showTooltips} side={tooltipSide}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={handleButtonClick(() => openPane())}
+                onClick={(e) => e.stopPropagation()}
+                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label={paneTooltip || "Open pane"}
+              >
+                {getIcon()}
+              </Button>
+            </TooltipButton>
+            {thirdButton && (
+              <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(thirdButton.onClick)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label={thirdButton.ariaLabel}
+                >
+                  {thirdButton.content || <Square className="h-4 w-4" />}
+                </Button>
+              </TooltipButton>
+            )}
+            <TooltipButton tooltip="Lock pane open" showTooltip={showTooltips} side={tooltipSide}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPointerUp={handleButtonClick(() => toggleLock(true))}
+                onClick={(e) => e.stopPropagation()}
+                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                aria-label="Lock pane"
+              >
+                <LockIcon className="h-4 w-4" />
+              </Button>
+            </TooltipButton>
+          </>
+        )}
       </div>
     </TooltipProvider>
   );

@@ -21,7 +21,7 @@ export const OPTIMISTIC_UPDATE_TIMEOUT = 5000; // ms
 export const RECONCILIATION_TIMEOUT = 5000; // ms for maximum lock duration
 
 // UI constants
-export const DEFAULT_BATCH_VIDEO_FRAMES = 60;
+export const DEFAULT_BATCH_VIDEO_FRAMES = 81;
 
 // Mobile bottom offset for action bars
 export const MOBILE_BOTTOM_OFFSET = 46; // px
