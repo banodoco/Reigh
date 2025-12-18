@@ -267,16 +267,23 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // DATA FETCHING
   // ===============================================================================
 
+  // [ShotNavDebug] RENDER-TIME logging for skeleton count issues
+  // Log values directly (not nested) so they're visible without expanding
+  const shotNavDebugRef = useRef<string | null>(null);
+  if (shotId !== shotNavDebugRef.current) {
+    const cachedCountNow = getShotVideoCount?.(shotId);
+    console.log('[ShotNavDebug] 🎬 VideoGallery - shotId:', shotId?.substring(0, 8) || 'none',
+      '| prevShotId:', shotNavDebugRef.current?.substring(0, 8) || 'none',
+      '| cachedCount:', cachedCountNow,
+      '| localZeroHint:', localZeroHint,
+      '| willShowSkeletons:', cachedCountNow === null || cachedCountNow > 0,
+      '| skeletonCount:', cachedCountNow ?? itemsPerPage);
+    shotNavDebugRef.current = shotId;
+  }
+
   // Reset state when shot changes to prevent stale data
   useEffect(() => {
     if (shotId !== prevShotIdRef.current) {
-      console.log('[SkeletonOptimization] Shot changed - resetting ALL state:', {
-        prevShotId: prevShotIdRef.current,
-        newShotId: shotId,
-        resettingLastGoodCount: lastGoodCountRef.current,
-        timestamp: Date.now()
-      });
-
       // CRITICAL: Reset lastGoodCountRef to prevent cross-shot contamination
       lastGoodCountRef.current = null;
 
@@ -329,20 +336,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     ? { items: preloadedGenerations, total: preloadedGenerations.length }
     : fetchedGenerationsData;
 
-  // DEEP DEBUG: Log every change in loading states
-  useEffect(() => {
-    console.log(`[VideoGalleryPreload] DATA_LOADING_STATE_CHANGE:`, {
-      isLoadingGenerations,
-      isFetchingGenerations,
-      hasGenerationsData: !!generationsData,
-      generationsDataItems: generationsData?.items?.length || 0,
-      generationsDataTotal: generationsData?.total || 0,
-      generationsError: !!generationsError,
-      projectId,
-      shotId,
-      timestamp: Date.now()
-    });
-  }, [isLoadingGenerations, isFetchingGenerations, generationsData, generationsError, projectId, shotId]);
 
   // Get video outputs from unified data (already paginated from server)
   const videoOutputs = useMemo(() => {
@@ -542,142 +535,77 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // DATA CACHING AND SKELETON LOGIC
   // ===============================================================================
 
+
   // Track when generationsData becomes available and cache video count
   useEffect(() => {
     const newTotal = (generationsData as any)?.total;
     const projectVideoCount = getShotVideoCount?.(shotId) ?? null;
 
     if (shotId && typeof newTotal === 'number' && newTotal >= 0) {
-      // Check for cache mismatch; do NOT invalidate globally to avoid transient nulls/flicker.
-      // We immediately update the per-shot cache below which resolves the mismatch.
-      if (projectVideoCount !== null && projectVideoCount !== newTotal) {
-        console.log('[SkeletonOptimization] Cache mismatch detected - updating per-shot cache only (no global invalidate):', {
-          shotId,
-          projectVideoCount,
-          actualTotal: newTotal,
-          timestamp: Date.now()
-        });
-      }
-
       // Always update cache immediately when we get valid data (including 0)
       setCachedCount(shotId, newTotal);
 
       // Only update lastGoodCountRef if we have a positive count or it's the first time
       if (newTotal > 0 || lastGoodCountRef.current === null) {
         lastGoodCountRef.current = newTotal;
-        console.log(`[SkeletonIssue:${shotId?.substring(0, 8)}] CACHE_UPDATE:`, {
-          shotId,
-          newTotal,
-          lastGoodCount: lastGoodCountRef.current,
-          reason: newTotal > 0 ? 'positive_count' : 'first_time_seeing_data',
-          cacheUpdated: true,
-          timestamp: Date.now()
-        });
-      } else if (newTotal === 0 && lastGoodCountRef.current && lastGoodCountRef.current > 0) {
-        // Data disappeared - this might be a race condition or cache invalidation
-        console.warn(`[SkeletonIssue:${shotId?.substring(0, 8)}] DATA_LOSS_DETECTED:`, {
-          shotId,
-          newTotal,
-          lastGoodCount: lastGoodCountRef.current,
-          preservingCount: true,
-          cacheAlreadyUpdated: true, // We already updated cache above
-          timestamp: Date.now()
-        });
-        // Don't update lastGoodCountRef with 0 if we had a good count before
-      } else {
-        console.log(`[SkeletonIssue:${shotId?.substring(0, 8)}] CACHE_UPDATE_SKIPPED:`, {
-          shotId,
-          newTotal,
-          lastGoodCount: lastGoodCountRef.current,
-          reason: 'conditions_not_met',
-          cacheStillUpdated: true, // We still updated cache above
-          timestamp: Date.now()
-        });
       }
+      // If newTotal is 0 but we had a good count before, don't update lastGoodCountRef
+      // (protects against transient data loss during cache invalidation)
     }
   }, [generationsData, isLoadingGenerations, isFetchingGenerations, generationsError, shotId, setCachedCount, getShotVideoCount, invalidateVideoCountsCache]);
 
-  // SIMPLIFIED: Use ImageGallery's pure and simple skeleton logic - no delays!
-  // Only show skeletons during INITIAL loading (never loaded before)
-  // If we know the count is zero (from cache or local hint), show empty immediately
+  // Get cached video count from shot_statistics
   const cachedCountRaw = getShotVideoCount?.(shotId);
-  // If project cache hasn't loaded yet but local shot data hints 0 videos,
-  // treat the effective cached count as 0 to avoid a skeleton flicker.
+  // If project cache hasn't loaded yet but local shot data hints 0 videos, treat as 0
   const cachedCount = (typeof cachedCountRaw === 'number') ? cachedCountRaw : (localZeroHint ? 0 : null);
-  console.log(`[VideoSkeletonDebug] GET_CACHED_COUNT for shot gallery:`, {
-    shotId: shotId?.substring(0, 8) || 'no-shot',
-    cachedCount,
-    cachedCountRaw,
-    localZeroHint,
-    hasShotVideoCountFunction: !!getShotVideoCount,
-    timestamp: Date.now()
-  });
-  const hasEverFetched = !isLoadingGenerations || videoOutputs.length > 0 || generationsError;
-  // Suppress skeletons if cache says 0 for this shot
-  const showSkeletons = isLoadingGenerations && videoOutputs.length === 0 && !hasEverFetched && (cachedCount === null || cachedCount > 0);
+  
+  // Determine if we've received a definitive answer from the server
+  const serverTotal = (generationsData as any)?.total;
+  const hasServerResponse = typeof serverTotal === 'number';
+  
+  // React Query uses placeholderData (keepPreviousData) in useUnifiedGenerations.
+  // When switching shots, we can briefly see the previous shot's `total` (often 0),
+  // with `isFetchingGenerations=true`. That causes an "empty flash".
+  //
+  // Treat this state as "loading" when:
+  // - we expect videos for the new shot (cachedCount > 0)
+  // - we don't have any yet
+  // - and the query is currently fetching (i.e. placeholder data may be showing)
+  const expectingVideos = cachedCount !== null && cachedCount > 0;
+  const isTransitionFetching = isFetchingGenerations && expectingVideos && videoOutputs.length === 0;
 
-  const skeletonCount = showSkeletons ? Math.min(cachedCount || itemsPerPage, itemsPerPage) : 0;
-
-  // UNIQUE DEBUG ID for tracking this specific issue
-  const debugId = `[VideoSkeletonDebug]`;
-  console.log(`${debugId} SKELETON_DECISION for shot gallery:`, {
-    shotId: shotId?.substring(0, 8) || 'no-shot',
-    isLoadingGenerations,
-    videoOutputsLength: videoOutputs.length,
-    generationsError: !!generationsError,
-    hasEverFetched,
-    cachedCount,
-    showSkeletons,
+  // Show skeleton when:
+  // 1) Still loading, OR
+  // 2) We're transitioning (fetching) and expect videos but have none yet
+  const shouldShowSkeleton = (isLoadingGenerations || isTransitionFetching) && (cachedCount ?? itemsPerPage) > 0;
+  const skeletonCount = shouldShowSkeleton ? Math.min(cachedCount ?? itemsPerPage, itemsPerPage) : 0;
+  
+  // [SkeletonCountMismatch] Debug log
+  console.log(`[SkeletonCountMismatch] 🎯 SHOT ${shotId?.substring(0, 8) || 'none'}:`, {
+    willShowSkeleton: shouldShowSkeleton,
     skeletonCount,
-    detailedLogic: {
-      condition1_isLoading: isLoadingGenerations,
-      condition2_noVideos: videoOutputs.length === 0,
-      condition3_notFetchedBefore: !hasEverFetched,
-      condition4_cacheAllows: cachedCount === null || cachedCount > 0,
-      finalDecision: `${isLoadingGenerations} && ${videoOutputs.length === 0} && ${!hasEverFetched} && ${cachedCount === null || cachedCount > 0} = ${showSkeletons}`
-    },
-    willRender: showSkeletons ? 'SKELETONS' : 'VIDEOS_OR_EMPTY',
-    timestamp: Date.now()
-  });
-
-  // AGGRESSIVE DEBUG: Always log skeleton state (no useEffect gating)
-  console.log(`[VideoGallerySimplified] SKELETON_DEBUG:`, {
-    showSkeletons,
-    skeletonCount,
-    isLoadingGenerations,
-    videoOutputsLength: videoOutputs.length,
-    hasEverFetched,
-    generationsError: !!generationsError,
-    logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0 && !hasEverFetched=${!hasEverFetched}`,
-    decision: showSkeletons ? 'SHOW_SKELETONS' : 'SHOW_VIDEOS',
     cachedCount,
-    shotId,
-    timestamp: Date.now()
+    serverTotal,
+    actualVideos: videoOutputs.length,
+    hasServerResponse,
+    isFetching: isFetchingGenerations,
+    isTransitionFetching,
+    reason: shouldShowSkeleton 
+      ? (isLoadingGenerations ? 'isLoading=true' : 'waiting for server response')
+      : (videoOutputs.length > 0 ? 'have videos' : 'server says 0'),
   });
 
-  // Enhanced empty state check - show immediately if cache says 0 OR local hint says 0, 
-  // otherwise show after loading completes with 0 results.
-  // IMPORTANT: If cachedCount suggests videos exist, trust it over localZeroHint during loading!
-  // NOTE: We intentionally ignore isFetchingGenerations to prevent flickering during background refetches
+  // Empty state: show when we know there are 0 videos (from cache or server)
   const effectiveZero = (cachedCount === 0) || (Boolean(localZeroHint) && cachedCount === null);
   const shouldShowEmpty = (
-    (sortedVideoOutputs.length === 0 && effectiveZero) ||
-    (!isLoadingGenerations && sortedVideoOutputs.length === 0)
+    !shouldShowSkeleton &&
+    (
+      (sortedVideoOutputs.length === 0 && effectiveZero) ||
+      // Only trust serverTotal=0 once we're not actively fetching (prevents placeholder empty flash)
+      (!isFetchingGenerations && hasServerResponse && serverTotal === 0 && sortedVideoOutputs.length === 0)
+    )
   );
 
-  // Log empty state decision
-  console.log(`${debugId} EMPTY_STATE_DECISION:`, {
-    shouldShowEmpty,
-    isLoadingGenerations,
-    isFetchingGenerations,
-    sortedVideoOutputsLength: sortedVideoOutputs.length,
-    cachedCount,
-    effectiveZero,
-    emptyLogic: `((${sortedVideoOutputs.length} === 0 && effectiveZero=${effectiveZero}) || (!${isLoadingGenerations} && ${sortedVideoOutputs.length} === 0)) = ${shouldShowEmpty}`,
-    finalRenderDecision: shouldShowEmpty ? 'RENDER_EMPTY_STATE' : showSkeletons ? 'RENDER_SKELETONS' : 'RENDER_VIDEOS',
-    note: 'isFetchingGenerations ignored to prevent flickering during background refetches',
-    timestamp: Date.now()
-  });
 
   // ===============================================================================
   // EVENT HANDLERS
@@ -1026,10 +954,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           onStarredFilterChange={setShowStarredOnly}
         />
 
-        {/* Loading state */}
-        {isLoadingGenerations ? (
+        {/* Loading state - show skeleton when waiting for videos */}
+        {shouldShowSkeleton ? (
           <SkeletonGallery
-            count={6}
+            // Prevent accidentally rendering hundreds of skeletons if shot_statistics is off.
+            // We already only fetch one page at a time, so cap at the current page size.
+            count={Math.min(cachedCount ?? itemsPerPage, itemsPerPage)}
             columns={gridColumnConfig.columns}
             gapClasses="gap-2 sm:gap-3 md:gap-4"
             projectAspectRatio={projectAspectRatio}

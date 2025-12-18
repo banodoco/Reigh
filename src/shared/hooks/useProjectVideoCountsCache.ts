@@ -51,8 +51,6 @@ const globalProjectVideoCountsCache = new ProjectVideoCountsCache();
  * Fetch all shot video counts for a project using shot_statistics view
  */
 async function fetchProjectVideoCountsFromDB(projectId: string): Promise<Map<string, number>> {
-  console.log('[ProjectVideoCountsCache] Fetching all shot video counts for project:', projectId);
-  
   const { data, error } = await supabase
     .from('shot_statistics')
     .select('shot_id, video_count')
@@ -66,14 +64,6 @@ async function fetchProjectVideoCountsFromDB(projectId: string): Promise<Map<str
   const counts = new Map<string, number>();
   data?.forEach(row => {
     counts.set(row.shot_id, row.video_count || 0);
-  });
-  
-  console.log('[ProjectVideoCountsCache] Fetched video counts:', {
-    projectId,
-    shotCount: counts.size,
-    totalVideos: Array.from(counts.values()).reduce((sum, count) => sum + count, 0),
-    shotBreakdown: Object.fromEntries(counts),
-    timestamp: Date.now()
   });
   
   return counts;

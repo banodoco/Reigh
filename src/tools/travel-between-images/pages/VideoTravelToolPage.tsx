@@ -325,8 +325,9 @@ const VideoTravelToolPage: React.FC = () => {
   const lastActiveShotSettingsRef = useRef<VideoTravelSettings | null>(null);
   
   useEffect(() => {
-    // Only update if we have a selected shot and settings are loaded
-    if (selectedShot?.id && shotSettings.settings && shotSettings.status === 'ready') {
+    // Only update if we have a selected shot and settings are loaded AND confirmed for this shot
+    if (selectedShot?.id && shotSettings.settings && 
+        shotSettings.status === 'ready' && shotSettings.shotId === selectedShot.id) {
       console.log('[ShotSettingsInherit] 📝 Updating lastActiveShotSettingsRef for shot:', selectedShot.id.substring(0, 8));
       console.log('[ShotSettingsInherit] motionMode:', shotSettings.settings.motionMode);
       console.log('[ShotSettingsInherit] amountOfMotion:', shotSettings.settings.amountOfMotion);
@@ -335,7 +336,7 @@ const VideoTravelToolPage: React.FC = () => {
       console.log('[ShotSettingsInherit] steerableMotionSettings:', shotSettings.settings.steerableMotionSettings);
       lastActiveShotSettingsRef.current = shotSettings.settings;
     }
-  }, [selectedShot?.id, shotSettings.settings, shotSettings.status]);
+  }, [selectedShot?.id, shotSettings.settings, shotSettings.status, shotSettings.shotId]);
 
   // [VideoTravelDebug] Log the data loading states - reduced frequency
   if (videoRenderCount.current <= 5 || videoRenderCount.current % 10 === 0) {
@@ -957,14 +958,39 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
 
   // [GenerationModeDebug] Track generationMode through its lifecycle
   // Use cached value during loading to prevent flash of wrong mode
-  const cachedGenerationMode = getShotGenerationMode(selectedShot?.id ?? null);
+  // CRITICAL: Use currentShotId (not selectedShot?.id) for cache lookup - it updates immediately on navigation
+  const cachedGenerationMode = getShotGenerationMode(currentShotId ?? null);
   
-  // FIX: Use cached mode during loading instead of the default 'timeline'
-  // This prevents the 10-second flash of wrong mode while DB loads
+  // [ShotNavDebug] RENDER-TIME logging to catch timing issues
+  // Log values directly (not nested) so they're visible without expanding
+  const shotNavDebugRef = useRef<string | null>(null);
+  const shotJustChanged = currentShotId !== shotNavDebugRef.current;
+  if (shotJustChanged) {
+    console.log('[ShotNavDebug] 🔍 RENDER - shotId:', currentShotId?.substring(0, 8) || 'none',
+      '| prevShotId:', shotNavDebugRef.current?.substring(0, 8) || 'none',
+      '| selectedShotId:', selectedShot?.id?.substring(0, 8) || 'none',
+      '| idsMatch:', currentShotId === selectedShot?.id);
+    console.log('[ShotNavDebug] 🎯 MODE - cachedMode:', cachedGenerationMode,
+      '| rawMode:', rawGenerationMode,
+      '| settingsStatus:', shotSettings.status,
+      '| settingsFor:', shotSettings.shotId?.substring(0, 8) || 'none');
+    console.log('[ShotNavDebug] 📊 CACHE - videoCount:', getShotVideoCount(currentShotId),
+      '| isLoadingCounts:', isLoadingProjectCounts,
+      '| isLoadingModes:', isLoadingProjectModes,
+      '| shotsInArray:', shots?.length ?? 0);
+    shotNavDebugRef.current = currentShotId;
+  }
+  
+  // CLEAN FIX: Use cached mode unless settings are ready AND confirmed for current shot
+  // shotSettings.shotId tells us exactly which shot the settings are for (from useAutoSaveSettings)
+  const settingsReadyForCurrentShot = 
+    shotSettings.status === 'ready' && 
+    shotSettings.shotId === currentShotId;
+  
   const generationMode: 'batch' | 'timeline' | 'by-pair' = 
-    shotSettings.status === 'loading' || shotSettings.status === 'idle'
-      ? (cachedGenerationMode ?? rawGenerationMode)
-      : rawGenerationMode;
+    settingsReadyForCurrentShot
+      ? rawGenerationMode
+      : (cachedGenerationMode ?? rawGenerationMode);
   React.useEffect(() => {
     if (selectedShot?.id) {
       console.log('[GenerationModeDebug] 🎯 MODE COMPARISON:', {
@@ -1594,25 +1620,25 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   // useVideoTravelHeader({ ... });
 
   // Auto-disable turbo mode when cloud generation is disabled
-  // CRITICAL: Skip during settings loading to prevent race condition where
-  // loaded settings get immediately overwritten by auto-disable logic
+  // CRITICAL: Skip during settings loading or if settings aren't for current shot
+  // to prevent race condition where loaded settings get immediately overwritten
   useEffect(() => {
-    if (shotSettings.status === 'loading') {
-      return; // Don't auto-disable while settings are loading
+    if (shotSettings.status === 'loading' || shotSettings.shotId !== currentShotId) {
+      return; // Don't auto-disable while settings are loading or stale
     }
     
     if (!isCloudGenerationEnabled && turboMode) {
       console.log('[VideoTravelToolPage] Auto-disabling turbo mode - cloud generation is disabled');
       shotSettingsRef.current.updateField('turboMode', false);
     }
-  }, [isCloudGenerationEnabled, turboMode, shotSettings.status]);
+  }, [isCloudGenerationEnabled, turboMode, shotSettings.status, shotSettings.shotId, currentShotId]);
 
   // Auto-disable advanced mode when turbo mode is on
-  // CRITICAL: Skip during settings loading to prevent race condition where
-  // loaded settings get immediately overwritten by auto-disable logic
+  // CRITICAL: Skip during settings loading or if settings aren't for current shot
+  // to prevent race condition where loaded settings get immediately overwritten
   useEffect(() => {
-    if (shotSettings.status === 'loading') {
-      return; // Don't auto-disable while settings are loading
+    if (shotSettings.status === 'loading' || shotSettings.shotId !== currentShotId) {
+      return; // Don't auto-disable while settings are loading or stale
     }
     
     if (turboMode && advancedMode) {
@@ -1622,7 +1648,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
         motionMode: 'basic'
       });
     }
-  }, [turboMode, advancedMode, shotSettings.status]);
+  }, [turboMode, advancedMode, shotSettings.status, shotSettings.shotId, currentShotId]);
 
   // Memoize the selected shot update logic to prevent unnecessary re-renders
   // Note: selectedShotRef is already declared earlier in the component
@@ -2748,7 +2774,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
               hasPrevious={hasPrevious}
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
-              settingsLoading={shotSettings.status !== 'ready'}
+              settingsLoading={shotSettings.status !== 'ready' || shotSettings.shotId !== currentShotId}
               getShotVideoCount={getShotVideoCount}
               invalidateVideoCountsCache={invalidateOnVideoChanges}
               // afterEachPromptText props removed - not in ShotEditorProps interface

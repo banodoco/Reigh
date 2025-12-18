@@ -1,27 +1,32 @@
 import React, { useCallback, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
+import { 
+  resolveGenerationMode, 
+  extractToolSettings,
+  type GenerationModeNormalized 
+} from '@/shared/lib/settingsResolution';
 
 /**
  * Project-wide generation modes cache
  * Fetches all shot generation modes for a project in a single query
  */
 class ProjectGenerationModesCache {
-  private cache = new Map<string, Map<string, 'batch' | 'timeline'>>(); // projectId -> shotId -> generationMode
+  private cache = new Map<string, Map<string, GenerationModeNormalized>>(); // projectId -> shotId -> generationMode
   
-  getProjectModes(projectId: string): Map<string, 'batch' | 'timeline'> | null {
+  getProjectModes(projectId: string): Map<string, GenerationModeNormalized> | null {
     return this.cache.get(projectId) || null;
   }
   
-  getShotMode(projectId: string, shotId: string): 'batch' | 'timeline' | null {
+  getShotMode(projectId: string, shotId: string): GenerationModeNormalized | null {
     const projectModes = this.cache.get(projectId);
     if (!projectModes) return null;
     const value = projectModes.get(shotId);
     return value !== undefined ? value : null;
   }
   
-  setProjectModes(projectId: string, modes: Map<string, 'batch' | 'timeline'>): void {
+  setProjectModes(projectId: string, modes: Map<string, GenerationModeNormalized>): void {
     this.cache.set(projectId, modes);
   }
   
@@ -50,30 +55,53 @@ const globalProjectGenerationModesCache = new ProjectGenerationModesCache();
 /**
  * Fetch all shot generation modes for a project
  */
-async function fetchProjectGenerationModesFromDB(projectId: string): Promise<Map<string, 'batch' | 'timeline'>> {
+async function fetchProjectGenerationModesFromDB(projectId: string): Promise<Map<string, GenerationModeNormalized>> {
   console.log('[ProjectGenerationModesCache] Fetching all shot generation modes for project:', projectId);
   
-  const { data, error } = await supabase
-    .from('shots')
-    .select('id, settings')
-    .eq('project_id', projectId);
-  
-  if (error) {
-    console.error('[ProjectGenerationModesCache] Error fetching shot settings:', error);
-    throw error;
+  // IMPORTANT:
+  // This cache must match the effective settings resolution used by `useToolSettings`:
+  // defaults → user → project → shot.
+  //
+  // If we only look at shots.settings, we will be wrong for shots that inherit
+  // generationMode from user/project defaults.
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData?.session?.user?.id ?? null;
+
+  const [userResult, projectResult, shotsResult] = await Promise.all([
+    userId
+      ? supabase.from('users').select('settings').eq('id', userId).maybeSingle()
+      : Promise.resolve({ data: null, error: null } as any),
+    supabase.from('projects').select('settings').eq('id', projectId).maybeSingle(),
+    supabase.from('shots').select('id, settings').eq('project_id', projectId),
+  ]);
+
+  if (userResult.error && !userResult.error.message?.includes('No rows found')) {
+    console.warn('[ProjectGenerationModesCache] Error fetching user settings:', userResult.error);
   }
-  
-  const modes = new Map<string, 'batch' | 'timeline'>();
-  data?.forEach(shot => {
-    // Extract generation mode from settings JSON
-    // Settings structure: { "travel-between-images": { "generationMode": "batch" | "timeline" } }
-    const toolSettings = (shot.settings as any)?.['travel-between-images'];
-    const generationMode = toolSettings?.generationMode as 'batch' | 'timeline' | 'by-pair' | undefined;
-    
-    // Default to timeline if not set, and convert 'by-pair' to 'batch'
-    const effectiveMode: 'batch' | 'timeline' = 
-      generationMode === 'batch' || generationMode === 'by-pair' ? 'batch' : 'timeline';
-    
+  if (projectResult.error && !projectResult.error.message?.includes('No rows found')) {
+    console.warn('[ProjectGenerationModesCache] Error fetching project settings:', projectResult.error);
+  }
+  if (shotsResult.error) {
+    console.error('[ProjectGenerationModesCache] Error fetching shot settings:', shotsResult.error);
+    throw shotsResult.error;
+  }
+
+  const toolId = 'travel-between-images';
+  const userToolSettings = extractToolSettings(userResult.data?.settings, toolId);
+  const projectToolSettings = extractToolSettings(projectResult.data?.settings, toolId);
+
+  const modes = new Map<string, GenerationModeNormalized>();
+  (shotsResult.data || []).forEach((shot: any) => {
+    const shotToolSettings = extractToolSettings(shot.settings, toolId);
+
+    // Use shared resolution logic (priority: shot → project → user → defaults)
+    // defaults to 'timeline' via normalizeGenerationMode
+    const effectiveMode = resolveGenerationMode({
+      shot: shotToolSettings,
+      project: projectToolSettings,
+      user: userToolSettings,
+      // defaults not needed - normalizeGenerationMode handles undefined → 'timeline'
+    });
     modes.set(shot.id, effectiveMode);
   });
   
@@ -97,12 +125,13 @@ async function fetchProjectGenerationModesFromDB(projectId: string): Promise<Map
  */
 export function useProjectGenerationModesCache(projectId: string | null) {
   const cacheRef = useRef(globalProjectGenerationModesCache);
+  const queryClient = useQueryClient();
   
   // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
   const smartPollingConfig = useSmartPollingConfig(['project-generation-modes', projectId]);
   
   // Query to fetch all shot generation modes for the project
-  const { data: projectModes, isLoading, error, refetch } = useQuery<Map<string, 'batch' | 'timeline'>>({
+  const { data: projectModes, isLoading, error, refetch } = useQuery<Map<string, GenerationModeNormalized>>({
     queryKey: ['project-generation-modes', projectId],
     queryFn: () => fetchProjectGenerationModesFromDB(projectId!),
     enabled: !!projectId,
@@ -120,7 +149,7 @@ export function useProjectGenerationModesCache(projectId: string | null) {
     }
   }, [projectModes, projectId]);
   
-  const getShotGenerationMode = useCallback((shotId: string | null, isMobile: boolean = false): 'batch' | 'timeline' | null => {
+  const getShotGenerationMode = useCallback((shotId: string | null, isMobile: boolean = false): GenerationModeNormalized | null => {
     // Mobile always uses batch mode
     if (isMobile) {
       return 'batch';
@@ -143,7 +172,7 @@ export function useProjectGenerationModesCache(projectId: string | null) {
     return null;
   }, [projectId, projectModes]);
   
-  const getAllShotModes = useCallback((): Map<string, 'batch' | 'timeline'> | null => {
+  const getAllShotModes = useCallback((): Map<string, GenerationModeNormalized> | null => {
     if (!projectId) return null;
     
     // First try cache
@@ -178,14 +207,12 @@ export function useProjectGenerationModesCache(projectId: string | null) {
   }, [projectId, getAllShotModes]);
   
   // Optimistically update a single shot's mode in cache
-  const updateShotMode = useCallback((shotId: string | null, mode: 'batch' | 'timeline') => {
+  const updateShotMode = useCallback((shotId: string | null, mode: GenerationModeNormalized) => {
     if (!projectId || !shotId) return;
     
-    console.log('[ProjectGenerationModesCache] 🎯 Optimistically updating shot mode:', {
-      shotId: shotId.substring(0, 8),
-      newMode: mode,
-      timestamp: Date.now()
-    });
+    console.log('[ProjectGenerationModesCache] 🎯 Optimistically updating shot mode:',
+      'shotId:', shotId.substring(0, 8),
+      '| newMode:', mode);
     
     // Update in-memory cache immediately
     const currentModes = cacheRef.current.getProjectModes(projectId);
@@ -194,13 +221,18 @@ export function useProjectGenerationModesCache(projectId: string | null) {
       cacheRef.current.setProjectModes(projectId, currentModes);
     }
     
-    // Also update React Query cache if it exists
-    if (projectModes) {
-      const updatedModes = new Map(projectModes);
-      updatedModes.set(shotId, mode);
-      // Note: We don't force a refetch here - let it happen naturally via polling
-    }
-  }, [projectId, projectModes]);
+    // CRITICAL: Also update React Query cache so it persists across re-renders
+    // The previous code created updatedModes but never saved it!
+    queryClient.setQueryData<Map<string, GenerationModeNormalized>>(
+      ['project-generation-modes', projectId],
+      (oldData) => {
+        if (!oldData) return oldData;
+        const newData = new Map(oldData);
+        newData.set(shotId, mode);
+        return newData;
+      }
+    );
+  }, [projectId, queryClient]);
   
   // Invalidate cache when mode changes (for manual refresh if needed)
   const invalidateOnModeChange = useCallback(() => {

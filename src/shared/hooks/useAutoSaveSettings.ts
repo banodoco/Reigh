@@ -35,6 +35,8 @@ export interface UseAutoSaveSettingsReturn<T> {
   settings: T;
   /** Current status of the settings lifecycle */
   status: AutoSaveStatus;
+  /** The entity ID these settings are confirmed for (null if not yet loaded) */
+  entityId: string | null;
   /** Whether settings have been modified since last save */
   isDirty: boolean;
   /** Error if status is 'error' */
@@ -533,9 +535,13 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
   }, [entityId, isLoading, dbSettings, defaults, enabled, status, toolId, debounceMs]);
 
   // Memoize return value to prevent object recreation on every render
+  // NOTE: entityId uses currentEntityIdRef.current which is a ref value, so it updates
+  // without triggering memo recalculation. Consumers should check status === 'ready' 
+  // alongside entityId to ensure settings are actually loaded for that entity.
   return useMemo(() => ({
     settings,
     status,
+    entityId: currentEntityIdRef.current,
     isDirty,
     error,
     updateField,

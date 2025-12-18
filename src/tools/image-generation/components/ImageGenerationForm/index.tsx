@@ -916,12 +916,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Get current prompts - from shot settings if shot selected, otherwise local state
   // Include 'saving' status to prevent flicker during save
+  // Also verify settings are for the current shot (entityId check) to prevent flash of wrong data
   const prompts = useMemo(() => {
-    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+    if (associatedShotId && settingsForCurrentShot && 
+        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
       return shotPromptSettings.settings.prompts || [];
     }
     return noShotPrompts;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.prompts, noShotPrompts]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.prompts, shotPromptSettings.entityId, noShotPrompts]);
   
   // Helper to update prompts - routes to shot settings or local state
   const setPrompts = useCallback((newPrompts: PromptEntry[] | ((prev: PromptEntry[]) => PromptEntry[])) => {
@@ -943,11 +946,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Get current master prompt - from shot settings if shot selected, otherwise local state
   // Include 'saving' status to prevent flicker during save
   const masterPromptText = useMemo(() => {
-    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+    if (associatedShotId && settingsForCurrentShot &&
+        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
       return shotPromptSettings.settings.masterPrompt || '';
     }
     return noShotMasterPrompt;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, noShotMasterPrompt]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, shotPromptSettings.entityId, noShotMasterPrompt]);
   
   // Helper to update master prompt - routes to shot settings or local state
   const setMasterPromptText: React.Dispatch<React.SetStateAction<string>> = useCallback((newTextOrUpdater) => {
@@ -968,11 +973,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Get current prompt mode - from shot settings if shot selected, otherwise local state
   const effectivePromptMode = useMemo<PromptMode>(() => {
-    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+    if (associatedShotId && settingsForCurrentShot &&
+        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
       return shotPromptSettings.settings.promptMode || 'automated';
     }
     return promptMode;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, promptMode]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, shotPromptSettings.entityId, promptMode]);
 
   // Helper to update prompt mode - routes to shot settings or local state
   const setEffectivePromptMode = useCallback((newMode: PromptMode) => {
@@ -987,7 +994,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Get current selected reference ID - from shot settings if shot selected, otherwise project settings
   const effectiveSelectedReferenceId = useMemo<string | null>(() => {
-    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+    if (associatedShotId && settingsForCurrentShot &&
+        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
       // Shot-level reference takes precedence
       const shotRefId = shotPromptSettings.settings.selectedReferenceId;
       if (shotRefId !== undefined) {
@@ -996,7 +1005,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
     // Fall back to project-level per-shot mapping
     return selectedReferenceId;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.selectedReferenceId, selectedReferenceId]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.selectedReferenceId, shotPromptSettings.entityId, selectedReferenceId]);
 
   // Helper to update selected reference ID - routes to shot settings
   const setEffectiveSelectedReferenceId = useCallback((newRefId: string | null) => {
@@ -1012,11 +1021,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Get current before prompt text - from shot settings if shot selected, otherwise project state
   // Defaults to empty string (not inherited from other shots)
   const currentBeforePromptText = useMemo(() => {
-    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+    if (associatedShotId && settingsForCurrentShot &&
+        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
       return shotPromptSettings.settings.beforeEachPromptText ?? '';
     }
     return beforeEachPromptText;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.beforeEachPromptText, beforeEachPromptText]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.beforeEachPromptText, shotPromptSettings.entityId, beforeEachPromptText]);
 
   // Helper to update before prompt text - routes to shot settings or project state
   const setCurrentBeforePromptText = useCallback((newText: string) => {
@@ -1031,11 +1042,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Get current after prompt text - from shot settings if shot selected, otherwise project state
   // Defaults to empty string (not inherited from other shots)
   const currentAfterPromptText = useMemo(() => {
-    if (associatedShotId && (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+    if (associatedShotId && settingsForCurrentShot &&
+        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
       return shotPromptSettings.settings.afterEachPromptText ?? '';
     }
     return afterEachPromptText;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.afterEachPromptText, afterEachPromptText]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.afterEachPromptText, shotPromptSettings.entityId, afterEachPromptText]);
 
   // Helper to update after prompt text - routes to shot settings or project state
   const setCurrentAfterPromptText = useCallback((newText: string) => {
@@ -1050,7 +1063,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Save current shot settings to localStorage for inheritance by new shots
   // Note: prompts and before/after prompt text are NOT inherited, only masterPrompt and mode settings
   useEffect(() => {
-    if (associatedShotId && shotPromptSettings.status === 'ready') {
+    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+    if (associatedShotId && settingsForCurrentShot && shotPromptSettings.status === 'ready') {
       try {
         const settingsToSave = {
           masterPrompt: shotPromptSettings.settings.masterPrompt || '',
@@ -1061,7 +1075,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         // Ignore localStorage errors
       }
     }
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, shotPromptSettings.settings.promptMode, effectivePromptMode]);
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, shotPromptSettings.settings.promptMode, shotPromptSettings.entityId, effectivePromptMode]);
 
   // Sync local style strength with project settings
   // Legacy sync effects removed to prevent overwriting user input
@@ -1190,8 +1204,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return;
     }
     
-    // For shot mode: wait until shot settings are ready
-    if (associatedShotId && shotPromptSettings.status !== 'ready') {
+    // For shot mode: wait until shot settings are ready AND confirmed for current shot
+    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+    if (associatedShotId && (shotPromptSettings.status !== 'ready' || !settingsForCurrentShot)) {
       return;
     }
     
@@ -1218,7 +1233,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // Prompts exist, mark as initialized
       initializedEntitiesRef.current.add(entityKey);
     }
-  }, [associatedShotId, shotPromptSettings.status, generatePromptId]); // Removed settings.prompts and noShotPrompts to prevent loops
+  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.entityId, generatePromptId]); // Removed settings.prompts and noShotPrompts to prevent loops
 
   const hasApiKey = true; // Always true for wan-local
 

@@ -30,6 +30,8 @@ export interface UseShotSettingsReturn {
   // State
   settings: VideoTravelSettings;
   status: 'idle' | 'loading' | 'ready' | 'saving' | 'error';
+  /** The shot ID these settings are confirmed for (null if not yet loaded) */
+  shotId: string | null;
   isDirty: boolean;
   error: Error | null;
   
@@ -262,6 +264,7 @@ export const useShotSettings = (
   return useMemo(() => ({
     settings: autoSave.settings,
     status: autoSave.status as 'idle' | 'loading' | 'ready' | 'saving' | 'error',
+    shotId: autoSave.entityId,
     isDirty: autoSave.isDirty,
     error: autoSave.error,
     updateField,
@@ -275,6 +278,7 @@ export const useShotSettings = (
   }), [
     autoSave.settings,
     autoSave.status,
+    autoSave.entityId,
     autoSave.isDirty,
     autoSave.error,
     updateField,

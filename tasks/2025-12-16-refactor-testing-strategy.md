@@ -334,3 +334,4 @@ Logs revealed 9 callback props being recreated on every render:
 
 This should be added to the refactor plan as a quick win.
 
+
