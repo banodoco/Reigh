@@ -374,21 +374,50 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const unpositionedImagesQuery = useUnpositionedImages(selectedShotId);
   const videoOutputsQuery = useVideoOutputs(selectedShotId);
   
-  // Selector data (or empty arrays while loading)
-  const timelineImages = timelineImagesQuery.data || [];
-  const unpositionedImages = unpositionedImagesQuery.data || [];
-  const videoOutputs = videoOutputsQuery.data || [];
+  // All shot images - use query data when available, fall back to context images during transition
+  // This prevents the "flash to empty" when navigating between shots
+  const allShotImages = fullShotImages.length > 0 ? fullShotImages : contextImages;
   
-  // All shot images - with cache priming, fullShotImages has data immediately
-  // This is passed to children that need all data (not just filtered views)
-  const allShotImages = fullShotImages;
+  // Selector data with fallbacks derived from contextImages during transitions
+  // This prevents UI flicker when navigating between shots
+  const timelineImages = React.useMemo(() => {
+    if (timelineImagesQuery.data && timelineImagesQuery.data.length > 0) {
+      return timelineImagesQuery.data;
+    }
+    // Fallback: filter contextImages the same way the selector does
+    return contextImages
+      .filter(g => g.timeline_frame != null && g.timeline_frame >= 0 && !g.type?.includes('video'))
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+  }, [timelineImagesQuery.data, contextImages]);
+  
+  const unpositionedImages = React.useMemo(() => {
+    if (unpositionedImagesQuery.data && unpositionedImagesQuery.data.length > 0) {
+      return unpositionedImagesQuery.data;
+    }
+    // Fallback: filter contextImages the same way the selector does
+    return contextImages.filter(g => g.timeline_frame == null && !g.type?.includes('video'));
+  }, [unpositionedImagesQuery.data, contextImages]);
+  
+  const videoOutputs = React.useMemo(() => {
+    if (videoOutputsQuery.data && videoOutputsQuery.data.length > 0) {
+      return videoOutputsQuery.data;
+    }
+    // Fallback: filter contextImages the same way the selector does
+    return contextImages.filter(g => g.type?.includes('video'));
+  }, [videoOutputsQuery.data, contextImages]);
   
   console.log('[SelectorPattern] Shot data from selectors:', {
     shotId: selectedShotId?.substring(0, 8),
     allImages: allShotImages.length,
-    timelineImages: timelineImages.length,
-    unpositionedImages: unpositionedImages.length,
-    videoOutputs: videoOutputs.length,
+    fullQueryImages: fullShotImages.length,
+    contextImages: contextImages.length,
+    sources: {
+      all: fullShotImages.length > 0 ? 'query' : 'context',
+      timeline: timelineImagesQuery.data?.length ? 'query' : 'context',
+      unpositioned: unpositionedImagesQuery.data?.length ? 'query' : 'context',
+      videos: videoOutputsQuery.data?.length ? 'query' : 'context',
+    },
+    counts: { timelineImages: timelineImages.length, unpositionedImages: unpositionedImages.length, videoOutputs: videoOutputs.length },
     cacheStatus: fullImagesQueryResult.isFetching ? 'fetching' : 'ready',
   });
 
