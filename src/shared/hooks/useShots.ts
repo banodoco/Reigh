@@ -675,8 +675,13 @@ export const useAddImageToShot = () => {
         .not('timeline_frame', 'is', null);
         
       if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching existing frames:', fetchError);
+        console.error('[AddDebug] ❌ Error fetching existing frames:', fetchError);
       }
+
+      console.log('[AddDebug] 📊 Fetched existing frames:', {
+        count: existingGens?.length ?? 0,
+        timestamp: Date.now()
+      });
       
       const existingFrames = (existingGens || [])
         .map(g => g.timeline_frame)
@@ -692,7 +697,7 @@ export const useAddImageToShot = () => {
           resolvedFrame += 1;
         }
         if (resolvedFrame !== timelineFrame) {
-          console.log('[UniqueFrame] 🔄 Adjusted provided frame:', {
+          console.log('[AddDebug] 🔄 Adjusted provided frame:', {
             original: timelineFrame,
             resolved: resolvedFrame,
             reason: 'collision'
@@ -704,14 +709,13 @@ export const useAddImageToShot = () => {
         resolvedFrame = maxFrame + 60;
       }
 
+      console.log('[AddDebug] 🎯 Resolved frame for new item:', {
+        resolvedFrame,
+        timestamp: Date.now()
+      });
+
       // Insert into shot_generations
-      // NOTE: If there's a unique constraint on (shot_id, generation_id), this will fail
-      // when trying to add the same generation to the shot multiple times.
-      // Each shot_generations row should have a unique ID, but the same generation_id
-      // CAN appear multiple times (as duplicate instances).
-      
       // First, check if this generation is already on the timeline (for debugging)
-      // Skip this check if generation_id is empty (e.g., when adding URL-only images)
       let existingRecords: { id: string; timeline_frame: number | null }[] | null = null;
       if (generation_id) {
         const { data } = await supabase
@@ -722,12 +726,11 @@ export const useAddImageToShot = () => {
         existingRecords = data;
       }
       
-      console.log('[DuplicateGenDebug] 📤 Inserting into shot_generations:', {
+      console.log('[AddDebug] 📤 Inserting into shot_generations:', {
         shot_id: shot_id.substring(0, 8),
         generation_id: generation_id ? generation_id.substring(0, 8) : '(empty)',
         timeline_frame: resolvedFrame,
         existingRecordsCount: existingRecords?.length ?? 0,
-        existingRecords: existingRecords?.map(r => ({ id: r.id.substring(0, 8), frame: r.timeline_frame })),
         timestamp: Date.now()
       });
       
@@ -742,20 +745,16 @@ export const useAddImageToShot = () => {
         .single();
 
       if (error) {
-        console.error('[DuplicateGenDebug] ❌ Insert failed:', {
+        console.error('[AddDebug] ❌ Insert failed:', {
           errorCode: error.code,
           errorMessage: error.message,
-          errorDetails: error.details,
-          errorHint: error.hint,
           shot_id: shot_id.substring(0, 8),
-          generation_id: generation_id ? generation_id.substring(0, 8) : '(empty)',
           timestamp: Date.now()
         });
         throw error;
       }
       
       // After insert, verify what records exist now
-      // Skip this check if generation_id is empty
       let afterInsertRecords: { id: string; timeline_frame: number | null }[] | null = null;
       if (generation_id) {
         const { data: verifyData } = await supabase
@@ -766,13 +765,12 @@ export const useAddImageToShot = () => {
         afterInsertRecords = verifyData;
       }
       
-      console.log('[DuplicateGenDebug] ✅ Insert succeeded:', {
+      console.log('[AddDebug] ✅ Insert succeeded:', {
         newId: data?.id?.substring(0, 8),
         shot_id: shot_id.substring(0, 8),
         generation_id: generation_id ? generation_id.substring(0, 8) : '(empty)',
         timeline_frame: data?.timeline_frame,
         totalRecordsAfterInsert: afterInsertRecords?.length ?? 0,
-        allRecords: afterInsertRecords?.map(r => ({ id: r.id.substring(0, 8), frame: r.timeline_frame })),
         timestamp: Date.now()
       });
       

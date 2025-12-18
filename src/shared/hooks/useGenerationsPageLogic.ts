@@ -388,22 +388,18 @@ export function useGenerationsPageLogic({
     // Fast path: minimal validation and direct execution
     // Priority: dropdown selection (lastAffectedShotId) > current viewing shot (currentShotId)
     const targetShotId = lastAffectedShotId || currentShotId;
-    
-    console.log('[PATH_COMPARE] 🔵 BUTTON PATH START - handleAddToShot:', {
+
+    console.log('[AddDebug] 🔵 BUTTON PATH START - handleAddToShot:', {
       generationId: generationId?.substring(0, 8),
-      imageUrl: imageUrl?.substring(0, 60),
-      thumbUrl: thumbUrl?.substring(0, 60),
       currentShotId: currentShotId?.substring(0, 8),
       lastAffectedShotId: lastAffectedShotId?.substring(0, 8),
       targetShotId: targetShotId?.substring(0, 8),
       selectedProjectId: selectedProjectId?.substring(0, 8),
-      selectedShotFilter: selectedShotFilter?.substring(0, 8),
-      excludePositioned,
       timestamp: Date.now()
     });
-    
+
     if (!targetShotId || !selectedProjectId) {
-      console.log('[PositionFix] Missing required IDs:', {
+      console.log('[AddDebug] Missing required IDs:', {
         targetShotId,
         selectedProjectId
       });
@@ -428,7 +424,7 @@ export function useGenerationsPageLogic({
     
     try {
       if (shouldPositionExisting) {
-        console.log('[PositionFix] Using positionExistingGenerationMutation with params:', {
+        console.log('[AddDebug] Using positionExistingGenerationMutation with params:', {
           shot_id: targetShotId,
           generation_id: generationId,
           project_id: selectedProjectId,
@@ -441,7 +437,7 @@ export function useGenerationsPageLogic({
           project_id: selectedProjectId,
         });
         
-        console.log('[PositionFix] positionExistingGenerationMutation result:', {
+        console.log('[AddDebug] positionExistingGenerationMutation result:', {
           result,
           timestamp: Date.now()
         });
@@ -450,11 +446,9 @@ export function useGenerationsPageLogic({
         // This ensures correct positioning even when adding to a shot we're not currently viewing
         // The mutation will query the DB for existing frames and append at the end
         
-        console.log('[PATH_COMPARE] 🔵 BUTTON PATH - calling addImageToShotMutation.mutateAsync:', {
+        console.log('[AddDebug] 🔵 BUTTON PATH - calling addImageToShotMutation.mutateAsync:', {
           shot_id: targetShotId?.substring(0, 8),
           generation_id: generationId?.substring(0, 8),
-          imageUrl: imageUrl?.substring(0, 60),
-          thumbUrl: thumbUrl?.substring(0, 60),
           project_id: selectedProjectId?.substring(0, 8),
           timestamp: Date.now()
         });
@@ -469,17 +463,17 @@ export function useGenerationsPageLogic({
           project_id: selectedProjectId,
         });
         
-        console.log('[PositionFix] addImageToShotMutation result:', {
+        console.log('[AddDebug] addImageToShotMutation result:', {
           result,
           timestamp: Date.now()
         });
       }
       
-      console.log('[PositionFix] handleAddToShot completed successfully');
+      console.log('[AddDebug] handleAddToShot completed successfully');
       return true;
     } catch (error) {
-      console.error('[ADDTOSHOT] Error:', error);
-      console.error('[PositionFix] handleAddToShot failed:', {
+      console.error('[AddDebug] Error:', error);
+      console.error('[AddDebug] handleAddToShot failed:', {
         error: error instanceof Error ? error.message : error,
         stack: error instanceof Error ? error.stack : undefined,
         timestamp: Date.now()
