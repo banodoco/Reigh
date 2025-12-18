@@ -2923,7 +2923,7 @@
 /* Touch-friendly hover: only apply hover on devices that support it, use active for touch */
 @media (hover: hover) {
   .group:hover .touch-hover-gold {
-    color: #fafaf8 !important;
+    color: #f0ebe3 !important;
   }
   .dark .group:hover .touch-hover-gold {
     color: hsl(var(--wes-vintage-gold)) !important;

@@ -318,7 +318,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                         ? "text-[#a098a8] animate-color-shift group-hover:animate-none"
                         : "text-white",
                       isBrandFlash
-                        ? (darkMode ? "animate-none !text-wes-vintage-gold" : "!text-[#C9B896]")
+                        ? (darkMode ? "animate-none !text-wes-vintage-gold" : "!text-[#f0ebe3]")
                         : null
                     )}
                   />
@@ -513,7 +513,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                             ? "text-[#a098a8] animate-color-shift group-hover:animate-none"
                             : "text-white",
                           isBrandFlash
-                            ? (darkMode ? "animate-none !text-wes-vintage-gold" : "!text-[#C9B896]")
+                            ? (darkMode ? "animate-none !text-wes-vintage-gold" : "!text-[#f0ebe3]")
                             : null
                         )}
                       />
