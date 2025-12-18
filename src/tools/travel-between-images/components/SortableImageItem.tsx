@@ -341,8 +341,8 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
                 e.stopPropagation();
                 e.nativeEvent.stopImmediatePropagation();
               }}
-              disabled={duplicatingImageId === image.id}
-              title="Duplicate image"
+              disabled={duplicatingImageId === image.id || image.id?.startsWith('temp-')}
+              title={image.id?.startsWith('temp-') ? "Please wait..." : "Duplicate image"}
             >
               {duplicatingImageId === image.id ? (
                 <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
@@ -368,7 +368,8 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
               e.stopPropagation();
               e.nativeEvent.stopImmediatePropagation();
             }}
-            title="Remove from timeline"
+            disabled={image.id?.startsWith('temp-')}
+            title={image.id?.startsWith('temp-') ? "Please wait..." : "Remove from timeline"}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>

@@ -152,7 +152,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
         {/* Top right - Copy and Delete buttons */}
         <div className="absolute top-2 right-2 flex gap-2 items-end opacity-100 transition-opacity">
-          {/* Duplicate button (hidden in readOnly) */}
+          {/* Duplicate button (hidden in readOnly, disabled for optimistic items) */}
           {!readOnly && onDuplicate && (
             <Button
               size="icon"
@@ -166,8 +166,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               onTouchEnd={(e) => {
                 e.stopPropagation();
               }}
-              disabled={isDuplicating}
-              title="Duplicate"
+              disabled={isDuplicating || image.id?.startsWith('temp-')}
+              title={image.id?.startsWith('temp-') ? "Please wait..." : "Duplicate"}
             >
               {showSuccessIcon ? (
                 <Check className="h-3 w-3 text-green-600" />
@@ -178,7 +178,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               )}
             </Button>
           )}
-          {/* Delete button (hidden in readOnly) */}
+          {/* Delete button (hidden in readOnly, disabled for optimistic items) */}
           {!readOnly && !hideDeleteButton && (
             <Button
               size="icon"
@@ -188,7 +188,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
                 e.stopPropagation();
                 onDelete();
               }}
-              title="Delete"
+              disabled={image.id?.startsWith('temp-')}
+              title={image.id?.startsWith('temp-') ? "Please wait..." : "Delete"}
             >
               <Trash2 className="h-3 w-3" />
             </Button>
