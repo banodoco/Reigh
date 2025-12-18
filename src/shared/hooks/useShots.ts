@@ -660,6 +660,13 @@ export const useAddImageToShot = () => {
       timelineFrame?: number;
       skipOptimistic?: boolean;
     }) => {
+      // 🔴 CRITICAL LOG: Is mutationFn even being called?
+      console.log('[AddDebug] 🔴 mutationFn START - useAddImageToShot:', {
+        shot_id: shot_id?.substring(0, 8),
+        generation_id: generation_id?.substring(0, 8),
+        timestamp: Date.now(),
+      });
+      
       // Get all existing frames for collision detection
       const { data: existingGens, error: fetchError } = await supabase
         .from('shot_generations')
