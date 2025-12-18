@@ -59,7 +59,7 @@ export const useShotGenerations = (
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     // Use realtimeBacked preset - data freshness from realtime + mutations
     ...QUERY_PRESETS.realtimeBacked,
-    retry: STANDARD_RETRY,
+    staleTime: 0, // CRITICAL: Always refetch from DB when opening shot, even if primed
     retryDelay: STANDARD_RETRY_DELAY,
   });
 };
@@ -172,13 +172,14 @@ export const useAllShotGenerations = (
     // Use realtimeBacked preset - data freshness from realtime + mutations
     // (invalidated by SimpleRealtimeProvider + useGenerationInvalidation)
     ...QUERY_PRESETS.realtimeBacked,
+    staleTime: 0, // CRITICAL: Always refetch from DB when opening shot, even if primed
     retry: STANDARD_RETRY,
     // NOTE: Removed placeholderData: (previousData) => previousData
     // This was causing cross-shot data leakage - when navigating to a new shot,
     // the previous shot's images would briefly appear as "placeholder" data
     queryFn: async ({ signal }) => {
       const startTime = Date.now();
-      console.log('[AddFlicker] 6️⃣ QUERY FETCH START - all-shot-generations refetching!', { 
+      console.log('[DataTrace] 🔍 NETWORK FETCH START - all-shot-generations:', { 
         shotId: stableShotId?.substring(0, 8), 
         timestamp: startTime 
       });
@@ -208,38 +209,22 @@ export const useAllShotGenerations = (
         .abortSignal(signal);
       
       if (response.error) {
-        // Abort errors are expected when the query is invalidated before completion
-        // (e.g., rapid invalidations from mutation + realtime). 
-        // IMPORTANT: Return the current cached data to prevent UI flicker.
-        // This keeps the optimistic update visible while the next query runs.
+        console.error('[DataTrace] ❌ NETWORK FETCH ERROR:', response.error);
         if (response.error.code === '20' || response.error.message?.includes('abort')) {
-          console.log('[ShotGenerations] Query ABORTED - returning cached data to prevent flicker:', {
-            shotId: stableShotId,
-          });
-          // Get the current cached data and return it
-          // This prevents the UI from flickering between states
           const cachedData = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', stableShotId]);
-          if (cachedData) {
-            console.log('[ShotGenerations] Returning cached data:', { count: cachedData.length });
-            return cachedData;
-          }
-          // If no cache (shouldn't happen), return empty to avoid error state
-          return [];
-        }
-        
-        console.error('[ShotGenerations] Query ERROR:', {
-          shotId: stableShotId,
-          error: response.error,
-          code: response.error.code,
-          message: response.error.message,
-        });
-        
-        if (response.error.code === 'PGRST116' || response.error.message?.includes('Invalid')) {
-          console.warn('[ShotGenerations] Invalid shot ID:', { shotId: stableShotId });
-          return [];
+          return cachedData || [];
         }
         throw response.error;
       }
+
+      console.log('[DataTrace] 📦 NETWORK FETCH SUCCESS:', {
+        shotId: stableShotId?.substring(0, 8),
+        rowCount: response.data?.length ?? 0,
+        firstRowId: response.data?.[0]?.id?.substring(0, 8),
+        firstRowFrame: response.data?.[0]?.timeline_frame,
+        allFrames: response.data?.map(r => r.timeline_frame),
+        timestamp: Date.now()
+      });
 
       // Transform to standardized GenerationRow format using shared mapper
       const result: GenerationRow[] = (response.data || [])
