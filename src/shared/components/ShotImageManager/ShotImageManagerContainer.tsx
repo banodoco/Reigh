@@ -134,6 +134,10 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
         onImageUpload={props.onImageUpload}
         isUploadingImage={props.isUploadingImage}
         shotId={props.selectedShotId}
+        onGenerationDrop={props.onGenerationDrop ? 
+          (generationId, imageUrl, thumbUrl) => props.onGenerationDrop!(generationId, imageUrl, thumbUrl, 0, 0) 
+          : undefined
+        }
       />
     );
   }

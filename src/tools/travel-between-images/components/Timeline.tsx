@@ -669,27 +669,41 @@ const Timeline: React.FC<TimelineProps> = ({
   const hasNoImages = images.length === 0;
 
   // Drag and drop state for empty state upload container
-  const [isFileOver, setIsFileOver] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [dragType, setDragType] = useState<'file' | 'generation' | null>(null);
 
-  // Drag and drop handlers for empty state
+  // Drag and drop handlers for empty state - supports both files AND internal generations
   const handleEmptyStateDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.dataTransfer.types.includes('Files') && onImageUpload) {
-      setIsFileOver(true);
+    
+    // Check for internal generation drag first
+    if (e.dataTransfer.types.includes('application/x-generation') && onGenerationDrop) {
+      setIsDragOver(true);
+      setDragType('generation');
+    } else if (e.dataTransfer.types.includes('Files') && onImageUpload) {
+      setIsDragOver(true);
+      setDragType('file');
     }
-  }, [onImageUpload]);
+  }, [onImageUpload, onGenerationDrop]);
 
   const handleEmptyStateDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.dataTransfer.types.includes('Files') && onImageUpload) {
-      setIsFileOver(true);
+    
+    // Check for internal generation drag first
+    if (e.dataTransfer.types.includes('application/x-generation') && onGenerationDrop) {
+      setIsDragOver(true);
+      setDragType('generation');
+      e.dataTransfer.dropEffect = 'copy';
+    } else if (e.dataTransfer.types.includes('Files') && onImageUpload) {
+      setIsDragOver(true);
+      setDragType('file');
       e.dataTransfer.dropEffect = 'copy';
     } else {
       e.dataTransfer.dropEffect = 'none';
     }
-  }, [onImageUpload]);
+  }, [onImageUpload, onGenerationDrop]);
 
   const handleEmptyStateDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -699,15 +713,36 @@ const Timeline: React.FC<TimelineProps> = ({
     const x = e.clientX;
     const y = e.clientY;
     if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
-      setIsFileOver(false);
+      setIsDragOver(false);
+      setDragType(null);
     }
   }, []);
 
   const handleEmptyStateDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsFileOver(false);
+    setIsDragOver(false);
+    setDragType(null);
 
+    // Handle internal generation drop first
+    if (e.dataTransfer.types.includes('application/x-generation') && onGenerationDrop) {
+      try {
+        const dataString = e.dataTransfer.getData('application/x-generation');
+        if (dataString) {
+          const data = JSON.parse(dataString);
+          if (data.generationId && data.imageUrl) {
+            await onGenerationDrop(data.generationId, data.imageUrl, data.thumbUrl, 0);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error handling generation drop:', error);
+        toast.error(`Failed to add image: ${(error as Error).message}`);
+      }
+      return;
+    }
+
+    // Handle file drop
     if (!onImageUpload) return;
 
     const files = Array.from(e.dataTransfer.files);
@@ -731,38 +766,39 @@ const Timeline: React.FC<TimelineProps> = ({
       console.error('Error handling image drop:', error);
       toast.error(`Failed to add images: ${(error as Error).message}`);
     }
-  }, [onImageUpload]);
+  }, [onImageUpload, onGenerationDrop]);
 
   return (
     <div className="w-full overflow-x-hidden relative">
       {/* Blur and overlay when no images */}
       {hasNoImages && (
         <>
-          {/* Very light blur overlay */}
-          <div className="absolute inset-0 backdrop-blur-[0.5px] bg-background/5 z-10" />
-          
-          {/* Upload container */}
-          {onImageUpload && (
+          {/* Full-size drop zone overlay */}
+          {(onImageUpload || onGenerationDrop) && (
             <div 
-              className="absolute inset-0 z-20 flex items-start justify-center pt-20 p-4"
+              className={`absolute inset-0 z-20 flex items-center justify-center transition-all duration-200 ${
+                isDragOver 
+                  ? 'bg-primary/10 border-2 border-dashed border-primary' 
+                  : 'bg-background/50 backdrop-blur-[0.5px]'
+              }`}
               onDragEnter={handleEmptyStateDragEnter}
               onDragOver={handleEmptyStateDragOver}
               onDragLeave={handleEmptyStateDragLeave}
               onDrop={handleEmptyStateDrop}
             >
-              <div className={`w-full max-w-md p-6 border-2 rounded-lg bg-background shadow-lg transition-all duration-200 ${
-                isFileOver 
-                  ? 'border-primary bg-primary/5 ring-2 ring-primary scale-105' 
-                  : 'border-border'
+              <div className={`p-6 rounded-lg transition-all duration-200 ${
+                isDragOver 
+                  ? 'bg-primary/5 scale-105' 
+                  : 'bg-background/80'
               }`}>
                 <div className="flex flex-col items-center gap-3 text-center">
-                  {isFileOver ? (
+                  {isDragOver ? (
                     <>
                       <Upload className="h-12 w-12 text-primary animate-bounce" />
                       <div>
-                        <h3 className="font-medium mb-2 text-primary">Drop images here</h3>
+                        <h3 className="font-medium mb-2 text-primary">Drop {dragType === 'generation' ? 'image' : 'files'} here</h3>
                         <p className="text-sm text-muted-foreground">
-                          Release to add images to timeline
+                          Release to add to timeline
                         </p>
                       </div>
                     </>
@@ -773,13 +809,15 @@ const Timeline: React.FC<TimelineProps> = ({
                         <h3 className="font-medium mb-2">No images on timeline</h3>
                       </div>
                       
-                      <ImageUploadActions
-                        onImageUpload={onImageUpload}
-                        isUploadingImage={isUploadingImage}
-                        shotId={shotId}
-                        inputId="timeline-empty-image-upload"
-                        buttonSize="default"
-                      />
+                      {onImageUpload && (
+                        <ImageUploadActions
+                          onImageUpload={onImageUpload}
+                          isUploadingImage={isUploadingImage}
+                          shotId={shotId}
+                          inputId="timeline-empty-image-upload"
+                          buttonSize="default"
+                        />
+                      )}
                       
                       {/* Subtle drag and drop hint */}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
