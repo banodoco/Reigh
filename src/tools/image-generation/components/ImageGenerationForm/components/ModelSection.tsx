@@ -97,16 +97,22 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   }, [references]);
   
   // Debug logging for ReferenceSelector rendering decision
-  React.useEffect(() => {
-    console.log('[RefLoadingDebug] 🎨 ReferenceSelector render state:', {
-      isLoadingReferenceData,
-      referenceCount,
-      actualReferencesLength: references.length,
-      willShowSkeletons: isLoadingReferenceData && referenceCount > 0,
-      willShowActualRefs: !(isLoadingReferenceData && referenceCount > 0),
-      timestamp: Date.now()
-    });
-  }, [isLoadingReferenceData, referenceCount, references.length]);
+  // [GridDebug] Log EVERY render to catch the disappearance
+  const renderCount = React.useRef(0);
+  renderCount.current++;
+  
+  const shouldShowSkeletonsComputed = references.length === 0 && (referenceCount > 0 || isLoadingReferenceData);
+  const skeletonCountComputed = Math.max(referenceCount, isLoadingReferenceData ? 1 : 0);
+  
+  console.log('[GridDebug] 🔲 ModelSection RENDER #' + renderCount.current, {
+    references_length: references.length,
+    referenceCount,
+    isLoadingReferenceData,
+    shouldShowSkeletons: shouldShowSkeletonsComputed,
+    skeletonCount: skeletonCountComputed,
+    willRenderNothing: !shouldShowSkeletonsComputed && references.length === 0,
+    selectedReferenceId: selectedReferenceId?.substring(0, 8) || 'null',
+  });
   
   // Aggressively preload thumbnail images as soon as we have them
   React.useEffect(() => {
@@ -130,27 +136,31 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
     <div className="space-y-3">
       {/* Thumbnail gallery */}
       <div className="grid grid-cols-4 gap-2">
-        {/* Show skeleton placeholders while loading reference data */}
-        {isLoadingReferenceData && referenceCount > 0 ? (
-          // Render skeleton cards based on cached reference count
-          (() => {
-            console.log('[RefLoadingDebug] 💀 Rendering skeleton placeholders:', referenceCount);
-            return Array.from({ length: referenceCount }).map((_, idx) => (
-            <div
-              key={`skeleton-${idx}`}
-              className="relative rounded-lg border-2 border-gray-300 overflow-hidden aspect-square"
-            >
-              <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center animate-pulse">
-                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
+        {/* Show skeleton placeholders OR actual references */}
+        {(() => {
+          // If we have NO refs yet, show all skeletons
+          if (references.length === 0 && (referenceCount > 0 || isLoadingReferenceData)) {
+            const skeletonCount = Math.max(referenceCount, 1);
+            console.log('[GridDebug] 💀 All skeletons:', skeletonCount);
+            return Array.from({ length: skeletonCount }).map((_, idx) => (
+              <div
+                key={`skeleton-${idx}`}
+                className="relative rounded-lg border-2 border-border overflow-hidden aspect-square"
+              >
+                <div className="w-full h-full bg-muted/40 flex items-center justify-center animate-pulse">
+                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-muted-foreground/60"></div>
+                </div>
               </div>
-            </div>
             ));
-          })()
-        ) : (
-          // Render actual reference thumbnails once data is loaded
-          (() => {
-            console.log('[RefLoadingDebug] 🖼️ Rendering actual reference thumbnails:', references.length);
-            return references.map(ref => {
+          }
+          
+          // We have SOME refs - render them + placeholder skeletons for remaining
+          const remainingSkeletons = Math.max(0, referenceCount - references.length);
+          console.log('[GridDebug] 🖼️ Rendering', references.length, 'refs +', remainingSkeletons, 'skeletons');
+          
+          return (
+            <>
+              {references.map(ref => {
             const isSelected = selectedReferenceId === ref.id;
             // Use thumbnail for grid display, fallback to original or processed
             const imageUrl = ref.thumbnailUrl || ref.styleReferenceImageOriginal || ref.styleReferenceImage;
@@ -327,12 +337,23 @@ isSelected
                 )}
             </div>
           );
-        });
-          })()
-        )}
+        })}
+              {/* Placeholder skeletons for refs still loading */}
+              {Array.from({ length: remainingSkeletons }).map((_, idx) => (
+                <div
+                  key={`loading-skeleton-${idx}`}
+                  className="relative rounded-lg border-2 border-border overflow-hidden aspect-square"
+                >
+                  <div className="w-full h-full bg-muted/40 flex items-center justify-center animate-pulse">
+                    <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-muted-foreground/60"></div>
+                  </div>
+                </div>
+              ))}
+            </>
+          );
+        })()}
         
-        {/* Add reference button with search button - hide during loading since skeletons fill the space */}
-        {!(isLoadingReferenceData && referenceCount > 0) && (
+        {/* Add reference button with search button */}
         <div className="relative aspect-square">
           <label
             className={cn(
@@ -425,7 +446,6 @@ isSelected
             </button>
           )}
         </div>
-        )}
       </div>
     </div>
   );

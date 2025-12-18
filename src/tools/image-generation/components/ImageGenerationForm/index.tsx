@@ -295,17 +295,120 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Hydrate references with data from resources table
   const { hydratedReferences, isLoading: isLoadingReferences, hasLegacyReferences } = useHydratedReferences(referencePointers);
   
-  // Keep a stable reference to prevent flickering during refetches
-  // Only update when we have a valid new selectedReference
-  const lastValidSelectedReference = useRef<HydratedReferenceImage | null>(null);
-  const currentSelectedReference = hydratedReferences.find(ref => ref.id === selectedReferenceId) || null;
+  // [RefCleanup] If tool settings contain pointers to missing resources, hydration will drop them.
+  // That mismatch causes skeleton count/layout shifts and selection weirdness.
+  // Clean up invalid pointers once per project after hydration completes.
+  const hasCleanedInvalidReferencePointersRef = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    if (hasCleanedInvalidReferencePointersRef.current[selectedProjectId]) return;
+    if (isLoadingReferences) return;
+    if (!projectImageSettings) return;
+    if (!referencePointers || referencePointers.length === 0) return;
+
+    const hydratedPointerIds = new Set(hydratedReferences.map(r => r.id));
+    const invalidPointers = referencePointers.filter(p => {
+      const isLegacy = !p.resourceId && (p as any).styleReferenceImage;
+      if (isLegacy) return false;
+      return !!p.resourceId && !hydratedPointerIds.has(p.id);
+    });
+
+    if (invalidPointers.length === 0) {
+      hasCleanedInvalidReferencePointersRef.current[selectedProjectId] = true;
+      return;
+    }
+
+    const invalidIds = new Set(invalidPointers.map(p => p.id));
+    const cleanedReferences = referencePointers.filter(p => !invalidIds.has(p.id));
+
+    // NOTE: Don't reference stableSelectedReferenceId here (declared below).
+    // Prefer the first hydrated reference as a safe fallback.
+    const fallbackId = hydratedReferences[0]?.id ?? null;
+
+    const currentSelections = selectedReferenceIdByShot || {};
+    const cleanedSelections: Record<string, string | null> = { ...currentSelections };
+    Object.keys(cleanedSelections).forEach(shotKey => {
+      const selectedId = cleanedSelections[shotKey];
+      if (selectedId && invalidIds.has(selectedId)) {
+        cleanedSelections[shotKey] = fallbackId;
+      }
+    });
+
+    console.warn('[RefCleanup] Removing invalid reference pointers:', {
+      projectId: selectedProjectId.substring(0, 8),
+      invalidCount: invalidPointers.length,
+      invalidPointerIds: invalidPointers.map(p => p.id.substring(0, 8)),
+      referencesBefore: referencePointers.length,
+      referencesAfter: cleanedReferences.length,
+    });
+
+    hasCleanedInvalidReferencePointersRef.current[selectedProjectId] = true;
+    updateProjectImageSettings('project', {
+      references: cleanedReferences,
+      selectedReferenceIdByShot: cleanedSelections,
+    });
+  }, [
+    selectedProjectId,
+    isLoadingReferences,
+    projectImageSettings,
+    referencePointers,
+    hydratedReferences,
+    selectedReferenceIdByShot,
+    updateProjectImageSettings,
+  ]);
+
+  // [RefJumpDebug] Compute displayed reference ID purely from current state.
+  // Uses a ref to cache the first fallback per shot (prevents flickering as more refs hydrate).
+  const fallbackCache = useRef<{ shotId: string; referenceId: string } | null>(null);
   
+  const displayedReferenceId = useMemo(() => {
+    // If we have no hydrated references yet, nothing to display
+    if (hydratedReferences.length === 0) return null;
+    
+    // If the persisted selection exists in hydrated refs, use it
+    if (selectedReferenceId && hydratedReferences.some(r => r.id === selectedReferenceId)) {
+      // Clear any cached fallback since we have a real selection
+      if (fallbackCache.current?.shotId === effectiveShotId) {
+        fallbackCache.current = null;
+      }
+      return selectedReferenceId;
+    }
+    
+    // Need a fallback - check if we already cached one for this shot
+    if (fallbackCache.current?.shotId === effectiveShotId) {
+      // Verify the cached fallback still exists in hydrated refs
+      if (hydratedReferences.some(r => r.id === fallbackCache.current!.referenceId)) {
+        return fallbackCache.current.referenceId;
+      }
+      // Cached ref no longer valid, clear it
+      fallbackCache.current = null;
+    }
+    
+    // Compute fallback: most recently created reference
+    const sorted = [...hydratedReferences].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    const fallbackId = sorted[0]?.id ?? null;
+    
+    // Cache this fallback so it doesn't change as more refs hydrate
+    if (fallbackId) {
+      fallbackCache.current = { shotId: effectiveShotId, referenceId: fallbackId };
+      console.log('[RefJumpDebug] 📌 Cached fallback for shot', effectiveShotId, ':', fallbackId.substring(0, 8));
+    }
+    
+    return fallbackId;
+  }, [hydratedReferences, selectedReferenceId, effectiveShotId]);
+  
+  // Derive the full reference object
+  const currentSelectedReference = hydratedReferences.find(ref => ref.id === displayedReferenceId) || null;
+  
+  // Keep last valid reference for refetch stability
+  const lastValidSelectedReference = useRef<HydratedReferenceImage | null>(null);
   if (currentSelectedReference) {
     lastValidSelectedReference.current = currentSelectedReference;
   }
-  
-  // Use the current reference if available, otherwise fall back to last valid one
-  // This prevents the UI from showing "nothing" during refetches
   const selectedReference = currentSelectedReference || lastValidSelectedReference.current;
   
   // Debug log for final selected reference
@@ -329,11 +432,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // 2. We have a selection ID but references aren't loaded yet (can't verify if valid)
   const hasStaleSelection = selectedReferenceId && !currentSelectedReference && hydratedReferences.length > 0;
   const selectionPendingValidation = selectedReferenceId && hydratedReferences.length === 0 && referenceCount > 0;
-  
-  const isReferenceDataLoading = 
-    ((isLoadingProjectSettings || isLoadingReferences) && !hasEnoughReferences) ||
-    hasStaleSelection ||  // Wait for auto-selection to correct stale IDs
-    selectionPendingValidation;  // Wait for references to load so we can validate selection
+
+  // Only show reference skeletons when we truly have *no hydrated reference data to render yet*.
+  // If we already have hydratedReferences, render them even if queries are refetching in background.
+  const isReferenceDataLoading =
+    hydratedReferences.length === 0 &&
+    (
+      ((isLoadingProjectSettings || isLoadingReferences) && !hasEnoughReferences) ||
+      selectionPendingValidation
+    );
   
   // Debug logging for reference loading state
   useEffect(() => {
@@ -441,50 +548,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     
     return imageToDisplay;
   }, [styleReferenceOverride, rawStyleReferenceImageOriginal, rawStyleReferenceImage]);
-
-  // Auto-select reference if we have references but no valid selected reference for this shot
-  // Uses the most recently added reference as default
-  // Note: Only updates project-level here; shot-level is synced via handleSelectReference or later effect
-  // IMPORTANT: Skip while loading to prevent "jumping" - wait for actual saved selection to load
-  useEffect(() => {
-    if (hydratedReferences.length > 0 && projectImageSettings && !isLoadingProjectSettings) {
-      // Find the most recently added reference (by createdAt)
-      const getMostRecentReference = () => {
-        const sorted = [...hydratedReferences].sort((a, b) => {
-          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return dateB - dateA; // Newest first
-        });
-        return sorted[0];
-      };
-      
-      // Case 1: No selectedReferenceId for this shot - use most recent reference
-      if (!selectedReferenceId) {
-        const mostRecent = getMostRecentReference();
-        console.log('[RefSettings] 🔄 Auto-selecting most recent reference for shot', effectiveShotId, mostRecent.id);
-        
-        // Update project-level per-shot mapping
-        updateProjectImageSettings('project', {
-          selectedReferenceIdByShot: {
-            ...selectedReferenceIdByShot,
-            [effectiveShotId]: mostRecent.id
-          }
-        });
-      }
-      // Case 2: selectedReferenceId exists but doesn't match any reference (stale/corrupted)
-      else if (!selectedReference) {
-        const mostRecent = getMostRecentReference();
-        console.log('[RefSettings] 🔄 Auto-selecting most recent reference for shot', effectiveShotId, '(stale ID)');
-        
-        updateProjectImageSettings('project', {
-          selectedReferenceIdByShot: {
-            ...selectedReferenceIdByShot,
-            [effectiveShotId]: mostRecent.id
-          }
-        });
-      }
-    }
-  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings, isLoadingProjectSettings]);
 
   // Check if database has caught up with pending mode update
   useEffect(() => {
@@ -2925,7 +2988,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             onStyleBoostTermsChange={handleStyleBoostTermsChange}
             // New multiple references props
             references={hydratedReferences}
-            selectedReferenceId={selectedReferenceId}
+            selectedReferenceId={displayedReferenceId}
             onSelectReference={handleSelectReference}
             onDeleteReference={handleDeleteReference}
             onUpdateReferenceName={handleUpdateReferenceName}
