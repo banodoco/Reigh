@@ -43,8 +43,8 @@ interface ShotImagesEditorProps {
   shotName?: string;
   /** Frame spacing (frames between key-frames) */
   batchVideoFrames: number;
-  /** Reordering callback – receives ordered ids */
-  onImageReorder: (orderedIds: string[]) => void;
+  /** Reordering callback – receives ordered ids and optionally the dragged item ID */
+  onImageReorder: (orderedIds: string[], draggedItemId?: string) => void;
   /** Timeline frame positions change */
   onFramePositionsChange: (newPositions: Map<string, number>) => void;
   /** Callback when external images are dropped on the timeline */

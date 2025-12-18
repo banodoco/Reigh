@@ -5,7 +5,7 @@ import { DOUBLE_TAP_THRESHOLD } from '../constants';
 interface UseMobileGesturesProps {
   currentImages: GenerationRow[];
   mobileSelectedIds: string[];
-  onImageReorder: (orderedIds: string[]) => void;
+  onImageReorder: (orderedIds: string[], draggedItemId?: string) => void;
   setMobileSelectedIds: (fn: (prev: string[]) => string[]) => void;
   setLightboxIndex: (index: number) => void;
 }
@@ -113,15 +113,19 @@ export function useMobileGestures({
       // img.id is shot_generations.id - unique per entry
       const orderedIds = newOrder.map(img => img.id);
       
+      // For single item moves, pass the dragged item ID for midpoint insertion
+      const draggedItemId = selectedItems.length === 1 ? selectedItems[0].id : undefined;
+      
       console.log('[MobileReorder] 🎯 Calling unified reorder system:', {
         originalOrder: currentImages.map(img => img.id.substring(0, 8)),
         newOrder: orderedIds.map(id => id.substring(0, 8)),
         movedItems: selectedItems.map(item => item.id.substring(0, 8)),
-        targetIndex
+        targetIndex,
+        draggedItemId: draggedItemId?.substring(0, 8),
       });
-      
+
       // Use the unified position system
-      await onImageReorder(orderedIds);
+      await onImageReorder(orderedIds, draggedItemId);
       
       // Clear selection after successful reorder
       setMobileSelectedIds(() => []);

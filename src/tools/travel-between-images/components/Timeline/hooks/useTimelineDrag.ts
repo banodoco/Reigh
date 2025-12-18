@@ -31,7 +31,7 @@ interface UseTimelineDragProps {
   framePositions: Map<string, number>;
   setFramePositions: (positions: Map<string, number>) => void;
   images: GenerationRow[];
-  onImageReorder: (orderedIds: string[]) => void;
+  onImageReorder: (orderedIds: string[], draggedItemId?: string) => void;
   fullMin: number;
   fullMax: number;
   fullRange: number;

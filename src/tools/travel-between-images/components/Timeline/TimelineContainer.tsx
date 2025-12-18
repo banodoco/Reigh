@@ -95,7 +95,7 @@ interface TimelineContainerProps {
   images: GenerationRow[];
   framePositions: Map<string, number>;
   setFramePositions: (positions: Map<string, number>) => Promise<void>;
-  onImageReorder: (orderedIds: string[]) => void;
+  onImageReorder: (orderedIds: string[], draggedItemId?: string) => void;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
   onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetFrame?: number) => Promise<void>;
   setIsDragInProgress: (dragging: boolean) => void;

@@ -80,7 +80,7 @@ export interface TimelineProps {
   shotId: string;
   projectId?: string;
   frameSpacing: number;
-  onImageReorder: (orderedIds: string[]) => void;
+  onImageReorder: (orderedIds: string[], draggedItemId?: string) => void;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
   onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetFrame?: number) => Promise<void>;

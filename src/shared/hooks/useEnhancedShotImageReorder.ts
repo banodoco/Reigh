@@ -51,11 +51,12 @@ export const useEnhancedShotImageReorder = (
   } : ownBatchReorder;
 
   // Handle drag and drop reordering in batch mode - Timeline-frame-based swapping
-  const handleReorder = useCallback(async (orderedShotImageEntryIds: string[]) => {
+  const handleReorder = useCallback(async (orderedShotImageEntryIds: string[], draggedItemId?: string) => {
     console.log('[DataTrace] 🔄 handleReorder CALLED:', {
       shotId: shotId?.substring(0, 8),
       idsCount: orderedShotImageEntryIds.length,
       ids: orderedShotImageEntryIds.map(id => id?.substring(0, 8)),
+      draggedItemId: draggedItemId?.substring(0, 8),
     });
     
     if (!shotId || orderedShotImageEntryIds.length === 0) {
@@ -86,11 +87,35 @@ export const useEnhancedShotImageReorder = (
         desiredOrder: orderedShotImageEntryIds.map(id => id?.substring(0, 8)),
       });
       
-      // Detect item move (single or multi) for midpoint logic
+      // Detect item move for midpoint logic
+      // If draggedItemId is provided, use it directly (most reliable)
+      // Otherwise, try to detect which items moved
       const detectItemMove = (() => {
         if (orderedShotImageEntryIds.length !== currentOrder.length) return false;
         
-        // Find all items that changed position
+        // If we know the dragged item, use that directly
+        if (draggedItemId) {
+          const oldIndex = currentOrder.indexOf(draggedItemId);
+          const newIndex = orderedShotImageEntryIds.indexOf(draggedItemId);
+          
+          if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
+            return false; // Item not found or didn't move
+          }
+          
+          console.log('[DataTrace] 🎯 Using explicit draggedItemId for detection:', {
+            draggedItemId: draggedItemId.substring(0, 8),
+            oldIndex,
+            newIndex,
+          });
+          
+          return {
+            movedItemIds: [draggedItemId],
+            newStartIndex: newIndex,
+            oldStartIndex: oldIndex,
+          };
+        }
+        
+        // Fallback: Find all items that changed position (for multi-drag)
         const movedItemIds: string[] = [];
         const movedIndices: Array<{ oldIndex: number; newIndex: number }> = [];
         

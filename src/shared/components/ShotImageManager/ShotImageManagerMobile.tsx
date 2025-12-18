@@ -288,6 +288,9 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
 
       // Create ordered IDs array for the unified system (safe now - checked above)
       const orderedIds = newOrder.map(img => img.id);
+      
+      // For single item moves, pass the dragged item ID for midpoint insertion
+      const draggedItemId = selectedItems.length === 1 ? selectedItems[0].id : undefined;
 
       // 1. Apply optimistic update immediately for instant visual feedback
       setReconciliationId(prev => prev + 1);
@@ -299,7 +302,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       onSelectionChange?.(false);
 
       // 3. Call server update
-      await onImageReorder(orderedIds);
+      await onImageReorder(orderedIds, draggedItemId);
       
 
     } catch (error) {

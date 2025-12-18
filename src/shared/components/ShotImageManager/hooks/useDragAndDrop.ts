@@ -15,7 +15,7 @@ import { calculateMultiDragOrder } from '../utils/reorder-utils';
 interface UseDragAndDropProps {
   images: GenerationRow[];
   selectedIds: string[];
-  onImageReorder: (orderedIds: string[]) => void;
+  onImageReorder: (orderedIds: string[], draggedItemId?: string) => void;
   isMobile: boolean;
   setSelectedIds: (ids: string[]) => void;
   setLastSelectedIndex: (index: number | null) => void;
@@ -160,11 +160,13 @@ export function useDragAndDrop({
         
         // img.id is shot_generations.id - unique per entry
         const orderedIds = newOrder.map((img) => img.id);
+        const draggedItemId = active.id as string;
         console.log('[DataTrace] 🎯 Drag complete - calling onImageReorder:', {
           idsCount: orderedIds.length,
           ids: orderedIds.map(id => id?.substring(0, 8)),
+          draggedItemId: draggedItemId?.substring(0, 8),
         });
-        onImageReorder(orderedIds);
+        onImageReorder(orderedIds, draggedItemId);
       }
       setSelectedIds([]);
       setLastSelectedIndex(null);
@@ -206,11 +208,17 @@ export function useDragAndDrop({
     
     console.log('[DragDebug:ShotImageManager] Calling onImageReorder for multi-drag');
     const reorderedIds = newItems.map((img) => img.id);
+    // For multi-drag, pass the active item as the "primary" dragged item
+    const draggedItemId = active.id as string;
     console.log('[DataTrace] 🎯 Multi-drag complete - calling onImageReorder:', {
       idsCount: reorderedIds.length,
       ids: reorderedIds.map(id => id?.substring(0, 8)),
+      draggedItemId: draggedItemId?.substring(0, 8),
+      selectedIds: selectedIds.map(id => id?.substring(0, 8)),
     });
-    onImageReorder(reorderedIds);
+    // For multi-drag, we pass undefined for draggedItemId since multiple items moved
+    // The reorder handler will fall back to detecting the moved items
+    onImageReorder(reorderedIds, selectedIds.length > 1 ? undefined : draggedItemId);
     setSelectedIds([]);
     setLastSelectedIndex(null);
   }, [selectedIds, images, onImageReorder, setSelectedIds, setLastSelectedIndex, setOptimisticOrder, setIsOptimisticUpdate, setReconciliationId]);

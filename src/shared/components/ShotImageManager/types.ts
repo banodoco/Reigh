@@ -5,7 +5,8 @@ export interface ShotImageManagerProps {
   onImageDelete: (shotImageEntryId: string) => void;
   onBatchImageDelete?: (shotImageEntryIds: string[]) => void;
   onImageDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
-  onImageReorder: (orderedShotGenerationIds: string[]) => void;
+  /** @param draggedItemId - The ID of the item that was actually dragged (for midpoint insertion) */
+  onImageReorder: (orderedShotGenerationIds: string[], draggedItemId?: string) => void;
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   generationMode: 'batch' | 'timeline';
   onMagicEdit?: (imageUrl: string, prompt: string, numImages: number) => void;
@@ -52,7 +53,8 @@ export interface BaseShotImageManagerProps {
   onImageDelete: (shotImageEntryId: string) => void;
   onBatchImageDelete?: (shotImageEntryIds: string[]) => void;
   onImageDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
-  onImageReorder: (orderedShotGenerationIds: string[]) => void;
+  /** @param draggedItemId - The ID of the item that was actually dragged (for midpoint insertion) */
+  onImageReorder: (orderedShotGenerationIds: string[], draggedItemId?: string) => void;
   onOpenLightbox?: (index: number) => void;
   onInpaintClick?: (index: number) => void;
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;

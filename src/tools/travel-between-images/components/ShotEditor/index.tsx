@@ -1078,8 +1078,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const updateShotImageOrderMutationRef = useRef(updateShotImageOrderMutation);
   updateShotImageOrderMutationRef.current = updateShotImageOrderMutation;
   
-  const handleReorderImagesInShot = useCallback((orderedShotGenerationIds: string[]) => {
+  const handleReorderImagesInShot = useCallback((orderedShotGenerationIds: string[], draggedItemId?: string) => {
     // DragDebug: handleReorderImagesInShot called
+    // NOTE: draggedItemId is currently unused here as this function recalculates all positions
+    // It's passed through for interface compatibility
     const shot = selectedShotRef.current;
     const projId = projectIdRef.current;
     
