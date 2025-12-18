@@ -38,6 +38,7 @@ Mention these as brief observations (e.g., "Note: this file is getting large, mi
 # Debugging
 - Use unique tags like `[VideoLoadSpeedIssue]` - tell user the tag immediately so they can filter console.
 - Log values directly, not nested: `console.log('id:', id)` not `console.log({ id, name })` - values visible without expanding.
+- **Debug logs only fire in dev mode**: Production builds automatically strip console.log statements, so debug logging won't impact production performance.
 - After finishing a debugging session, consider: "What additional logging, debug utilities, or diagnostic tools would have made this issue easier to identify?" If you spot opportunities, suggest them before closing out the debugging work.
 
 # UI Conventions

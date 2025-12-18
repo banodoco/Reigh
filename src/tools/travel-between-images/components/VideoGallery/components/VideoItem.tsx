@@ -275,6 +275,10 @@ export const VideoItem = React.memo<VideoItemProps>(({
         num_inference_steps: 6,
         guidance_scale: 3.0,
         seed: -1,
+        parent_generation_id: video.id,
+        // IMPORTANT: This join is initiated from within Travel Between Images,
+        // so the resulting output should be attributed to this tool for filtering/counting.
+        tool_type: 'travel-between-images',
         ...(resolutionTuple && { resolution: resolutionTuple }),
       });
       

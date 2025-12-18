@@ -248,6 +248,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Stable video count to prevent data loss
   const lastGoodCountRef = useRef<number | null>(null);
   const prevShotIdRef = useRef<string | null>(null);
+  
+  // Track the shotId for which we last received fresh (non-placeholder) data
+  // Used to distinguish "placeholder from different shot" vs "placeholder from same shot (pagination)"
+  const lastFreshDataShotIdRef = useRef<string | null>(null);
 
   // Track the current shot key to detect changes
   const prevShotKeyRef = useRef<string | undefined>(shotKey);
@@ -319,7 +323,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   });
 
   // Use preloaded data if provided, otherwise fetch from database with SERVER-SIDE pagination
-  const { data: fetchedGenerationsData, isLoading: isLoadingGenerations, isFetching: isFetchingGenerations, error: generationsError } = useUnifiedGenerations({
+  const { data: fetchedGenerationsData, isLoading: isLoadingGenerations, isFetching: isFetchingGenerations, isPlaceholderData, error: generationsError } = useUnifiedGenerations({
     projectId,
     mode: 'shot-specific',
     shotId,
@@ -563,21 +567,18 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const serverTotal = (generationsData as any)?.total;
   const hasServerResponse = typeof serverTotal === 'number';
   
-  // React Query uses placeholderData (keepPreviousData) in useUnifiedGenerations.
-  // When switching shots, we can briefly see the previous shot's `total` (often 0),
-  // with `isFetchingGenerations=true`. That causes an "empty flash".
-  //
-  // Treat this state as "loading" when:
-  // - we expect videos for the new shot (cachedCount > 0)
-  // - we don't have any yet
-  // - and the query is currently fetching (i.e. placeholder data may be showing)
-  const expectingVideos = cachedCount !== null && cachedCount > 0;
-  const isTransitionFetching = isFetchingGenerations && expectingVideos && videoOutputs.length === 0;
-
+  // Update lastFreshDataShotIdRef when we receive fresh (non-placeholder) data for this shot
+  // This tracks which shot's data we're actually displaying
+  if (!isPlaceholderData && !isLoadingGenerations && hasServerResponse && shotId) {
+    lastFreshDataShotIdRef.current = shotId;
+  }
+  
   // Show skeleton when:
-  // 1) Still loading, OR
-  // 2) We're transitioning (fetching) and expect videos but have none yet
-  const shouldShowSkeleton = (isLoadingGenerations || isTransitionFetching) && (cachedCount ?? itemsPerPage) > 0;
+  // 1) Still loading (initial fetch), OR
+  // 2) isPlaceholderData is true AND it's from a DIFFERENT shot (shot navigation)
+  //    - Don't show skeletons for same-shot placeholder (pagination) - keep previous page visible
+  const isPlaceholderFromDifferentShot = isPlaceholderData && lastFreshDataShotIdRef.current !== shotId;
+  const shouldShowSkeleton = (isLoadingGenerations || isPlaceholderFromDifferentShot) && (cachedCount ?? itemsPerPage) > 0;
   const skeletonCount = shouldShowSkeleton ? Math.min(cachedCount ?? itemsPerPage, itemsPerPage) : 0;
   
   // [SkeletonCountMismatch] Debug log
@@ -589,9 +590,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     actualVideos: videoOutputs.length,
     hasServerResponse,
     isFetching: isFetchingGenerations,
-    isTransitionFetching,
+    isPlaceholderData,
+    isPlaceholderFromDifferentShot,
+    lastFreshDataShotId: lastFreshDataShotIdRef.current?.substring(0, 8),
     reason: shouldShowSkeleton 
-      ? (isLoadingGenerations ? 'isLoading=true' : 'waiting for server response')
+      ? (isLoadingGenerations ? 'isLoading=true' : 'placeholder from different shot')
       : (videoOutputs.length > 0 ? 'have videos' : 'server says 0'),
   });
 

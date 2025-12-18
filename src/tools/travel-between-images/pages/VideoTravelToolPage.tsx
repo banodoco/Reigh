@@ -2851,7 +2851,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      handlePreviousShotNoScroll();
+                      handlePreviousShot();
                     }}
                     disabled={!hasPrevious}
                     className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
@@ -2874,7 +2874,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      handleNextShotNoScroll();
+                      handleNextShot();
                     }}
                     disabled={!hasNext}
                     className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"

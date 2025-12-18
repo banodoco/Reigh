@@ -901,6 +901,9 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 guidance_scale: 3.0,
                 seed: -1,
                 parent_generation_id: parentGenerationId,
+                // IMPORTANT: This join is initiated from within Travel Between Images,
+                // so the resulting output should be attributed to this tool for filtering/counting.
+                tool_type: 'travel-between-images',
                 use_input_video_resolution: false,
                 use_input_video_fps: false,
                 ...(lorasForTask.length > 0 && { loras: lorasForTask }),
