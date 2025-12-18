@@ -83,6 +83,9 @@ export function useGenerationsPageLogic({
   // Track which shot we last applied settings for (to detect shot changes)
   const lastAppliedShotIdRef = useRef<string | null>(null);
   
+  // Track the filter that was applied for the last shot (to preserve "all" during navigation)
+  const lastAppliedFilterRef = useRef<string>('all');
+  
   // Track the last known unpositioned count for each shot (to detect when images are added/removed)
   const lastUnpositionedCountsRef = useRef<Map<string, number>>(new Map());
 
@@ -192,19 +195,41 @@ export function useGenerationsPageLogic({
       setSelectedShotFilter('all');
       setExcludePositioned(true);
       lastAppliedShotIdRef.current = currentShotId;
+      lastAppliedFilterRef.current = 'all';
       return;
     }
     
     // Get the filter state for this shot
     const filterState = getFilterStateForShot(currentShotId);
     
-    console.log('[StableFilter] Applying filter for shot:', {
-      shotId: currentShotId?.substring(0, 8),
-      filter: filterState.filter === 'all' ? 'all' : filterState.filter?.substring(0, 8),
-      isUserOverride: filterState.isUserOverride
-    });
+    // IMPORTANT: When navigating between shots (shot-to-shot), preserve "all" filter
+    // if the previous shot was on "all" and this shot has no user override.
+    // This prevents the dropdown from briefly flashing to the specific shot
+    // when shotsData stats are stale.
+    const isNavigatingBetweenShots = previousShotId !== null && currentShotId !== null;
+    const previousWasAll = lastAppliedFilterRef.current === 'all';
     
-    setSelectedShotFilter(filterState.filter);
+    let filterToApply = filterState.filter;
+    
+    if (isNavigatingBetweenShots && previousWasAll && !filterState.isUserOverride) {
+      // Previous shot was showing "all" and this shot has no user override
+      // Preserve "all" to avoid flash from stale shotsData stats
+      console.log('[StableFilter] Preserving "all" filter during shot-to-shot navigation:', {
+        from: previousShotId?.substring(0, 8),
+        to: currentShotId?.substring(0, 8),
+        computedDefault: filterState.filter === 'all' ? 'all' : filterState.filter?.substring(0, 8),
+        preserving: 'all'
+      });
+      filterToApply = 'all';
+    } else {
+      console.log('[StableFilter] Applying filter for shot:', {
+        shotId: currentShotId?.substring(0, 8),
+        filter: filterState.filter === 'all' ? 'all' : filterState.filter?.substring(0, 8),
+        isUserOverride: filterState.isUserOverride
+      });
+    }
+    
+    setSelectedShotFilter(filterToApply);
 
     // Default behavior: when entering a shot, we default to "exclude positioned" = true
     // (i.e., we primarily care about unpositioned items). If the user previously customized
@@ -213,7 +238,7 @@ export function useGenerationsPageLogic({
     
     // If not a user override, store this as the default in the map
     if (!filterState.isUserOverride) {
-      setFilterStateForShot(currentShotId, filterState.filter, false);
+      setFilterStateForShot(currentShotId, filterToApply, false);
     }
     
     // Sync the dropdown selection to the current shot
@@ -221,6 +246,7 @@ export function useGenerationsPageLogic({
 
     // Mark as applied only after we actually apply the filter for this shot
     lastAppliedShotIdRef.current = currentShotId;
+    lastAppliedFilterRef.current = filterToApply;
     
   }, [
     currentShotId,
@@ -264,6 +290,7 @@ export function useGenerationsPageLogic({
           // If this is the current shot, update the active filter too
           if (shot.id === currentShotId) {
             setSelectedShotFilter(newDefault);
+            lastAppliedFilterRef.current = newDefault;
           }
         }
       }
@@ -280,6 +307,9 @@ export function useGenerationsPageLogic({
 
   const handleShotFilterChange = useCallback((newShotFilter: string) => {
     setSelectedShotFilter(newShotFilter);
+    
+    // Track the applied filter for navigation preservation
+    lastAppliedFilterRef.current = newShotFilter;
     
     // Mark as user override so it persists
     if (currentShotId) {
@@ -513,6 +543,7 @@ export function useGenerationsPageLogic({
       }
       
       setSelectedShotFilter('all');
+      lastAppliedFilterRef.current = 'all';
     }
   }, [selectedShotFilter, isLoading, isFetching, generationsResponse?.total, page, currentShotId, setFilterStateForShot]);
 
