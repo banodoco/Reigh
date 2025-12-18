@@ -11,6 +11,9 @@
 // MIME type for generation drag data
 export const GENERATION_MIME_TYPE = 'application/x-generation';
 
+// Droppable ID for creating a new shot from a dropped generation
+export const NEW_GROUP_DROPPABLE_ID = 'new-shot-group-dropzone';
+
 /**
  * Data structure for dragging generations between components
  */

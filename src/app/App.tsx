@@ -6,7 +6,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useHandleExternalImageDrop, useCreateShot, useAddImageToShot } from "@/shared/hooks/useShots";
 import { useShots } from '@/shared/contexts/ShotsContext';
-import { NEW_GROUP_DROPPABLE_ID } from '@/shared/components/ShotsPane/NewGroupDropZone';
+import { NEW_GROUP_DROPPABLE_ID } from '@/shared/lib/dragDrop';
 import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
 import { AppRoutes } from "./routes";
 import { ProjectProvider, useProject } from "@/shared/contexts/ProjectContext";
