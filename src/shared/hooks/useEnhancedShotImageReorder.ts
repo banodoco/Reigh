@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useEnhancedShotPositions } from './useEnhancedShotPositions';
 import { useBatchReorder } from './useBatchReorder';
 import { toast } from 'sonner';
@@ -27,6 +27,11 @@ export const useEnhancedShotImageReorder = (
     shotId: parentHook ? null : shotId,
     onReload: parentHook ? undefined : (reason) => ownHook.loadPositions({ reason: 'reorder' })
   });
+  
+  // 🔧 FIX: Use ref to always access latest parentHook in callbacks
+  // This prevents stale closure bugs where handleReorder captured old parentHook
+  const parentHookRef = useRef(parentHook);
+  parentHookRef.current = parentHook;
   
   const {
     shotGenerations,
@@ -127,7 +132,8 @@ export const useEnhancedShotImageReorder = (
       });
       
       // NEW: Use midpoint logic for contiguous block moves (single or multi)
-      if (detectItemMove && parentHook?.['moveItemsToMidpoint']) {
+      // 🔧 FIX: Use parentHookRef to access latest parentHook (avoids stale closure)
+      if (detectItemMove && parentHookRef.current?.['moveItemsToMidpoint']) {
         console.log('[DataTrace] ✅ Using MIDPOINT DISTRIBUTION logic for block move');
         
         // Build the new order array for neighbor calculation
@@ -140,7 +146,7 @@ export const useEnhancedShotImageReorder = (
           };
         });
         
-        await (parentHook as any).moveItemsToMidpoint(
+        await (parentHookRef.current as any).moveItemsToMidpoint(
           detectItemMove.movedItemIds,
           detectItemMove.newStartIndex,
           newOrderItems
