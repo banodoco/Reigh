@@ -293,7 +293,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                               />
                             </g>
                           </svg>
-                          <span className="subtitle-link-text">an art tool</span> for
+                          <span className="subtitle-link-text">an open source tool</span> for
                         </span>
                       </TooltipTrigger>
                       {/* TooltipContent intentionally commented out
@@ -327,7 +327,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           }}
                           className="subtitle-link-right cursor-pointer transition-all duration-200"
                         >
-                          <span className="subtitle-link-text">making videos</span>
+                          <span className="subtitle-link-text">traveling between images</span>
                           {/* Right arrow tail (pushed out + more angular) */}
                           <svg
                             className="arrow-wrap-right absolute -right-5 -bottom-[1px] w-5 h-5 pointer-events-none"
