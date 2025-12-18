@@ -220,7 +220,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {/* Main title */}
               <div style={getFadeStyle(0.5, 20)}>
                 <h1 className="text-8xl md:text-[10rem] text-[#ecede3] mb-0 leading-tight">
-                  reigh
+                  Rainier
                 </h1>
               </div>
             </div>
@@ -293,7 +293,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                               />
                             </g>
                           </svg>
-                          <span className="subtitle-link-text">an open source tool</span> for
+                          <span className="subtitle-link-text">an art tool</span> for
                         </span>
                       </TooltipTrigger>
                       {/* TooltipContent intentionally commented out
@@ -327,7 +327,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           }}
                           className="subtitle-link-right cursor-pointer transition-all duration-200"
                         >
-                          <span className="subtitle-link-text">traveling between images</span>
+                          <span className="subtitle-link-text">making videos</span>
                           {/* Right arrow tail (pushed out + more angular) */}
                           <svg
                             className="arrow-wrap-right absolute -right-5 -bottom-[1px] w-5 h-5 pointer-events-none"
