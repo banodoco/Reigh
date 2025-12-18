@@ -6,6 +6,8 @@ import { isTimelineGeneration } from '@/shared/lib/typeGuards';
 import { QUERY_PRESETS, STANDARD_RETRY, STANDARD_RETRY_DELAY } from '@/shared/lib/queryDefaults';
 import React from 'react';
 
+import { mapShotGenerationToRow } from '@/shared/hooks/useShots';
+
 interface ShotGenerationsPage {
   items: GenerationRow[];
   nextCursor: number | null;
@@ -44,36 +46,10 @@ export const useShotGenerations = (
         throw error;
       }
 
-      // Transform to match GenerationRow interface
+      // Transform using shared mapper to ensure consistency
       const items: GenerationRow[] = (data || [])
-        .filter(sg => sg.generation)
-        .map(sg => {
-          // [MagicEditTaskDebug] Log magic edit generations from database
-          if (sg.generation?.type === 'image_edit' || sg.generation?.params?.tool_type === 'magic-edit') {
-            console.log('[MagicEditTaskDebug] Magic edit generation from database:', {
-              generation_id: sg.generation?.id?.substring(0, 8),
-              shot_generation_id: sg.id.substring(0, 8),
-              timeline_frame: sg.timeline_frame,
-              type: sg.generation?.type,
-              tool_type: sg.generation?.params?.tool_type,
-              created_at: sg.generation?.created_at
-            });
-          }
-          
-          return {
-            ...sg.generation,
-            // PRIMARY ID FIELDS:
-            id: sg.id, // shot_generations.id - unique per entry
-            generation_id: sg.generation?.id, // generations.id - the actual generation
-            // DEPRECATED (kept for backwards compat during transition):
-            shotImageEntryId: sg.id,
-            shot_generation_id: sg.id,
-            position: Math.floor((sg.timeline_frame ?? 0) / 50),
-            timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
-            imageUrl: sg.generation?.location,
-            thumbUrl: sg.generation?.thumbnail_url || sg.generation?.location,
-          };
-        });
+        .map(mapShotGenerationToRow)
+        .filter(Boolean) as GenerationRow[];
 
       return {
         items,
@@ -265,38 +241,10 @@ export const useAllShotGenerations = (
         throw response.error;
       }
 
-      // Transform to GenerationRow format
-      const result: GenerationRow[] = (response.data || []).map((sg: any) => {
-        const gen = sg.generations;
-        if (!gen) {
-          console.warn('[ShotGenerations] shot_generation missing generations join:', sg.id);
-          return null;
-        }
-        
-        return {
-          // PRIMARY ID FIELDS:
-          id: sg.id, // shot_generations.id - unique per entry
-          generation_id: gen.id, // generations.id - the actual generation
-          // DEPRECATED (kept for backwards compat during transition):
-          shotImageEntryId: sg.id,
-          shot_generation_id: sg.id,
-          // Generation data:
-          location: gen.location,
-          type: gen.type,
-          created_at: gen.created_at,
-          createdAt: gen.created_at,
-          starred: gen.starred,
-          name: gen.name,
-          based_on: gen.based_on,
-          params: gen.params,
-          // Computed fields
-          imageUrl: gen.location,
-          thumbUrl: gen.thumbnail_url || gen.location,
-          // From shot_generations table
-          timeline_frame: sg.timeline_frame,
-          metadata: sg.metadata || {},
-        };
-      }).filter(Boolean) as GenerationRow[];
+      // Transform to standardized GenerationRow format using shared mapper
+      const result: GenerationRow[] = (response.data || [])
+        .map(mapShotGenerationToRow)
+        .filter(Boolean) as GenerationRow[];
 
       const duration = Date.now() - startTime;
       
@@ -502,6 +450,18 @@ export const useTimelineImages = (
       )
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
     
+    // [SelectorDebug] THE GOD LOG - See exactly what's inside the data
+    if (baseQuery.data.length > 0) {
+      console.log('[SelectorDebug] RAW DATA SAMPLE (First Item):', {
+        raw: baseQuery.data[0],
+        id: baseQuery.data[0]?.id,
+        timeline_frame: baseQuery.data[0]?.timeline_frame,
+        type: baseQuery.data[0]?.type,
+        keys: Object.keys(baseQuery.data[0]),
+        isFilteredOut: result.length === 0 || !result.some(r => r.id === baseQuery.data[0].id)
+      });
+    }
+
     // [SelectorDebug] Log filtering results with WHY items were filtered
     const filtered = baseQuery.data.filter(g => 
       g.timeline_frame == null || g.timeline_frame < 0 || g.type?.includes('video')

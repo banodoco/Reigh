@@ -23,6 +23,51 @@ export interface ShotGenerationRow {
   timeline_frame: number;
 }
 
+// ============================================================================
+// SHARED DATA MAPPERS
+// ============================================================================
+
+/**
+ * Maps a raw Supabase response from shot_generations (with joined generations)
+ * to the standardized GenerationRow format used throughout the app.
+ * 
+ * IMPORTANT: This must be used by ALL hooks (useListShots, useAllShotGenerations, etc.)
+ * to ensure selectors and filters work consistently across the Sidebar and Editor.
+ */
+export const mapShotGenerationToRow = (sg: any): GenerationRow | null => {
+  const gen = sg.generations || sg.generation; // Handle both 'generations' and 'generation' aliases
+  if (!gen) return null;
+
+  return {
+    // PRIMARY ID FIELDS:
+    id: sg.id, // shot_generations.id - unique per entry in shot
+    generation_id: gen.id, // generations.id - the actual generation
+    
+    // DEPRECATED (kept for backwards compat during transition):
+    shotImageEntryId: sg.id,
+    shot_generation_id: sg.id,
+    
+    // Generation data:
+    location: gen.location,
+    imageUrl: gen.location,
+    thumbUrl: gen.thumbnail_url || gen.location,
+    type: gen.type || 'image',
+    created_at: gen.created_at,
+    createdAt: gen.created_at,
+    starred: gen.starred || false,
+    name: gen.name,
+    based_on: gen.based_on,
+    params: gen.params || {},
+    
+    // From shot_generations table:
+    timeline_frame: sg.timeline_frame,
+    metadata: sg.metadata || {},
+    
+    // Legacy support:
+    position: sg.timeline_frame != null ? Math.floor(sg.timeline_frame / 50) : undefined,
+  } as GenerationRow;
+};
+
 // CRUD functions will go here 
 
 // Create a new shot VIA API
@@ -542,34 +587,10 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             return { shotId: shot.id, images: [] };
           }
           
-          // Transform to GenerationRow format
+          // Transform to GenerationRow format using the shared mapper
           const images: GenerationRow[] = (shotGenerations || [])
-            .filter((sg: any) => sg.generations)
-            .map((sg: any) => {
-              const gen = sg.generations;
-              return {
-                // PRIMARY ID FIELDS:
-                id: sg.id, // shot_generations.id - unique per entry in shot
-                generation_id: gen.id, // generations.id - the actual generation
-                // DEPRECATED (kept for backwards compat during transition):
-                shotImageEntryId: sg.id,
-                shot_generation_id: sg.id,
-                // Generation data:
-                location: gen.location,
-                imageUrl: gen.location,
-                thumbUrl: gen.thumbnail_url || gen.location,
-                type: gen.type || 'image',
-                created_at: gen.created_at,
-                createdAt: gen.created_at,
-                starred: gen.starred || false,
-                name: gen.name,
-                based_on: gen.based_on,
-                params: gen.params,
-                // From shot_generations table
-                timeline_frame: sg.timeline_frame,
-                metadata: sg.metadata || {},
-              } as GenerationRow;
-            });
+            .map(mapShotGenerationToRow)
+            .filter(Boolean) as GenerationRow[];
           
           return { shotId: shot.id, images };
           })
