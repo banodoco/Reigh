@@ -548,18 +548,26 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             .map((sg: any) => {
               const gen = sg.generations;
               return {
+                // PRIMARY ID FIELDS:
                 id: sg.id, // shot_generations.id - unique per entry in shot
                 generation_id: gen.id, // generations.id - the actual generation
-                shotImageEntryId: sg.id, // Deprecated (kept for backwards compat)
+                // DEPRECATED (kept for backwards compat during transition):
+                shotImageEntryId: sg.id,
+                shot_generation_id: sg.id,
+                // Generation data:
+                location: gen.location,
                 imageUrl: gen.location,
                 thumbUrl: gen.thumbnail_url || gen.location,
                 type: gen.type || 'image',
+                created_at: gen.created_at,
                 createdAt: gen.created_at,
                 starred: gen.starred || false,
                 name: gen.name,
                 based_on: gen.based_on,
                 params: gen.params,
+                // From shot_generations table
                 timeline_frame: sg.timeline_frame,
+                metadata: sg.metadata || {},
               } as GenerationRow;
             });
           

@@ -606,25 +606,31 @@ export const usePrimeShotGenerationsCache = (
     // [SelectorDebug] Log every priming attempt
     const existingData = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', shotId]);
     
+    const willPrime = shotId && 
+                      contextImages && 
+                      contextImages.length > 0 && 
+                      (!existingData || existingData.length === 0);
+
     console.log('[SelectorDebug] usePrimeShotGenerationsCache check:', {
       shotId: shotId?.substring(0, 8),
       contextImagesCount: contextImages?.length ?? 0,
       existingCacheCount: existingData?.length ?? 0,
-      willPrime: shotId && contextImages && contextImages.length > 0 && (!existingData || existingData.length === 0),
+      willPrime,
       contextImageIds: contextImages?.slice(0, 3).map(i => i.id?.substring(0, 8)),
       contextImageFrames: contextImages?.slice(0, 5).map(i => i.timeline_frame),
       existingCacheIds: existingData?.slice(0, 3).map(i => i.id?.substring(0, 8)),
       existingCacheFrames: existingData?.slice(0, 5).map(i => i.timeline_frame),
     });
     
-    if (!shotId || !contextImages || contextImages.length === 0) return;
-    
-    // Only prime if cache is empty for this shot
-    if (existingData && existingData.length > 0) {
-      console.log('[SelectorDebug] Cache NOT primed - already has data:', {
-        shotId: shotId.substring(0, 8),
-        existingCount: existingData.length,
-      });
+    if (!willPrime) {
+      if (shotId && !existingData) {
+        console.log('[SelectorDebug] ⏳ Cache NOT primed - contextImages is empty or missing, waiting for real query');
+      } else if (shotId) {
+        console.log('[SelectorDebug] ⏩ Cache NOT primed - already has data or invalid conditions:', {
+          shotId: shotId.substring(0, 8),
+          existingCount: existingData?.length,
+        });
+      }
       return;
     }
     
