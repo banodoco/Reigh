@@ -1464,6 +1464,12 @@ export const usePositionExistingGenerationInShot = () => {
       generation_id: string; 
       project_id: string;
     }) => {
+      console.log('[AddDebug] 🔴 usePositionExistingGenerationInShot START:', {
+        shot_id: shot_id.substring(0, 8),
+        generation_id: generation_id.substring(0, 8),
+        timestamp: Date.now()
+      });
+
       // Use add_generation_to_shot with p_with_position=true to assign a position
       // to an existing generation that has NULL timeline_frame
       const { data, error } = await supabase
@@ -1473,10 +1479,20 @@ export const usePositionExistingGenerationInShot = () => {
           p_with_position: true
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[AddDebug] ❌ RPC Error:', error);
+        throw error;
+      }
+
+      console.log('[AddDebug] ✅ RPC Success:', {
+        data,
+        timestamp: Date.now()
+      });
+
       return { shot_id, generation_id, project_id, data };
     },
     onSuccess: (data) => {
+      console.log('[AddDebug] 🔄 onSuccess - invalidating queries for shot:', data.shot_id.substring(0, 8));
       // Invalidate all-shot-generations to ensure the generation appears immediately
       // This is needed because realtime may skip invalidating for INSERT-only batches
       invalidateGenerationsSync(queryClient, data.shot_id, {
@@ -1487,7 +1503,7 @@ export const usePositionExistingGenerationInShot = () => {
       });
     },
     onError: (error: Error) => {
-      console.error('Error positioning existing generation in shot:', error);
+      console.error('[AddDebug] ❌ Mutation failed:', error);
       toast.error(`Failed to position image: ${error.message}`);
     }
   });
