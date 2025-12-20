@@ -33,6 +33,7 @@ import { useVideoTravelViewMode } from '../hooks/useVideoTravelViewMode';
 import { useVideoTravelData } from '../hooks/useVideoTravelData';
 import { useVideoTravelDropHandlers } from '../hooks/useVideoTravelDropHandlers';
 import { useVideoTravelAddToShot } from '../hooks/useVideoTravelAddToShot';
+import { useStableSkeletonVisibility } from '../hooks/useStableSkeletonVisibility';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
@@ -1610,38 +1611,7 @@ const VideoTravelToolPage: React.FC = () => {
   // const handleLoraStrengthChange = (loraId: string, newStrength: number) => { ... };
 
   // Stabilized skeleton visibility to avoid rapid flicker when multiple queries resolve at different times.
-  const [showStableSkeleton, setShowStableSkeleton] = useState<boolean>(false);
-  const hideTimeoutRef = useRef<number | null>(null);
-  const lastLoadingStateRef = useRef<boolean>(false);
-  
-  useEffect(() => {
-    // Only update skeleton state if loading state actually changed
-    if (isLoading !== lastLoadingStateRef.current) {
-      lastLoadingStateRef.current = isLoading;
-      
-      if (isLoading) {
-        // Immediately show the skeleton when entering loading
-        if (hideTimeoutRef.current) {
-          window.clearTimeout(hideTimeoutRef.current);
-          hideTimeoutRef.current = null;
-        }
-        setShowStableSkeleton(true);
-      } else {
-        // Delay hiding slightly to prevent rapid toggle flicker
-        hideTimeoutRef.current = window.setTimeout(() => {
-          setShowStableSkeleton(false);
-          hideTimeoutRef.current = null;
-        }, 120);
-      }
-    }
-    
-    return () => {
-      if (hideTimeoutRef.current) {
-        window.clearTimeout(hideTimeoutRef.current);
-        hideTimeoutRef.current = null;
-      }
-    };
-  }, [isLoading]);
+  const showStableSkeleton = useStableSkeletonVisibility(isLoading);
 
   if (!selectedProjectId) {
     if (showProjectError) {
