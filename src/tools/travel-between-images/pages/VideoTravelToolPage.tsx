@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect,
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
 import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName, useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
-import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -33,6 +32,7 @@ import { useVideoTravelSettingsHandlers } from '../hooks/useVideoTravelSettingsH
 import { useVideoTravelViewMode } from '../hooks/useVideoTravelViewMode';
 import { useVideoTravelData } from '../hooks/useVideoTravelData';
 import { useVideoTravelDropHandlers } from '../hooks/useVideoTravelDropHandlers';
+import { useVideoTravelAddToShot } from '../hooks/useVideoTravelAddToShot';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
@@ -336,7 +336,6 @@ const VideoTravelToolPage: React.FC = () => {
   const [isCreatingShot, setIsCreatingShot] = useState(false);
   const queryClient = useQueryClient();
   const invalidateGenerations = useInvalidateGenerations();
-  const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   
   // Skeleton setup functions from ShotListDisplay (for instant modal close)
@@ -1352,133 +1351,18 @@ const VideoTravelToolPage: React.FC = () => {
   }, [currentShotId, shots, viaShotClick, navigate, location.pathname, setCurrentShotId, shotFromState]);
 
   // ============================================================================
-  // TARGET SHOT INFO FOR ADD TO SHOT BUTTONS (Videos Gallery)
+  // ADD TO SHOT HANDLERS (extracted to useVideoTravelAddToShot hook)
   // ============================================================================
-  
-  // Memoize target shot calculations for the "Add to Shot" button
-  const targetShotInfo = useMemo(() => {
-    const targetShotIdForButton = lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : undefined);
-    const targetShotNameForButtonTooltip = targetShotIdForButton 
-      ? (shots?.find(s => s.id === targetShotIdForButton)?.name || 'Selected Shot')
-      : (shots && shots.length > 0 ? shots[0].name : 'Last Shot');
-    
-    console.log('[VideoTravelAddToShot] targetShotInfo computed:', {
-      targetShotIdForButton: targetShotIdForButton?.substring(0, 8),
-      targetShotNameForButtonTooltip,
-      lastAffectedShotId: lastAffectedShotId?.substring(0, 8),
-      shotsCount: shots?.length || 0,
-      firstShotId: shots?.[0]?.id?.substring(0, 8)
-    });
-    
-    return { targetShotIdForButton, targetShotNameForButtonTooltip };
-  }, [lastAffectedShotId, shots]);
-  
-  // Handle adding a video/image to target shot WITH position
-  const handleAddVideoToTargetShot = useCallback(async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
-    console.log('[VideoTravelAddToShot] 🎯 handleAddVideoToTargetShot called:', {
-      generationId: generationId?.substring(0, 8),
-      targetShotId: targetShotInfo.targetShotIdForButton?.substring(0, 8),
-      targetShotName: targetShotInfo.targetShotNameForButtonTooltip,
-      lastAffectedShotId: lastAffectedShotId?.substring(0, 8),
-      selectedProjectId,
-      hasImageUrl: !!imageUrl,
-      hasThumbUrl: !!thumbUrl,
-      timestamp: Date.now()
-    });
-    
-    if (!targetShotInfo.targetShotIdForButton) {
-      console.error('[VideoTravelAddToShot] ❌ No target shot available');
-      toast.error("No target shot available to add to. Create a shot first or interact with one.");
-      return false;
-    }
-    if (!generationId) {
-      console.error('[VideoTravelAddToShot] ❌ No generationId provided');
-      toast.error("Item has no ID, cannot add to shot.");
-      return false;
-    }
-    if (!selectedProjectId) {
-      console.error('[VideoTravelAddToShot] ❌ No selectedProjectId');
-      toast.error("No project selected. Cannot add item to shot.");
-      return false;
-    }
-
-    try {
-      console.log('[VideoTravelAddToShot] 📤 Calling addImageToShotMutation with:', {
-        shot_id: targetShotInfo.targetShotIdForButton?.substring(0, 8),
-        generation_id: generationId?.substring(0, 8),
-        project_id: selectedProjectId
-      });
-      
-      await addImageToShotMutation.mutateAsync({
-        shot_id: targetShotInfo.targetShotIdForButton,
-        generation_id: generationId,
-        imageUrl: imageUrl,
-        thumbUrl: thumbUrl,
-        project_id: selectedProjectId, 
-      });
-      
-      console.log('[VideoTravelAddToShot] ✅ Mutation success! Setting lastAffectedShotId to:', targetShotInfo.targetShotIdForButton?.substring(0, 8));
-      setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
-      
-      // Force refresh of generations data to show updated positioning
-      console.log('[VideoTravelAddToShot] 🔄 Invalidating unified-generations query');
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
-      
-      return true;
-    } catch (error) {
-      console.error("[VideoTravelAddToShot] ❌ Error adding video to target shot:", error);
-      toast.error("Failed to add item to shot.");
-      return false;
-    }
-  }, [targetShotInfo.targetShotIdForButton, targetShotInfo.targetShotNameForButtonTooltip, lastAffectedShotId, selectedProjectId, addImageToShotMutation, setLastAffectedShotId, queryClient]);
-
-  // Handle adding a video/image to target shot WITHOUT position
-  const handleAddVideoToTargetShotWithoutPosition = useCallback(async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
-    console.log('[VideoTravelAddToShot] handleAddVideoToTargetShotWithoutPosition called:', {
-      generationId: generationId?.substring(0, 8),
-      targetShotId: targetShotInfo.targetShotIdForButton?.substring(0, 8),
-      selectedProjectId
-    });
-    
-    if (!targetShotInfo.targetShotIdForButton) {
-      console.error('[VideoTravelAddToShot] No target shot available (without position)');
-      toast.error("No target shot available to add to. Create a shot first or interact with one.");
-      return false;
-    }
-    if (!generationId) {
-      console.error('[VideoTravelAddToShot] No generationId provided (without position)');
-      toast.error("Item has no ID, cannot add to shot.");
-      return false;
-    }
-    if (!selectedProjectId) {
-      console.error('[VideoTravelAddToShot] No selectedProjectId (without position)');
-      toast.error("No project selected. Cannot add item to shot.");
-      return false;
-    }
-
-    try {
-      console.log('[VideoTravelAddToShot] Calling addImageToShotWithoutPositionMutation...');
-      await addImageToShotWithoutPositionMutation.mutateAsync({
-        shot_id: targetShotInfo.targetShotIdForButton,
-        generation_id: generationId,
-        imageUrl: imageUrl,
-        thumbUrl: thumbUrl,
-        project_id: selectedProjectId, 
-      });
-      
-      console.log('[VideoTravelAddToShot] Success (without position)! Setting lastAffectedShotId');
-      setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
-      
-      // Force refresh of generations data to show updated association
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
-      
-      return true;
-    } catch (error) {
-      console.error("[VideoTravelAddToShot] Error adding video to target shot without position:", error);
-      toast.error("Failed to add item to shot without position.");
-      return false;
-    }
-  }, [targetShotInfo.targetShotIdForButton, selectedProjectId, addImageToShotWithoutPositionMutation, setLastAffectedShotId, queryClient]);
+  const {
+    targetShotInfo,
+    handleAddVideoToTargetShot,
+    handleAddVideoToTargetShotWithoutPosition,
+  } = useVideoTravelAddToShot({
+    selectedProjectId,
+    shots,
+    addImageToShotMutation,
+    addImageToShotWithoutPositionMutation,
+  });
 
   // ============================================================================
   // DROP HANDLERS FOR GENERATIONS FROM GENERATIONSPANE
