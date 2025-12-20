@@ -4,9 +4,7 @@ import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../c
 import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName, useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Input } from '@/shared/components/ui/input';
-import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
-import { ChevronLeft, ChevronRight, ArrowDown, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
@@ -39,8 +37,6 @@ import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidati
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useGenerations } from '@/shared/hooks/useGenerations';
-import { ImageGallery } from '@/shared/components/ImageGallery';
-import { SKELETON_COLUMNS } from '@/shared/components/ImageGallery/utils';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
@@ -48,8 +44,10 @@ import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { useFloatingCTA } from '../hooks/useFloatingCTA';
 import { useStickyHeader } from '../hooks/useStickyHeader';
-import { GenerateVideoCTA } from '../components/GenerateVideoCTA';
 import { useRenderCount } from '@/shared/components/debug/RefactorMetricsCollector';
+import { VideoTravelListHeader } from '../components/VideoTravelListHeader';
+import { VideoTravelVideosGallery } from '../components/VideoTravelVideosGallery';
+import { VideoTravelFloatingOverlay } from '../components/VideoTravelFloatingOverlay';
 
 // ShotEditor is imported eagerly to avoid dynamic import issues on certain mobile browsers.
 // useVideoTravelData moved to hooks/useVideoTravelData.ts
@@ -1590,265 +1588,70 @@ const VideoTravelToolPage: React.FC = () => {
     <div ref={mainContainerRef} className="w-full">
       {!shouldShowShotEditor ? (
         <>
-          {/* Shot List Header - Constrained */}
-          <div className="px-4 max-w-7xl mx-auto pt-6 pb-4">
-            {/* Controls row - all on one line */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Left side: Shots vs Videos Toggle - styled as header */}
-              <SegmentedControl
-                value={showVideosView ? 'videos' : 'shots'}
-                onValueChange={(value) => {
-                  console.log('[ViewToggleDebug] onValueChange fired', { value, showVideosView });
-                  // Default behavior (e.g. keyboard): select the requested mode.
-                  setViewMode(value === 'videos' ? 'videos' : 'shots');
-                }}
-                // Prevent clicks on the toggle from bubbling to parent click handlers
-                onClick={(e) => {
-                  console.log('[ViewToggleDebug] SegmentedControl onClick', { target: (e.target as HTMLElement)?.textContent });
-                  e.stopPropagation();
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="p-1"
-              >
-                <SegmentedControlItem
-                  value="shots"
-                  className="text-lg font-light px-5 py-0"
-                  onClick={(e) => {
-                    console.log('[ViewToggleDebug] Shots item onClick FIRED', { showVideosView });
-                    e.stopPropagation();
-                    setViewMode('shots', { blurTarget: e.currentTarget });
-                  }}
-                >
-                  Shots
-                </SegmentedControlItem>
-                <SegmentedControlItem
-                  value="videos"
-                  className="text-lg font-light px-5 py-0"
-                  onClick={(e) => {
-                    console.log('[ViewToggleDebug] Videos item onClick FIRED', { showVideosView, willSwitchTo: showVideosView ? 'shots' : 'videos' });
-                    e.stopPropagation();
-                    // Special toggle: clicking "Videos" while already in videos returns to shots.
-                    setViewMode(showVideosView ? 'shots' : 'videos', { blurTarget: e.currentTarget });
-                  }}
-                >
-                  Videos
-                </SegmentedControlItem>
-              </SegmentedControl>
-
-              {/* Mobile: Search icon button - Shots or Videos view */}
-              {isMobile && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground hover:bg-muted p-1"
-                  onClick={handleSearchToggle}
-                  title={isSearchOpen ? "Close search" : (showVideosView ? "Search videos" : "Search shots")}
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              )}
-
-              {/* Desktop: Search - Shots view */}
-              {!isMobile && !showVideosView && (
-                <div className="relative w-28 sm:w-52">
-                  <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-                    <Search className="h-3.5 w-3.5" />
-                  </div>
-                  <Input
-                    ref={searchInputRef}
-                    placeholder="Search..."
-                    value={shotSearchQuery}
-                    onChange={(e) => setShotSearchQuery(e.target.value)}
-                    className="h-8 text-xs pl-8"
-                  />
-                </div>
-              )}
-
-              {/* Desktop: Search - Videos view */}
-              {!isMobile && showVideosView && (
-                <div className="relative w-28 sm:w-52">
-                  <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-                    <Search className="h-3.5 w-3.5" />
-                  </div>
-                  <Input
-                    placeholder="Search..."
-                    value={videoSearchTerm}
-                    onChange={(e) => {
-                      setVideoSearchTerm(e.target.value);
-                      setVideoPage(1);
-                    }}
-                    className="h-8 text-xs pl-8"
-                  />
-                </div>
-              )}
-
-              {/* Right side: Sort toggle - always right-aligned */}
-              {!showVideosView && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs ml-auto"
-                  onClick={() => setShotSortMode(shotSortMode === 'oldest' ? 'newest' : 'oldest')}
-                  title={`Currently showing ${shotSortMode === 'ordered' ? 'newest' : shotSortMode} first. Click to toggle.`}
-                >
-                  <ArrowDown className="h-3.5 w-3.5 mr-1" />
-                  {(shotSortMode === 'oldest') ? 'Oldest first' : 'Newest first'}
-                </Button>
-              )}
-
-              {showVideosView && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs ml-auto"
-                  onClick={() => {
-                    setVideoSortMode(videoSortMode === 'oldest' ? 'newest' : 'oldest');
-                    setVideoPage(1);
-                  }}
-                  title={`Currently showing ${videoSortMode} first. Click to toggle.`}
-                >
-                  <ArrowDown className="h-3.5 w-3.5 mr-1" />
-                  {videoSortMode === 'oldest' ? 'Oldest first' : 'Newest first'}
-                </Button>
-              )}
-            </div>
-            
-            {/* Mobile: Search box appears below full width when open */}
-            {isMobile && (
-              <div 
-                className={cn(
-                  "overflow-hidden transition-all duration-200 ease-out w-full",
-                  isSearchOpen ? "max-h-14 opacity-100 mt-3" : "max-h-0 opacity-0"
-                )}
-              >
-                <div className="flex items-center space-x-2 border rounded-md px-3 py-1 h-8 bg-background w-full">
-                  <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder={showVideosView ? "Search videos..." : "Search shots..."}
-                    value={showVideosView ? videoSearchTerm : shotSearchQuery}
-                    onChange={(e) => {
-                      if (showVideosView) {
-                        setVideoSearchTerm(e.target.value);
-                        setVideoPage(1);
-                      } else {
-                        setShotSearchQuery(e.target.value);
-                      }
-                    }}
-                    className="bg-transparent border-none outline-none text-base flex-1"
-                    style={{ fontSize: '16px' }} // Prevents iOS auto-zoom on focus
-                  />
-                  {(showVideosView ? videoSearchTerm : shotSearchQuery) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (showVideosView) {
-                          setVideoSearchTerm('');
-                        } else {
-                          setShotSearchQuery('');
-                        }
-                        setIsSearchOpen(false);
-                      }}
-                      className="h-auto p-0.5 flex-shrink-0"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Shot List Header */}
+          <VideoTravelListHeader
+            viewMode={{
+              showVideosView,
+              setViewMode,
+            }}
+            search={{
+              isMobile,
+              isSearchOpen,
+              setIsSearchOpen,
+              handleSearchToggle,
+              searchInputRef,
+              shotSearchQuery,
+              setShotSearchQuery,
+              videoSearchTerm,
+              setVideoSearchTerm,
+              setVideoPage,
+            }}
+            sort={{
+              showVideosView,
+              shotSortMode,
+              setShotSortMode,
+              videoSortMode,
+              setVideoSortMode,
+              setVideoPage,
+            }}
+          />
           
-          {/* Content Area - Videos: Constrained */}
+          {/* Content Area */}
           {showVideosView ? (
-            <div className="px-4 max-w-7xl mx-auto">
-            {(() => {
-              // Show SkeletonGallery when loading videos or when no data yet
-              // IMPROVED: Track view transition to prevent empty state flash
-              const vd: any = videosData as any;
-              const hasValidData = vd?.items && vd.items.length > 0;
-              const isLoadingOrFetching = videosLoading || videosFetching;
-              
-              // Show skeleton if:
-              // 1. No project selected, OR
-              // 2. Currently loading/fetching and no valid data, OR
-              // 3. We just switched to videos view (videosViewJustEnabled flag)
-              const shouldShowSkeleton = !selectedProjectId || (isLoadingOrFetching && !hasValidData) || videosViewJustEnabled;
-              
-              // Use actual count if available, otherwise default to 12
-              const skeletonCount = (vd?.total) || 12;
-              
-              console.log('[VideoSkeletonDebug] === RENDER DECISION ===', {
-                showVideosView,
-                selectedProjectId,
+            <VideoTravelVideosGallery
+              query={{
+                videosData,
                 videosLoading,
                 videosFetching,
-                hasValidData,
-                videosViewJustEnabled,
-                shouldShowSkeleton,
-                skeletonCount,
-                videosDataTotal: vd?.total,
-                videosDataItemsLength: vd?.items?.length,
-                decisionBreakdown: {
-                  condition1_noProject: !selectedProjectId,
-                  condition2_loadingNoData: isLoadingOrFetching && !hasValidData,
-                  condition3_justEnabled: videosViewJustEnabled,
-                  result: `${!selectedProjectId} || (${isLoadingOrFetching} && ${!hasValidData}) || ${videosViewJustEnabled} = ${shouldShowSkeleton}`
-                },
-                willRender: shouldShowSkeleton ? 'SKELETON' : 'GALLERY',
-                timestamp: Date.now()
-              });
-              
-              return shouldShowSkeleton ? (
-                <div className="pb-2">
-                  <SkeletonGallery
-                    count={skeletonCount}
-                    columns={SKELETON_COLUMNS[3]}
-                    showControls={true}
-                    projectAspectRatio={projectAspectRatio}
-                  />
-                </div>
-              ) : (
-                <div className="pb-2">
-                  <ImageGallery
-                    images={(videosData as any)?.items || []}
-                    allShots={shots || []}
-                    // Add to Shot functionality for the videos gallery
-                    onAddToLastShot={handleAddVideoToTargetShot}
-                    onAddToLastShotWithoutPosition={handleAddVideoToTargetShotWithoutPosition}
-                    lastShotId={targetShotInfo.targetShotIdForButton}
-                    lastShotNameForTooltip={targetShotInfo.targetShotNameForButtonTooltip}
-                    currentToolType="travel-between-images"
-                    currentToolTypeName="Travel Between Images"
-                    // Pagination props
-                    totalCount={(videosData as any)?.total}
-                    serverPage={videoPage}
-                    onServerPageChange={(page) => setVideoPage(page)}
-                    itemsPerPage={itemsPerPage}
-                    
-                    initialMediaTypeFilter={videoMediaTypeFilter}
-                    onMediaTypeFilterChange={(val) => { setVideoMediaTypeFilter(val); setVideoPage(1); }}
-                    initialToolTypeFilter={videoToolTypeFilter}
-                    onToolTypeFilterChange={(val) => { setVideoToolTypeFilter(val); setVideoPage(1); }}
-                    showShotFilter={true}
-                    initialShotFilter={videoShotFilter}
-                    onShotFilterChange={(val) => { setVideoShotFilter(val); setVideoPage(1); }}
-                    initialExcludePositioned={videoExcludePositioned}
-                    onExcludePositionedChange={(val) => { setVideoExcludePositioned(val); setVideoPage(1); }}
-                    showSearch={false}
-                    initialSearchTerm={videoSearchTerm}
-                    onSearchChange={(val) => { setVideoSearchTerm(val); setVideoPage(1); }}
-                    initialStarredFilter={videoStarredOnly}
-                    onStarredFilterChange={(val) => { setVideoStarredOnly(val); setVideoPage(1); }}
-                    columnsPerRow={3}
-                    showShare={false}
-                  />
-                </div>
-              );
-            })()}
-            </div>
+                selectedProjectId,
+                projectAspectRatio,
+                itemsPerPage,
+                shots,
+              }}
+              filters={{
+                videoPage,
+                setVideoPage,
+                videoShotFilter,
+                setVideoShotFilter,
+                videoExcludePositioned,
+                setVideoExcludePositioned,
+                videoSearchTerm,
+                setVideoSearchTerm,
+                videoMediaTypeFilter,
+                setVideoMediaTypeFilter,
+                videoToolTypeFilter,
+                setVideoToolTypeFilter,
+                videoStarredOnly,
+                setVideoStarredOnly,
+              }}
+              addToShot={{
+                targetShotIdForButton: targetShotInfo.targetShotIdForButton,
+                targetShotNameForButtonTooltip: targetShotInfo.targetShotNameForButtonTooltip,
+                handleAddVideoToTargetShot,
+                handleAddVideoToTargetShotWithoutPosition,
+              }}
+              videosViewJustEnabled={videosViewJustEnabled}
+            />
           ) : (
             hasNoSearchResults ? (
               <div className="px-4 max-w-7xl mx-auto py-10 text-center text-muted-foreground">
@@ -2000,115 +1803,40 @@ const VideoTravelToolPage: React.FC = () => {
         cropToProjectSize={uploadSettings?.cropToProjectSize ?? true}
       />
       
-      {/* ============================================================================ */}
-      {/* FLOATING UI ELEMENTS (Page-level concerns) */}
-      {/* ============================================================================ */}
-      
-      {/* Sticky Shot Selector - appears when original header is out of view */}
-      {shouldShowShotEditor && stickyHeader.isSticky && shotToEdit && (
-        <div
-          className="fixed z-50 animate-in fade-in slide-in-from-top-2"
-          style={{
-            top: `${isMobile ? 52 : 114}px`,
-            left: stickyHeader.stableBounds.width > 0 
-              ? `${stickyHeader.stableBounds.left}px` 
-              : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
-            width: stickyHeader.stableBounds.width > 0 
-              ? `${stickyHeader.stableBounds.width}px` 
-              : undefined,
-            right: stickyHeader.stableBounds.width > 0 
-              ? undefined 
-              : `${isTasksPaneLocked ? tasksPaneWidth : 0}px`,
-            transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out, opacity 0.3s ease-out',
-            willChange: 'left, width, right, opacity',
-            transform: 'translateZ(0)',
-            pointerEvents: 'none'
-          }}
-        >
-          <div className="flex-shrink-0 pb-2 sm:pb-1">
-            <div className="flex flex-col items-center px-2">
-              <div className="flex items-center justify-center">
-                <div className="flex items-center space-x-1 sm:space-x-2 bg-background/80 backdrop-blur-md shadow-xl rounded-lg border border-border p-1" style={{ pointerEvents: 'auto' }}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handlePreviousShot();
-                    }}
-                    disabled={!hasPrevious}
-                    className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
-                    title="Previous shot"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  
-                  <span
-                    className="text-base sm:text-xl font-semibold text-primary truncate px-2 sm:px-4 w-[140px] sm:w-[200px] text-center border-2 border-transparent rounded-md py-1 sm:py-2 cursor-pointer hover:underline"
-                    title="Click to edit shot name"
-                    onClick={handleFloatingHeaderNameClick}
-                  >
-                    {shotToEdit.name || 'Untitled Shot'}
-                  </span>
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleNextShot();
-                    }}
-                    disabled={!hasNext}
-                    className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
-                    title="Next shot"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              {/* Mobile: Back to shot list button */}
-              {isMobile && (
-                <button
-                  onClick={handleBackToShotList}
-                  className="mt-0.5 px-3 py-1 text-xs text-muted-foreground hover:text-foreground bg-background/80 backdrop-blur-md rounded-b-lg border border-t-0 border-border flex items-center"
-                  style={{ pointerEvents: 'auto' }}
-                >
-                  <ChevronLeft className="h-3 w-3 mr-0.5" />
-                  Back to shots
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Floating Generate Video Button - appears when scrolling in timeline */}
-      {shouldShowShotEditor && floatingCTA.showElement && floatingCTA.isFloating && shotToEdit && (
-        <div 
-          className="fixed z-[80] animate-in fade-in duration-300 flex justify-center"
-          style={{
-            bottom: isMobile ? '55px' : '60px',
-            left: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0',
-            right: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0',
-            pointerEvents: 'none'
-          }}
-        >
-          <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-6 w-full max-w-md" style={{ pointerEvents: 'auto' }}>
-            <GenerateVideoCTA
-              variantName={variantName}
-              onVariantNameChange={setVariantName}
-              onGenerate={handleGenerateVideo}
-              isGenerating={isGeneratingVideo}
-              justQueued={videoJustQueued}
-              disabled={isGeneratingVideo}
-              inputId="variant-name-floating"
-            />
-          </div>
-        </div>
-      )}
+      {/* Floating UI Overlays */}
+      <VideoTravelFloatingOverlay
+        sticky={{
+          shouldShowShotEditor,
+          stickyHeader,
+          shotToEdit,
+          isMobile,
+          isShotsPaneLocked,
+          shotsPaneWidth,
+          isTasksPaneLocked,
+          tasksPaneWidth,
+          hasPrevious,
+          hasNext,
+          onPreviousShot: handlePreviousShot,
+          onNextShot: handleNextShot,
+          onBackToShotList: handleBackToShotList,
+          onFloatingHeaderNameClick: handleFloatingHeaderNameClick,
+        }}
+        cta={{
+          shouldShowShotEditor,
+          floatingCTA,
+          shotToEdit,
+          isMobile,
+          isShotsPaneLocked,
+          shotsPaneWidth,
+          isTasksPaneLocked,
+          tasksPaneWidth,
+          variantName,
+          setVariantName,
+          onGenerateVideo: handleGenerateVideo,
+          isGeneratingVideo,
+          videoJustQueued,
+        }}
+      />
       
     </div>
   );

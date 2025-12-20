@@ -1,0 +1,217 @@
+/**
+ * Floating Overlay Component for VideoTravelToolPage
+ * 
+ * Renders floating UI elements that appear over the main content:
+ * - Sticky shot selector header (when scrolled past original header)
+ * - Floating Generate Video CTA (when scrolling in timeline)
+ * 
+ * @see VideoTravelToolPage.tsx - Parent page component
+ */
+
+import React from 'react';
+import { Button } from '@/shared/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { GenerateVideoCTA } from '../components/GenerateVideoCTA';
+import { Shot } from '@/types/shots';
+
+// =============================================================================
+// PROP TYPES (grouped for clarity)
+// =============================================================================
+
+export interface StickyHeaderProps {
+  shouldShowShotEditor: boolean;
+  stickyHeader: {
+    isSticky: boolean;
+    stableBounds: { left: number; width: number };
+  };
+  shotToEdit: Shot | null | undefined;
+  isMobile: boolean;
+  isShotsPaneLocked: boolean;
+  shotsPaneWidth: number;
+  isTasksPaneLocked: boolean;
+  tasksPaneWidth: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onPreviousShot: () => void;
+  onNextShot: () => void;
+  onBackToShotList: () => void;
+  onFloatingHeaderNameClick: () => void;
+}
+
+export interface FloatingCTAProps {
+  shouldShowShotEditor: boolean;
+  floatingCTA: {
+    showElement: boolean;
+    isFloating: boolean;
+  };
+  shotToEdit: Shot | null | undefined;
+  isMobile: boolean;
+  isShotsPaneLocked: boolean;
+  shotsPaneWidth: number;
+  isTasksPaneLocked: boolean;
+  tasksPaneWidth: number;
+  variantName: string;
+  setVariantName: (name: string) => void;
+  onGenerateVideo: () => Promise<void>;
+  isGeneratingVideo: boolean;
+  videoJustQueued: boolean;
+}
+
+export interface VideoTravelFloatingOverlayProps {
+  sticky: StickyHeaderProps;
+  cta: FloatingCTAProps;
+}
+
+// =============================================================================
+// COMPONENT
+// =============================================================================
+
+export const VideoTravelFloatingOverlay: React.FC<VideoTravelFloatingOverlayProps> = ({
+  sticky,
+  cta,
+}) => {
+  const {
+    shouldShowShotEditor: showEditorSticky,
+    stickyHeader,
+    shotToEdit: shotSticky,
+    isMobile: isMobileSticky,
+    isShotsPaneLocked: isShotsPaneLockedSticky,
+    shotsPaneWidth: shotsPaneWidthSticky,
+    isTasksPaneLocked: isTasksPaneLockedSticky,
+    tasksPaneWidth: tasksPaneWidthSticky,
+    hasPrevious,
+    hasNext,
+    onPreviousShot,
+    onNextShot,
+    onBackToShotList,
+    onFloatingHeaderNameClick,
+  } = sticky;
+
+  const {
+    shouldShowShotEditor: showEditorCTA,
+    floatingCTA,
+    shotToEdit: shotCTA,
+    isMobile: isMobileCTA,
+    isShotsPaneLocked: isShotsPaneLockedCTA,
+    shotsPaneWidth: shotsPaneWidthCTA,
+    isTasksPaneLocked: isTasksPaneLockedCTA,
+    tasksPaneWidth: tasksPaneWidthCTA,
+    variantName,
+    setVariantName,
+    onGenerateVideo,
+    isGeneratingVideo,
+    videoJustQueued,
+  } = cta;
+
+  return (
+    <>
+      {/* Sticky Shot Selector - appears when original header is out of view */}
+      {showEditorSticky && stickyHeader.isSticky && shotSticky && (
+        <div
+          className="fixed z-50 animate-in fade-in slide-in-from-top-2"
+          style={{
+            top: `${isMobileSticky ? 52 : 114}px`,
+            left: stickyHeader.stableBounds.width > 0 
+              ? `${stickyHeader.stableBounds.left}px` 
+              : `${isShotsPaneLockedSticky ? shotsPaneWidthSticky : 0}px`,
+            width: stickyHeader.stableBounds.width > 0 
+              ? `${stickyHeader.stableBounds.width}px` 
+              : undefined,
+            right: stickyHeader.stableBounds.width > 0 
+              ? undefined 
+              : `${isTasksPaneLockedSticky ? tasksPaneWidthSticky : 0}px`,
+            transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out, opacity 0.3s ease-out',
+            willChange: 'left, width, right, opacity',
+            transform: 'translateZ(0)',
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="flex-shrink-0 pb-2 sm:pb-1">
+            <div className="flex flex-col items-center px-2">
+              <div className="flex items-center justify-center">
+                <div className="flex items-center space-x-1 sm:space-x-2 bg-background/80 backdrop-blur-md shadow-xl rounded-lg border border-border p-1" style={{ pointerEvents: 'auto' }}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onPreviousShot();
+                    }}
+                    disabled={!hasPrevious}
+                    className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
+                    title="Previous shot"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <span
+                    className="text-base sm:text-xl font-semibold text-primary truncate px-2 sm:px-4 w-[140px] sm:w-[200px] text-center border-2 border-transparent rounded-md py-1 sm:py-2 cursor-pointer hover:underline"
+                    title="Click to edit shot name"
+                    onClick={onFloatingHeaderNameClick}
+                  >
+                    {shotSticky.name || 'Untitled Shot'}
+                  </span>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onNextShot();
+                    }}
+                    disabled={!hasNext}
+                    className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
+                    title="Next shot"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Mobile: Back to shot list button */}
+              {isMobileSticky && (
+                <button
+                  onClick={onBackToShotList}
+                  className="mt-0.5 px-3 py-1 text-xs text-muted-foreground hover:text-foreground bg-background/80 backdrop-blur-md rounded-b-lg border border-t-0 border-border flex items-center"
+                  style={{ pointerEvents: 'auto' }}
+                >
+                  <ChevronLeft className="h-3 w-3 mr-0.5" />
+                  Back to shots
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Floating Generate Video Button - appears when scrolling in timeline */}
+      {showEditorCTA && floatingCTA.showElement && floatingCTA.isFloating && shotCTA && (
+        <div 
+          className="fixed z-[80] animate-in fade-in duration-300 flex justify-center"
+          style={{
+            bottom: isMobileCTA ? '55px' : '60px',
+            left: isShotsPaneLockedCTA ? `${shotsPaneWidthCTA}px` : '0',
+            right: isTasksPaneLockedCTA ? `${tasksPaneWidthCTA}px` : '0',
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-6 w-full max-w-md" style={{ pointerEvents: 'auto' }}>
+            <GenerateVideoCTA
+              variantName={variantName}
+              onVariantNameChange={setVariantName}
+              onGenerate={onGenerateVideo}
+              isGenerating={isGeneratingVideo}
+              justQueued={videoJustQueued}
+              disabled={isGeneratingVideo}
+              inputId="variant-name-floating"
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default VideoTravelFloatingOverlay;
