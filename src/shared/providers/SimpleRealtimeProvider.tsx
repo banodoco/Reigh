@@ -114,7 +114,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
 
       // Analyze batch to determine what needs invalidation
       const hasCompleteTask = payloads.some((p: any) => p?.new?.status === 'Complete');
-      const completedShotIds = new Set(
+      const completedShotIds = new Set<string>(
         payloads
           .filter((p: any) => p?.new?.status === 'Complete')
           .map((p: any) => {
@@ -128,7 +128,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
                    newItem?.params?.originalParams?.orchestrator_details?.shot_id ||
                    newItem?.params?.full_orchestrator_payload?.shot_id;
           })
-          .filter(Boolean)
+          .filter((id: any): id is string => typeof id === 'string')
       );
 
       // ALWAYS invalidate list queries
@@ -147,6 +147,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       if (hasCompleteTask) {
         // Invalidate derived generations (edits based on source images)
         queryClient.invalidateQueries({ queryKey: ['derived-generations'] });
+        queryClient.invalidateQueries({ queryKey: ['derived-items'] });
         
         // 🎯 ALWAYS invalidate project-level unified-generations queries
         // This ensures ChildGenerationsView and other project-wide queries update immediately

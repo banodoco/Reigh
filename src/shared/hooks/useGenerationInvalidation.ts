@@ -263,6 +263,8 @@ export async function invalidateVariantChange(
   // 4. Invalidate generation galleries - cover ALL key patterns for compatibility
   queryClient.invalidateQueries({ queryKey: ['unified-generations'] }); // Legacy
   queryClient.invalidateQueries({ queryKey: ['generations'] });
+  // Derived items (variants/generations "based on this")
+  queryClient.invalidateQueries({ queryKey: ['derived-items'] });
   
   // 5. If projectId provided, also invalidate project-scoped queries
   if (projectId) {
@@ -313,4 +315,5 @@ export function invalidateGenerationUpdate(
   
   // 4. Invalidate derived-generations (for child/variant galleries)
   queryClient.invalidateQueries({ queryKey: ['derived-generations'] });
+  queryClient.invalidateQueries({ queryKey: ['derived-items'] });
 }

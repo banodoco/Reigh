@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { GenerationRow } from '@/types/shots';
-import { transformForTimeline, type RawShotGeneration } from '@/shared/lib/generationTransformers';
+import { transformForTimeline, type RawShotGeneration, calculateDerivedCounts } from '@/shared/lib/generationTransformers';
 import { timelineDebugger } from '@/tools/travel-between-images/components/Timeline/utils/timeline-debug';
 import { isVideoGeneration, isVideoShotGeneration, isPositioned, type ShotGenerationLike } from '@/shared/lib/typeGuards';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
@@ -106,7 +106,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           created_at: sg.created_at
         }))
       });
-
+      
       if (fetchError) throw fetchError;
 
       // Convert database data to ShotGeneration format and set state
@@ -123,7 +123,21 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           generation: sg.generation as any
         }));
 
-      setShotGenerations(shotGenerationsData as ShotGeneration[]);
+      // Calculate derivedCount for each generation
+      const generationIds = shotGenerationsData.map(sg => sg.generation_id);
+      const derivedCounts = await calculateDerivedCounts(generationIds);
+      
+      // Add derivedCount to each generation
+      const enrichedData = shotGenerationsData.map(sg => ({
+        ...sg,
+        generation: {
+          ...sg.generation,
+          derivedCount: derivedCounts[sg.generation_id] || 0,
+        }
+      }));
+
+      setShotGenerations(enrichedData as ShotGeneration[]);
+
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load shot positions';
@@ -227,11 +241,15 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   }, [shotGenerations]);
 
   // Get images sorted by mode (excludes videos like original system)
-  const getImagesForMode = useCallback((mode: 'batch' | 'timeline'): GenerationRow[] => {
+  // NOTE: NOT using useCallback here to ensure we always get fresh shotGenerations with derivedCount
+  const getImagesForMode = (mode: 'batch' | 'timeline'): GenerationRow[] => {
     // Transform to GenerationRow, then filter videos using canonical function
     const images = shotGenerations
       .filter(sg => sg.generation)
-      .map(sg => transformForTimeline(sg as any as RawShotGeneration))
+      .map(sg => {
+        const transformed = transformForTimeline(sg as any as RawShotGeneration);
+        return transformed;
+      })
       .filter(img => !isVideoGeneration(img));
 
     if (mode === 'timeline') {
@@ -291,7 +309,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         return frameA - frameB;
       });
     }
-  }, [shotGenerations]);
+  };
 
   // Helper function to clear enhanced prompts for specific generation IDs
   const clearEnhancedPromptsForGenerations = useCallback(async (shotGenerationIds: string[]) => {
@@ -1256,15 +1274,15 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           : sg
       ));
 
-      // Invalidate queries to refresh data
-      await queryClient.invalidateQueries({ queryKey: ['shot_generations', shotId] });
+      // Invalidate queries to refresh data (metadata only)
+      invalidateGenerations(shotId, { reason: 'clear-enhanced-prompt', scope: 'metadata' });
       await queryClient.invalidateQueries({ queryKey: ['shots'] });
 
     } catch (err) {
       console.error('[clearEnhancedPrompt] Error:', err);
       throw err;
     }
-  }, [shotId, shotGenerations, queryClient]);
+  }, [shotId, shotGenerations, queryClient, invalidateGenerations]);
 
   // Clear all enhanced prompts for the shot (used when base prompt changes)
   const clearAllEnhancedPrompts = useCallback(async () => {
