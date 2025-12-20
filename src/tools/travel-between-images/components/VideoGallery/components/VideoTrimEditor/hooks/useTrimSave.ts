@@ -230,12 +230,17 @@ export const useTrimSave = ({
       setSaveSuccess(true);
 
       console.log('[useTrimSave] Complete! MP4 saved with proper duration.');
+      console.log('[VariantFlow] 1️⃣ VARIANT CREATED - id:', newVariantId.substring(0, 8), 'generationId:', generationId.substring(0, 8));
 
-      // Invalidate queries
+      // Invalidate queries to refresh all views
+      console.log('[VariantFlow] 2️⃣ DIRECT INVALIDATION starting...');
       queryClient.invalidateQueries({ queryKey: ['generation-variants'] });
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       queryClient.invalidateQueries({ queryKey: ['generation'] });
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations'] }); // Timeline/Batch mode
+      queryClient.invalidateQueries({ queryKey: ['generations'] }); // General generations
       queryClient.removeQueries({ queryKey: ['unified-generations'], exact: false });
+      console.log('[VariantFlow] 2️⃣ DIRECT INVALIDATION complete');
 
       // Call success callback
       onSuccess?.(newVariantId);

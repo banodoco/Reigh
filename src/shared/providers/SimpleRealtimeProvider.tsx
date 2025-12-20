@@ -379,12 +379,33 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       invalidateAllShotGenerations(queryClient, 'generation-insert-batch');
     };
 
+    // NEW: Handle batched variant changes (primary variant switches, new variants, etc.)
+    const handleVariantChangeBatch = (event: CustomEvent) => {
+      const { count, payloads, affectedGenerationIds } = event.detail;
+      console.log('[VariantFlow] 5️⃣ PROVIDER RECEIVED EVENT - count:', count, 'affectedGenerations:', affectedGenerationIds?.length || 0, 'ids:', affectedGenerationIds?.map((id: string) => id.substring(0, 8)));
+
+      // Invalidate generation-variants queries for affected generations
+      affectedGenerationIds?.forEach((generationId: string) => {
+        queryClient.invalidateQueries({ queryKey: ['generation-variants', generationId] });
+        queryClient.invalidateQueries({ queryKey: ['generation', generationId] });
+      });
+
+      // IMPORTANT: When a variant becomes primary, the generation's location changes
+      // This affects Timeline/Batch mode displays, so invalidate shot-generations
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      invalidateAllShotGenerations(queryClient, 'variant-change-batch');
+      
+      console.log('[VariantFlow] 5️⃣ PROVIDER INVALIDATION complete');
+    };
+
     // Listen for BATCHED events (new, efficient)
     window.addEventListener('realtime:task-update-batch', handleTaskUpdateBatch as EventListener);
     window.addEventListener('realtime:task-new-batch', handleNewTaskBatch as EventListener);
     window.addEventListener('realtime:shot-generation-change-batch', handleShotGenerationChangeBatch as EventListener);
     window.addEventListener('realtime:generation-update-batch', handleGenerationUpdateBatch as EventListener);
     window.addEventListener('realtime:generation-insert-batch', handleGenerationInsertBatch as EventListener);
+    window.addEventListener('realtime:variant-change-batch', handleVariantChangeBatch as EventListener);
     
     // Keep legacy event listeners for backward compatibility
     window.addEventListener('realtime:task-update', handleTaskUpdate as EventListener);
@@ -398,6 +419,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       window.removeEventListener('realtime:shot-generation-change-batch', handleShotGenerationChangeBatch as EventListener);
       window.removeEventListener('realtime:generation-update-batch', handleGenerationUpdateBatch as EventListener);
       window.removeEventListener('realtime:generation-insert-batch', handleGenerationInsertBatch as EventListener);
+      window.removeEventListener('realtime:variant-change-batch', handleVariantChangeBatch as EventListener);
       
       // Remove legacy event listeners
       window.removeEventListener('realtime:task-update', handleTaskUpdate as EventListener);

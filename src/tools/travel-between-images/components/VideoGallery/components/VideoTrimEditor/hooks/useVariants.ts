@@ -142,11 +142,19 @@ export const useVariants = ({
     },
     onSuccess: (variantId) => {
       console.log('[useVariants] Successfully set primary variant:', variantId.substring(0, 8));
+      console.log('[useVariants] 🔄 Invalidating queries to refresh data...');
       
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['generation-variants', generationId] });
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       queryClient.invalidateQueries({ queryKey: ['generation', generationId] });
+      // IMPORTANT: Invalidate shot generations cache so Timeline/Batch mode updates
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations'] });
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      
+      console.log('[useVariants] ✅ Query invalidation complete');
+      
+      toast.success('Set as primary variant');
     },
     onError: (error) => {
       console.error('[useVariants] Failed to set primary variant:', error);

@@ -472,6 +472,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // Use preloaded images if provided, otherwise use database images
   const shotGenerations = preloadedImages || dbShotGenerations;
   
+  // DEBUG: Log preloadedImages to see if they're updating
+  console.log('[VariantFlow] 📥 ShotImagesEditor - preloadedImages check:', {
+    count: preloadedImages?.length,
+    firstId: preloadedImages?.[0]?.id?.substring(0, 8),
+    firstGenId: (preloadedImages?.[0] as any)?.generation_id?.substring(0, 8),
+    firstUrlFile: preloadedImages?.[0]?.imageUrl?.split('/').pop()?.substring(0, 40),
+  });
+  
   // Log data source for debugging
   console.log('[UnifiedDataFlow] ShotImagesEditor data source:', {
     selectedShotId: selectedShotId.substring(0, 8),
@@ -1492,8 +1500,9 @@ const arePropsEqual = (prevProps: ShotImagesEditorProps, nextProps: ShotImagesEd
     }
   }
 
-  // Compare images by content that affects rendering (order + timeline_frame).
+  // Compare images by content that affects rendering (order + timeline_frame + imageUrl).
   // NOTE: This is intentionally O(n) to avoid incorrect "skips" on reorder.
+  // IMPORTANT: Must compare imageUrl to detect variant changes!
   const prevImages = prevProps.preloadedImages || [];
   const nextImages = nextProps.preloadedImages || [];
   if (prevImages.length !== nextImages.length) return false;
@@ -1503,6 +1512,8 @@ const arePropsEqual = (prevProps: ShotImagesEditorProps, nextProps: ShotImagesEd
     if (!prevImg || !nextImg) return false;
     if (prevImg.id !== nextImg.id) return false;
     if ((prevImg.timeline_frame ?? null) !== (nextImg.timeline_frame ?? null)) return false;
+    // CRITICAL: Compare imageUrl to detect variant/location changes
+    if (prevImg.imageUrl !== nextImg.imageUrl) return false;
   }
 
   // Compare allShots by stable identity + display-relevant properties (id + name).

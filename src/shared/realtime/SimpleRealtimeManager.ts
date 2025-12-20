@@ -486,22 +486,23 @@ export class SimpleRealtimeManager {
       }
     });
 
-    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched variant changes:', {
-      count: payloads.length,
-      affectedGenerations: affectedGenerationIds.size,
-      generationIds: Array.from(affectedGenerationIds).map(id => id.substring(0, 8)),
-      timestamp: Date.now()
-    });
+    console.log('[VariantFlow] 4️⃣ DISPATCHING EVENT - affectedGenerations:', affectedGenerationIds.size, 'ids:', Array.from(affectedGenerationIds).map(id => id.substring(0, 8)));
 
     // Build query keys for each affected generation's variants
-    const queryKeys = Array.from(affectedGenerationIds).map(generationId => 
+    const queryKeys = Array.from(affectedGenerationIds).map(generationId =>
       ['generation-variants', generationId]
     );
     
+    // IMPORTANT: Also add all-shot-generations to invalidate Timeline/Batch mode
+    // When a variant becomes primary, the generation's location changes which affects shot displays
+    queryKeys.push(['all-shot-generations']);
+    queryKeys.push(['generations']);
+
     dataFreshnessManager.onRealtimeEvent('variant-change', queryKeys);
 
     // Emit single consolidated event with all payloads
     if (typeof window !== 'undefined') {
+      console.log('[VariantFlow] 4️⃣ EMITTING realtime:variant-change-batch event');
       window.dispatchEvent(new CustomEvent('realtime:variant-change-batch', {
         detail: {
           payloads,
@@ -609,7 +610,7 @@ export class SimpleRealtimeManager {
       return;
     }
     
-    console.log('[SimpleRealtime] 🎯 Variant change for generation:', generationId.substring(0, 8), eventType);
+    console.log('[VariantFlow] 3️⃣ REALTIME RECEIVED - variantId:', newRecord?.id?.substring(0, 8), 'generationId:', generationId.substring(0, 8), 'eventType:', eventType);
     
     // Batch this event to prevent rapid invalidation from multiple variant changes
     this.batchEvent('variant-change', { ...payload, eventType, generationId });
