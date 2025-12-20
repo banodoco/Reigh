@@ -83,11 +83,11 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
         {/* Controls row - all on one line matching actual layout */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* SegmentedControl skeleton - Shots/Videos toggle */}
-          {/* Actual has bg-muted rounded-full p-1, h-10, with two items (px-5 py-0 text-lg) */}
-          {/* One item appears "active" (bg-background), the other is transparent/muted */}
-          <div className="h-10 bg-muted rounded-full p-1 inline-flex items-center gap-0.5">
-            <div className="h-8 w-[85px] sm:w-[95px] rounded-full bg-background shadow-sm animate-pulse" />
-            <div className="h-8 w-[85px] sm:w-[95px] rounded-full" />
+          {/* Actual: h-10 bg-muted rounded-full p-1, items have text-lg px-5 py-0 */}
+          {/* "Shots" ~85px, "Videos" ~95px at text-lg with px-5 padding */}
+          <div className="h-10 bg-muted rounded-full p-1 inline-flex items-center">
+            <div className="h-8 w-[85px] rounded-full bg-background shadow-sm animate-pulse" />
+            <div className="h-8 w-[95px] rounded-full" />
           </div>
           
           {/* Mobile: Search icon button skeleton */}

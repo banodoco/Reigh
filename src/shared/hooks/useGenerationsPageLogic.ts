@@ -369,7 +369,8 @@ export function useGenerationsPageLogic({
     shotId: selectedShotFilter === 'all' ? undefined : selectedShotFilter,
     // Only apply excludePositioned for specific shots (not 'all' or 'no-shot')
     excludePositioned: (selectedShotFilter !== 'all' && selectedShotFilter !== 'no-shot') ? excludePositioned : undefined,
-    starredOnly
+    starredOnly,
+    searchTerm: searchTerm.trim() || undefined
     };
     
     // [SkeletonCountDebug]
@@ -377,11 +378,12 @@ export function useGenerationsPageLogic({
       shotId: computedFilters.shotId === undefined ? 'all' : computedFilters.shotId?.substring(0, 8),
       excludePositioned: computedFilters.excludePositioned,
       mediaType: computedFilters.mediaType,
-      starredOnly: computedFilters.starredOnly
+      starredOnly: computedFilters.starredOnly,
+      searchTerm: computedFilters.searchTerm
     });
     
     return computedFilters;
-  }, [mediaType, toolType, selectedShotFilter, excludePositioned, starredOnly]);
+  }, [mediaType, toolType, selectedShotFilter, excludePositioned, starredOnly, searchTerm]);
 
   const generationsQuery = useGenerations(
     shouldLoadData ? selectedProjectId : null, 

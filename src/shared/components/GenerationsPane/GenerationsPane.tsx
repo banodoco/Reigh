@@ -7,7 +7,7 @@ import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages,
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye, Sparkles, ExternalLink } from 'lucide-react';
+import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye, Sparkles, ExternalLink, Search, X } from 'lucide-react';
 import { ImageGenerationModal } from '@/shared/components/ImageGenerationModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
@@ -75,6 +75,10 @@ const GenerationsPaneComponent: React.FC = () => {
   const [shotFilterOpen, setShotFilterOpen] = useState(false);
   const [mediaTypeFilterOpen, setMediaTypeFilterOpen] = useState(false);
   
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
   // Image generation modal state
   const [isGenerationModalOpen, setIsGenerationModalOpen] = useState(false);
 
@@ -91,9 +95,11 @@ const GenerationsPaneComponent: React.FC = () => {
     error,
     isDeleting,
     starredOnly,
+    searchTerm,
     setSelectedShotFilter,
     setExcludePositioned,
     setStarredOnly,
+    setSearchTerm,
     handleServerPageChange,
     handleDeleteGeneration,
     handleAddToShot,
@@ -425,23 +431,51 @@ const GenerationsPaneComponent: React.FC = () => {
             <div className="flex items-center justify-between min-w-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <h2 className="text-xl font-light text-zinc-200 ml-2 truncate">Generations</h2>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+                  {/* Search input */}
+                  <div className="flex items-center">
+                    {!isSearchOpen ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setIsSearchOpen(true);
+                          // Focus the input after it renders
+                          setTimeout(() => searchInputRef.current?.focus(), 0);
+                        }}
+                        className="h-7 w-7 p-0 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                        aria-label="Search prompts"
+                      >
+                        <Search className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <div className="flex items-center space-x-1 border rounded-md px-2 py-1 h-7 bg-zinc-800 border-zinc-600">
+                        <Search className="h-3.5 w-3.5 text-zinc-400" />
+                        <input
+                          ref={searchInputRef}
+                          type="text"
+                          placeholder="Search..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="bg-transparent border-none outline-none text-xs w-24 sm:w-32 text-white placeholder-zinc-400"
+                        />
                         <Button
                           variant="ghost"
-                          onClick={() => setIsGenerationModalOpen(true)}
-                          className="flex items-center justify-center w-6 h-6 rounded bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white transition-colors p-0"
-                          aria-label="Create new image"
+                          size="sm"
+                          onClick={() => {
+                            if (searchTerm) {
+                              setSearchTerm('');
+                              searchInputRef.current?.focus();
+                            } else {
+                              setIsSearchOpen(false);
+                            }
+                          }}
+                          className="h-auto p-0.5 text-zinc-400 hover:text-white"
                         >
-                          <Sparkles className="!w-3.5 !h-3.5" />
+                          <X className="h-3 w-3" />
                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Create new image</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2 sm:space-x-4 mr-2 flex-shrink-0">
                     {/* Star Filter - Button style matching ImageGalleryFilters */}
@@ -517,7 +551,7 @@ const GenerationsPaneComponent: React.FC = () => {
                     size="sm"
                     whiteText={true}
                     checkboxId="exclude-positioned-generations-pane"
-                    triggerWidth="w-[200px] sm:w-[320px] flex-shrink-0 !text-xs"
+                    triggerWidth="w-[100px] sm:w-[160px] flex-shrink-0 !text-xs"
                     isMobile={isMobile}
                     contentRef={shotFilterContentRef}
                     className="flex flex-col space-y-2"

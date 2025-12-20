@@ -11,7 +11,6 @@
 
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { Input } from '@/shared/components/ui/input';
 import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 import { Search, ArrowDown, X } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
@@ -144,35 +143,56 @@ export const VideoTravelListHeader: React.FC<VideoTravelListHeaderProps> = ({
 
         {/* Desktop: Search - Shots view */}
         {!isMobile && !showVideosView && (
-          <div className="relative w-28 sm:w-52">
-            <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-              <Search className="h-3.5 w-3.5" />
-            </div>
-            <Input
+          <div className="flex items-center space-x-2 border rounded-md px-3 py-1 h-8 bg-background">
+            <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <input
               ref={searchInputRef}
+              type="text"
               placeholder="Search..."
               value={shotSearchQuery}
               onChange={(e) => setShotSearchQuery(e.target.value)}
-              className="h-8 text-xs pl-8"
+              className="bg-transparent border-none outline-none text-sm w-24 sm:w-40"
             />
+            {shotSearchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShotSearchQuery('')}
+                className="h-auto p-0.5 text-muted-foreground hover:text-foreground flex-shrink-0"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         )}
 
         {/* Desktop: Search - Videos view */}
         {!isMobile && showVideosView && (
-          <div className="relative w-28 sm:w-52">
-            <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-              <Search className="h-3.5 w-3.5" />
-            </div>
-            <Input
+          <div className="flex items-center space-x-2 border rounded-md px-3 py-1 h-8 bg-background">
+            <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <input
+              type="text"
               placeholder="Search..."
               value={videoSearchTerm}
               onChange={(e) => {
                 setVideoSearchTerm(e.target.value);
                 setVideoPageSearch(1);
               }}
-              className="h-8 text-xs pl-8"
+              className="bg-transparent border-none outline-none text-sm w-24 sm:w-40"
             />
+            {videoSearchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setVideoSearchTerm('');
+                  setVideoPageSearch(1);
+                }}
+                className="h-auto p-0.5 text-muted-foreground hover:text-foreground flex-shrink-0"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         )}
 
