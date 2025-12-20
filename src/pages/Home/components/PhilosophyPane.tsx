@@ -1,7 +1,5 @@
 import React, { useRef } from 'react';
-import { X } from 'lucide-react';
-import { useScrollFade } from '@/shared/hooks/useScrollFade';
-import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { GlassSidePane } from './GlassSidePane';
 
 interface ExampleStyle {
   prompt: string;
@@ -23,211 +21,170 @@ interface PhilosophyPaneProps {
 export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   isOpen,
   onClose,
-  isClosing,
   isOpening,
   currentExample,
   navigate,
   selectedExampleStyle,
 }) => {
-  const isMobile = useIsMobile();
-  const philosophyContentRef = React.useRef<HTMLDivElement | null>(null);
   const philosophyVideoRef = useRef<HTMLVideoElement | null>(null);
 
-  const philosophyScrollFade = useScrollFade({ 
-    isOpen,
-    debug: false,
-    preloadFade: isMobile
-  });
-
-  // Attach the ref from useScrollFade and our local ref
-  const setRefs = (element: HTMLDivElement | null) => {
-    philosophyContentRef.current = element;
-    if (philosophyScrollFade.scrollRef) {
-      // @ts-ignore
-      philosophyScrollFade.scrollRef.current = element;
-    }
-  };
-
   return (
-    <div className={`fixed top-0 right-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-card dark:bg-gray-900 shadow-2xl z-[60] transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
-      isOpen ? 'translate-x-0' : 'translate-x-full'
-    }`}>
-      <div ref={setRefs} className="px-4 sm:px-8 pt-2 sm:pt-4 pb-4 sm:pb-8 flex-1 overflow-y-auto overflow-x-visible min-h-0">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 sm:top-4 sm:right-4 p-2 sm:p-2 rounded-full bg-secondary/80 hover:bg-secondary transition-colors duration-200 z-10"
-        >
-          <X className="w-5 h-5 sm:w-4 sm:h-4 text-secondary-foreground" />
-        </button>
+    <GlassSidePane isOpen={isOpen} onClose={onClose} side="right" zIndex={60}>
+      <div className="mt-8 sm:mt-10 mb-6 relative z-10">
+        <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary leading-tight mb-5">reigh is a tool made just for travelling between images</h2>
+        <div className="w-20 h-1.5 bg-gradient-to-r from-wes-vintage-gold to-wes-vintage-gold/50 rounded-full animate-pulse-breathe opacity-90"></div>
+      </div>
 
-        <div className="mb-8 relative z-10">
-          <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary leading-tight mb-5">reigh is a tool made just for travelling between images</h2>
-          <div className="w-20 h-1.5 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full animate-pulse-breathe opacity-90"></div>
-        </div>
-
-        <div className="space-y-3 pb-4 text-left text-muted-foreground">
-          <p className="text-sm leading-relaxed">
-            There are many tools that aim to be a 'one-stop-shop' for creating with AI - a kind of 'Amazon for art'. 
-          </p>
-          <p className="text-sm leading-relaxed">
-          Reigh is not one of them.
-          </p>
-          <p className="text-sm leading-relaxed">
-          It's a tool <em>just</em> for travelling between images:
-          </p>
-          
-          <div className="space-y-2 mt-4 mb-4">
-            <div className="flex gap-4 items-start">
-              {/* Left side: Two stacked square images */}
-              <div className="flex flex-col gap-2">
-                <div className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
-                  <img 
-                    src={currentExample.image1} 
-                    alt="Input image 1"
-                    className="w-full h-full object-cover border rounded-lg"
-                  />
-                </div>
-                <div className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
-                  <img 
-                    src={currentExample.image2} 
-                    alt="Input image 2"
-                    className="w-full h-full object-cover border rounded-lg"
-                  />
-                </div>
+      <div className="space-y-3 pb-4 text-left text-foreground/70">
+        <p className="text-sm leading-relaxed">
+          There are many tools that aim to be a 'one-stop-shop' for creating with AI - a kind of 'Amazon for art'. 
+        </p>
+        <p className="text-sm leading-relaxed">
+        Reigh is not one of them.
+        </p>
+        <p className="text-sm leading-relaxed">
+        It's a tool <em>just</em> for travelling between images:
+        </p>
+        
+        <div className="space-y-2 mt-4 mb-4">
+          <div className="flex gap-4 items-start">
+            {/* Left side: Two stacked square images */}
+            <div className="flex flex-col gap-2">
+              <div className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
+                <img 
+                  src={currentExample.image1} 
+                  alt="Input image 1"
+                  className="w-full h-full object-cover border rounded-lg"
+                />
               </div>
-              {/* Right side: Output video */}
-              <div className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
-                <video 
-                  key={selectedExampleStyle}
-                  ref={(video) => {
-                    philosophyVideoRef.current = video;
-                    if (video && isOpen) {
-                      const playButton = video.nextElementSibling as HTMLElement | null;
-                      if (playButton) {
-                        playButton.style.display = 'none';
-                        playButton.style.opacity = '0';
-                      }
-                    }
-                  }}
-                  src={currentExample.video}
-                  poster={currentExample.image1}
-                  muted
-                  playsInline
-                  preload="auto"
-                  crossOrigin="anonymous"
-                  disableRemotePlayback
-                  onCanPlay={(e) => {
-                    const v = e.currentTarget as HTMLVideoElement;
-                    if (v.paused && isOpen && !isOpening) v.play().catch((err) => console.log('[VideoLoadSpeedIssue] play() failed on canplay', err));
-                  }}
-                  onPlay={(e) => {
-                    const video = e.target as HTMLVideoElement;
+              <div className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
+                <img 
+                  src={currentExample.image2} 
+                  alt="Input image 2"
+                  className="w-full h-full object-cover border rounded-lg"
+                />
+              </div>
+            </div>
+            {/* Right side: Output video */}
+            <div className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
+              <video 
+                key={selectedExampleStyle}
+                ref={(video) => {
+                  philosophyVideoRef.current = video;
+                  if (video && isOpen) {
                     const playButton = video.nextElementSibling as HTMLElement | null;
                     if (playButton) {
                       playButton.style.display = 'none';
                       playButton.style.opacity = '0';
                     }
-                    video.style.opacity = '1';
-                  }}
-                  onLoadStart={(e) => {
-                    const video = e.target as HTMLVideoElement;
-                    video.style.opacity = '1';
-                  }}
-                  onEnded={(e) => {
-                    const playButton = (e.target as HTMLElement).nextElementSibling as HTMLElement | null;
-                    if (playButton) {
-                      playButton.style.display = 'flex';
-                      playButton.style.backdropFilter = 'blur(0px)';
-                      playButton.style.opacity = '1';
-                      
-                      let blurAmount = 0;
-                      const blurInterval = setInterval(() => {
-                        blurAmount += 0.1;
-                        playButton.style.backdropFilter = `blur(${blurAmount}px)`;
-                        if (blurAmount >= 2) {
-                          clearInterval(blurInterval);
-                        }
-                      }, 50);
-                    }
-                  }}
-                  className="w-full h-full object-cover border rounded-lg transition-opacity duration-75"
-                />
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const video = e.currentTarget.previousElementSibling as HTMLVideoElement | null;
-                    if (video) {
-                      video.currentTime = 0;
-                      video.play();
-                      e.currentTarget.style.opacity = '0';
-                      setTimeout(() => {
-                        e.currentTarget.style.display = 'none';
-                      }, 300);
-                    }
-                  }}
-                  className="absolute inset-0 bg-black/40 rounded-lg items-center justify-center text-white hover:bg-black/50 transition-all duration-500 opacity-0"
-                  style={{ display: 'none' }}
-                >
-                  <svg className="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3 mt-4 mb-4">
-            <p className="text-sm leading-relaxed">
-              Just as a songwriter might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images - especially with the ability <strong>generate precise images based on references.</strong>
-            </p>
-          </div>
-
-          <div className="space-y-3 mb-8">
-            <div className="space-y-3">
-              <p className="text-sm leading-relaxed mt-6">
-                Reigh is a tool <strong>just</strong> for exploring this artform. By creating with it and endlessly refining every element, I want to make it extremely good, and build a community of people who want to explore it with me.
-              </p>
-              <p className="text-sm leading-relaxed">
-                If you're interested in joining, you're very welcome! If we're successful, I hope that we can inspire a whole ecosystem of similar tools and communities focusing on discovering and creating their own artforms.
-              </p>
-              <p className="font-serif text-lg italic transform -rotate-1">POM</p>
-            </div>
-
-            <div className="w-12 h-px bg-muted/30"></div>
-
-            <div className="flex items-center space-x-2">
+                  }
+                }}
+                src={currentExample.video}
+                poster={currentExample.image1}
+                muted
+                playsInline
+                preload="auto"
+                crossOrigin="anonymous"
+                disableRemotePlayback
+                onCanPlay={(e) => {
+                  const v = e.currentTarget as HTMLVideoElement;
+                  if (v.paused && isOpen && !isOpening) v.play().catch((err) => console.log('[VideoLoadSpeedIssue] play() failed on canplay', err));
+                }}
+                onPlay={(e) => {
+                  const video = e.target as HTMLVideoElement;
+                  const playButton = video.nextElementSibling as HTMLElement | null;
+                  if (playButton) {
+                    playButton.style.display = 'none';
+                    playButton.style.opacity = '0';
+                  }
+                  video.style.opacity = '1';
+                }}
+                onLoadStart={(e) => {
+                  const video = e.target as HTMLVideoElement;
+                  video.style.opacity = '1';
+                }}
+                onEnded={(e) => {
+                  const playButton = (e.target as HTMLElement).nextElementSibling as HTMLElement | null;
+                  if (playButton) {
+                    playButton.style.display = 'flex';
+                    playButton.style.backdropFilter = 'blur(0px)';
+                    playButton.style.opacity = '1';
+                    
+                    let blurAmount = 0;
+                    const blurInterval = setInterval(() => {
+                      blurAmount += 0.1;
+                      playButton.style.backdropFilter = `blur(${blurAmount}px)`;
+                      if (blurAmount >= 2) {
+                        clearInterval(blurInterval);
+                      }
+                    }, 50);
+                  }
+                }}
+                className="w-full h-full object-cover border rounded-lg transition-opacity duration-75"
+              />
               <button
-                onClick={() => navigate('/tools')}
-                className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const video = e.currentTarget.previousElementSibling as HTMLVideoElement | null;
+                  if (video) {
+                    video.currentTime = 0;
+                    video.play();
+                    e.currentTarget.style.opacity = '0';
+                    setTimeout(() => {
+                      e.currentTarget.style.display = 'none';
+                    }, 300);
+                  }
+                }}
+                className="absolute inset-0 bg-black/40 rounded-lg items-center justify-center text-white hover:bg-black/50 transition-all duration-500 opacity-0"
+                style={{ display: 'none' }}
               >
-                Try the tool
+                <svg className="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
               </button>
-              <span className="text-muted-foreground/50">|</span>
-              <a
-                href="https://discord.gg/D5K2c6kfhy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
-              >
-                Join the community
-              </a>
             </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 mt-4 mb-4">
+          <p className="text-sm leading-relaxed">
+            Just as a songwriter might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images - especially with the ability <strong>generate precise images based on references.</strong>
+          </p>
+        </div>
+
+        <div className="space-y-3 mb-8">
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed mt-6">
+              Reigh is a tool <strong>just</strong> for exploring this artform. By creating with it and endlessly refining every element, I want to make it extremely good, and build a community of people who want to explore it with me.
+            </p>
+            <p className="text-sm leading-relaxed">
+              If you're interested in joining, you're very welcome! If we're successful, I hope that we can inspire a whole ecosystem of similar tools and communities focusing on discovering and creating their own artforms.
+            </p>
+            <p className="font-serif text-lg italic transform -rotate-1">POM</p>
+          </div>
+
+          <div className="w-12 h-px bg-muted/30"></div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => navigate('/tools')}
+              className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+            >
+              Try the tool
+            </button>
+            <span className="text-muted-foreground/50">|</span>
+            <a
+              href="https://discord.gg/D5K2c6kfhy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+            >
+              Join the community
+            </a>
           </div>
         </div>
       </div>
-      
-      {philosophyScrollFade.showFade && (
-        <div 
-          className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none z-10"
-        >
-          <div className="h-full bg-gradient-to-t from-background via-background/95 to-transparent" />
-        </div>
-      )}
-    </div>
+    </GlassSidePane>
   );
 };
-
-
-

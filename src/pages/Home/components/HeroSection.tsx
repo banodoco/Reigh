@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Github, MessageCircle, Plus, ChevronLeft, ChevronRight, Download, ExternalLink } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { usePlatformInstall } from '@/shared/hooks/usePlatformInstall';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { InstallInstructionsModal } from './InstallInstructionsModal';
 import type { Session } from '@supabase/supabase-js';
 
@@ -21,6 +22,7 @@ interface HeroSectionProps {
   handleOpenToolActivate: () => void;
   handleEmergingActivate: () => void;
   currentExample: ExampleStyle;
+  isPaneOpen?: boolean;
 }
 
 type AnimationPhase = 'initial' | 'loading' | 'bar-complete' | 'content-revealing' | 'complete';
@@ -104,6 +106,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   handleOpenToolActivate,
   handleEmergingActivate,
   currentExample,
+  isPaneOpen = false,
 }) => {
   const [phase, setPhase] = useState<AnimationPhase>('initial');
   const [banodocoState, setBanodocoState] = useState<'hidden' | 'animating' | 'visible'>('hidden');
@@ -115,6 +118,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   
   // Platform-aware PWA install detection
   const platformInstall = usePlatformInstall();
+  const isMobile = useIsMobile();
+  
+  // Hide hero content on mobile when pane is open
+  const hideHeroContent = isMobile && isPaneOpen;
 
   // Close install modal if we're in standalone mode (PWA)
   // This handles the case where Chrome transfers page state when clicking "Open in app"
@@ -208,7 +215,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   return (
     <div className="container mx-auto px-4 relative flex items-center justify-center min-h-[100svh] md:min-h-[100dvh] py-4 md:py-16">
       <div className="text-center w-full -translate-y-6">
-        <div className="max-w-4xl mx-auto">
+        <div 
+          className={`max-w-4xl mx-auto transition-opacity duration-300 ${hideHeroContent ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+          aria-hidden={hideHeroContent}
+        >
           
           {/* Top Section: Icon + Title */}
           {/* Use grid-template-rows for height animation from 0 to auto */}
@@ -484,20 +494,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </div>
               )}
             </div>
-            
-            {/* Install Instructions Modal */}
-            <InstallInstructionsModal
-              open={showInstallModal}
-              onOpenChange={setShowInstallModal}
-              installMethod={platformInstall.installMethod}
-              platform={platformInstall.platform}
-              browser={platformInstall.browser}
-              deviceType={platformInstall.deviceType}
-              instructions={platformInstall.installInstructions}
-              isAppInstalled={platformInstall.isAppInstalled}
-              isSignedIn={!!session}
-              onFallbackToDiscord={session ? () => navigate('/tools') : handleDiscordSignIn}
-            />
             </div>
           </div>
 
@@ -566,6 +562,20 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           </div>
 
         </div>
+        
+        {/* Install Instructions Modal - outside hidden wrapper so it stays visible */}
+        <InstallInstructionsModal
+          open={showInstallModal}
+          onOpenChange={setShowInstallModal}
+          installMethod={platformInstall.installMethod}
+          platform={platformInstall.platform}
+          browser={platformInstall.browser}
+          deviceType={platformInstall.deviceType}
+          instructions={platformInstall.installInstructions}
+          isAppInstalled={platformInstall.isAppInstalled}
+          isSignedIn={!!session}
+          onFallbackToDiscord={session ? () => navigate('/tools') : handleDiscordSignIn}
+        />
       </div>
     </div>
   );

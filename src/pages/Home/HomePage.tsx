@@ -494,7 +494,7 @@ export default function HomePage() {
       
       <ConstellationCanvas />
 
-      <HeroSection 
+<HeroSection
         barTransitionCompleted={barTransitionCompleted}
         session={session}
         handleDiscordSignIn={handleDiscordSignIn}
@@ -503,6 +503,7 @@ export default function HomePage() {
         handleOpenToolActivate={wrappedHandleOpenToolActivate}
         handleEmergingActivate={wrappedHandleEmergingActivate}
         currentExample={currentExample}
+        isPaneOpen={paneState.showCreativePartner || paneState.showPhilosophy || paneState.showExamples}
       />
 
       {/* Overlay for Panes */}
