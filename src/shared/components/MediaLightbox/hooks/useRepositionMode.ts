@@ -469,7 +469,6 @@ export const useRepositionMode = ({
 
       // Get the actual generation ID
       const actualGenerationId = (media as any).generation_id || media.id;
-      console.log('[VariantFlow] 0️⃣ SAVE STARTING - mediaId:', media.id?.substring(0, 8), 'actualGenerationId:', actualGenerationId?.substring(0, 8), 'createAsGeneration:', createAsGeneration);
       
       if (createAsGeneration) {
         // Create a new generation with based_on pointing to the source
@@ -500,7 +499,6 @@ export const useRepositionMode = ({
         console.log('[Reposition] ✅ Saved as new generation:', insertedGeneration?.id);
       } else {
         // Create a new variant and set it as primary (original behavior)
-        console.log('[VariantFlow] 1️⃣ VARIANT CREATING - generationId:', actualGenerationId.substring(0, 8));
         const { data: insertedVariant, error: insertError } = await supabase
           .from('generation_variants')
           .insert({
@@ -524,7 +522,7 @@ export const useRepositionMode = ({
           throw insertError;
         }
         
-        console.log('[VariantFlow] 1️⃣ VARIANT CREATED - variantId:', insertedVariant?.id?.substring(0, 8), 'generationId:', actualGenerationId.substring(0, 8), 'newLocation:', transformedUrl.substring(0, 50));
+        console.log('[Reposition] ✅ Saved as variant:', insertedVariant?.id);
         
         // Switch to the newly created variant (only for variant mode)
         if (insertedVariant?.id && onVariantCreated) {
@@ -533,7 +531,6 @@ export const useRepositionMode = ({
       }
       
       // Invalidate unified-generations cache so results galleries refresh
-      console.log('[VariantFlow] 2️⃣ DIRECT INVALIDATION starting...');
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       
       // Also invalidate shot-generations so Timeline/ShotImagesEditor update
@@ -541,39 +538,21 @@ export const useRepositionMode = ({
       const effectiveShotId = shotId || (media as any).shot_id || 
         ((media as any).all_shot_associations?.[0]?.shot_id);
       
-      console.log('[VariantFlow] 2️⃣ effectiveShotId:', effectiveShotId?.substring(0, 8) || 'none');
-      
       // Small delay to ensure DB trigger (AFTER INSERT) completes before refetch
       // The trigger updates generations.location from the new primary variant
       await new Promise(resolve => setTimeout(resolve, 100));
-      console.log('[VariantFlow] 2️⃣ Waited 100ms for DB trigger to complete');
-      
-      // DEBUG: Check if the generation's location actually changed
-      const { data: checkGen } = await supabase
-        .from('generations')
-        .select('id, location, primary_variant_id')
-        .eq('id', actualGenerationId)
-        .single();
-      console.log('[VariantFlow] 2️⃣ DB CHECK - generation after trigger:', {
-        genId: checkGen?.id?.substring(0, 8),
-        locationFirst50: checkGen?.location?.substring(0, 50),
-        primaryVariantId: checkGen?.primary_variant_id?.substring(0, 8),
-      });
       
       if (effectiveShotId) {
-        console.log('[VariantFlow] 2️⃣ Refetching all-shot-generations for shotId:', effectiveShotId.substring(0, 8));
         await queryClient.refetchQueries({ queryKey: ['all-shot-generations', effectiveShotId] });
       }
       
       // Also invalidate ALL shot-generations caches since we don't know which shots have this image
-      console.log('[VariantFlow] 2️⃣ Invalidating ALL shot-generations caches');
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey;
           return key[0] === 'all-shot-generations' || key[0] === 'shot-generations';
         }
       });
-      console.log('[VariantFlow] 2️⃣ DIRECT INVALIDATION complete');
       
       // Refetch variants to update the list
       if (refetchVariants) {

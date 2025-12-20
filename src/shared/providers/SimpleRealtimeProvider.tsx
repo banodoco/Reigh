@@ -382,7 +382,11 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     // NEW: Handle batched variant changes (primary variant switches, new variants, etc.)
     const handleVariantChangeBatch = (event: CustomEvent) => {
       const { count, payloads, affectedGenerationIds } = event.detail;
-      console.log('[VariantFlow] 5️⃣ PROVIDER RECEIVED EVENT - count:', count, 'affectedGenerations:', affectedGenerationIds?.length || 0, 'ids:', affectedGenerationIds?.map((id: string) => id.substring(0, 8)));
+      console.log('[SimpleRealtimeProvider] 📨 Variant change batch received:', {
+        count,
+        affectedGenerations: affectedGenerationIds?.length || 0,
+        timestamp: Date.now()
+      });
 
       // Invalidate generation-variants queries for affected generations
       affectedGenerationIds?.forEach((generationId: string) => {
@@ -395,8 +399,6 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       queryClient.invalidateQueries({ queryKey: ['generations'] });
       invalidateAllShotGenerations(queryClient, 'variant-change-batch');
-      
-      console.log('[VariantFlow] 5️⃣ PROVIDER INVALIDATION complete');
     };
 
     // Listen for BATCHED events (new, efficient)

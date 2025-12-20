@@ -302,7 +302,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
             <Button
               variant="secondary"
               size="icon"
-              className="absolute bottom-1 left-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              className="absolute bottom-1 left-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -321,15 +321,26 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
               }}
               title="Edit image"
             >
-              <Pencil className="h-3.5 w-3.5" />
+              <Pencil className="h-3 w-3" />
             </Button>
           )}
           
           {onDuplicate && timeline_frame !== undefined && (
-            <Button
+            <>
+          {/* Variant Count - top left */}
+          {(image as any).derivedCount && (image as any).derivedCount > 1 && (
+            <div 
+              className="absolute top-1 left-1 h-6 w-6 rounded-full bg-black/60 text-white text-[9px] font-medium flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none"
+              title={`${(image as any).derivedCount} variants`}
+            >
+              {(image as any).derivedCount}
+            </div>
+          )}
+              
+              <Button
               variant="secondary"
               size="icon"
-              className="absolute top-1 right-9 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              className="absolute top-1 right-[2rem] h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
               onClick={handleDuplicateClick}
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -345,18 +356,19 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
               title={image.id?.startsWith('temp-') ? "Please wait..." : "Duplicate image"}
             >
               {duplicatingImageId === image.id ? (
-                <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
+                <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
               ) : duplicateSuccessImageId === image.id ? (
-                <Check className="h-3.5 w-3.5" />
+                <Check className="h-3 w-3" />
               ) : (
-                <Copy className="h-3.5 w-3.5" />
+                <Copy className="h-3 w-3" />
               )}
             </Button>
+            </>
           )}
           <Button
             variant="destructive"
             size="icon"
-            className="absolute top-1 right-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
             onClick={handleDeleteClick}
             onMouseDown={(e) => {
               e.preventDefault();
@@ -371,7 +383,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
             disabled={image.id?.startsWith('temp-')}
             title={image.id?.startsWith('temp-') ? "Please wait..." : "Remove from timeline"}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3 w-3" />
           </Button>
         </>
       )}

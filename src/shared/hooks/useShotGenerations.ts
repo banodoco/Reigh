@@ -179,9 +179,9 @@ export const useAllShotGenerations = (
     // the previous shot's images would briefly appear as "placeholder" data
     queryFn: async ({ signal }) => {
       const startTime = Date.now();
-      console.log('[DataTrace] 🔍 NETWORK FETCH START - all-shot-generations:', { 
-        shotId: stableShotId?.substring(0, 8), 
-        timestamp: startTime 
+      console.log('[DataTrace] 🔍 NETWORK FETCH START - all-shot-generations:', {
+        shotId: stableShotId?.substring(0, 8),
+        timestamp: startTime
       });
 
       // Query shot_generations with embedded generations data
@@ -227,9 +227,20 @@ export const useAllShotGenerations = (
       });
 
       // Transform to standardized GenerationRow format using shared mapper
-      const result: GenerationRow[] = (response.data || [])
+      const baseResult: GenerationRow[] = (response.data || [])
         .map(mapShotGenerationToRow)
         .filter(Boolean) as GenerationRow[];
+
+      // Calculate derivedCount for each generation
+      const generationIds = baseResult.map(r => r.generation_id).filter(Boolean) as string[];
+      const { calculateDerivedCounts } = await import('@/shared/lib/generationTransformers');
+      const derivedCounts = await calculateDerivedCounts(generationIds);
+      
+      // Add derivedCount to each item
+      const result: GenerationRow[] = baseResult.map(item => ({
+        ...item,
+        derivedCount: derivedCounts[item.generation_id || ''] || 0,
+      }));
 
       const duration = Date.now() - startTime;
       

@@ -472,14 +472,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // Use preloaded images if provided, otherwise use database images
   const shotGenerations = preloadedImages || dbShotGenerations;
   
-  // DEBUG: Log preloadedImages to see if they're updating
-  console.log('[VariantFlow] 📥 ShotImagesEditor - preloadedImages check:', {
-    count: preloadedImages?.length,
-    firstId: preloadedImages?.[0]?.id?.substring(0, 8),
-    firstGenId: (preloadedImages?.[0] as any)?.generation_id?.substring(0, 8),
-    firstUrlFile: preloadedImages?.[0]?.imageUrl?.split('/').pop()?.substring(0, 40),
-  });
-  
   // Log data source for debugging
   console.log('[UnifiedDataFlow] ShotImagesEditor data source:', {
     selectedShotId: selectedShotId.substring(0, 8),
@@ -1450,100 +1442,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   );
 };
 
-// [PERFORMANCE] Custom comparison function for React.memo
-// This is critical because parent (ShotEditor) re-renders frequently due to settings queries
-// Default shallow comparison fails because arrays get new references on each render
-const arePropsEqual = (prevProps: ShotImagesEditorProps, nextProps: ShotImagesEditorProps): boolean => {
-  // Compare primitive props
-  if (
-    prevProps.isModeReady !== nextProps.isModeReady ||
-    prevProps.settingsError !== nextProps.settingsError ||
-    prevProps.isMobile !== nextProps.isMobile ||
-    prevProps.generationMode !== nextProps.generationMode ||
-    prevProps.selectedShotId !== nextProps.selectedShotId ||
-    prevProps.projectId !== nextProps.projectId ||
-    prevProps.shotName !== nextProps.shotName ||
-    prevProps.batchVideoFrames !== nextProps.batchVideoFrames ||
-    prevProps.readOnly !== nextProps.readOnly ||
-    prevProps.columns !== nextProps.columns ||
-    prevProps.unpositionedGenerationsCount !== nextProps.unpositionedGenerationsCount ||
-    prevProps.fileInputKey !== nextProps.fileInputKey ||
-    prevProps.isUploadingImage !== nextProps.isUploadingImage ||
-    prevProps.uploadProgress !== nextProps.uploadProgress ||
-    prevProps.duplicatingImageId !== nextProps.duplicatingImageId ||
-    prevProps.duplicateSuccessImageId !== nextProps.duplicateSuccessImageId ||
-    prevProps.projectAspectRatio !== nextProps.projectAspectRatio ||
-    prevProps.defaultPrompt !== nextProps.defaultPrompt ||
-    prevProps.defaultNegativePrompt !== nextProps.defaultNegativePrompt ||
-    prevProps.structureVideoPath !== nextProps.structureVideoPath ||
-    prevProps.structureVideoTreatment !== nextProps.structureVideoTreatment ||
-    prevProps.structureVideoMotionStrength !== nextProps.structureVideoMotionStrength ||
-    prevProps.structureVideoType !== nextProps.structureVideoType
-  ) {
-    return false;
-  }
+// NOTE: Removed custom arePropsEqual comparison (was ~90 lines of manual prop checking).
+// The custom comparison was error-prone (missed imageUrl, causing variant updates to not render).
+// Default shallow comparison is safer - any new preloadedImages reference triggers re-render.
+// If perf becomes an issue, consider useMemo in parent to stabilize array references.
 
-  // Compare structureVideoMetadata by key properties (object reference changes frequently)
-  const prevMeta = prevProps.structureVideoMetadata;
-  const nextMeta = nextProps.structureVideoMetadata;
-  if (prevMeta !== nextMeta) {
-    if (!prevMeta || !nextMeta) return false;
-    if (
-      prevMeta.duration_seconds !== nextMeta.duration_seconds ||
-      prevMeta.frame_rate !== nextMeta.frame_rate ||
-      prevMeta.total_frames !== nextMeta.total_frames ||
-      prevMeta.width !== nextMeta.width ||
-      prevMeta.height !== nextMeta.height ||
-      prevMeta.file_size !== nextMeta.file_size
-    ) {
-      return false;
-    }
-  }
-
-  // Compare images by content that affects rendering (order + timeline_frame + imageUrl).
-  // NOTE: This is intentionally O(n) to avoid incorrect "skips" on reorder.
-  // IMPORTANT: Must compare imageUrl to detect variant changes!
-  const prevImages = prevProps.preloadedImages || [];
-  const nextImages = nextProps.preloadedImages || [];
-  if (prevImages.length !== nextImages.length) return false;
-  for (let i = 0; i < prevImages.length; i++) {
-    const prevImg: any = prevImages[i];
-    const nextImg: any = nextImages[i];
-    if (!prevImg || !nextImg) return false;
-    if (prevImg.id !== nextImg.id) return false;
-    if ((prevImg.timeline_frame ?? null) !== (nextImg.timeline_frame ?? null)) return false;
-    // CRITICAL: Compare imageUrl to detect variant/location changes
-    if (prevImg.imageUrl !== nextImg.imageUrl) return false;
-  }
-
-  // Compare allShots by stable identity + display-relevant properties (id + name).
-  const prevShots: any[] = prevProps.allShots || [];
-  const nextShots: any[] = nextProps.allShots || [];
-  if (prevShots.length !== nextShots.length) return false;
-  for (let i = 0; i < prevShots.length; i++) {
-    const prevShot = prevShots[i];
-    const nextShot = nextShots[i];
-    if (!prevShot || !nextShot) return false;
-    if (prevShot.id !== nextShot.id) return false;
-    if ((prevShot.name ?? '') !== (nextShot.name ?? '')) return false;
-  }
-
-  // Compare pendingPositions map by entries (size alone is not sufficient).
-  const prevPending = prevProps.pendingPositions;
-  const nextPending = nextProps.pendingPositions;
-  if ((prevPending?.size || 0) !== (nextPending?.size || 0)) return false;
-  if (prevPending && nextPending) {
-    for (const [key, value] of prevPending.entries()) {
-      if (nextPending.get(key) !== value) return false;
-    }
-  }
-
-  // SKIP these props intentionally:
-  // - skeleton: inline JSX that changes reference every render (visual only)
-  // - callbacks: stable via refs in parent
-  // - onFramePositionsChange: callback
-
-  return true;
-};
-
-export default React.memo(ShotImagesEditor, arePropsEqual);
+export default React.memo(ShotImagesEditor);
