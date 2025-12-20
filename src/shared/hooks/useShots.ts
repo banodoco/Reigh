@@ -1900,8 +1900,15 @@ export const useCreateShotWithImage = () => {
       console.log('[CreateShotWithImage] Invalidating queries for project:', variables.projectId);
       
       // Invalidate and refetch relevant queries
-      queryClient.invalidateQueries({ queryKey: ['shots', variables.projectId] });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', variables.projectId] });
+      // IMPORTANT (performance):
+      // `useListShots(projectId, { maxImagesPerShot: 0 })` is extremely expensive for large projects
+      // because it fetches images for every shot in batches.
+      //
+      // The unified `useShotCreation` hook now patches the shots cache optimistically for new shots,
+      // so we avoid immediately refetching active shots/generations queries here.
+      // We still mark them stale (inactive-only refetch) so they can refresh later if needed.
+      queryClient.invalidateQueries({ queryKey: ['shots', variables.projectId], refetchType: 'inactive' });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', variables.projectId], refetchType: 'inactive' });
 
       if (data.shotId) {
         // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates

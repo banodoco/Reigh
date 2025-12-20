@@ -11,17 +11,17 @@ const SelectGroup = SelectPrimitive.Group
 const SelectValue = SelectPrimitive.Value
 
 const selectTriggerVariants = cva(
-  "flex w-full items-center justify-between rounded-md px-3 py-2 text-base lg:text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+  "flex w-full items-center justify-between rounded-md px-3 py-2 text-base lg:text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 relative",
   {
     variants: {
       variant: {
-        default: "border border-input bg-background focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        default: "border border-input bg-background focus:ring-2 focus:ring-ring focus:ring-offset-2 [&>span]:line-clamp-1",
         // Retro style matching buttons - uses theme bg-background to match outline buttons
         // Light mode: subtle shadow increase + bg tint on hover for gentle "active" feel
         // Dark mode: keeps existing press-down interaction pattern
-        retro: "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-background hover:bg-[#6a8a8a]/10 rounded-sm border-2 border-[#6a8a8a]/30 hover:border-[#6a8a8a]/45 dark:border-[#6a7a7a] dark:hover:bg-transparent text-[#5a7a7a] dark:text-[#c8c4bb] font-heading font-light tracking-wide transition-all duration-200 shadow-[0_1px_2px_0_rgba(106,138,138,0.06)] hover:shadow-[0_2px_4px_-1px_rgba(106,138,138,0.1)] dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] dark:hover:translate-x-[-0.5px] dark:hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
+        retro: "justify-start [&>span]:w-full [&>span]:text-left [&>span]:truncate bg-background hover:bg-[#6a8a8a]/10 rounded-sm border-2 border-[#6a8a8a]/30 hover:border-[#6a8a8a]/45 dark:border-[#6a7a7a] dark:hover:bg-transparent text-[#5a7a7a] dark:text-[#c8c4bb] font-heading font-light tracking-wide transition-all duration-200 shadow-[0_1px_2px_0_rgba(106,138,138,0.06)] hover:shadow-[0_2px_4px_-1px_rgba(106,138,138,0.1)] dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)] dark:hover:translate-x-[-0.5px] dark:hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
         // Retro dark - for always-dark contexts (panes, galleries)
-        "retro-dark": "!justify-start gap-1 [&>span]:flex-1 [&>span]:text-left [&>span]:truncate bg-[#3a4a4a] hover:bg-[#4a5a5a] rounded-sm border-2 border-[#6a7a7a] text-[#d8d4cb] font-heading font-light tracking-wide transition-all duration-200 shadow-[-2px_2px_0_0_rgba(20,30,30,0.3)] hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.3)] hover:translate-x-[-0.5px] hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a7a7a]/30 focus:ring-offset-0",
+        "retro-dark": "justify-start [&>span]:w-full [&>span]:min-w-0 [&>span]:text-left [&>span]:truncate !text-xs bg-[#3a4a4a] hover:bg-[#4a5a5a] rounded-sm border-2 border-[#6a7a7a] text-[#d8d4cb] font-heading font-light tracking-wide transition-all duration-200 shadow-[-2px_2px_0_0_rgba(20,30,30,0.3)] hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.3)] hover:translate-x-[-0.5px] hover:translate-y-[0.5px] focus:ring-2 focus:ring-[#6a7a7a]/30 focus:ring-offset-0",
       },
       size: {
         default: "h-10",
@@ -65,9 +65,13 @@ const SelectTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    {!hideIcon && (
+    {!hideIcon && !(variant === "retro" || variant === "retro-dark") && (
       <SelectPrimitive.Icon asChild>
-        <ChevronDown className={cn("h-4 w-4", (variant === "retro" || variant === "retro-dark") ? "opacity-70" : "opacity-50")} />
+        <ChevronDown 
+          className={cn(
+            "h-4 w-4 opacity-50"
+          )} 
+        />
       </SelectPrimitive.Icon>
     )}
   </SelectPrimitive.Trigger>

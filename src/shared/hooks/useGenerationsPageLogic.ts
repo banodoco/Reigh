@@ -634,6 +634,12 @@ export function useGenerationsPageLogic({
       timestamp: Date.now()
     });
     
+    // Dispatch event to trigger skeleton animation in ShotListDisplay
+    // Do this BEFORE the mutation so the skeleton appears immediately
+    window.dispatchEvent(new CustomEvent('shot-pending-upload', {
+      detail: { shotId: targetShotId, expectedCount: 1 }
+    }));
+    
     try {
       if (shouldPositionExisting) {
         console.log('[AddDebug] Using positionExistingGenerationMutation with params:', {

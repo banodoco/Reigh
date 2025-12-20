@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { toast } from "sonner";
-import { useUpdateShotImageOrder, useCreateShot, useAddImageToShotWithoutPosition } from "@/shared/hooks/useShots";
+import { useUpdateShotImageOrder, useAddImageToShotWithoutPosition } from "@/shared/hooks/useShots";
+import { useShotCreation } from "@/shared/hooks/useShotCreation";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useDeviceDetection } from "@/shared/hooks/useDeviceDetection";
 import { arrayMove } from '@dnd-kit/sortable';
@@ -179,14 +180,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   projectIdRef.current = projectId;
 
   // Shot management hooks for external generation viewing
-  const { mutateAsync: createShotMutation } = useCreateShot();
+  const { createShot } = useShotCreation();
   const { mutateAsync: addToShotMutation } = useAddImageToShot();
   const { mutateAsync: addToShotWithoutPositionMutation } = useAddImageToShotWithoutPosition();
 
   // 🎯 PERF FIX: Refs for mutation functions to prevent callback recreation
   // React Query mutations change reference on state changes (idle → pending → success)
-  const createShotMutationRef = useRef(createShotMutation);
-  createShotMutationRef.current = createShotMutation;
+  const createShotRef = useRef(createShot);
+  createShotRef.current = createShot;
   const addToShotMutationRef = useRef(addToShotMutation);
   addToShotMutationRef.current = addToShotMutation;
   const addToShotWithoutPositionMutationRef = useRef(addToShotWithoutPositionMutation);
@@ -1376,8 +1377,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // 🎯 PERF FIX: Uses refs to prevent callback recreation
   const handleCreateShot = useCallback(async (name: string) => {
     console.log('[ShotEditor] Creating new shot', { name });
-    const result = await createShotMutationRef.current({ name, projectId: projectIdRef.current });
-    return result.shot.id;
+    // Use unified shot creation - handles inheritance, events, lastAffected automatically
+    const result = await createShotRef.current({ name });
+    if (!result) {
+      throw new Error('Failed to create shot');
+    }
+    return result.shotId;
   }, []);
   
 

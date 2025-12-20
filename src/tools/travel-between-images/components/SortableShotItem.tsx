@@ -151,6 +151,29 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
     }
   }, [nonVideoImageCount, onInitialPendingUploadsConsumed]);
 
+  // Track previous pending count to detect when uploads complete
+  const prevPendingCountRef = useRef(pendingSkeletonCount);
+  
+  // When pending count drops to 0 from >0 AND we're showing loading state, show success
+  useEffect(() => {
+    const wasLoading = prevPendingCountRef.current > 0;
+    const nowComplete = pendingSkeletonCount === 0;
+    
+    if (wasLoading && nowComplete && withPositionDropState === 'loading') {
+      // Upload completed - show success state
+      setWithPositionDropState('success');
+      
+      // Clear success state after 1.5s
+      if (withPositionSuccessTimeoutRef.current) clearTimeout(withPositionSuccessTimeoutRef.current);
+      withPositionSuccessTimeoutRef.current = setTimeout(() => {
+        setWithPositionDropState('idle');
+        withPositionSuccessTimeoutRef.current = null;
+      }, 1500);
+    }
+    
+    prevPendingCountRef.current = pendingSkeletonCount;
+  }, [pendingSkeletonCount, withPositionDropState]);
+
   // Cleanup success timeouts on unmount
   useEffect(() => {
     return () => {
@@ -162,6 +185,43 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
       }
     };
   }, []);
+
+  // Listen for cross-component "Add to shot" button clicks from GenerationsPane
+  // This triggers the same skeleton animation as drag-and-drop
+  useEffect(() => {
+    const handlePendingUpload = (event: CustomEvent<{ shotId: string; expectedCount: number }>) => {
+      const { shotId, expectedCount } = event.detail;
+      
+      // Only handle if this event is for our shot
+      if (shotId !== shot.id) return;
+      
+      console.log('[ShotDrop] Received shot-pending-upload event:', {
+        shotId: shotId.substring(0, 8),
+        shotName: shot.name,
+        expectedCount,
+        currentImageCount: nonVideoImageIds.length,
+        timestamp: Date.now()
+      });
+      
+      // Trigger the same skeleton setup as drag-drop
+      setWithPositionDropState('loading');
+      
+      // Setup skeleton placeholders
+      baselineNonVideoIdsRef.current = new Set(nonVideoImageIds);
+      expectedNewCountRef.current = expectedCount;
+      
+      // Safety timeout - clear after 5s (same as generation drops)
+      if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = setTimeout(() => {
+        expectedNewCountRef.current = 0;
+        baselineNonVideoIdsRef.current = null;
+        safetyTimeoutRef.current = null;
+      }, 5000);
+    };
+    
+    window.addEventListener('shot-pending-upload', handlePendingUpload as EventListener);
+    return () => window.removeEventListener('shot-pending-upload', handlePendingUpload as EventListener);
+  }, [shot.id, shot.name, nonVideoImageIds]);
 
   // Check if we can accept this drop (generation or file)
   const canAcceptDrop = useCallback((e: React.DragEvent): boolean => {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { PlusCircle, Check } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
@@ -8,12 +8,11 @@ import {
 } from "@/shared/components/ui/tooltip";
 import ShotSelector, { ShotOption } from "@/shared/components/ShotSelector";
 import { useToast } from "@/shared/hooks/use-toast";
-import { useProject } from "@/shared/contexts/ProjectContext";
 import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
-import { useCreateShotWithImage } from "@/shared/hooks/useShots";
-import { inheritSettingsForNewShot } from "@/shared/lib/shotSettingsInheritance";
+import { useQuickShotCreate } from "@/shared/hooks/useQuickShotCreate";
 import { cn } from "@/shared/lib/utils";
+import type { Shot } from "@/types/shots";
 
 export interface ShotSelectorWithAddProps {
   // Image data
@@ -81,124 +80,30 @@ export const ShotSelectorWithAdd: React.FC<ShotSelectorWithAddProps> = ({
   isMobile = false,
 }) => {
   const { toast } = useToast();
-  const { selectedProjectId } = useProject();
   const { navigateToShot } = useShotNavigation();
   const { setLastAffectedShotId } = useLastAffectedShot();
-  const createShotWithImageMutation = useCreateShotWithImage();
   
-  // Local state for quick create success
-  const [isCreatingShot, setIsCreatingShot] = useState(false);
-  const [quickCreateSuccess, setQuickCreateSuccess] = useState<{
-    isSuccessful: boolean;
-    shotId: string | null;
-    shotName: string | null;
-    isLoading?: boolean;
-  }>({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
+  // Use consolidated hook for quick shot creation
+  const {
+    isCreatingShot,
+    quickCreateSuccess,
+    handleQuickCreateAndAdd,
+    handleQuickCreateSuccess,
+  } = useQuickShotCreate({
+    generationId: imageId,
+    generationPreview: {
+      imageUrl,
+      thumbUrl,
+    },
+    shots,
+    onShotChange,
+    onClose,
+  });
   
   // Get current target shot name for tooltips
   const currentTargetShotName = useMemo(() => {
     return selectedShotId ? shots.find(s => s.id === selectedShotId)?.name : undefined;
   }, [selectedShotId, shots]);
-  
-  // Handle quick create and add using atomic database function
-  const handleQuickCreateAndAdd = useCallback(async () => {
-    if (!selectedProjectId) return;
-    
-    // Generate automatic shot name
-    const shotCount = shots.length;
-    const newShotName = `Shot ${shotCount + 1}`;
-    
-    setIsCreatingShot(true);
-    try {
-      console.log('[ShotSelectorWithAdd] Starting atomic shot creation with image:', {
-        projectId: selectedProjectId,
-        shotName: newShotName,
-        generationId: imageId
-      });
-      
-      // Use the atomic database function to create shot and add image in one operation
-      const result = await createShotWithImageMutation.mutateAsync({
-        projectId: selectedProjectId,
-        shotName: newShotName,
-        generationId: imageId
-      });
-      
-      console.log('[ShotSelectorWithAdd] Atomic operation successful:', result);
-      
-      // Apply standardized settings inheritance
-      if (result.shotId && selectedProjectId) {
-        await inheritSettingsForNewShot({
-          newShotId: result.shotId,
-          projectId: selectedProjectId,
-          shots: shots as any[]
-        });
-      }
-      
-      // Set the newly created shot as the last affected shot
-      setLastAffectedShotId(result.shotId);
-      
-      // Select the newly created shot in the dropdown
-      onShotChange(result.shotId);
-      
-      // Set success state with loading=true initially while cache syncs
-      setQuickCreateSuccess({
-        isSuccessful: true,
-        shotId: result.shotId,
-        shotName: result.shotName,
-        isLoading: true
-      });
-      
-      // After a brief delay for cache to sync, show the Visit button as ready
-      setTimeout(() => {
-        setQuickCreateSuccess(prev => 
-          prev.shotId === result.shotId 
-            ? { ...prev, isLoading: false } 
-            : prev
-        );
-      }, 600);
-      
-      // Clear success state after 5 seconds
-      setTimeout(() => {
-        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
-      }, 5000);
-      
-    } catch (error) {
-      console.error('[ShotSelectorWithAdd] Error in atomic operation:', error);
-      toast({ 
-        title: "Error", 
-        description: "Failed to create shot and add image. Please try again.",
-        variant: "destructive" 
-      });
-    } finally {
-      setIsCreatingShot(false);
-    }
-  }, [selectedProjectId, shots, imageId, createShotWithImageMutation, setLastAffectedShotId, onShotChange, toast]);
-  
-  // Handle quick create success navigation
-  const handleQuickCreateSuccess = useCallback(() => {
-    if (quickCreateSuccess.shotId) {
-      // Close lightbox before navigating
-      onClose?.();
-      
-      const shot = shots.find(s => s.id === quickCreateSuccess.shotId);
-      if (shot) {
-        navigateToShot({ 
-          id: shot.id, 
-          name: shot.name,
-          images: [],
-          position: 0
-        }, { isNewlyCreated: true });
-      } else {
-        // Shot not in list yet, navigate with stored data
-        navigateToShot({ 
-          id: quickCreateSuccess.shotId, 
-          name: quickCreateSuccess.shotName || `Shot`,
-          images: [],
-          position: 0
-        }, { isNewlyCreated: true });
-      }
-    }
-  }, [quickCreateSuccess, shots, navigateToShot, onClose]);
   
   // Handle add to shot click
   const handleAddClick = useCallback(async () => {
@@ -208,7 +113,8 @@ export const ShotSelectorWithAdd: React.FC<ShotSelectorWithAddProps> = ({
       if (targetShot) {
         // Close lightbox before navigating
         onClose?.();
-        navigateToShot(targetShot as any, { scrollToTop: true });
+        const minimalShot: Shot = { id: targetShot.id, name: targetShot.name, images: [], position: 0 };
+        navigateToShot(minimalShot, { scrollToTop: true });
         return;
       }
     }
@@ -284,7 +190,8 @@ export const ShotSelectorWithAdd: React.FC<ShotSelectorWithAddProps> = ({
         container={container}
         onNavigateToShot={(shot) => {
           onClose?.();
-          navigateToShot(shot as any, { scrollToTop: true });
+          const minimalShot: Shot = { id: shot.id, name: shot.name, images: [], position: 0 };
+          navigateToShot(minimalShot, { scrollToTop: true });
         }}
       />
 

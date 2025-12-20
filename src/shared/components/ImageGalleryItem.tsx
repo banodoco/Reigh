@@ -23,10 +23,11 @@ import { log } from '@/shared/lib/logger';
 import { setGenerationDragData, createDragPreview } from '@/shared/lib/dragDrop';
 import { cn } from "@/shared/lib/utils";
 import CreateShotModal from "@/shared/components/CreateShotModal";
-import { useAddImageToShot, useCreateShotWithImage } from "@/shared/hooks/useShots";
+import { useAddImageToShot } from "@/shared/hooks/useShots";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
+import { useQuickShotCreate } from "@/shared/hooks/useQuickShotCreate";
 import { parseRatio } from "@/shared/lib/aspectRatios";
 import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
 import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
@@ -35,7 +36,6 @@ import { useTaskType } from "@/shared/hooks/useTaskType";
 import { useGetTask } from "@/shared/hooks/useTasks";
 import { useShareGeneration } from "@/shared/hooks/useShareGeneration";
 import { deriveInputImages } from "./ImageGallery/utils";
-import { inheritSettingsForNewShot } from "@/shared/lib/shotSettingsInheritance";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -213,9 +213,30 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const { toast } = useToast();
   const { selectedProjectId } = useProject();
   const addImageToShotMutation = useAddImageToShot();
-  const createShotWithImageMutation = useCreateShotWithImage();
   const { navigateToShot } = useShotNavigation();
   const { lastAffectedShotId, setLastAffectedShotId: updateLastAffectedShotId } = useLastAffectedShot();
+  
+  // Use consolidated hook for quick shot creation
+  const {
+    quickCreateSuccess,
+    handleQuickCreateAndAdd,
+    handleQuickCreateSuccess,
+  } = useQuickShotCreate({
+    generationId: image.id,
+    generationPreview: {
+      imageUrl: image.url,
+      thumbUrl: image.thumbUrl,
+      type: image.type,
+      location: image.location,
+    },
+    shots: simplifiedShotOptions,
+    onShotChange: (shotId) => {
+      updateLastAffectedShotId(shotId);
+      setSelectedShotIdLocal(shotId);
+    },
+    onLoadingStart: () => setAddingToShotImageId(image.id),
+    onLoadingEnd: () => setAddingToShotImageId(null),
+  });
   // Progressive loading for thumbnail → full image transition
   // DISABLE progressive loading for videos - we want to show thumbnails, not load the full video file
   const progressiveEnabled = isProgressiveLoadingEnabled() && !image.isVideo;
@@ -317,13 +338,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // State for CreateShotModal
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState<boolean>(false);
   const [isCreatingShot, setIsCreatingShot] = useState<boolean>(false);
-  // State for quick create success
-  const [quickCreateSuccess, setQuickCreateSuccess] = useState<{
-    isSuccessful: boolean;
-    shotId: string | null;
-    shotName: string | null;
-    isLoading?: boolean;
-  }>({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
   // Check if this image was already cached by the preloader using centralized function
   const isPreloadedAndCached = isImageCached(image);
   const [imageLoaded, setImageLoaded] = useState<boolean>(isPreloadedAndCached);
@@ -360,81 +374,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
   };
 
-  // Handle quick create and add using atomic database function
-  const handleQuickCreateAndAdd = async () => {
-    if (!selectedProjectId) return;
-    
-    // Generate automatic shot name
-    const shotCount = simplifiedShotOptions.length;
-    const newShotName = `Shot ${shotCount + 1}`;
-    
-    setAddingToShotImageId(image.id);
-    try {
-      console.log('[QuickCreate] Starting atomic shot creation with image:', {
-        projectId: selectedProjectId,
-        shotName: newShotName,
-        generationId: image.id
-      });
-      
-      // Use the atomic database function to create shot and add image in one operation
-      const result = await createShotWithImageMutation.mutateAsync({
-        projectId: selectedProjectId,
-        shotName: newShotName,
-        generationId: image.id
-      });
-      
-      console.log('[QuickCreate] Atomic operation successful:', result);
-      
-      // Apply standardized settings inheritance
-      if (result.shotId && selectedProjectId) {
-        await inheritSettingsForNewShot({
-          newShotId: result.shotId,
-          projectId: selectedProjectId,
-          // Pass simplified shots - inheritance will use localStorage primarily
-          // DB fallback may be limited but that's acceptable here
-          shots: simplifiedShotOptions as any[] 
-        });
-      }
-      
-      // Set the newly created shot as the last affected shot
-      updateLastAffectedShotId(result.shotId);
-      
-      // Select the newly created shot in the dropdown
-      setSelectedShotIdLocal(result.shotId);
-      
-      // Set success state with loading=true initially while cache syncs
-      setQuickCreateSuccess({
-        isSuccessful: true,
-        shotId: result.shotId,
-        shotName: result.shotName,
-        isLoading: true
-      });
-      
-      // After a brief delay for cache to sync, show the Visit button as ready
-      setTimeout(() => {
-        setQuickCreateSuccess(prev => 
-          prev.shotId === result.shotId 
-            ? { ...prev, isLoading: false } 
-            : prev
-        );
-      }, 600);
-      
-      // Clear success state after 5 seconds
-      setTimeout(() => {
-        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
-      }, 5000);
-      
-    } catch (error) {
-      console.error('[QuickCreate] Error in atomic operation:', error);
-      toast({ 
-        title: "Error", 
-        description: "Failed to create shot and add image. Please try again.",
-        variant: "destructive" 
-      });
-    } finally {
-      setAddingToShotImageId(null);
-    }
-  };
   
   // Track previous image ID to detect actual changes vs re-renders
   // Create a stable identifier using urlIdentity/thumbUrlIdentity (computed at data layer)
@@ -780,32 +719,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     isCurrentlyViewingSelectedShot
   ]);
   
-  // Handle quick create success navigation
-  const handleQuickCreateSuccess = useCallback(() => {
-    if (quickCreateSuccess.shotId) {
-      // Try to find the shot in the list first
-      const shot = simplifiedShotOptions.find(s => s.id === quickCreateSuccess.shotId);
-      if (shot) {
-        // Shot found in list, use it - still pass isNewlyCreated in case cache is stale
-        navigateToShot({ 
-          id: shot.id, 
-          name: shot.name,
-          images: [],
-          position: 0
-        }, { isNewlyCreated: true });
-      } else {
-        // Shot not in list yet, but we have the ID and name, so navigate anyway
-        console.log('[QuickCreate] Shot not in list yet, navigating with stored data');
-        navigateToShot({ 
-          id: quickCreateSuccess.shotId, 
-          name: quickCreateSuccess.shotName || `Shot`,
-          images: [],
-          position: 0
-        }, { isNewlyCreated: true });
-      }
-    }
-  }, [quickCreateSuccess, simplifiedShotOptions, navigateToShot]);
-
   let aspectRatioPadding = '100%'; 
   let minHeight = '120px'; // Minimum height for very small images
   

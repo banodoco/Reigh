@@ -280,9 +280,9 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
           }}
         >
           <SelectValue placeholder={placeholder}>
-            {selectedShotName && selectedShotName.length > 10 
-              ? `${selectedShotName.substring(0, 10)}...` 
-              : selectedShotName || placeholder}
+            {selectedShotName 
+              ? (selectedShotName.length > 10 ? `${selectedShotName.substring(0, 10)}...` : selectedShotName)
+              : (value ? "Loading..." : placeholder)}
           </SelectValue>
         </SelectTrigger>
         <SelectContent 

@@ -512,6 +512,27 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     }
   }, [onSkeletonSetupReady, setupPendingNewShot, clearPendingNewShot]);
 
+  // Listen for shot-pending-create events (from ShotSelectorWithAdd quick create)
+  React.useEffect(() => {
+    const handlePendingCreate = (event: CustomEvent<{ imageCount: number }>) => {
+      const { imageCount } = event.detail;
+      console.log('[ShotListDisplay] Received shot-pending-create event:', { imageCount });
+      setupPendingNewShot(imageCount);
+    };
+
+    const handlePendingCreateClear = () => {
+      console.log('[ShotListDisplay] Received shot-pending-create-clear event');
+      clearPendingNewShot();
+    };
+
+    window.addEventListener('shot-pending-create', handlePendingCreate as EventListener);
+    window.addEventListener('shot-pending-create-clear', handlePendingCreateClear);
+    return () => {
+      window.removeEventListener('shot-pending-create', handlePendingCreate as EventListener);
+      window.removeEventListener('shot-pending-create-clear', handlePendingCreateClear);
+    };
+  }, [setupPendingNewShot, clearPendingNewShot]);
+
   // Handle drop for new shot
   const handleNewShotDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
@@ -639,9 +660,15 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                     : 'border-border hover:border-[hsl(40,55%,58%)] cursor-pointer'
               )}
             >
-              {/* Invisible structure to match shot card height */}
-              <div className="h-8 mb-3" aria-hidden="true" /> {/* Header row height */}
-              <div className="aspect-[3/1]" aria-hidden="true" /> {/* Image area height */}
+              {/* Invisible structure to match shot card height exactly */}
+              {/* Header: matches VideoShotDisplay's flex header with h-8 buttons */}
+              <div className="h-8 mb-3" aria-hidden="true" />
+              {/* Image grid: matches VideoShotDisplay's grid-cols-3 gap-2 with aspect-square items */}
+              <div className="grid grid-cols-3 gap-2" aria-hidden="true">
+                <div className="aspect-square" />
+                <div className="aspect-square" />
+                <div className="aspect-square" />
+              </div>
               
               {/* Centered content overlay */}
               <div className="absolute inset-0 flex items-center justify-center">

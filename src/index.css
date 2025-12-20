@@ -225,9 +225,9 @@
     --foreground: 45 20% 88%;               /* Warm cream white */
     
     /* Cards & Popovers - warmer, clear depth separation */
-    --card: 140 8% 15%;                     /* Elevated, hint of green */
+    --card: 140 8% 14%;                     /* Elevated, hint of green - slightly darker for contrast */
     --card-foreground: 45 20% 88%;
-    --popover: 130 6% 18%;                  /* Highest elevation */
+    --popover: 130 6% 17%;                  /* Highest elevation */
     --popover-foreground: 45 20% 88%;
     
     /* Primary - vintage gold */
@@ -239,8 +239,8 @@
     --secondary-foreground: 210 25% 85%;
     
     /* Muted/subtle - cooler for contrast with green */
-    --muted: 200 10% 18%;                   /* Blue-gray muted */
-    --muted-foreground: 200 8% 55%;
+    --muted: 200 10% 20%;                   /* Blue-gray muted - lighter for contrast */
+    --muted-foreground: 200 8% 58%;
     
     /* Accent - subtle forest highlight */
     --accent: 150 15% 25%;                  /* Forest green hover */
@@ -250,8 +250,8 @@
     --destructive: 0 60% 45%;
     --destructive-foreground: 0 0% 100%;
     
-    /* Borders & Inputs */
-    --border: 150 8% 22%;                   /* Green-tinted border */
+    /* Borders & Inputs - more visible for panel separation */
+    --border: 150 10% 28%;                  /* Green-tinted border - more contrast */
     --input: 140 8% 16%;
     --ring: 40 55% 58%;
     

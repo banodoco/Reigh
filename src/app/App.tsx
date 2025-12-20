@@ -4,7 +4,8 @@ import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { Toaster as Sonner } from "@/shared/components/ui/sonner";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { useHandleExternalImageDrop, useCreateShot, useAddImageToShot } from "@/shared/hooks/useShots";
+import { useHandleExternalImageDrop, useAddImageToShot } from "@/shared/hooks/useShots";
+import { useShotCreation } from "@/shared/hooks/useShotCreation";
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { NEW_GROUP_DROPPABLE_ID } from '@/shared/lib/dragDrop';
 import { LastAffectedShotProvider, LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
@@ -87,7 +88,7 @@ const AppInternalContent = () => {
     })
   );
 
-  const createShotMutation = useCreateShot();
+  const { createShot } = useShotCreation();
   const addImageToShotMutation = useAddImageToShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
 
@@ -179,23 +180,18 @@ const AppInternalContent = () => {
         setLastAffectedShotId(shotId);
 
       } else if (over.id === NEW_GROUP_DROPPABLE_ID && droppableZone.type === 'new-group-zone') {
-        // Determine the next sequential shot number in the current project
-        const currentShotsCount = shotsFromHook?.length ?? 0;
-        const newShotName = `Shot ${currentShotsCount + 1}`;
-        
-        const newShot = await createShotMutation.mutateAsync({ name: newShotName, projectId: selectedProjectId });
-        if (newShot && newShot.shot && newShot.shot.id) {
-          await addImageToShotMutation.mutateAsync({ 
-            shot_id: newShot.shot.id,
-            generation_id: generationId,
-            imageUrl: imageUrl,
-            thumbUrl: thumbUrl,
-            project_id: selectedProjectId,
-          });
-          setLastAffectedShotId(newShot.shot.id);
-        } else {
-          throw new Error('Failed to create new shot or new shot ID is missing.');
+        // Use unified shot creation - handles inheritance, events, lastAffected automatically
+        const result = await createShot({
+          generationId,
+          generationPreview: { imageUrl, thumbUrl },
+        });
+        if (!result) {
+          throw new Error('Failed to create new shot.');
         }
+        console.log('[App] New shot created via drag & drop:', {
+          shotId: result.shotId.substring(0, 8),
+          shotName: result.shotName,
+        });
       }
     } catch (error) {
       console.error('Error handling drop:', error);

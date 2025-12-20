@@ -9,14 +9,15 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeWithTimeout } from '@/shared/lib/invokeWithTimeout';
 import { Button } from "@/shared/components/ui/button";
-import { useAddImageToShot, useAddImageToShotWithoutPosition, usePositionExistingGenerationInShot, useCreateShot } from "@/shared/hooks/useShots";
+import { useAddImageToShot, useAddImageToShotWithoutPosition, usePositionExistingGenerationInShot } from "@/shared/hooks/useShots";
+import { useShotCreation } from '@/shared/hooks/useShotCreation';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
 import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, useCreateGeneration, GenerationsPaginatedResponse } from "@/shared/hooks/useGenerations";
-import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
+// Settings inheritance is handled by useShotCreation
 
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
@@ -280,7 +281,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const addImageToShotMutation = useAddImageToShot();
   const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
-  const createShotMutation = useCreateShot();
+  const { createShot } = useShotCreation();
   
   // Debug logging for state changes (after hook declarations)
   useEffect(() => {
@@ -790,43 +791,32 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Handle creating a new shot
   const handleCreateShot = useCallback(async (shotName: string, files: File[]): Promise<void> => {
-    if (!selectedProjectId) {
-      toast.error("No project selected");
-      return;
+    // Use unified shot creation - handles inheritance, events, lastAffected automatically
+    const result = await createShot({
+      name: shotName,
+      files: files.length > 0 ? files : undefined,
+      // Disable skeleton events for lightbox shot creation
+      dispatchSkeletonEvents: files.length > 0,
+      onSuccess: () => {
+        // Invalidate and refetch shots to update the list
+        queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+        queryClient.refetchQueries({ queryKey: ['shots', selectedProjectId] });
+      },
+    });
+
+    if (!result) {
+      // Error already shown by useShotCreation
+      throw new Error('Shot creation failed');
     }
 
-    try {
-      const result = await createShotMutation.mutateAsync({
-        name: shotName,
-        projectId: selectedProjectId,
-        shouldSelectAfterCreation: false
-      });
-
-      // Apply standardized settings inheritance
-      if (result.shot?.id) {
-        await inheritSettingsForNewShot({
-          newShotId: result.shot.id,
-          projectId: selectedProjectId,
-          shots: validShots
-        });
-      }
-
-      // Invalidate and refetch shots to update the list
-      await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
-      await queryClient.refetchQueries({ queryKey: ['shots', selectedProjectId] });
-      
-      // Set the newly created shot as the target for "Add to Shot" actions
-      // but don't change the gallery filter to keep existing images visible
-      if (result.shot?.id) {
-        setLastAffectedShotId(result.shot.id);
-        // Note: We're NOT changing setSelectedShotFilter here to keep the gallery populated
-      }
-    } catch (error) {
-      console.error('Error creating shot:', error);
-      toast.error("Failed to create shot");
-      throw error; // Re-throw so the modal can handle the error state
-    }
-  }, [selectedProjectId, createShotMutation, queryClient, setLastAffectedShotId, validShots]);
+    console.log('[ImageGenerationToolPage] Shot created:', {
+      shotId: result.shotId.substring(0, 8),
+      shotName: result.shotName,
+    });
+    
+    // Note: lastAffectedShotId is automatically updated by useShotCreation
+    // Note: We're NOT changing setSelectedShotFilter here to keep the gallery populated
+  }, [createShot, queryClient, selectedProjectId]);
 
   // Unified handler for Collapsible open/close with smooth scroll on open
   // Only perform scroll-then-open when triggered from the sticky toggle

@@ -7,7 +7,7 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default: "rounded-lg border bg-card text-card-foreground shadow-sm",
+        default: "rounded-lg border bg-card text-card-foreground shadow-sm dark:shadow-md dark:border-border",
         wes: "wes-card wes-frame wes-texture",
         "wes-simple": "bg-card/90 dark:bg-card/95 backdrop-blur-sm border-2 border-primary/10 rounded-xl shadow-wes",
         "wes-floating": "wes-card animate-wes-float shadow-wes-hover",

@@ -15,7 +15,8 @@ import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { ImageGenerationSettings } from "../../settings";
 import { VideoTravelSettings } from "@/tools/travel-between-images/settings";
 import { useListPublicResources, useCreateResource, useUpdateResource, useDeleteResource, StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
-import { useListShots, useCreateShot } from "@/shared/hooks/useShots";
+import { useListShots } from "@/shared/hooks/useShots";
+import { useShotCreation } from "@/shared/hooks/useShotCreation";
 import CreateShotModal from "@/shared/components/CreateShotModal";
 import { useQueryClient } from '@tanstack/react-query';
 import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
@@ -919,7 +920,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Removed unused currentShotId that was causing unnecessary re-renders
   const { data: shots } = useListShots(selectedProjectId);
-  const createShotMutation = useCreateShot();
+  const { createShot, isCreating: isCreatingShot } = useShotCreation();
   const { navigateToShot } = useShotNavigation();
   
   // Define generatePromptId before using it in hooks
@@ -2751,62 +2752,35 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Handle creating a new shot
   const handleCreateShot = useCallback(async (shotName: string, files: File[]) => {
-    if (!selectedProjectId) {
-      toast.error("No project selected");
+    // Use unified shot creation - handles inheritance, events, lastAffected automatically
+    const result = await createShot({
+      name: shotName,
+      files: files.length > 0 ? files : undefined,
+      dispatchSkeletonEvents: false, // No skeleton needed in form context
+      onSuccess: () => {
+        // Invalidate and refetch shots to update the list
+        queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+        queryClient.refetchQueries({ queryKey: ['shots', selectedProjectId] });
+      },
+    });
+
+    if (!result) {
+      // Error already shown by useShotCreation
       return;
     }
 
-    try {
-      const result = await createShotMutation.mutateAsync({
-        name: shotName,
-        projectId: selectedProjectId,
-        shouldSelectAfterCreation: false
-      });
+    console.log('[ImageGenerationForm] Shot created:', {
+      shotId: result.shotId.substring(0, 8),
+      shotName: result.shotName,
+    });
 
-      await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
-      await queryClient.refetchQueries({ queryKey: ['shots', selectedProjectId] });
-      
-      // Apply settings inheritance logic for travel tool
-      if (result.shot.id) {
-        // Find latest shot to inherit from
-        let settingsSource: any = null;
-        if (shots && shots.length > 0) {
-           const sortedShots = [...shots].sort((a: any, b: any) => {
-             const dateA = new Date(a.created_at || 0).getTime();
-             const dateB = new Date(b.created_at || 0).getTime();
-             return dateB - dateA;
-           });
-           // Filter out the just-created shot if it's already in the list (though we just invalidated, refetch might be async)
-           const potentialSourceShots = sortedShots.filter(s => s.id !== result.shot.id);
-           const latestShot = potentialSourceShots[0];
-           
-           if (latestShot && (latestShot as any).settings?.['travel-between-images']) {
-             settingsSource = (latestShot as any).settings['travel-between-images'];
-             console.log('[ImageGenerationForm] Inheriting travel settings from latest shot:', latestShot.name);
-           }
-        }
-        
-        // Fallback to project settings
-        settingsSource = settingsSource || travelProjectSettings;
-        
-        if (settingsSource || travelProjectUISettings) {
-           const defaultsToApply = {
-             ...(settingsSource || {}),
-             _uiSettings: travelProjectUISettings || {}
-           };
-           sessionStorage.setItem(`apply-project-defaults-${result.shot.id}`, JSON.stringify(defaultsToApply));
-        }
-      }
-      
-      // Switch to the newly created shot
-      markAsInteracted();
-      setAssociatedShotId(result.shot.id);
-      setIsCreateShotModalOpen(false);
-    } catch (error) {
-      console.error('Error creating shot:', error);
-      toast.error("Failed to create shot");
-    }
-  }, [selectedProjectId, createShotMutation, markAsInteracted, queryClient, shots, travelProjectSettings, travelProjectUISettings]);
+    // Note: Settings inheritance is handled automatically by useShotCreation
+    
+    // Switch to the newly created shot
+    markAsInteracted();
+    setAssociatedShotId(result.shotId);
+    setIsCreateShotModalOpen(false);
+  }, [createShot, markAsInteracted, queryClient, selectedProjectId]);
 
   // Optimize event handlers with useCallback to prevent recreating on each render
   const handleSliderChange = useCallback((setter: React.Dispatch<React.SetStateAction<number>>) => (value: number) => {
@@ -3067,7 +3041,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         isOpen={isCreateShotModalOpen}
         onClose={() => setIsCreateShotModalOpen(false)}
         onSubmit={handleCreateShot}
-        isLoading={createShotMutation.isPending}
+        isLoading={isCreatingShot}
         projectId={selectedProjectId}
       />
     </>

@@ -23,8 +23,7 @@ import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { performanceMonitoredTimeout, measureAsync } from '@/shared/lib/performanceUtils';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useCreateShot } from '@/shared/hooks/useShots';
-import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
+import { useShotCreation } from '@/shared/hooks/useShotCreation';
 import { toast } from 'sonner';
 
 import { 
@@ -112,39 +111,33 @@ const GenerationsPaneComponent: React.FC = () => {
     ? shotsData
     : (contextShots || []);
   
-  // Shot creation mutation
-  const createShotMutation = useCreateShot();
+  // Unified shot creation hook
+  const { createShot } = useShotCreation();
   
   // Handle creating a new shot from lightbox
   const handleCreateShot = useCallback(async (shotName: string, files: File[]): Promise<void> => {
-    if (!selectedProjectId) {
-      toast.error("No project selected");
+    // Use unified shot creation - handles inheritance, events, lastAffected automatically
+    const result = await createShot({
+      name: shotName,
+      files: files.length > 0 ? files : undefined,
+      // Disable skeleton events for empty shot creation from lightbox
+      dispatchSkeletonEvents: files.length > 0,
+      onSuccess: () => {
+        // Invalidate and refetch shots to update the list
+        queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+      },
+    });
+
+    if (!result) {
+      // Error already shown by useShotCreation
       return;
     }
 
-    try {
-      const result = await createShotMutation.mutateAsync({
-        name: shotName,
-        projectId: selectedProjectId,
-        shouldSelectAfterCreation: false
-      });
-
-      // Apply standardized settings inheritance
-      if (result.shot?.id) {
-        await inheritSettingsForNewShot({
-          newShotId: result.shot.id,
-          projectId: selectedProjectId,
-          shots: shotsForFilter
-        });
-      }
-
-      // Invalidate and refetch shots to update the list
-      await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
-    } catch (error) {
-      console.error('[GenerationsPane] Failed to create shot:', error);
-      toast.error(`Failed to create shot: ${(error as Error).message}`);
-    }
-  }, [selectedProjectId, createShotMutation, queryClient, shotsForFilter]);
+    console.log('[GenerationsPane] Shot created:', {
+      shotId: result.shotId.substring(0, 8),
+      shotName: result.shotName,
+    });
+  }, [createShot, queryClient, selectedProjectId]);
 
   // Debug: Log the current filter state
   useEffect(() => {
@@ -524,7 +517,7 @@ const GenerationsPaneComponent: React.FC = () => {
                     size="sm"
                     whiteText={true}
                     checkboxId="exclude-positioned-generations-pane"
-                    triggerWidth="w-[110px] sm:w-[170px]"
+                    triggerWidth="w-[200px] sm:w-[320px] flex-shrink-0 !text-xs"
                     isMobile={isMobile}
                     contentRef={shotFilterContentRef}
                     className="flex flex-col space-y-2"

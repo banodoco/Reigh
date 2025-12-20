@@ -1,15 +1,13 @@
-import { useState, useCallback } from 'react';
-import { toast } from 'sonner';
-import { GenerationRow } from '@/types/shots';
+import { useCallback, useMemo } from 'react';
+import { GenerationRow, Shot } from '@/types/shots';
 import { QuickCreateSuccess, ShotOption } from '../types';
-import { useCreateShotWithImage } from '@/shared/hooks/useShots';
-import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
+import { useQuickShotCreate } from '@/shared/hooks/useQuickShotCreate';
 
 export interface UseShotCreationProps {
   media: GenerationRow;
   selectedProjectId: string | null;
   allShots: ShotOption[];
-  onNavigateToShot?: (shot: any, options?: { isNewlyCreated?: boolean }) => void;
+  onNavigateToShot?: (shot: Shot, options?: { isNewlyCreated?: boolean }) => void;
   onClose: () => void;
   onShotChange?: (shotId: string) => void;
 }
@@ -22,174 +20,88 @@ export interface UseShotCreationReturn {
 }
 
 /**
- * Hook for managing quick shot creation with image
- * Uses atomic database function to create shot and add image in one operation
+ * Hook for managing quick shot creation with image in MediaLightbox
+ * 
+ * This is a thin wrapper around useQuickShotCreate that:
+ * 1. Handles the generation_id vs id distinction (when viewing from ShotImagesEditor,
+ *    media.id is the shot_generations.id, not the actual generations.id)
+ * 2. Uses custom navigation via onNavigateToShot callback instead of internal navigation
  */
 export const useShotCreation = ({
   media,
-  selectedProjectId,
   allShots,
   onNavigateToShot,
   onClose,
   onShotChange,
 }: UseShotCreationProps): UseShotCreationReturn => {
-  const [isCreatingShot, setIsCreatingShot] = useState(false);
-  const [quickCreateSuccess, setQuickCreateSuccess] = useState<QuickCreateSuccess>({
-    isSuccessful: false,
-    shotId: null,
-    shotName: null,
-    isLoading: false,
-  });
+  const mediaGenerationId = (media as any).generation_id as string | undefined;
   
-  const createShotWithImageMutation = useCreateShotWithImage();
-
-  // Handle quick create and add shot
-  const handleQuickCreateAndAdd = useCallback(async () => {
-    console.warn('[ShotSettingsInherit] 🚀 handleQuickCreateAndAdd called from ImageGallery');
-    
-    // CRITICAL: When viewing from ShotImagesEditor, media.id is the shot_generations.id (join table ID)
-    // We need to use media.generation_id (actual generations table ID) for creating new shot associations
-    const actualGenerationId = (media as any).generation_id || media.id;
-    
-    console.log('[VisitShotDebug] handleQuickCreateAndAdd called', {
-      hasSelectedProjectId: !!selectedProjectId,
-      allShotsLength: allShots.length,
+  // CRITICAL: When viewing from ShotImagesEditor, media.id is the shot_generations.id (join table ID)
+  // We need to use media.generation_id (actual generations table ID) for creating new shot associations
+  const actualGenerationId = useMemo(() => {
+    const genId = mediaGenerationId || media.id;
+    console.log('[useShotCreation] Computed actualGenerationId:', {
       mediaId: media.id,
-      generationId: (media as any).generation_id,
-      actualGenerationId,
-      usingGenerationIdField: !!(media as any).generation_id
+      generationId: mediaGenerationId,
+      actualGenerationId: genId,
+      usingGenerationIdField: !!mediaGenerationId
     });
-    
-    if (!selectedProjectId) {
-      console.error('[VisitShotDebug] No project selected');
-      console.warn('[ShotSettingsInherit] ❌ No project selected, aborting');
-      return;
-    }
-    
-    // Generate automatic shot name
-    const shotCount = allShots.length;
-    const newShotName = `Shot ${shotCount + 1}`;
-    
-    console.warn('[ShotSettingsInherit] 📝 Creating shot:', newShotName);
-    
-    setIsCreatingShot(true);
-    try {
-      console.log('[VisitShotDebug] Creating shot WITH image using atomic operation:', {
-        shotName: newShotName,
-        projectId: selectedProjectId,
-        generationId: actualGenerationId
-      });
-      
-      // Use atomic database function to create shot and add image in one operation
-      // This is the same approach as ImageGalleryItem
-      const result = await createShotWithImageMutation.mutateAsync({
-        projectId: selectedProjectId,
-        shotName: newShotName,
-        generationId: actualGenerationId
-      });
-      
-      console.log('[VisitShotDebug] Atomic shot creation result:', result);
-      
-      // Apply standardized settings inheritance
-      if (result.shotId && selectedProjectId) {
-        await inheritSettingsForNewShot({
-          newShotId: result.shotId,
-          projectId: selectedProjectId,
-          shots: allShots as any[]
-        });
-      }
-      
-      // Update the selected shot ID (same as ImageGalleryItem does)
-      if (result.shotId && onShotChange) {
-        console.log('[VisitShotDebug] Updating selected shot ID to:', result.shotId);
-        onShotChange(result.shotId);
-      }
-      
-      // Set success state with loading=true initially while cache syncs
-      setQuickCreateSuccess({
-        isSuccessful: true,
-        shotId: result.shotId,
-        shotName: result.shotName,
-        isLoading: true
-      });
-      
-      // After a brief delay for cache to sync, show the Visit button as ready
-      setTimeout(() => {
-        setQuickCreateSuccess(prev => 
-          prev.shotId === result.shotId 
-            ? { ...prev, isLoading: false } 
-            : prev
-        );
-      }, 600);
-      
-      // Clear success state after 5 seconds
-      setTimeout(() => {
-        setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
-      }, 5000);
-      
-    } catch (error) {
-      console.error('[VisitShotDebug] Error in atomic shot creation:', error);
-      toast.error('Failed to create shot and add image');
-    } finally {
-      setIsCreatingShot(false);
-    }
-  }, [selectedProjectId, allShots, media.id, (media as any).generation_id, createShotWithImageMutation, onShotChange]);
+    return genId;
+  }, [media.id, mediaGenerationId]);
 
-  // Handle quick create success navigation
+  // Use the consolidated hook
+  const {
+    isCreatingShot,
+    quickCreateSuccess,
+    handleQuickCreateAndAdd,
+    clearQuickCreateSuccess,
+  } = useQuickShotCreate({
+    generationId: actualGenerationId,
+    shots: allShots,
+    onShotChange,
+    // Don't use the hook's built-in navigation - we have custom navigation via onNavigateToShot
+    onClose: undefined,
+  });
+
+  // Custom navigation handler that uses onNavigateToShot callback
   const handleQuickCreateSuccess = useCallback(() => {
-    console.log('[VisitShotDebug] 2. MediaLightbox handleQuickCreateSuccess called', {
+    console.log('[useShotCreation] handleQuickCreateSuccess called', {
       quickCreateSuccess,
       hasOnNavigateToShot: !!onNavigateToShot,
       allShotsCount: allShots?.length || 0,
-      timestamp: Date.now()
     });
 
     if (quickCreateSuccess.shotId && onNavigateToShot) {
-      // Try to find the shot in the list first (we only have id/name here)
+      // Try to find the shot in the list first
       const shotOption = allShots?.find(s => s.id === quickCreateSuccess.shotId);
-      
-      console.log('[VisitShotDebug] 3. MediaLightbox shot search result', {
-        shotId: quickCreateSuccess.shotId,
-        foundInList: !!shotOption,
-        shotOption: shotOption ? { id: shotOption.id, name: shotOption.name } : null,
-        allShots: allShots?.map(s => ({ id: s.id, name: s.name })) || []
-      });
 
       // Close the lightbox first
       onClose();
 
       if (shotOption) {
         // Build a minimal Shot object compatible with navigation
-        const minimalShot = {
+        const minimalShot: Shot = {
           id: shotOption.id,
           name: shotOption.name,
           images: [],
           position: 0,
         };
-        console.log('[VisitShotDebug] 4a. MediaLightbox calling onNavigateToShot with found shot', minimalShot);
         onNavigateToShot(minimalShot, { isNewlyCreated: true });
       } else {
         // Fallback when shot not in list yet
-        const minimalShot = {
+        const minimalShot: Shot = {
           id: quickCreateSuccess.shotId,
           name: quickCreateSuccess.shotName || 'Shot',
           images: [],
           position: 0,
         };
-        console.log('[VisitShotDebug] 4b. MediaLightbox calling onNavigateToShot with fallback shot', minimalShot);
         onNavigateToShot(minimalShot, { isNewlyCreated: true });
       }
-    } else {
-      console.log('[VisitShotDebug] 4c. MediaLightbox not navigating - missing requirements', {
-        hasShotId: !!quickCreateSuccess.shotId,
-        hasOnNavigateToShot: !!onNavigateToShot
-      });
     }
-    
-    // Clear the success state
-    console.log('[VisitShotDebug] 5. MediaLightbox clearing success state');
-    setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null, isLoading: false });
-  }, [quickCreateSuccess, onNavigateToShot, onClose, allShots]);
+
+    // Always clear the success state (prevents the header from sticking on "Visit Shot")
+    clearQuickCreateSuccess();
+  }, [quickCreateSuccess, onNavigateToShot, onClose, allShots, clearQuickCreateSuccess]);
 
   return {
     isCreatingShot,
@@ -198,4 +110,3 @@ export const useShotCreation = ({
     handleQuickCreateSuccess,
   };
 };
-

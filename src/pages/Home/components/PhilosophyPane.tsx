@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { GlassSidePane } from './GlassSidePane';
+import { cn } from '@/lib/utils';
 
 interface ExampleStyle {
   prompt: string;
@@ -18,6 +19,47 @@ interface PhilosophyPaneProps {
   selectedExampleStyle: string;
 }
 
+// Placeholder for dummy images/videos
+const PLACEHOLDER = '/placeholder.svg';
+
+// Dummy data for the different sections
+const travelExamples = [
+  {
+    id: '2-images',
+    label: '2 Images',
+    images: [PLACEHOLDER, PLACEHOLDER],
+    video: PLACEHOLDER,
+  },
+  {
+    id: '3-images',
+    label: '3 Images',
+    images: [PLACEHOLDER, PLACEHOLDER, PLACEHOLDER],
+    video: PLACEHOLDER,
+  },
+  {
+    id: '4-images',
+    label: '4 Images',
+    images: [PLACEHOLDER, PLACEHOLDER, PLACEHOLDER, PLACEHOLDER],
+    video: PLACEHOLDER,
+  },
+];
+
+const loraOptions = [
+  { id: 'smooth-motion', label: 'Smooth Motion', video: PLACEHOLDER },
+  { id: 'dramatic-zoom', label: 'Dramatic Zoom', video: PLACEHOLDER },
+  { id: 'cinematic-pan', label: 'Cinematic Pan', video: PLACEHOLDER },
+];
+
+const referenceTypes = ['Style', 'Character', 'Scene'] as const;
+
+const imageLoraOptions = [
+  { id: 'upscale', label: 'Upscale', description: 'Enhance resolution' },
+  { id: 'style-transfer', label: 'Style Transfer', description: 'Apply artistic styles' },
+  { id: 'inpaint', label: 'Inpaint', description: 'Edit specific areas' },
+  { id: 'outpaint', label: 'Outpaint', description: 'Extend the canvas' },
+  { id: 'relight', label: 'Relight', description: 'Change lighting' },
+];
+
 export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   isOpen,
   onClose,
@@ -28,6 +70,13 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   selectedExampleStyle,
 }) => {
   const philosophyVideoRef = useRef<HTMLVideoElement | null>(null);
+  
+  // State for interactive sections
+  const [selectedTravelExample, setSelectedTravelExample] = useState(0);
+  const [selectedLora, setSelectedLora] = useState(0);
+  const [selectedReferenceType, setSelectedReferenceType] = useState<typeof referenceTypes[number]>('Style');
+  const [selectedReferenceImage, setSelectedReferenceImage] = useState(0);
+  const [selectedImageLora, setSelectedImageLora] = useState(0);
 
   // Play video when pane finishes opening, reset when fully closed
   useEffect(() => {
@@ -37,7 +86,6 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
     } else if (!isOpen && !isClosing && philosophyVideoRef.current) {
       philosophyVideoRef.current.pause();
       philosophyVideoRef.current.currentTime = 0;
-      // Also hide the play button overlay
       const playButton = philosophyVideoRef.current.nextElementSibling as HTMLElement | null;
       if (playButton) {
         playButton.style.display = 'none';
@@ -48,47 +96,112 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
   return (
     <GlassSidePane isOpen={isOpen} onClose={onClose} side="right" zIndex={60}>
+      {/* Header */}
       <div className="mt-8 sm:mt-10 mb-6 relative z-10">
-        <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary leading-tight mb-5">reigh is a tool made just for travelling between images</h2>
+        <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary leading-tight mb-5">
+          reigh is a tool made just for travelling between images
+        </h2>
         <div className="w-20 h-1.5 bg-gradient-to-r from-wes-vintage-gold to-wes-vintage-gold/50 rounded-full animate-pulse-breathe opacity-90"></div>
       </div>
 
-      <div className="space-y-3 pb-4 text-left text-foreground/70">
-        <p className="text-sm leading-relaxed">
-          There are many tools that aim to be a 'one-stop-shop' for creating with AI - a kind of 'Amazon for art'. 
-        </p>
-        <p className="text-sm leading-relaxed">
-        Reigh is not one of them.
-        </p>
-        <p className="text-sm leading-relaxed">
-        It's a tool <em>just</em> for travelling between images:
-        </p>
-        
+      <div className="space-y-8 pb-4 text-left text-foreground/70">
+        {/* Intro text */}
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed">
+            There are many tools that aim to be a 'one-stop-shop' for creating with AI - a kind of 'Amazon for art'. 
+          </p>
+          <p className="text-sm leading-relaxed">
+            Reigh is not one of them.
+          </p>
+          <p className="text-sm leading-relaxed">
+            It's a tool <em>just</em> for travelling between images:
+          </p>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 1: Basic Image Travel Demo
+            - Selector below visualization, full width, each option 1/3
+            - Fixed pixel sizes matching original layout
+            - All images square:
+              - 2 images: stacked vertically
+              - 3 images: L-shape (2 stacked left, 1 top-right)
+              - 4 images: 2x2 grid
+        ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-2 mt-4 mb-4">
-          <div className="flex gap-4 items-start">
-            {/* Left side: Two stacked square images */}
-            <div className="flex flex-col gap-2">
-              <div className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
-                <img 
-                  src={currentExample.image1} 
-                  alt="Input image 1"
-                  className="w-full h-full object-cover border rounded-lg"
-                />
-              </div>
-              <div className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
-                <img 
-                  src={currentExample.image2} 
-                  alt="Input image 2"
-                  className="w-full h-full object-cover border rounded-lg"
-                />
-              </div>
-            </div>
-            {/* Right side: Output video */}
-            <div className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
+          {/* Main travel visualization */}
+          <div className="flex gap-4 items-start justify-center">
+            {/* Left side: Input images with dynamic layout */}
+            {(() => {
+              const images = selectedTravelExample === 0 
+                ? [currentExample.image1, currentExample.image2]
+                : travelExamples[selectedTravelExample].images;
+              const imageCount = images.length;
+              
+              // 2 images: stacked vertically
+              if (imageCount === 2) {
+                return (
+                  <div className="flex flex-col gap-2">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
+                        <img 
+                          src={selectedTravelExample === 0 ? img : PLACEHOLDER}
+                          alt={`Input image ${idx + 1}`}
+                          className="w-full h-full object-cover border rounded-lg"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              
+              // 3 images: stacked vertically, 4:3 aspect ratio
+              if (imageCount === 3) {
+                return (
+                  <div className="flex flex-col gap-2">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="w-[69px] sm:w-[112px] aspect-[4/3] flex-shrink-0">
+                        <img 
+                          src={PLACEHOLDER}
+                          alt={`Input image ${idx + 1}`}
+                          className="w-full h-full object-cover border rounded-lg"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              
+              // 4 images: stacked vertically, 16:9 aspect ratio
+              if (imageCount === 4) {
+                return (
+                  <div className="flex flex-col gap-2">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="w-[68px] sm:w-[109px] aspect-video flex-shrink-0">
+                        <img 
+                          src={PLACEHOLDER}
+                          alt={`Input image ${idx + 1}`}
+                          className="w-full h-full object-cover border rounded-lg"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+              
+              return null;
+            })()}
+            
+            {/* Right side: Output video - fixed size */}
+            <div 
+              className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative"
+              style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+            >
               <video 
-                key={selectedExampleStyle}
+                key={selectedTravelExample === 0 ? selectedExampleStyle : travelExamples[selectedTravelExample].id}
                 ref={(video) => {
-                  philosophyVideoRef.current = video;
+                  if (selectedTravelExample === 0) {
+                    philosophyVideoRef.current = video;
+                  }
                   if (video && isOpen) {
                     const playButton = video.nextElementSibling as HTMLElement | null;
                     if (playButton) {
@@ -97,8 +210,8 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     }
                   }
                 }}
-                src={currentExample.video}
-                poster={currentExample.image1}
+                src={selectedTravelExample === 0 ? currentExample.video : PLACEHOLDER}
+                poster={selectedTravelExample === 0 ? currentExample.image1 : PLACEHOLDER}
                 muted
                 playsInline
                 preload="auto"
@@ -106,7 +219,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 disableRemotePlayback
                 onCanPlay={(e) => {
                   const v = e.currentTarget as HTMLVideoElement;
-                  if (v.paused && isOpen && !isOpening) v.play().catch((err) => console.log('[VideoLoadSpeedIssue] play() failed on canplay', err));
+                  if (v.paused && isOpen && !isOpening) v.play().catch(() => {});
                 }}
                 onPlay={(e) => {
                   const video = e.target as HTMLVideoElement;
@@ -127,14 +240,11 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     playButton.style.display = 'flex';
                     playButton.style.backdropFilter = 'blur(0px)';
                     playButton.style.opacity = '1';
-                    
                     let blurAmount = 0;
                     const blurInterval = setInterval(() => {
                       blurAmount += 0.05;
                       playButton.style.backdropFilter = `blur(${blurAmount}px)`;
-                      if (blurAmount >= 2) {
-                        clearInterval(blurInterval);
-                      }
+                      if (blurAmount >= 2) clearInterval(blurInterval);
                     }, 100);
                   }
                 }}
@@ -163,44 +273,338 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Example selector with thumbnail previews - below visualization, full width */}
+          <div className="grid grid-cols-3 gap-2 w-full">
+            {travelExamples.map((example, idx) => {
+              // Get thumbnail images for the selector
+              const thumbImages = idx === 0 
+                ? [currentExample.image1, currentExample.image2] 
+                : example.images;
+              
+              return (
+                <button
+                  key={example.id}
+                  onClick={() => setSelectedTravelExample(idx)}
+                  className={cn(
+                    "p-2 rounded-lg transition-all duration-200 flex items-center justify-center",
+                    selectedTravelExample === idx
+                      ? "bg-primary/20 ring-2 ring-primary/50"
+                      : "bg-muted/30 hover:bg-muted/50"
+                  )}
+                >
+                  {/* Mini preview grid matching the layout */}
+                  <div className={cn(
+                    "gap-0.5",
+                    example.images.length === 2 && "flex flex-row",
+                    example.images.length === 3 && "flex flex-row",
+                    example.images.length === 4 && "flex flex-row"
+                  )}>
+                    {thumbImages.map((img, imgIdx) => (
+                      <div 
+                        key={imgIdx} 
+                        className={cn(
+                          "bg-muted/50 rounded-sm overflow-hidden",
+                          example.images.length === 2 && "w-5 h-5 aspect-square",
+                          example.images.length === 3 && "w-5 aspect-[4/3]",
+                          example.images.length === 4 && "w-6 aspect-video"
+                        )}
+                      >
+                        <img 
+                          src={idx === 0 ? img : PLACEHOLDER}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="space-y-3 mt-4 mb-4">
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 2: Reference Videos for Motion Control
+            - 3 columns, all 4:3 aspect ratio, same height, full width
+            - Image grid: 4 cols × 3 rows (12 images) = 4:3 aspect ratio
+            - Videos: 4:3 aspect ratio
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            Just as a songwriter might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images - especially with the ability <strong>generate precise images based on references.</strong>
+            In order to guide a video with precision, you use reference videos to steer the motion - here's an example of a combination of images and videos to guide a video with precision:
           </p>
+          
+          {/* All three columns are 4:3, same height, full width */}
+          <div className="flex gap-3 w-full">
+            {/* Column 1: 4×4 grid of input images (15 images + 1 empty) */}
+            <div className="space-y-1 flex-[1.33]">
+              <span className="text-xs text-muted-foreground/70">Input Images</span>
+              <div className="aspect-square grid grid-cols-4 grid-rows-4 gap-1">
+                {Array.from({ length: 15 }).map((_, idx) => (
+                  <div key={idx} className="aspect-square bg-muted/30 rounded border border-muted/50 overflow-hidden">
+                    <img 
+                      src={PLACEHOLDER} 
+                      alt={`Input ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+                {/* Empty 16th cell */}
+                <div className="aspect-square" />
+              </div>
+            </div>
+            
+            {/* Column 2: Motion reference video (4:3) */}
+            <div className="space-y-1 flex-1">
+              <span className="text-xs text-muted-foreground/70">Motion Reference</span>
+              <div className="aspect-[4/3] bg-muted/30 rounded-lg border border-muted/50 overflow-hidden">
+                <video 
+                  src={PLACEHOLDER}
+                  poster={PLACEHOLDER}
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+            
+            {/* Column 3: Output video (4:3) */}
+            <div className="space-y-1 flex-1">
+              <span className="text-xs text-muted-foreground/70">Output</span>
+              <div className="aspect-[4/3] bg-muted/30 rounded-lg border border-muted/50 overflow-hidden">
+                <video 
+                  src={PLACEHOLDER}
+                  poster={PLACEHOLDER}
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-3 mb-8">
-          <div className="space-y-3">
-            <p className="text-sm leading-relaxed mt-6">
-              Reigh is a tool <strong>just</strong> for exploring this artform. By creating with it and endlessly refining every element, I want to make it extremely good, and build a community of people who want to explore it with me.
-            </p>
-            <p className="text-sm leading-relaxed">
-              If you're interested in joining, you're very welcome! If we're successful, I hope that we can inspire a whole ecosystem of similar tools and communities focusing on discovering and creating their own artforms.
-            </p>
-            <p className="font-serif text-lg italic transform -rotate-1">POM</p>
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 3: LoRA Selector for Motion Styles
+            - 16:9 video with LoRA selector on the right
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed">
+            Not only this, but you can use community-trained LoRAs to make it move in all kinds of unique and interesting ways:
+          </p>
+          
+          <div className="flex gap-3">
+            {/* LoRA selector (left, right-aligned) */}
+            <div className="flex flex-col items-end gap-2">
+              <span className="text-xs text-muted-foreground/70 pr-2">Motion LoRA</span>
+              {loraOptions.map((lora, idx) => (
+                <button
+                  key={lora.id}
+                  onClick={() => setSelectedLora(idx)}
+                  className={cn(
+                    "px-2 py-2 text-xs rounded-md transition-all duration-200 text-right",
+                    selectedLora === idx
+                      ? "bg-primary/20 text-primary border border-primary/30"
+                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
+                  )}
+                >
+                  {lora.label}
+                </button>
+              ))}
+            </div>
+            
+            {/* Video display (16:9) */}
+            <div className="flex-1">
+              <div className="aspect-video bg-muted/30 rounded-lg border border-muted/50 overflow-hidden">
+                <video 
+                  key={loraOptions[selectedLora].id}
+                  src={PLACEHOLDER}
+                  poster={PLACEHOLDER}
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div className="w-12 h-px bg-muted/30"></div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => navigate('/tools')}
-              className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
-            >
-              Try the tool
-            </button>
-            <span className="text-muted-foreground/50">|</span>
-            <a
-              href="https://discord.gg/D5K2c6kfhy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
-            >
-              Join the community
-            </a>
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 4: Image Generation with References
+            - Left: Reference images (vertical)
+            - Top right: Reference Type selector (horizontal)
+            - Bottom right: Generated images
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed">
+            In order to steer these videos, we also let you generate images by providing style, subject and scene references:
+          </p>
+          
+          <div className="flex gap-3">
+            {/* Left: Reference image selector (vertical, centered) */}
+            <div className="flex flex-col justify-center space-y-1">
+              <span className="text-xs text-muted-foreground/70">Reference</span>
+              <div className="flex flex-col gap-2">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedReferenceImage(idx)}
+                    className={cn(
+                      "w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border-2 transition-all duration-200",
+                      selectedReferenceImage === idx
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-transparent hover:border-muted"
+                    )}
+                  >
+                    <img 
+                      src={PLACEHOLDER} 
+                      alt={`Reference option ${idx + 1}`}
+                      className="w-full h-full object-cover bg-muted/30"
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Right: Reference type (top) + Generated images (bottom) */}
+            <div className="flex-1 flex flex-col justify-center space-y-3">
+              {/* Top: Reference type selector (full width) */}
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground/70">Reference Type</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {referenceTypes.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setSelectedReferenceType(type)}
+                      className={cn(
+                        "px-2 py-3 text-xs rounded-md transition-all duration-200 text-center",
+                        selectedReferenceType === type
+                          ? "bg-primary/20 text-primary border border-primary/30"
+                          : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
+                      )}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Bottom: Generated images grid */}
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground/70">Generated Images</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {Array.from({ length: 6 }).map((_, idx) => (
+                    <div key={idx} className="aspect-square bg-muted/30 rounded-lg border border-muted/50">
+                      <img 
+                        src={PLACEHOLDER} 
+                        alt={`Generated ${idx + 1}`}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 5: Image Editing LoRAs
+            - Input image | LoRA selector | Output image
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed">
+            And you can edit them with LoRAs focused on specific tasks:
+          </p>
+          
+          <div className="flex gap-3 items-stretch">
+            {/* Input image */}
+            <div className="flex-1 flex flex-col justify-center space-y-1">
+              <span className="text-xs text-muted-foreground/70 text-center">Input</span>
+              <div className="aspect-square bg-muted/30 rounded-lg border border-muted/50">
+                <img 
+                  src={PLACEHOLDER} 
+                  alt="Input for editing"
+                  className="w-full h-full object-cover rounded-lg"
+                />
+              </div>
+            </div>
+            
+            {/* LoRA selector */}
+            <div className="flex flex-col justify-center gap-1.5 w-28 sm:w-32">
+              <span className="text-xs text-muted-foreground/70 text-center">Edit LoRA</span>
+              <div className="flex flex-col gap-1">
+                {imageLoraOptions.map((lora, idx) => (
+                  <button
+                    key={lora.id}
+                    onClick={() => setSelectedImageLora(idx)}
+                    className={cn(
+                      "px-2 py-1.5 text-xs rounded-md transition-all duration-200 text-center",
+                      selectedImageLora === idx
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
+                    )}
+                  >
+                    {lora.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Output image */}
+            <div className="flex-1 flex flex-col justify-center space-y-1">
+              <span className="text-xs text-muted-foreground/70 text-center">Output</span>
+              <div className="aspect-square bg-muted/30 rounded-lg border border-muted/50">
+                <img 
+                  src={PLACEHOLDER} 
+                  alt="Edited output"
+                  className="w-full h-full object-cover rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            CLOSING SECTION
+        ═══════════════════════════════════════════════════════════════════ */}
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-muted/50 to-transparent my-6"></div>
+
+        <div className="space-y-3">
+          <p className="text-sm leading-relaxed">
+            Just as a songwriter might uncover infinite possibilities in six strings, we believe an entire artform lies waiting in the AI-driven journey between images.
+          </p>
+          <p className="text-sm leading-relaxed">
+            Reigh is a tool <strong>just</strong> for exploring this artform. By creating with it and endlessly refining every element, we want to make it extremely good, and build a community of people who want to explore it with us.
+          </p>
+          <p className="text-sm leading-relaxed">
+            If you're interested in joining, you're very welcome.
+          </p>
+          <p className="font-serif text-lg italic transform -rotate-1 mt-4">POM</p>
+        </div>
+
+        <div className="w-12 h-px bg-muted/30 mt-6"></div>
+
+        <div className="flex items-center space-x-2 pb-4">
+          <button
+            onClick={() => navigate('/tools')}
+            className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+          >
+            Try the tool
+          </button>
+          <span className="text-muted-foreground/50">|</span>
+          <a
+            href="https://discord.gg/D5K2c6kfhy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
+          >
+            Join the community
+          </a>
         </div>
       </div>
     </GlassSidePane>

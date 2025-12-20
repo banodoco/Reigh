@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect, useCallback, startTransition } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
-import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName, useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
+import { useHandleExternalImageDrop, useUpdateShotName, useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
+import { useShotCreation } from '@/shared/hooks/useShotCreation';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -14,7 +15,7 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import { VideoTravelSettings } from '../settings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
+// Settings inheritance is handled by useShotCreation
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
 import { timeEnd } from '@/shared/lib/logger';
@@ -33,6 +34,7 @@ import { useVideoTravelAddToShot } from '../hooks/useVideoTravelAddToShot';
 import { useStableSkeletonVisibility } from '../hooks/useStableSkeletonVisibility';
 import { useVideoTravelFloatingUI } from '../hooks/useVideoTravelFloatingUI';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
+import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useGenerations } from '@/shared/hooks/useGenerations';
@@ -119,6 +121,9 @@ const VideoTravelToolPage: React.FC = () => {
   
   const { currentShotId, setCurrentShotId } = useCurrentShot();
   
+  // Get setLastAffectedShotId to update the default shot in GenerationsPane when creating new shots
+  const { setLastAffectedShotId } = useLastAffectedShot();
+
   // Scroll to top on initial mount and when returning to main view (hash cleared)
   const prevHashRef = useRef<string | null>(null);
   useLayoutEffect(() => {
@@ -281,7 +286,8 @@ const VideoTravelToolPage: React.FC = () => {
 
   // isLoading is computed after deep-link initialization guard is set
   
-  const createShotMutation = useCreateShot();
+  // Unified shot creation hook - handles inheritance, events, lastAffected automatically
+  const { createShot } = useShotCreation();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const updateShotNameMutation = useUpdateShotName();
   const addImageToShotMutation = useAddImageToShot();
@@ -1321,7 +1327,6 @@ const VideoTravelToolPage: React.FC = () => {
   } = useVideoTravelDropHandlers({
     selectedProjectId,
     shots,
-    createShotMutation,
     addImageToShotMutation,
     addImageToShotWithoutPositionMutation,
     handleExternalImageDropMutation,
@@ -1434,7 +1439,7 @@ const VideoTravelToolPage: React.FC = () => {
     if (skeletonSetupRef.current) {
       skeletonSetupRef.current(imageCount);
     }
-    
+
     // Switch to "Newest First" so the new shot appears at the top
     setShotSortMode('newest');
 
@@ -1442,65 +1447,31 @@ const VideoTravelToolPage: React.FC = () => {
     (async () => {
       setIsCreatingShot(true);
       try {
-        let newShot: Shot;
-        
-        if (files.length > 0) {
-          // Use the multi-purpose hook if there are files
-          const result = await handleExternalImageDropMutation.mutateAsync({
-            imageFiles: files, 
-            targetShotId: null, 
-            currentProjectQueryKey: selectedProjectId, 
-            currentShotCount: shots?.length ?? 0
-          });
-          
-          if (result?.shotId) {
-            // Refetch shots and use fresh query cache to locate the new shot
+        // Use unified shot creation - handles inheritance, events, lastAffected automatically
+        const result = await createShot({
+          name,
+          files: files.length > 0 ? files : undefined,
+          aspectRatio: aspectRatio || undefined,
+          // For the travel tool, we already drive the optimistic skeleton via refs
+          // (and we want empty-shot skeletons too), so don't also dispatch global events.
+          dispatchSkeletonEvents: false,
+          onSuccess: async (creationResult) => {
+            // Refetch shots to update the list
             await refetchShots();
-            const updatedShots = queryClient.getQueryData<Shot[]>(['shots', selectedProjectId]);
-            const createdShot = updatedShots?.find(s => s.id === result.shotId);
-            if (createdShot) {
-              newShot = createdShot;
-            } else {
-              throw new Error("Created shot not found after refetch");
-            }
-          } else {
-            throw new Error("Failed to create shot with files");
+          },
+        });
+
+        if (!result) {
+          // Error already handled by useShotCreation, clear skeleton
+          if (skeletonClearRef.current) {
+            skeletonClearRef.current();
           }
-        } else {
-          // Otherwise, just create an empty shot
-          const result = await createShotMutation.mutateAsync({
-            name,
-            projectId: selectedProjectId,
-            aspectRatio: aspectRatio || undefined,
-          } as any);
-          
-          // Transform the database response to match Shot interface
-          newShot = {
-            ...result.shot,
-            images: [], // New shot starts with no images
-            position: 0 // New shots start at position 0, will be updated by the backend
-          } as Shot;
-          
-          // Refetch shots to update the list
-          await refetchShots();
+          return;
         }
-        
-        // Update shot with aspect ratio if created via file upload
-        if (files.length > 0 && aspectRatio && newShot.id) {
-          await supabase
-            .from('shots')
-            .update({ aspect_ratio: aspectRatio } as any)
-            .eq('id', newShot.id);
-          
-          // Update local shot object
-          newShot.aspect_ratio = aspectRatio;
-        }
-        
-        // Apply standardized settings inheritance
-        await inheritSettingsForNewShot({
-          newShotId: newShot.id,
-          projectId: selectedProjectId,
-          shots: shots || []
+
+        console.log('[VideoTravelToolPage] Shot created via modal:', {
+          shotId: result.shotId.substring(0, 8),
+          shotName: result.shotName,
         });
         
         // Don't auto-navigate into the shot - user stays on shot list

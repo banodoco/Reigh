@@ -129,7 +129,7 @@ export const VideoTravelFloatingOverlay: React.FC<VideoTravelFloatingOverlayProp
           <div className="flex-shrink-0 pb-2 sm:pb-1">
             <div className="flex flex-col items-center px-2">
               <div className="flex items-center justify-center">
-                <div className="flex items-center space-x-1 sm:space-x-2 bg-background/80 backdrop-blur-md shadow-xl rounded-lg border border-border p-1" style={{ pointerEvents: 'auto' }}>
+                <div className="flex items-center space-x-1 sm:space-x-2 bg-background/90 backdrop-blur-md shadow-xl rounded-lg border border-border/80 dark:border-border p-1 dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]" style={{ pointerEvents: 'auto' }}>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -174,7 +174,7 @@ export const VideoTravelFloatingOverlay: React.FC<VideoTravelFloatingOverlayProp
               {isMobileSticky && (
                 <button
                   onClick={onBackToShotList}
-                  className="mt-0.5 px-3 py-1 text-xs text-muted-foreground hover:text-foreground bg-background/80 backdrop-blur-md rounded-b-lg border border-t-0 border-border flex items-center"
+                  className="mt-0.5 px-3 py-1 text-xs text-muted-foreground hover:text-foreground bg-background/90 backdrop-blur-md rounded-b-lg border border-t-0 border-border/80 dark:border-border flex items-center"
                   style={{ pointerEvents: 'auto' }}
                 >
                   <ChevronLeft className="h-3 w-3 mr-0.5" />
@@ -197,7 +197,7 @@ export const VideoTravelFloatingOverlay: React.FC<VideoTravelFloatingOverlayProp
             pointerEvents: 'none'
           }}
         >
-          <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-6 w-full max-w-md" style={{ pointerEvents: 'auto' }}>
+          <div className="bg-background/90 backdrop-blur-md rounded-lg shadow-2xl dark:shadow-[0_4px_30px_rgba(0,0,0,0.5)] border border-border/50 dark:border-border py-4 px-6 w-full max-w-md" style={{ pointerEvents: 'auto' }}>
             <GenerateVideoCTA
               variantName={variantName}
               onVariantNameChange={setVariantName}

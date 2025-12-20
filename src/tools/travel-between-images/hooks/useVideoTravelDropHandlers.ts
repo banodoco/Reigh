@@ -7,13 +7,18 @@
  * - Dropping files onto existing shots
  * - Dropping files to create new shots
  * 
+ * Uses useShotCreation for new shot creation (handles inheritance, events, etc.)
+ * 
  * @see VideoTravelToolPage.tsx - Main page component that uses this hook
  * @see ShotListDisplay.tsx - Component that triggers these handlers
+ * @see useShotCreation.ts - Unified shot creation hook
  */
 
-import { useCallback } from 'react';
+import { useCallback, useContext } from 'react';
 import { toast } from 'sonner';
 import { Shot } from '@/types/shots';
+import { LastAffectedShotContext } from '@/shared/contexts/LastAffectedShotContext';
+import { useShotCreation } from '@/shared/hooks/useShotCreation';
 
 export interface GenerationDropData {
   generationId: string;
@@ -27,10 +32,6 @@ export interface UseVideoTravelDropHandlersParams {
   selectedProjectId: string | null | undefined;
   /** Current shots list */
   shots: Shot[] | undefined;
-  /** Mutation to create a new shot */
-  createShotMutation: {
-    mutateAsync: (params: { name: string; projectId: string }) => Promise<{ shot?: { id: string } }>;
-  };
   /** Mutation to add an image to a shot with automatic position */
   addImageToShotMutation: {
     mutateAsync: (params: {
@@ -51,7 +52,7 @@ export interface UseVideoTravelDropHandlersParams {
       thumbUrl?: string;
     }) => Promise<any>;
   };
-  /** Mutation to handle external file drops */
+  /** Mutation to handle external file drops (for existing shots only) */
   handleExternalImageDropMutation: {
     mutateAsync: (params: {
       imageFiles: File[];
@@ -88,17 +89,27 @@ export interface UseVideoTravelDropHandlersReturn {
 
 /**
  * Hook that provides drop handlers for shot list drag-and-drop operations.
+ * 
+ * New shot creation is delegated to useShotCreation which handles:
+ * - Settings inheritance (runs in background)
+ * - Last affected shot tracking
+ * - Optimistic skeleton events
  */
 export const useVideoTravelDropHandlers = ({
   selectedProjectId,
   shots,
-  createShotMutation,
   addImageToShotMutation,
   addImageToShotWithoutPositionMutation,
   handleExternalImageDropMutation,
-  refetchShots,
   setShotSortMode,
 }: UseVideoTravelDropHandlersParams): UseVideoTravelDropHandlersReturn => {
+  
+  // Use unified shot creation hook
+  const { createShot } = useShotCreation();
+  
+  // Get setLastAffectedShotId to update the default shot in GenerationsPane
+  const lastAffectedShotContext = useContext(LastAffectedShotContext);
+  const setLastAffectedShotId = lastAffectedShotContext?.setLastAffectedShotId;
   
   // Handle dropping a generation onto an existing shot
   const handleGenerationDropOnShot = useCallback(async (
@@ -142,92 +153,75 @@ export const useVideoTravelDropHandlers = ({
           thumbUrl: data.thumbUrl,
         });
       }
+      
+      // Update last affected shot so GenerationsPane targets this shot by default
+      setLastAffectedShotId?.(shotId);
     } catch (error) {
       console.error('[ShotDrop] Failed to add to shot:', error);
       toast.error(`Failed to add to shot: ${(error as Error).message}`);
     }
-  }, [selectedProjectId, shots, addImageToShotMutation, addImageToShotWithoutPositionMutation]);
+  }, [selectedProjectId, shots, addImageToShotMutation, addImageToShotWithoutPositionMutation, setLastAffectedShotId]);
 
   // Handle dropping a generation to create a new shot
   const handleGenerationDropForNewShot = useCallback(async (
     data: GenerationDropData
   ) => {
-    if (!selectedProjectId) {
-      toast.error('No project selected');
-      return;
-    }
-
-    const newShotName = `Shot ${(shots?.length ?? 0) + 1}`;
     console.log('[ShotDrop] Creating new shot with generation:', {
-      newShotName,
       generationId: data.generationId?.substring(0, 8),
       timestamp: Date.now()
     });
 
-    try {
-      // First create the shot
-      const result = await createShotMutation.mutateAsync({
-        name: newShotName,
-        projectId: selectedProjectId,
-      } as any);
-
-      const newShotId = result.shot?.id;
-      if (!newShotId) {
-        throw new Error('Failed to create shot - no ID returned');
-      }
-
-      // Then add the generation to it
-      await addImageToShotMutation.mutateAsync({
-        shot_id: newShotId,
-        generation_id: data.generationId,
-        project_id: selectedProjectId,
+    // Use unified shot creation - handles inheritance, lastAffectedShot, events automatically
+    const result = await createShot({
+      generationId: data.generationId,
+      generationPreview: {
         imageUrl: data.imageUrl,
         thumbUrl: data.thumbUrl,
-      });
+      },
+      onSuccess: () => {
+        // Switch to "Newest First" so the new shot appears at the top
+        setShotSortMode('newest');
+      },
+    });
 
-      // Switch to "Newest First" so the new shot appears at the top
-      setShotSortMode('newest');
-
-      // Refetch shots to update the list (don't await - mutations already invalidate cache)
-      refetchShots();
-    } catch (error) {
-      console.error('[ShotDrop] Failed to create new shot:', error);
-      toast.error(`Failed to create shot: ${(error as Error).message}`);
-    }
-  }, [selectedProjectId, shots, createShotMutation, addImageToShotMutation, refetchShots, setShotSortMode]);
-
-  // Handle dropping files to create a new shot
-  const handleFilesDropForNewShot = useCallback(async (files: File[]) => {
-    if (!selectedProjectId) {
-      toast.error('No project selected');
+    if (!result) {
+      // Error already shown by useShotCreation
       return;
     }
 
+    console.log('[ShotDrop] New shot created:', {
+      shotId: result.shotId.substring(0, 8),
+      shotName: result.shotName,
+    });
+  }, [createShot, setShotSortMode]);
+
+  // Handle dropping files to create a new shot
+  const handleFilesDropForNewShot = useCallback(async (files: File[]) => {
     console.log('[ShotDrop] Creating new shot with files:', {
       fileCount: files.length,
       fileNames: files.map(f => f.name),
       timestamp: Date.now()
     });
 
-    try {
-      // Use the external image drop mutation which handles file uploads and shot creation
-      await handleExternalImageDropMutation.mutateAsync({
-        imageFiles: files,
-        targetShotId: null, // Create new shot
-        currentProjectQueryKey: selectedProjectId,
-        currentShotCount: shots?.length ?? 0
-      });
+    // Use unified shot creation - handles inheritance, lastAffectedShot, events automatically
+    const result = await createShot({
+      files,
+      onSuccess: () => {
+        // Switch to "Newest First" so the new shot appears at the top
+        setShotSortMode('newest');
+      },
+    });
 
-      // Switch to "Newest First" so the new shot appears at the top
-      setShotSortMode('newest');
-
-      // Refetch shots to update the list (don't await - mutations already invalidate cache)
-      refetchShots();
-    } catch (error) {
-      console.error('[ShotDrop] Failed to create new shot from files:', error);
-      toast.error(`Failed to create shot: ${(error as Error).message}`);
+    if (!result) {
+      // Error already shown by useShotCreation
+      return;
     }
-  }, [selectedProjectId, shots, handleExternalImageDropMutation, refetchShots, setShotSortMode]);
+
+    console.log('[ShotDrop] New shot created from files:', {
+      shotId: result.shotId.substring(0, 8),
+      shotName: result.shotName,
+    });
+  }, [createShot, setShotSortMode]);
 
   // Handle dropping files onto an existing shot
   const handleFilesDropOnShot = useCallback(async (
@@ -258,14 +252,14 @@ export const useVideoTravelDropHandlers = ({
         currentShotCount: shots?.length ?? 0,
         skipAutoPosition: withoutPosition, // Use skipAutoPosition to add without timeline position
       });
-
-      // Refetch shots - skeleton clears when new images appear in data
-      refetchShots();
+      
+      // Update last affected shot so GenerationsPane targets this shot by default
+      setLastAffectedShotId?.(shotId);
     } catch (error) {
       console.error('[ShotDrop] Failed to add files to shot:', error);
       toast.error(`Failed to add images: ${(error as Error).message}`);
     }
-  }, [selectedProjectId, shots, handleExternalImageDropMutation, refetchShots]);
+  }, [selectedProjectId, shots, handleExternalImageDropMutation, setLastAffectedShotId]);
 
   return {
     handleGenerationDropOnShot,
