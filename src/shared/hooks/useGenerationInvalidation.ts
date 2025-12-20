@@ -12,6 +12,9 @@
  *   const invalidateGenerations = useInvalidateGenerations();
  *   invalidateGenerations(shotId, { reason: 'delete-image' });
  * 
+ * For variant changes (no shotId needed):
+ *   invalidateVariantChange(queryClient, { generationId, reason: 'set-primary' });
+ * 
  * Scopes:
  * - 'all': All generation-related queries (default)
  * - 'images': Just image data (all-shot-generations, shot-generations)
@@ -44,6 +47,21 @@ export interface InvalidationOptions {
   projectId?: string;
   /** Also invalidate unified-generations at project level */
   includeProjectUnified?: boolean;
+}
+
+/**
+ * Options for variant-specific invalidation.
+ * Use when a variant is created/updated/set-as-primary.
+ */
+export interface VariantInvalidationOptions {
+  /** Debug reason for logging. Required for traceability. */
+  reason: string;
+  /** Generation ID that the variant belongs to */
+  generationId: string;
+  /** Optional: specific shot ID to prioritize (will refetch immediately before global invalidation) */
+  shotId?: string;
+  /** Delay before invalidation (e.g., 100ms for DB trigger to complete) */
+  delayMs?: number;
 }
 
 /**
@@ -176,4 +194,58 @@ export function invalidateAllShotGenerations(
   queryClient.invalidateQueries({
     predicate: (query) => query.queryKey[0] === 'shot-generations'
   });
+}
+
+/**
+ * Invalidate caches after a variant change (create, update, set-as-primary).
+ * 
+ * This handles the variant → generation → shot cascade:
+ * - A variant belongs to a generation
+ * - A generation can appear in multiple shots (via shot_generations)
+ * - When the primary variant changes, generations.location changes
+ * - This affects Timeline/Batch mode displays
+ * 
+ * @param queryClient - React Query client
+ * @param options - Invalidation options including generationId and reason
+ */
+export async function invalidateVariantChange(
+  queryClient: QueryClient,
+  options: VariantInvalidationOptions
+): Promise<void> {
+  const { reason, generationId, shotId, delayMs } = options;
+  
+  // Apply delay if specified (e.g., for DB trigger to complete)
+  if (delayMs && delayMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+  
+  if (debugConfig.isEnabled('invalidation')) {
+    console.log(`[Invalidation] Variant change: ${reason}`, {
+      generationId: generationId.substring(0, 8),
+      shotId: shotId?.substring(0, 8) || 'unknown',
+      timestamp: Date.now()
+    });
+  }
+  
+  // 1. Invalidate variant-specific queries
+  queryClient.invalidateQueries({ queryKey: ['generation-variants', generationId] });
+  queryClient.invalidateQueries({ queryKey: ['generation', generationId] });
+  
+  // 2. If we know the shot, refetch it immediately for faster UI update
+  if (shotId) {
+    await queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
+  }
+  
+  // 3. Invalidate all shot-generations (generation might be in multiple shots)
+  queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === 'all-shot-generations'
+  });
+  queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === 'shot-generations'
+  });
+  
+  // 4. Invalidate generation galleries (unified-generations, generations)
+  // Use both scoped and legacy key patterns for compatibility
+  queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+  queryClient.invalidateQueries({ queryKey: ['generations'] });
 }

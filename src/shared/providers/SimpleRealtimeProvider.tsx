@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { simpleRealtimeManager } from '@/shared/realtime/SimpleRealtimeManager';
 import { dataFreshnessManager } from '@/shared/realtime/DataFreshnessManager';
-import { invalidateGenerationsSync, invalidateAllShotGenerations } from '@/shared/hooks/useGenerationInvalidation';
+import { invalidateGenerationsSync, invalidateAllShotGenerations, invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 
 interface SimpleRealtimeContextType {
   isConnected: boolean;

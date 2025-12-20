@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { extractAndUploadThumbnailOnly } from '@/shared/utils/videoThumbnailGenerator';
+import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 import type { TrimState, UseTrimSaveReturn } from '../types';
 
 interface UseTrimSaveProps {
@@ -231,13 +232,11 @@ export const useTrimSave = ({
 
       console.log('[useTrimSave] Complete! MP4 saved with proper duration.');
 
-      // Invalidate queries to refresh all views
-      queryClient.invalidateQueries({ queryKey: ['generation-variants'] });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
-      queryClient.invalidateQueries({ queryKey: ['generation'] });
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations'] }); // Timeline/Batch mode
-      queryClient.invalidateQueries({ queryKey: ['generations'] }); // General generations
-      queryClient.removeQueries({ queryKey: ['unified-generations'], exact: false });
+      // Invalidate caches using centralized function
+      await invalidateVariantChange(queryClient, {
+        generationId,
+        reason: 'trim-save-variant-created',
+      });
 
       // Call success callback
       onSuccess?.(newVariantId);

@@ -10,6 +10,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 import type { GenerationVariant, UseVariantsReturn } from '../types';
 
 interface UseVariantsProps {
@@ -140,19 +141,16 @@ export const useVariants = ({
 
       return variantId;
     },
-    onSuccess: (variantId) => {
+    onSuccess: async (variantId) => {
       console.log('[useVariants] Successfully set primary variant:', variantId.substring(0, 8));
-      console.log('[useVariants] 🔄 Invalidating queries to refresh data...');
       
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['generation-variants', generationId] });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
-      queryClient.invalidateQueries({ queryKey: ['generation', generationId] });
-      // IMPORTANT: Invalidate shot generations cache so Timeline/Batch mode updates
-      queryClient.invalidateQueries({ queryKey: ['all-shot-generations'] });
-      queryClient.invalidateQueries({ queryKey: ['generations'] });
-      
-      console.log('[useVariants] ✅ Query invalidation complete');
+      // Invalidate caches using centralized function
+      if (generationId) {
+        await invalidateVariantChange(queryClient, {
+          generationId,
+          reason: 'set-primary-variant',
+        });
+      }
       
       toast.success('Set as primary variant');
     },

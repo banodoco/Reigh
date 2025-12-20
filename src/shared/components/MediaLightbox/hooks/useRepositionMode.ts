@@ -5,6 +5,7 @@ import { GenerationRow } from '@/types/shots';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { createImageInpaintTask } from '@/shared/lib/tasks/imageInpaint';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 
 export interface ImageTransform {
   translateX: number; // percentage (0-100)
@@ -530,28 +531,17 @@ export const useRepositionMode = ({
         }
       }
       
-      // Invalidate unified-generations cache so results galleries refresh
-      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
-      
-      // Also invalidate shot-generations so Timeline/ShotImagesEditor update
-      // Try to get shotId from prop, or from media's shot associations
+      // Get shotId from prop, or from media's shot associations
       const effectiveShotId = shotId || (media as any).shot_id || 
         ((media as any).all_shot_associations?.[0]?.shot_id);
       
-      // Small delay to ensure DB trigger (AFTER INSERT) completes before refetch
-      // The trigger updates generations.location from the new primary variant
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      if (effectiveShotId) {
-        await queryClient.refetchQueries({ queryKey: ['all-shot-generations', effectiveShotId] });
-      }
-      
-      // Also invalidate ALL shot-generations caches since we don't know which shots have this image
-      queryClient.invalidateQueries({ 
-        predicate: (query) => {
-          const key = query.queryKey;
-          return key[0] === 'all-shot-generations' || key[0] === 'shot-generations';
-        }
+      // Invalidate caches using centralized function
+      // Note: 100ms delay allows DB trigger to update generations.location from new primary variant
+      await invalidateVariantChange(queryClient, {
+        generationId: actualGenerationId,
+        shotId: effectiveShotId,
+        reason: 'reposition-variant-created',
+        delayMs: 100,
       });
       
       // Refetch variants to update the list
