@@ -34,6 +34,7 @@ import { useVideoTravelData } from '../hooks/useVideoTravelData';
 import { useVideoTravelDropHandlers } from '../hooks/useVideoTravelDropHandlers';
 import { useVideoTravelAddToShot } from '../hooks/useVideoTravelAddToShot';
 import { useStableSkeletonVisibility } from '../hooks/useStableSkeletonVisibility';
+import { useVideoTravelFloatingUI } from '../hooks/useVideoTravelFloatingUI';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
@@ -353,85 +354,31 @@ const VideoTravelToolPage: React.FC = () => {
   const mainContainerRef = useRef<HTMLDivElement>(null);
   
   // ============================================================================
-  // FLOATING UI - Refs and State
+  // FLOATING UI - Refs and State (extracted to useVideoTravelFloatingUI hook)
   // ============================================================================
-  // Stable refs for floating elements (maintained for hook access)
-  const headerContainerRef = useRef<HTMLDivElement>(null);
-  const timelineSectionRef = useRef<HTMLDivElement>(null);
-  const ctaContainerRef = useRef<HTMLDivElement>(null);
-  
-  // State to track when refs are attached to DOM elements
-  const [headerReady, setHeaderReady] = useState(false);
-  const [timelineReady, setTimelineReady] = useState(false);
-  const [ctaReady, setCtaReady] = useState(false);
-  
-  // Callback refs that update both the ref object AND state when elements attach
-  const headerCallbackRef = useCallback((node: HTMLDivElement | null) => {
-    headerContainerRef.current = node;
-    setHeaderReady(!!node);
-  }, []);
-  
-  const timelineCallbackRef = useCallback((node: HTMLDivElement | null) => {
-    timelineSectionRef.current = node;
-    setTimelineReady(!!node);
-  }, []);
-  
-  const ctaCallbackRef = useCallback((node: HTMLDivElement | null) => {
-    ctaContainerRef.current = node;
-    setCtaReady(!!node);
-  }, []);
-  
-  // Selection state for floating CTA visibility control
-  const [hasActiveSelection, setHasActiveSelection] = useState(false);
-  
-  // Callback to receive selection changes from ShotEditor
-  const handleSelectionChange = useCallback((hasSelection: boolean) => {
-    setHasActiveSelection(hasSelection);
-  }, []);
-  
-  // ============================================================================
-  // GENERATE VIDEO CTA STATE (Page-level management)
-  // ============================================================================
-  const [variantName, setVariantName] = useState('');
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
-  const [videoJustQueued, setVideoJustQueued] = useState(false);
-  
-  // Refs to get shot-specific data and generate function from ShotEditor
-  const getGenerationDataRef = useRef<(() => any) | null>(null);
-  const generateVideoRef = useRef<((variantName: string) => Promise<void>) | null>(null);
-  const nameClickRef = useRef<(() => void) | null>(null);
-  
-  // Handle generate video - calls ShotEditor's function with current variant name
-  const handleGenerateVideo = useCallback(async () => {
-    if (generateVideoRef.current) {
-      setIsGeneratingVideo(true);
-      setVideoJustQueued(false);
-      try {
-        await generateVideoRef.current(variantName);
-        setVariantName(''); // Clear after success
-        setVideoJustQueued(true);
-        setTimeout(() => setVideoJustQueued(false), 2000);
-      } catch (error) {
-        console.error('Failed to generate video:', error);
-      } finally {
-        setIsGeneratingVideo(false);
-      }
-    }
-  }, [variantName]);
-  
-  // Handle floating header name click - scroll to top and trigger edit mode
-  const handleFloatingHeaderNameClick = useCallback(() => {
-    // Scroll to absolute top (position 0) to fully hide floating header
-    // Using window.scrollTo instead of scrollIntoView to ensure we scroll past the global header
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    // Trigger edit mode after a short delay to let scroll finish
-    setTimeout(() => {
-      if (nameClickRef.current) {
-        nameClickRef.current();
-      }
-    }, 300);
-  }, []);
+  const {
+    headerContainerRef,
+    timelineSectionRef,
+    ctaContainerRef,
+    headerReady,
+    timelineReady,
+    ctaReady,
+    headerCallbackRef,
+    timelineCallbackRef,
+    ctaCallbackRef,
+    hasActiveSelection,
+    handleSelectionChange,
+    resetSelection,
+    variantName,
+    setVariantName,
+    isGeneratingVideo,
+    videoJustQueued,
+    getGenerationDataRef,
+    generateVideoRef,
+    nameClickRef,
+    handleGenerateVideo,
+    handleFloatingHeaderNameClick,
+  } = useVideoTravelFloatingUI();
   
   
   // Use the shot navigation hook
@@ -968,8 +915,8 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Reset selection tracking whenever the active shot changes
   useEffect(() => {
-    setHasActiveSelection(false);
-  }, [shotToEdit?.id]);
+    resetSelection();
+  }, [shotToEdit?.id, resetSelection]);
   
   // Initialize video gallery thumbnail preloader (after dependencies are defined)
   const preloaderState = useVideoGalleryPreloader({
