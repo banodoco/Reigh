@@ -159,11 +159,11 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 return (
                   <div className="flex flex-col gap-2">
                     {images.map((img, idx) => (
-                      <div key={idx} className="w-[69px] sm:w-[112px] aspect-[4/3] flex-shrink-0">
+                      <div key={idx} className="w-[69px] h-[52px] sm:w-[112px] sm:h-[84px] flex-shrink-0 overflow-hidden rounded-lg border">
                         <img 
                           src={PLACEHOLDER}
                           alt={`Input image ${idx + 1}`}
-                          className="w-full h-full object-cover border rounded-lg"
+                          className="w-full h-full object-cover"
                         />
                       </div>
                     ))}
@@ -171,19 +171,35 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 );
               }
               
-              // 4 images: stacked vertically, 16:9 aspect ratio
+              // 4 images: 2x2 grid above output, 16:9 aspect ratio each
               if (imageCount === 4) {
                 return (
                   <div className="flex flex-col gap-2">
-                    {images.map((img, idx) => (
-                      <div key={idx} className="w-[68px] sm:w-[109px] aspect-video flex-shrink-0">
-                        <img 
-                          src={PLACEHOLDER}
-                          alt={`Input image ${idx + 1}`}
-                          className="w-full h-full object-cover border rounded-lg"
-                        />
-                      </div>
-                    ))}
+                    <div className="grid grid-cols-2 gap-2">
+                      {images.map((img, idx) => (
+                        <div key={idx} className="w-[80px] h-[45px] sm:w-[128px] sm:h-[72px] flex-shrink-0 overflow-hidden rounded-lg border">
+                          <img 
+                            src={PLACEHOLDER}
+                            alt={`Input image ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {/* Output video below the grid */}
+                    <div 
+                      className="w-[168px] h-[94px] sm:w-[264px] sm:h-[148px] flex-shrink-0 relative overflow-hidden rounded-lg border"
+                      style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+                    >
+                      <video 
+                        src={PLACEHOLDER}
+                        poster={PLACEHOLDER}
+                        muted
+                        playsInline
+                        preload="auto"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                   </div>
                 );
               }
@@ -191,7 +207,8 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               return null;
             })()}
             
-            {/* Right side: Output video - fixed size */}
+            {/* Right side: Output video - fixed size (hidden for 4-image layout which has its own) */}
+            {selectedTravelExample !== 2 && (
             <div 
               className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative"
               style={{ transform: 'translateZ(0)', willChange: 'transform' }}
@@ -272,10 +289,11 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 </svg>
               </button>
             </div>
+            )}
           </div>
 
           {/* Example selector with thumbnail previews - below visualization, full width */}
-          <div className="grid grid-cols-3 gap-2 w-full">
+          <div className="grid grid-cols-3 gap-2 w-full pt-4">
             {travelExamples.map((example, idx) => {
               // Get thumbnail images for the selector
               const thumbImages = idx === 0 
@@ -397,15 +415,15 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
           </p>
           
           <div className="flex gap-3">
-            {/* LoRA selector (left, right-aligned) */}
-            <div className="flex flex-col items-end gap-2">
+            {/* LoRA selector (left, right-aligned, fixed width) */}
+            <div className="flex flex-col items-end gap-2 w-28 sm:w-32">
               <span className="text-xs text-muted-foreground/70 pr-2">Motion LoRA</span>
               {loraOptions.map((lora, idx) => (
                 <button
                   key={lora.id}
                   onClick={() => setSelectedLora(idx)}
                   className={cn(
-                    "px-2 py-2 text-xs rounded-md transition-all duration-200 text-right",
+                    "w-full px-2 py-2 text-xs rounded-md transition-all duration-200 text-right",
                     selectedLora === idx
                       ? "bg-primary/20 text-primary border border-primary/30"
                       : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
@@ -576,10 +594,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            Just as a songwriter might uncover infinite possibilities in six strings, we believe an entire artform lies waiting in the AI-driven journey between images.
+            Just as a songwriter might uncover infinite possibilities with six strings, we believe an entire artform lies waiting in the AI-driven journey between images.
           </p>
           <p className="text-sm leading-relaxed">
-            Reigh is a tool <strong>just</strong> for exploring this artform. By creating with it and endlessly refining every element, we want to make it extremely good, and build a community of people who want to explore it with us.
+            Reigh is a tool just for exploring this artform. By endless improving it and implementing ideas and work from the community, we hope to make it very good. And everything is open source - meaning you can <em>run it for free</em> on your computer!
           </p>
           <p className="text-sm leading-relaxed">
             If you're interested in joining, you're very welcome.
