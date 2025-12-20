@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
 import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName, useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
-import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -15,17 +14,12 @@ import ShotListDisplay from '../components/ShotListDisplay';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { usePanes } from '@/shared/contexts/PanesContext';
-import { LoraModel } from '@/shared/components/LoraSelectorModal';
-import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
-import { VideoTravelSettings, PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
-import { buildBasicModePhaseConfig } from '../components/ShotEditor/services/generateVideoService';
-import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
+import { VideoTravelSettings } from '../settings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
 import { PageFadeIn } from '@/shared/components/transitions';
-import { useListPublicResources } from '@/shared/hooks/useResources';
 import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
 import { timeEnd } from '@/shared/lib/logger';
 
@@ -35,6 +29,9 @@ import { useAllShotGenerations, usePrimeShotGenerationsCache } from '@/shared/ho
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
 import { useProjectGenerationModesCache } from '@/shared/hooks/useProjectGenerationModesCache';
 import { useShotSettings } from '../hooks/useShotSettings';
+import { useVideoTravelSettingsHandlers } from '../hooks/useVideoTravelSettingsHandlers';
+import { useVideoTravelViewMode } from '../hooks/useVideoTravelViewMode';
+import { useVideoTravelData } from '../hooks/useVideoTravelData';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
@@ -51,92 +48,8 @@ import { useStickyHeader } from '../hooks/useStickyHeader';
 import { GenerateVideoCTA } from '../components/GenerateVideoCTA';
 import { useRenderCount } from '@/shared/components/debug/RefactorMetricsCollector';
 
-// Custom hook to parallelize data fetching for better performance
-const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
-  // Get shots data from context (single source of truth) - full data for ShotEditor
-  const { shots, isLoading: shotsLoading, error: shotsError, refetchShots } = useShots();
-  
-  // Note: Removed limitedShots - ShotListDisplay now uses ShotsContext directly for consistency
-  
-  // Fetch public LoRAs data - always call this hook
-  const publicLorasQuery = useListPublicResources('lora');
-  
-  // Always call these hooks but disable them when parameters are missing
-  // This ensures consistent hook order between renders
-  const toolSettingsQuery = useToolSettings<VideoTravelSettings>(
-    'travel-between-images',
-    { 
-      shotId: selectedShotId || null, 
-      enabled: !!selectedShotId 
-    }
-  );
-  
-  // Destructure error separately to ensure it's available
-  const { error: toolSettingsError } = toolSettingsQuery;
-
-  const projectSettingsQuery = useToolSettings<VideoTravelSettings>(
-    'travel-between-images',
-    { 
-      projectId: projectId || null, 
-      enabled: !!projectId 
-    }
-  );
-
-  const projectUISettingsQuery = useToolSettings<{
-    acceleratedMode?: boolean;
-    randomSeed?: boolean;
-    shotSortMode?: 'ordered' | 'newest' | 'oldest';
-  }>('travel-ui-state', { 
-    projectId: projectId || null, 
-    enabled: !!projectId 
-  });
-
-  // Upload settings (for cropToProjectSize)
-  const uploadSettingsQuery = useToolSettings<{
-    cropToProjectSize?: boolean;
-  }>('upload', { 
-    projectId: projectId || null, 
-    enabled: !!projectId 
-  });
-
-  // NOTE: shotLoraSettings query removed - LoRAs are now part of main settings (selectedLoras field)
-  // and are inherited via useShotSettings along with all other settings
-
-  return {
-    // Shots data
-    shots, // Full shots data for both ShotEditor and ShotListDisplay (from context)
-    // Expose raw loading flags; page can decide how to combine based on context
-    shotsLoading,
-    shotsError,
-    refetchShots,
-    
-    // LoRAs data
-    availableLoras: ((publicLorasQuery.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[],
-    lorasLoading: publicLorasQuery.isLoading,
-    
-    // Settings data
-    settings: toolSettingsQuery.settings,
-    updateSettings: toolSettingsQuery.update,
-    settingsLoading: toolSettingsQuery.isLoading,
-    settingsUpdating: toolSettingsQuery.isUpdating,
-    settingsError: toolSettingsError,
-
-    // Project settings data
-    projectSettings: projectSettingsQuery.settings,
-    updateProjectSettings: projectSettingsQuery.update,
-    projectSettingsLoading: projectSettingsQuery.isLoading,
-    projectSettingsUpdating: projectSettingsQuery.isUpdating,
-
-    // Project UI settings data
-    projectUISettings: projectUISettingsQuery.settings,
-    updateProjectUISettings: projectUISettingsQuery.update,
-    
-    // Upload settings (cropToProjectSize)
-    uploadSettings: uploadSettingsQuery.settings,
-  };
-};
-
 // ShotEditor is imported eagerly to avoid dynamic import issues on certain mobile browsers.
+// useVideoTravelData moved to hooks/useVideoTravelData.ts
 
 const VideoTravelToolPage: React.FC = () => {
   // [RefactorMetrics] Track render count for baseline measurements
@@ -373,47 +286,39 @@ const VideoTravelToolPage: React.FC = () => {
   const updateShotNameMutation = useUpdateShotName();
   const addImageToShotMutation = useAddImageToShot();
 
-  // Memoized callbacks to prevent infinite re-renders
-  // FIX: Use shotSettingsRef.current instead of shotSettings to prevent callback recreation
-  // when shotSettings object changes (which happens on every shot change)
-  const noOpCallback = useCallback(() => {}, []);
-  
-  const handleVideoControlModeChange = useCallback((mode: 'individual' | 'batch') => {
-    shotSettingsRef.current.updateField('videoControlMode', mode);
-  }, []);
+  // =============================================================================
+  // SETTINGS HANDLERS (extracted to useVideoTravelSettingsHandlers hook)
+  // =============================================================================
+  const {
+    noOpCallback,
+    handleVideoControlModeChange,
+    handlePairConfigChange,
+    handleBatchVideoPromptChange,
+    handleBatchVideoFramesChange,
+    handleBatchVideoStepsChange,
+    handleTextBeforePromptsChange,
+    handleTextAfterPromptsChange,
+    handleBlurSave,
+    handleEnhancePromptChange,
+    handleTurboModeChange,
+    handleAmountOfMotionChange,
+    handleMotionModeChange,
+    handleGenerationTypeModeChange,
+    handleSteerableMotionSettingsChange,
+    handlePhaseConfigChange,
+    handlePhasePresetSelect,
+    handlePhasePresetRemove,
+    handleRestoreDefaults,
+    handleGenerationModeChange,
+    handleSelectedLorasChange,
+  } = useVideoTravelSettingsHandlers({
+    shotSettingsRef,
+    currentShotId,
+    selectedShot,
+    updateShotMode,
+  });
 
-  const handlePairConfigChange = useCallback((pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => {
-    const currentPairConfigs = shotSettingsRef.current.settings?.pairConfigs || [];
-    const updated = currentPairConfigs.map(p => p.id === pairId ? { ...p, [field]: value } : p);
-    shotSettingsRef.current.updateField('pairConfigs', updated);
-  }, []);
-
-  const handleBatchVideoPromptChange = useCallback((prompt: string) => {
-    shotSettingsRef.current.updateField('batchVideoPrompt', prompt);
-  }, []);
-  
-  const handleTextBeforePromptsChange = useCallback((text: string) => {
-    shotSettingsRef.current.updateField('textBeforePrompts', text);
-  }, []);
-  
-  const handleTextAfterPromptsChange = useCallback((text: string) => {
-    shotSettingsRef.current.updateField('textAfterPrompts', text);
-  }, []);
-  
-  const handleBlurSave = useCallback(() => {
-    console.log('[PhaseConfigTrack] 🔵 Blur save triggered - saving immediately');
-    shotSettingsRef.current.saveImmediate();
-  }, []);
-
-  const handleBatchVideoFramesChange = useCallback((frames: number) => {
-    shotSettingsRef.current.updateField('batchVideoFrames', frames);
-  }, []);
-
-  const handleBatchVideoStepsChange = useCallback((steps: number) => {
-    console.log('[BatchVideoSteps] User changing steps to:', steps);
-    shotSettingsRef.current.updateField('batchVideoSteps', steps);
-  }, []);
-
+  // Dimension source handlers - local state, not persisted to shot settings
   const handleDimensionSourceChange = useCallback((source: 'project' | 'firstImage' | 'custom') => {
     setDimensionSource(source);
   }, []);
@@ -425,247 +330,6 @@ const VideoTravelToolPage: React.FC = () => {
   const handleCustomHeightChange = useCallback((height?: number) => {
     setCustomHeight(height);
   }, []);
-
-  const handleEnhancePromptChange = useCallback((enhance: boolean) => {
-    shotSettingsRef.current.updateField('enhancePrompt', enhance);
-  }, []);
-
-  const handleTurboModeChange = useCallback((turbo: boolean) => {
-    // When enabling turbo mode, automatically disable advanced mode but keep preset
-    if (turbo && shotSettingsRef.current.settings?.advancedMode) {
-      console.log('[TurboMode] Turbo mode enabled - auto-disabling advanced mode');
-      shotSettingsRef.current.updateFields({
-        turboMode: turbo,
-        advancedMode: false,
-        motionMode: 'basic'
-      });
-    } else {
-      shotSettingsRef.current.updateField('turboMode', turbo);
-    }
-  }, []);
-
-  // =============================================================================
-  // PHASE CONFIG SYNC: Keep the phase config in sync based on basic mode settings.
-  // Used by multiple handlers to ensure Advanced mode shows correct defaults:
-  // - I2V vs VACE mode (2 vs 3 phases, different models)
-  // - Amount of motion (motion LoRA strength)
-  // - User-selected LoRAs (added to all phases)
-  //
-  // By default, only rebuilds when in Basic mode (to preserve Advanced customizations).
-  // Pass force: true to always rebuild (for I2V/VACE toggle and Restore Defaults).
-  // =============================================================================
-  const rebuildPhaseConfig = useCallback((options?: {
-    generationTypeMode?: 'i2v' | 'vace';
-    amountOfMotion?: number;
-    selectedLoras?: Array<{ path: string; strength: number }>;
-    force?: boolean;  // Set true to always rebuild (I2V/VACE toggle, Restore Defaults)
-  }) => {
-    const currentSettings = shotSettingsRef.current.settings;
-    
-    // Only rebuild when in Basic mode, unless force is true
-    const isBasicMode = currentSettings?.motionMode === 'basic' || !currentSettings?.motionMode;
-    if (!isBasicMode && !options?.force) return;
-    
-    const useVaceMode = (options?.generationTypeMode ?? currentSettings?.generationTypeMode) === 'vace';
-    const motion = options?.amountOfMotion ?? currentSettings?.amountOfMotion ?? 50;
-    const loras = options?.selectedLoras ?? (currentSettings?.selectedLoras || []).map(l => ({
-      path: l.path,
-      strength: l.strength
-    }));
-    
-    const basicConfig = buildBasicModePhaseConfig(useVaceMode, motion, loras);
-    shotSettingsRef.current.updateField('phaseConfig', basicConfig.phaseConfig);
-  }, []);
-
-  const handleAmountOfMotionChange = useCallback((motion: number) => {
-    shotSettingsRef.current.updateField('amountOfMotion', motion);
-    rebuildPhaseConfig({ amountOfMotion: motion });
-  }, [rebuildPhaseConfig]);
-
-  const handleMotionModeChange = useCallback((mode: 'basic' | 'advanced') => {
-    // CRITICAL: Guard against calls when no shot is selected
-    // This can happen during component unmount/remount cycles when Tabs triggers onValueChange
-    // Use currentShotId (same source as useShotSettings) not selectedShot which can be out of sync
-    if (!currentShotId) {
-      console.log('[VTDebug] ⚠️ handleMotionModeChange ignored - no currentShotId');
-      return;
-    }
-    
-    // Prevent switching to advanced mode when turbo mode is on
-    if (mode === 'advanced' && shotSettingsRef.current.settings?.turboMode) {
-      console.log('[VTDebug] ⚠️ Cannot switch to advanced mode while turbo mode is active');
-      return;
-    }
-    
-    console.log('[VTDebug] 🔄 handleMotionModeChange called:', {
-      from: shotSettingsRef.current.settings?.motionMode,
-      to: mode,
-      currentShotId: currentShotId?.substring(0, 8),
-      hasPhaseConfig: !!shotSettingsRef.current.settings?.phaseConfig,
-      settingsStatus: shotSettingsRef.current.status,
-      timestamp: Date.now()
-    });
-    
-    // When switching to advanced mode, initialize phaseConfig from basic mode settings
-    if (mode === 'advanced') {
-      const currentPhaseConfig = shotSettingsRef.current.settings?.phaseConfig;
-      if (!currentPhaseConfig) {
-        // Build phase config from current basic mode settings (respects I2V/VACE mode)
-        const currentSettings = shotSettingsRef.current.settings;
-        const useVaceMode = currentSettings?.generationTypeMode === 'vace';
-        const currentMotion = currentSettings?.amountOfMotion ?? 50;
-        const currentLoras = (currentSettings?.selectedLoras || []).map(l => ({
-          path: l.path,
-          strength: l.strength
-        }));
-        
-        const basicConfig = buildBasicModePhaseConfig(useVaceMode, currentMotion, currentLoras);
-        
-        console.log('[MotionMode] Initializing phaseConfig from basic mode settings:', {
-          useVaceMode,
-          amountOfMotion: currentMotion,
-          loraCount: currentLoras.length,
-          model: basicConfig.model
-        });
-        
-        shotSettingsRef.current.updateFields({
-          motionMode: mode,
-          advancedMode: true,
-          phaseConfig: basicConfig.phaseConfig
-        });
-      } else {
-        shotSettingsRef.current.updateFields({
-          motionMode: mode,
-          advancedMode: true
-        });
-      }
-    } else {
-      // Basic mode - disable advanced mode but keep selected preset
-      shotSettingsRef.current.updateFields({
-        motionMode: mode,
-        advancedMode: false
-      });
-    }
-  }, [currentShotId]);
-
-  const handleGenerationTypeModeChange = useCallback((mode: 'i2v' | 'vace') => {
-    console.log('[GenerationTypeMode] Changing generation type mode:', {
-      from: shotSettingsRef.current.settings?.generationTypeMode,
-      to: mode
-    });
-    
-    shotSettingsRef.current.updateField('generationTypeMode', mode);
-    
-    // Always rebuild phase config when mode changes (force: true bypasses Basic mode check)
-    // because I2V vs VACE fundamentally changes the phase structure (2 vs 3 phases)
-    rebuildPhaseConfig({ generationTypeMode: mode, force: true });
-  }, [rebuildPhaseConfig]);
-
-  // Handler for restoring defaults in Advanced mode - respects current I2V/VACE mode
-  const handleRestoreDefaults = useCallback(() => {
-    console.log('[RestoreDefaults] Restoring phase config from basic mode settings');
-    // Force rebuild regardless of current mode (user explicitly clicked "Restore Defaults")
-    rebuildPhaseConfig({ force: true });
-  }, [rebuildPhaseConfig]);
-
-  const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
-    // Auto-set model_switch_phase to 1 when num_phases is 2
-    const adjustedConfig = config.num_phases === 2 
-      ? { ...config, model_switch_phase: 1 }
-      : config;
-    
-    console.log('[PhaseConfigTrack] 📝 User changed phase config:', {
-      num_phases: adjustedConfig.num_phases,
-      model_switch_phase: adjustedConfig.model_switch_phase,
-      phases_array_length: adjustedConfig.phases?.length,
-      steps_array_length: adjustedConfig.steps_per_phase?.length,
-      phases_data: adjustedConfig.phases?.map(p => ({ 
-        phase: p.phase, 
-        guidance_scale: p.guidance_scale, 
-        loras_count: p.loras?.length,
-        lora_urls: p.loras?.map(l => l.url.split('/').pop()) // Show filenames for easier debugging
-      })),
-      steps_per_phase: adjustedConfig.steps_per_phase,
-      auto_adjusted: config.num_phases === 2 && config.model_switch_phase !== 1,
-      timestamp: Date.now()
-    });
-    
-    // Clear preset reference when user manually edits config - the config no longer matches the preset
-    shotSettingsRef.current.updateFields({
-      phaseConfig: adjustedConfig,
-      selectedPhasePresetId: null
-    });
-  }, []);
-
-  const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, presetMetadata?: any) => {
-    console.log('[PhasePreset] User selected preset:', {
-      presetId: presetId.substring(0, 8),
-      generationTypeMode: presetMetadata?.generationTypeMode,
-      timestamp: Date.now()
-    });
-    
-    // DEEP CLONE: Create completely new config to prevent shared references
-    // This ensures modifying LoRA strengths in one phase doesn't affect other phases
-    const deepClonedConfig: PhaseConfig = {
-      ...config,
-      steps_per_phase: [...config.steps_per_phase],
-      phases: config.phases.map(phase => ({
-        ...phase,
-        loras: phase.loras.map(lora => ({ ...lora })) // Deep clone each LoRA
-      }))
-    };
-    
-    // Update preset ID, phase config, and generation type mode (if preset specifies one)
-    const updates: Record<string, any> = {
-      selectedPhasePresetId: presetId,
-      phaseConfig: deepClonedConfig
-    };
-    
-    // Also apply the preset's generation type mode if it has one
-    if (presetMetadata?.generationTypeMode) {
-      updates.generationTypeMode = presetMetadata.generationTypeMode;
-    }
-    
-    shotSettingsRef.current.updateFields(updates);
-  }, []);
-
-  const handlePhasePresetRemove = useCallback(() => {
-    console.log('[PhasePreset] User removed preset');
-    
-    // Clear preset ID but keep the current config
-    shotSettingsRef.current.updateField('selectedPhasePresetId', null);
-  }, []);
-
-  // Use refs to avoid recreating this callback when selectedShot or updateShotMode change
-  const selectedShotRef = useRef(selectedShot);
-  selectedShotRef.current = selectedShot;
-  const updateShotModeRef = useRef(updateShotMode);
-  updateShotModeRef.current = updateShotMode;
-
-const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
-    console.log('[GenerationModeDebug] 🔄 MODE CHANGE triggered:', {
-      shotId: selectedShotRef.current?.id?.substring(0, 8),
-      newMode: mode,
-      previousMode: shotSettingsRef.current.settings?.generationMode,
-      timestamp: Date.now()
-    });
-    
-    // Optimistically update the cache for THIS shot immediately
-    if (selectedShotRef.current?.id) {
-      updateShotModeRef.current(selectedShotRef.current.id, mode);
-    }
-
-    // Update the actual settings (will save to DB asynchronously)
-    shotSettingsRef.current.updateField('generationMode', mode);
-  }, []);
-
-  // LoRAs handler - now synced with all other settings
-  const handleSelectedLorasChange = useCallback((loras: any[]) => {
-    shotSettingsRef.current.updateField('selectedLoras', loras);
-    rebuildPhaseConfig({
-      selectedLoras: (loras || []).map(l => ({ path: l.path, strength: l.strength }))
-    });
-  }, [rebuildPhaseConfig]);
 
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const [isCreatingShot, setIsCreatingShot] = useState(false);
@@ -1036,167 +700,50 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
   // DEPRECATED: videoPairConfigs removed - pair prompts now stored in shot_generations.metadata.pair_prompt
   
-  // Add state for toggling between shots and videos view
-  const [showVideosViewRaw, setShowVideosViewRaw] = useState<boolean>(false);
-  
-  // Wrapper to log every state change
-  const setShowVideosView = useCallback((value: boolean | ((prev: boolean) => boolean)) => {
-    console.log('[ViewToggleDebug] setShowVideosView called', { 
-      newValue: typeof value === 'function' ? 'function' : value,
-      stack: new Error().stack?.split('\n').slice(1, 4).join(' <- ')
-    });
-    setShowVideosViewRaw(value);
-  }, []);
-  const showVideosView = showVideosViewRaw;
-  
-  // Track when we've just switched to videos view to prevent empty state flash
-  const [videosViewJustEnabled, setVideosViewJustEnabled] = useState<boolean>(false);
-  
-  // Debug: log whenever showVideosView actually changes
-  useEffect(() => {
-    console.log('[ViewToggleDebug] showVideosView STATE CHANGED to:', showVideosView);
-  }, [showVideosView]);
-  
-  // Reset to Shots view and scroll to top when navigating to the tool root (e.g., clicking logo)
-  // Uses location.key to detect actual navigation events (not just state changes)
-  const prevLocationKeyRef = useRef<string | undefined>(location.key);
-  useEffect(() => {
-    const hasHash = location.hash && location.hash.length > 1;
-    const isActualNavigation = prevLocationKeyRef.current !== location.key;
-    
-    // When navigating to tool root (no hash):
-    if (isActualNavigation && !hasHash) {
-      // Always scroll to top when clicking logo/nav to tool root
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      
-      // Reset videos view to shots if currently in videos
-      if (showVideosViewRaw) {
-        console.log('[ViewToggleDebug] Resetting to Shots view (navigated to tool root)');
-        setShowVideosViewRaw(false);
-      }
-    }
-    
-    prevLocationKeyRef.current = location.key;
-  }, [location.key, location.hash, showVideosViewRaw]);
-  
-  // Video gallery filter state
-  const [videoPage, setVideoPage] = useState<number>(1);
-  const [videoShotFilter, setVideoShotFilter] = useState<string>('all');
-  const [videoExcludePositioned, setVideoExcludePositioned] = useState<boolean>(false);
-  const [videoSearchTerm, setVideoSearchTerm] = useState<string>('');
-  const [videoMediaTypeFilter, setVideoMediaTypeFilter] = useState<'all' | 'image' | 'video'>('video');
-  const [videoToolTypeFilter, setVideoToolTypeFilter] = useState<boolean>(true);
-  const [videoStarredOnly, setVideoStarredOnly] = useState<boolean>(false);
-  const [videoSortMode, setVideoSortMode] = useState<'newest' | 'oldest'>('newest');
-
-  // Search functionality for shots and videos
-  const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
-  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  
-  // Search toggle handler - matches ShotsPane pattern
-  const handleSearchToggle = useCallback(() => {
-    setIsSearchOpen(prev => {
-      const newValue = !prev;
-      if (!newValue) {
-        // Clear search when closing
-        if (showVideosView) {
-          setVideoSearchTerm('');
-          setVideoPage(1);
-        } else {
-          setShotSearchQuery('');
-        }
-      }
-      return newValue;
-    });
-  }, [showVideosView, setVideoSearchTerm, setShotSearchQuery, setVideoPage]);
-
-  // Sort mode for shots - local state for immediate updates, synced with persisted settings
-  const [localShotSortMode, setLocalShotSortMode] = useState<'ordered' | 'newest' | 'oldest'>('newest');
-  
-  // Sync local state with persisted settings when they load
-  useEffect(() => {
-    if (projectUISettings?.shotSortMode) {
-      setLocalShotSortMode(projectUISettings.shotSortMode);
-    }
-  }, [projectUISettings?.shotSortMode]);
-  
-  const shotSortMode = localShotSortMode;
-  const setShotSortMode = useCallback((mode: 'ordered' | 'newest' | 'oldest') => {
-    setLocalShotSortMode(mode); // Immediate local update
-    updateProjectUISettings?.('project', { shotSortMode: mode }); // Persist async
+  // =============================================================================
+  // VIEW MODE & FILTERS (extracted to useVideoTravelViewMode hook)
+  // =============================================================================
+  const persistShotSortMode = useCallback((mode: 'ordered' | 'newest' | 'oldest') => {
+    updateProjectUISettings?.('project', { shotSortMode: mode });
   }, [updateProjectUISettings]);
 
-  // Reset video page when project changes
-  useEffect(() => {
-    setVideoPage(1);
-  }, [selectedProjectId]);
-  
-  // [REMOVED] shot-duplicated listener was dead code - event was never dispatched
-  // Shot duplication feedback now handled via optimistic cache updates
-  
-  // Search helper functions
-  const clearSearch = useCallback(() => {
-    setShotSearchQuery('');
-  }, []);
-  
-  // View mode is a first-class concept (shots vs videos).
-  // Centralize side-effects here so every switch behaves the same.
-  const setViewMode = useCallback((mode: 'shots' | 'videos', opts?: { blurTarget?: HTMLElement | null }) => {
-    const willShowVideos = mode === 'videos';
-
-    console.log('[ViewToggleDebug] setViewMode called', {
-      requestedMode: mode,
-      currentShowVideosView: showVideosView,
-      willShowVideos,
-      isNoOp: willShowVideos === showVideosView,
-      timestamp: Date.now()
-    });
-
-    // Skip if already in the requested mode (but allow toggle logic to work)
-    // NOTE: We still call setShowVideosView even if same value - React will skip re-render
-    setShowVideosView(willShowVideos);
-
-    // Clear search state when switching views
-    setIsSearchOpen(false);
-
-    if (willShowVideos) {
-      // Prevent empty state flash while the gallery query spins up
-      setVideosViewJustEnabled(true);
-      console.log('[VideoSkeletonDebug] Setting videosViewJustEnabled=true to show skeletons during transition');
-
-      // Reset video filters when entering videos view
-      setVideoPage(1);
-      setVideoShotFilter('all');
-      setVideoExcludePositioned(false);
-      setVideoSearchTerm('');
-      setVideoMediaTypeFilter('video');
-      setVideoToolTypeFilter(true);
-      setVideoStarredOnly(false);
-    } else {
-      // Clear shot search when switching to shots view
-      setShotSearchQuery('');
-    }
-
-    opts?.blurTarget?.blur?.();
-  }, [
+  const {
     showVideosView,
-    setShowVideosView,
+    setShowVideosViewRaw,
+    setViewMode,
+    handleToggleVideosView,
+    videosViewJustEnabled,
     setVideosViewJustEnabled,
+    videoPage,
     setVideoPage,
+    videoShotFilter,
     setVideoShotFilter,
+    videoExcludePositioned,
     setVideoExcludePositioned,
+    videoSearchTerm,
     setVideoSearchTerm,
+    videoMediaTypeFilter,
     setVideoMediaTypeFilter,
+    videoToolTypeFilter,
     setVideoToolTypeFilter,
+    videoStarredOnly,
     setVideoStarredOnly,
+    videoSortMode,
+    setVideoSortMode,
+    shotSearchQuery,
     setShotSearchQuery,
-  ]);
-
-  // Kept for callers that want "toggle" semantics.
-  const handleToggleVideosView = useCallback((e?: React.MouseEvent<HTMLElement>) => {
-    setViewMode(showVideosView ? 'shots' : 'videos', { blurTarget: (e?.currentTarget as HTMLElement | null) ?? null });
-  }, [setViewMode, showVideosView]);
+    clearSearch,
+    isSearchOpen,
+    setIsSearchOpen,
+    handleSearchToggle,
+    searchInputRef,
+    shotSortMode,
+    setShotSortMode,
+  } = useVideoTravelViewMode({
+    selectedProjectId,
+    initialShotSortMode: projectUISettings?.shotSortMode,
+    onShotSortModeChange: persistShotSortMode,
+  });
   
   // Memoize create shot handler to prevent infinite loops in useVideoTravelHeader
   const handleCreateNewShot = useCallback(() => {
@@ -2110,7 +1657,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
       shotName: shot.name
     });
     // Reset videos view when selecting a shot
-    setShowVideosView(false);
+    setShowVideosViewRaw(false);
     // Jump to top immediately (no smooth scroll) so the shot opens "starting at top".
     navigateToShot(shot, { scrollBehavior: 'auto', scrollDelay: 0 });
   };
@@ -2121,13 +1668,13 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   const handleBackToShotList = useCallback(() => {
     setCurrentShotId(null);
     // Reset videos view when going back to shot list
-    setShowVideosView(false);
+    setShowVideosViewRaw(false);
     // By replacing the current entry in the history stack, we effectively reset 
     // the 'fromShotClick' state without adding a new entry to the browser history.
     // This ensures that subsequent interactions with the shot list behave as if 
     // it's the first visit, resolving the "two-click" issue on mobile.
     navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
-  }, [setCurrentShotId, navigate, location.pathname]);
+  }, [setCurrentShotId, setShowVideosViewRaw, navigate, location.pathname]);
 
   // Navigation handlers (use sortedShots to respect Newest/Oldest sort order)
   const handlePreviousShot = useCallback(() => {
@@ -2318,22 +1865,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
   //   }
   // };
 
-  const handleSteerableMotionSettingsChange = useCallback((settings: Partial<SteerableMotionSettings>) => {
-    // FIX: Use ref to get current value and avoid callback recreation
-    // Ensure required fields are always present by seeding with defaults
-    const currentSettings: SteerableMotionSettings = {
-      ...DEFAULT_STEERABLE_MOTION_SETTINGS,
-      ...(shotSettingsRef.current.settings?.steerableMotionSettings ?? {}),
-    };
-    shotSettingsRef.current.updateFields({
-      steerableMotionSettings: {
-        ...currentSettings,
-        ...settings
-      }
-    });
-  }, []);
-
-  // Mode change handler removed - now hardcoded to use specific model
+  // handleSteerableMotionSettingsChange - now provided by useVideoTravelSettingsHandlers hook
 
   // Memoize current settings to reduce effect runs
 
