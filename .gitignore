@@ -37,12 +37,13 @@ local.db
 # Temporary files
 temp/
 
-# Ignore all markdown files except structure.md, structure_detail/, and tasks/
+# Ignore all markdown files except structure.md, structure_detail/, tasks/, and CLAUDE.md
 *.md
 !structure.md
 !structure_detail/*.md
 !docs/structure_detail/*.md
 !tasks/*.md
+!CLAUDE.md
 
 # Stray video/media files in root (should be in public/)
 /*.mp4

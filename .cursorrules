@@ -2,6 +2,7 @@
 - Use `structure.md` to understand where to make changes. Sub-docs in `docs/structure_detail/` have implementation specifics.
 - Find and use common components in `src/shared/` before creating new ones.
 - After each change, ask yourself "Did I unintentionally delete or edit something out of scope?"
+- Test comment to verify auto-sync
 
 # Code Quality Review
 When reading or modifying code, proactively flag potential issues:
