@@ -1353,6 +1353,22 @@ export const VideoItem = React.memo<VideoItemProps>(({
               </TooltipProvider>
             )}
 
+            {/* Variant Count - positioned above Info button */}
+            {(video as any).derivedCount && (video as any).derivedCount > 1 && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-black/50 text-white text-[10px] font-medium flex items-center justify-center backdrop-blur-sm cursor-help">
+                      {(video as any).derivedCount}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p>{(video as any).derivedCount} variant{(video as any).derivedCount !== 1 ? 's' : ''}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
             <Button
               variant="secondary"
               size="icon"
@@ -1497,6 +1513,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
     prevProps.video.location === nextProps.video.location &&
     prevProps.video.thumbUrl === nextProps.video.thumbUrl &&
     (prevProps.video as any).name === (nextProps.video as any).name && // Check variant name changes
+    (prevProps.video as any).derivedCount === (nextProps.video as any).derivedCount && // Check variant count changes
     prevProps.index === nextProps.index &&
     prevProps.originalIndex === nextProps.originalIndex &&
     prevProps.shouldPreload === nextProps.shouldPreload &&

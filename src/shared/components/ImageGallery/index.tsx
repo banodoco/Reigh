@@ -9,6 +9,7 @@ import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { useBackgroundThumbnailGenerator } from '@/shared/hooks/useBackgroundThumbnailGenerator';
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
+import { cn } from "@/shared/lib/utils";
 import { ImageGalleryPagination } from "@/shared/components/ImageGalleryPagination";
 
 // Import hooks
@@ -100,6 +101,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     formAssociatedShotId,
     onSwitchToAssociatedShot,
     reducedSpacing = false,
+    className,
     hidePagination = false,
     hideTopFilters = false,
     hideMediaTypeFilter = false,
@@ -558,7 +560,11 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
 
   return (
     <TooltipProvider>
-      <div className={`${reducedSpacing ? 'space-y-0' : 'space-y-6'} ${(!hidePagination && !hideBottomPagination) ? 'pb-[62px]' : 'pb-12'}`}>
+      <div className={cn(
+        reducedSpacing ? 'space-y-3' : 'space-y-6',
+        (!hidePagination && !hideBottomPagination) ? 'pb-[62px]' : 'pb-12',
+        className
+      )}>
         {/* Header section with pagination and filters */}
         <div ref={stateHook.galleryTopRef}>
           <ImageGalleryHeader

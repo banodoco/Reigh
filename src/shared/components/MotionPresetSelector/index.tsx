@@ -78,6 +78,18 @@ export const MotionPresetSelector: React.FC<MotionPresetSelectorProps> = ({
   renderBasicModeContent,
   queryKeyPrefix = 'motion-presets',
 }) => {
+  // Defensive: some callsites may pass non-functions (e.g. via `any`).
+  // Avoid crashing the entire UI; treat invalid callbacks as no-ops.
+  const safeOnModeChange = typeof onModeChange === 'function' ? onModeChange : (() => {});
+  const safeOnPresetRemove = typeof onPresetRemove === 'function' ? onPresetRemove : (() => {});
+  const safeOnPresetSelect = typeof onPresetSelect === 'function' ? onPresetSelect : (() => {});
+  const safeOnPhaseConfigChange = typeof onPhaseConfigChange === 'function' ? onPhaseConfigChange : (() => {});
+
+  // Normalize possibly-missing/invalid mode values coming from persisted settings.
+  // This prevents the Tabs from ending up with "no selection".
+  const normalizedMotionMode: MotionMode =
+    advancedDisabled ? 'basic' : (motionMode === 'advanced' ? 'advanced' : 'basic');
+
   // Preset modal state
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
 
@@ -95,27 +107,27 @@ export const MotionPresetSelector: React.FC<MotionPresetSelectorProps> = ({
 
   // Handle motion mode change
   const handleModeChange = useCallback((newMode: string) => {
-    if (newMode === motionMode) return;
+    if (newMode === normalizedMotionMode) return;
     if (advancedDisabled && newMode === 'advanced') return;
-    onModeChange(newMode as MotionMode);
-  }, [motionMode, advancedDisabled, onModeChange]);
+    safeOnModeChange(newMode as MotionMode);
+  }, [normalizedMotionMode, advancedDisabled, safeOnModeChange]);
 
   // Handle editing a preset (load its config and switch to advanced)
   const handleEditPreset = useCallback((presetPhaseConfig: PhaseConfig | undefined) => {
     if (presetPhaseConfig) {
-      onPhaseConfigChange(presetPhaseConfig);
+      safeOnPhaseConfigChange(presetPhaseConfig);
     }
-    onPresetRemove();
-    onModeChange('advanced');
-  }, [onPhaseConfigChange, onPresetRemove, onModeChange]);
+    safeOnPresetRemove();
+    safeOnModeChange('advanced');
+  }, [safeOnPhaseConfigChange, safeOnPresetRemove, safeOnModeChange]);
 
   // Handle preset selection (from chips or modal)
   const handlePresetSelect = useCallback((preset: Preset) => {
     if (preset.metadata?.phaseConfig) {
-      onPresetSelect(preset.id, preset.metadata.phaseConfig, preset.metadata);
+      safeOnPresetSelect(preset.id, preset.metadata.phaseConfig, preset.metadata);
     }
     setIsPresetModalOpen(false);
-  }, [onPresetSelect]);
+  }, [safeOnPresetSelect]);
 
   // Adapter for modal's onSelectPreset (it passes a Resource type)
   const handleModalPresetSelect = useCallback((resource: { id: string; metadata: PresetMetadata }) => {
@@ -124,19 +136,19 @@ export const MotionPresetSelector: React.FC<MotionPresetSelectorProps> = ({
 
   // Handle switching to custom/advanced mode
   const handleCustomClick = useCallback(() => {
-    onPresetRemove();
-    onModeChange('advanced');
-  }, [onPresetRemove, onModeChange]);
+    safeOnPresetRemove();
+    safeOnModeChange('advanced');
+  }, [safeOnPresetRemove, safeOnModeChange]);
 
   // Handle restore defaults for phase config
   const handleRestorePhaseConfigDefaults = useCallback(() => {
-    onPhaseConfigChange(builtinPreset.metadata.phaseConfig);
-    onPresetSelect(builtinPreset.id, builtinPreset.metadata.phaseConfig, builtinPreset.metadata);
-  }, [builtinPreset, onPhaseConfigChange, onPresetSelect]);
+    safeOnPhaseConfigChange(builtinPreset.metadata.phaseConfig);
+    safeOnPresetSelect(builtinPreset.id, builtinPreset.metadata.phaseConfig, builtinPreset.metadata);
+  }, [builtinPreset, safeOnPhaseConfigChange, safeOnPresetSelect]);
 
   return (
     <div className="space-y-4">
-      <Tabs value={motionMode} onValueChange={handleModeChange}>
+      <Tabs value={normalizedMotionMode} onValueChange={handleModeChange}>
         <div className="flex items-center justify-between mb-3">
           <Label className="text-sm font-medium">Motion Settings</Label>
           <TabsList className="grid w-40 grid-cols-2">

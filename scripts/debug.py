@@ -8,6 +8,9 @@ Investigate tasks and system state.
 Usage:
     debug.py task <task_id>             # Investigate specific task
     debug.py tasks                      # Analyze recent tasks
+    debug.py logs                       # View system logs
+    debug.py logs --latest              # View logs from most recent browser session
+    debug.py logs --sessions            # List recent browser sessions
 
 Options:
     --json                              # Output as JSON
@@ -23,8 +26,14 @@ Examples:
     # List recent failed tasks
     debug.py tasks --status Failed --limit 10
     
-    # Get tasks as JSON
-    debug.py tasks --json
+    # View most recent browser session logs
+    debug.py logs --latest
+    
+    # View browser errors from last 2 hours
+    debug.py logs --source browser --level ERROR --hours 2
+    
+    # List browser sessions
+    debug.py logs --sessions
 """
 
 import sys
@@ -36,7 +45,7 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from debug.client import DebugClient
-from debug.commands import task, tasks
+from debug.commands import task, tasks, logs
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -64,6 +73,19 @@ def create_parser() -> argparse.ArgumentParser:
     tasks_parser.add_argument('--hours', type=int, help='Filter by hours')
     tasks_parser.add_argument('--json', action='store_true', help='Output as JSON')
     tasks_parser.add_argument('--debug', action='store_true', help='Show debug info on errors')
+    
+    # Logs command
+    logs_parser = subparsers.add_parser('logs', help='View system logs')
+    logs_parser.add_argument('--source', help='Filter by source type (browser, worker, edge_function, orchestrator_gpu, orchestrator_api)')
+    logs_parser.add_argument('--session', help='Filter by session ID (source_id)')
+    logs_parser.add_argument('--latest', action='store_true', help='Show logs from most recent browser session')
+    logs_parser.add_argument('--sessions', action='store_true', help='List recent browser sessions')
+    logs_parser.add_argument('--tag', help='Filter by tag in message (e.g., TaskPoller, ShotNav, console)')
+    logs_parser.add_argument('--level', help='Filter by log level (DEBUG, INFO, WARNING, ERROR)')
+    logs_parser.add_argument('--hours', type=int, help='Filter by hours')
+    logs_parser.add_argument('--limit', type=int, default=5000, help='Max logs to fetch (default: 5000, use 0 for unlimited)')
+    logs_parser.add_argument('--json', action='store_true', help='Output as JSON')
+    logs_parser.add_argument('--debug', action='store_true', help='Show debug info on errors')
     
     return parser
 
@@ -101,12 +123,28 @@ def main():
     if hasattr(args, 'logs_only'):
         options['logs_only'] = args.logs_only
     
+    # Add logs-specific options
+    if hasattr(args, 'source') and args.source:
+        options['source'] = args.source
+    if hasattr(args, 'session') and args.session:
+        options['session'] = args.session
+    if hasattr(args, 'latest') and args.latest:
+        options['latest'] = True
+    if hasattr(args, 'sessions') and args.sessions:
+        options['sessions'] = True
+    if hasattr(args, 'tag') and args.tag:
+        options['tag'] = args.tag
+    if hasattr(args, 'level') and args.level:
+        options['level'] = args.level
+    
     # Route to appropriate command handler
     try:
         if args.command == 'task':
             task.run(client, args.task_id, options)
         elif args.command == 'tasks':
             tasks.run(client, options)
+        elif args.command == 'logs':
+            logs.run(client, options)
         else:
             parser.print_help()
             sys.exit(1)

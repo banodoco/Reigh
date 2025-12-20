@@ -1070,13 +1070,29 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       {image.id && ( // Ensure image has ID for actions
       <>
           {/* Shot Name Badge / Variant Name for Videos - Top Left */}
-          {isVideoContent && ((image as any).name || (image.shot_id && simplifiedShotOptions.length > 0)) && (
+          {isVideoContent && ((image as any).name || (image.shot_id && simplifiedShotOptions.length > 0) || (image.derivedCount && image.derivedCount > 0)) && (
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
               {/* Variant Name */}
               {(image as any).name && (
                 <div className="bg-black/50 text-white text-xs sm:text-sm px-2 py-0.5 rounded-md mb-1 font-medium backdrop-blur-sm">
                   {(image as any).name}
                 </div>
+              )}
+              
+              {/* Variant Count - show below variant name */}
+              {image.derivedCount && image.derivedCount > 1 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help">
+                        {image.derivedCount}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{image.derivedCount} variant{image.derivedCount !== 1 ? 's' : ''}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               
               {/* Shot Navigation Button */}
@@ -1098,7 +1114,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
           </div>
           )}
-          
+
           {/* Add to Shot UI - Top Left (for non-video content) */}
           {showAddToShot && simplifiedShotOptions.length > 0 && onAddToLastShot && (
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -1448,7 +1464,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               </div>
             </div>
           )}
-
+          
           {/* Action buttons - Top Right (Delete, Info & Apply) */}
           <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8 z-20">
               {/* Delete button - Mobile Top Right */}
@@ -1470,7 +1486,26 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     )}
                 </Button>
               )}
-              {/* Info tooltip (shown on hover) */}
+              
+              {/* Variant Count + Info Button Row (for non-video content) */}
+              <div className="flex flex-row items-center gap-1.5">
+                {/* Variant Count - positioned to the left of Info button */}
+                {!isVideoContent && image.derivedCount && image.derivedCount > 1 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="bg-black/50 text-white text-[10px] font-medium px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help opacity-0 group-hover:opacity-100 transition-opacity">
+                          {image.derivedCount}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        <p>{image.derivedCount} variant{image.derivedCount !== 1 ? 's' : ''}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                
+                {/* Info tooltip (shown on hover) */}
               {image.metadata && (
                 isMobile ? (
                   <PopoverPrimitive.Root open={mobilePopoverOpenImageId === image.id} onOpenChange={(open) => {
@@ -1558,6 +1593,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   </Tooltip>
                 )
               )}
+              </div>
 
               {/* Share Button - Below Info */}
               {showShare && taskId && (

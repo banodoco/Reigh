@@ -468,7 +468,7 @@ export default function HomePage() {
         src="/hero-background-poster.jpg" 
         alt="Background" 
         className="fixed inset-0 w-full h-full object-cover"
-        style={{ zIndex: -2 }}
+        style={{ zIndex: -3 }}
       />
       
       {/* Background Video - sits on top of poster */}
@@ -481,10 +481,14 @@ export default function HomePage() {
         webkit-playsinline="true"
         preload="auto"
         className="fixed inset-0 w-full h-full object-cover"
-        style={{ zIndex: -1 }}
+        style={{ zIndex: -2 }}
       >
         <source src="/hero-background-interpolated.mp4" type="video/mp4" />
       </video>
+      
+      {/* Film grain overlay - above video, below darkening */}
+      <div className="fixed inset-0 bg-film-grain opacity-30 animate-film-grain pointer-events-none" style={{ zIndex: -1 }} />
+      
       {/* Overlay to darken video for readability */}
       <div className="fixed inset-0 bg-black/50" style={{ zIndex: 0 }} />
       

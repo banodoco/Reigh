@@ -1,53 +1,75 @@
-# Project Understanding
-- Use `structure.md` to understand where to make changes. Sub-docs in `docs/structure_detail/` have implementation specifics.
-- Find and use common components in `src/shared/` before creating new ones.
-- After each change, ask yourself "Did I unintentionally delete or edit something out of scope?"
+# Reigh: Working Rules (read first)
 
-# Code Quality Review
-When reading or modifying code, proactively flag potential issues:
-- **Duplication**: Similar logic in multiple places that should be abstracted
-- **God components**: Files doing too much (>300 lines is a warning sign)
-- **Prop drilling**: Props passed through 3+ levels - consider context or composition
-- **Mixed concerns**: UI logic mixed with business logic, or data fetching in presentation components
-- **Inconsistent patterns**: Code that doesn't follow established patterns in the codebase
-- **Missing error handling**: Async operations without proper error boundaries or catches
-- **Stale abstractions**: Utilities/components that exist but aren't used consistently
-- **Naming issues**: Unclear or misleading names that don't reflect actual behavior
+## Docs (consult before editing cross-cutting code)
+- **Cross-cutting** = spans multiple tools, or touches core tables/storage/auth/billing.
+- Start at `structure.md` (links to sub-docs). Deep dives live in `docs/structure_detail/`.
+- **Read the relevant sub-doc before editing**:
+  - Settings/persistence → `settings_system.md` (+ `data_persistence.md`)
+  - Performance → `performance_system.md`
+  - Image loading → `image_loading_system.md`
+  - Realtime → `realtime_system.md`
+  - Task creation → `unified_task_creation.md`
+  - Workers/lifecycle → `task_worker_lifecycle.md`
+  - DB triggers, RPCs, storage → `db_and_storage.md`
+  - Edge Functions → `edge_functions.md`
+  - Payments/credits → `auto_topup_system.md`
+  - Debugging/logs → `debugging.md` (CLI, `system_logs` table, frontend logging)
+- **Multiple docs apply?** Start with most specific (e.g., `image_loading` before `performance`).
+- **New feature?** Check `adding_new_tool.md` for tool pattern; `structure.md` for where things live.
+- **Debugging a flow?** Trace: UI → hook → task creation (`unified_task_creation.md`) → worker (`task_worker_lifecycle.md`) → `complete_task` edge function.
 
-Mention these as brief observations (e.g., "Note: this file is getting large, might want to split out X") - don't derail the task, just flag for awareness.
+## Supabase safety (non-negotiable)
+- Prefer Edge Functions/DB triggers for atomic/elevated/sensitive/guaranteed work.
+- Deploy functions individually: `npx supabase functions deploy <name> --project-ref wczysqzxlwdndgxitrvc`
+- Migrations: `npx supabase db push --linked` (**never** `db reset --linked`)
+- SQL for editor: wrap results in `SELECT json_agg(results) FROM (...) results;`
 
-# Key Concepts
-- **Generations vs Variants**: A `generation` is a standalone image/video in the gallery. A `variant` belongs to a generation (shown in variant selector). Use `based_on` for lineage tracking.
-- **Task creation**: Use helpers in `src/shared/lib/tasks/` (e.g., `imageInpaint.ts`, `magicEdit.ts`). Tasks are processed by workers, completed via `complete_task` edge function. See `docs/structure_detail/unified_task_creation.md`.
-- **Shots data**: Use `ShotsContext` via `useShots()` hook - single source of truth. For shot images, use `useAllShotGenerations(shotId)`. See `docs/structure_detail/shared_hooks_contexts.md`.
-- **React Query**: Invalidate caches after mutations with `queryClient.invalidateQueries({ queryKey: [...] })`.
+## UI conventions
+- Toasts: **errors only** (no “success” toasts for task creation).
+- Don’t create new `*.md` unless explicitly requested.
 
-# Code Patterns
-- **Tool structure**: Each tool follows `src/tools/[name]/` with `pages/`, `components/`, `hooks/`, `settings.ts`. See `docs/structure_detail/adding_new_tool.md`.
-- **UI components**: Use shadcn-ui from `src/shared/components/ui/`, icons from lucide-react. Never hardcode colors - use theme tokens (`bg-background`, `text-foreground`).
-- **Responsive**: TailwindCSS with container queries (`@container`). Test both mobile and desktop.
+## Prefer existing patterns
+- Reuse shared components/hooks in `src/shared/` before creating new ones.
+- Tools follow `src/tools/[name]/{pages,components,hooks,settings.ts}` (see `adding_new_tool.md`).
+- UI: shadcn (`src/shared/components/ui/`), lucide icons, **never hardcode colors** (use `bg-background`, `text-foreground`, etc.). Responsive: Tailwind + `@container`.
 
-# Git Workflow
-- On push: run `git diff | cat`, update `structure.md` if files were added/deleted/changed purpose, then single command: `git add . && git commit -m "feat/fix: specific message" && git push`
+## Key concepts / correctness
+- Generations vs variants: generations are gallery items; variants are per-generation alternates; use `based_on` for lineage.
+- Shots data: use `ShotsContext` via `useShots()`; shot images via `useAllShotGenerations(shotId)`.
+- React Query: invalidate after mutations; scope invalidations where possible.
 
-# Supabase & Server-Side Logic
-- Prefer server-side (Edge Functions, DB triggers) for: atomic transactions, elevated privileges, sensitive keys, guaranteed execution, or DB-triggered events.
-- **Deployments**: See `docs/structure_detail/deployment_and_migration_guide.md`. Deploy edge functions individually: `npx supabase functions deploy function-name --project-ref wczysqzxlwdndgxitrvc`. Use `npx supabase db push --linked` for migrations (NEVER `db reset --linked`).
-- SQL queries for Supabase editor: wrap in `SELECT json_agg(results) FROM (...) results;`
+## Review discipline
+- After changes: ensure nothing out-of-scope was deleted/edited.
+- Flag briefly (don’t derail): duplication, giant components (>300 LOC), prop drilling (3+ levels), mixed concerns, inconsistent patterns, missing error handling.
 
-# Debugging
-- Use unique tags like `[VideoLoadSpeedIssue]` - tell user the tag immediately so they can filter console.
-- Log values directly, not nested: `console.log('id:', id)` not `console.log({ id, name })` - values visible without expanding.
-- **Debug logs only fire in dev mode**: Production builds automatically strip console.log statements, so debug logging won't impact production performance.
-- After finishing a debugging session, consider: "What additional logging, debug utilities, or diagnostic tools would have made this issue easier to identify?" If you spot opportunities, suggest them before closing out the debugging work.
+## Debugging
+- **Server-side (tasks/workers)**: Use `system_logs` table (48h retention). Query via:
+  - CLI: `cd scripts && python3 debug.py task <task_id>` — shows full timeline + related data
+  - SQL: `SELECT * FROM system_logs WHERE task_id = '...' ORDER BY timestamp`
+  - Views: `v_recent_errors`, `v_worker_log_activity`
+- **Client-side (browser logs)**:
+  1. Start dev server: `VITE_PERSIST_LOGS=true npm run dev`
+  2. Use app in browser (all console.log/warn/error captured)
+  3. Query: `cd scripts && python3 debug.py logs --latest`
+  - Filter by tag: `debug.py logs --latest --tag ShotNav`
+  - List sessions: `debug.py logs --sessions`
+  - Add `VITE_DEBUG_LOGS=true` to also see logs in browser console
+- Debug logs are dev-only (production builds strip `console.log`), so temporary instrumentation is OK.
+- After debugging, suggest what extra diagnostics/logging would have made it easier.
+- See `debugging.md` for full details on CLI, frontend logging, and SQL queries.
 
-# UI Conventions
-- Toast notifications: only for errors, never success toasts for task creation etc.
-- NEVER create documentation files (*.md) unless explicitly requested.
+## Doc maintenance
+- **When to update**: Adding/changing system patterns (triggers, RPCs, storage paths, shared hooks) → update the relevant sub-doc.
+- **Which doc?**: Use the routing table above. If none fits: DB patterns → `db_and_storage.md`; other cross-cutting → `structure.md`.
+- **Style (rubric)**: Each sub-doc should have:
+  1. Header: `> **Purpose**: [1 sentence]` + `> **Source of Truth**: [code paths]`
+  2. **Key Invariants**: 3-8 bullets of "break these, things fail"
+  3. Tables > prose; point to code instead of copying it
+  4. Keep sub-docs under ~150 lines
+- **Where**: Sub-docs live in `docs/structure_detail/`. Update `structure.md` only if adding new sub-docs or changing file paths.
 
-# Task Lists
-Save in `tasks/` with date-based filename (e.g., `2025-12-06-video-player-tasks.md`).
+## Git workflow (when pushing)
+- Before push: review `git diff`, update docs if system patterns changed, then `git add . && git commit -m "feat/fix: ..." && git push`.
 
-**Per task:** Header (number, title, status emoji), Area, Description, Observed Behavior (if bug), Requirements (bullets), Impacted Files, Execution Notes, Additional Data Needed, Testing Instructions.
-
-**Master Checklist:** `[ ]`/`[x]` checkboxes grouped by: Quick Wins first, then logical clusters (same files together), with dependency notes.
+## Task lists (when asked)
+- Save to `tasks/YYYY-MM-DD-*.md` with per-task sections + a master checklist (quick wins first; group by area/files).

@@ -5,7 +5,7 @@ import { GenerationRow } from '@/types/shots';
 import { supabase } from '@/integrations/supabase/client';
 import { useSmartPollingConfig } from './useSmartPolling';
 import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
-import { transformForUnifiedGenerations, type RawShotGeneration } from '@/shared/lib/generationTransformers';
+import { transformForUnifiedGenerations, type RawShotGeneration, calculateDerivedCounts } from '@/shared/lib/generationTransformers';
 
 // Extended interface that includes task data
 export interface GenerationWithTask extends GeneratedImageWithMetadata {
@@ -217,6 +217,16 @@ async function fetchShotSpecificGenerations({
         taskData: includeTaskData && gen.tasks ? gen.tasks : undefined,
       } as GenerationWithTask;
     });
+  
+  // Fetch counts of generations/variants based on each generation (for "X variants" display)
+  const generationIds = items.map(item => item.id) || [];
+  const derivedCounts = await calculateDerivedCounts(generationIds);
+
+  // Add derivedCount to each item
+  items = items.map(item => ({
+    ...item,
+    derivedCount: derivedCounts[item.id] || 0,
+  }));
   
   console.log('[VideoGenMissing] Raw transformed items before sorting and filtering:', {
     projectId,

@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 // Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
 import { useSmartPollingConfig } from './useSmartPolling';
 import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
-import { transformGeneration, type RawGeneration, type TransformOptions } from '@/shared/lib/generationTransformers';
+import { transformGeneration, type RawGeneration, type TransformOptions, calculateDerivedCounts } from '@/shared/lib/generationTransformers';
 
 /**
  * Fetch edit variants from generation_variants table for a project
@@ -436,10 +436,20 @@ export async function fetchGenerations(
     hasMore = (offset + limit) < totalCount;
   }
 
+  // Fetch counts of generations/variants based on each generation (for "X variants" display)
+  const generationIds = finalData.map(d => d.id) || [];
+  const derivedCounts = await calculateDerivedCounts(generationIds);
+
   // Use shared transformer instead of inline transformation logic
   const items = finalData?.map((item: any) => {
+    // Add derivedCount to the raw data before transforming
+    const itemWithDerivedCount = {
+      ...item,
+      derivedCount: derivedCounts[item.id] || 0,
+    };
+    
     // Transform using shared function - handles all the complex logic
-    return transformGeneration(item as RawGeneration, {
+    return transformGeneration(itemWithDerivedCount as RawGeneration, {
       shotId: filters?.shotId,
     });
   }) || [];

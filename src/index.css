@@ -1758,6 +1758,26 @@
   .subtitle-link-right:hover .arrow-group-right path {
     stroke: hsl(var(--wes-vintage-gold));
   }
+  
+  /* Hero CTA button hover state */
+  .hero-cta {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .hero-cta:hover {
+    background-color: #4a5a5a !important;
+    border-color: hsl(var(--wes-vintage-gold)) !important;
+    color: hsl(var(--wes-vintage-gold)) !important;
+  }
+  
+  /* Arrow sway animation on hover */
+  .subtitle-link-left:hover .arrow-wrap-left {
+    animation: arrowSwayLeft 1s ease-in-out infinite;
+  }
+  
+  .subtitle-link-right:hover .arrow-wrap-right {
+    animation: arrowSwayRight 1s ease-in-out infinite;
+  }
    
   /* Multicolour border for tooltips on hover */
   .tooltip-content:hover {
@@ -2630,6 +2650,16 @@
 @keyframes swayX {
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(-1.5px); }
+}
+
+@keyframes arrowSwayLeft {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+
+@keyframes arrowSwayRight {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-3px); }
 }
 
 @keyframes swayY {

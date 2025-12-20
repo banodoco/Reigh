@@ -699,6 +699,7 @@ const GenerationsPaneComponent: React.FC = () => {
                     initialStarredFilter={starredOnly}
                     onStarredFilterChange={setStarredOnly}
                     reducedSpacing={true}
+                    className="space-y-0"
                     hidePagination={true}
                     hideTopFilters={true}
                     showShare={false}

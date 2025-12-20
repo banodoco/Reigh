@@ -158,6 +158,6 @@ Your tool now has:
 
 **📚 Related Docs**
 
-[Back to Structure](../structure.md) • [Tool Settings](./data_persistence.md) • [Design Guidelines](./design_motion_guidelines.md)
+[Back to Structure](../../structure.md) • [Tool Settings](./data_persistence.md) • [Design Guidelines](./design_motion_guidelines.md)
 
 </div> 

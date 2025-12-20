@@ -348,6 +348,6 @@ Structure video parameters are added to `TravelBetweenImagesTaskParams`:
 
 **🔗 Related Documentation**
 
-[Back to Structure](../structure.md)
+[Back to Structure](../../structure.md)
 
 </div> 

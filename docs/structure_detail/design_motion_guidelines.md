@@ -11,8 +11,8 @@ If you only skim one section of this document, read this one—it tells you **wh
 
 | Layer | Location | Purpose |
 |-------|----------|---------|
-| **Theme Tokens** | `themes/default/theme.ts` | Source-of-truth color palette & shadows exported as CSS variables |
-| **Tailwind Config** | `tailwind.config.ts` | Registers the theme tokens and custom utilities/breakpoints |
+| **Theme Tokens** | `tailwind.config.ts` | Color palette, shadows, animations via CSS variables (`hsl(var(--*))`) |
+| **CSS Variables** | `src/index.css` | Defines `--background`, `--foreground`, `--wes-*` HSL values |
 | **UI Primitives** | `src/shared/components/ui/` | Thin wrappers around shadcn-ui with project-level defaults |
 | **Motion Helpers** | `src/shared/components/transitions/` | Reusable animation components (PageFadeIn, FadeInSection, …) |
 | **High-Level Layout** | `src/app/Layout.tsx` & `src/shared/components/` | GlobalHeader, PaneHeader, etc.—compose primitives into app-specific patterns |
@@ -364,6 +364,6 @@ const handleMobileTap = (item: any) => {
 
 **🔗 Quick References**
 
-[Tailwind Docs](https://tailwindcss.com) • [shadcn-ui](https://ui.shadcn.com) • [Lucide Icons](https://lucide.dev) • [Back to Structure](../structure.md)
+[Tailwind Docs](https://tailwindcss.com) • [shadcn-ui](https://ui.shadcn.com) • [Lucide Icons](https://lucide.dev) • [Back to Structure](../../structure.md)
 
 </div> 

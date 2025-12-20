@@ -1,8 +1,35 @@
 # Debugging
 
-> **Status:** ✅ Active
->
-> **Purpose:** Tools and patterns for investigating task failures, performance issues, and system state.
+> **Purpose**: Tools and patterns for investigating task failures, performance issues, and system state.
+> **Source of Truth**: `scripts/debug.py` (CLI), `system_logs` table (server logs), `src/shared/lib/logger.ts` (frontend)
+
+---
+
+## When to Use What
+
+| Problem | Tool | Why |
+|---------|------|-----|
+| Task failed / stuck | `debug.py task <id>` | Shows full timeline from `system_logs` + related data (generation, worker, credits) |
+| Recent errors across system | SQL: `SELECT * FROM v_recent_errors` | Aggregated view of last 24h errors |
+| Worker issues | SQL: `SELECT * FROM v_worker_log_activity` | Worker status + log counts |
+| Frontend performance | `VITE_DEBUG_LOGS=true npm run dev` | Console logging with `[PerfDebug:*]` tags |
+| Persist frontend logs | `VITE_PERSIST_LOGS=true npm run dev` | Captures ALL console.log/warn/error to `system_logs` |
+| View browser session logs | `debug.py logs --latest` | Shows logs from most recent browser session |
+| List browser sessions | `debug.py logs --sessions` | Shows all recent browser sessions with log counts |
+| Specific UI issue | Use `log('YourTag', ...)` from `@/shared/lib/logger` | Filter in DevTools or query `system_logs` |
+
+**Note**: `system_logs` has **48h retention** (auto-cleaned). For older issues, check `tasks.error_message` directly.
+
+### What writes to `system_logs`
+
+| Source | `source_type` | What's logged |
+|--------|---------------|---------------|
+| Edge Functions | `edge_function` | `create-task`, `claim-next-task`, `update-task-status`, `complete_task`, `calculate-task-cost` |
+| Workers (GPU) | `worker` | Task processing steps, errors, via heartbeat |
+| Orchestrators | `orchestrator_gpu/api` | Cycle tracking, segment coordination |
+| Browser (with flag) | `browser` | **ALL** console.log/warn/error when `VITE_PERSIST_LOGS=true`. Query with `debug.py logs --latest` |
+
+Edge Functions use `SystemLogger` class (`supabase/functions/_shared/systemLogger.ts`) — always call `await logger.flush()` before returning.
 
 ---
 
@@ -124,6 +151,40 @@ python3 debug.py tasks --limit 10
       → CUDA out of memory...
 ```
 
+#### View system logs
+
+```bash
+python3 debug.py logs [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--latest` | Logs from most recent browser session |
+| `--sessions` | List recent browser sessions |
+| `--tag TAG` | Filter by tag (e.g., `ShotNav`, `TaskPoller`, `console`) |
+| `--source TYPE` | Filter by source: `browser`, `worker`, `edge_function`, `orchestrator_gpu` |
+| `--session ID` | Logs from a specific session ID |
+| `--level LEVEL` | Filter by level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `--hours N` | Filter by time window |
+| `--limit N` | Max logs (default: 5000, use `--limit 0` for unlimited) |
+| `--json` | Output as JSON |
+
+**Example:**
+```bash
+# View most recent browser session
+python3 debug.py logs --latest
+
+# Filter by tag
+python3 debug.py logs --latest --tag ShotNav
+python3 debug.py logs --latest --tag TaskPoller --level ERROR
+
+# List all browser sessions
+python3 debug.py logs --sessions
+
+# Browser errors from last 2 hours
+python3 debug.py logs --source browser --level ERROR --hours 2
+```
+
 ### Architecture
 
 ```
@@ -135,7 +196,8 @@ scripts/
     ├── models.py         # Data models
     └── commands/
         ├── task.py       # Single task investigation
-        └── tasks.py      # Multi-task analysis
+        ├── tasks.py      # Multi-task analysis
+        └── logs.py       # System log viewing
 ```
 
 ---
@@ -145,17 +207,20 @@ scripts/
 Logging is **opt-in** – nothing prints unless you set an env flag.
 
 ```bash
-# One-shot
+# Console logging only
 VITE_DEBUG_LOGS=true npm run dev
+
+# Console + persist to system_logs table
+VITE_PERSIST_LOGS=true VITE_DEBUG_LOGS=true npm run dev
 
 # Persist across all dev runs
 echo "VITE_DEBUG_LOGS=true" >> .env.local
+echo "VITE_PERSIST_LOGS=true" >> .env.local
 ```
 
-Backend scripts (Express worker, Edge-Function tests) respect the **same** flag:
-
-```bash
-VITE_DEBUG_LOGS=true npm run start:api
+When `VITE_PERSIST_LOGS=true`, logs are buffered and sent to `system_logs` every 10s (or when buffer hits 50 entries). Query with:
+```sql
+SELECT * FROM system_logs WHERE source_type = 'browser' ORDER BY timestamp DESC;
 ```
 
 Supported truthy values: `"true"`, `"1"` (string). Anything else disables logs.
@@ -164,19 +229,24 @@ Supported truthy values: `"true"`, `"1"` (string). Anything else disables logs.
 
 | Helper | Description |
 |--------|-------------|
-| `log(tag, ...data)` | Standard console.log wrapper. Tag is prefixed with `[PerfDebug:*]` convention. |
+| `log(tag, ...data)` | Console.log + optional persistence. Use tags like `[TaskPoller]`. |
+| `logWarn(tag, ...data)` | Console.warn + persistence with level `WARNING`. |
+| `logError(tag, ...data)` | Console.error + persistence. **Always logs, even without flag.** |
 | `time(tag, label)` / `timeEnd(tag, label)` | Thin wrappers around `console.time` for duration scopes. |
+| `forceFlush()` | Immediately flush buffered logs to `system_logs`. |
 | `reactProfilerOnRender` | Ready-to-pass callback for React’s `<Profiler>` (`onRender`). |
 
 ### Example
 ```ts
-import { log, time, timeEnd } from '@/shared/lib/logger';
+import { log, logError, time, timeEnd, forceFlush } from '@/shared/lib/logger';
 
 time('TaskPoller', 'dbFetch');
 const rows = await db.select().from(tasks);
 timeEnd('TaskPoller', 'dbFetch');
 
 log('ImageUpload', 'bytes', file.size);
+logError('ImageUpload', 'Failed', error.message); // Always logs + persists
+await forceFlush(); // Ensure logs sent before navigating
 ```
 
 ### React Render Tracing

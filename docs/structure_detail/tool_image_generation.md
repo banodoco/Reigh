@@ -182,6 +182,6 @@ graph TD
 
 **🔗 Related**
 
-[Tool Settings](../data_persistence.md) • [Adding Tools](../adding_new_tool.md) • [Back to Structure](../structure.md)
+[Tool Settings](./data_persistence.md) • [Adding Tools](./adding_new_tool.md) • [Back to Structure](../../structure.md)
 
 </div> 

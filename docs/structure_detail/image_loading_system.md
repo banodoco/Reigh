@@ -2,10 +2,12 @@
 
 ## Overview
 
-Reigh uses a simplified image loading system that displays all images immediately for optimal user experience. The system combines **immediate loading** for instant visual feedback with **adjacent page preloading** for fast navigation between pages.
+Reigh uses a progressive image loading system with device-adaptive batching for optimal performance across all device capabilities. The system combines **progressive loading** for smooth initial display with **adjacent page preloading** for fast navigation.
 
 **Key Characteristics:**
-- All images load and display immediately (no staggering)
+- Progressive loading with device-adaptive batching (2-4 images load immediately, rest stagger)
+- Automatic device capability detection (memory, CPU, connection speed)
+- Performance tracking with auto-adjustment of delays
 - Smart caching prevents duplicate loading and enables immediate display
 - Adjacent pages preload in background for instant navigation
 - Session management prevents race conditions during page changes
@@ -40,12 +42,27 @@ ImageGallery
 
 ## Key Features
 
-### 1. Immediate Loading
-- **All Images**: All images load and display immediately upon page change
-- **No Staggering**: Removed progressive delays for instant visual feedback
-- **Smart Caching**: Cached/preloaded images display instantly without network requests
+### 1. Progressive Loading with Device Detection
+- **Initial Batch**: First 2-4 images load immediately (varies by device capability)
+- **Progressive Stagger**: Remaining images load with adaptive delays (25-60ms)
+- **Device Detection**: Automatically detects low-end devices (memory, CPU, connection)
+- **Performance Tracking**: Learns from actual load times and adjusts delays (0.5x-2.0x multiplier)
+- **Smart Caching**: Cached/preloaded images display instantly without delays
 - **Race Condition Protection**: Prevents overlapping sessions with unique session IDs
-- **Instant Display**: All content appears as soon as it's available
+
+**Device-Adaptive Batching:**
+
+| Device Type | Initial Batch | Stagger Delay | Max Delay |
+|-------------|---------------|---------------|-----------|
+| Very Low-End Mobile | 2 images | 60ms | 150ms |
+| Low-End / Mobile | 3 images | 40-50ms | 120ms |
+| Desktop / High-End | 4 images | 25ms | 100ms |
+
+**Loading Priority:**
+1. Preloaded images - 0ms (instant)
+2. First image - 0ms (instant)
+3. Initial batch - 8ms increments (8ms, 16ms, 24ms)
+4. Remaining images - Progressive stagger with device-specific cap
 
 ### 2. Adjacent Page Preloading
 - **Background Preloading**: Loads next/prev page images while user views current page
@@ -55,19 +72,12 @@ ImageGallery
 - **Coordinated Timing**: Slower than current page to avoid resource conflicts
 
 ### 3. Simplified Loading System
-- **Single Source of Truth**: Loading strategy comes from `imageLoadingPriority.ts`
-- **No Device Discrimination**: All devices get the same immediate loading experience
-- **Simplified Logic**: Removed complex progressive delay calculations
-- **Cache Integration**: All images benefit from intelligent caching
+- **Single Source of Truth**: Loading strategy/timing comes from `src/shared/lib/imageLoadingPriority.ts`
+- **Unified Strategy**: Progressive loading is the primary mechanism (individual items should not invent their own delays)
+- **Device-Adaptive**: Batch sizes and stagger delays adapt to capability signals (mobile/low-end/slow connection)
+- **Cache Integration**: Cached/preloaded images bypass delays (appear immediately)
 
-## Configuration
-
-### Loading Configuration
-```typescript
-// All devices: Immediate loading of all images
-// No progressive delays or batch sizes
-const allImages = images.map((_, index) => index);
-```
+## API / Usage
 
 ### Loading Strategy
 ```typescript
@@ -76,7 +86,7 @@ const strategy = getImageLoadingStrategy(index, {
   totalImages: images.length,
   isPreloaded: isImageCached(image)
 });
-// Returns: tier, shouldLoadInInitialBatch, progressiveDelay
+// Returns: shouldLoadInInitialBatch, progressiveDelay, batchGroup
 ```
 
 ## Debugging

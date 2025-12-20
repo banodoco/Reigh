@@ -29,6 +29,8 @@
   - [3.2. Top-Level Pages](#32-top-level-pages-srcpages)
   - [3.3. Tool Modules](#33-tool-modules-srctools)
   - [3.4. Shared Elements](#34-shared-elements-srcshared)
+  - [3.5. Data Flow Architecture](#35-data-flow-architecture-shot-generations)
+  - [3.6. Centralized Systems](#36-centralized-systems--utilities)
 - [Design & Motion Guidelines](#design--motion-guidelines)
 
 ## Quick Reference: Sub-Documentation
@@ -39,19 +41,22 @@
 | **Database & Storage** | [db_and_storage.md](docs/structure_detail/db_and_storage.md) | Schema map, migration workflow, storage buckets |
 | **Deployment** | [deployment_and_migration_guide.md](docs/structure_detail/deployment_and_migration_guide.md) | Safe database migrations and Edge Function deployment workflow |
 | **Data Persistence** | [data_persistence.md](docs/structure_detail/data_persistence.md) | State management patterns, hooks, storage layers |
+| **Settings System** | [settings_system.md](docs/structure_detail/settings_system.md) | Settings priority (shot→project→user→defaults), inheritance, persistence mechanisms |
 | **Task System** | [task_worker_lifecycle.md](docs/structure_detail/task_worker_lifecycle.md) | Async task queue, worker polling, Edge Functions |
 | **Unified Task Creation** | [unified_task_creation.md](docs/structure_detail/unified_task_creation.md) | Client-side task creation pattern, migration guide, authentication flow |
 | **Edge Functions** | [edge_functions.md](docs/structure_detail/edge_functions.md) | Complete serverless function reference and API details |
 | **Adding Tools** | [adding_new_tool.md](docs/structure_detail/adding_new_tool.md) | Step-by-step guide for new tool modules |
 | **Design Standards** | [design_motion_guidelines.md](docs/structure_detail/design_motion_guidelines.md) | UI/UX patterns, motion, accessibility, mobile touch interactions |
+| **Performance System** | [performance_system.md](docs/structure_detail/performance_system.md) | Frame budget monitoring, time-slicing, image loading optimization, callback stability |
 | **Shared Code** | [shared_hooks_contexts.md](docs/structure_detail/shared_hooks_contexts.md) | Reusable hooks, contexts, components catalog (includes variant-based detail components) |
 | **Realtime Architecture** | [realtime_system.md](docs/structure_detail/realtime_system.md) | Implemented unified realtime system and usage guide |
 | **Tool: Image Gen** | [tool_image_generation.md](docs/structure_detail/tool_image_generation.md) | Multi-model image generation (Wan 2.2, Qwen.Image), LoRA support, resource-based style reference system (bulk migrated), inline AI prompt editing |
 | **Tool: Video Travel** | [tool_video_travel.md](docs/structure_detail/tool_video_travel.md) | Frame-accurate video generation workflow, shot reordering, mobile video preloading, video gallery with hover-to-play |
+| **Image Loading System** | [image_loading_system.md](docs/structure_detail/image_loading_system.md) | Progressive loading, device-adaptive batching, adjacent page preloading, performance optimization |
 | **Auto-Top-Up System** | [auto_topup_system.md](docs/structure_detail/auto_topup_system.md) | Credit purchases, auto-top-up setup, Stripe integration, database triggers |
+| **Debugging** | [debugging.md](docs/structure_detail/debugging.md) | CLI (`debug.py`), `system_logs` table, frontend logging, SQL queries |
 | **Referral System** | [referral_system.md](docs/structure_detail/referral_system.md) | Referral tracking with username-based links, visitor attribution, secure conversion handling |
 | **Debug Logging** | [debug_logging.md](docs/structure_detail/debug_logging.md) | PerfDebug log helpers & profiling |
-| **Image Loading System** | [image_loading_system.md](docs/structure_detail/image_loading_system.md) | Progressive loading, adjacent page preloading, performance optimization |
 | **Modal Styling System** | [modal_styling_system.md](docs/structure_detail/modal_styling_system.md) | Unified responsive modal system for both mobile and desktop, positioning, safe area handling |
 | **Railway Deployment** | `railway.toml`, `nixpacks.toml`, `.dockerignore` | Optimized Railway deployment config: npm-based builds, excludes node_modules/bun.lock/dist from Docker context for faster builds (~60-90s improvement) |
 | **Instrumentation System** | [instrumentation/README.md](src/integrations/supabase/instrumentation/README.md) | Centralized instrumentation management, diagnostics, and debugging tools |
@@ -251,6 +256,32 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 | **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns, reference image recropping (`recropReferences.ts`), generation transformers (`generationTransformers.ts`), URL resolution (`imageUrlResolver.ts`) |
 | **lib/tasks/** | `/src/shared/lib/tasks/` | Task creation utilities: `imageGeneration.ts`, `magicEdit.ts`, `imageInpaint.ts`, `annotatedImageEdit.ts`, `imageUpscale.ts`, `travelBetweenImages.ts`, `joinClips.ts`, `characterAnimate.ts`, `individualTravelSegment.ts` |
 
+---
+
+### 🔧 Centralized Systems & Utilities
+
+Single sources of truth for consistency. See [`settings_system.md`](docs/structure_detail/settings_system.md) and [`performance_system.md`](docs/structure_detail/performance_system.md) for detailed guides.
+
+| System | Location | Purpose | Key Functions |
+|--------|----------|---------|---------------|
+| **debugConfig** | `lib/debugConfig.ts` | Centralized debug logging control. Runtime control at `window.debugConfig` | `isEnabled(category)`, `enable/disable(category)`, `setQuietMode()`, `conditionalLog()`, `throttledLog()` |
+| **settingsResolution** | `src/shared/lib/settingsResolution.ts` | Settings priority: shot → project → user → defaults. See [settings_system.md](docs/structure_detail/settings_system.md) | `resolveSettingField<T>(field, sources)`, `resolveGenerationMode(sources)` |
+| **shotSettingsInheritance** | `src/shared/lib/shotSettingsInheritance.ts` | Standardized new shot settings (localStorage → DB fallback). See [settings_system.md](docs/structure_detail/settings_system.md) | `inheritSettingsForNewShot({ newShotId, projectId, shots })` |
+| **toastThrottle** | `lib/toastThrottle.ts` | Prevents notification spam (500ms errors, 1000ms others) | `throttledToast.error/info/warning(msg)`, `debouncedTaskUpdateToast()` |
+| **taskConfig** | `lib/taskConfig.ts` | Task visibility & metadata registry. Categories: orchestration, generation, processing (hidden), utility (hidden) | `isTaskVisible(type)`, `getTaskDisplayName(type)`, `filterVisibleTasks(tasks)` |
+| **performanceUtils** | `src/shared/lib/performanceUtils.ts` | 16ms frame budget monitoring & time-slicing. See [performance_system.md](docs/structure_detail/performance_system.md) | `performanceMonitoredTimeout()`, `processArrayTimeSliced()`, `PerformanceBudget`, `measureAsync()` |
+| **imageLoadingPriority** | `src/shared/lib/imageLoadingPriority.ts` | Progressive loading with device-adaptive batching (2-4 initial, auto-adjusts delays). See [image_loading_system.md](docs/structure_detail/image_loading_system.md) | `getImageLoadingStrategy(index, config)`, `getUnifiedBatchConfig(isMobile)`, `trackImageLoadTime()` |
+| **queryKeys** | `lib/queryKeys.ts` | Standardized React Query key construction | `unifiedGenerationsProjectKey()`, `unifiedGenerationsShotKey()` |
+| **Realtime System** | `providers/`, `realtime/` | Smart polling + realtime updates. See [`realtime_system.md`](docs/structure_detail/realtime_system.md) | `SimpleRealtimeProvider`, `SimpleRealtimeManager`, `DataFreshnessManager` |
+
+**Debug Categories:** `reactProfiler`, `renderLogging`, `progressiveImage`, `imageLoading`, `shotImageDebug`, `autoplayDebugger`, `tasksPaneDebug`, `dragDebug`, `skeletonDebug`, `videoDebug`, `realtimeDebug`, `reconnectionDebug`
+
+**Settings Inheritance Priority:** localStorage (project) → localStorage (global for first shot) → Database (latest shot) → Database (project defaults). **[Full guide: settings_system.md](docs/structure_detail/settings_system.md)**
+
+**Realtime Polling Strategy:** Connected & stable (no polling) → Recently connected (30s) → Disconnected (15s) → Error (60s)
+
+---
+
 #### 📦 Storage Path Structure
 
 All files in the `image_uploads` bucket follow a user-namespaced structure for security and easy data management:
@@ -381,6 +412,195 @@ useAllShotGenerations (two-phase loading + merge)
            Pair Prompts Display
 ```
 
+### Cache Management & Query Invalidation
+
+**Centralized Cache Invalidation** (`src/shared/hooks/useGenerationInvalidation.ts`)
+
+Reigh uses a centralized approach to cache invalidation to ensure consistency and prevent stale data:
+
+```typescript
+import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
+
+const invalidateGenerations = useInvalidateGenerations();
+
+// Basic usage - invalidate all generation-related caches for a shot
+invalidateGenerations(shotId, { 
+  reason: 'delete-image',  // Always include reason for debugging
+});
+
+// Scoped invalidation - only specific query types
+invalidateGenerations(shotId, { 
+  reason: 'metadata-update',
+  scope: 'metadata'  // Options: 'all' | 'images' | 'metadata' | 'counts' | 'unified'
+});
+
+// Include related queries
+invalidateGenerations(shotId, { 
+  reason: 'thumbnail-change',
+  includeShots: true,  // Also invalidate shots list
+  projectId: projectId
+});
+```
+
+**Invalidation Scopes:**
+- `'all'` (default): All generation-related queries for a shot
+- `'images'`: Just image data (all-shot-generations, shot-generations)
+- `'metadata'`: Just metadata (shot-generations-meta)
+- `'counts'`: Just counts (unpositioned-count)
+- `'unified'`: Just unified-generations queries
+
+**Non-hook version** for use outside React components:
+```typescript
+import { invalidateGenerationsSync } from '@/shared/hooks/useGenerationInvalidation';
+
+invalidateGenerationsSync(queryClient, shotId, { reason: 'realtime-update' });
+```
+
+**Query Presets** (`src/shared/lib/queryDefaults.ts`)
+
+Reigh standardizes React Query configurations with preset stale times and refetch behaviors:
+
+```typescript
+import { QUERY_PRESETS } from '@/shared/lib/queryDefaults';
+
+// For data updated by realtime or mutations
+useQuery({
+  ...QUERY_PRESETS.realtimeBacked,  // staleTime: 30s, refetchOnMount: false
+  queryKey: ['shot-data', shotId],
+  // ...
+});
+
+// For static reference data
+useQuery({
+  ...QUERY_PRESETS.staticReference,  // staleTime: 5min, no background refetch
+  queryKey: ['loras'],
+  // ...
+});
+
+// For data that changes frequently
+useQuery({
+  ...QUERY_PRESETS.frequentlyChanging,  // staleTime: 5s, smart refetch
+  queryKey: ['task-status', taskId],
+  // ...
+});
+```
+
+Available presets: `realtimeBacked`, `staticReference`, `frequentlyChanging`, `userSettings`
+
+### Optimistic Updates Pattern
+
+For immediate UI feedback, Reigh uses optimistic updates in mutations. Key patterns:
+
+**Basic Optimistic Update** (e.g., `useAddImageToShot`):
+```typescript
+useMutation({
+  mutationFn: async (variables) => { /* DB operation */ },
+  
+  onMutate: async (variables) => {
+    // 1. Cancel outgoing queries to prevent overwriting optimistic update
+    await queryClient.cancelQueries({ queryKey: ['all-shot-generations', shotId] });
+    
+    // 2. Snapshot previous data for rollback
+    const previousData = queryClient.getQueryData(['all-shot-generations', shotId]);
+    
+    // 3. Optimistically update cache
+    queryClient.setQueryData(['all-shot-generations', shotId], (old) => [
+      ...old,
+      { id: tempId, ...newItem, _optimistic: true }  // Mark as optimistic
+    ]);
+    
+    // 4. Return context for rollback
+    return { previousData, tempId };
+  },
+  
+  onError: (err, variables, context) => {
+    // Rollback on error
+    if (context?.previousData) {
+      queryClient.setQueryData(['all-shot-generations', shotId], context.previousData);
+    }
+    toast.error('Operation failed');
+  },
+  
+  onSuccess: (data, variables, context) => {
+    // Replace optimistic item with real data
+    queryClient.setQueryData(['all-shot-generations', shotId], (old) =>
+      old.map(item => 
+        item.id === context.tempId 
+          ? { ...item, ...data, _optimistic: undefined }  // Merge real data
+          : item
+      )
+    );
+    
+    // Invalidate for eventual consistency
+    invalidateGenerations(shotId, { 
+      reason: 'add-image-success',
+      scope: 'metadata'  // Only refetch metadata if needed
+    });
+  }
+});
+```
+
+**Key Principles:**
+1. **Cancel in-flight queries** before optimistic update to prevent race conditions
+2. **Always save previous state** for rollback on error
+3. **Mark optimistic items** with `_optimistic: true` flag for debugging
+4. **Replace, don't invalidate** - Replace optimistic items with real data in `onSuccess`
+5. **Scoped invalidation** - Only invalidate what changed to minimize refetches
+6. **Use refs in components** - Prevent callback recreation when query data changes reference
+
+**Preventing Callback Recreation:**
+```typescript
+// ❌ Bad: Callback recreates every time queryData changes
+const handleAdd = useCallback(() => {
+  addMutation.mutate({ shotId, imageUrl });
+}, [shotId, imageUrl, addMutation]);  // addMutation changes reference
+
+// ✅ Good: Use refs for values, callbacks stay stable
+const shotIdRef = useRef(shotId);
+shotIdRef.current = shotId;
+const addMutationRef = useRef(addMutation);
+addMutationRef.current = addMutation;
+
+const handleAdd = useCallback(() => {
+  addMutationRef.current.mutate({ 
+    shotId: shotIdRef.current, 
+    imageUrl: imageUrlRef.current 
+  });
+}, []);  // Empty deps - callback never recreates
+```
+
+### Filtering State Management
+
+**Stable Filter Pattern** (`useGenerationsPageLogic`)
+
+To prevent filter flicker during navigation and data updates:
+
+```typescript
+// Use ref-based map to track filter state per shot
+const filterStateMapRef = useRef<Map<string, { 
+  filter: string;           // 'all' or shotId
+  isUserOverride: boolean;  // true = user set explicitly
+}>>(new Map());
+
+// Preserve "all" filter when navigating between shots
+const isNavigatingBetweenShots = previousShotId && currentShotId;
+const previousWasAll = lastAppliedFilterRef.current === 'all';
+
+if (isNavigatingBetweenShots && previousWasAll && !filterState.isUserOverride) {
+  // Keep "all" to avoid flash from stale pre-computed stats
+  filterToApply = 'all';
+}
+
+// Track which filters are user-set vs computed defaults
+setFilterStateForShot(shotId, filter, isUserOverride);
+```
+
+**Key Techniques:**
+- **Ref-based state tracking** - Avoid reactive flicker from state updates
+- **User override detection** - Distinguish user choices from computed defaults
+- **Navigation preservation** - Keep "all" filter across shot changes when appropriate
+- **Pre-computed stats** - Use cached counts for instant skeleton display
+
 ### Best Practices
 
 1. **Use `useAllShotGenerations` by default** - It's the single source of truth
@@ -388,6 +608,11 @@ useAllShotGenerations (two-phase loading + merge)
 3. **Never cast metadata with `as any`** - Use proper types instead
 4. **Use type guards for filtering** - `isTimelineGeneration` provides both runtime check and type narrowing
 5. **Metadata is always loaded** - Both hooks fetch the full metadata field from the database
+6. **Centralize invalidation** - Always use `useInvalidateGenerations` with clear reasons
+7. **Scope invalidation** - Only invalidate what changed to minimize refetches
+8. **Use refs in callbacks** - Prevent callback recreation storms (see "Preventing Callback Recreation")
+9. **Mark optimistic updates** - Use `_optimistic: true` flag for debugging
+10. **Replace, don't refetch** - Update optimistic items with real data in `onSuccess` before invalidating
 
 ### Common Patterns
 
@@ -418,10 +643,11 @@ await supabase
   })
   .eq('id', shotGenerationId);
 
-// Invalidate cache to trigger refetch (both phases)
-queryClient.invalidateQueries(['unified-generations', 'shot', shotId]);
-queryClient.invalidateQueries(['shot-generations-fast', shotId]);
-queryClient.invalidateQueries(['shot-generations-meta', shotId]);
+// Invalidate with proper scope and reason
+invalidateGenerations(shotId, { 
+  reason: 'pair-prompt-update',
+  scope: 'metadata'  // Only metadata changed
+});
 ```
 
 ---

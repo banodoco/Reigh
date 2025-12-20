@@ -417,7 +417,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
               {onInpaintClick && (
                 <div
                   data-click-blocker="edit-button"
-                  className="absolute bottom-0 left-0 h-8 w-8 z-[19]"
+                  className="absolute bottom-0 left-0 h-7 w-7 z-[19]"
                   onMouseDown={(e) => {
                     buttonClickedRef.current = true;
                     e.preventDefault();
@@ -445,7 +445,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 <Button
                   variant="secondary"
                   size="icon"
-                  className="absolute bottom-1 left-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                  className="absolute bottom-1 left-1 h-5 w-5 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -478,15 +478,25 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   }}
                   title="Edit image"
                 >
-                  <Pencil className="h-3 w-3" />
+                  <Pencil className="!h-3 !w-3" />
                 </Button>
               )}
 
               {/* Duplicate Button */}
+              {/* Variant Count - top left */}
+              {(image as any).derivedCount && (image as any).derivedCount > 1 && (
+                <div 
+                  className="absolute top-1 left-1 h-5 w-5 rounded-full bg-black/60 text-white text-[9px] font-medium flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none"
+                  title={`${(image as any).derivedCount} variants`}
+                >
+                  {(image as any).derivedCount}
+                </div>
+              )}
+              
               <Button
                 variant="secondary"
                 size="icon"
-                className="absolute top-1 right-7 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                className="absolute top-1 right-[1.65rem] h-5 w-5 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
                 onClick={handleDuplicateClick}
                 onMouseDown={(e) => {
                   buttonClickedRef.current = true;
@@ -516,11 +526,11 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 title="Duplicate image"
               >
                 {duplicatingImageId === imageKey ? (
-                  <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
+                  <div className="!h-3 !w-3 animate-spin rounded-full border-b-2 border-white"></div>
                 ) : duplicateSuccessImageId === imageKey ? (
-                  <Check className="h-3 w-3" />
+                  <Check className="!h-3 !w-3" />
                 ) : (
-                  <Copy className="h-3 w-3" />
+                  <Copy className="!h-3 !w-3" />
                 )}
               </Button>
 
@@ -528,7 +538,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
               <Button
                 variant="destructive"
                 size="icon"
-                className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                className="absolute top-1 right-1 h-5 w-5 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
                 onClick={handleDeleteClick}
                 onMouseDown={(e) => {
                   buttonClickedRef.current = true;
@@ -556,7 +566,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 }}
                 title="Remove from timeline"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="!h-3 !w-3" />
               </Button>
             </>
           )}

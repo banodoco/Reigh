@@ -250,6 +250,134 @@ class DebugClient:
         except:
             return []
     
+    def get_logs(
+        self,
+        limit: Optional[int] = None,  # None = fetch all (paginated)
+        source_type: Optional[str] = None,
+        session_id: Optional[str] = None,
+        level: Optional[str] = None,
+        hours: Optional[int] = None,
+        latest_session: bool = False,
+        tag: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get logs from system_logs table with filters. Auto-paginates if limit is None."""
+        # If latest_session, first find the most recent browser session
+        if latest_session:
+            session_id = self._get_latest_browser_session()
+            if not session_id:
+                return {'logs': [], 'session_id': None, 'message': 'No browser sessions found'}
+            source_type = 'browser'  # Implied when using latest_session
+        
+        PAGE_SIZE = 1000  # Supabase max per query
+        all_logs = []
+        offset = 0
+        max_pages = 100  # Safety limit: 100k logs max
+        
+        while True:
+            # Build query
+            query = self.supabase.table('system_logs').select('*')
+            
+            if source_type:
+                query = query.eq('source_type', source_type)
+            if session_id:
+                query = query.eq('source_id', session_id)
+            if level:
+                query = query.eq('log_level', level.upper())
+            if hours:
+                cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+                query = query.gte('timestamp', cutoff.isoformat())
+            if tag:
+                # Filter by tag in message (case-insensitive search)
+                query = query.ilike('message', f'%[{tag}%')
+            
+            # Determine how many to fetch this page
+            if limit is not None:
+                remaining = limit - len(all_logs)
+                fetch_count = min(PAGE_SIZE, remaining)
+            else:
+                fetch_count = PAGE_SIZE
+            
+            query = query.order('timestamp', desc=True).range(offset, offset + fetch_count - 1)
+            result = query.execute()
+            page_logs = result.data or []
+            
+            all_logs.extend(page_logs)
+            
+            # Stop conditions
+            if len(page_logs) < fetch_count:
+                # No more logs available
+                break
+            if limit is not None and len(all_logs) >= limit:
+                # Reached requested limit
+                break
+            if offset // PAGE_SIZE >= max_pages:
+                # Safety limit reached
+                break
+            
+            offset += len(page_logs)
+        
+        # Reverse to show chronological order
+        all_logs.reverse()
+        
+        return {
+            'logs': all_logs,
+            'session_id': session_id,
+            'total_count': len(all_logs),
+            'tag_filter': tag
+        }
+    
+    def _get_latest_browser_session(self) -> Optional[str]:
+        """Get the most recent browser session ID."""
+        try:
+            result = self.supabase.table('system_logs').select('source_id').eq(
+                'source_type', 'browser'
+            ).order('timestamp', desc=True).limit(1).execute()
+            
+            if result.data:
+                return result.data[0].get('source_id')
+            return None
+        except:
+            return None
+    
+    def get_browser_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent browser sessions with log counts."""
+        # Manual aggregation - query recent browser logs and group by session
+        try:
+            logs_result = self.supabase.table('system_logs').select(
+                'source_id, timestamp, log_level'
+            ).eq('source_type', 'browser').order('timestamp', desc=True).limit(1000).execute()
+            
+            sessions = {}
+            for log in (logs_result.data or []):
+                sid = log.get('source_id')
+                if not sid:
+                    continue
+                if sid not in sessions:
+                    sessions[sid] = {
+                        'session_id': sid,
+                        'last_timestamp': log.get('timestamp'),
+                        'first_timestamp': log.get('timestamp'),
+                        'log_count': 0,
+                        'error_count': 0
+                    }
+                sessions[sid]['log_count'] += 1
+                if log.get('log_level') == 'ERROR':
+                    sessions[sid]['error_count'] += 1
+                # Update first_timestamp (logs are desc, so this becomes earliest)
+                sessions[sid]['first_timestamp'] = log.get('timestamp')
+            
+            # Sort by last timestamp and limit
+            sorted_sessions = sorted(
+                sessions.values(), 
+                key=lambda s: s['last_timestamp'] or '', 
+                reverse=True
+            )[:limit]
+            
+            return sorted_sessions
+        except Exception as e:
+            print(f"  [debug] Error fetching browser sessions: {e}")
+            return []
+
     def get_recent_tasks(
         self,
         limit: int = 50,

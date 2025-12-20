@@ -88,7 +88,7 @@ const CTAContent: React.FC<CTAContentProps> = ({ icon, text }) => {
 
 // Force dark mode styles for retro button to prevent white flash during hydration/theme switch
 // Using inline styles for colors to guarantee they're present during re-renders, Tailwind classes for layout/behavior
-const retroButtonBaseStyles = "inline-flex items-center justify-center gap-2 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-14 px-8 sm:px-12 py-4 text-base sm:text-xl max-w-[90vw] sm:max-w-none font-heading rounded-sm border-2 tracking-wide transition-[transform,box-shadow] duration-200 shadow-[-3px_3px_0_0_rgba(20,30,30,0.4)] hover:shadow-[-1.5px_1.5px_0_0_rgba(20,30,30,0.4)] hover:translate-x-[-0.75px] hover:translate-y-[0.75px] active:shadow-none active:translate-x-[-1.5px] active:translate-y-[1.5px]";
+const retroButtonBaseStyles = "hero-cta inline-flex items-center justify-center gap-2 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-14 px-8 sm:px-12 py-4 text-base sm:text-xl max-w-[90vw] sm:max-w-none font-heading rounded-sm border-2 tracking-wide shadow-[-3px_3px_0_0_rgba(20,30,30,0.4)] hover:shadow-[-1.5px_1.5px_0_0_rgba(20,30,30,0.4)] hover:translate-x-[-0.75px] hover:translate-y-[0.75px] active:shadow-none active:translate-x-[-1.5px] active:translate-y-[1.5px]";
 const retroButtonInlineStyles = {
   backgroundColor: '#3a4a4a',
   borderColor: '#8a9a9a',
@@ -206,8 +206,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   };
 
   return (
-    <div className="container mx-auto px-4 relative flex items-center justify-center min-h-[calc(100svh-64px)] md:min-h-[calc(100dvh-96px)] py-4 md:py-16">
-      <div className="text-center w-full">
+    <div className="container mx-auto px-4 relative flex items-center justify-center min-h-[100svh] md:min-h-[100dvh] py-4 md:py-16">
+      <div className="text-center w-full -translate-y-6">
         <div className="max-w-4xl mx-auto">
           
           {/* Top Section: Icon + Title */}
@@ -220,15 +220,15 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {/* Main title */}
               <div style={getFadeStyle(0.5, 20)}>
                 <h1 className="text-8xl md:text-[10rem] text-[#ecede3] mb-0 leading-tight">
-                  Rainier
+                  Reigh
                 </h1>
               </div>
             </div>
           </div>
           
-          {/* Loading Bar - fixed in viewport center, fades out when content reveals */}
+          {/* Loading Bar - fixed in viewport center (shifted up to match content's optical centering), fades out when content reveals */}
           <div 
-            className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-1.5 z-10 pointer-events-none transition-opacity duration-500 ${
+            className={`fixed top-[calc(50%-1.5rem)] left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-1.5 z-10 pointer-events-none transition-opacity duration-500 ${
               phase === 'content-revealing' || phase === 'complete' ? 'opacity-0' : 'opacity-100'
             }`}
           >

@@ -235,7 +235,7 @@ Both `SharedTaskDetails` and `SharedMetadataDetails` use a variant pattern:
 
 **📚 More Resources**
 
-[Back to Structure](../structure.md)
+[Back to Structure](../../structure.md)
 
 </div> 
 

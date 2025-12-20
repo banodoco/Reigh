@@ -20,6 +20,56 @@
 
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { GenerationRow } from '@/types/shots';
+import { supabase } from '@/integrations/supabase/client';
+
+/**
+ * Calculate derivedCount for generations (how many variants/derivatives exist)
+ * 
+ * Queries both:
+ * - generations table (based_on relationships)
+ * - generation_variants table (edit variants)
+ * 
+ * @param generationIds - Array of generation IDs to count variants for
+ * @returns Record mapping generation ID to variant count
+ */
+export async function calculateDerivedCounts(
+  generationIds: string[]
+): Promise<Record<string, number>> {
+  const derivedCounts: Record<string, number> = {};
+
+  if (generationIds.length === 0) {
+    return derivedCounts;
+  }
+
+  // Count from generations table (based_on relationships)
+  const { data: genCountsData, error: genCountsError } = await supabase
+    .from('generations')
+    .select('based_on')
+    .in('based_on', generationIds);
+
+  if (!genCountsError && genCountsData) {
+    genCountsData.forEach((item: any) => {
+      const basedOnId = item.based_on;
+      derivedCounts[basedOnId] = (derivedCounts[basedOnId] || 0) + 1;
+    });
+  }
+
+  // Count from generation_variants table (edit variants)
+  const { data: variantCountsData, error: variantCountsError } = await supabase
+    .from('generation_variants')
+    .select('generation_id')
+    .in('generation_id', generationIds);
+
+  if (!variantCountsError && variantCountsData) {
+    variantCountsData.forEach((item: any) => {
+      const genId = item.generation_id;
+      derivedCounts[genId] = (derivedCounts[genId] || 0) + 1;
+    });
+  }
+
+  return derivedCounts;
+}
+
 
 /**
  * Raw generation record from database (before transformation)
@@ -36,6 +86,7 @@ export interface RawGeneration {
   tasks?: any[] | any | null;
   based_on?: string | null;
   name?: string | null;
+  derivedCount?: number; // Number of generations/variants based on this one
   // JSONB column mapping shot_id -> array of timeline_frames
   // Each generation can appear multiple times in the same shot (different positions)
   // Example: { "shot_id_123": [120, 420, null] } means 3 entries: at frame 120, 420, and one unpositioned
@@ -182,6 +233,7 @@ export function transformGeneration(
     position: null, // Will be set if shot context provided
     timeline_frame: null, // Will be set if shot context provided
     name: item.name || item.params?.name || undefined,
+    derivedCount: item.derivedCount || 0, // Number of generations/variants based on this one
   };
 
   // Handle shot associations - prefer JSONB shot_data over JOIN shot_generations
@@ -349,6 +401,7 @@ export function transformForTimeline(
     metadata: shotGen.metadata,
     starred: genData.starred ?? false, // ⭐ Pass through starred status
     based_on: genData.based_on ?? undefined, // 🔗 Pass through based_on for lineage tracking
+    derivedCount: (genData as any).derivedCount ?? 0, // 🔢 Pass through variant count
   };
 }
 

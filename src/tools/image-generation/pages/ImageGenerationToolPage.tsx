@@ -610,7 +610,10 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const validShots = useMemo(() => shots || [], [shots]);
 
   // Memoize images array to prevent unnecessary re-renders
-  const imagesToShow = useMemo(() => [...(generationsResponse?.items || [])], [generationsResponse]);
+  const imagesToShow = useMemo(() => {
+    const images = [...(generationsResponse?.items || [])];
+    return images;
+  }, [generationsResponse]);
 
   const handleAddImageToTargetShot = useCallback(async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
     if (!targetShotInfo.targetShotIdForButton) {

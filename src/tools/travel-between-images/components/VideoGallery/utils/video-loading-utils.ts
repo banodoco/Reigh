@@ -69,6 +69,7 @@ export const transformUnifiedGenerationsData = (items: any[]): GenerationRow[] =
     position: item.position,
     name: item.name, // Include variant name
     starred: item.starred ?? false, // 🌟 Preserve starred state from cache
+    derivedCount: item.derivedCount ?? 0, // Include variant count
     // Include task data if available
     ...(item.taskId && { taskId: item.taskId }),
   })) as GenerationRow[];

@@ -94,6 +94,8 @@ export interface ImageGalleryProps {
   formAssociatedShotId?: string | null;
   onSwitchToAssociatedShot?: (shotId: string) => void;
   reducedSpacing?: boolean;
+  /** Additional className to apply to the gallery wrapper (can override default spacing) */
+  className?: string;
   hidePagination?: boolean;
   hideTopFilters?: boolean;
   hideMediaTypeFilter?: boolean;
