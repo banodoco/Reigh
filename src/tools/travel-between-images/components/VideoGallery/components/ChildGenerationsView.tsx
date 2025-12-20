@@ -20,6 +20,7 @@ import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individual
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { JoinClipsSettingsForm, DEFAULT_JOIN_CLIPS_PHASE_CONFIG, BUILTIN_JOIN_CLIPS_DEFAULT_ID } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import { useJoinClipsSettings } from '@/tools/join-clips/hooks/useJoinClipsSettings';
+import { invalidateGenerationUpdate } from '@/shared/hooks/useGenerationInvalidation';
 import { 
     validateClipsForJoin, 
     type ClipFrameInfo,
@@ -722,9 +723,12 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 description: "Final video output has been removed. You can regenerate it.",
             });
             
-            // Invalidate queries to refresh the UI
-            queryClient.invalidateQueries({ queryKey: ['generation', parentGenerationId] });
-            queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+            // Invalidate queries using centralized helper
+            invalidateGenerationUpdate(queryClient, {
+                generationId: parentGenerationId,
+                projectId: projectId || undefined,
+                reason: 'clear-parent-output',
+            });
         } catch (error) {
             console.error('[ChildGenerationsView] Error clearing parent output:', error);
             toast({
@@ -733,7 +737,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 variant: "destructive",
             });
         }
-    }, [parentGenerationId, queryClient, toast]);
+    }, [parentGenerationId, queryClient, toast, projectId]);
 
     // Handler for opening external generation (for "Based On" navigation in lightboxes)
     const handleOpenExternalGeneration = useCallback(async (

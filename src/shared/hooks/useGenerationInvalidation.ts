@@ -60,8 +60,23 @@ export interface VariantInvalidationOptions {
   generationId: string;
   /** Optional: specific shot ID to prioritize (will refetch immediately before global invalidation) */
   shotId?: string;
+  /** Optional: project ID for project-scoped unified-generations invalidation */
+  projectId?: string;
   /** Delay before invalidation (e.g., 100ms for DB trigger to complete) */
   delayMs?: number;
+}
+
+/**
+ * Options for generation update invalidation.
+ * Use when a generation's data changes (not variant-related).
+ */
+export interface GenerationUpdateOptions {
+  /** Debug reason for logging. Required for traceability. */
+  reason: string;
+  /** Generation ID that was updated */
+  generationId: string;
+  /** Optional: project ID for project-scoped invalidation */
+  projectId?: string;
 }
 
 /**
@@ -212,7 +227,7 @@ export async function invalidateVariantChange(
   queryClient: QueryClient,
   options: VariantInvalidationOptions
 ): Promise<void> {
-  const { reason, generationId, shotId, delayMs } = options;
+  const { reason, generationId, shotId, projectId, delayMs } = options;
   
   // Apply delay if specified (e.g., for DB trigger to complete)
   if (delayMs && delayMs > 0) {
@@ -223,6 +238,7 @@ export async function invalidateVariantChange(
     console.log(`[Invalidation] Variant change: ${reason}`, {
       generationId: generationId.substring(0, 8),
       shotId: shotId?.substring(0, 8) || 'unknown',
+      projectId: projectId?.substring(0, 8) || 'unknown',
       timestamp: Date.now()
     });
   }
@@ -244,8 +260,57 @@ export async function invalidateVariantChange(
     predicate: (query) => query.queryKey[0] === 'shot-generations'
   });
   
-  // 4. Invalidate generation galleries (unified-generations, generations)
-  // Use both scoped and legacy key patterns for compatibility
-  queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+  // 4. Invalidate generation galleries - cover ALL key patterns for compatibility
+  queryClient.invalidateQueries({ queryKey: ['unified-generations'] }); // Legacy
   queryClient.invalidateQueries({ queryKey: ['generations'] });
+  
+  // 5. If projectId provided, also invalidate project-scoped queries
+  if (projectId) {
+    queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
+  }
+}
+
+/**
+ * Invalidate caches after a generation is updated (non-variant changes).
+ * 
+ * Use this when:
+ * - Generation's location/thumbnail is directly updated
+ * - Generation's metadata is cleared/changed
+ * - Generation is deleted
+ * 
+ * This is lighter-weight than invalidateVariantChange - it doesn't
+ * touch shot-generations caches since the generation-shot relationship
+ * isn't changing.
+ * 
+ * @param queryClient - React Query client
+ * @param options - Invalidation options including generationId and reason
+ */
+export function invalidateGenerationUpdate(
+  queryClient: QueryClient,
+  options: GenerationUpdateOptions
+): void {
+  const { reason, generationId, projectId } = options;
+  
+  if (debugConfig.isEnabled('invalidation')) {
+    console.log(`[Invalidation] Generation update: ${reason}`, {
+      generationId: generationId.substring(0, 8),
+      projectId: projectId?.substring(0, 8) || 'unknown',
+      timestamp: Date.now()
+    });
+  }
+  
+  // 1. Invalidate the specific generation
+  queryClient.invalidateQueries({ queryKey: ['generation', generationId] });
+  
+  // 2. Invalidate generation galleries - cover ALL key patterns
+  queryClient.invalidateQueries({ queryKey: ['unified-generations'] }); // Legacy
+  queryClient.invalidateQueries({ queryKey: ['generations'] });
+  
+  // 3. If projectId provided, also invalidate project-scoped queries
+  if (projectId) {
+    queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
+  }
+  
+  // 4. Invalidate derived-generations (for child/variant galleries)
+  queryClient.invalidateQueries({ queryKey: ['derived-generations'] });
 }

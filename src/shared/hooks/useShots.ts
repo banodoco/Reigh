@@ -1414,7 +1414,6 @@ export const useRemoveImageFromShot = () => {
         includeProjectUnified: true,
         projectId: data.projectId
       });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
     },
   });
 };
