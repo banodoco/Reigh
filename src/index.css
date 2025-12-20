@@ -1765,7 +1765,7 @@
   }
   
   .hero-cta:hover {
-    background-color: #4a5a5a !important;
+    background-color: #5a6a6a !important;
     border-color: hsl(var(--wes-vintage-gold)) !important;
     color: hsl(var(--wes-vintage-gold)) !important;
   }

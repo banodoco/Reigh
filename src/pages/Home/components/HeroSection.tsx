@@ -110,6 +110,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 }) => {
   const [phase, setPhase] = useState<AnimationPhase>('initial');
   const [banodocoState, setBanodocoState] = useState<'hidden' | 'animating' | 'visible'>('hidden');
+  const [titleHover, setTitleHover] = useState({ x: 0, y: 0, active: false });
+  const [goldTrail, setGoldTrail] = useState<Array<{ x: number; y: number; opacity: number; id: number }>>([]);
+  const titleRef = useRef<HTMLDivElement>(null);
+  const trailIdRef = useRef(0);
   const [minLoadTimePassed, setMinLoadTimePassed] = useState(false);
   const [openTipOpen, setOpenTipOpen] = useState(false);
   const [emergingTipOpen, setEmergingTipOpen] = useState(false);
@@ -122,6 +126,39 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   
   // Hide hero content on mobile when pane is open
   const hideHeroContent = isMobile && isPaneOpen;
+
+  // Handle mouse move over title for gold spotlight effect with trailing fade
+  const handleTitleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!titleRef.current) return;
+    const rect = titleRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    setTitleHover({ x, y, active: true });
+    
+    // Add a trail point
+    const newId = trailIdRef.current++;
+    setGoldTrail(prev => [...prev, { x, y, opacity: 1, id: newId }]); // Points only removed when fully faded
+  };
+
+  const handleTitleMouseLeave = () => {
+    setTitleHover(prev => ({ ...prev, active: false }));
+  };
+
+  // Fade out trail points over time
+  useEffect(() => {
+    if (goldTrail.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setGoldTrail(prev => 
+        prev
+          .map(point => ({ ...point, opacity: point.opacity - 0.008 }))
+          .filter(point => point.opacity > 0)
+      );
+    }, 50);
+    
+    return () => clearInterval(interval);
+  }, [goldTrail.length > 0]);
 
   // Close install modal if we're in standalone mode (PWA)
   // This handles the case where Chrome transfers page state when clicking "Open in app"
@@ -227,11 +264,49 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             style={{ gridTemplateRows: phase === 'content-revealing' || phase === 'complete' ? '1fr' : '0fr' }}
           >
             <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
-              {/* Main title */}
+              {/* Main title with gold hover spotlight */}
               <div style={getFadeStyle(0.5, 20)}>
-                <h1 className="text-8xl md:text-[10rem] text-[#ecede3] mb-0 leading-tight">
-                  Reigh
-                </h1>
+                <div 
+                  ref={titleRef}
+                  className="relative inline-block cursor-default"
+                  onMouseMove={handleTitleMouseMove}
+                  onMouseLeave={handleTitleMouseLeave}
+                >
+                  {/* Base text */}
+                  <h1 className="text-8xl md:text-[10rem] text-[#ecede3] mb-0 leading-tight select-none">
+                    Reigh
+                  </h1>
+                  {/* Gold trail - fading spots where cursor has been */}
+                  {goldTrail.map(point => (
+                    <h1 
+                      key={point.id}
+                      className="absolute inset-0 text-8xl md:text-[10rem] mb-0 leading-tight select-none pointer-events-none"
+                      style={{
+                        color: '#fbbf24',
+                        opacity: point.opacity,
+                        maskImage: `radial-gradient(circle 60px at ${point.x}px ${point.y}px, black 0%, black 60%, transparent 100%)`,
+                        WebkitMaskImage: `radial-gradient(circle 60px at ${point.x}px ${point.y}px, black 0%, black 60%, transparent 100%)`,
+                      }}
+                      aria-hidden="true"
+                    >
+                      Reigh
+                    </h1>
+                  ))}
+                  {/* Current cursor spotlight - solid gold */}
+                  <h1 
+                    className="absolute inset-0 text-8xl md:text-[10rem] mb-0 leading-tight select-none pointer-events-none"
+                    style={{
+                      color: '#fbbf24',
+                      opacity: titleHover.active ? 1 : 0,
+                      maskImage: `radial-gradient(circle 70px at ${titleHover.x}px ${titleHover.y}px, black 0%, black 70%, transparent 100%)`,
+                      WebkitMaskImage: `radial-gradient(circle 70px at ${titleHover.x}px ${titleHover.y}px, black 0%, black 70%, transparent 100%)`,
+                      transition: 'opacity 0.15s ease-out'
+                    }}
+                    aria-hidden="true"
+                  >
+                    Reigh
+                  </h1>
+                </div>
               </div>
             </div>
           </div>
