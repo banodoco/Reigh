@@ -102,12 +102,49 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
       </div>
       
       {/* Grid content with matching container - matches ShotListDisplay grid exactly */}
-      {/* Breakpoints: 1 col default, 2 cols at lg (1024px), 3 cols at xl (1280px) */}
+      {/* Breakpoints: 1 col default, 2 cols at sm (640px), 3 cols at lg (1024px) */}
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4">
-            {Array.from({ length: gridItemCount }).map((_, idx) => (
-            <Skeleton key={idx} className="h-32 rounded-lg" />
-            ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4">
+          {/* First item: "Create new shot" drop zone skeleton */}
+          <div className="p-4 border-2 border-dashed rounded-lg self-start flex flex-col relative">
+            {/* Invisible structure to match shot card height */}
+            <div className="h-8 mb-3" aria-hidden="true" />
+            <div className="grid grid-cols-3 gap-2" aria-hidden="true">
+              <div className="aspect-square" />
+              <div className="aspect-square" />
+              <div className="aspect-square" />
+            </div>
+            {/* Centered content overlay */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-2">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-4 w-24 rounded" />
+              </div>
+            </div>
+          </div>
+          
+          {/* Remaining shot card skeletons */}
+          {Array.from({ length: Math.max(0, gridItemCount - 1) }).map((_, idx) => (
+            /* Shot card skeleton - matches VideoShotDisplay structure */
+            <div key={idx} className="p-4 border rounded-lg bg-card/50 self-start">
+              {/* Header: shot name + action buttons (Video, Pencil, Copy, Trash) */}
+              <div className="flex justify-between items-start mb-3">
+                <Skeleton className="h-7 w-32 rounded" />
+                <div className="flex items-center space-x-1">
+                  <Skeleton className="h-8 w-8 rounded" />
+                  <Skeleton className="h-8 w-8 rounded" />
+                  <Skeleton className="h-8 w-8 rounded" />
+                  <Skeleton className="h-8 w-8 rounded" />
+                </div>
+              </div>
+              {/* Image grid: 3-column with aspect-square items */}
+              <div className="grid grid-cols-3 gap-2">
+                <Skeleton className="aspect-square rounded" />
+                <Skeleton className="aspect-square rounded" />
+                <Skeleton className="aspect-square rounded" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </>

@@ -594,8 +594,45 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   if (shotsLoading || shots === undefined) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4 pb-2 items-start">
-        {Array.from({ length: 6 }).map((_, idx) => (
-          <div key={idx} className="h-32 rounded-lg bg-muted animate-pulse" />
+        {/* First item: "Create new shot" drop zone skeleton */}
+        <div className="p-4 border-2 border-dashed rounded-lg self-start flex flex-col relative animate-pulse">
+          {/* Invisible structure to match shot card height */}
+          <div className="h-8 mb-3" aria-hidden="true" />
+          <div className="grid grid-cols-3 gap-2" aria-hidden="true">
+            <div className="aspect-square" />
+            <div className="aspect-square" />
+            <div className="aspect-square" />
+          </div>
+          {/* Centered content overlay */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-muted" />
+              <div className="h-4 w-24 rounded bg-muted" />
+            </div>
+          </div>
+        </div>
+        
+        {/* Remaining shot card skeletons */}
+        {Array.from({ length: 5 }).map((_, idx) => (
+          /* Shot card skeleton - matches VideoShotDisplay structure */
+          <div key={idx} className="p-4 border rounded-lg bg-card/50 self-start animate-pulse">
+            {/* Header: shot name + action buttons (Video, Pencil, Copy, Trash) */}
+            <div className="flex justify-between items-start mb-3">
+              <div className="h-7 w-32 bg-muted rounded" />
+              <div className="flex items-center space-x-1">
+                <div className="h-8 w-8 bg-muted rounded" />
+                <div className="h-8 w-8 bg-muted rounded" />
+                <div className="h-8 w-8 bg-muted rounded" />
+                <div className="h-8 w-8 bg-muted rounded" />
+              </div>
+            </div>
+            {/* Image grid: 3-column with aspect-square items */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="aspect-square bg-muted rounded" />
+              <div className="aspect-square bg-muted rounded" />
+              <div className="aspect-square bg-muted rounded" />
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -703,10 +740,11 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
           {/* Skeleton shot card - appears when creating new shot via drop/modal */}
           {pendingSkeletonShot && (
             <div className="p-4 border rounded-lg bg-card/50 opacity-70 animate-pulse self-start">
-              {/* Header skeleton */}
+              {/* Header skeleton (Video, Pencil, Copy, Trash) */}
               <div className="flex justify-between items-start mb-3">
                 <div className="h-7 w-32 bg-muted rounded" />
                 <div className="flex items-center space-x-1">
+                  <div className="h-8 w-8 bg-muted rounded" />
                   <div className="h-8 w-8 bg-muted rounded" />
                   <div className="h-8 w-8 bg-muted rounded" />
                   <div className="h-8 w-8 bg-muted rounded" />
