@@ -14,7 +14,6 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import { VideoTravelSettings } from '../settings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
