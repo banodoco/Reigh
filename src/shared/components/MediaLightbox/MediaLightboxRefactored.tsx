@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { 
   ChevronLeft, 
@@ -26,6 +27,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
+import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 
 // Import all extracted hooks
 import {
@@ -266,6 +268,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const DOUBLE_TAP_DELAY = 300; // ms
 
   // Basic hooks
+  const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const { selectedProjectId } = useProject();
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
@@ -1284,14 +1287,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       }
 
       console.log('[VariantClickDebug] Successfully made current media the main variant');
-      
-      // Refresh the page to show updated data
+
+      // Invalidate caches so all views update (timeline, shot editor, galleries, variants list).
+      // Use selectedShotId if available (most likely current context), else fall back to shotId.
+      await invalidateVariantChange(queryClient, {
+        generationId: parentGenId,
+        shotId: selectedShotId || shotId,
+        reason: 'child-promoted-to-primary',
+      });
+
+      // Close the lightbox (UI will now reflect updated data without refresh)
       onClose();
     } catch (error) {
       console.error('[VariantClickDebug] handleMakeMainVariant failed:', error);
       throw error;
     }
-  }, [sourceGenerationData, media, onClose, canMakeMainVariantFromChild, canMakeMainVariantFromVariant, activeVariant, setPrimaryVariant, refetchVariants]);
+  }, [
+    sourceGenerationData,
+    media,
+    onClose,
+    canMakeMainVariantFromChild,
+    canMakeMainVariantFromVariant,
+    activeVariant,
+    setPrimaryVariant,
+    refetchVariants,
+    queryClient,
+    selectedShotId,
+    shotId,
+  ]);
 
   return (
     <TooltipProvider delayDuration={500}>
