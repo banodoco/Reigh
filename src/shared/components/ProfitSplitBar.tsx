@@ -35,7 +35,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                 <Tooltip open={engLeftOpen} onOpenChange={setEngLeftOpen}>
                   <TooltipTrigger asChild>
                     <div
-                      className="h-full w-full bg-wes-yellow-dark transition-all duration-200 hover:brightness-90"
+                      className="h-full w-full bg-wes-yellow-dark dark:bg-amber-600 transition-all duration-200 hover:brightness-90"
                       onClick={() => { if (isMobile) setEngLeftOpen((v) => !v); }}
                     />
                   </TooltipTrigger>
@@ -51,7 +51,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                 <Tooltip open={engRightOpen} onOpenChange={setEngRightOpen}>
                   <TooltipTrigger asChild>
                     <div
-                      className="h-full w-full bg-wes-yellow transition-all duration-200 hover:brightness-95"
+                      className="h-full w-full bg-wes-yellow dark:bg-amber-500 transition-all duration-200 hover:brightness-95"
                       onClick={() => { if (isMobile) setEngRightOpen((v) => !v); }}
                     />
                   </TooltipTrigger>
@@ -72,7 +72,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                 <Tooltip open={artLeftOpen} onOpenChange={setArtLeftOpen}>
                   <TooltipTrigger asChild>
                     <div
-                      className="h-full w-full bg-wes-mint-dark transition-all duration-200 hover:brightness-110"
+                      className="h-full w-full bg-wes-mint-dark dark:bg-emerald-600 transition-all duration-200 hover:brightness-110"
                       onClick={() => { if (isMobile) setArtLeftOpen((v) => !v); }}
                     />
                   </TooltipTrigger>
@@ -88,7 +88,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                 <Tooltip open={artRightOpen} onOpenChange={setArtRightOpen}>
                   <TooltipTrigger asChild>
                     <div
-                      className="h-full w-full bg-wes-mint transition-all duration-200 hover:brightness-110"
+                      className="h-full w-full bg-wes-mint dark:bg-emerald-500 transition-all duration-200 hover:brightness-110"
                       onClick={() => { if (isMobile) setArtRightOpen((v) => !v); }}
                     />
                   </TooltipTrigger>
@@ -106,7 +106,7 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
             <Tooltip open={banoOpen} onOpenChange={setBanoOpen}>
               <TooltipTrigger asChild>
                 <div
-                  className="h-full w-full bg-wes-pink hover:bg-wes-pink-dark transition-all duration-200"
+                  className="h-full w-full bg-wes-pink dark:bg-orange-400 hover:bg-wes-pink-dark dark:hover:bg-orange-500 transition-all duration-200"
                   aria-label="Banodoco"
                   onClick={() => { if (isMobile) setBanoOpen((v) => !v); }}
                 />

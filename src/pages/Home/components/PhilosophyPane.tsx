@@ -111,10 +111,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             There are many tools that aim to be a 'one-stop-shop' for creating with AI - a kind of 'Amazon for art'. 
           </p>
           <p className="text-sm leading-relaxed">
-            Reigh is not one of them.
+            <span className="font-theme-heading">Reigh</span> is not one of them.
           </p>
           <p className="text-sm leading-relaxed">
-            It's a tool <em>just</em> for travelling between images:
+            It's a tool <span className="text-wes-vintage-gold">just for travelling between images</span>:
           </p>
         </div>
 
@@ -350,7 +350,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            In order to guide a video with precision, you use reference videos to steer the motion - here's an example of a combination of images and videos to guide a video with precision:
+            In order to guide a video with precision, you use <span className="text-wes-vintage-gold">reference videos to steer the motion</span> - here's an example of a combination of images and videos to guide a video with precision:
           </p>
           
           {/* All three columns are 4:3, same height, full width */}
@@ -411,7 +411,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            Not only this, but you can use community-trained LoRAs to make it move in all kinds of unique and interesting ways:
+            Not only this, but you can use <span className="text-wes-vintage-gold">community-trained LoRAs</span> to make it move in all kinds of unique and interesting ways:
           </p>
           
           <div className="flex gap-3">
@@ -459,7 +459,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            In order to steer these videos, we also let you generate images by providing style, subject and scene references:
+            In order to steer these videos, we also let you <span className="text-wes-vintage-gold">generate images by providing references</span> for style, subject and scene:
           </p>
           
           <div className="flex gap-3">
@@ -536,7 +536,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            And you can edit them with LoRAs focused on specific tasks:
+            And you can <span className="text-wes-vintage-gold">edit images in many ways</span> with community-trained LoRAs trained for specific tasks:
           </p>
           
           <div className="flex gap-3 items-stretch">
@@ -594,10 +594,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            Just as a songwriter might uncover infinite possibilities with six strings, we believe an entire artform lies waiting in the AI-driven journey between images.
+            We believe that there's an <span className="text-wes-vintage-gold">entire artform that's waiting to be discovered</span> in the AI-driven journey between images.
           </p>
           <p className="text-sm leading-relaxed">
-            Reigh is a tool just for exploring this artform. By endless improving it and implementing ideas and work from the community, we hope to make it very good. And everything is open source - meaning you can <em>run it for free</em> on your computer!
+            <span className="text-wes-vintage-gold"><span className="font-theme-heading">Reigh</span> is a tool just for exploring this artform</span>. By endless improving it and implementing ideas and work from the community, we hope to make it extremely good. And everything is open source - meaning you can run it for free on your computer!
           </p>
           <p className="text-sm leading-relaxed">
             If you're interested in joining, you're very welcome.

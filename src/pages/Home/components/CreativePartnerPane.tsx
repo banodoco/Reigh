@@ -56,7 +56,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
             </div>
             
             <p className="text-sm leading-relaxed">
-              We call our approach an <strong className="text-primary">Open Creative Partner Programme</strong>. We open source our tool and models so artists can create for free, hoping this attracts others who choose to pay for convenience.
+              We call our approach an <strong className="text-wes-vintage-gold">Open Creative Partner Programme</strong>. We open source our tool and models so artists can create for free, hoping this attracts others who choose to pay for convenience.
             </p>
           </div>
 

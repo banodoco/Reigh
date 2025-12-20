@@ -319,7 +319,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         >
           {isBottom ? (
             <>
-              {/* Bottom (mobile unlocked): Third, Lock, Open - Third always on left */}
+              {/* Bottom (mobile unlocked): Third, Lock, then Open (if closed) or Fourth (if open) */}
               {thirdButton && (
                 <Button
                   variant="ghost"
@@ -342,16 +342,32 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
               >
                 <LockIcon className="h-5 w-5" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onPointerUp={handleButtonClick(() => openPane())}
-                onClick={(e) => e.stopPropagation()}
-                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                aria-label={paneTooltip || "Open pane"}
-              >
-                {getIcon()}
-              </Button>
+              {/* Show Open button when closed, Fourth button when open */}
+              {isOpen ? (
+                fourthButton && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(fourthButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={fourthButton.ariaLabel}
+                  >
+                    {fourthButton.content || <Square className="h-5 w-5" />}
+                  </Button>
+                )
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerUp={handleButtonClick(() => openPane())}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                  aria-label={paneTooltip || "Open pane"}
+                >
+                  {getIcon()}
+                </Button>
+              )}
             </>
           ) : (
             <>
@@ -464,7 +480,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         >
           {isBottom ? (
             <>
-              {/* Bottom (open not locked): Third, Lock, Open - Third always on left */}
+              {/* Bottom (open not locked): Third, Lock, Fourth (if provided) */}
               {thirdButton && (
                 <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
                   <Button
@@ -491,18 +507,20 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
                   <LockIcon className="h-4 w-4" />
                 </Button>
               </TooltipButton>
-              <TooltipButton tooltip={paneTooltip} showTooltip={showTooltips} side={tooltipSide}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onPointerUp={handleButtonClick(() => openPane())}
-                  onClick={(e) => e.stopPropagation()}
-                  className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                  aria-label={paneTooltip || "Open pane"}
-                >
-                  {getIcon()}
-                </Button>
-              </TooltipButton>
+              {fourthButton && (
+                <TooltipButton tooltip={fourthButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onPointerUp={handleButtonClick(fourthButton.onClick)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                    aria-label={fourthButton.ariaLabel}
+                  >
+                    {fourthButton.content || <Square className="h-4 w-4" />}
+                  </Button>
+                </TooltipButton>
+              )}
             </>
           ) : (
             <>
