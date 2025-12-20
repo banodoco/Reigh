@@ -253,7 +253,7 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 |---------|----------|---------|
 | **edge functions** | `/supabase/functions/` | Task completion, post-execution billing, payments, video trimming (`trim-video`) |
 | **database triggers** | migr. SQL | Instant task processing, status broadcasts |
-| **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns, reference image recropping (`recropReferences.ts`), generation transformers (`generationTransformers.ts`), URL resolution (`imageUrlResolver.ts`) |
+| **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns, reference image recropping (`recropReferences.ts`), generation transformers (`generationTransformers.ts` - computes `urlIdentity`/`thumbUrlIdentity` for stable caching), URL resolution (`imageUrlResolver.ts`) |
 | **lib/tasks/** | `/src/shared/lib/tasks/` | Task creation utilities: `imageGeneration.ts`, `magicEdit.ts`, `imageInpaint.ts`, `annotatedImageEdit.ts`, `imageUpscale.ts`, `travelBetweenImages.ts`, `joinClips.ts`, `characterAnimate.ts`, `individualTravelSegment.ts` |
 
 ---
@@ -334,6 +334,11 @@ Shot generation data flows from the database through React Query hooks to UI com
 - Base type for all generation data throughout the app
 - Used in galleries, lightboxes, shot managers
 - Includes optional `metadata: GenerationMetadata`
+
+**`GeneratedImageWithMetadata`** (`src/shared/components/ImageGallery/types.ts`)
+- UI-layer type returned by `transformGeneration()` in `generationTransformers.ts`
+- Includes `urlIdentity` and `thumbUrlIdentity` fields - URL paths without query params for stable comparison
+- **Why?** Supabase signed URLs have rotating tokens; identity fields prevent unnecessary re-renders/reloads when only tokens change
 
 **`TimelineGenerationRow`** (`src/types/shots.ts`)
 - Extends `GenerationRow` with required fields for timeline display

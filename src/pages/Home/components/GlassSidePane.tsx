@@ -41,13 +41,20 @@ export const GlassSidePane: React.FC<GlassSidePaneProps> = ({
     ? 'left-0 border-r translate-x-0 -translate-x-full'
     : 'right-0 border-l translate-x-0 translate-x-full';
   
+  // Stronger background on mobile for "harsher" edge feel
   const gradientDirection = isLeft ? 'bg-gradient-to-r' : 'bg-gradient-to-l';
+  const mobileBg = isMobile 
+    ? `from-background/80 via-background/60 to-background/40` // Mobile: sharper, less glassy
+    : `from-background/25 via-background/15 to-background/10`; // Desktop: subtle glass
+    
+  const mobileBorder = isMobile ? 'border-border/40' : 'border-border/15';
+  
   const translateOpen = isLeft ? 'translate-x-0' : 'translate-x-0';
   const translateClosed = isLeft ? '-translate-x-full' : 'translate-x-full';
 
   return (
     <div 
-      className={`fixed top-0 ${isLeft ? 'left-0 border-r' : 'right-0 border-l'} h-full w-5/6 max-w-[30rem] sm:w-[30rem] ${gradientDirection} from-background/25 via-background/15 to-background/10 backdrop-blur-xl backdrop-saturate-150 border-border/15 shadow-2xl transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
+      className={`fixed top-0 ${isLeft ? 'left-0 border-r' : 'right-0 border-l'} h-full w-5/6 max-w-[30rem] sm:w-[30rem] ${gradientDirection} ${mobileBg} backdrop-blur-xl backdrop-saturate-150 ${mobileBorder} shadow-2xl transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
         isOpen ? translateOpen : translateClosed
       }`}
       style={{ zIndex }}
@@ -55,6 +62,14 @@ export const GlassSidePane: React.FC<GlassSidePaneProps> = ({
       <div 
         ref={setRefs} 
         className="px-4 sm:px-8 pb-4 sm:pb-8 flex-1 overflow-y-auto overflow-x-visible min-h-0 relative z-20 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-foreground/30 [scrollbar-width:thin] [scrollbar-color:rgb(255_255_255_/_0.2)_transparent]"
+        style={{
+          maskImage: scrollFade.showFade 
+            ? 'linear-gradient(to bottom, black calc(100% - 3rem), transparent 100%)' 
+            : 'none',
+          WebkitMaskImage: scrollFade.showFade 
+            ? 'linear-gradient(to bottom, black calc(100% - 3rem), transparent 100%)' 
+            : 'none'
+        }}
       >
         {/* Close Button */}
         <button
@@ -67,14 +82,7 @@ export const GlassSidePane: React.FC<GlassSidePaneProps> = ({
         {children}
       </div>
       
-      {/* Bottom fade */}
-      {scrollFade.showFade && (
-        <div 
-          className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none z-30"
-        >
-          <div className="h-full bg-gradient-to-t from-background/40 via-background/20 to-transparent backdrop-blur-sm" />
-        </div>
-      )}
+      {/* Bottom fade - removed in favor of mask-image for better glass support */}
     </div>
   );
 };

@@ -173,7 +173,7 @@ export default function HomePage() {
     return () => video.removeEventListener('timeupdate', updatePlaybackRate);
   }, [updatePlaybackRate, isMobile]);
 
-  // Mobile video autoplay fix
+  // Video autoplay fix - ensures video plays on all devices
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -441,16 +441,8 @@ export default function HomePage() {
   const barTransitionCompleted = useDebounce(assetsLoaded, 200);
 
   return (
-    <div className="wes-texture relative min-h-screen overflow-hidden">
-      {/* Background Poster Image - fallback behind video */}
-      <img 
-        src="/hero-background-poster.jpg" 
-        alt="Background" 
-        className="fixed inset-0 w-full h-full object-cover"
-        style={{ zIndex: -3 }}
-      />
-      
-      {/* Background Video - sits on top of poster */}
+    <div className="min-h-screen overflow-hidden">
+      {/* Background Video with poster fallback */}
       <video
         ref={videoRef}
         autoPlay
@@ -460,31 +452,38 @@ export default function HomePage() {
         // @ts-expect-error webkit-specific attribute for iOS
         webkit-playsinline="true"
         preload="auto"
+        poster="/hero-background-poster.jpg"
+        src={isMobile ? "/hero-background-mobile.mp4" : "/hero-background-interpolated-seamless-faststart.mp4"}
         className="fixed inset-0 w-full h-full object-cover"
-        style={{ zIndex: -2 }}
-      >
-        <source src="/hero-background-interpolated-seamless.mp4" type="video/mp4" />
-      </video>
+        style={{ zIndex: 0 }}
+        onLoadedData={(e) => {
+          const video = e.currentTarget;
+          video.play().catch(() => {});
+        }}
+      />
       
       {/* Film grain overlay - above video, below darkening */}
-      <div className="fixed inset-0 bg-film-grain opacity-30 animate-film-grain pointer-events-none" style={{ zIndex: -1 }} />
+      <div className="fixed inset-0 bg-film-grain opacity-30 animate-film-grain pointer-events-none" style={{ zIndex: 1 }} />
       
       {/* Overlay to darken video for readability */}
-      <div className="fixed inset-0 bg-black/50" style={{ zIndex: 0 }} />
+      <div className="fixed inset-0 bg-black/50" style={{ zIndex: 2 }} />
       
       <ConstellationCanvas />
 
-<HeroSection
-        barTransitionCompleted={barTransitionCompleted}
-        session={session}
-        handleDiscordSignIn={handleDiscordSignIn}
-        navigate={navigate}
-        assetsLoaded={assetsLoaded}
-        handleOpenToolActivate={wrappedHandleOpenToolActivate}
-        handleEmergingActivate={wrappedHandleEmergingActivate}
-        currentExample={currentExample}
-        isPaneOpen={paneState.showCreativePartner || paneState.showPhilosophy || paneState.showExamples}
-      />
+      {/* Main content - above background layers */}
+      <div className="relative" style={{ zIndex: 10 }}>
+        <HeroSection
+          barTransitionCompleted={barTransitionCompleted}
+          session={session}
+          handleDiscordSignIn={handleDiscordSignIn}
+          navigate={navigate}
+          assetsLoaded={assetsLoaded}
+          handleOpenToolActivate={wrappedHandleOpenToolActivate}
+          handleEmergingActivate={wrappedHandleEmergingActivate}
+          currentExample={currentExample}
+          isPaneOpen={paneState.showCreativePartner || paneState.showPhilosophy || paneState.showExamples}
+        />
+      </div>
 
       {/* Overlay for Panes */}
       {(paneState.showCreativePartner || paneState.showPhilosophy || paneState.showExamples) && (
