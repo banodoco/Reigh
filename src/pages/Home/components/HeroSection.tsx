@@ -238,7 +238,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           
           {/* Loading Bar - fixed in viewport center, fades out when content reveals */}
           <div 
-            className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-1.5 z-10 pointer-events-none transition-opacity duration-500 ${
+            className={`fixed top-1/2 left-1/2 -translate-x-1/2 translate-y-[calc(-50%+1.5rem)] w-32 h-1.5 z-10 pointer-events-none transition-opacity duration-500 ${
               phase === 'content-revealing' || phase === 'complete' ? 'opacity-0' : 'opacity-100'
             }`}
           >
