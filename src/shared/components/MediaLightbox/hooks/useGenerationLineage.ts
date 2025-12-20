@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { 
-  useDerivedGenerations, 
   useDerivedItems, 
   useSourceGeneration,
   DerivedItem 
