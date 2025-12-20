@@ -209,27 +209,6 @@ export default function HomePage() {
     }
   }, []);
 
-  // Handle video end - pause for 1.5 seconds before restarting
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const handleVideoEnd = () => {
-      // Pause the video
-      video.pause();
-      
-      // Wait 1.5 seconds, then restart
-      setTimeout(() => {
-        video.currentTime = 0;
-        video.play().catch((err) => {
-          console.log('[VideoEnd] Failed to restart video:', err);
-        });
-      }, 1500);
-    };
-
-    video.addEventListener('ended', handleVideoEnd);
-    return () => video.removeEventListener('ended', handleVideoEnd);
-  }, []);
 
   // Auth Session Management
   useEffect(() => {
@@ -475,6 +454,7 @@ export default function HomePage() {
       <video
         ref={videoRef}
         autoPlay
+        loop
         muted
         playsInline
         // @ts-expect-error webkit-specific attribute for iOS
@@ -483,7 +463,7 @@ export default function HomePage() {
         className="fixed inset-0 w-full h-full object-cover"
         style={{ zIndex: -2 }}
       >
-        <source src="/hero-background-interpolated.mp4" type="video/mp4" />
+        <source src="/hero-background-interpolated-seamless.mp4" type="video/mp4" />
       </video>
       
       {/* Film grain overlay - above video, below darkening */}
