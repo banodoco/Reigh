@@ -10,7 +10,7 @@ import {
 } from "@/shared/components/ui/tooltip";
 import ShotSelector from "@/shared/components/ShotSelector";
 import { DraggableImage } from "@/shared/components/DraggableImage";
-import { getDisplayUrl } from "@/shared/lib/utils";
+import { getDisplayUrl, stripQueryParameters } from "@/shared/lib/utils";
 import { isImageCached, setImageCacheStatus } from "@/shared/lib/imageCacheManager";
 import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { TimeStamp } from "@/shared/components/TimeStamp";
@@ -297,6 +297,19 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
     return fallbackUrl;
   }, [progressiveEnabled, progressiveSrc, image.thumbUrl, image.url, image.isVideo, image.id, index, phase]);
+  // Track stable display URL to avoid browser reloads when only tokens change
+  // Uses urlIdentity (computed at data layer) for stable comparison
+  const displayUrlIdentity = image.urlIdentity || image.url || '';
+  const [stableDisplayUrl, setStableDisplayUrl] = useState<string>(displayUrl);
+  const [lastDisplayUrlIdentity, setLastDisplayUrlIdentity] = useState<string>(displayUrlIdentity);
+  useEffect(() => {
+    // Only update stableDisplayUrl if the underlying file changed (not just token refresh)
+    if (displayUrlIdentity !== lastDisplayUrlIdentity) {
+      setStableDisplayUrl(displayUrl);
+      setLastDisplayUrlIdentity(displayUrlIdentity);
+    }
+  }, [displayUrl, displayUrlIdentity, lastDisplayUrlIdentity]);
+
   // Track loading state for this specific image
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [imageRetryCount, setImageRetryCount] = useState<number>(0);
@@ -424,9 +437,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   };
   
   // Track previous image ID to detect actual changes vs re-renders
-  // Create a stable identifier for the image
-  // Include URL (and optional updatedAt) so identifier changes when the image asset changes
-  const imageIdentifier = `${image.id}:${image.url || ''}:${image.thumbUrl || ''}:${(image as any).updatedAt || ''}`;
+  // Create a stable identifier using urlIdentity/thumbUrlIdentity (computed at data layer)
+  // This prevents resets when only Supabase URL tokens change
+  const imageIdentifier = useMemo(() => {
+    return `${image.id}:${image.urlIdentity || image.url || ''}:${image.thumbUrlIdentity || image.thumbUrl || ''}:${(image as any).updatedAt || ''}`;
+  }, [image.id, image.urlIdentity, image.url, image.thumbUrlIdentity, image.thumbUrl, (image as any).updatedAt]);
   const prevImageIdentifierRef = useRef<string>(imageIdentifier);
 
   // Handle image load error with retry mechanism
@@ -574,9 +589,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         return;
       }
       
-      // Update actualSrc if it's different from actualDisplayUrl
-      // This handles both initial load AND progressive thumbnail→full transitions
-      if (actualSrc !== actualDisplayUrl) {
+      // Update actualSrc if it's different from actualDisplayUrl AND it's a different file
+      // This handles initial load and progressive transitions, but avoids token-only refreshes
+      const isActuallyDifferent = actualSrc !== actualDisplayUrl;
+      const isDifferentFile = stripQueryParameters(actualSrc) !== stripQueryParameters(actualDisplayUrl);
+      
+      if (isActuallyDifferent && isDifferentFile) {
         if (index < 3) {
           console.log(`[ThumbToFullTransition] Item ${index} updating actualSrc:`, {
             imageId: image.id?.substring(0, 8),
@@ -638,6 +656,25 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   }, [image.thumbUrl]);
 
   const videoUrl = useMemo(() => (isVideoContent ? (image.url || null) : null), [isVideoContent, image.url]);
+
+  // Track stable video URL to avoid browser reloads when only tokens change
+  // Uses urlIdentity (computed at data layer) for stable comparison
+  const videoUrlIdentity = image.urlIdentity || '';
+  const [stableVideoUrl, setStableVideoUrl] = useState<string | null>(videoUrl);
+  const [lastVideoUrlIdentity, setLastVideoUrlIdentity] = useState<string>(videoUrlIdentity);
+  useEffect(() => {
+    if (!videoUrl) {
+      setStableVideoUrl(null);
+      setLastVideoUrlIdentity('');
+      return;
+    }
+
+    // Only update stableVideoUrl if the underlying file changed (not just token refresh)
+    if (videoUrlIdentity !== lastVideoUrlIdentity) {
+      setStableVideoUrl(videoUrl);
+      setLastVideoUrlIdentity(videoUrlIdentity);
+    }
+  }, [videoUrl, videoUrlIdentity, lastVideoUrlIdentity]);
 
   // Placeholder check
   const isPlaceholder = !image.id && actualDisplayUrl === "/placeholder.svg";
@@ -944,7 +981,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               // Lightweight thumbnail mode - just show a static image for video selection panels
               <div className="absolute inset-0 w-full h-full">
                 <img
-                  src={displayUrl || ''}
+                  src={stableDisplayUrl || ''}
                   alt={image.prompt || ''}
                   className="w-full h-full object-cover cursor-pointer"
                   loading="lazy"
@@ -963,17 +1000,17 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               // Full HoverScrubVideo mode for galleries that need scrubbing
               <>
                 {/* Thumbnail overlay - stays visible until video is loaded to prevent flash */}
-                {displayUrl && !imageLoaded && (
+                {stableDisplayUrl && !imageLoaded && (
                   <img
-                    src={displayUrl}
+                    src={stableDisplayUrl}
                     alt=""
                     className="absolute inset-0 w-full h-full object-cover z-[1] pointer-events-none"
                     loading="eager"
                   />
                 )}
                 <HoverScrubVideo
-                  src={videoUrl || actualSrc || ''}
-                  poster={displayUrl || undefined}
+                  src={stableVideoUrl || actualSrc || ''}
+                  poster={stableDisplayUrl || undefined}
                   preload={shouldLoad ? "auto" : "none"}
                   className="absolute inset-0 w-full h-full"
                   videoClassName="object-cover cursor-pointer w-full h-full"

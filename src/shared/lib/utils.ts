@@ -105,3 +105,14 @@ export const getDisplayUrl = (relativePath: string | undefined | null, forceRefr
   
   return finalUrl;
 };
+
+/**
+ * Strips query parameters from a URL for comparison purposes.
+ * Useful for checking if two Supabase URLs point to the same file even if tokens differ.
+ */
+export const stripQueryParameters = (url: string | undefined | null): string => {
+  if (!url) return '';
+  const questionMarkIndex = url.indexOf('?');
+  if (questionMarkIndex === -1) return url;
+  return url.substring(0, questionMarkIndex);
+};

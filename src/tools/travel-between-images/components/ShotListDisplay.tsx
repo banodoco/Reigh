@@ -572,7 +572,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   // Show loading skeleton while data is being fetched
   if (shotsLoading || shots === undefined) {
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4 pb-2 items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4 pb-2 items-start">
         {Array.from({ length: 6 }).map((_, idx) => (
           <div key={idx} className="h-32 rounded-lg bg-muted animate-pulse" />
         ))}
@@ -621,7 +621,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         items={sortableItems}
         strategy={rectSortingStrategy}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4 pb-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-x-6 md:gap-y-5 pb-6 md:pb-8 px-4 pt-4 pb-2">
           {/* New Shot Drop Zone - matches collapsed shot card structure for consistent height */}
           {(onGenerationDropForNewShot || onFilesDropForNewShot) && (
             <div

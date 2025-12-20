@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { getDisplayUrl } from '@/shared/lib/utils';
+import { getDisplayUrl, stripQueryParameters } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { getAutoplayContext, logAutoplayAttempt, trackVideoStates } from '@/shared/utils/autoplayDebugger';
@@ -130,6 +130,9 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   // Safely handle potentially missing or placeholder sources
   const displaySrc = getDisplayUrl(src);
   const hasValidVideoSrc = displaySrc && displaySrc !== '/placeholder.svg';
+  
+  // Track stable source (without query params) to avoid resetting when only tokens change
+  const stableSrcRef = useRef<string>(stripQueryParameters(src));
   
   // Debug mobile detection (development only)
   React.useEffect(() => {
@@ -457,22 +460,24 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
       
       // Set to first frame to show as poster - but only for gallery thumbnails, not lightbox
-      if (!disableScrubbing && videoRef.current.currentTime === 0) {
+      // IMPORTANT: Skip this if we already have a poster to avoid "weird reset" flashes
+      if (!disableScrubbing && videoRef.current.currentTime === 0 && !poster) {
         // Very small seek to ensure first frame is visible
         videoRef.current.currentTime = 0.001;
         if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
-          console.log('[MobileVideoAutoplay] Set currentTime to show first frame', {
+          console.log('[MobileVideoAutoplay] Set currentTime to show first frame (no poster present)', {
             isMobile,
             disableScrubbing,
             newCurrentTime: videoRef.current.currentTime,
             timestamp: Date.now()
           });
         }
-      } else if (disableScrubbing) {
+      } else if (disableScrubbing || poster) {
         if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
-          console.log('[MobileVideoAutoplay] Skipping currentTime manipulation in lightbox mode', {
+          console.log(`[MobileVideoAutoplay] Skipping currentTime manipulation (${disableScrubbing ? 'lightbox mode' : 'poster present'})`, {
             isMobile,
             disableScrubbing,
+            hasPoster: !!poster,
             currentTime: videoRef.current.currentTime,
             timestamp: Date.now()
           });
@@ -489,25 +494,35 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
+    const currentStableSrc = stripQueryParameters(src);
+    const isActuallyNewSrc = currentStableSrc !== stableSrcRef.current;
+    
     if (process.env.NODE_ENV === 'development') {
       console.log('[MobileVideoAutoplay] useEffect[src] called', {
         isMobile,
         disableScrubbing,
-        src,
+        src: src?.substring(0, 50),
+        isActuallyNewSrc,
         videoPaused: video.paused,
         videoCurrentTime: video.currentTime,
         timestamp: Date.now()
       });
     }
 
-    // Ensure the video starts paused
-    video.pause();
-    // Important: never force-reset currentTime in lightbox (disableScrubbing=true)
-    if (!disableScrubbing) {
-      // Only reset currentTime for gallery thumbnails
-      video.currentTime = 0;
+    // Update stable source ref
+    stableSrcRef.current = currentStableSrc;
+
+    // Only perform reset logic if the underlying source has actually changed
+    if (isActuallyNewSrc) {
+      // Ensure the video starts paused
+      video.pause();
+      // Important: never force-reset currentTime in lightbox (disableScrubbing=true)
+      if (!disableScrubbing) {
+        // Only reset currentTime for gallery thumbnails
+        video.currentTime = 0;
+      }
+      setDuration(0);
     }
-    setDuration(0);
 
     // Add event listeners to track unexpected play events
     const handlePlay = () => {

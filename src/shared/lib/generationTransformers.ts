@@ -21,6 +21,7 @@
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { GenerationRow } from '@/types/shots';
 import { supabase } from '@/integrations/supabase/client';
+import { stripQueryParameters } from '@/shared/lib/utils';
 
 /**
  * Calculate derivedCount for generations (how many variants/derivatives exist)
@@ -212,11 +213,18 @@ export function transformGeneration(
     contentType = 'image/png';
   }
   
+  // Compute stable URL identities for caching/comparison
+  // Supabase URLs have rotating tokens but the file path is stable
+  const urlIdentity = stripQueryParameters(mainUrl);
+  const thumbUrlIdentity = stripQueryParameters(thumbnailUrl);
+
   // Base transformation - fields common to all generations
   const baseItem: GeneratedImageWithMetadata = {
     id: item.id,
     url: mainUrl,
     thumbUrl: thumbnailUrl,
+    urlIdentity,
+    thumbUrlIdentity,
     prompt,
     metadata: {
       ...(item.params || {}),

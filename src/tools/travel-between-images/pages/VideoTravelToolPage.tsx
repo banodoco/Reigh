@@ -1079,7 +1079,17 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     prevLocationKeyRef.current = location.key;
   }, [location.key, location.hash, showVideosViewRaw]);
   
-  // Search functionality for shots
+  // Video gallery filter state
+  const [videoPage, setVideoPage] = useState<number>(1);
+  const [videoShotFilter, setVideoShotFilter] = useState<string>('all');
+  const [videoExcludePositioned, setVideoExcludePositioned] = useState<boolean>(false);
+  const [videoSearchTerm, setVideoSearchTerm] = useState<string>('');
+  const [videoMediaTypeFilter, setVideoMediaTypeFilter] = useState<'all' | 'image' | 'video'>('video');
+  const [videoToolTypeFilter, setVideoToolTypeFilter] = useState<boolean>(true);
+  const [videoStarredOnly, setVideoStarredOnly] = useState<boolean>(false);
+  const [videoSortMode, setVideoSortMode] = useState<'newest' | 'oldest'>('newest');
+
+  // Search functionality for shots and videos
   const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -1090,12 +1100,17 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
       const newValue = !prev;
       if (!newValue) {
         // Clear search when closing
-        setShotSearchQuery('');
+        if (showVideosView) {
+          setVideoSearchTerm('');
+          setVideoPage(1);
+        } else {
+          setShotSearchQuery('');
+        }
       }
       return newValue;
     });
-  }, []);
-  
+  }, [showVideosView, setVideoSearchTerm, setShotSearchQuery, setVideoPage]);
+
   // Sort mode for shots - local state for immediate updates, synced with persisted settings
   const [localShotSortMode, setLocalShotSortMode] = useState<'ordered' | 'newest' | 'oldest'>('newest');
   
@@ -1111,16 +1126,6 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     setLocalShotSortMode(mode); // Immediate local update
     updateProjectUISettings?.('project', { shotSortMode: mode }); // Persist async
   }, [updateProjectUISettings]);
-  
-  // Video gallery filter state
-  const [videoPage, setVideoPage] = useState<number>(1);
-  const [videoShotFilter, setVideoShotFilter] = useState<string>('all');
-  const [videoExcludePositioned, setVideoExcludePositioned] = useState<boolean>(false);
-  const [videoSearchTerm, setVideoSearchTerm] = useState<string>('');
-  const [videoMediaTypeFilter, setVideoMediaTypeFilter] = useState<'all' | 'image' | 'video'>('video');
-  const [videoToolTypeFilter, setVideoToolTypeFilter] = useState<boolean>(true);
-  const [videoStarredOnly, setVideoStarredOnly] = useState<boolean>(false);
-  const [videoSortMode, setVideoSortMode] = useState<'newest' | 'oldest'>('newest');
 
   // Reset video page when project changes
   useEffect(() => {
@@ -1152,8 +1157,8 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     // NOTE: We still call setShowVideosView even if same value - React will skip re-render
     setShowVideosView(willShowVideos);
 
-    // Scroll to top when switching views
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Clear search state when switching views
+    setIsSearchOpen(false);
 
     if (willShowVideos) {
       // Prevent empty state flash while the gallery query spins up
@@ -2447,14 +2452,14 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                 </SegmentedControlItem>
               </SegmentedControl>
 
-              {/* Mobile: Search icon button - Shots view */}
-              {isMobile && !showVideosView && (
+              {/* Mobile: Search icon button - Shots or Videos view */}
+              {isMobile && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="text-muted-foreground hover:text-foreground hover:bg-muted p-1"
                   onClick={handleSearchToggle}
-                  title={isSearchOpen ? "Close search" : "Search shots"}
+                  title={isSearchOpen ? "Close search" : (showVideosView ? "Search videos" : "Search shots")}
                 >
                   <Search className="h-4 w-4" />
                 </Button>
@@ -2476,8 +2481,8 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                 </div>
               )}
 
-              {/* Search - Videos view */}
-              {showVideosView && (
+              {/* Desktop: Search - Videos view */}
+              {!isMobile && showVideosView && (
                 <div className="relative w-28 sm:w-52">
                   <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
                     <Search className="h-3.5 w-3.5" />
@@ -2526,7 +2531,7 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
             </div>
             
             {/* Mobile: Search box appears below full width when open */}
-            {isMobile && !showVideosView && (
+            {isMobile && (
               <div 
                 className={cn(
                   "overflow-hidden transition-all duration-200 ease-out w-full",
@@ -2538,18 +2543,29 @@ const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
                   <input
                     ref={searchInputRef}
                     type="text"
-                    placeholder="Search shots..."
-                    value={shotSearchQuery}
-                    onChange={(e) => setShotSearchQuery(e.target.value)}
+                    placeholder={showVideosView ? "Search videos..." : "Search shots..."}
+                    value={showVideosView ? videoSearchTerm : shotSearchQuery}
+                    onChange={(e) => {
+                      if (showVideosView) {
+                        setVideoSearchTerm(e.target.value);
+                        setVideoPage(1);
+                      } else {
+                        setShotSearchQuery(e.target.value);
+                      }
+                    }}
                     className="bg-transparent border-none outline-none text-base flex-1"
                     style={{ fontSize: '16px' }} // Prevents iOS auto-zoom on focus
                   />
-                  {shotSearchQuery && (
+                  {(showVideosView ? videoSearchTerm : shotSearchQuery) && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        setShotSearchQuery('');
+                        if (showVideosView) {
+                          setVideoSearchTerm('');
+                        } else {
+                          setShotSearchQuery('');
+                        }
                         setIsSearchOpen(false);
                       }}
                       className="h-auto p-0.5 flex-shrink-0"

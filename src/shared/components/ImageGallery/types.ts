@@ -34,6 +34,10 @@ export interface GeneratedImageWithMetadata {
   id: string;
   url: string;
   thumbUrl?: string;
+  /** Stable URL identity (URL without query params) for caching/comparison - tokens change but file doesn't */
+  urlIdentity?: string;
+  /** Stable thumbnail URL identity for caching/comparison */
+  thumbUrlIdentity?: string;
   prompt?: string;
   seed?: number;
   metadata?: DisplayableMetadata;

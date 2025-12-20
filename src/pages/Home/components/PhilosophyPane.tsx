@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { GlassSidePane } from './GlassSidePane';
 
 interface ExampleStyle {
@@ -21,12 +21,30 @@ interface PhilosophyPaneProps {
 export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   isOpen,
   onClose,
+  isClosing,
   isOpening,
   currentExample,
   navigate,
   selectedExampleStyle,
 }) => {
   const philosophyVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Play video when pane finishes opening, reset when fully closed
+  useEffect(() => {
+    if (isOpen && !isOpening && philosophyVideoRef.current) {
+      philosophyVideoRef.current.currentTime = 0;
+      philosophyVideoRef.current.play().catch(() => {});
+    } else if (!isOpen && !isClosing && philosophyVideoRef.current) {
+      philosophyVideoRef.current.pause();
+      philosophyVideoRef.current.currentTime = 0;
+      // Also hide the play button overlay
+      const playButton = philosophyVideoRef.current.nextElementSibling as HTMLElement | null;
+      if (playButton) {
+        playButton.style.display = 'none';
+        playButton.style.opacity = '0';
+      }
+    }
+  }, [isOpen, isOpening, isClosing]);
 
   return (
     <GlassSidePane isOpen={isOpen} onClose={onClose} side="right" zIndex={60}>
@@ -112,12 +130,12 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     
                     let blurAmount = 0;
                     const blurInterval = setInterval(() => {
-                      blurAmount += 0.1;
+                      blurAmount += 0.05;
                       playButton.style.backdropFilter = `blur(${blurAmount}px)`;
                       if (blurAmount >= 2) {
                         clearInterval(blurInterval);
                       }
-                    }, 50);
+                    }, 100);
                   }
                 }}
                 className="w-full h-full object-cover border rounded-lg transition-opacity duration-75"
