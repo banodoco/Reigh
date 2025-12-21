@@ -163,12 +163,23 @@ export function useLastUsedEditSettings({
     // 2. Update database (cross-device sync)
     // Save at user level (persists across projects)
     console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: Saving to DB (user level)');
-    updateDbSettings('user', merged);
+    void updateDbSettings('user', merged).catch((err) => {
+      // IMPORTANT: swallow to avoid "Uncaught (in promise)" spam.
+      // useToolSettings already handles user-facing errors/toasts and backs off on network exhaustion.
+      console.warn('[EditSettingsPersist] ❌ LAST-USED SAVE: User-level DB save failed', {
+        message: err?.message,
+      });
+    });
     
     // Also save at project level (overrides user for this project)
     if (projectId) {
       console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: Saving to DB (project level)');
-      updateDbSettings('project', merged);
+      void updateDbSettings('project', merged).catch((err) => {
+        console.warn('[EditSettingsPersist] ❌ LAST-USED SAVE: Project-level DB save failed', {
+          projectId: projectId.substring(0, 8),
+          message: err?.message,
+        });
+      });
     }
   }, [projectId, updateDbSettings]);
   

@@ -395,7 +395,14 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
       .single();
 
     if (fetchError) {
-      throw new Error(`Failed to fetch current ${scope} settings: ${fetchError.message}`);
+      // Check for network exhaustion - include the error type in the message for downstream handling
+      const errorMessage = fetchError.message || '';
+      if (errorMessage.includes('ERR_INSUFFICIENT_RESOURCES') || 
+          errorMessage.includes('Failed to fetch') ||
+          fetchError.code === 'ERR_INSUFFICIENT_RESOURCES') {
+        throw new Error(`Network exhaustion: ${errorMessage}`);
+      }
+      throw new Error(`Failed to fetch current ${scope} settings: ${errorMessage}`);
     }
     
     // Check if request was cancelled after fetch - return gracefully
@@ -529,6 +536,12 @@ export function useToolSettings<T>(
           error?.message?.includes('signal is aborted')) {
         return false;
       }
+      // Don't retry on network exhaustion - retrying just makes it worse
+      if (error?.message?.includes('ERR_INSUFFICIENT_RESOURCES') ||
+          error?.message?.includes('Network exhaustion')) {
+        console.warn('[useToolSettings] Network exhaustion - not retrying');
+        return false;
+      }
       // Retry up to 3 times for network errors on mobile
       return failureCount < 3;
     },
@@ -618,10 +631,22 @@ export function useToolSettings<T>(
         return; // Silent handling for expected cancellations
       }
       
+      // Check if this is a network exhaustion error - don't invalidate or show toast
+      // as this would just create more requests and spam the user
+      const isNetworkExhaustion = error?.message?.includes('ERR_INSUFFICIENT_RESOURCES') ||
+                                   error?.message?.includes('Network exhaustion') ||
+                                   error?.message?.includes('Failed to fetch');
+      
+      if (isNetworkExhaustion) {
+        console.warn('[useToolSettings] Network exhaustion detected - backing off, not invalidating');
+        return; // Don't invalidate - that would just make more requests
+      }
+      
       console.error('[useToolSettings] Update error:', error);
       toast.error(`Failed to save ${toolId} settings: ${error.message}`);
       
       // On error, invalidate to refetch correct state from server
+      // But only for non-network errors (auth issues, server errors, etc.)
       queryClient.invalidateQueries({ 
         queryKey: ['toolSettings', toolId, projectId, shotId] 
       });

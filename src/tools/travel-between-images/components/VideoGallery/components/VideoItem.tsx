@@ -135,45 +135,85 @@ export const VideoItem = React.memo<VideoItemProps>(({
     
     if (shouldCheckForChildren) {
       setIsLoadingChildren(true);
-      
-      // Fetch child generations ordered by child_order
-      supabase
-        .from('generations')
-        .select('*')
-        .eq('parent_generation_id', video.id)
-        .order('child_order', { ascending: true })
-        .then(({ data, error }) => {
+
+      let cancelled = false;
+
+      const fetchChildren = async () => {
+        try {
+          // Fetch child generations ordered by child_order
+          const { data, error } = await supabase
+            .from('generations')
+            .select('*')
+            .eq('parent_generation_id', video.id)
+            .order('child_order', { ascending: true })
+            .order('created_at', { ascending: false }); // Within same child_order, newest first
+
+          if (cancelled) return;
+
           if (error) {
             console.error('[JoinClips] Error fetching child generations:', error);
             return;
           }
-          
-          if (data) {
-            // Transform to GenerationRow format
-            const children = data.map(gen => ({
-              id: gen.id,
-              location: gen.location || '',
-              imageUrl: gen.location || '',
-              thumbUrl: gen.thumbnail_url || '',
-              type: gen.type || 'video',
-              created_at: gen.created_at || new Date().toISOString(),
-              createdAt: gen.created_at || new Date().toISOString(),
-              params: gen.params as any,
-              parent_generation_id: gen.parent_generation_id,
-              child_order: (gen as any).child_order,
-            })) as GenerationRow[];
-            
-            console.log('[JoinClips] Found child generations:', {
-              parentId: video.id?.substring(0, 8),
-              childCount: children.length,
-              allHaveLocations: children.every(c => c.location),
-            });
-            
-            setChildGenerations(children);
+
+          if (!data) {
+            setChildGenerations([]);
+            return;
           }
-          
-          setIsLoadingChildren(false);
-        });
+
+          // Transform to GenerationRow format
+          const allChildren = data.map(gen => ({
+            id: gen.id,
+            location: gen.location || '',
+            imageUrl: gen.location || '',
+            thumbUrl: gen.thumbnail_url || '',
+            type: gen.type || 'video',
+            created_at: gen.created_at || new Date().toISOString(),
+            createdAt: gen.created_at || new Date().toISOString(),
+            params: gen.params as any,
+            parent_generation_id: gen.parent_generation_id,
+            child_order: (gen as any).child_order,
+          })) as GenerationRow[];
+
+          // Deduplicate by child_order - keep the newest (first) for each unique child_order
+          // This handles the case where a segment was regenerated (creating a variant with the same child_order)
+          const seenChildOrders = new Set<number>();
+          const uniqueChildren = allChildren.filter(child => {
+            const rawChildOrder = (child as any).child_order;
+            if (rawChildOrder === undefined || rawChildOrder === null) {
+              return true; // Keep children without child_order (shouldn't happen but be safe)
+            }
+            const childOrder = typeof rawChildOrder === 'number' ? rawChildOrder : parseInt(String(rawChildOrder), 10);
+            if (Number.isNaN(childOrder)) {
+              return true;
+            }
+            if (seenChildOrders.has(childOrder)) {
+              return false; // Skip duplicates
+            }
+            seenChildOrders.add(childOrder);
+            return true;
+          });
+
+          console.log('[JoinClips] Found child generations:', {
+            parentId: video.id?.substring(0, 8),
+            totalChildren: allChildren.length,
+            uniqueSegments: uniqueChildren.length,
+            deduplicatedCount: allChildren.length - uniqueChildren.length,
+            allHaveLocations: uniqueChildren.every(c => c.location),
+          });
+
+          setChildGenerations(uniqueChildren);
+        } finally {
+          if (!cancelled) {
+            setIsLoadingChildren(false);
+          }
+        }
+      };
+
+      fetchChildren();
+
+      return () => {
+        cancelled = true;
+      };
     }
   }, [video.id, video.parent_generation_id, video.location]);
 
