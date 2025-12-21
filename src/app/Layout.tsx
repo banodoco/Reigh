@@ -29,6 +29,8 @@ function ScrollToTop() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    // Also dispatch event for custom scroll containers
+    window.dispatchEvent(new CustomEvent('app:scrollToTop', { detail: { behavior: 'auto' } }));
   }, [pathname]);
 
   return null;
@@ -117,6 +119,24 @@ const Layout: React.FC = () => {
       lastWindowScrollRef.current = scrollToRestore;
     }
     wasSplitViewRef.current = isMobileSplitView;
+  }, [isMobileSplitView]);
+  
+  // Listen for global scrollToTop event (for cases where window.scrollTo doesn't work, e.g. split view)
+  useEffect(() => {
+    const handleScrollToTop = (e: CustomEvent<{ behavior?: ScrollBehavior }>) => {
+      if (isMobileSplitView && splitViewWrapperRef.current) {
+        console.log('[SplitViewScroll] Handling app:scrollToTop event');
+        splitViewWrapperRef.current.scrollTo({ 
+          top: 0, 
+          behavior: e.detail?.behavior || 'auto' 
+        });
+      }
+    };
+
+    window.addEventListener('app:scrollToTop', handleScrollToTop as EventListener);
+    return () => {
+      window.removeEventListener('app:scrollToTop', handleScrollToTop as EventListener);
+    };
   }, [isMobileSplitView]);
   
   // Track page visibility for debugging polling issues

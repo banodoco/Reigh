@@ -51,6 +51,8 @@ export const useShotNavigation = (): ShotNavigationResult => {
     // Avoid delaying the "start at top" behavior.
     if (options.scrollDelay !== 0) return;
     window.scrollTo({ top: 0, behavior: 'auto' });
+    // Also dispatch event for custom scroll containers (e.g. mobile split view)
+    window.dispatchEvent(new CustomEvent('app:scrollToTop', { detail: { behavior: 'auto' } }));
   };
 
   const performScroll = (options: Required<ShotNavigationOptions>) => {
@@ -61,6 +63,8 @@ export const useShotNavigation = (): ShotNavigationResult => {
           // Always scroll the window - containerRef is just a wrapper div, not a scroll container
           console.log('[ShotNavPerf] 📜 Scrolling window to top');
           window.scrollTo({ top: 0, behavior: options.scrollBehavior });
+          // Also dispatch event for custom scroll containers (e.g. mobile split view)
+          window.dispatchEvent(new CustomEvent('app:scrollToTop', { detail: { behavior: options.scrollBehavior } }));
           console.log('[ShotNavPerf] 📜 Scroll to top executed');
         });
       };

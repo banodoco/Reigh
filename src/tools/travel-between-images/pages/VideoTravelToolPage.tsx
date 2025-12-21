@@ -135,6 +135,7 @@ const VideoTravelToolPage: React.FC = () => {
     // 2. When hash is cleared (returning from shot view to main view)
     if (!hasHash && (prevHashRef.current === null || hadHash)) {
       window.scrollTo(0, 0);
+      window.dispatchEvent(new CustomEvent('app:scrollToTop', { detail: { behavior: 'auto' } }));
     }
     
     prevHashRef.current = location.hash;
