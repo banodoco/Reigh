@@ -171,13 +171,14 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 );
               }
               
-              // 4 images: 2x2 grid above output, 16:9 aspect ratio each
+              // 4 images: 2x2 grid on left, 9:16 output on right
               if (imageCount === 4) {
                 return (
-                  <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="flex gap-2 items-center">
+                    {/* 4 input images in 2x2 grid, 9:16 aspect */}
+                    <div className="grid grid-cols-2 gap-1">
                       {images.map((img, idx) => (
-                        <div key={idx} className="w-[80px] h-[45px] sm:w-[128px] sm:h-[72px] flex-shrink-0 overflow-hidden rounded-lg border">
+                        <div key={idx} className="w-[56px] h-[100px] sm:w-[73px] sm:h-[130px] flex-shrink-0 overflow-hidden rounded-lg border">
                           <img 
                             src={PLACEHOLDER}
                             alt={`Input image ${idx + 1}`}
@@ -186,9 +187,9 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         </div>
                       ))}
                     </div>
-                    {/* Output video below the grid */}
+                    {/* 9:16 output video */}
                     <div 
-                      className="w-[168px] h-[94px] sm:w-[264px] sm:h-[148px] flex-shrink-0 relative overflow-hidden rounded-lg border"
+                      className="w-[150px] h-[267px] sm:w-[148px] sm:h-[264px] flex-shrink-0 relative overflow-hidden rounded-lg border"
                       style={{ transform: 'translateZ(0)', willChange: 'transform' }}
                     >
                       <video 
@@ -316,7 +317,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     "gap-0.5",
                     example.images.length === 2 && "flex flex-row",
                     example.images.length === 3 && "flex flex-row",
-                    example.images.length === 4 && "flex flex-row"
+                    example.images.length === 4 && "grid grid-cols-2"
                   )}>
                     {thumbImages.map((img, imgIdx) => (
                       <div 
@@ -325,7 +326,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                           "bg-muted/50 rounded-sm overflow-hidden",
                           example.images.length === 2 && "w-5 h-5 aspect-square",
                           example.images.length === 3 && "w-5 aspect-[4/3]",
-                          example.images.length === 4 && "w-6 aspect-video"
+                          example.images.length === 4 && "w-4 h-4"
                         )}
                       >
                         <img 
@@ -350,13 +351,13 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            In order to guide a video with precision, you use <span className="text-wes-vintage-gold">reference videos to steer the motion</span> - here's an example of a combination of images and videos to guide a video with precision:
+            You can use <span className="text-wes-vintage-gold">reference videos to steer the motion</span> — here's an example of how images and video references combine:
           </p>
           
           {/* All three columns are 4:3, same height, full width */}
           <div className="flex gap-3 w-full">
             {/* Column 1: 4×4 grid of input images (15 images + 1 empty) */}
-            <div className="space-y-1 flex-[1.33]">
+            <div className="space-y-1 flex-[2]">
               <span className="text-xs text-muted-foreground/70">Input Images</span>
               <div className="aspect-square grid grid-cols-4 grid-rows-4 gap-1">
                 {Array.from({ length: 15 }).map((_, idx) => (
@@ -373,24 +374,12 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               </div>
             </div>
             
-            {/* Column 2: Motion reference video (4:3) */}
-            <div className="space-y-1 flex-1">
-              <span className="text-xs text-muted-foreground/70">Motion Reference</span>
-              <div className="aspect-[4/3] bg-muted/30 rounded-lg border border-muted/50 overflow-hidden">
-                <video 
-                  src={PLACEHOLDER}
-                  poster={PLACEHOLDER}
-                  muted
-                  loop
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
+            {/* Column 2: Combined video showing motion reference + output (4:3) */}
+            <div className="space-y-1 flex-[3]">
+              <div className="flex justify-between">
+                <span className="text-xs text-muted-foreground/70">Motion Reference</span>
+                <span className="text-xs text-muted-foreground/70">Output</span>
               </div>
-            </div>
-            
-            {/* Column 3: Output video (4:3) */}
-            <div className="space-y-1 flex-1">
-              <span className="text-xs text-muted-foreground/70">Output</span>
               <div className="aspect-[4/3] bg-muted/30 rounded-lg border border-muted/50 overflow-hidden">
                 <video 
                   src={PLACEHOLDER}
@@ -411,7 +400,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            Not only this, but you can use <span className="text-wes-vintage-gold">community-trained LoRAs</span> to make it move in all kinds of unique and interesting ways:
+            You can also use community-trained LoRAs to <span className="text-wes-vintage-gold">give the motion a distinctive style</span>:
           </p>
           
           <div className="flex gap-3">
@@ -459,7 +448,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            In order to steer these videos, we also let you <span className="text-wes-vintage-gold">generate images by providing references</span> for style, subject and scene:
+            To give you the right starting images, you can <span className="text-wes-vintage-gold">generate them using references</span> for style, subject and scene:
           </p>
           
           <div className="flex gap-3">
@@ -536,7 +525,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            And you can <span className="text-wes-vintage-gold">edit images in many ways</span> with community-trained LoRAs trained for specific tasks:
+            And you can <span className="text-wes-vintage-gold">edit images with LoRAs built for specific tasks</span>:
           </p>
           
           <div className="flex gap-3 items-stretch">
@@ -594,13 +583,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            We believe that there's an <span className="text-wes-vintage-gold">entire artform that's waiting to be discovered</span> in the AI-driven journey between images.
+            We believe that there's a world of creativity that's waiting to be discovered in the AI-driven journey between images and <span className="text-wes-vintage-gold"><span className="font-theme-heading">Reigh</span> is a tool just for exploring this artform.</span> By endless improving it and implementing ideas and work from the community, we hope to make it extremely good.
           </p>
           <p className="text-sm leading-relaxed">
-            <span className="text-wes-vintage-gold"><span className="font-theme-heading">Reigh</span> is a tool just for exploring this artform</span>. By endless improving it and implementing ideas and work from the community, we hope to make it extremely good. And everything is open source - meaning you can run it for free on your computer!
-          </p>
-          <p className="text-sm leading-relaxed">
-            If you're interested in joining, you're very welcome.
+            And everything is open source - meaning <span className="text-wes-vintage-gold">you can run it for free on your computer</span>! If you're interested in joining, you're very welcome.
           </p>
           <p className="font-serif text-lg italic transform -rotate-1 mt-4">POM</p>
         </div>
