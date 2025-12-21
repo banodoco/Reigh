@@ -11,10 +11,31 @@ This is the single source of truth, implemented in `settingsResolution.ts`.
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **settingsResolution** | `src/shared/lib/settingsResolution.ts` | Priority resolution |
+| **settingsWriteQueue** | `src/shared/lib/settingsWriteQueue.ts` | Global write queue (prevents network flooding) |
 | **shotSettingsInheritance** | `src/shared/lib/shotSettingsInheritance.ts` | New shot inheritance |
 | **useToolSettings** | `src/shared/hooks/useToolSettings.ts` | Low-level DB access |
 | **useAutoSaveSettings** | `src/shared/hooks/useAutoSaveSettings.ts` | Self-contained per-shot/project settings |
 | **usePersistentToolState** | `src/shared/hooks/usePersistentToolState.ts` | Binds useState to DB |
+
+## Write Queue (Network Protection)
+
+All settings writes go through a global queue that prevents `ERR_INSUFFICIENT_RESOURCES`:
+
+- **Global concurrency limit**: 1 in-flight write at a time
+- **Per-target debouncing**: 300ms window coalesces rapid updates  
+- **Merge-on-write**: Multiple patches to same target merge into one write
+- **Best-effort flush**: Pending writes flush on page unload
+
+```typescript
+// Writes are automatically queued and debounced
+await updateToolSettingsSupabase({ scope, id, toolId, patch });
+
+// Force immediate flush (e.g., on unmount)
+await updateToolSettingsSupabase({ scope, id, toolId, patch }, undefined, 'immediate');
+
+// Flush pending writes for a target
+flushToolSettingsTarget(scope, entityId, toolId);
+```
 
 ## Persistence Layers
 

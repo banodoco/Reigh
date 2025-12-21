@@ -98,6 +98,7 @@ See [realtime_system.md](docs/structure_detail/realtime_system.md).
 | System | Location | Purpose |
 |--------|----------|---------|
 | **settingsResolution** | `lib/settingsResolution.ts` | Resolve settings across scopes |
+| **settingsWriteQueue** | `lib/settingsWriteQueue.ts` | Global queue for settings writes (prevents network flooding) |
 | **debugConfig** | `lib/debugConfig.ts` | Runtime debug logging (`window.debugConfig`) |
 | **toastThrottle** | `lib/toastThrottle.ts` | Prevent notification spam |
 | **taskConfig** | `lib/taskConfig.ts` | Task visibility & display names |

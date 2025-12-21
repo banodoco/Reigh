@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import { 
   useGenerationEditSettings, 
   type GenerationEditSettings,
@@ -167,35 +167,36 @@ export function useEditSettingsPersistence({
   ]);
   
   // Wrapper setters that also update "last used" (except prompt)
-  const setEditMode = (mode: EditMode) => {
+  // IMPORTANT: memoize these so downstream effects don't fire every render.
+  const setEditMode = useCallback((mode: EditMode) => {
     console.log('[EditSettingsPersist] 🔧 SET: editMode →', mode);
     generationSettings.setEditMode(mode);
     lastUsedSettings.updateLastUsed({ editMode: mode });
-  };
+  }, [generationSettings, lastUsedSettings]);
   
-  const setLoraMode = (mode: LoraMode) => {
+  const setLoraMode = useCallback((mode: LoraMode) => {
     console.log('[EditSettingsPersist] 🔧 SET: loraMode →', mode);
     generationSettings.setLoraMode(mode);
     lastUsedSettings.updateLastUsed({ loraMode: mode });
-  };
+  }, [generationSettings, lastUsedSettings]);
   
-  const setCustomLoraUrl = (url: string) => {
+  const setCustomLoraUrl = useCallback((url: string) => {
     console.log('[EditSettingsPersist] 🔧 SET: customLoraUrl →', url || '(empty)');
     generationSettings.setCustomLoraUrl(url);
     lastUsedSettings.updateLastUsed({ customLoraUrl: url });
-  };
+  }, [generationSettings, lastUsedSettings]);
   
-  const setNumGenerations = (num: number) => {
+  const setNumGenerations = useCallback((num: number) => {
     console.log('[EditSettingsPersist] 🔧 SET: numGenerations →', num);
     generationSettings.setNumGenerations(num);
     lastUsedSettings.updateLastUsed({ numGenerations: num });
-  };
+  }, [generationSettings, lastUsedSettings]);
   
   // Prompt only saves to generation (never to "last used")
-  const setPrompt = (prompt: string) => {
+  const setPrompt = useCallback((prompt: string) => {
     console.log('[EditSettingsPersist] 🔧 SET: prompt →', prompt ? `"${prompt.substring(0, 30)}..."` : '(empty)');
     generationSettings.setPrompt(prompt);
-  };
+  }, [generationSettings]);
   
   // Computed LoRAs based on mode (replaces useEditModeLoRAs logic)
   const editModeLoRAs = useMemo(() => {

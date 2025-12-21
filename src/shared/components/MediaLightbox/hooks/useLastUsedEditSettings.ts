@@ -139,7 +139,19 @@ export function useLastUsedEditSettings({
   
   // Update all storage locations
   const updateLastUsed = useCallback((updates: Partial<LastUsedEditSettings>) => {
-    const merged = { ...currentValueRef.current, ...updates };
+    const prev = currentValueRef.current;
+    const merged = { ...prev, ...updates };
+
+    // If nothing actually changed, don't write (prevents save loops)
+    if (
+      prev.editMode === merged.editMode &&
+      prev.loraMode === merged.loraMode &&
+      prev.customLoraUrl === merged.customLoraUrl &&
+      prev.numGenerations === merged.numGenerations
+    ) {
+      return;
+    }
+
     currentValueRef.current = merged;
     
     console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: Updating "last used" settings');
@@ -161,26 +173,15 @@ export function useLastUsedEditSettings({
     }
     
     // 2. Update database (cross-device sync)
-    // Save at user level (persists across projects)
-    console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: Saving to DB (user level)');
+    // Save at user level only - "last used" is a personal preference, not project-specific
+    // This halves the DB writes and prevents dual-scope flooding
     void updateDbSettings('user', merged).catch((err) => {
       // IMPORTANT: swallow to avoid "Uncaught (in promise)" spam.
       // useToolSettings already handles user-facing errors/toasts and backs off on network exhaustion.
-      console.warn('[EditSettingsPersist] ❌ LAST-USED SAVE: User-level DB save failed', {
+      console.warn('[EditSettingsPersist] ❌ LAST-USED SAVE: DB save failed', {
         message: err?.message,
       });
     });
-    
-    // Also save at project level (overrides user for this project)
-    if (projectId) {
-      console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: Saving to DB (project level)');
-      void updateDbSettings('project', merged).catch((err) => {
-        console.warn('[EditSettingsPersist] ❌ LAST-USED SAVE: Project-level DB save failed', {
-          projectId: projectId.substring(0, 8),
-          message: err?.message,
-        });
-      });
-    }
   }, [projectId, updateDbSettings]);
   
   return {
