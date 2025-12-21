@@ -32,6 +32,9 @@ interface ImageGridProps {
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
+  isDragging?: boolean;
+  activeDragId?: string | null;
+  dropTargetIndex?: number | null;
 }
 
 export const ImageGrid: React.FC<ImageGridProps> = ({
@@ -58,6 +61,9 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   defaultPrompt,
   defaultNegativePrompt,
   onClearEnhancedPrompt,
+  isDragging = false,
+  activeDragId = null,
+  dropTargetIndex = null,
 }) => {
   console.log('[DataTrace] 🖼️  ImageGrid rendering:', {
     imagesCount: images.length,
@@ -108,6 +114,14 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
         const startImage = images[index];
         const endImage = images[index + 1];
         
+        // Hide indicator if this item is being dragged OR if an external file is being dropped into this gap
+        // The gap after item 'index' corresponds to insertion at 'index + 1'
+        const isDraggingThisItem = image.id === activeDragId;
+        const isDropTargetGap = dropTargetIndex !== null && dropTargetIndex === index + 1;
+        
+        // Only hide if specifically affected by drag/drop
+        const shouldHideIndicator = isDraggingThisItem || isDropTargetGap;
+        
         return (
           <div key={imageKey} data-sortable-item className="relative">
             <SortableImageItem
@@ -130,7 +144,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             />
             
             {/* Pair indicator positioned in the gap to the right */}
-            {!isLastImage && onPairClick && (
+            {!isLastImage && onPairClick && !shouldHideIndicator && (
               <div className="absolute top-1/2 -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto">
                 <PairPromptIndicator
                   pairIndex={index}

@@ -1305,7 +1305,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
                 showLabel={showPairLabels}
-                hidePairLabel={!!tapToMove.selectedItemId}
+                hidePairLabel={
+                  !!tapToMove.selectedItemId || 
+                  (isFileOver && dropTargetFrame !== null && dropTargetFrame > actualStartFrame && dropTargetFrame < actualEndFrame) ||
+                  (dragState.isDragging && currentDragFrame !== null && currentDragFrame > actualStartFrame && currentDragFrame < actualEndFrame)
+                }
                 onClearEnhancedPrompt={onClearEnhancedPrompt}
               />
             );

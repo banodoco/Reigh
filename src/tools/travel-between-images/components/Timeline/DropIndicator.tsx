@@ -40,8 +40,11 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
         transform: 'translateX(-50%)',
       }}
     >
-      {/* Label with icon badge */}
-      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 flex items-center gap-1.5 bg-background border-2 border-primary text-foreground text-xs px-2 py-1 rounded-md shadow-[-2px_2px_0_0_rgba(0,0,0,0.1)] whitespace-nowrap">
+      {/* Label with icon badge - centered on the line */}
+      <div 
+        className="absolute flex items-center gap-1.5 bg-background border-2 border-primary text-foreground text-xs px-2 py-1 rounded-md shadow-[-2px_2px_0_0_rgba(0,0,0,0.1)] whitespace-nowrap"
+        style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
+      >
         {DragIcon && (
           <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
             <DragIcon className="h-3 w-3 text-primary-foreground" />

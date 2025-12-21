@@ -27,22 +27,42 @@ const GridSkeletonItem: React.FC<{
     const itemWidth = firstItemRect.width;
     const itemHeight = firstItemRect.height;
     
+    // Use the exact gap calculation logic from calculateDropIndex
     let gap = 12;
     if (items.length > 1) {
       const secondItemRect = items[1].getBoundingClientRect();
+      // Check if on same row
       if (Math.abs(firstItemRect.top - secondItemRect.top) < 10) {
         gap = secondItemRect.left - firstItemRect.right;
+      } else {
+        gap = secondItemRect.top - firstItemRect.bottom;
       }
     }
     
     const row = Math.floor(targetIndex / columns);
     const col = targetIndex % columns;
     
+    // Position based on grid layout logic
+    const left = gridOffsetX + col * (itemWidth + gap);
+    const top = gridOffsetY + row * (itemHeight + gap);
+
     setPosition({
+      left,
+      top,
+      width: itemWidth,
+      height: itemHeight,
+    });
+    
+    console.log('[BatchDropZone] 🦴 Skeleton positioned at:', {
+      targetIndex,
+      row,
+      col,
       left: gridOffsetX + col * (itemWidth + gap),
       top: gridOffsetY + row * (itemHeight + gap),
       width: itemWidth,
       height: itemHeight,
+      firstItemRect: { width: firstItemRect.width, height: firstItemRect.height, top: firstItemRect.top, left: firstItemRect.left },
+      containerRect: { top: containerRect.top, left: containerRect.left }
     });
   }, [containerRef, targetIndex, columns]);
 
@@ -59,7 +79,7 @@ const GridSkeletonItem: React.FC<{
 
   return (
     <div
-      className="absolute pointer-events-none z-50"
+      className="absolute pointer-events-none z-[100]"
       style={{
         left: `${position.left}px`,
         top: `${position.top}px`,
@@ -68,10 +88,10 @@ const GridSkeletonItem: React.FC<{
       }}
     >
       <div 
-        className="w-full h-full border-2 border-primary/30 rounded-lg overflow-hidden bg-muted/50 backdrop-blur-sm flex items-center justify-center"
+        className="w-full h-full border-2 border-primary/50 rounded-lg overflow-hidden bg-muted/80 backdrop-blur-sm flex items-center justify-center shadow-lg"
         style={aspectRatioStyle}
       >
-        <Loader2 className="h-8 w-8 text-primary/60 animate-spin" />
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
       </div>
     </div>
   );
@@ -79,7 +99,7 @@ const GridSkeletonItem: React.FC<{
 
 
 interface BatchDropZoneProps {
-  children: React.ReactNode;
+  children: React.ReactNode | ((isDragging: boolean, dropTargetIndex: number | null) => React.ReactNode);
   onImageDrop?: (files: File[], targetPosition?: number, framePosition?: number) => Promise<void>;
   onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetPosition?: number, framePosition?: number) => Promise<void>;
   columns: number;
@@ -178,8 +198,9 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
   // Clear pending skeleton when item count increases (new item appeared)
   useEffect(() => {
     if (pendingDropIndex !== null && itemCount > prevItemCountRef.current) {
-      // Small delay for smooth transition
-      setTimeout(() => setPendingDropIndex(null), 100);
+      console.log('[BatchDropZone] ✨ Item count increased, clearing skeleton');
+      // Clear immediately to prevent overlaying the new item
+      setPendingDropIndex(null);
     }
     prevItemCountRef.current = itemCount;
   }, [itemCount, pendingDropIndex]);
@@ -266,6 +287,7 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
     
     // Show optimistic skeleton at drop position
     if (targetPosition !== null) {
+      console.log('[BatchDropZone] 🦴 Setting pending drop skeleton at index:', targetPosition);
       setPendingDropIndex(targetPosition);
       setIsProcessingDrop(true);
     }
@@ -345,7 +367,10 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Optimistic skeleton for pending drop */}
+      {/* Render children (support function for render prop pattern) */}
+      {typeof children === 'function' ? children(isOver, dropTargetIndex) : children}
+
+      {/* Optimistic skeleton for pending drop - Rendered AFTER children to ensure visibility */}
       {pendingDropIndex !== null && (
         <GridSkeletonItem
           containerRef={containerRef}
@@ -354,91 +379,80 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
           projectAspectRatio={projectAspectRatio}
         />
       )}
-      
-      {/* Render children with drop indicator */}
-      {React.Children.map(children, (child) => {
-        if (React.isValidElement(child)) {
-          return (
-            <>
-              {child}
-              {/* Insertion line indicator - shows between images */}
-              {isOver && dropTargetIndex !== null && (() => {
-                const containerElement = containerRef.current;
-                if (!containerElement) return null;
-                
-                // Get all sortable items directly from container
-                const items = containerElement.querySelectorAll('[data-sortable-item]');
-                if (items.length === 0) return null;
-                
-                const containerRect = containerElement.getBoundingClientRect();
-                const firstItemRect = items[0].getBoundingClientRect();
-                const itemHeight = firstItemRect.height;
-                
-                // Calculate grid offset
-                const gridOffsetX = firstItemRect.left - containerRect.left;
-                const gridOffsetY = firstItemRect.top - containerRect.top;
-                
-                // Calculate gap
-                let gap = 12;
-                if (items.length > 1) {
-                  const secondItemRect = items[1].getBoundingClientRect();
-                  if (Math.abs(firstItemRect.top - secondItemRect.top) < 10) {
-                    gap = secondItemRect.left - firstItemRect.right;
-                  }
-                }
-                
-                const itemWidth = firstItemRect.width;
-                const row = Math.floor(dropTargetIndex / columns);
-                const col = dropTargetIndex % columns;
-                
-                // Calculate position for insertion line relative to grid
-                const leftPosition = col * (itemWidth + gap);
-                const topPosition = row * (itemHeight + gap);
-                
-                // Adjust to be in the middle of the gap (or at left edge for col 0)
-                let finalLeft: number;
-                if (col === 0) {
-                  finalLeft = gridOffsetX - 2; // At left edge of first item
-                } else {
-                  finalLeft = gridOffsetX + leftPosition - (gap / 2) - 2;
-                }
 
-                return (
-                  <div 
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: `${finalLeft}px`,
-                      top: `${gridOffsetY + topPosition}px`,
-                      width: '4px',
-                      height: `${itemHeight}px`,
-                      zIndex: 100,
-                    }}
-                  >
-                    {/* Vertical insertion line */}
-                    <div className="w-full h-full bg-primary shadow-lg rounded-full flex flex-col items-center justify-center">
-                      {/* Top dot */}
-                      <div className="w-3 h-3 bg-primary rounded-full border-2 border-primary-foreground mb-auto" />
-                      {/* Middle indicator with icon badge */}
-                      <div className="flex items-center gap-1.5 bg-background border-2 border-primary text-foreground text-xs px-2 py-1 rounded-md shadow-[-2px_2px_0_0_rgba(0,0,0,0.1)] font-medium whitespace-nowrap" style={{ marginLeft: '12px' }}>
-                        <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
-                          {dragType === 'file' ? (
-                            <FileUp className="h-3 w-3 text-primary-foreground" />
-                          ) : (
-                            <ImagePlus className="h-3 w-3 text-primary-foreground" />
-                          )}
-                        </div>
-                      </div>
-                      {/* Bottom dot */}
-                      <div className="w-3 h-3 bg-primary rounded-full border-2 border-primary-foreground mt-auto" />
-                    </div>
-                  </div>
-                );
-              })()}
-            </>
-          );
+      {/* Insertion line indicator - shows between images */}
+      {isOver && dropTargetIndex !== null && (() => {
+        const containerElement = containerRef.current;
+        if (!containerElement) return null;
+        
+        // Get all sortable items directly from container
+        const items = containerElement.querySelectorAll('[data-sortable-item]');
+        if (items.length === 0) return null;
+        
+        const containerRect = containerElement.getBoundingClientRect();
+        const firstItemRect = items[0].getBoundingClientRect();
+        const itemHeight = firstItemRect.height;
+        
+        // Calculate grid offset
+        const gridOffsetX = firstItemRect.left - containerRect.left;
+        const gridOffsetY = firstItemRect.top - containerRect.top;
+        
+        // Calculate gap
+        let gap = 12;
+        if (items.length > 1) {
+          const secondItemRect = items[1].getBoundingClientRect();
+          if (Math.abs(firstItemRect.top - secondItemRect.top) < 10) {
+            gap = secondItemRect.left - firstItemRect.right;
+          }
         }
-        return child;
-      })}
+        
+        const itemWidth = firstItemRect.width;
+        const row = Math.floor(dropTargetIndex / columns);
+        const col = dropTargetIndex % columns;
+        
+        // Calculate position for insertion line relative to grid
+        const leftPosition = col * (itemWidth + gap);
+        const topPosition = row * (itemHeight + gap);
+        
+        // Adjust to be in the middle of the gap (or at left edge for col 0)
+        let finalLeft: number;
+        if (col === 0) {
+          finalLeft = gridOffsetX - 2; // At left edge of first item
+        } else {
+          finalLeft = gridOffsetX + leftPosition - (gap / 2) - 2;
+        }
+
+        return (
+          <div 
+            className="absolute pointer-events-none"
+            style={{
+              left: `${finalLeft}px`,
+              top: `${gridOffsetY + topPosition}px`,
+              width: '4px',
+              height: `${itemHeight}px`,
+              zIndex: 100,
+            }}
+          >
+            {/* Vertical insertion line */}
+            <div className="w-full h-full bg-primary shadow-lg rounded-full flex flex-col items-center justify-center">
+              {/* Top dot */}
+              <div className="w-3 h-3 bg-primary rounded-full border-2 border-primary-foreground mb-auto" />
+              {/* Middle indicator with icon badge */}
+              <div className="flex items-center gap-1.5 bg-background border-2 border-primary text-foreground text-xs px-2 py-1 rounded-md shadow-[-2px_2px_0_0_rgba(0,0,0,0.1)] font-medium whitespace-nowrap" style={{ zIndex: 10 }}>
+                <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                  {dragType === 'file' ? (
+                    <FileUp className="h-3 w-3 text-primary-foreground" />
+                  ) : (
+                    <ImagePlus className="h-3 w-3 text-primary-foreground" />
+                  )}
+                </div>
+              </div>
+              {/* Bottom dot */}
+              <div className="w-3 h-3 bg-primary rounded-full border-2 border-primary-foreground mt-auto" />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
