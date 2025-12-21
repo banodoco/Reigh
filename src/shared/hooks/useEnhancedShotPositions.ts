@@ -1340,13 +1340,16 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         shotId: shotId.substring(0, 8)
       });
 
-      // Invalidate cache to refresh UI
+      // Refresh local state directly - invalidation alone doesn't trigger immediate UI update
+      await loadPositions({ silent: true, reason: 'invalidation' });
+      
+      // Also invalidate cache for other components
       invalidateGenerations(shotId, { reason: 'clear-all-enhanced-prompts', scope: 'all' });
     } catch (err) {
       console.error('[PromptClearLog] ❌ CLEAR ALL - Error clearing enhanced prompts:', err);
       throw err;
     }
-  }, [shotId, queryClient]);
+  }, [shotId, queryClient, loadPositions]);
 
   return {
     shotGenerations,
