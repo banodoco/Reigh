@@ -221,9 +221,21 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
-    if (disabled) return;
+    console.log('[BatchDropZone] 🚀 handleDragEnter:', {
+      disabled,
+      hasOnImageDrop: !!onImageDrop,
+      hasOnGenerationDrop: !!onGenerationDrop,
+      timestamp: Date.now()
+    });
+    
+    if (disabled) {
+      console.log('[BatchDropZone] ⛔ Disabled - returning early');
+      return;
+    }
     
     const type = getDragType(e);
+    console.log('[BatchDropZone] 🔍 getDragType result:', type);
+    
     if ((type === 'file' && onImageDrop) || (type === 'generation' && onGenerationDrop)) {
       setDragType(type);
     }
@@ -269,9 +281,20 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
-    if (disabled) return;
+    console.log('[BatchDropZone] 💥 handleDrop CALLED:', {
+      disabled,
+      hasOnImageDrop: !!onImageDrop,
+      hasOnGenerationDrop: !!onGenerationDrop,
+      timestamp: Date.now()
+    });
+    
+    if (disabled) {
+      console.log('[BatchDropZone] ⛔ Disabled - returning early from drop');
+      return;
+    }
     
     const type = getDragType(e);
+    console.log('[BatchDropZone] 🔍 Drop type:', type);
     
     // CRITICAL: Calculate position at drop time, not from stale state
     const targetPosition = calculateDropIndex(e, containerRef, columns, itemCount);

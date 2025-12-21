@@ -126,7 +126,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
       onGenerationDrop={props.onGenerationDrop}
       columns={props.columns || 4}
       itemCount={lightbox.currentImages.length}
-      disabled={props.readOnly || !props.onFileDrop}
+      disabled={props.readOnly || (!props.onFileDrop && !props.onGenerationDrop)}
       getFramePositionForIndex={getFramePosition}
       projectAspectRatio={props.projectAspectRatio}
     >
