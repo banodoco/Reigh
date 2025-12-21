@@ -85,6 +85,23 @@ export function useGenerationsPageLogic({
   // Track which shot we last applied settings for (to detect shot changes)
   const lastAppliedShotIdRef = useRef<string | null>(null);
   
+  // Track whether we've done the initial filter setup (to handle null === null case)
+  const hasInitializedRef = useRef<boolean>(false);
+  
+  // Debug: Log on mount
+  useEffect(() => {
+    console.log('[StableFilter] Hook mounted, initial state:', {
+      currentShotId: currentShotId?.substring(0, 8) ?? 'null',
+      selectedShotFilter,
+      isLoadingShotSettings,
+    });
+    
+    return () => {
+      console.log('[StableFilter] Hook unmounted');
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  
   // Track the filter that was applied for the last shot (to preserve "all" during navigation)
   const lastAppliedFilterRef = useRef<string>('all');
   
@@ -168,6 +185,14 @@ export function useGenerationsPageLogic({
   // ============================================================================
   
   useEffect(() => {
+    console.log('[StableFilter] Effect running:', {
+      currentShotId: currentShotId?.substring(0, 8) ?? 'null',
+      hasInitialized: hasInitializedRef.current,
+      lastAppliedShotId: lastAppliedShotIdRef.current?.substring(0, 8) ?? 'null',
+      isLoadingShotSettings,
+      selectedShotFilter,
+    });
+
     // Don't apply defaults while per-shot settings are still loading.
     // If we apply a shotsData-based default first, then apply settings a moment later,
     // the dropdown can "flip" (all -> shot -> all) or get stuck (all -> stays all).
@@ -178,8 +203,12 @@ export function useGenerationsPageLogic({
       return;
     }
 
-    // Only run when the shot actually changes (or when we deferred previously and settings finished loading)
-    if (currentShotId === lastAppliedShotIdRef.current) {
+    // Only run when the shot actually changes (or on initial load)
+    // The hasInitializedRef handles the case where currentShotId is null on both initial load
+    // and after navigating away from a shot - we need to run on initial load but not re-run
+    // if we navigate back to "no shot" after already being there
+    if (hasInitializedRef.current && currentShotId === lastAppliedShotIdRef.current) {
+      console.log('[StableFilter] Skipping - already initialized and shot unchanged');
       return;
     }
     
@@ -210,6 +239,7 @@ export function useGenerationsPageLogic({
       setExcludePositioned(true);
       lastAppliedShotIdRef.current = currentShotId;
       lastAppliedFilterRef.current = filterToApply;
+      hasInitializedRef.current = true;
       return;
     }
     
@@ -261,6 +291,7 @@ export function useGenerationsPageLogic({
     // Mark as applied only after we actually apply the filter for this shot
     lastAppliedShotIdRef.current = currentShotId;
     lastAppliedFilterRef.current = filterToApply;
+    hasInitializedRef.current = true;
     
   }, [
     currentShotId,
@@ -537,16 +568,29 @@ export function useGenerationsPageLogic({
   const lastQueryResultRef = useRef<{ filter: string; total: number } | null>(null);
   
   useEffect(() => {
+    console.log('[StableFilter] Query fallback effect running:', {
+      isLoading,
+      isFetching,
+      selectedShotFilter,
+      page,
+      total: generationsResponse?.total,
+    });
+
     // Only check when query has completed and we're filtering by a specific shot
-    if (isLoading || isFetching || selectedShotFilter === 'all' || page !== 1) {
+    // IMPORTANT: Also check that generationsResponse exists - undefined means query hasn't run yet
+    if (isLoading || isFetching || selectedShotFilter === 'all' || page !== 1 || generationsResponse === undefined) {
+      console.log('[StableFilter] Query fallback - skipping (not ready or already all)', {
+        isLoading, isFetching, selectedShotFilter, page, hasResponse: generationsResponse !== undefined
+      });
       return;
     }
     
-    const total = generationsResponse?.total ?? 0;
+    const total = generationsResponse.total ?? 0;
     const lastResult = lastQueryResultRef.current;
     
     // Check if this is a NEW result for this filter (not a re-render with same data)
     if (lastResult?.filter === selectedShotFilter && lastResult?.total === total) {
+      console.log('[StableFilter] Query fallback - skipping (same result as before)');
       return; // Same result, don't re-process
     }
     
@@ -568,6 +612,11 @@ export function useGenerationsPageLogic({
       
       setSelectedShotFilter('all');
       lastAppliedFilterRef.current = 'all';
+    } else {
+      console.log('[StableFilter] Query fallback - has results, keeping filter:', {
+        filter: selectedShotFilter,
+        total
+      });
     }
   }, [selectedShotFilter, isLoading, isFetching, generationsResponse?.total, page, currentShotId, setFilterStateForShot]);
 
