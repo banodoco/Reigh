@@ -31,23 +31,24 @@ const travelExamples = [
     video: PLACEHOLDER,
   },
   {
+    id: '4-images',
+    label: '4 Images',
+    images: ['/916-1.jpg', '/916-2.jpg', '/916-3.jpg', '/916-4.jpg'],
+    video: '/916-output.mp4',
+  },
+  {
     id: '3-images',
     label: '3 Images',
     images: [PLACEHOLDER, PLACEHOLDER, PLACEHOLDER],
     video: PLACEHOLDER,
   },
-  {
-    id: '4-images',
-    label: '4 Images',
-    images: [PLACEHOLDER, PLACEHOLDER, PLACEHOLDER, PLACEHOLDER],
-    video: PLACEHOLDER,
-  },
 ];
 
 const loraOptions = [
-  { id: 'smooth-motion', label: 'Smooth Motion', video: PLACEHOLDER },
-  { id: 'dramatic-zoom', label: 'Dramatic Zoom', video: PLACEHOLDER },
-  { id: 'cinematic-pan', label: 'Cinematic Pan', video: PLACEHOLDER },
+  { id: 'slow-motion-explode', label: 'slow-motion-explode', video: '/slow-motion-explode.mp4' },
+  { id: 'animatediff', label: 'animatediff', video: '/animatediff.mp4' },
+  { id: 'water-morphing', label: 'water-morphing', video: '/water-morphing.mp4' },
+  { id: 'steampunk-willy', label: 'steampunk-willy', video: '/steampunk-willy.mp4' },
 ];
 
 const referenceTypes = ['Style', 'Character', 'Scene'] as const;
@@ -173,6 +174,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               
               // 4 images: 2x2 grid on left, 9:16 output on right
               if (imageCount === 4) {
+                const example = travelExamples[selectedTravelExample];
                 return (
                   <div className="flex gap-2 items-center">
                     {/* 4 input images in 2x2 grid, 9:16 aspect */}
@@ -180,7 +182,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       {images.map((img, idx) => (
                         <div key={idx} className="w-[56px] h-[100px] sm:w-[73px] sm:h-[130px] flex-shrink-0 overflow-hidden rounded-lg border">
                           <img 
-                            src={PLACEHOLDER}
+                            src={img}
                             alt={`Input image ${idx + 1}`}
                             className="w-full h-full object-cover"
                           />
@@ -193,9 +195,11 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       style={{ transform: 'translateZ(0)', willChange: 'transform' }}
                     >
                       <video 
-                        src={PLACEHOLDER}
-                        poster={PLACEHOLDER}
+                        src={example.video}
+                        poster={images[0]}
                         muted
+                        loop
+                        autoPlay
                         playsInline
                         preload="auto"
                         className="w-full h-full object-cover"
@@ -209,7 +213,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             })()}
             
             {/* Right side: Output video - fixed size (hidden for 4-image layout which has its own) */}
-            {selectedTravelExample !== 2 && (
+            {selectedTravelExample !== 1 && (
             <div 
               className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative"
               style={{ transform: 'translateZ(0)', willChange: 'transform' }}
@@ -314,23 +318,23 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 >
                   {/* Mini preview grid matching the layout */}
                   <div className={cn(
-                    "gap-0.5",
+                    "gap-1",
                     example.images.length === 2 && "flex flex-row",
                     example.images.length === 3 && "flex flex-row",
-                    example.images.length === 4 && "grid grid-cols-2"
+                    example.images.length === 4 && "flex flex-row"
                   )}>
                     {thumbImages.map((img, imgIdx) => (
                       <div 
                         key={imgIdx} 
                         className={cn(
                           "bg-muted/50 rounded-sm overflow-hidden",
-                          example.images.length === 2 && "w-5 h-5 aspect-square",
-                          example.images.length === 3 && "w-5 aspect-[4/3]",
-                          example.images.length === 4 && "w-4 h-4"
+                          example.images.length === 2 && "w-6 h-6 aspect-square",
+                          example.images.length === 3 && "w-6 aspect-[4/3]",
+                          example.images.length === 4 && "w-4 h-7"
                         )}
                       >
                         <img 
-                          src={idx === 0 ? img : PLACEHOLDER}
+                          src={img}
                           alt=""
                           className="w-full h-full object-cover"
                         />
