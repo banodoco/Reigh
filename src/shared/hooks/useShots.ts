@@ -775,14 +775,46 @@ export const useAddImageToShot = () => {
       timelineFrame?: number;
       skipOptimistic?: boolean;
     }) => {
-      // 🔴 CRITICAL LOG: Is mutationFn even being called?
       console.log('[AddDebug] 🔴 mutationFn START - useAddImageToShot:', {
         shot_id: shot_id?.substring(0, 8),
         generation_id: generation_id?.substring(0, 8),
+        hasExplicitFrame: timelineFrame !== undefined,
         timestamp: Date.now(),
       });
       
-      // Get all existing frames for collision detection
+      // 🚀 FAST PATH: Use RPC when no explicit timelineFrame (e.g., "add to shot" button)
+      // This reduces from 2+ DB calls to 1 atomic RPC call
+      if (timelineFrame === undefined) {
+        console.log('[AddDebug] 🚀 Using fast RPC path (add_generation_to_shot)');
+        
+        const { data: rpcResult, error: rpcError } = await supabase
+          .rpc('add_generation_to_shot', {
+            p_shot_id: shot_id,
+            p_generation_id: generation_id,
+            p_with_position: true
+          });
+        
+        if (rpcError) {
+          console.error('[AddDebug] ❌ RPC failed:', rpcError);
+          throw rpcError;
+        }
+        
+        // RPC returns array, get first row
+        const result = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
+        
+        console.log('[AddDebug] ✅ RPC succeeded:', {
+          id: result?.id?.substring(0, 8),
+          timeline_frame: result?.timeline_frame,
+          timestamp: Date.now()
+        });
+        
+        return { ...result, project_id, imageUrl, thumbUrl };
+      }
+      
+      // EXPLICIT FRAME PATH: For drag-drop with specific position
+      // Need to fetch existing frames for collision detection
+      console.log('[AddDebug] 📍 Using explicit frame path:', timelineFrame);
+      
       const { data: existingGens, error: fetchError } = await supabase
         .from('shot_generations')
         .select('timeline_frame')
@@ -792,61 +824,23 @@ export const useAddImageToShot = () => {
       if (fetchError && fetchError.code !== 'PGRST116') {
         console.error('[AddDebug] ❌ Error fetching existing frames:', fetchError);
       }
-
-      console.log('[AddDebug] 📊 Fetched existing frames:', {
-        count: existingGens?.length ?? 0,
-        timestamp: Date.now()
-      });
       
       const existingFrames = (existingGens || [])
         .map(g => g.timeline_frame)
         .filter((f): f is number => f != null && f !== -1);
       
-      // Calculate frame using centralized position calculator
-      let resolvedFrame: number;
-      
-      if (timelineFrame !== undefined) {
-        // Explicit frame provided - ensure it's unique using centralized function
-        resolvedFrame = ensureUniqueFrame(timelineFrame, existingFrames);
-        if (resolvedFrame !== timelineFrame) {
-          console.log('[AddDebug] 🔄 Adjusted provided frame:', {
-            original: timelineFrame,
-            resolved: resolvedFrame,
-            reason: 'collision'
-          });
-        }
-      } else {
-        // No frame specified - append at end using centralized function (50 frames after highest)
-        resolvedFrame = calculateNextAvailableFrame(existingFrames);
+      // Ensure the explicit frame is unique
+      const resolvedFrame = ensureUniqueFrame(timelineFrame, existingFrames);
+      if (resolvedFrame !== timelineFrame) {
+        console.log('[AddDebug] 🔄 Adjusted provided frame:', {
+          original: timelineFrame,
+          resolved: resolvedFrame,
+          reason: 'collision'
+        });
       }
-
-      console.log('[AddDebug] 🎯 Resolved frame for new item:', {
-        resolvedFrame,
-        timestamp: Date.now()
-      });
-
-      // Insert into shot_generations
-      // First, check if this generation is already on the timeline (for debugging)
-      let existingRecords: { id: string; timeline_frame: number | null }[] | null = null;
-      if (generation_id) {
-        const { data } = await supabase
-          .from('shot_generations')
-          .select('id, timeline_frame')
-          .eq('shot_id', shot_id)
-          .eq('generation_id', generation_id);
-        existingRecords = data;
-      }
-      
-      console.log('[AddDebug] 📤 Inserting into shot_generations:', {
-        shot_id: shot_id.substring(0, 8),
-        generation_id: generation_id ? generation_id.substring(0, 8) : '(empty)',
-        timeline_frame: resolvedFrame,
-        existingRecordsCount: existingRecords?.length ?? 0,
-        timestamp: Date.now()
-      });
       
       const { data, error } = await supabase
-          .from('shot_generations')
+        .from('shot_generations')
         .insert({
           shot_id,
           generation_id,
@@ -865,23 +859,9 @@ export const useAddImageToShot = () => {
         throw error;
       }
       
-      // After insert, verify what records exist now
-      let afterInsertRecords: { id: string; timeline_frame: number | null }[] | null = null;
-      if (generation_id) {
-        const { data: verifyData } = await supabase
-          .from('shot_generations')
-          .select('id, timeline_frame')
-          .eq('shot_id', shot_id)
-          .eq('generation_id', generation_id);
-        afterInsertRecords = verifyData;
-      }
-      
       console.log('[AddDebug] ✅ Insert succeeded:', {
         newId: data?.id?.substring(0, 8),
-        shot_id: shot_id.substring(0, 8),
-        generation_id: generation_id ? generation_id.substring(0, 8) : '(empty)',
         timeline_frame: data?.timeline_frame,
-        totalRecordsAfterInsert: afterInsertRecords?.length ?? 0,
         timestamp: Date.now()
       });
       
@@ -1015,6 +995,46 @@ export const useAddImageToShot = () => {
         });
       }
 
+      // 🚀 INSTANT DISAPPEAR: Optimistically remove from unified-generations cache
+      // This makes items disappear instantly from "Items without shots" filter
+      // Query key pattern: ['unified-generations', 'project', projectId, page, limit, filters]
+      const unifiedGenQueries = queryClient.getQueriesData<{
+        items: any[];
+        total: number;
+        hasMore?: boolean;
+      }>({ queryKey: ['unified-generations', 'project', project_id] });
+      
+      if (unifiedGenQueries.length > 0) {
+        console.log('[AddToShot] 🚀 Optimistically removing from unified-generations cache:', {
+          generation_id: generation_id?.substring(0, 8),
+          matchingCacheEntries: unifiedGenQueries.length
+        });
+        
+        unifiedGenQueries.forEach(([queryKey, data]) => {
+          if (data?.items) {
+            // Remove the generation from items (match by id or generation_id)
+            const filteredItems = data.items.filter(item => 
+              item.id !== generation_id && item.generation_id !== generation_id
+            );
+            
+            // Only update if we actually removed something
+            if (filteredItems.length < data.items.length) {
+              queryClient.setQueryData(queryKey, {
+                ...data,
+                items: filteredItems,
+                total: Math.max(0, (data.total || 0) - 1)
+              });
+              
+              console.log('[AddToShot] ✅ Removed from cache:', {
+                queryKey: JSON.stringify(queryKey).substring(0, 80),
+                previousCount: data.items.length,
+                newCount: filteredItems.length
+              });
+            }
+          }
+        });
+      }
+
       return { previousShots, previousFastGens, project_id, shot_id, tempId };
     },
     onError: (error: Error, variables, context) => {
@@ -1051,6 +1071,11 @@ export const useAddImageToShot = () => {
           timestamp: Date.now()
         });
         queryClient.setQueryData(['all-shot-generations', context.shot_id], context.previousFastGens);
+      }
+      
+      // Rollback unified-generations by invalidating (will refetch correct state)
+      if (context?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', context.project_id] });
       }
       
       // Provide more helpful error messages for common mobile issues
@@ -1243,6 +1268,44 @@ export const useAddImageToShotWithoutPosition = () => {
       
       return { ...data, project_id, imageUrl, thumbUrl };
     },
+    onMutate: async (variables) => {
+      const { generation_id, project_id } = variables;
+      
+      if (!project_id) return;
+      
+      // 🚀 INSTANT DISAPPEAR: Optimistically remove from unified-generations cache
+      // This makes items disappear instantly from "Items without shots" filter
+      const unifiedGenQueries = queryClient.getQueriesData<{
+        items: any[];
+        total: number;
+        hasMore?: boolean;
+      }>({ queryKey: ['unified-generations', 'project', project_id] });
+      
+      if (unifiedGenQueries.length > 0) {
+        console.log('[AddWithoutPos] 🚀 Optimistically removing from unified-generations cache:', {
+          generation_id: generation_id?.substring(0, 8),
+          matchingCacheEntries: unifiedGenQueries.length
+        });
+        
+        unifiedGenQueries.forEach(([queryKey, data]) => {
+          if (data?.items) {
+            const filteredItems = data.items.filter(item => 
+              item.id !== generation_id && item.generation_id !== generation_id
+            );
+            
+            if (filteredItems.length < data.items.length) {
+              queryClient.setQueryData(queryKey, {
+                ...data,
+                items: filteredItems,
+                total: Math.max(0, (data.total || 0) - 1)
+              });
+            }
+          }
+        });
+      }
+      
+      return { project_id };
+    },
     onSuccess: (data, variables) => {
       console.log('[AddWithoutPosDebug] 🎉 onSuccess callback fired');
       console.log('[AddWithoutPosDebug] Invalidating queries for project:', variables.project_id?.substring(0, 8));
@@ -1254,10 +1317,15 @@ export const useAddImageToShotWithoutPosition = () => {
       // unified-generations query won't reflect this until invalidated
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', variables.project_id] });
     },
-    onError: (error, variables) => {
+    onError: (error, variables, context) => {
       console.error('[AddWithoutPosDebug] 💥 onError callback fired');
       console.error('[AddWithoutPosDebug] Error:', error);
       console.error('[AddWithoutPosDebug] Variables:', variables);
+      
+      // Rollback unified-generations by invalidating (will refetch correct state)
+      if (context?.project_id) {
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', context.project_id] });
+      }
       
       // Check for duplicate key constraint violation - this shouldn't happen anymore
       // since we allow the same generation to appear multiple times in a shot
