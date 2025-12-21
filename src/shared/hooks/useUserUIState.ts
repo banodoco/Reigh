@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 
 // Shared cache to prevent duplicate database calls
 const settingsCache = new Map<string, { data: any; timestamp: number; loading: Promise<any> | null }>();
@@ -112,40 +113,23 @@ export function useUserUIState<K extends keyof UISettings>(
   // This automatically backfills existing users with default values when they first load the app
   // IMPORTANT: Only runs when the key is completely missing from database (undefined)
   // Does NOT override explicit user choices (including both options set to false)
-  const saveFallbackToDatabase = async (userId: string, currentSettings: any) => {
+  const saveFallbackToDatabase = async (userId: string, _currentSettings: any) => {
     try {
-      const currentUI = currentSettings.ui || {};
       const fallbackToSave = normalizeIfGenerationMethods(fallback);
       
-      // Only add the missing key, preserve everything else
-      const updatedSettings = {
-        ...currentSettings,
-        ui: {
-          ...currentUI,
-          [key]: fallbackToSave
-        }
-      };
+      // Use the global queue to save - it handles merging
+      await updateToolSettingsSupabase({
+        scope: 'user',
+        id: userId,
+        toolId: 'ui',
+        patch: { [key]: fallbackToSave },
+      }, undefined, 'immediate');
       
-      // Add timeout to prevent hanging
-      const { error } = await Promise.race([
-        supabase
-          .from('users')
-          .update({ settings: updatedSettings })
-          .eq('id', userId),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Database save timeout')), 5000)
-        )
-      ]) as any;
-      
-      if (error) {
-        console.error('[useUserUIState] Error saving fallback to database:', error);
-      } else {
-        console.log(`[useUserUIState] Successfully saved fallback for key "${key}"`);
-        // Invalidate cache so other components see the backfilled values
-        const cacheKey = `user_settings_${userId}`;
-        settingsCache.delete(cacheKey);
-        setValue(fallbackToSave); // Update local state after successful save
-      }
+      console.log(`[useUserUIState] Successfully saved fallback for key "${key}"`);
+      // Invalidate cache so other components see the backfilled values
+      const cacheKey = `user_settings_${userId}`;
+      settingsCache.delete(cacheKey);
+      setValue(fallbackToSave); // Update local state after successful save
     } catch (error) {
       console.error('[useUserUIState] Error in saveFallbackToDatabase:', error);
     }
@@ -192,31 +176,18 @@ export function useUserUIState<K extends keyof UISettings>(
             Object.keys(fallback as any).some((k) => (keyValue as any)[k] === undefined)) ||
             JSON.stringify(normalizedValue) !== JSON.stringify(keyValue)
           ) {
-            try {
-              const currentSettings = data?.settings || {};
-              const currentUI = currentSettings.ui || {};
-              const updatedSettings = {
-                ...currentSettings,
-                ui: {
-                  ...currentUI,
-                  [key]: normalizedValue
-                }
-              };
-
-              const { error: saveError } = await supabase
-                .from('users')
-                .update({ settings: updatedSettings })
-                .eq('id', user.id);
-
-              if (saveError) {
-                console.error('[useUserUIState] Error backfilling/normalizing fields:', saveError);
-              } else {
-                const cacheKey = `user_settings_${user.id}`;
-                settingsCache.delete(cacheKey);
-              }
-            } catch (e) {
-              console.error('[useUserUIState] Unexpected error during backfill/normalize:', e);
-            }
+            // Use the global queue to save - it handles merging
+            updateToolSettingsSupabase({
+              scope: 'user',
+              id: user.id,
+              toolId: 'ui',
+              patch: { [key]: normalizedValue },
+            }, undefined, 'immediate').then(() => {
+              const cacheKey = `user_settings_${user.id}`;
+              settingsCache.delete(cacheKey);
+            }).catch(e => {
+              console.error('[useUserUIState] Error backfilling/normalizing fields:', e);
+            });
           }
         } else {
           // Key doesn't exist in database - this is an existing user who hasn't set preferences yet

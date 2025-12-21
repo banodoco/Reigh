@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 import { deepEqual } from '@/shared/lib/deepEqual';
-import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Options for configuring the tool page settings hook
@@ -137,42 +136,20 @@ export function useToolPageSettings<T extends Record<string, any>>(
         
         // Only save if there are actual changes
         if (!deepEqual(settingsToFlush, oldLoadedSettings)) {
-          // CRITICAL: Save directly to Supabase with the OLD scope ID
-          // We cannot use updateSettings here because it has the NEW scopeId in its closure
-          (async () => {
-            try {
-              const table = scope === 'shot' ? 'shots' : 'projects';
-              const { data: currentRecord, error: fetchError } = await supabase
-                .from(table)
-                .select('settings')
-                .eq('id', previousScopeId)
-                .single();
-              
-              if (fetchError) {
-                console.error(`${debugTag} Failed to fetch old ${scope} settings:`, fetchError);
-                return;
-              }
-              
-              const currentSettings = (currentRecord?.settings as any) ?? {};
-              const updatedSettings = {
-                ...currentSettings,
-                [toolId]: settingsToFlush
-              };
-              
-              const { error: updateError } = await supabase
-                .from(table)
-                .update({ settings: updatedSettings })
-                .eq('id', previousScopeId);
-              
-              if (updateError) {
-                console.error(`${debugTag} Failed to flush save:`, updateError);
-              } else if (debug) {
-                console.log(`${debugTag} ✅ Flush successful for previous ${scope}`);
-              }
-            } catch (err) {
-              console.error(`${debugTag} Failed to flush save:`, err);
-            }
-          })();
+          // CRITICAL: Save with the OLD scope ID using the global queue
+          // Use 'immediate' mode to bypass debounce - we're switching away
+          updateToolSettingsSupabase({
+            scope,
+            id: previousScopeId,
+            toolId,
+            patch: settingsToFlush,
+          }, undefined, 'immediate').catch(err => {
+            console.error(`${debugTag} Failed to flush save:`, err);
+          });
+          
+          if (debug) {
+            console.log(`${debugTag} ✅ Flush queued for previous ${scope}`);
+          }
         }
         
         pendingSettingsRef.current = null;

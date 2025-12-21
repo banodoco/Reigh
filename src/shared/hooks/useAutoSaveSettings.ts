@@ -209,12 +209,13 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
         // Fire-and-forget; cleanup cannot be async.
         // Call updateToolSettingsSupabase directly with explicit entity ID
         // to avoid drift issues with hook refs
+        // Use 'immediate' mode to bypass debounce - we need to flush NOW
         updateToolSettingsSupabase({
           scope: currentScope,
           id: pendingForEntity,
           toolId: currentToolId,
           patch: pending,
-        }).catch(err => {
+        }, undefined, 'immediate').catch(err => {
           console.error('[useAutoSaveSettings] Cleanup flush failed:', err);
         });
       }
@@ -247,12 +248,13 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
         
         // Fire-and-forget save directly to DB
         // Most browsers will wait a bit for this to complete
+        // Use 'immediate' mode to bypass debounce - page is closing
         updateToolSettingsSupabase({
           scope,
           id: pendingForEntity,
           toolId,
           patch: pending,
-        }).catch(err => {
+        }, undefined, 'immediate').catch(err => {
           console.error('[useAutoSaveSettings] Unload flush failed:', err);
         });
       }

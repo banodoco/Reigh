@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
 import { UserPreferences } from '@/shared/settings/userPreferences';
 import { usePrefetchToolSettings } from '@/shared/hooks/usePrefetchToolSettings';
+import { updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 import { useQueryClient } from '@tanstack/react-query';
 import { STORAGE_KEYS } from '@/tools/travel-between-images/storageKeys';
 
@@ -349,37 +350,25 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [userId]);
 
-  // Update user preferences directly
+  // Update user preferences directly using the global write queue
   const updateUserPreferences = useCallback(async (_scope: 'user', patch: Partial<UserPreferences>) => {
     if (!userId) return;
 
     try {
-      // Fetch current settings so we don't overwrite unrelated keys
-      const { data: currentUser, error: fetchErr } = await supabase
-        .from('users')
-        .select('settings')
-        .eq('id', userId)
-        .single();
+      // Use the global queue - it handles read-modify-write internally
+      await updateToolSettingsSupabase({
+        scope: 'user',
+        id: userId,
+        toolId: 'user-preferences',
+        patch,
+      });
 
-      if (fetchErr) throw fetchErr;
-
-      const currentSettings = (currentUser?.settings as any) ?? {};
-      const existingPrefs = currentSettings['user-preferences'] ?? {};
-
-      const updatedPrefs = { ...existingPrefs, ...patch };
-      const newSettings = { ...currentSettings, ['user-preferences']: updatedPrefs };
-
-      const { error: updateErr } = await supabase
-        .from('users')
-        .update({ settings: newSettings })
-        .eq('id', userId);
-
-      if (updateErr) throw updateErr;
-
-      // Update local state if DB update succeeds
-      const merged = { ...existingPrefs, ...patch };
-      setUserPreferences(merged);
-      userPreferencesRef.current = merged;
+      // Update local state optimistically
+      setUserPreferences(prev => {
+        const merged = { ...prev, ...patch };
+        userPreferencesRef.current = merged;
+        return merged;
+      });
     } catch (error) {
       console.error('[ProjectContext] Failed to update user preferences:', error);
     }

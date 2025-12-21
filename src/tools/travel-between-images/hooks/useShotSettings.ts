@@ -130,12 +130,13 @@ export const useShotSettings = (
   useEffect(() => {
     if (inheritedSettings && shotId && autoSave.status === 'ready') {
       console.log('[useShotSettings] 💾 Saving inherited settings to DB');
+      // Use 'immediate' mode - inherited settings should persist right away
       updateToolSettingsSupabase({
         scope: 'shot',
         id: shotId,
         toolId: 'travel-between-images',
         patch: inheritedSettings,
-      }).catch(err => {
+      }, undefined, 'immediate').catch(err => {
         console.error('[useShotSettings] Failed to save inherited settings:', err);
       });
     }
