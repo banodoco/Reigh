@@ -59,14 +59,9 @@
 - See `debugging.md` for full details on CLI, frontend logging, and SQL queries.
 
 ## Doc maintenance
-- **When to update**: Adding/changing system patterns (triggers, RPCs, storage paths, shared hooks) → update the relevant sub-doc.
-- **Which doc?**: Use the routing table above. If none fits: DB patterns → `db_and_storage.md`; other cross-cutting → `structure.md`.
-- **Style (rubric)**: Each sub-doc should have:
-  1. Header: `> **Purpose**: [1 sentence]` + `> **Source of Truth**: [code paths]`
-  2. **Key Invariants**: 3-8 bullets of "break these, things fail"
-  3. Tables > prose; point to code instead of copying it
-  4. Keep sub-docs under ~150 lines
-- **Where**: Sub-docs live in `docs/structure_detail/`. Update `structure.md` only if adding new sub-docs or changing file paths.
+- **Sub-docs** (`docs/structure_detail/`): Update when changing system patterns (triggers, RPCs, storage, shared hooks). Use routing table above.
+- **structure.md**: Update only when adding/removing sub-docs or changing top-level directory structure. It's an index, not implementation detail.
+- **Style**: Tables > prose; point to code; sub-docs under ~150 lines; include Purpose + Source of Truth + Key Invariants.
 
 ## Git workflow (when pushing)
 - Before push: review `git diff`, update docs if system patterns changed, then `git add . && git commit -m "feat/fix: ..." && git push`.
