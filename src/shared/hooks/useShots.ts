@@ -12,6 +12,55 @@ import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
 import { invalidateGenerationsSync } from '@/shared/hooks/useGenerationInvalidation';
 import { calculateNextAvailableFrame, ensureUniqueFrame } from '@/shared/utils/timelinePositionCalculator';
+import { QueryClient } from '@tanstack/react-query';
+
+// ============================================================================
+// SHARED CACHE HELPERS
+// ============================================================================
+
+/**
+ * Optimistically removes a generation from all unified-generations cache entries.
+ * Used for instant "disappear from Items without shots" effect.
+ * 
+ * @param queryClient - React Query client
+ * @param projectId - Project ID to scope the cache search
+ * @param generationId - Generation ID to remove from cache
+ * @returns Number of cache entries that were updated
+ */
+function optimisticallyRemoveFromUnifiedGenerations(
+  queryClient: QueryClient,
+  projectId: string,
+  generationId: string
+): number {
+  const unifiedGenQueries = queryClient.getQueriesData<{
+    items: any[];
+    total: number;
+    hasMore?: boolean;
+  }>({ queryKey: ['unified-generations', 'project', projectId] });
+  
+  let updatedCount = 0;
+  
+  unifiedGenQueries.forEach(([queryKey, data]) => {
+    if (data?.items) {
+      // Remove the generation from items (match by id or generation_id)
+      const filteredItems = data.items.filter(item => 
+        item.id !== generationId && item.generation_id !== generationId
+      );
+      
+      // Only update if we actually removed something
+      if (filteredItems.length < data.items.length) {
+        queryClient.setQueryData(queryKey, {
+          ...data,
+          items: filteredItems,
+          total: Math.max(0, (data.total || 0) - 1)
+        });
+        updatedCount++;
+      }
+    }
+  });
+  
+  return updatedCount;
+}
 
 // Define the type for the new shot data returned by Supabase
 // This should align with your 'shots' table structure from `supabase/types.ts`
@@ -997,41 +1046,16 @@ export const useAddImageToShot = () => {
 
       // 🚀 INSTANT DISAPPEAR: Optimistically remove from unified-generations cache
       // This makes items disappear instantly from "Items without shots" filter
-      // Query key pattern: ['unified-generations', 'project', projectId, page, limit, filters]
-      const unifiedGenQueries = queryClient.getQueriesData<{
-        items: any[];
-        total: number;
-        hasMore?: boolean;
-      }>({ queryKey: ['unified-generations', 'project', project_id] });
+      const updatedCacheCount = optimisticallyRemoveFromUnifiedGenerations(
+        queryClient, 
+        project_id, 
+        generation_id
+      );
       
-      if (unifiedGenQueries.length > 0) {
-        console.log('[AddToShot] 🚀 Optimistically removing from unified-generations cache:', {
+      if (updatedCacheCount > 0) {
+        console.log('[AddToShot] 🚀 Optimistically removed from unified-generations:', {
           generation_id: generation_id?.substring(0, 8),
-          matchingCacheEntries: unifiedGenQueries.length
-        });
-        
-        unifiedGenQueries.forEach(([queryKey, data]) => {
-          if (data?.items) {
-            // Remove the generation from items (match by id or generation_id)
-            const filteredItems = data.items.filter(item => 
-              item.id !== generation_id && item.generation_id !== generation_id
-            );
-            
-            // Only update if we actually removed something
-            if (filteredItems.length < data.items.length) {
-              queryClient.setQueryData(queryKey, {
-                ...data,
-                items: filteredItems,
-                total: Math.max(0, (data.total || 0) - 1)
-              });
-              
-              console.log('[AddToShot] ✅ Removed from cache:', {
-                queryKey: JSON.stringify(queryKey).substring(0, 80),
-                previousCount: data.items.length,
-                newCount: filteredItems.length
-              });
-            }
-          }
+          cacheEntriesUpdated: updatedCacheCount
         });
       }
 
@@ -1274,33 +1298,16 @@ export const useAddImageToShotWithoutPosition = () => {
       if (!project_id) return;
       
       // 🚀 INSTANT DISAPPEAR: Optimistically remove from unified-generations cache
-      // This makes items disappear instantly from "Items without shots" filter
-      const unifiedGenQueries = queryClient.getQueriesData<{
-        items: any[];
-        total: number;
-        hasMore?: boolean;
-      }>({ queryKey: ['unified-generations', 'project', project_id] });
+      const updatedCacheCount = optimisticallyRemoveFromUnifiedGenerations(
+        queryClient,
+        project_id,
+        generation_id
+      );
       
-      if (unifiedGenQueries.length > 0) {
-        console.log('[AddWithoutPos] 🚀 Optimistically removing from unified-generations cache:', {
+      if (updatedCacheCount > 0) {
+        console.log('[AddWithoutPos] 🚀 Optimistically removed from unified-generations:', {
           generation_id: generation_id?.substring(0, 8),
-          matchingCacheEntries: unifiedGenQueries.length
-        });
-        
-        unifiedGenQueries.forEach(([queryKey, data]) => {
-          if (data?.items) {
-            const filteredItems = data.items.filter(item => 
-              item.id !== generation_id && item.generation_id !== generation_id
-            );
-            
-            if (filteredItems.length < data.items.length) {
-              queryClient.setQueryData(queryKey, {
-                ...data,
-                items: filteredItems,
-                total: Math.max(0, (data.total || 0) - 1)
-              });
-            }
-          }
+          cacheEntriesUpdated: updatedCacheCount
         });
       }
       
