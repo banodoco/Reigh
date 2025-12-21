@@ -348,6 +348,14 @@ const Timeline: React.FC<TimelineProps> = ({
     // NOTE: -1 is used as a sentinel value in useTimelinePositionUtils for unpositioned items
     result = result.filter(img => img.timeline_frame !== null && img.timeline_frame !== undefined && img.timeline_frame >= 0);
 
+    // Deterministic ordering: sort by timeline_frame, then by id as a stable tie-breaker.
+    // This matches backend ordering used by update-shot-pair-prompts.
+    result = result.sort((a, b) => {
+      const frameDiff = (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0);
+      if (frameDiff !== 0) return frameDiff;
+      return String(a.id ?? '').localeCompare(String(b.id ?? ''));
+    });
+
     // [TimelineVisibility] Log images array changes
     console.log(`[TimelineVisibility] 📸 IMAGES ARRAY COMPUTED:`, {
       shotId: shotId.substring(0, 8),

@@ -117,7 +117,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
           `${totalItems} ${getFilterLabel()}, showing ${ITEMS_PER_PAGE} per page`
         )}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <Button
           variant="ghost"
           size="sm"
@@ -127,9 +127,28 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
+        
+        {/* Page selector dropdown */}
+        <Select 
+          value={currentPage.toString()} 
+          onValueChange={(value) => onPageChange(parseInt(value))}
+          disabled={isLoading}
+        >
+          <SelectTrigger variant="retro-dark" colorScheme="zinc" size="sm" className="h-6 w-9 text-xs px-1" hideIcon>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent variant="zinc">
+            {Array.from({ length: totalPages }, (_, i) => (
+              <SelectItem variant="zinc" key={i + 1} value={(i + 1).toString()} className="text-xs">
+                {i + 1}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <span className="text-zinc-300 text-[11px]">
-          Page {currentPage} of {totalPages}
+          of {totalPages}
         </span>
+        
         <Button
           variant="ghost"
           size="sm"

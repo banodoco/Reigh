@@ -332,6 +332,27 @@ serve(async (req) => {
       });
     }
 
+    // Don't overwrite Cancelled tasks - once cancelled, status should not change
+    // This prevents workers from "uncancelling" tasks by continuing to update status
+    if (currentTask?.status === "Cancelled") {
+      logger.warn("Refusing to update cancelled task", { 
+        task_id, 
+        current_status: currentTask.status,
+        requested_status: status
+      });
+      await logger.flush();
+      return new Response(JSON.stringify({
+        success: false,
+        task_id: task_id,
+        current_status: currentTask.status,
+        requested_status: status,
+        message: "Cannot update cancelled task"
+      }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     // Build update payload
     const updatePayload: any = {
       status: status,

@@ -631,7 +631,7 @@ const GenerationsPaneComponent: React.FC = () => {
                         value={page.toString()} 
                         onValueChange={(value) => handleServerPageChange(parseInt(value))}
                       >
-                        <SelectTrigger variant="retro-dark" colorScheme="zinc" size="sm" className="h-6 w-12 text-xs px-1" hideIcon>
+                        <SelectTrigger variant="retro-dark" colorScheme="zinc" size="sm" className="h-6 w-9 text-xs px-1" hideIcon>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent variant="zinc">

@@ -160,7 +160,9 @@ serve(async (req) => {
       `)
       .eq("shot_id", shot_id)
       .not("timeline_frame", "is", null)
-      .order("timeline_frame", { ascending: true });
+      // Deterministic ordering: Timeline sorts by timeline_frame; add a stable tie-breaker.
+      .order("timeline_frame", { ascending: true })
+      .order("id", { ascending: true });
 
     if (sgError) {
       logger.error("Error fetching shot_generations", { 
@@ -184,13 +186,30 @@ serve(async (req) => {
       });
     }
 
-    // Filter to only include images (not videos)
+    // Filter to only include positioned images (not videos, not unpositioned)
+    // Must match Timeline.tsx filtering logic exactly:
+    // - Exclude videos by type and extension (.mp4, .webm, .mov)
+    // - Exclude unpositioned items (timeline_frame < 0, e.g. -1 sentinel)
+    const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov'];
+    const hasVideoExtension = (url: string | null | undefined): boolean => {
+      if (!url) return false;
+      const lower = url.toLowerCase();
+      return VIDEO_EXTENSIONS.some(ext => lower.endsWith(ext));
+    };
+    
     const imageGenerations = shotGenerations.filter(sg => {
       const gen = sg.generation as any;
+      // Exclude videos
       const isVideo = gen?.type === 'video' || 
                      gen?.type === 'video_travel_output' ||
-                     (gen?.location && gen.location.endsWith('.mp4'));
-      return !isVideo;
+                     hasVideoExtension(gen?.location);
+      if (isVideo) return false;
+      
+      // Exclude unpositioned items (timeline_frame < 0, e.g. -1 sentinel)
+      // Note: NULL already excluded by query, but check for safety
+      if (sg.timeline_frame == null || sg.timeline_frame < 0) return false;
+      
+      return true;
     });
 
     logger.info("Found shot_generations", {
