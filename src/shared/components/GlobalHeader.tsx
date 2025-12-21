@@ -15,6 +15,7 @@ import { useProjectContextDebug } from '@/shared/hooks/useProjectContextDebug';
 
 import { useIsTablet } from '@/shared/hooks/use-mobile';
 import { useDarkMode } from '@/shared/hooks/useDarkMode';
+import { usePanes } from '@/shared/contexts/PanesContext';
 
 interface GlobalHeaderProps {
   contentOffsetRight?: number;
@@ -32,6 +33,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const navigate = useNavigate();
   const isTablet = useIsTablet();
   const { darkMode } = useDarkMode();
+  const { isGenerationsPaneLocked } = usePanes();
 
   // Mobile Safari keeps :hover "stuck" after taps. For the brand icon we explicitly
   // flash the highlight briefly on touch/click, then clear it.
@@ -76,8 +78,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
-  // Wide viewport OR tablet = sticky header
-  const shouldHaveStickyHeader = isWideViewport || isTablet;
+  // Wide viewport OR tablet = sticky header, UNLESS GenerationsPane is locked
+  const shouldHaveStickyHeader = (isWideViewport || isTablet) && !isGenerationsPaneLocked;
 
   // [MobileStallFix] Enable debug monitoring
   useProjectContextDebug();
