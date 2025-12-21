@@ -381,6 +381,12 @@ export function useGenerationsPageLogic({
         newFilter: newShotFilter === 'all' ? 'all' : (newShotFilter === 'no-shot' ? 'no-shot' : newShotFilter?.substring(0, 8))
       });
     }
+    
+    // Also track user override keyed by the selected shot itself (for query fallback to check)
+    // This ensures if user explicitly selects an empty shot, we don't auto-switch away
+    if (newShotFilter !== 'all' && newShotFilter !== 'no-shot') {
+      filterStateMapRef.current.set(newShotFilter, { filter: newShotFilter, isUserOverride: true });
+    }
   }, [currentShotId, excludePositioned, setFilterStateForShot, updateShotSettings]);
 
   const handleExcludePositionedChange = useCallback((newExcludePositioned: boolean) => {
@@ -597,6 +603,19 @@ export function useGenerationsPageLogic({
     lastQueryResultRef.current = { filter: selectedShotFilter, total };
     
     if (total === 0) {
+      // Check if user intentionally selected this empty shot - if so, respect their choice
+      const existingState = currentShotId 
+        ? filterStateMapRef.current.get(currentShotId)
+        : filterStateMapRef.current.get(selectedShotFilter); // For explicit shot selection without currentShotId
+      
+      if (existingState?.isUserOverride) {
+        console.log('[StableFilter] Query returned 0 results but user intentionally selected this shot, keeping filter:', {
+          filter: selectedShotFilter?.substring(0, 8),
+          total
+        });
+        return; // Don't auto-switch - user chose this intentionally
+      }
+      
       console.log('[StableFilter] Query returned 0 results, falling back to "all":', {
         filter: selectedShotFilter?.substring(0, 8),
         total
@@ -604,10 +623,7 @@ export function useGenerationsPageLogic({
       
       // Update the filter state map (NOT as user override - this is auto-fallback)
       if (currentShotId) {
-        const existingState = filterStateMapRef.current.get(currentShotId);
-        if (!existingState?.isUserOverride) {
-          setFilterStateForShot(currentShotId, 'all', false);
-        }
+        setFilterStateForShot(currentShotId, 'all', false);
       }
       
       setSelectedShotFilter('all');
