@@ -286,13 +286,13 @@ export async function fetchGenerations(
     countQuery = countQuery.or('shot_data.is.null,shot_data.eq.{}');
   } else if (filters?.shotId) {
     // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
-    // shot_data->'shot_id' checks if the key exists (returns the array or null if key missing)
-    // We want: WHERE shot_data->'shot_id' IS NOT NULL (meaning key exists)
+    // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
+    // Check that the key exists (generation is in this shot)
     countQuery = countQuery.not(`shot_data->${filters.shotId}`, 'is', null);
-
+    
     // Add positioned filter if needed
     if (filters.excludePositioned) {
-      // Filter to only show generations with at least one unpositioned entry in this shot
+      // Show only unpositioned items: array contains null
       // Use PostgREST 'cs.' operator (contains) to check if array contains null
       countQuery = countQuery.filter(`shot_data->${filters.shotId}`, 'cs', '[null]');
     }
@@ -390,11 +390,13 @@ export async function fetchGenerations(
     dataQuery = dataQuery.or('shot_data.is.null,shot_data.eq.{}');
   } else if (filters?.shotId) {
     // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
+    // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
+    // Check that the key exists (generation is in this shot)
     dataQuery = dataQuery.not(`shot_data->${filters.shotId}`, 'is', null);
-
+    
     // Add positioned filter if needed
     if (filters.excludePositioned) {
-      // Filter to only show generations with at least one unpositioned entry in this shot
+      // Show only unpositioned items: array contains null
       // Use PostgREST 'cs.' operator (contains) to check if array contains null
       dataQuery = dataQuery.filter(`shot_data->${filters.shotId}`, 'cs', '[null]');
     }

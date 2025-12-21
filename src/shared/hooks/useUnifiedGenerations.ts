@@ -130,21 +130,25 @@ async function fetchShotSpecificGenerations({
       name,
       shot_data${includeTaskData ? ',tasks' : ''}
     `, { count: 'exact' })
-    .not(`shot_data->${shotId}`, 'is', null) // GIN index filter - checks if shotId key exists
     .eq('project_id', projectId);
+  
+  // Apply shot filter - check if generation is in this shot
+  // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
+  // Check that the key exists (generation is in this shot)
+  dataQuery = dataQuery.not(`shot_data->${shotId}`, 'is', null);
+  
+  // Add positioned filter if needed
+  if (filters?.excludePositioned) {
+    // Show only unpositioned items: array contains null
+    // Use PostgREST 'cs.' operator (contains) to check if array contains null
+    dataQuery = dataQuery.filter(`shot_data->${shotId}`, 'cs', '[null]');
+  }
   
   // Apply media type filter at database level for performance
   if (filters?.mediaType === 'video') {
     dataQuery = dataQuery.like('type', '%video%');
   } else if (filters?.mediaType === 'image') {
     dataQuery = dataQuery.not('type', 'like', '%video%');
-  }
-  
-  // Apply exclude positioned filter - check if array contains null (has unpositioned entry)
-  // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
-  if (filters?.excludePositioned) {
-    // Use PostgREST 'cs.' operator (contains) to check if array contains null
-    dataQuery = dataQuery.filter(`shot_data->${shotId}`, 'cs', '[null]');
   }
 
   // Apply starred filter at DB level
@@ -197,9 +201,17 @@ async function fetchShotSpecificGenerations({
       const metadata = gen.params || {};
       
       // Extract timeline_frame from shot_data JSONB for this specific shot
-      // New format is array, get first value (or handle old single-value format)
+      // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
+      // Get first non-null value, or null if all are null
       const shotFrames = gen.shot_data?.[shotId];
-      const timelineFrame = Array.isArray(shotFrames) ? shotFrames[0] : (shotFrames ?? null);
+      let timelineFrame: number | null = null;
+      if (Array.isArray(shotFrames)) {
+        // Find first non-null frame in array
+        timelineFrame = shotFrames.find((f: any) => f !== null && f !== undefined) ?? null;
+      } else if (shotFrames !== null && shotFrames !== undefined) {
+        // Handle legacy single-value format (backwards compat during migration)
+        timelineFrame = shotFrames;
+      }
       
       return {
         id: gen.id,

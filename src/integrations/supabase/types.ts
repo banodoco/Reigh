@@ -152,9 +152,12 @@ export type Database = {
           parent_generation_id: string | null
           primary_variant_id: string | null
           project_id: string
+          shot_data: Json | null
+          shot_id: string | null
           starred: boolean
           tasks: Json | null
           thumbnail_url: string | null
+          timeline_frame: number | null
           type: string | null
           updated_at: string | null
         }
@@ -171,9 +174,12 @@ export type Database = {
           parent_generation_id?: string | null
           primary_variant_id?: string | null
           project_id: string
+          shot_data?: Json | null
+          shot_id?: string | null
           starred?: boolean
           tasks?: Json | null
           thumbnail_url?: string | null
+          timeline_frame?: number | null
           type?: string | null
           updated_at?: string | null
         }
@@ -190,9 +196,12 @@ export type Database = {
           parent_generation_id?: string | null
           primary_variant_id?: string | null
           project_id?: string
+          shot_data?: Json | null
+          shot_id?: string | null
           starred?: boolean
           tasks?: Json | null
           thumbnail_url?: string | null
+          timeline_frame?: number | null
           type?: string | null
           updated_at?: string | null
         }

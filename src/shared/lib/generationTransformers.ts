@@ -248,11 +248,12 @@ export function transformGeneration(
   let shotGenerations: Array<{ shot_id: string; timeline_frame: number | null }> = [];
   
   // Convert JSONB shot_data to flat array format
-  // shot_data is now { shot_id: [frame1, frame2, ...] } (array per shot)
+  // shot_data format: { shot_id: [frame1, frame2, ...] } (array per shot)
+  // Each generation can appear multiple times in a shot (different positions)
   if (item.shot_data && Object.keys(item.shot_data).length > 0) {
     for (const [shotId, frames] of Object.entries(item.shot_data)) {
-      // Handle both old format (single value) and new format (array)
-      const frameArray = Array.isArray(frames) ? frames : [frames];
+      // shot_data should always be an array now, but handle legacy single-value format during migration
+      const frameArray = Array.isArray(frames) ? frames : (frames !== null && frames !== undefined ? [frames] : []);
       for (const frame of frameArray) {
         shotGenerations.push({
           shot_id: shotId,
