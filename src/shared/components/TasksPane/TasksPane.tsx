@@ -5,7 +5,7 @@ import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import TaskList from './TaskList';
 import { cn } from '@/shared/lib/utils'; // For conditional classnames
 import { Button } from '@/shared/components/ui/button'; // For the lock button
-import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, Loader2, Filter, X, FolderOpen } from 'lucide-react'; // Example icons
+import { LockIcon, UnlockIcon, ChevronLeft, ChevronRight, Loader2, Filter, X } from 'lucide-react'; // Example icons
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';

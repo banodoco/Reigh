@@ -10,6 +10,9 @@ export type SettingsScope = 'user' | 'project' | 'shot';
 
 // Single-flight dedupe for settings fetches across components
 const inflightSettingsFetches = new Map<string, Promise<unknown>>();
+// Single-flight dedupe for settings UPDATES to prevent network flooding
+// Key: scope-id-toolId, Value: { promise, latestPatch }
+const inflightSettingsUpdates = new Map<string, { promise: Promise<any>; latestPatch: unknown }>();
 // Single-flight dedupe for getSession calls (it's slow - 600ms to 16s!)
 let inflightGetSession: Promise<any> | null = null;
 // Lightweight user cache to avoid repeated auth calls within a short window
@@ -358,94 +361,135 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
  * Update tool settings using atomic Supabase function
  * This eliminates the read-modify-write pattern for better performance and consistency
  * 
+ * IMPORTANT: This function has single-flight deduplication to prevent network flooding.
+ * If there's already an in-flight update for the same scope/id/toolId, we wait for it
+ * to complete and then run our update (with the latest patch).
+ * 
  * @returns The full merged settings after update (for optimistic cache updates)
  */
 export async function updateToolSettingsSupabase(params: UpdateToolSettingsParams, signal?: AbortSignal): Promise<any> {
   const { scope, id, toolId, patch } = params;
-
-  try {
-    // Check if request was cancelled before starting - return gracefully
-    if (signal?.aborted) {
-      console.log('[useToolSettings] Update cancelled before start');
-      return;
-    }
-    
-    let tableName: string;
-    switch (scope) {
-      case 'user':
-        tableName = 'users';
-        break;
-      case 'project':
-        tableName = 'projects';
-        break;
-      case 'shot':
-        tableName = 'shots';
-        break;
-      default:
-        throw new Error(`Invalid scope: ${scope}`);
-    }
-
-    // For patch updates, we need to fetch current settings to merge
-    // This is necessary because the caller provides a partial update
-    // TODO: In the future, consider passing full settings to eliminate this fetch
-    const { data: currentEntity, error: fetchError } = await supabase
-      .from(tableName)
-      .select('settings')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) {
-      // Check for network exhaustion - include the error type in the message for downstream handling
-      const errorMessage = fetchError.message || '';
-      if (errorMessage.includes('ERR_INSUFFICIENT_RESOURCES') || 
-          errorMessage.includes('Failed to fetch') ||
-          fetchError.code === 'ERR_INSUFFICIENT_RESOURCES') {
-        throw new Error(`Network exhaustion: ${errorMessage}`);
-      }
-      throw new Error(`Failed to fetch current ${scope} settings: ${errorMessage}`);
-    }
-    
-    // Check if request was cancelled after fetch - return gracefully
-    if (signal?.aborted) {
-      console.log('[useToolSettings] Update cancelled after fetch');
-      return;
-    }
-
-    // Merge patch with current tool settings
-    const currentSettings = (currentEntity?.settings as any) ?? {};
-    const currentToolSettings = currentSettings[toolId] ?? {};
-    const updatedToolSettings = deepMerge({}, currentToolSettings, patch);
-
-    // Use atomic PostgreSQL function to update settings
-    // This is much faster than update() because it happens in a single DB operation
-    const { error: rpcError } = await supabase.rpc('update_tool_settings_atomic', {
-      p_table_name: tableName,
-      p_id: id,
-      p_tool_id: toolId,
-      p_settings: updatedToolSettings
+  
+  // Create a unique key for deduplication
+  const dedupeKey = `${scope}-${id}-${toolId}`;
+  
+  // Check if there's already an in-flight update for this key
+  const existing = inflightSettingsUpdates.get(dedupeKey);
+  if (existing) {
+    // Wait for the existing request to complete, then run our update
+    // This coalesces rapid consecutive updates
+    console.log('[updateToolSettingsSupabase] ♻️ Waiting for in-flight update:', {
+      scope,
+      id: id?.substring(0, 8),
+      toolId,
     });
-
-    if (rpcError) {
-      throw new Error(`Failed to update ${scope} settings: ${rpcError.message}`);
+    try {
+      await existing.promise;
+    } catch {
+      // Ignore errors from the previous request - we'll try our own
     }
-
-    // CRITICAL: Return the full merged settings, not just the patch
-    // This ensures the cache gets the exact same data that was saved to the DB
-    // Prevents data loss when cache is stale (e.g., multiple tabs, concurrent edits)
-    return updatedToolSettings;
-
-  } catch (error) {
-    // Handle abort errors silently to reduce noise during task cancellation
-    if (error?.name === 'AbortError' || 
-        error?.message?.includes('Request was cancelled') ||
-        error?.message?.includes('signal is aborted')) {
-      // Don't log these as errors - they're expected during component unmounting
-      throw new Error('Request was cancelled');
-    }
-    
-    console.error('[updateToolSettingsSupabase] Error:', error);
-    throw error;
   }
+  
+  // Create our update promise
+  const updatePromise = (async () => {
+    try {
+      // Check if request was cancelled before starting - return gracefully
+      if (signal?.aborted) {
+        console.log('[useToolSettings] Update cancelled before start');
+        return;
+      }
+      
+      let tableName: string;
+      switch (scope) {
+        case 'user':
+          tableName = 'users';
+          break;
+        case 'project':
+          tableName = 'projects';
+          break;
+        case 'shot':
+          tableName = 'shots';
+          break;
+        default:
+          throw new Error(`Invalid scope: ${scope}`);
+      }
+
+      // For patch updates, we need to fetch current settings to merge
+      // This is necessary because the caller provides a partial update
+      // TODO: In the future, consider passing full settings to eliminate this fetch
+      const { data: currentEntity, error: fetchError } = await supabase
+        .from(tableName)
+        .select('settings')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) {
+        // Check for network exhaustion - include the error type in the message for downstream handling
+        const errorMessage = fetchError.message || '';
+        if (errorMessage.includes('ERR_INSUFFICIENT_RESOURCES') || 
+            errorMessage.includes('Failed to fetch') ||
+            fetchError.code === 'ERR_INSUFFICIENT_RESOURCES') {
+          throw new Error(`Network exhaustion: ${errorMessage}`);
+        }
+        throw new Error(`Failed to fetch current ${scope} settings: ${errorMessage}`);
+      }
+      
+      // Check if request was cancelled after fetch - return gracefully
+      if (signal?.aborted) {
+        console.log('[useToolSettings] Update cancelled after fetch');
+        return;
+      }
+
+      // Merge patch with current tool settings
+      const currentSettings = (currentEntity?.settings as any) ?? {};
+      const currentToolSettings = currentSettings[toolId] ?? {};
+      const updatedToolSettings = deepMerge({}, currentToolSettings, patch);
+
+      // Use atomic PostgreSQL function to update settings
+      // This is much faster than update() because it happens in a single DB operation
+      const { error: rpcError } = await supabase.rpc('update_tool_settings_atomic', {
+        p_table_name: tableName,
+        p_id: id,
+        p_tool_id: toolId,
+        p_settings: updatedToolSettings
+      });
+
+      if (rpcError) {
+        throw new Error(`Failed to update ${scope} settings: ${rpcError.message}`);
+      }
+
+      // CRITICAL: Return the full merged settings, not just the patch
+      // This ensures the cache gets the exact same data that was saved to the DB
+      // Prevents data loss when cache is stale (e.g., multiple tabs, concurrent edits)
+      return updatedToolSettings;
+
+    } catch (error) {
+      // Handle abort errors silently to reduce noise during task cancellation
+      if (error?.name === 'AbortError' || 
+          error?.message?.includes('Request was cancelled') ||
+          error?.message?.includes('signal is aborted')) {
+        // Don't log these as errors - they're expected during component unmounting
+        throw new Error('Request was cancelled');
+      }
+      
+      console.error('[updateToolSettingsSupabase] Error:', error);
+      throw error;
+    }
+  })();
+  
+  // Store this as the in-flight update
+  inflightSettingsUpdates.set(dedupeKey, { promise: updatePromise, latestPatch: patch });
+  
+  // Clean up when done
+  updatePromise.finally(() => {
+    // Only clear if this is still our promise (not replaced by a newer one)
+    const current = inflightSettingsUpdates.get(dedupeKey);
+    if (current?.promise === updatePromise) {
+      inflightSettingsUpdates.delete(dedupeKey);
+    }
+  });
+  
+  return updatePromise;
 }
 
 // Type overloads

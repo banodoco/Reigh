@@ -922,8 +922,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
               </TooltipContent>
             </Tooltip>
             
-            {/* Project indicator - shown in "All Projects" mode */}
-            {showProjectIndicator && projectName && (
+            {/* Project indicator - shown in "All Projects" mode (except current project) */}
+            {showProjectIndicator && projectName && task.projectId !== selectedProjectId && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
