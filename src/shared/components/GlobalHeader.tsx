@@ -78,11 +78,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
-  // Wide viewport OR tablet = sticky header
-  const shouldHaveStickyHeader = isWideViewport || isTablet;
-  
-  // When GenerationsPane is locked, slide the header up out of view
-  const shouldHideHeader = shouldHaveStickyHeader && isGenerationsPaneLocked;
+  // Wide viewport OR tablet = sticky header, UNLESS GenerationsPane is locked
+  // When locked, header stays at top of page but doesn't follow on scroll
+  const shouldHaveStickyHeader = (isWideViewport || isTablet) && !isGenerationsPaneLocked;
 
   // [MobileStallFix] Enable debug monitoring
   useProjectContextDebug();
@@ -264,9 +262,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
     <>
       <header 
         className={cn(
-          "wes-header z-50 w-full md:p-0 transition-[transform,margin] duration-300 ease-smooth",
-          shouldHaveStickyHeader ? "sticky top-0" : "relative",
-          shouldHideHeader && "-translate-y-full -mb-24 pointer-events-none"
+          "wes-header z-50 w-full md:p-0",
+          shouldHaveStickyHeader ? "sticky top-0" : "relative"
         )} 
       >
         {/* Enhanced background patterns */}
