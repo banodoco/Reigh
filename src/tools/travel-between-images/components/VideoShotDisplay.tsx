@@ -241,9 +241,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   
   // When collapsed: how many real images do we show? (up to 3)
   const collapsedRealImages = Math.min(displayImages.length, IMAGES_PER_ROW);
-  // How many skeleton slots should fill the remaining first row?
+  // How many skeleton slots should fill the remaining first row? (for pending uploads with spinner)
   const collapsedSkeletonCount = !isImagesExpanded 
     ? Math.min(pendingUploads, IMAGES_PER_ROW - collapsedRealImages)
+    : 0;
+  // How many empty placeholder slots to show? (fill remaining slots to 3 when collapsed, no spinner)
+  const emptyPlaceholderCount = !isImagesExpanded
+    ? Math.max(0, IMAGES_PER_ROW - collapsedRealImages - collapsedSkeletonCount)
     : 0;
 
   // Handle click - block if temp shot
@@ -452,77 +456,68 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             </div>
           )}
           <div className="grid grid-cols-3 gap-2 relative">
-            {displayImages.length > 0 || pendingUploads > 0 ? (
-              <>
-                {/* When collapsed: show first row of existing images */}
-                {/* When expanded: show all existing images */}
-                {(isImagesExpanded ? displayImages : displayImages.slice(0, IMAGES_PER_ROW)).map((image, index) => (
-                  <img
-                    key={`${image.thumbUrl || image.imageUrl || image.location || 'img'}-${index}`}
-                    src={getDisplayUrl(image.thumbUrl || image.imageUrl || image.location)}
-                    alt={`Shot image ${index + 1}`}
-                    className="w-full aspect-square object-cover rounded border border-border bg-muted shadow-sm"
-                    title={`Image ${index + 1}`}
-                  />
-                ))}
+            {/* When collapsed: show first row of existing images */}
+            {/* When expanded: show all existing images */}
+            {(isImagesExpanded ? displayImages : displayImages.slice(0, IMAGES_PER_ROW)).map((image, index) => (
+              <img
+                key={`${image.thumbUrl || image.imageUrl || image.location || 'img'}-${index}`}
+                src={getDisplayUrl(image.thumbUrl || image.imageUrl || image.location)}
+                alt={`Shot image ${index + 1}`}
+                className="w-full aspect-square object-cover rounded border border-border bg-muted shadow-sm"
+                title={`Image ${index + 1}`}
+              />
+            ))}
 
-                {/* Show skeletons to fill first row when collapsed */}
-                {collapsedSkeletonCount > 0 && (
-                  <>
-                    {Array.from({ length: collapsedSkeletonCount }).map((_, index) => (
-                      <div
-                        key={`pending-collapsed-${index}`}
-                        className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
-                      >
-                        <Loader2 className="h-5 w-5 text-primary/60 animate-spin" />
-                      </div>
-                    ))}
-                  </>
-                )}
-                
-                {/* Skeleton items for pending uploads - always appended at end, only visible when expanded */}
-                {pendingUploads > 0 && isImagesExpanded && (
-                  <>
-                    {Array.from({ length: pendingUploads }).map((_, index) => (
-                      <div
-                        key={`pending-${index}`}
-                        className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
-                      >
-                        <Loader2 className="h-5 w-5 text-primary/60 animate-spin" />
-                      </div>
-                    ))}
-                  </>
-                )}
-
-                {hasMultipleRows && !isImagesExpanded && (
-                  <button
-                    className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1 z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsImagesExpanded(true);
-                    }}
-                  >
-                    Show All ({totalImageCount}) <ChevronDown className="w-3 h-3" />
-                  </button>
-                )}
-
-                {isImagesExpanded && hasMultipleRows && (
-                  <button
-                    className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1 z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsImagesExpanded(false);
-                    }}
-                  >
-                    Hide <ChevronUp className="w-3 h-3" />
-                  </button>
-                )}
-              </>
-            ) : (
-              /* Empty placeholder spans all 3 columns with same aspect ratio as one row of images */
-              <div className="col-span-3 aspect-[3/1] flex items-center justify-center text-sm text-muted-foreground border-2 border-dashed border-border rounded">
-                No images yet
+            {/* Show skeletons for pending uploads (with spinner) */}
+            {collapsedSkeletonCount > 0 && Array.from({ length: collapsedSkeletonCount }).map((_, index) => (
+              <div
+                key={`pending-collapsed-${index}`}
+                className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
+              >
+                <Loader2 className="h-5 w-5 text-primary/60 animate-spin" />
               </div>
+            ))}
+            
+            {/* Empty placeholder slots to fill up to 3 when collapsed (no spinner) */}
+            {emptyPlaceholderCount > 0 && Array.from({ length: emptyPlaceholderCount }).map((_, index) => (
+              <div
+                key={`empty-${index}`}
+                className="w-full aspect-square rounded border-2 border-dashed border-border"
+              />
+            ))}
+            
+            {/* Skeleton items for pending uploads - always appended at end, only visible when expanded */}
+            {pendingUploads > 0 && isImagesExpanded && Array.from({ length: pendingUploads }).map((_, index) => (
+              <div
+                key={`pending-${index}`}
+                className="w-full aspect-square rounded border-2 border-dashed border-primary/30 bg-primary/5 flex items-center justify-center"
+              >
+                <Loader2 className="h-5 w-5 text-primary/60 animate-spin" />
+              </div>
+            ))}
+
+            {hasMultipleRows && !isImagesExpanded && (
+              <button
+                className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1 z-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsImagesExpanded(true);
+                }}
+              >
+                Show All ({totalImageCount}) <ChevronDown className="w-3 h-3" />
+              </button>
+            )}
+
+            {isImagesExpanded && hasMultipleRows && (
+              <button
+                className="absolute bottom-1 right-1 text-xs bg-black/60 hover:bg-black/80 text-white px-2 py-0.5 rounded flex items-center gap-1 z-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsImagesExpanded(false);
+                }}
+              >
+                Hide <ChevronUp className="w-3 h-3" />
+              </button>
             )}
           </div>
           

@@ -770,11 +770,12 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                     )}
                   </>
                 ) : (
-                  /* Empty shot placeholder - matches VideoShotDisplay empty state */
-                  <div className="col-span-3 aspect-[3/1] flex items-center justify-center text-sm text-muted-foreground border-2 border-dashed border-border rounded">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Creating...
-                  </div>
+                  /* Empty shot placeholder - 3 empty cells */
+                  <>
+                    <div className="aspect-square rounded border-2 border-dashed border-border" />
+                    <div className="aspect-square rounded border-2 border-dashed border-border" />
+                    <div className="aspect-square rounded border-2 border-dashed border-border" />
+                  </>
                 )}
               </div>
             </div>
