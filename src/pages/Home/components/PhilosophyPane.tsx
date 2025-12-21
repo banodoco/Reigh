@@ -410,7 +410,6 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
           <div className="flex gap-3">
             {/* LoRA selector (left, right-aligned, fixed width) */}
             <div className="flex flex-col items-end gap-2 w-28 sm:w-32">
-              <span className="text-xs text-muted-foreground/70 pr-2">Motion LoRA</span>
               {loraOptions.map((lora, idx) => (
                 <button
                   key={lora.id}
@@ -432,10 +431,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               <div className="aspect-video bg-muted/30 rounded-lg border border-muted/50 overflow-hidden">
                 <video 
                   key={loraOptions[selectedLora].id}
-                  src={PLACEHOLDER}
-                  poster={PLACEHOLDER}
+                  src={loraOptions[selectedLora].video}
                   muted
                   loop
+                  autoPlay
                   playsInline
                   className="w-full h-full object-cover"
                 />

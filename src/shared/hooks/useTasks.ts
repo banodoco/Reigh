@@ -46,6 +46,8 @@ interface PaginatedTasksParams {
   limit?: number;
   offset?: number;
   taskType?: string | null; // Filter by specific task type
+  allProjects?: boolean; // If true, query across all projects
+  allProjectIds?: string[]; // List of project IDs to query when allProjects is true
 }
 
 export interface PaginatedTasksResponse {
@@ -327,7 +329,7 @@ export const useListTasks = (params: ListTasksParams) => {
 
 // Hook to list tasks with pagination - GALLERY PATTERN
 export const usePaginatedTasks = (params: PaginatedTasksParams) => {
-  const { projectId, status, limit = 50, offset = 0, taskType } = params;
+  const { projectId, status, limit = 50, offset = 0, taskType, allProjects, allProjectIds } = params;
   const page = Math.floor(offset / limit) + 1;
   
   console.log('[TaskTypeFilterDebug] usePaginatedTasks called:', {
@@ -335,6 +337,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     taskType,
     page,
     status,
+    allProjects,
+    allProjectIds: allProjectIds?.length,
   });
   
   // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
@@ -346,12 +350,20 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   }
   
   const effectiveProjectId = projectId ?? (typeof window !== 'undefined' ? (window as any).__PROJECT_CONTEXT__?.selectedProjectId : null);
+  
+  // For cache key: use 'all' when querying all projects, otherwise use effectiveProjectId
+  const cacheProjectKey = allProjects ? 'all' : effectiveProjectId;
+  
   const query = useQuery<PaginatedTasksResponse, Error>({
     // CRITICAL: Use page-based cache keys like gallery
-    queryKey: [TASKS_QUERY_KEY, 'paginated', effectiveProjectId, page, limit, status, taskType],
+    queryKey: [TASKS_QUERY_KEY, 'paginated', cacheProjectKey, page, limit, status, taskType],
     queryFn: async (queryContext) => {
       
-      if (!effectiveProjectId) {
+      // For all projects mode, we need allProjectIds; otherwise we need effectiveProjectId
+      if (allProjects && (!allProjectIds || allProjectIds.length === 0)) {
+        return { tasks: [], total: 0, hasMore: false, totalPages: 0, distinctTaskTypes: [] };
+      }
+      if (!allProjects && !effectiveProjectId) {
         return { tasks: [], total: 0, hasMore: false, totalPages: 0, distinctTaskTypes: [] }; 
       }
       
@@ -366,9 +378,15 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       let countQuery = supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
-        .eq('project_id', effectiveProjectId)
         .is('params->orchestrator_task_id_ref', null) // Only parent tasks
         .in('task_type', visibleTaskTypes); // Only visible task types
+
+      // Apply project filter: either single project or multiple projects
+      if (allProjects && allProjectIds) {
+        countQuery = countQuery.in('project_id', allProjectIds);
+      } else {
+        countQuery = countQuery.eq('project_id', effectiveProjectId!);
+      }
 
       if (status && status.length > 0) {
         countQuery = countQuery.in('status', status);
@@ -386,9 +404,15 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       let dataQuery = supabase
         .from('tasks')
         .select('*')
-        .eq('project_id', effectiveProjectId)
         .is('params->orchestrator_task_id_ref', null) // Only parent tasks
         .in('task_type', visibleTaskTypes); // Only visible task types
+      
+      // Apply project filter: either single project or multiple projects
+      if (allProjects && allProjectIds) {
+        dataQuery = dataQuery.in('project_id', allProjectIds);
+      } else {
+        dataQuery = dataQuery.eq('project_id', effectiveProjectId!);
+      }
 
       // For Succeeded view, order by completion time (most recent first)
       const succeededOnly = status && status.length === 1 && status[0] === TASK_STATUS.COMPLETE;

@@ -25,7 +25,7 @@ import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast as sonnerToast } from 'sonner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from '@/shared/components/ui/select';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -935,8 +935,17 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 <SelectContent variant="zinc">
                   <SelectItem variant="zinc" value="current" className="!text-xs">This project</SelectItem>
                   <SelectItem variant="zinc" value="all" className="!text-xs">All projects</SelectItem>
+                  {projects.filter(p => p.id !== selectedProjectId).length > 0 && (
+                    <SelectSeparator className="bg-zinc-700" />
+                  )}
                   {projects
                     .filter(p => p.id !== selectedProjectId)
+                    .sort((a, b) => {
+                      // Sort by newest first (createdAt descending)
+                      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                      return bDate - aDate;
+                    })
                     .map((project) => (
                       <SelectItem variant="zinc" key={project.id} value={project.id} className="!text-xs">
                         {project.name}
