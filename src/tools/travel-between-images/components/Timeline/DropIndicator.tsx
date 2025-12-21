@@ -1,4 +1,5 @@
 import React from "react";
+import { ImagePlus, FileUp } from "lucide-react";
 import { TIMELINE_PADDING_OFFSET } from "./constants";
 import type { DragType } from "@/shared/lib/dragDrop";
 
@@ -29,19 +30,24 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
   const leftPercent = (pixelPosition / containerWidth) * 100;
 
   // Visual indicator based on drag type
-  const dragIcon = dragType === 'file' ? '📁' : dragType === 'generation' ? '🖼️' : '';
+  const DragIcon = dragType === 'file' ? FileUp : dragType === 'generation' ? ImagePlus : null;
 
   return (
     <div
-      className="absolute top-0 bottom-0 w-1 bg-primary z-40 pointer-events-none"
+      className="absolute top-0 bottom-0 w-0.5 bg-primary z-40 pointer-events-none"
       style={{
         left: `${leftPercent}%`,
         transform: 'translateX(-50%)',
       }}
     >
-      <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded whitespace-nowrap">
-        {dragIcon && <span className="mr-1">{dragIcon}</span>}
-        Frame {dropTargetFrame}
+      {/* Label with icon badge */}
+      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 flex items-center gap-1.5 bg-background border-2 border-primary text-foreground text-xs px-2 py-1 rounded-md shadow-[-2px_2px_0_0_rgba(0,0,0,0.1)] whitespace-nowrap">
+        {DragIcon && (
+          <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+            <DragIcon className="h-3 w-3 text-primary-foreground" />
+          </div>
+        )}
+        <span className="font-medium">Frame {dropTargetFrame}</span>
       </div>
     </div>
   );

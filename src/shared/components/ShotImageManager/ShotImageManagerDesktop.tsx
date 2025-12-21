@@ -128,6 +128,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
       itemCount={lightbox.currentImages.length}
       disabled={props.readOnly || !props.onFileDrop}
       getFramePositionForIndex={getFramePosition}
+      projectAspectRatio={props.projectAspectRatio}
     >
       <DndContext
         sensors={dragAndDrop.sensors}

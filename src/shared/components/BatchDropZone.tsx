@@ -1,6 +1,81 @@
-import React, { useRef, useCallback, useState } from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import { toast } from "sonner";
+import { ImagePlus, FileUp, Loader2 } from "lucide-react";
 import { getDragType, getGenerationDropData, type DragType } from "@/shared/lib/dragDrop";
+
+// Skeleton component for pending drop items
+const GridSkeletonItem: React.FC<{
+  containerRef: React.RefObject<HTMLDivElement>;
+  targetIndex: number;
+  columns: number;
+  projectAspectRatio?: string;
+}> = ({ containerRef, targetIndex, columns, projectAspectRatio }) => {
+  const [position, setPosition] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const items = containerRef.current.querySelectorAll('[data-sortable-item]');
+    if (items.length === 0) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const firstItemRect = items[0].getBoundingClientRect();
+    
+    const gridOffsetX = firstItemRect.left - containerRect.left;
+    const gridOffsetY = firstItemRect.top - containerRect.top;
+    
+    const itemWidth = firstItemRect.width;
+    const itemHeight = firstItemRect.height;
+    
+    let gap = 12;
+    if (items.length > 1) {
+      const secondItemRect = items[1].getBoundingClientRect();
+      if (Math.abs(firstItemRect.top - secondItemRect.top) < 10) {
+        gap = secondItemRect.left - firstItemRect.right;
+      }
+    }
+    
+    const row = Math.floor(targetIndex / columns);
+    const col = targetIndex % columns;
+    
+    setPosition({
+      left: gridOffsetX + col * (itemWidth + gap),
+      top: gridOffsetY + row * (itemHeight + gap),
+      width: itemWidth,
+      height: itemHeight,
+    });
+  }, [containerRef, targetIndex, columns]);
+
+  if (!position) return null;
+
+  // Calculate aspect ratio
+  let aspectRatioStyle: React.CSSProperties = { aspectRatio: '1' };
+  if (projectAspectRatio) {
+    const [w, h] = projectAspectRatio.split(':').map(Number);
+    if (!isNaN(w) && !isNaN(h)) {
+      aspectRatioStyle = { aspectRatio: `${w / h}` };
+    }
+  }
+
+  return (
+    <div
+      className="absolute pointer-events-none z-50"
+      style={{
+        left: `${position.left}px`,
+        top: `${position.top}px`,
+        width: `${position.width}px`,
+        height: `${position.height}px`,
+      }}
+    >
+      <div 
+        className="w-full h-full border-2 border-primary/30 rounded-lg overflow-hidden bg-muted/50 backdrop-blur-sm flex items-center justify-center"
+        style={aspectRatioStyle}
+      >
+        <Loader2 className="h-8 w-8 text-primary/60 animate-spin" />
+      </div>
+    </div>
+  );
+};
 
 
 interface BatchDropZoneProps {
@@ -13,6 +88,8 @@ interface BatchDropZoneProps {
   disabled?: boolean;
   // Function to calculate frame position for a given index based on surrounding images
   getFramePositionForIndex?: (index: number) => number | undefined;
+  // Project aspect ratio for skeleton sizing
+  projectAspectRatio?: string;
 }
 
 /**
@@ -87,10 +164,36 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
   className = "",
   disabled = false,
   getFramePositionForIndex,
+  projectAspectRatio,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [dragType, setDragType] = useState<DragType>('none');
+  
+  // Pending drop state for optimistic skeleton
+  const [pendingDropIndex, setPendingDropIndex] = useState<number | null>(null);
+  const [isProcessingDrop, setIsProcessingDrop] = useState(false);
+  const prevItemCountRef = useRef(itemCount);
+  
+  // Clear pending skeleton when item count increases (new item appeared)
+  useEffect(() => {
+    if (pendingDropIndex !== null && itemCount > prevItemCountRef.current) {
+      // Small delay for smooth transition
+      setTimeout(() => setPendingDropIndex(null), 100);
+    }
+    prevItemCountRef.current = itemCount;
+  }, [itemCount, pendingDropIndex]);
+  
+  // Safety timeout for pending skeleton
+  useEffect(() => {
+    if (pendingDropIndex !== null) {
+      const timer = setTimeout(() => {
+        setPendingDropIndex(null);
+        setIsProcessingDrop(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingDropIndex]);
 
   // Handle drag enter
   const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -157,14 +260,24 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
       ? getFramePositionForIndex(targetPosition) 
       : undefined;
     
-    // Clear visual state
+    // Clear visual drop indicator state
     setDropTargetIndex(null);
     setDragType('none');
+    
+    // Show optimistic skeleton at drop position
+    if (targetPosition !== null) {
+      setPendingDropIndex(targetPosition);
+      setIsProcessingDrop(true);
+    }
     
     // Handle file drops
     if (type === 'file' && onImageDrop) {
       const files = Array.from(e.dataTransfer.files);
-      if (files.length === 0) return;
+      if (files.length === 0) {
+        setPendingDropIndex(null);
+        setIsProcessingDrop(false);
+        return;
+      }
       
       const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
       const validFiles = files.filter(file => {
@@ -175,27 +288,45 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
         return false;
       });
 
-      if (validFiles.length === 0) return;
+      if (validFiles.length === 0) {
+        setPendingDropIndex(null);
+        setIsProcessingDrop(false);
+        return;
+      }
 
       try {
         await onImageDrop(validFiles, targetPosition ?? undefined, framePosition);
       } catch (error) {
         console.error('[BatchDropZone] File drop error:', error);
         toast.error(`Failed to add images: ${(error as Error).message}`);
+        setPendingDropIndex(null);
+      } finally {
+        setIsProcessingDrop(false);
       }
     }
     
     // Handle generation drops
     else if (type === 'generation' && onGenerationDrop) {
       const data = getGenerationDropData(e);
-      if (!data) return;
+      if (!data) {
+        setPendingDropIndex(null);
+        setIsProcessingDrop(false);
+        return;
+      }
       
       try {
         await onGenerationDrop(data.generationId, data.imageUrl, data.thumbUrl, targetPosition ?? undefined, framePosition);
       } catch (error) {
         console.error('[BatchDropZone] Generation drop error:', error);
         toast.error(`Failed to add generation: ${(error as Error).message}`);
+        setPendingDropIndex(null);
+      } finally {
+        setIsProcessingDrop(false);
       }
+    } else {
+      // No handler matched, clear pending state
+      setPendingDropIndex(null);
+      setIsProcessingDrop(false);
     }
   }, [columns, itemCount, disabled, onImageDrop, onGenerationDrop, getFramePositionForIndex]);
 
@@ -214,6 +345,16 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Optimistic skeleton for pending drop */}
+      {pendingDropIndex !== null && (
+        <GridSkeletonItem
+          containerRef={containerRef}
+          targetIndex={pendingDropIndex}
+          columns={columns}
+          projectAspectRatio={projectAspectRatio}
+        />
+      )}
+      
       {/* Render children with drop indicator */}
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
@@ -277,9 +418,15 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
                     <div className="w-full h-full bg-primary shadow-lg rounded-full flex flex-col items-center justify-center">
                       {/* Top dot */}
                       <div className="w-3 h-3 bg-primary rounded-full border-2 border-primary-foreground mb-auto" />
-                      {/* Middle indicator */}
-                      <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-md shadow-lg font-medium whitespace-nowrap" style={{ marginLeft: '12px' }}>
-                        {dragType === 'file' ? '📁' : '🖼️'}
+                      {/* Middle indicator with icon badge */}
+                      <div className="flex items-center gap-1.5 bg-background border-2 border-primary text-foreground text-xs px-2 py-1 rounded-md shadow-[-2px_2px_0_0_rgba(0,0,0,0.1)] font-medium whitespace-nowrap" style={{ marginLeft: '12px' }}>
+                        <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                          {dragType === 'file' ? (
+                            <FileUp className="h-3 w-3 text-primary-foreground" />
+                          ) : (
+                            <ImagePlus className="h-3 w-3 text-primary-foreground" />
+                          )}
+                        </div>
                       </div>
                       {/* Bottom dot */}
                       <div className="w-3 h-3 bg-primary rounded-full border-2 border-primary-foreground mt-auto" />
