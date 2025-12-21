@@ -3,7 +3,7 @@ import { GenerationRow } from '@/types/shots';
 import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowLeft, Loader2, Check, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Check, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { TooltipProvider } from '@/shared/components/ui/tooltip';
 import { VideoPortionEditor } from './VideoPortionEditor';
@@ -686,18 +686,6 @@ export function InlineEditVideoView({
         "w-full bg-background",
         useStackedLayout ? "flex flex-col" : "h-full flex flex-row"
       )}>
-        {/* Header - Mobile and Tablet */}
-        {useStackedLayout && (
-          <div className="flex items-center justify-between p-4 border-b">
-            <Button variant="ghost" size="sm" onClick={onClose} className="gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Button>
-            <h2 className="text-sm font-medium">Edit Video</h2>
-            <div className="w-16" /> {/* Spacer for centering */}
-          </div>
-        )}
-        
         {/* Left side: Video + Timeline (stacked vertically) */}
         <div className={cn(
           "flex flex-col min-h-0",
