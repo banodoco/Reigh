@@ -19,8 +19,13 @@ import { QueryClient } from '@tanstack/react-query';
 // ============================================================================
 
 /**
- * Optimistically removes a generation from all unified-generations cache entries.
- * Used for instant "disappear from Items without shots" effect.
+ * Optimistically removes a generation from unified-generations cache entries
+ * that are filtered to "Items without shots" (shotId === 'no-shot').
+ * 
+ * Only affects the 'no-shot' filter view - items in "All shots" view are not touched.
+ * 
+ * Query key structure: ['unified-generations', 'project', projectId, page, limit, filters]
+ * where filters.shotId === 'no-shot' for "Items without shots" view.
  * 
  * @param queryClient - React Query client
  * @param projectId - Project ID to scope the cache search
@@ -41,6 +46,13 @@ function optimisticallyRemoveFromUnifiedGenerations(
   let updatedCount = 0;
   
   unifiedGenQueries.forEach(([queryKey, data]) => {
+    // Query key structure: ['unified-generations', 'project', projectId, page, limit, filters]
+    // Only remove from 'no-shot' filter views (Items without shots)
+    const filters = queryKey[5] as { shotId?: string } | undefined;
+    if (filters?.shotId !== 'no-shot') {
+      return; // Skip - not the "Items without shots" view
+    }
+    
     if (data?.items) {
       // Remove the generation from items (match by id or generation_id)
       const filteredItems = data.items.filter(item => 
