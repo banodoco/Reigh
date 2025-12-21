@@ -112,13 +112,30 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   const [selectionActive, setSelectionActive] = React.useState(false);
   
   // Prevent clicks from passing through to elements behind the control
+  // Must handle all event types for reliable mobile behavior
   const handleButtonClick = React.useCallback((callback: () => void) => {
-    return (e: React.PointerEvent | React.MouseEvent) => {
+    return (e: React.PointerEvent | React.MouseEvent | React.TouchEvent) => {
       e.stopPropagation();
       e.preventDefault();
       callback();
     };
   }, []);
+  
+  // Helper to get both pointer and touch handlers for buttons
+  // This ensures the callback fires on both desktop (pointer) and mobile (touch)
+  const getButtonHandlers = React.useCallback((callback: () => void) => ({
+    onPointerUp: handleButtonClick(callback),
+    onTouchEnd: handleButtonClick(callback),
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+  }), [handleButtonClick]);
+  
+  // Container event handlers to block all event propagation on mobile
+  const containerEventHandlers = {
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+    onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+    onTouchEnd: (e: React.TouchEvent) => e.stopPropagation(),
+  };
   
   // Tooltips only show on desktop, not mobile/tablet (touch devices)
   const showTooltips = !isMobile;
@@ -229,8 +246,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
               getPositionClasses(),
               'opacity-100'
             )}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
+            {...containerEventHandlers}
           >
             {isBottom ? (
               <>
@@ -314,8 +330,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             getPositionClasses(),
             'opacity-100'
           )}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
+          {...containerEventHandlers}
         >
           {isBottom ? (
             <>
@@ -427,8 +442,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           getPositionClasses(),
           'opacity-100'
         )}
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
+        {...containerEventHandlers}
       >
         {/* Left/Right: Open pane at top, then thirdButton (current tool) */}
         <Button
@@ -475,8 +489,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           )}
           onMouseEnter={handlePaneEnter}
           onMouseLeave={handlePaneLeave}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
+          {...containerEventHandlers}
         >
           {isBottom ? (
             <>
@@ -568,8 +581,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
             getFlexDirection()
           )}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
+          {...containerEventHandlers}
         >
           {isBottom ? (
             <>
@@ -664,8 +676,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           getPositionClasses(),
           isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
         )}
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
+        {...containerEventHandlers}
       >
         {isBottom ? (
           <>
