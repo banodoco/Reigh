@@ -15,6 +15,55 @@ export const GENERATION_MIME_TYPE = 'application/x-generation';
 export const NEW_GROUP_DROPPABLE_ID = 'new-shot-group-dropzone';
 
 /**
+ * Cross-browser safe check for whether a DataTransfer contains a type.
+ *
+ * In Chromium, `dataTransfer.types` is often a DOMStringList (has `.contains`, may not have `.includes`).
+ * In TS typings, it's usually `string[]`.
+ */
+function hasDataTransferType(dataTransfer: DataTransfer, type: string): boolean {
+  const types: any = dataTransfer?.types;
+  if (!types) return false;
+
+  // DOMStringList path
+  if (typeof types.contains === 'function') {
+    try {
+      return !!types.contains(type);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Array path
+  if (typeof types.includes === 'function') {
+    try {
+      return !!types.includes(type);
+    } catch {
+      // ignore
+    }
+  }
+
+  // DOMStringList `.item(i)` path
+  if (typeof types.item === 'function' && typeof types.length === 'number') {
+    try {
+      for (let i = 0; i < types.length; i++) {
+        if (types.item(i) === type) return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Final fallback: numeric indexing
+  if (typeof types.length === 'number') {
+    for (let i = 0; i < types.length; i++) {
+      if (types[i] === type) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Data structure for dragging generations between components
  */
 export interface GenerationDropData {
@@ -33,14 +82,14 @@ export type DragType = 'generation' | 'file' | 'none';
  * Check if the drag event contains generation data
  */
 export function isGenerationDrag(e: React.DragEvent): boolean {
-  return e.dataTransfer.types.includes(GENERATION_MIME_TYPE);
+  return hasDataTransferType(e.dataTransfer, GENERATION_MIME_TYPE);
 }
 
 /**
  * Check if the drag event contains files
  */
 export function isFileDrag(e: React.DragEvent): boolean {
-  return e.dataTransfer.types.includes('Files');
+  return hasDataTransferType(e.dataTransfer, 'Files');
 }
 
 /**
@@ -59,6 +108,12 @@ export function getDragType(e: React.DragEvent): DragType {
 export function setGenerationDragData(e: React.DragEvent, data: GenerationDropData): void {
   e.dataTransfer.effectAllowed = 'copy';
   e.dataTransfer.setData(GENERATION_MIME_TYPE, JSON.stringify(data));
+  // Fallback: some browsers/targets are inconsistent about exposing custom MIME types during dragover.
+  try {
+    e.dataTransfer.setData('text/plain', JSON.stringify(data));
+  } catch {
+    // ignore
+  }
 }
 
 /**
@@ -68,7 +123,9 @@ export function setGenerationDragData(e: React.DragEvent, data: GenerationDropDa
  */
 export function getGenerationDropData(e: React.DragEvent): GenerationDropData | null {
   try {
-    const dataString = e.dataTransfer.getData(GENERATION_MIME_TYPE);
+    const dataString =
+      e.dataTransfer.getData(GENERATION_MIME_TYPE) ||
+      e.dataTransfer.getData('text/plain');
     if (!dataString) return null;
     
     const data = JSON.parse(dataString) as GenerationDropData;
