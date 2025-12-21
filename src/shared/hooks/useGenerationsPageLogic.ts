@@ -76,8 +76,10 @@ export function useGenerationsPageLogic({
   // STABLE FILTER STATE MAP
   // This map tracks the filter state for each shot, avoiding reactive flicker.
   // It uses pre-computed stats from shotsData (hasUnpositionedImages) for defaults.
+  // Special key '__no_shot_view__' is used for the overall view (no specific shot).
   // ============================================================================
   
+  const NO_SHOT_VIEW_KEY = '__no_shot_view__';
   const filterStateMapRef = useRef<ShotFilterStateMap>(new Map());
   
   // Track which shot we last applied settings for (to detect shot changes)
@@ -190,12 +192,24 @@ export function useGenerationsPageLogic({
     });
     
     if (!currentShotId) {
-      // No shot selected - show all
-      console.log('[StableFilter] No current shot, showing all');
-      setSelectedShotFilter('all');
+      // No shot selected - check for user override, otherwise default to 'no-shot'
+      const noShotViewState = filterStateMapRef.current.get(NO_SHOT_VIEW_KEY);
+      
+      let filterToApply: string;
+      if (noShotViewState?.isUserOverride) {
+        // User has explicitly changed the filter in the overall view - respect it
+        filterToApply = noShotViewState.filter;
+        console.log('[StableFilter] No current shot, using user override:', filterToApply);
+      } else {
+        // Default to 'no-shot' (items without shots) for the overall view
+        filterToApply = 'no-shot';
+        console.log('[StableFilter] No current shot, defaulting to "no-shot"');
+      }
+      
+      setSelectedShotFilter(filterToApply);
       setExcludePositioned(true);
       lastAppliedShotIdRef.current = currentShotId;
-      lastAppliedFilterRef.current = 'all';
+      lastAppliedFilterRef.current = filterToApply;
       return;
     }
     
@@ -326,6 +340,14 @@ export function useGenerationsPageLogic({
       console.log('[StableFilter] User changed filter (override):', {
         shotId: currentShotId?.substring(0, 8),
         newFilter: newShotFilter === 'all' ? 'all' : newShotFilter?.substring(0, 8)
+      });
+    } else {
+      // No current shot - track override for the "overall view" (e.g., /tools/travel-between-images)
+      // This uses a special key in the filter state map
+      filterStateMapRef.current.set(NO_SHOT_VIEW_KEY, { filter: newShotFilter, isUserOverride: true });
+      
+      console.log('[StableFilter] User changed filter in overall view (override):', {
+        newFilter: newShotFilter === 'all' ? 'all' : (newShotFilter === 'no-shot' ? 'no-shot' : newShotFilter?.substring(0, 8))
       });
     }
   }, [currentShotId, excludePositioned, setFilterStateForShot, updateShotSettings]);

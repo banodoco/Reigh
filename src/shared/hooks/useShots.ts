@@ -1183,6 +1183,11 @@ export const useAddImageToShot = () => {
       
       // Also invalidate metadata for pair prompts (different data, won't cause flicker)
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });
+      
+      // IMPORTANT: Invalidate unified-generations so "items without shots" filter updates immediately
+      // When an item is added to a shot, the DB trigger updates generations.shot_data, but the
+      // unified-generations query won't reflect this until invalidated
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
     }
   });
 };
@@ -1243,6 +1248,11 @@ export const useAddImageToShotWithoutPosition = () => {
       console.log('[AddWithoutPosDebug] Invalidating queries for project:', variables.project_id?.substring(0, 8));
       // Don't invalidate all-shot-generations - realtime will handle it
       queryClient.invalidateQueries({ queryKey: ['shots', variables.project_id] });
+      
+      // IMPORTANT: Invalidate unified-generations so "items without shots" filter updates immediately
+      // When an item is added to a shot, the DB trigger updates generations.shot_data, but the
+      // unified-generations query won't reflect this until invalidated
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', variables.project_id] });
     },
     onError: (error, variables) => {
       console.error('[AddWithoutPosDebug] 💥 onError callback fired');
@@ -1604,7 +1614,8 @@ export const usePositionExistingGenerationInShot = () => {
         reason: 'add-image-to-shot',
         scope: 'all',
         includeShots: true,
-        projectId: data.project_id
+        projectId: data.project_id,
+        includeProjectUnified: true  // So "items without shots" filter updates immediately
       });
     },
     onError: (error: Error) => {
