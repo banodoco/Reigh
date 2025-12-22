@@ -130,11 +130,13 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   }), [handleButtonClick]);
   
   // Container event handlers to block all event propagation on mobile
+  // Must call preventDefault() AND stopPropagation() to fully claim touch events
+  // and prevent them from reaching elements behind the control
   const containerEventHandlers = {
-    onClick: (e: React.MouseEvent) => e.stopPropagation(),
-    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
-    onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
-    onTouchEnd: (e: React.TouchEvent) => e.stopPropagation(),
+    onClick: (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); },
+    onPointerDown: (e: React.PointerEvent) => { e.stopPropagation(); e.preventDefault(); },
+    onTouchStart: (e: React.TouchEvent) => { e.stopPropagation(); e.preventDefault(); },
+    onTouchEnd: (e: React.TouchEvent) => { e.stopPropagation(); e.preventDefault(); },
   };
   
   // Tooltips only show on desktop, not mobile/tablet (touch devices)
@@ -238,16 +240,16 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         // Left/Right panes: vertical layout (Open, Third, Lock)
         const isBottom = side === 'bottom';
         return (
-          <div
-            data-pane-control
-            style={dynamicStyle}
-            className={cn(
-              `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
-              getPositionClasses(),
-              'opacity-100'
-            )}
-            {...containerEventHandlers}
-          >
+        <div
+          data-pane-control
+          style={dynamicStyle}
+          className={cn(
+            `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
+            getPositionClasses(),
+            'opacity-100 touch-none'
+          )}
+          {...containerEventHandlers}
+        >
             {isBottom ? (
               <>
                 {/* Bottom (mobile locked): Third, Unlock, Fourth */}
@@ -328,7 +330,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           className={cn(
             `fixed ${mobileZIndex} flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
             getPositionClasses(),
-            'opacity-100'
+            'opacity-100 touch-none'
           )}
           {...containerEventHandlers}
         >
@@ -440,7 +442,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         className={cn(
           `fixed ${mobileZIndex} flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
           getPositionClasses(),
-          'opacity-100'
+          'opacity-100 touch-none'
         )}
         {...containerEventHandlers}
       >
@@ -485,7 +487,8 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           style={dynamicStyle}
           className={cn(
             `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
-            getFlexDirection()
+            getFlexDirection(),
+            'touch-none'
           )}
           onMouseEnter={handlePaneEnter}
           onMouseLeave={handlePaneLeave}
@@ -579,7 +582,8 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           style={dynamicStyle}
           className={cn(
             `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
-            getFlexDirection()
+            getFlexDirection(),
+            'touch-none'
           )}
           {...containerEventHandlers}
         >
@@ -674,7 +678,8 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         className={cn(
           `fixed ${PANE_CONFIG.zIndex.CONTROL_UNLOCKED} flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
           getPositionClasses(),
-          isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100',
+          'touch-none'
         )}
         {...containerEventHandlers}
       >
