@@ -34,14 +34,14 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
         <div className="w-20 h-1.5 bg-gradient-to-r from-wes-vintage-gold to-wes-vintage-gold/50 rounded-full animate-pulse-breathe opacity-90"></div>
       </div>
       
-      <div className="space-y-6 text-foreground/70 font-medium">
-        <p className="text-sm leading-relaxed">
+      <div className="space-y-6 text-foreground/85 font-medium">
+        <p className="text-sm leading-7">
           Practically for you, <strong>this means three things</strong>:
         </p>
 
-        <div className="space-y-6">
+        <div className="space-y-8">
           <div className="space-y-3">
-            <p className="text-sm leading-6 clearfix">
+            <p className="text-sm leading-7 clearfix">
               <span
                 aria-hidden
                 className="float-left mr-3 mt-1.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
@@ -63,14 +63,14 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
           </div>
 
           <div className="space-y-3">
-            <p className="text-sm leading-6 clearfix">
+            <p className="text-sm leading-7 clearfix">
               <span
                 aria-hidden
                 className="float-left mr-3 mt-1.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
               >
                 2
               </span>
-              Because we use open models on consumer-grade hardware, <span className="text-wes-vintage-gold">you can also run Reigh conveniently and cheaply in the cloud</span>. By being the least expensive place to run leading open models, we aim to honour this quote by Picasso:
+              Because we use open models on consumer-grade hardware, <span className="text-wes-vintage-gold">you can also run Reigh cheaply using our cloud service</span>. By being the least expensive place to run leading open models, we aim to honour this quote by Picasso:
             </p>
             
             <blockquote className="bg-muted/30 border-l-4 border-muted/60 p-3 rounded-r-lg">
@@ -81,7 +81,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
           </div>
 
           <div className="space-y-3">
-            <p className="text-sm leading-6 clearfix">
+            <p className="text-sm leading-7 clearfix">
               <span
                 aria-hidden
                 className="float-left mr-3 mt-1.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
@@ -119,7 +119,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
                           }
                         }
                       }}
-                      className={`sparkle-underline cursor-pointer transition-colors duration-200 hover:text-primary ${ecosystemTipOpen ? 'tooltip-open text-primary' : 'text-foreground/70'} ${ecosystemTipDisabled ? 'pointer-events-none' : ''}`}
+                      className={`sparkle-underline cursor-pointer transition-colors duration-200 hover:text-primary ${ecosystemTipOpen ? 'tooltip-open text-primary' : ''} ${ecosystemTipDisabled ? 'pointer-events-none' : ''}`}
                     >
                       open source ecosystem
                     </span>
@@ -158,7 +158,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
               {' '}flourish, so <span className="text-wes-vintage-gold">we share our profits with those whose work makes Reigh possible</span>.
             </p>
             
-            <p className="mt-3 text-sm leading-relaxed">
+            <p className="mt-3 text-sm leading-7">
               After other costs like hosting, we'll <strong>split the profit three ways</strong>:
             </p>
 
@@ -167,13 +167,13 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
         </div>
         
         <div className="space-y-4">
-          <p className="text-sm leading-relaxed">
+          <p className="text-sm leading-7">
             We'd like to show a model for how others can build successful tools while supporting this ecosystem that makes them possible.
           </p>
         </div>
         
         {/* Divider */}
-        <div className="w-12 h-px bg-muted/30"></div>
+        <div className="w-16 h-px bg-foreground/20 my-2"></div>
 
         {/* CTA */}
         <div className="flex items-center space-x-2">

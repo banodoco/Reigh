@@ -310,6 +310,8 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const [loraPlaying, setLoraPlaying] = useState(false);
   const [travelVideoEnded, setTravelVideoEnded] = useState<Set<number>>(new Set([0, 1, 2])); // All start with play button visible
   const [travelVideoPlayed, setTravelVideoPlayed] = useState<Set<number>>(new Set()); // Track which have played at least once
+  const [autoAdvanceProgress, setAutoAdvanceProgress] = useState<number | null>(null); // null = not progressing, 0-100 = progress %
+  const lastProgressUpdateRef = useRef<number>(0);
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [loadedVideos, setLoadedVideos] = useState<Set<string>>(new Set());
   const loadedImagesRef = useRef<Set<string>>(new Set());
@@ -355,6 +357,32 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
   const handleTravelVideoEnded = (idx: number) => {
     setTravelVideoEnded(prev => new Set(prev).add(idx));
+    
+    // Pause 2.5 seconds at 100%, then advance to next
+    setTimeout(() => {
+      setAutoAdvanceProgress(null);
+      const nextIdx = (idx + 1) % travelExamples.length;
+      setSelectedTravelExample(nextIdx);
+    }, 2500);
+  };
+
+  // Track video progress during playback - fill current selector (throttled to reduce re-renders)
+  const handleVideoTimeUpdate = (idx: number, video: HTMLVideoElement) => {
+    if (idx !== selectedTravelExample || !video.duration) return;
+    
+    const now = Date.now();
+    // Throttle updates to every 100ms - CSS transition smooths between updates
+    if (now - lastProgressUpdateRef.current < 100) return;
+    lastProgressUpdateRef.current = now;
+    
+    const progress = (video.currentTime / video.duration) * 100;
+    setAutoAdvanceProgress(progress);
+  };
+
+  // Cancel auto-advance when user manually selects a different example
+  const handleSelectExample = (idx: number) => {
+    setAutoAdvanceProgress(null);
+    setSelectedTravelExample(idx);
   };
 
   const toggleLoraPlay = () => {
@@ -410,6 +438,8 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
       // Reset all play buttons to visible and show posters again
       setTravelVideoEnded(new Set([0, 1, 2]));
       setTravelVideoPlayed(new Set());
+      // Reset auto-advance progress
+      setAutoAdvanceProgress(null);
     }
   }, [isOpen, isOpening, isClosing]);
 
@@ -457,16 +487,16 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         <div className="w-20 h-1.5 bg-gradient-to-r from-wes-vintage-gold to-wes-vintage-gold/50 rounded-full animate-pulse-breathe opacity-90"></div>
       </div>
 
-      <div className="space-y-8 pb-4 text-left text-foreground/70 font-medium">
+      <div className="space-y-8 pb-1 text-left text-foreground/85 font-medium">
         {/* Intro text */}
         <div className="space-y-3">
-          <p className="text-sm leading-relaxed">
+          <p className="text-sm leading-7">
             There are many tools that aim to be a 'one-stop-shop' for creating with AI - a kind of 'Amazon for art'. 
           </p>
-          <p className="text-sm leading-relaxed">
+          <p className="text-sm leading-7">
             <span className="font-theme-heading">Reigh</span> is not one of them.
           </p>
-          <p className="text-sm leading-relaxed">
+          <p className="text-sm leading-7">
             It's a tool <span className="text-wes-vintage-gold">just for travelling between images</span>:
           </p>
         </div>
@@ -544,13 +574,14 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       className="w-[240px] h-[172px] sm:w-[296px] sm:h-[212px] flex-shrink-0 relative overflow-hidden rounded-lg border"
                       style={{ transform: 'translateZ(0)', willChange: 'transform' }}
                     >
-                      <video 
+                      <video
                         ref={(el) => { travelVideoRefs.current[2] = el; }}
                         src={example.video}
                         muted
                         playsInline
                         preload="metadata"
                         className="w-full h-full object-cover"
+                        onTimeUpdate={(e) => handleVideoTimeUpdate(2, e.currentTarget)}
                         onEnded={() => handleTravelVideoEnded(2)}
                       />
                       {/* Thumbnail - only show before first play */}
@@ -628,6 +659,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         playsInline
                         preload="metadata"
                         className="w-full h-full object-cover"
+                        onTimeUpdate={(e) => handleVideoTimeUpdate(1, e.currentTarget)}
                         onEnded={() => handleTravelVideoEnded(1)}
                       />
                       {/* Thumbnail - only show before first play */}
@@ -688,6 +720,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 preload="auto"
                 crossOrigin="anonymous"
                 disableRemotePlayback
+                onTimeUpdate={(e) => handleVideoTimeUpdate(0, e.currentTarget)}
                 onEnded={() => handleTravelVideoEnded(0)}
                 className="w-full h-full object-cover"
               />
@@ -735,24 +768,36 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 ? [currentExample.image1, currentExample.image2] 
                 : example.images;
               
+              const isCurrentWithProgress = selectedTravelExample === idx && autoAdvanceProgress !== null;
+              
               return (
                 <button
                   key={example.id}
-                  onClick={() => setSelectedTravelExample(idx)}
+                  onClick={() => handleSelectExample(idx)}
                   className={cn(
-                    "p-2 rounded-lg transition-all duration-200 flex items-center justify-center",
+                    "p-2 rounded-lg transition-all duration-200 flex items-center justify-center min-h-[60px] relative overflow-hidden",
                     selectedTravelExample === idx
-                      ? "bg-primary/20 ring-2 ring-primary/50"
+                      ? "bg-muted/30 ring-2 ring-primary/50"
                       : "bg-muted/30 hover:bg-muted/50"
                   )}
                 >
+                  {/* Progress fill on current selection */}
+                  {isCurrentWithProgress && (
+                    <div 
+                      className="absolute inset-0 bg-primary/20"
+                      style={{ 
+                        clipPath: `inset(0 ${100 - autoAdvanceProgress}% 0 0)`,
+                        transition: 'clip-path 100ms linear',
+                      }}
+                    />
+                  )}
                   {/* Mini preview grid matching the layout */}
                   {example.images.length === 7 ? (
                     // 7 images: 1 2 3 4 / 5 6 7 (centered)
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-0.5 relative z-10">
                       <div className="flex gap-0.5">
                         {thumbImages.slice(0, 4).map((img, imgIdx) => (
-                          <div key={imgIdx} className="w-4 h-[12px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
+                          <div key={imgIdx} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
                             {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                             <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
                           </div>
@@ -760,7 +805,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       </div>
                       <div className="flex gap-0.5 justify-center">
                         {thumbImages.slice(4, 7).map((img, imgIdx) => (
-                          <div key={imgIdx + 4} className="w-4 h-[12px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
+                          <div key={imgIdx + 4} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
                             {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                             <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
                           </div>
@@ -769,7 +814,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     </div>
                   ) : (
                     <div className={cn(
-                      "gap-1",
+                      "gap-1 relative z-10",
                       example.images.length === 2 && "flex flex-row",
                       example.images.length === 4 && "flex flex-row"
                     )}>
@@ -778,8 +823,9 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                           key={imgIdx} 
                           className={cn(
                             "bg-muted/50 rounded-sm overflow-hidden relative",
-                            example.images.length === 2 && "w-6 h-6 aspect-square",
-                            example.images.length === 4 && "w-4 h-7"
+                            example.images.length === 2 && example.id === '2-images' && "w-10 h-10 aspect-square",
+                            example.images.length === 2 && example.id !== '2-images' && "w-6 h-6 aspect-square",
+                            example.images.length === 4 && "w-6 h-10"
                           )}
                         >
                           {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
@@ -806,7 +852,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             - Videos: 4:3 aspect ratio
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
-          <p className="text-sm leading-relaxed">
+          <p className="text-sm leading-7">
             You can use <span className="text-wes-vintage-gold">reference videos to steer the motion</span> - here's an example of how images and video references combine:
           </p>
           
@@ -849,8 +895,8 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             - Starting/ending images left, 2x2 video grid right
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
-          <p className="text-sm leading-relaxed">
-            You can also use community-trained LoRAs to <span className="text-wes-vintage-gold">give the motion a distinctive style</span>:
+          <p className="text-sm leading-7">
+            You can also combine community-trained LoRAs to <span className="text-wes-vintage-gold">craft a truly unique style of motion</span>:
           </p>
           
           <div className="flex gap-4 items-center">
@@ -994,7 +1040,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
           <>
             {/* Section 4 content */}
             <div className="space-y-3">
-              <p className="text-sm leading-relaxed">
+              <p className="text-sm leading-7">
                 To give you the right starting images, you can <span className="text-wes-vintage-gold">generate them using references</span> for style, subject and scene:
               </p>
               
@@ -1064,7 +1110,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
             {/* Section 5 content */}
             <div className="space-y-3">
-              <p className="text-sm leading-relaxed">
+              <p className="text-sm leading-7">
                 And you can <span className="text-wes-vintage-gold">edit images with LoRAs built for specific tasks</span>:
               </p>
               
@@ -1119,16 +1165,18 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             CLOSING SECTION
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
-          <p className="text-sm leading-relaxed">
-            We believe that there's a world of creativity that's waiting to be discovered in the AI-driven journey between images and <span className="text-wes-vintage-gold"><span className="font-theme-heading">Reigh</span> is a tool just for exploring this artform.</span> By endless improving it and implementing ideas and work from the community, we hope to make it extremely good.
+          <p className="text-sm leading-7">
+            We believe that there's a world of creativity that's waiting to be discovered in the AI-driven journey between images and <span className="text-wes-vintage-gold"><span className="font-theme-heading">Reigh</span> is a tool just for exploring this artform.</span>
           </p>
-          <p className="text-sm leading-relaxed">
-            And everything is open source - meaning <span className="text-wes-vintage-gold">you can run it for free on your computer</span>! If you're interested in joining, you're very welcome.
+          <p className="text-sm leading-7">
+            And everything is open source - meaning <span className="text-wes-vintage-gold">you can run it for free on your computer</span>!
           </p>
-          <p className="font-serif text-lg italic transform -rotate-1 mt-4">POM</p>
         </div>
 
-        <div className="flex items-center space-x-2 pb-4">
+        {/* Divider */}
+        <div className="w-16 h-px bg-foreground/20 my-2"></div>
+
+        <div className="flex items-center space-x-2">
           <button
             onClick={() => navigate('/tools')}
             className="text-muted-foreground hover:text-primary text-xs underline transition-colors duration-200"
