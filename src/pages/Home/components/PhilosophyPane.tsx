@@ -309,6 +309,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const [selectedImageLora, setSelectedImageLora] = useState(0);
   const [loraPlaying, setLoraPlaying] = useState(false);
   const [travelVideoEnded, setTravelVideoEnded] = useState<Set<number>>(new Set([0, 1, 2])); // All start with play button visible
+  const [travelVideoPlayed, setTravelVideoPlayed] = useState<Set<number>>(new Set()); // Track which have played at least once
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [loadedVideos, setLoadedVideos] = useState<Set<string>>(new Set());
   const loadedImagesRef = useRef<Set<string>>(new Set());
@@ -335,12 +336,20 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
     const video = travelVideoRefs.current[idx];
     if (video) {
       video.currentTime = 0;
-      setTravelVideoEnded(prev => {
-        const next = new Set(prev);
-        next.delete(idx);
-        return next;
+      // Wait for video to actually start playing before hiding poster
+      const onPlaying = () => {
+        setTravelVideoEnded(prev => {
+          const next = new Set(prev);
+          next.delete(idx);
+          return next;
+        });
+        setTravelVideoPlayed(prev => new Set(prev).add(idx));
+        video.removeEventListener('playing', onPlaying);
+      };
+      video.addEventListener('playing', onPlaying);
+      video.play().catch(() => {
+        video.removeEventListener('playing', onPlaying);
       });
-      video.play().catch(() => {});
     }
   };
 
@@ -398,8 +407,9 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
           v.currentTime = 0;
         }
       });
-      // Reset all play buttons to visible
+      // Reset all play buttons to visible and show posters again
       setTravelVideoEnded(new Set([0, 1, 2]));
+      setTravelVideoPlayed(new Set());
     }
   }, [isOpen, isOpening, isClosing]);
 
@@ -516,23 +526,23 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         className="w-full h-full object-cover"
                         onEnded={() => handleTravelVideoEnded(2)}
                       />
-                      {/* Poster overlay - thumbnail loads instantly, full fades in */}
-                      <img 
+                      {/* Poster overlay - only show before first play */}
+                      <img
                         src={getThumbPath(example.poster)}
                         alt=""
                         className={cn(
                           "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                          !travelVideoEnded.has(2) && "opacity-0"
+                          (!travelVideoEnded.has(2) || travelVideoPlayed.has(2)) && "opacity-0"
                         )}
                       />
-                      <img 
+                      <img
                         ref={(imgEl) => handleImageRef(imgEl, example.poster)}
                         src={example.poster}
                         alt=""
                         onLoad={() => handleImageLoad(example.poster)}
                         className={cn(
                           "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                          (!travelVideoEnded.has(2) || !loadedImages.has(example.poster)) && "opacity-0"
+                          (!travelVideoEnded.has(2) || travelVideoPlayed.has(2) || !loadedImages.has(example.poster)) && "opacity-0"
                         )}
                       />
                       {/* Play button overlay */}
@@ -592,23 +602,23 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         className="w-full h-full object-cover"
                         onEnded={() => handleTravelVideoEnded(1)}
                       />
-                      {/* Poster overlay - thumbnail loads instantly, full fades in */}
-                      <img 
+                      {/* Poster overlay - only show before first play */}
+                      <img
                         src={getThumbPath(example.poster)}
                         alt=""
                         className={cn(
                           "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                          !travelVideoEnded.has(1) && "opacity-0"
+                          (!travelVideoEnded.has(1) || travelVideoPlayed.has(1)) && "opacity-0"
                         )}
                       />
-                      <img 
+                      <img
                         ref={(imgEl) => handleImageRef(imgEl, example.poster)}
                         src={example.poster}
                         alt=""
                         onLoad={() => handleImageLoad(example.poster)}
                         className={cn(
                           "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                          (!travelVideoEnded.has(1) || !loadedImages.has(example.poster)) && "opacity-0"
+                          (!travelVideoEnded.has(1) || travelVideoPlayed.has(1) || !loadedImages.has(example.poster)) && "opacity-0"
                         )}
                       />
                       {/* Play button overlay */}
@@ -652,23 +662,23 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 onEnded={() => handleTravelVideoEnded(0)}
                 className="w-full h-full object-cover"
               />
-              {/* Poster overlay - thumbnail loads instantly, full fades in */}
-              <img 
+              {/* Poster overlay - only show before first play */}
+              <img
                 src={getThumbPath(currentExample.image1)}
                 alt=""
                 className={cn(
                   "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                  !travelVideoEnded.has(0) && "opacity-0"
+                  (!travelVideoEnded.has(0) || travelVideoPlayed.has(0)) && "opacity-0"
                 )}
               />
-              <img 
+              <img
                 ref={(imgEl) => handleImageRef(imgEl, currentExample.image1)}
                 src={currentExample.image1}
                 alt=""
                 onLoad={() => handleImageLoad(currentExample.image1)}
                 className={cn(
                   "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                  (!travelVideoEnded.has(0) || !loadedImages.has(currentExample.image1)) && "opacity-0"
+                  (!travelVideoEnded.has(0) || travelVideoPlayed.has(0) || !loadedImages.has(currentExample.image1)) && "opacity-0"
                 )}
               />
               {/* Play button overlay */}
