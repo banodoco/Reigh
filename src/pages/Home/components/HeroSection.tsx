@@ -284,8 +284,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       style={{
                         color: '#fbbf24',
                         opacity: point.opacity,
-                        maskImage: `radial-gradient(circle 60px at ${point.x}px ${point.y}px, black 0%, black 60%, transparent 100%)`,
-                        WebkitMaskImage: `radial-gradient(circle 60px at ${point.x}px ${point.y}px, black 0%, black 60%, transparent 100%)`,
+                        filter: 'blur(0.4px)',
+                        maskImage: `radial-gradient(circle 80px at ${point.x}px ${point.y}px, black 0%, black 30%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.3) 70%, transparent 100%)`,
+                        WebkitMaskImage: `radial-gradient(circle 80px at ${point.x}px ${point.y}px, black 0%, black 30%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.3) 70%, transparent 100%)`,
                       }}
                       aria-hidden="true"
                     >
@@ -298,8 +299,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     style={{
                       color: '#fbbf24',
                       opacity: titleHover.active ? 1 : 0,
-                      maskImage: `radial-gradient(circle 70px at ${titleHover.x}px ${titleHover.y}px, black 0%, black 70%, transparent 100%)`,
-                      WebkitMaskImage: `radial-gradient(circle 70px at ${titleHover.x}px ${titleHover.y}px, black 0%, black 70%, transparent 100%)`,
+                      filter: 'blur(0.4px)',
+                      maskImage: `radial-gradient(circle 90px at ${titleHover.x}px ${titleHover.y}px, black 0%, black 30%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.3) 70%, transparent 100%)`,
+                      WebkitMaskImage: `radial-gradient(circle 90px at ${titleHover.x}px ${titleHover.y}px, black 0%, black 30%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.3) 70%, transparent 100%)`,
                       transition: 'opacity 0.15s ease-out'
                     }}
                     aria-hidden="true"
