@@ -112,6 +112,7 @@ const MotionComparison = () => {
     setIsPlaying(nextIsPlaying);
     
     if (nextIsPlaying) {
+      setSliderPos(20); // Start showing 80% of the result
       videoInputRef.current?.play().catch(() => {});
       videoOutputRef.current?.play().catch(() => {});
       // Sync durations by slowing down input if needed
@@ -158,7 +159,7 @@ const MotionComparison = () => {
         loop
         muted={isMuted}
         playsInline
-        preload="auto"
+        preload="metadata"
         onTimeUpdate={handleTimeUpdate}
         onSeeked={() => setFadeOpacity(0)}
       />
@@ -176,7 +177,7 @@ const MotionComparison = () => {
           loop
           muted={isMuted}
           playsInline
-          preload="auto"
+          preload="metadata"
           onLoadedMetadata={(e) => {
             // Initial sync attempt if both ready
              const video = e.currentTarget;
@@ -267,9 +268,20 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const [loraPlaying, setLoraPlaying] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [loadedVideos, setLoadedVideos] = useState<Set<string>>(new Set());
+  const loadedImagesRef = useRef<Set<string>>(new Set());
 
   const handleImageLoad = (src: string) => {
-    setLoadedImages(prev => new Set(prev).add(src));
+    if (!loadedImagesRef.current.has(src)) {
+      loadedImagesRef.current.add(src);
+      setLoadedImages(prev => new Set(prev).add(src));
+    }
+  };
+
+  // Handle cached images that don't fire onLoad on mobile
+  const handleImageRef = (img: HTMLImageElement | null, src: string) => {
+    if (img && img.complete && img.naturalWidth > 0 && !loadedImagesRef.current.has(src)) {
+      handleImageLoad(src);
+    }
   };
 
   const handleVideoLoad = (src: string) => {
@@ -372,6 +384,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         <div key={idx} className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0 relative">
                           {!loadedImages.has(imgSrc) && <Skeleton className="absolute inset-0 rounded-lg" />}
                           <img 
+                            ref={(img) => handleImageRef(img, imgSrc)}
                             src={imgSrc}
                             alt={`Input image ${idx + 1}`}
                             className={cn("w-full h-full object-cover border rounded-lg transition-opacity duration-300", !loadedImages.has(imgSrc) && "opacity-0")}
@@ -395,6 +408,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         <div key={idx} className="w-[40px] h-[30px] sm:w-[56px] sm:h-[42px] flex-shrink-0 overflow-hidden rounded border relative">
                           {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                           <img 
+                            ref={(imgEl) => handleImageRef(imgEl, img)}
                             src={img}
                             alt={`Input image ${idx + 1}`}
                             className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(img) && "opacity-0")}
@@ -416,7 +430,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         loop
                         autoPlay
                         playsInline
-                        preload="auto"
+                        preload="metadata"
                         className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedVideos.has(example.video) && "opacity-0")}
                         onCanPlay={() => handleVideoLoad(example.video)}
                       />
@@ -436,6 +450,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         <div key={idx} className="w-[42px] h-[75px] sm:w-[73px] sm:h-[130px] flex-shrink-0 overflow-hidden rounded-lg border relative">
                           {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                           <img 
+                            ref={(imgEl) => handleImageRef(imgEl, img)}
                             src={img}
                             alt={`Input image ${idx + 1}`}
                             className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(img) && "opacity-0")}
@@ -457,7 +472,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         loop
                         autoPlay
                         playsInline
-                        preload="auto"
+                        preload="metadata"
                         className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedVideos.has(example.video) && "opacity-0")}
                         onCanPlay={() => handleVideoLoad(example.video)}
                       />
@@ -648,6 +663,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     <div key={idx} className="aspect-square bg-muted/30 rounded border border-muted/50 overflow-hidden relative">
                       {!loadedImages.has(imgSrc) && <Skeleton className="absolute inset-0" />}
                       <img 
+                        ref={(imgEl) => handleImageRef(imgEl, imgSrc)}
                         src={imgSrc} 
                         alt={`Input ${idx + 1}`}
                         className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(imgSrc) && "opacity-0")}
@@ -686,6 +702,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50 relative">
                   {!loadedImages.has('/lora-3.webp') && <Skeleton className="absolute inset-0" />}
                   <img 
+                    ref={(imgEl) => handleImageRef(imgEl, '/lora-3.webp')}
                     src="/lora-3.webp"
                     alt="starting image"
                     className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has('/lora-3.webp') && "opacity-0")}
@@ -698,6 +715,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50 relative">
                   {!loadedImages.has('/lora-4.webp') && <Skeleton className="absolute inset-0" />}
                   <img 
+                    ref={(imgEl) => handleImageRef(imgEl, '/lora-4.webp')}
                     src="/lora-4.webp"
                     alt="ending image"
                     className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has('/lora-4.webp') && "opacity-0")}
@@ -710,33 +728,52 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             
             {/* Right: 2x2 grid of videos with labels */}
             <div className="flex-1 relative min-w-0">
-              <div className="grid grid-cols-2 gap-0 rounded-lg border border-muted/50 overflow-hidden">
-                {loraOptions.map((lora, idx) => (
-                  <div key={lora.id} className="relative aspect-square bg-muted/30 overflow-hidden">
-                    {!loadedVideos.has(lora.video) && <Skeleton className="absolute inset-0 z-0" />}
-                    <video 
-                      ref={(el) => { loraVideosRef.current[idx] = el; }}
-                      src={lora.video}
-                      poster={lora.poster}
-                      muted
-                      playsInline
-                      preload="auto"
-                      onCanPlay={() => handleVideoLoad(lora.video)}
-                      onEnded={() => {
-                        if (idx === 0) setLoraPlaying(false);
-                      }}
-                      className={cn("w-full h-full object-cover transition-opacity duration-300")}
-                    />
-                    <span className={cn(
-                      "absolute text-[10px] text-white bg-black/70 px-1.5 py-0.5 w-20 h-8 flex items-center justify-center text-center leading-tight z-10",
-                      idx === 0 && "bottom-0 right-0 rounded-tl",
-                      idx === 1 && "bottom-0 left-0 rounded-tr",
-                      idx === 2 && "top-0 right-0 rounded-bl",
-                      idx === 3 && "top-0 left-0 rounded-br"
-                    )}>{lora.label.replace(/-/g, ' ')}</span>
+              <div className="aspect-square bg-muted/30 rounded-lg border border-muted/50 overflow-hidden relative">
+                {!loadedVideos.has('/lora-grid-combined.mp4') && <Skeleton className="absolute inset-0 z-0" />}
+                <video 
+                  ref={(el) => { if (el) loraVideosRef.current[0] = el; }}
+                  src="/lora-grid-combined.mp4"
+                  poster="/lora-grid-combined-poster.jpg"
+                  muted
+                  playsInline
+                  preload="metadata"
+                  onCanPlay={() => handleVideoLoad('/lora-grid-combined.mp4')}
+                  onEnded={() => setLoraPlaying(false)}
+                  className={cn("w-full h-full object-cover transition-opacity duration-300")}
+                />
+                
+                {/* Labels overlay */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {/* Top Left - Label Bottom Right */}
+                  <div className="absolute top-0 left-0 w-1/2 h-1/2">
+                    <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded-tl z-10 w-20 h-8 flex items-center justify-center text-center leading-tight">
+                      slow motion explode
+                    </span>
                   </div>
-                ))}
+                  
+                  {/* Top Right - Label Bottom Left */}
+                  <div className="absolute top-0 right-0 w-1/2 h-1/2">
+                    <span className="absolute bottom-0 left-0 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded-tr z-10 w-20 h-8 flex items-center justify-center text-center leading-tight">
+                      animatediff
+                    </span>
+                  </div>
+                  
+                  {/* Bottom Left - Label Top Right */}
+                  <div className="absolute bottom-0 left-0 w-1/2 h-1/2">
+                    <span className="absolute top-0 right-0 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded-bl z-10 w-20 h-8 flex items-center justify-center text-center leading-tight">
+                      water morphing
+                    </span>
+                  </div>
+                  
+                  {/* Bottom Right - Label Top Left */}
+                  <div className="absolute bottom-0 right-0 w-1/2 h-1/2">
+                    <span className="absolute top-0 left-0 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded-br z-10 w-20 h-8 flex items-center justify-center text-center leading-tight">
+                      steampunk willy
+                    </span>
+                  </div>
+                </div>
               </div>
+              
               {/* Play button overlay */}
               {!loraPlaying && (
                 <button
