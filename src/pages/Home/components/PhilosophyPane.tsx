@@ -27,6 +27,23 @@ const Skeleton = ({ className }: { className?: string }) => (
   <div className={cn("animate-pulse bg-muted/50 rounded", className)} />
 );
 
+// Helper to get thumbnail path for an image
+const getThumbPath = (src: string): string => {
+  if (src.startsWith('/introduction-images/')) {
+    const name = src.split('/').pop()!;
+    const ext = name.split('.').pop();
+    const base = name.replace(`.${ext}`, '');
+    return `/thumbs/${base}-thumb.${ext}`;
+  }
+  if (src.startsWith('/916-')) {
+    return `/thumbs/${src.slice(1).replace('.jpg', '-thumb.jpg')}`;
+  }
+  if (src.startsWith('/h') && src.includes('-crop.webp')) {
+    return `/thumbs/${src.slice(1).replace('.webp', '-thumb.webp')}`;
+  }
+  return src; // No thumb available, use original
+};
+
 // Dummy data for the different sections
 const travelExamples = [
   {

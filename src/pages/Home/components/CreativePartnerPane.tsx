@@ -44,7 +44,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
             <p className="text-sm leading-6 clearfix">
               <span
                 aria-hidden
-                className="float-left mr-3 mt-0.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
+                className="float-left mr-3 mt-1.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
               >
                 1
               </span>
@@ -66,7 +66,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
             <p className="text-sm leading-6 clearfix">
               <span
                 aria-hidden
-                className="float-left mr-3 mt-0.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
+                className="float-left mr-3 mt-1.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
               >
                 2
               </span>
@@ -84,7 +84,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
             <p className="text-sm leading-6 clearfix">
               <span
                 aria-hidden
-                className="float-left mr-3 mt-0.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
+                className="float-left mr-3 mt-1.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
               >
                 3
               </span>
