@@ -255,8 +255,8 @@ const MotionComparison = () => {
       <div 
         className={`absolute inset-0 flex items-center justify-center z-30 transition-all duration-300 ${isPlaying ? 'opacity-0 pointer-events-none' : 'opacity-100 bg-black/20'}`}
       >
-        <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/40 shadow-xl text-white transform transition-transform group-hover:scale-110">
-          <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/40 shadow-xl text-white transform transition-transform group-hover:scale-110">
+          <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
         </div>
       </div>
 
@@ -749,10 +749,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                   {/* Mini preview grid matching the layout */}
                   {example.images.length === 7 ? (
                     // 7 images: 1 2 3 4 / 5 6 7 (centered)
-                    <div className="flex flex-col gap-0.5 overflow-hidden">
+                    <div className="flex flex-col gap-0.5">
                       <div className="flex gap-0.5">
                         {thumbImages.slice(0, 4).map((img, imgIdx) => (
-                          <div key={imgIdx} className="w-5 h-[14px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
+                          <div key={imgIdx} className="w-4 h-[12px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
                             {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                             <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
                           </div>
@@ -760,7 +760,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       </div>
                       <div className="flex gap-0.5 justify-center">
                         {thumbImages.slice(4, 7).map((img, imgIdx) => (
-                          <div key={imgIdx + 4} className="w-5 h-[14px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
+                          <div key={imgIdx + 4} className="w-4 h-[12px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
                             {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                             <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
                           </div>
@@ -976,8 +976,8 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                   className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 rounded-lg transition-all duration-300 z-20 group"
                 >
                   <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm border border-white/50 flex items-center justify-center group-hover:scale-105 transition-transform">
-                    <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z"/>
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                     </svg>
                   </div>
                 </button>
