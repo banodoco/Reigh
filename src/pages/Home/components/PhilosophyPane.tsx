@@ -875,15 +875,20 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             {/* Right: 2x2 grid of videos with labels */}
             <div className="flex-1 relative min-w-0">
               <div className="aspect-square bg-muted/30 rounded-lg border border-muted/50 overflow-hidden relative">
-                {!loadedVideos.has('/lora-grid-combined.mp4') && <Skeleton className="absolute inset-0 z-0" />}
-                <video 
+                {!loadedVideos.has('/lora-grid-pingpong.mp4') && <Skeleton className="absolute inset-0 z-0" />}
+                <video
                   ref={(el) => { if (el) loraVideosRef.current[0] = el; }}
-                  src="/lora-grid-combined.mp4"
+                  src="/lora-grid-pingpong.mp4"
                   muted
                   playsInline
                   preload="auto"
-                  onCanPlay={() => handleVideoLoad('/lora-grid-combined.mp4')}
-                  onEnded={() => setLoraPlaying(false)}
+                  onCanPlay={() => handleVideoLoad('/lora-grid-pingpong.mp4')}
+                  onEnded={() => {
+                    // Reset to start so poster fades in over matching frame
+                    const video = loraVideosRef.current[0];
+                    if (video) video.currentTime = 0;
+                    setLoraPlaying(false);
+                  }}
                   className="w-full h-full object-cover"
                 />
                 {/* Poster overlay - thumbnail loads first, full poster fades in */}
