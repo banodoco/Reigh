@@ -22,6 +22,11 @@ interface PhilosophyPaneProps {
 // Placeholder for dummy images/videos
 const PLACEHOLDER = '/placeholder.svg';
 
+// Skeleton component for loading states
+const Skeleton = ({ className }: { className?: string }) => (
+  <div className={cn("animate-pulse bg-muted/50 rounded", className)} />
+);
+
 // Dummy data for the different sections
 const travelExamples = [
   {
@@ -29,26 +34,29 @@ const travelExamples = [
     label: '2 Images',
     images: [PLACEHOLDER, PLACEHOLDER],
     video: PLACEHOLDER,
+    poster: PLACEHOLDER,
   },
   {
     id: '4-images',
     label: '4 Images',
     images: ['/916-1.jpg', '/916-2.jpg', '/916-3.jpg', '/916-4.jpg'],
     video: '/916-output.mp4',
+    poster: '/916-output-poster.jpg',
   },
   {
     id: '7-images',
     label: '7 Images',
     images: ['/h1-crop.webp', '/h2-crop.webp', '/h3-crop.webp', '/h4-crop.webp', '/h5-crop.webp', '/h6-crop.webp', '/h7-crop.webp'],
-    video: '/h_output.mp4',
+    video: '/h-output.mp4',
+    poster: '/h-output-poster.jpg',
   },
 ];
 
 const loraOptions = [
-  { id: 'slow-motion-explode', label: 'slow-motion-explode', video: '/slow-motion-explode.mp4' },
-  { id: 'animatediff', label: 'animatediff', video: '/animatediff.mp4' },
-  { id: 'water-morphing', label: 'water-morphing', video: '/water-morphing.mp4' },
-  { id: 'steampunk-willy', label: 'steampunk-willy', video: '/steampunk-willy.mp4' },
+  { id: 'slow-motion-explode', label: 'slow-motion-explode', video: '/slow-motion-explode.mp4', poster: '/slow-motion-explode-poster.jpg' },
+  { id: 'animatediff', label: 'animatediff', video: '/animatediff.mp4', poster: '/animatediff-poster.jpg' },
+  { id: 'water-morphing', label: 'water-morphing', video: '/water-morphing.mp4', poster: '/water-morphing-poster.jpg' },
+  { id: 'steampunk-willy', label: 'steampunk-willy', video: '/steampunk-willy.mp4', poster: '/steampunk-willy-poster.jpg' },
 ];
 
 const referenceTypes = ['Style', 'Character', 'Scene'] as const;
@@ -60,6 +68,181 @@ const imageLoraOptions = [
   { id: 'outpaint', label: 'Outpaint', description: 'Extend the canvas' },
   { id: 'relight', label: 'Relight', description: 'Change lighting' },
 ];
+
+const MotionComparison = () => {
+  const [sliderPos, setSliderPos] = useState(50);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [fadeOpacity, setFadeOpacity] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const videoInputRef = useRef<HTMLVideoElement>(null);
+  const videoOutputRef = useRef<HTMLVideoElement>(null);
+
+  const handleTimeUpdate = () => {
+    const video = videoOutputRef.current;
+    if (!video) return;
+    
+    const timeRemaining = video.duration - video.currentTime;
+    if (timeRemaining <= 5) {
+      // Fade from 0 to 1 over 5 seconds
+      setFadeOpacity(1 - (timeRemaining / 5));
+    } else {
+      setFadeOpacity(0);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!containerRef.current || !isPlaying) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    setSliderPos((x / rect.width) * 100);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!containerRef.current || !isPlaying) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const touchX = e.touches[0].clientX;
+    const x = Math.max(0, Math.min(touchX - rect.left, rect.width));
+    setSliderPos((x / rect.width) * 100);
+  };
+  
+  const togglePlay = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    const nextIsPlaying = !isPlaying;
+    setIsPlaying(nextIsPlaying);
+    
+    if (nextIsPlaying) {
+      videoInputRef.current?.play().catch(() => {});
+      videoOutputRef.current?.play().catch(() => {});
+      // Sync durations by slowing down input if needed
+      if (videoInputRef.current && videoOutputRef.current) {
+         // Assuming output is the "master" duration or we want to match them
+         // If we want to slow down input to match output:
+         if (videoOutputRef.current.duration && videoInputRef.current.duration) {
+             const ratio = videoInputRef.current.duration / videoOutputRef.current.duration;
+             // If input is shorter (ratio < 1), we'd need to slow it down to match output duration? 
+             // "slow down the motion input video so it matches the other one precisely"
+             // usually implies input is faster or shorter duration but same content.
+             // If they are same content but input is 2s and output is 4s, input is 2x fast.
+             // We want input to take 4s. So playbackRate = 0.5.
+             videoInputRef.current.playbackRate = ratio; 
+         }
+      }
+    } else {
+      videoInputRef.current?.pause();
+      videoOutputRef.current?.pause();
+      setSliderPos(50);
+    }
+  };
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMuted(!isMuted);
+  };
+
+  return (
+    <div 
+      ref={containerRef}
+      className="relative w-full aspect-[4/3] rounded-lg overflow-hidden cursor-col-resize group select-none border border-muted/50 touch-none"
+      onMouseMove={handleMouseMove}
+      onTouchMove={handleTouchMove}
+      onClick={togglePlay}
+      onMouseLeave={() => !isPlaying && setSliderPos(50)}
+    >
+      {/* Output Video (Right / Background) */}
+      <video 
+        ref={videoOutputRef}
+        src="/motion-output.mp4"
+        poster="/motion-output-poster.jpg"
+        className="absolute inset-0 w-full h-full object-cover"
+        loop
+        muted={isMuted}
+        playsInline
+        preload="auto"
+        onTimeUpdate={handleTimeUpdate}
+        onSeeked={() => setFadeOpacity(0)}
+      />
+
+      {/* Input Video (Left / Foreground) - Clipped */}
+      <div 
+        className="absolute inset-0 overflow-hidden"
+        style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
+      >
+        <video 
+          ref={videoInputRef}
+          src="/motion-input.mp4"
+          poster="/motion-input-poster.jpg"
+          className="absolute inset-0 w-full h-full object-cover"
+          loop
+          muted={isMuted}
+          playsInline
+          preload="auto"
+          onLoadedMetadata={(e) => {
+            // Initial sync attempt if both ready
+             const video = e.currentTarget;
+             if (videoOutputRef.current?.duration) {
+                video.playbackRate = video.duration / videoOutputRef.current.duration;
+             }
+          }}
+        />
+      </div>
+
+      {/* Slider Handle - Only visible when playing */}
+      {isPlaying && (
+        <div 
+          className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(0,0,0,0.5)] pointer-events-none z-10"
+          style={{ left: `${sliderPos}%` }}
+        >
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/50 shadow-lg">
+            <svg className="w-4 h-4 text-white drop-shadow-md" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h8m-8 0l4-4m-4 4l4 4" />
+            </svg>
+          </div>
+        </div>
+      )}
+      
+      {/* Labels */}
+      <div className={`absolute top-3 left-3 px-2 py-1 bg-black/50 backdrop-blur-md rounded-md text-[10px] uppercase tracking-wider text-white/90 font-bold transition-opacity duration-300 pointer-events-none z-20 ${sliderPos < 15 ? 'opacity-0' : 'opacity-100'}`}>
+        Reference
+      </div>
+      <div className={`absolute top-3 right-3 px-2 py-1 bg-black/50 backdrop-blur-md rounded-md text-[10px] uppercase tracking-wider text-white/90 font-bold transition-opacity duration-300 pointer-events-none z-20 ${sliderPos > 85 ? 'opacity-0' : 'opacity-100'}`}>
+        Result
+      </div>
+
+      {/* Play Button Overlay */}
+      <div 
+        className={`absolute inset-0 flex items-center justify-center z-30 transition-all duration-300 ${isPlaying ? 'opacity-0 pointer-events-none' : 'opacity-100 bg-black/20'}`}
+      >
+        <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/40 shadow-xl text-white transform transition-transform group-hover:scale-110">
+          <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+      </div>
+
+      {/* Mute Button - Bottom Right */}
+      <button 
+        onClick={toggleMute}
+        className="absolute bottom-3 right-3 p-2 bg-black/50 backdrop-blur-md rounded-full text-white/90 hover:bg-black/70 transition-colors z-40"
+      >
+        {isMuted ? (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+        )}
+      </button>
+
+      {/* Fade to black overlay */}
+      <div 
+        className="absolute inset-0 bg-black pointer-events-none z-50"
+        style={{ opacity: fadeOpacity }}
+      />
+    </div>
+  );
+};
 
 export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   isOpen,
@@ -81,34 +264,51 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const [selectedReferenceType, setSelectedReferenceType] = useState<typeof referenceTypes[number]>('Style');
   const [selectedReferenceImage, setSelectedReferenceImage] = useState(0);
   const [selectedImageLora, setSelectedImageLora] = useState(0);
-  const [loraVideosEnded, setLoraVideosEnded] = useState(false);
+  const [loraPlaying, setLoraPlaying] = useState(false);
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+  const [loadedVideos, setLoadedVideos] = useState<Set<string>>(new Set());
 
-  const maybeStartLoraVideosTogether = () => {
-    if (!isOpen || isOpening) return;
-    if (loraVideosSyncedStartRef.current) return;
-    if (!loraVideosReadyRef.current.every(Boolean)) return;
-
-    loraVideosSyncedStartRef.current = true;
-    setLoraVideosEnded(false);
-    loraVideosRef.current.forEach((v) => {
-      if (v) {
-        v.currentTime = 0;
-        v.play().catch(() => {});
-      }
-    });
+  const handleImageLoad = (src: string) => {
+    setLoadedImages(prev => new Set(prev).add(src));
   };
 
-  const replayLoraVideos = () => {
-    setLoraVideosEnded(false);
-    loraVideosRef.current.forEach((v) => {
-      if (v) {
-        v.currentTime = 0;
-        v.play().catch(() => {});
-      }
-    });
+  const handleVideoLoad = (src: string) => {
+    setLoadedVideos(prev => new Set(prev).add(src));
   };
 
-  // Play video when pane finishes opening, reset when fully closed
+  const toggleLoraPlay = () => {
+    const nextPlaying = !loraPlaying;
+    setLoraPlaying(nextPlaying);
+    
+    if (nextPlaying) {
+      // Play all videos from the start
+      loraVideosRef.current.forEach(v => {
+        if (v) {
+          v.currentTime = 0;
+          v.play().catch(() => {});
+        }
+      });
+    } else {
+      loraVideosRef.current.forEach(v => {
+        if (v) v.pause();
+      });
+    }
+  };
+
+  // Stop LoRA videos when closed
+  useEffect(() => {
+    if (!isOpen) {
+      setLoraPlaying(false);
+      loraVideosRef.current.forEach(v => {
+        if (v) {
+          v.pause();
+          v.currentTime = 0;
+        }
+      });
+    }
+  }, [isOpen]);
+
+  // Play philosophy video when pane finishes opening
   useEffect(() => {
     if (isOpen && !isOpening && philosophyVideoRef.current) {
       philosophyVideoRef.current.currentTime = 0;
@@ -116,38 +316,8 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
     } else if (!isOpen && !isClosing && philosophyVideoRef.current) {
       philosophyVideoRef.current.pause();
       philosophyVideoRef.current.currentTime = 0;
-      const playButton = philosophyVideoRef.current.nextElementSibling as HTMLElement | null;
-      if (playButton) {
-        playButton.style.display = 'none';
-        playButton.style.opacity = '0';
-      }
     }
   }, [isOpen, isOpening, isClosing]);
-
-  // Synchronize lora videos - reset ready state when pane opens
-  useEffect(() => {
-    if (isOpen && !isOpening) {
-      loraVideosReadyRef.current = [false, false, false, false];
-      loraVideosSyncedStartRef.current = false;
-      setLoraVideosEnded(false);
-      loraVideosRef.current.forEach((v, idx) => {
-        if (v && v.readyState >= 3) {
-          loraVideosReadyRef.current[idx] = true;
-        }
-      });
-      maybeStartLoraVideosTogether();
-    } else if (!isOpen) {
-      setLoraVideosEnded(false);
-      loraVideosRef.current.forEach((v) => {
-        if (v) {
-          v.pause();
-          v.currentTime = 0;
-        }
-      });
-      loraVideosReadyRef.current = [false, false, false, false];
-      loraVideosSyncedStartRef.current = false;
-    }
-  }, [isOpen, isOpening]);
 
   return (
     <GlassSidePane isOpen={isOpen} onClose={onClose} side="right" zIndex={60}>
@@ -196,15 +366,20 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               if (imageCount === 2) {
                 return (
                   <div className="flex flex-col gap-2">
-                    {images.map((img, idx) => (
-                      <div key={idx} className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0">
-                        <img 
-                          src={selectedTravelExample === 0 ? img : PLACEHOLDER}
-                          alt={`Input image ${idx + 1}`}
-                          className="w-full h-full object-cover border rounded-lg"
-                        />
-                      </div>
-                    ))}
+                    {images.map((img, idx) => {
+                      const imgSrc = selectedTravelExample === 0 ? img : PLACEHOLDER;
+                      return (
+                        <div key={idx} className="w-20 h-20 sm:w-32 sm:h-32 flex-shrink-0 relative">
+                          {!loadedImages.has(imgSrc) && <Skeleton className="absolute inset-0 rounded-lg" />}
+                          <img 
+                            src={imgSrc}
+                            alt={`Input image ${idx + 1}`}
+                            className={cn("w-full h-full object-cover border rounded-lg transition-opacity duration-300", !loadedImages.has(imgSrc) && "opacity-0")}
+                            onLoad={() => handleImageLoad(imgSrc)}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               }
@@ -217,11 +392,13 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     {/* 7 input images in a row */}
                     <div className="flex gap-1">
                       {images.map((img, idx) => (
-                        <div key={idx} className="w-[40px] h-[30px] sm:w-[56px] sm:h-[42px] flex-shrink-0 overflow-hidden rounded border">
+                        <div key={idx} className="w-[40px] h-[30px] sm:w-[56px] sm:h-[42px] flex-shrink-0 overflow-hidden rounded border relative">
+                          {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                           <img 
                             src={img}
                             alt={`Input image ${idx + 1}`}
-                            className="w-full h-full object-cover"
+                            className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(img) && "opacity-0")}
+                            onLoad={() => handleImageLoad(img)}
                           />
                         </div>
                       ))}
@@ -231,15 +408,17 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       className="w-[240px] h-[172px] sm:w-[296px] sm:h-[212px] flex-shrink-0 relative overflow-hidden rounded-lg border"
                       style={{ transform: 'translateZ(0)', willChange: 'transform' }}
                     >
+                      {!loadedVideos.has(example.video) && <Skeleton className="absolute inset-0" />}
                       <video 
                         src={example.video}
-                        poster={images[0]}
+                        poster={example.poster}
                         muted
                         loop
                         autoPlay
                         playsInline
                         preload="auto"
-                        className="w-full h-full object-cover"
+                        className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedVideos.has(example.video) && "opacity-0")}
+                        onCanPlay={() => handleVideoLoad(example.video)}
                       />
                     </div>
                   </div>
@@ -254,11 +433,13 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     {/* 4 input images in 2x2 grid, 9:16 aspect */}
                     <div className="grid grid-cols-2 gap-1">
                       {images.map((img, idx) => (
-                        <div key={idx} className="w-[42px] h-[75px] sm:w-[73px] sm:h-[130px] flex-shrink-0 overflow-hidden rounded-lg border">
+                        <div key={idx} className="w-[42px] h-[75px] sm:w-[73px] sm:h-[130px] flex-shrink-0 overflow-hidden rounded-lg border relative">
+                          {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                           <img 
                             src={img}
                             alt={`Input image ${idx + 1}`}
-                            className="w-full h-full object-cover"
+                            className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(img) && "opacity-0")}
+                            onLoad={() => handleImageLoad(img)}
                           />
                         </div>
                       ))}
@@ -268,15 +449,17 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       className="w-[117px] h-[208px] sm:w-[148px] sm:h-[264px] flex-shrink-0 relative overflow-hidden rounded-lg border"
                       style={{ transform: 'translateZ(0)', willChange: 'transform' }}
                     >
+                      {!loadedVideos.has(example.video) && <Skeleton className="absolute inset-0" />}
                       <video 
                         src={example.video}
-                        poster={images[0]}
+                        poster={example.poster}
                         muted
                         loop
                         autoPlay
                         playsInline
                         preload="auto"
-                        className="w-full h-full object-cover"
+                        className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedVideos.has(example.video) && "opacity-0")}
+                        onCanPlay={() => handleVideoLoad(example.video)}
                       />
                     </div>
                   </div>
@@ -396,15 +579,17 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     <div className="flex flex-col gap-0.5">
                       <div className="flex gap-0.5">
                         {thumbImages.slice(0, 4).map((img, imgIdx) => (
-                          <div key={imgIdx} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden">
-                            <img src={img} alt="" className="w-full h-full object-cover" />
+                          <div key={imgIdx} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative">
+                            {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
+                            <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
                           </div>
                         ))}
                       </div>
                       <div className="flex gap-0.5 justify-center">
                         {thumbImages.slice(4, 7).map((img, imgIdx) => (
-                          <div key={imgIdx + 4} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden">
-                            <img src={img} alt="" className="w-full h-full object-cover" />
+                          <div key={imgIdx + 4} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative">
+                            {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
+                            <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
                           </div>
                         ))}
                       </div>
@@ -419,15 +604,17 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         <div 
                           key={imgIdx} 
                           className={cn(
-                            "bg-muted/50 rounded-sm overflow-hidden",
+                            "bg-muted/50 rounded-sm overflow-hidden relative",
                             example.images.length === 2 && "w-6 h-6 aspect-square",
                             example.images.length === 4 && "w-4 h-7"
                           )}
                         >
+                          {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                           <img 
                             src={img}
                             alt=""
-                            className="w-full h-full object-cover"
+                            className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")}
+                            onLoad={() => handleImageLoad(img)}
                           />
                         </div>
                       ))}
@@ -447,45 +634,36 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
-            You can use <span className="text-wes-vintage-gold">reference videos to steer the motion</span> — here's an example of how images and video references combine:
+            You can use <span className="text-wes-vintage-gold">reference videos to steer the motion</span> - here's an example of how images and video references combine:
           </p>
           
-          {/* All three columns are 4:3, same height, full width */}
           <div className="flex gap-3 w-full">
-            {/* Column 1: 4×4 grid of input images (15 images + 1 empty) */}
             <div className="space-y-1 flex-[2]">
               <span className="text-xs text-muted-foreground/70">Input Images</span>
               <div className="aspect-square grid grid-cols-4 grid-rows-4 gap-1">
-                {Array.from({ length: 15 }).map((_, idx) => (
-                  <div key={idx} className="aspect-square bg-muted/30 rounded border border-muted/50 overflow-hidden">
-                    <img 
-                      src={PLACEHOLDER} 
-                      alt={`Input ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
-                {/* Empty 16th cell */}
-                <div className="aspect-square" />
+                {Array.from({ length: 16 }).map((_, idx) => {
+                  const imgNum = String(idx + 1).padStart(3, '0');
+                  const imgSrc = `/introduction-images/${imgNum}.${idx === 13 ? 'png' : 'jpg'}`;
+                  return (
+                    <div key={idx} className="aspect-square bg-muted/30 rounded border border-muted/50 overflow-hidden relative">
+                      {!loadedImages.has(imgSrc) && <Skeleton className="absolute inset-0" />}
+                      <img 
+                        src={imgSrc} 
+                        alt={`Input ${idx + 1}`}
+                        className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(imgSrc) && "opacity-0")}
+                        onLoad={() => handleImageLoad(imgSrc)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
             
-            {/* Column 2: Combined video showing motion reference + output (4:3) */}
             <div className="space-y-1 flex-[3]">
               <div className="flex justify-between">
-                <span className="text-xs text-muted-foreground/70">Motion Reference</span>
-                <span className="text-xs text-muted-foreground/70">Output</span>
+                <span className="text-xs text-muted-foreground/70">Motion & Output</span>
               </div>
-              <div className="aspect-[4/3] bg-muted/30 rounded-lg border border-muted/50 overflow-hidden">
-                <video 
-                  src={PLACEHOLDER}
-                  poster={PLACEHOLDER}
-                  muted
-                  loop
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              <MotionComparison />
             </div>
           </div>
         </div>
@@ -505,21 +683,25 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               {/* Starting image - label above */}
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[10px] italic text-muted-foreground/60">starting</span>
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50 relative">
+                  {!loadedImages.has('/lora-3.webp') && <Skeleton className="absolute inset-0" />}
                   <img 
-                    src="/lora-3.png"
+                    src="/lora-3.webp"
                     alt="starting image"
-                    className="w-full h-full object-cover"
+                    className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has('/lora-3.webp') && "opacity-0")}
+                    onLoad={() => handleImageLoad('/lora-3.webp')}
                   />
                 </div>
               </div>
               {/* Ending image - label below */}
               <div className="flex flex-col items-center gap-1">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50 relative">
+                  {!loadedImages.has('/lora-4.webp') && <Skeleton className="absolute inset-0" />}
                   <img 
-                    src="/lora-4.png"
+                    src="/lora-4.webp"
                     alt="ending image"
-                    className="w-full h-full object-cover"
+                    className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has('/lora-4.webp') && "opacity-0")}
+                    onLoad={() => handleImageLoad('/lora-4.webp')}
                   />
                 </div>
                 <span className="text-[10px] italic text-muted-foreground/60">ending</span>
@@ -527,27 +709,26 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             </div>
             
             {/* Right: 2x2 grid of videos with labels */}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative min-w-0">
               <div className="grid grid-cols-2 gap-0 rounded-lg border border-muted/50 overflow-hidden">
                 {loraOptions.map((lora, idx) => (
                   <div key={lora.id} className="relative aspect-square bg-muted/30 overflow-hidden">
+                    {!loadedVideos.has(lora.video) && <Skeleton className="absolute inset-0 z-0" />}
                     <video 
                       ref={(el) => { loraVideosRef.current[idx] = el; }}
                       src={lora.video}
+                      poster={lora.poster}
                       muted
                       playsInline
                       preload="auto"
-                      onCanPlay={() => {
-                        loraVideosReadyRef.current[idx] = true;
-                        maybeStartLoraVideosTogether();
-                      }}
+                      onCanPlay={() => handleVideoLoad(lora.video)}
                       onEnded={() => {
-                        if (idx === 0) setLoraVideosEnded(true);
+                        if (idx === 0) setLoraPlaying(false);
                       }}
-                      className="w-full h-full object-cover"
+                      className={cn("w-full h-full object-cover transition-opacity duration-300")}
                     />
                     <span className={cn(
-                      "absolute text-[10px] text-white bg-black/70 px-1.5 py-0.5 w-24 h-8 flex items-center justify-center text-center leading-tight z-10",
+                      "absolute text-[10px] text-white bg-black/70 px-1.5 py-0.5 w-20 h-8 flex items-center justify-center text-center leading-tight z-10",
                       idx === 0 && "bottom-0 right-0 rounded-tl",
                       idx === 1 && "bottom-0 left-0 rounded-tr",
                       idx === 2 && "top-0 right-0 rounded-bl",
@@ -557,13 +738,13 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 ))}
               </div>
               {/* Play button overlay */}
-              {loraVideosEnded && (
+              {!loraPlaying && (
                 <button
-                  onClick={replayLoraVideos}
-                  className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg transition-opacity duration-300 z-20"
+                  onClick={toggleLoraPlay}
+                  className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 rounded-lg transition-all duration-300 z-20 group"
                 >
-                  <div className="w-7 h-7 rounded-full border border-white bg-black/50 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm border border-white/50 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <svg className="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z"/>
                     </svg>
                   </div>
@@ -574,146 +755,137 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            SECTION 4: Image Generation with References
-            - Left: Reference images (vertical)
-            - Top right: Reference Type selector (horizontal)
-            - Bottom right: Generated images
+            SECTION 4: Image Generation with References (TEMPORARILY DISABLED)
+            SECTION 5: Image Editing LoRAs (TEMPORARILY DISABLED)
         ═══════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-3">
-          <p className="text-sm leading-relaxed">
-            To give you the right starting images, you can <span className="text-wes-vintage-gold">generate them using references</span> for style, subject and scene:
-          </p>
-          
-          <div className="flex gap-3">
-            {/* Left: Reference image selector (vertical, centered) */}
-            <div className="flex flex-col justify-center space-y-1">
-              <span className="text-xs text-muted-foreground/70">Reference</span>
-              <div className="flex flex-col gap-2">
-                {Array.from({ length: 3 }).map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedReferenceImage(idx)}
-                    className={cn(
-                      "w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border-2 transition-all duration-200",
-                      selectedReferenceImage === idx
-                        ? "border-primary ring-2 ring-primary/30"
-                        : "border-transparent hover:border-muted"
-                    )}
-                  >
+        {false && (
+          <>
+            {/* Section 4 content */}
+            <div className="space-y-3">
+              <p className="text-sm leading-relaxed">
+                To give you the right starting images, you can <span className="text-wes-vintage-gold">generate them using references</span> for style, subject and scene:
+              </p>
+              
+              <div className="flex gap-3">
+                <div className="flex flex-col justify-center space-y-1">
+                  <span className="text-xs text-muted-foreground/70">Reference</span>
+                  <div className="flex flex-col gap-2">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedReferenceImage(idx)}
+                        className={cn(
+                          "w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border-2 transition-all duration-200",
+                          selectedReferenceImage === idx
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-transparent hover:border-muted"
+                        )}
+                      >
+                        <img 
+                          src={PLACEHOLDER} 
+                          alt={`Reference option ${idx + 1}`}
+                          className="w-full h-full object-cover bg-muted/30"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="flex-1 flex flex-col justify-center space-y-3">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground/70">Reference Type</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {referenceTypes.map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => setSelectedReferenceType(type)}
+                          className={cn(
+                            "px-2 py-3 text-xs rounded-md transition-all duration-200 text-center",
+                            selectedReferenceType === type
+                              ? "bg-primary/20 text-primary border border-primary/30"
+                              : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
+                          )}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground/70">Generated Images</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {Array.from({ length: 6 }).map((_, idx) => (
+                        <div key={idx} className="aspect-square bg-muted/30 rounded-lg border border-muted/50">
+                          <img 
+                            src={PLACEHOLDER} 
+                            alt={`Generated ${idx + 1}`}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 5 content */}
+            <div className="space-y-3">
+              <p className="text-sm leading-relaxed">
+                And you can <span className="text-wes-vintage-gold">edit images with LoRAs built for specific tasks</span>:
+              </p>
+              
+              <div className="flex gap-3 items-stretch">
+                <div className="flex-1 flex flex-col justify-center space-y-1">
+                  <span className="text-xs text-muted-foreground/70 text-center">Input</span>
+                  <div className="aspect-square bg-muted/30 rounded-lg border border-muted/50">
                     <img 
                       src={PLACEHOLDER} 
-                      alt={`Reference option ${idx + 1}`}
-                      className="w-full h-full object-cover bg-muted/30"
+                      alt="Input for editing"
+                      className="w-full h-full object-cover rounded-lg"
                     />
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            {/* Right: Reference type (top) + Generated images (bottom) */}
-            <div className="flex-1 flex flex-col justify-center space-y-3">
-              {/* Top: Reference type selector (full width) */}
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground/70">Reference Type</span>
-                <div className="grid grid-cols-3 gap-2">
-                  {referenceTypes.map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setSelectedReferenceType(type)}
-                      className={cn(
-                        "px-2 py-3 text-xs rounded-md transition-all duration-200 text-center",
-                        selectedReferenceType === type
-                          ? "bg-primary/20 text-primary border border-primary/30"
-                          : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
-                      )}
-                    >
-                      {type}
-                    </button>
-                  ))}
+                  </div>
                 </div>
-              </div>
-              
-              {/* Bottom: Generated images grid */}
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground/70">Generated Images</span>
-                <div className="grid grid-cols-3 gap-2">
-                  {Array.from({ length: 6 }).map((_, idx) => (
-                    <div key={idx} className="aspect-square bg-muted/30 rounded-lg border border-muted/50">
-                      <img 
-                        src={PLACEHOLDER} 
-                        alt={`Generated ${idx + 1}`}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                    </div>
-                  ))}
+                
+                <div className="flex flex-col justify-center gap-1.5 w-28 sm:w-32">
+                  <span className="text-xs text-muted-foreground/70 text-center">Edit LoRA</span>
+                  <div className="flex flex-col gap-1">
+                    {imageLoraOptions.map((lora, idx) => (
+                      <button
+                        key={lora.id}
+                        onClick={() => setSelectedImageLora(idx)}
+                        className={cn(
+                          "px-2 py-1.5 text-xs rounded-md transition-all duration-200 text-center",
+                          selectedImageLora === idx
+                            ? "bg-primary/20 text-primary border border-primary/30"
+                            : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
+                        )}
+                      >
+                        {lora.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="flex-1 flex flex-col justify-center space-y-1">
+                  <span className="text-xs text-muted-foreground/70 text-center">Output</span>
+                  <div className="aspect-square bg-muted/30 rounded-lg border border-muted/50">
+                    <img 
+                      src={PLACEHOLDER} 
+                      alt="Edited output"
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            SECTION 5: Image Editing LoRAs
-            - Input image | LoRA selector | Output image
-        ═══════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-3">
-          <p className="text-sm leading-relaxed">
-            And you can <span className="text-wes-vintage-gold">edit images with LoRAs built for specific tasks</span>:
-          </p>
-          
-          <div className="flex gap-3 items-stretch">
-            {/* Input image */}
-            <div className="flex-1 flex flex-col justify-center space-y-1">
-              <span className="text-xs text-muted-foreground/70 text-center">Input</span>
-              <div className="aspect-square bg-muted/30 rounded-lg border border-muted/50">
-                <img 
-                  src={PLACEHOLDER} 
-                  alt="Input for editing"
-                  className="w-full h-full object-cover rounded-lg"
-                />
-              </div>
-            </div>
-            
-            {/* LoRA selector */}
-            <div className="flex flex-col justify-center gap-1.5 w-28 sm:w-32">
-              <span className="text-xs text-muted-foreground/70 text-center">Edit LoRA</span>
-              <div className="flex flex-col gap-1">
-                {imageLoraOptions.map((lora, idx) => (
-                  <button
-                    key={lora.id}
-                    onClick={() => setSelectedImageLora(idx)}
-                    className={cn(
-                      "px-2 py-1.5 text-xs rounded-md transition-all duration-200 text-center",
-                      selectedImageLora === idx
-                        ? "bg-primary/20 text-primary border border-primary/30"
-                        : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
-                    )}
-                  >
-                    {lora.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            {/* Output image */}
-            <div className="flex-1 flex flex-col justify-center space-y-1">
-              <span className="text-xs text-muted-foreground/70 text-center">Output</span>
-              <div className="aspect-square bg-muted/30 rounded-lg border border-muted/50">
-                <img 
-                  src={PLACEHOLDER} 
-                  alt="Edited output"
-                  className="w-full h-full object-cover rounded-lg"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════════════
             CLOSING SECTION
         ═══════════════════════════════════════════════════════════════════ */}
-        <div className="w-full h-px bg-gradient-to-r from-transparent via-muted/50 to-transparent my-6"></div>
-
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
             We believe that there's a world of creativity that's waiting to be discovered in the AI-driven journey between images and <span className="text-wes-vintage-gold"><span className="font-theme-heading">Reigh</span> is a tool just for exploring this artform.</span> By endless improving it and implementing ideas and work from the community, we hope to make it extremely good.
@@ -723,8 +895,6 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
           </p>
           <p className="font-serif text-lg italic transform -rotate-1 mt-4">POM</p>
         </div>
-
-        <div className="w-12 h-px bg-muted/30 mt-6"></div>
 
         <div className="flex items-center space-x-2 pb-4">
           <button

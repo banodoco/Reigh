@@ -41,48 +41,58 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
 
         <div className="space-y-6">
           <div className="space-y-3">
-            <h3 className="font-theme-light text-primary text-lg">1) You can run Reigh for free on your computer</h3>
-            
-            <p className="text-sm leading-relaxed">
-              If you have a decent computer, you can run Reigh for free. We make it easy—you can use the app in any browser while tasks process at home. Just run this command:
+            <p className="text-sm leading-6 clearfix">
+              <span
+                aria-hidden
+                className="float-left mr-3 mt-0 font-theme-heading text-[48px] leading-[40px] h-[40px]"
+              >
+                1
+              </span>
+              If you have a decent computer, <span className="text-wes-vintage-gold">you can run Reigh for free</span>. We make it very easy - you can use the app in any browser while tasks process locally. Just run this command:
             </p>
             
             <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
               <img 
-                src="/gpu.png"
+                src="/gpu.webp"
                 alt="Screenshot showing how easy it is to run Reigh locally"
                 className="w-full h-auto rounded-lg"
               />
             </div>
             
-            <p className="text-sm leading-relaxed">
-              We call our approach an <strong className="text-wes-vintage-gold">Open Creative Partner Programme</strong>. We open source our tool and models so artists can create for free, hoping this attracts others who choose to pay for convenience.
-            </p>
+  
           </div>
 
           <div className="space-y-3">
-            <h3 className="font-theme-light text-primary text-lg">2) Reigh is very convenient and cheap to run on the cloud</h3>
-            
-            <p className="text-sm leading-relaxed">
-              While we make it as easy as possible to run Reigh for free, you can also run it conveniently and cheaply in the cloud. Because we use open models on consumer-grade hardware, <strong>our costs are a fraction of what big platforms charge.</strong>
+            <p className="text-sm leading-6 clearfix">
+              <span
+                aria-hidden
+                className="float-left mr-3 mt-0 font-theme-heading text-[48px] leading-[40px] h-[40px]"
+              >
+                2
+              </span>
+              Because we use open models on consumer-grade hardware, <span className="text-wes-vintage-gold">you can also run Reigh conveniently and cheaply in the cloud</span>.
             </p>
             
-            <p className="text-sm leading-relaxed">
-              Therefore, if you choose to create with Reigh, you'll be honouring the age-old truth in the sentiment expressed by Picasso:
+            <p className="text-sm leading-relaxed mt-3">
+              By being the least expensive place to run leading open models, we aim to honour this quote by Picasso:
             </p>
             
-            <blockquote className="bg-wes-vintage-gold/10 border-l-4 border-wes-vintage-gold/60 p-3 rounded-r-lg">
-              <p className="text-sm italic text-primary font-theme-light">
+            <blockquote className="bg-muted/30 border-l-4 border-muted/60 p-3 rounded-r-lg">
+              <p className="text-sm italic text-foreground/80 font-theme-light">
                 "...when artists get together they talk about where you can buy cheap turpentine."
               </p>
             </blockquote>
           </div>
 
           <div className="space-y-3">
-            <h3 className="font-theme-light text-primary text-lg">3) We're part of the open source ecosystem, and will systematically support this & the people within it</h3>
-            
-            <p className="text-sm leading-relaxed">
-              We're part of the{' '}
+            <p className="text-sm leading-6 clearfix">
+              <span
+                aria-hidden
+                className="float-left mr-3 mt-0 font-theme-heading text-[48px] leading-[40px] h-[40px]"
+              >
+                3
+              </span>
+              We have a responsibility to help the{' '}
               <TooltipProvider>
                 <Tooltip
                   open={ecosystemTipOpen}
@@ -113,7 +123,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
                           }
                         }
                       }}
-                      className={`sparkle-underline cursor-pointer transition-all duration-300 ease-out ${ecosystemTipOpen ? 'tooltip-open font-bold scale-110' : 'scale-100'} ${ecosystemTipDisabled ? 'pointer-events-none' : ''}`}
+                      className={`sparkle-underline cursor-pointer transition-colors duration-200 hover:text-primary ${ecosystemTipOpen ? 'tooltip-open text-primary' : 'text-foreground/70'} ${ecosystemTipDisabled ? 'pointer-events-none' : ''}`}
                     >
                       open source ecosystem
                     </span>
@@ -121,7 +131,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
                   <TooltipContent
                     side="top"
                     align="center"
-                    className="group p-2 sm:p-3 bg-wes-cream/90 dark:bg-gray-950 dark:border-gray-700 border-2 border-transparent rounded-lg shadow-md"
+                    className="group p-2 sm:p-3 rounded-lg border border-border/25 bg-popover/45 text-popover-foreground shadow-sm backdrop-blur-md"
                     onPointerEnter={() => {
                       console.log('[EcosystemTooltip] Pointer entered content – holding open');
                       if (!isMobile) {
@@ -149,39 +159,20 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              . We have a responsibility to help this ecosystem flourish, so we share our profits with the people and projects that make Reigh possible:
+              {' '}flourish, so <span className="text-wes-vintage-gold">we share our profits with those whose work makes Reigh possible</span>.
             </p>
             
+            <p className="mt-3 text-sm leading-relaxed">
+              After other costs like hosting, we'll <strong>split the profit three ways</strong>:
+            </p>
+
             <ProfitSplitBar className="space-y-2" />
-            <div className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground">
-              <p>After other costs like hosting, we'll <strong>split the profit three ways</strong>:</p>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-primary font-theme-light">A) Artists — 1/3:</p>
-                  <p className="mt-1 text-sm text-muted-foreground">We'll share 1/3 with artists, of which half will go to those who refer others to Reigh, while half will go towards art competitions and support for arts.</p>
-                </div>
-                <div>
-                  <p className="text-primary font-theme-light">B) Engineers — 1/3:</p>
-                  <p className="mt-1 text-sm text-muted-foreground">We'll share 1/3 with engineers, of which half will go to developers whose LoRAs/workflows are used in Reigh, while half will fund open source projects (model training, extensions, etc.).</p>
-                </div>
-                <div>
-                  <p className="text-primary font-theme-light">C) Banodoco — 1/3:</p>
-                  <p className="mt-1 text-sm text-muted-foreground">A further third will go towards our company, to fund this and further projects.</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
         
-        {/* Divider */}
-        <div className="w-full h-px bg-muted/30"></div>
-
         <div className="space-y-4">
           <p className="text-sm leading-relaxed">
-            We believe that the open source art ecosystem can be a beautiful place that helps humanity's relationship with AI flourish. We would like Reigh to support this as much as possible, and show a model for how others can build successful tools that support this ecosystem. 
-            <br />
-            <br />
-            We hugely appreciate your support.
+            We'd like to show a model for how others can build successful tools while supporting this ecosystem that makes them possible.
           </p>
         </div>
         

@@ -10,10 +10,8 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
   const isMobile = useIsMobile();
 
   // Controlled tooltip states to mirror HomePage behavior exactly
-  const [engLeftOpen, setEngLeftOpen] = useState(false);
-  const [engRightOpen, setEngRightOpen] = useState(false);
-  const [artLeftOpen, setArtLeftOpen] = useState(false);
-  const [artRightOpen, setArtRightOpen] = useState(false);
+  const [engineersOpen, setEngineersOpen] = useState(false);
+  const [artistsOpen, setArtistsOpen] = useState(false);
   const [banoOpen, setBanoOpen] = useState(false);
 
   return (
@@ -26,80 +24,42 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
       </div>
       {/* Thin split bar */}
       <div className="flex h-4 overflow-visible rounded-full">
-        {/* Engineers (1/3) with two equal sub-splits and per-half hover labels */}
+        {/* Engineers (1/3) */}
         <div className="relative flex-1 cursor-default select-none rounded-l-full bg-transparent">
-          <div className="flex h-full overflow-visible">
-            {/* Left half: Technical contributors to workflows and LoRAs */}
-            <div className="relative flex-1">
-              <TooltipProvider>
-                <Tooltip open={engLeftOpen} onOpenChange={setEngLeftOpen}>
-                  <TooltipTrigger asChild>
-                    <div
-                      className="h-full w-full bg-wes-yellow-dark dark:bg-amber-600 transition-all duration-200 hover:brightness-90"
-                      onClick={() => { if (isMobile) setEngLeftOpen((v) => !v); }}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[100010]">
-                    Technical contributors to workflows and LoRAs
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            {/* Right half: Fund to train models and build extensions */}
-            <div className="relative flex-1">
-              <TooltipProvider>
-                <Tooltip open={engRightOpen} onOpenChange={setEngRightOpen}>
-                  <TooltipTrigger asChild>
-                    <div
-                      className="h-full w-full bg-wes-yellow dark:bg-amber-500 transition-all duration-200 hover:brightness-95"
-                      onClick={() => { if (isMobile) setEngRightOpen((v) => !v); }}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[100010]">
-                    Fund to train models and build extensions
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
+          <TooltipProvider>
+            <Tooltip open={engineersOpen} onOpenChange={setEngineersOpen}>
+              <TooltipTrigger asChild>
+                <div
+                  className="h-full w-full bg-wes-yellow dark:bg-amber-500 transition-all duration-200 hover:brightness-95"
+                  aria-label="Engineers"
+                  onClick={() => { if (isMobile) setEngineersOpen((v) => !v); }}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="center" className="px-2 py-1 text-center text-[11px] leading-tight z-[100010] max-w-[240px]">
+                supporting developers whose LoRAs/workflows are used in Reigh, and funding open source projects (model training, extensions, etc.).
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
-        {/* Artists (1/3) with two equal sub-splits and per-half hover labels */}
+
+        {/* Artists (1/3) */}
         <div className="relative flex-1 cursor-default select-none bg-transparent">
-          <div className="flex h-full overflow-visible">
-            {/* Left half: Artists who refer people... */}
-            <div className="relative flex-1">
-              <TooltipProvider>
-                <Tooltip open={artLeftOpen} onOpenChange={setArtLeftOpen}>
-                  <TooltipTrigger asChild>
-                    <div
-                      className="h-full w-full bg-wes-mint-dark dark:bg-emerald-600 transition-all duration-200 hover:brightness-110"
-                      onClick={() => { if (isMobile) setArtLeftOpen((v) => !v); }}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[100010]">
-                    Artists who refer people will receive a share of their lifetime spend
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            {/* Right half: Fund art competitions */}
-            <div className="relative flex-1">
-              <TooltipProvider>
-                <Tooltip open={artRightOpen} onOpenChange={setArtRightOpen}>
-                  <TooltipTrigger asChild>
-                    <div
-                      className="h-full w-full bg-wes-mint dark:bg-emerald-500 transition-all duration-200 hover:brightness-110"
-                      onClick={() => { if (isMobile) setArtRightOpen((v) => !v); }}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[100010]">
-                    We will fund art competitions with our profits
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
+          <TooltipProvider>
+            <Tooltip open={artistsOpen} onOpenChange={setArtistsOpen}>
+              <TooltipTrigger asChild>
+                <div
+                  className="h-full w-full bg-wes-mint dark:bg-emerald-500 transition-all duration-200 hover:brightness-110"
+                  aria-label="Artists"
+                  onClick={() => { if (isMobile) setArtistsOpen((v) => !v); }}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="center" className="px-2 py-1 text-center text-[11px] leading-tight z-[100010] max-w-[240px]">
+                supporting artists who refer others to Reigh, and funding art competitions and arts support.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
+
         {/* Banodoco (1/3) */}
         <div className="relative flex-1 cursor-default select-none rounded-r-full bg-transparent">
           <TooltipProvider>
@@ -111,8 +71,8 @@ export const ProfitSplitBar: React.FC<ProfitSplitBarProps> = ({ className }) => 
                   onClick={() => { if (isMobile) setBanoOpen((v) => !v); }}
                 />
               </TooltipTrigger>
-              <TooltipContent side="bottom" align="center" className="px-2 py-1 whitespace-nowrap text-center text-[11px] leading-tight z-[100010]">
-                Yeah, we like money too
+              <TooltipContent side="bottom" align="center" className="px-2 py-1 text-center text-[11px] leading-tight z-[100010] max-w-[240px]">
+                funding Reigh and future projects.
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
