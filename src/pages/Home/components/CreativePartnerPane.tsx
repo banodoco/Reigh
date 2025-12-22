@@ -44,7 +44,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
             <p className="text-sm leading-6 clearfix">
               <span
                 aria-hidden
-                className="float-left mr-3 mt-0 font-theme-heading text-[48px] leading-[40px] h-[40px]"
+                className="float-left mr-3 mt-0.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
               >
                 1
               </span>
@@ -66,15 +66,11 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
             <p className="text-sm leading-6 clearfix">
               <span
                 aria-hidden
-                className="float-left mr-3 mt-0 font-theme-heading text-[48px] leading-[40px] h-[40px]"
+                className="float-left mr-3 mt-0.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
               >
                 2
               </span>
-              Because we use open models on consumer-grade hardware, <span className="text-wes-vintage-gold">you can also run Reigh conveniently and cheaply in the cloud</span>.
-            </p>
-            
-            <p className="text-sm leading-relaxed mt-3">
-              By being the least expensive place to run leading open models, we aim to honour this quote by Picasso:
+              Because we use open models on consumer-grade hardware, <span className="text-wes-vintage-gold">you can also run Reigh conveniently and cheaply in the cloud</span>. By being the least expensive place to run leading open models, we aim to honour this quote by Picasso:
             </p>
             
             <blockquote className="bg-muted/30 border-l-4 border-muted/60 p-3 rounded-r-lg">
@@ -88,7 +84,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
             <p className="text-sm leading-6 clearfix">
               <span
                 aria-hidden
-                className="float-left mr-3 mt-0 font-theme-heading text-[48px] leading-[40px] h-[40px]"
+                className="float-left mr-3 mt-0.5 w-9 h-9 flex items-center justify-center rounded-full border border-muted-foreground/30 font-theme-heading text-lg text-foreground/90"
               >
                 3
               </span>
