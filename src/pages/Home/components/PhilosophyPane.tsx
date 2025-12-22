@@ -345,10 +345,11 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
       if (autoAdvanceTimeoutRef.current) {
         clearTimeout(autoAdvanceTimeoutRef.current);
         autoAdvanceTimeoutRef.current = null;
+        // Only clear animation states if we're canceling an auto-advance
+        setNextAdvanceIdx(null);
+        setPrevAdvanceIdx(null);
       }
-      setNextAdvanceIdx(null);
-      setPrevAdvanceIdx(null);
-      setDrainingIdx(null);
+      // Don't clear drainingIdx here - it needs to persist for the drain animation
       
       video.currentTime = 0;
       setVideoProgress(0); // Reset progress when starting
@@ -372,20 +373,26 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const handleTravelVideoEnded = (idx: number) => {
     setTravelVideoEnded(prev => new Set(prev).add(idx));
     setDrainingIdx(null); // Clear any draining animation when video ends
-    
+
     // Start border animation on next selector, remove from current
     const nextIdx = (idx + 1) % travelExamples.length;
     setNextAdvanceIdx(nextIdx);
     setPrevAdvanceIdx(idx);
-    
-    // Timeout slightly longer than animation (2.5s) so animation completes before switch
+
+    // Preload the next video during countdown so it's ready to play
+    const nextVideo = travelVideoRefs.current[nextIdx];
+    if (nextVideo) {
+      nextVideo.load();
+    }
+
+    // Timeout slightly longer than animation (3.75s) so animation completes before switch
     autoAdvanceTimeoutRef.current = setTimeout(() => {
       setNextAdvanceIdx(null);
       setPrevAdvanceIdx(null);
       setDrainingIdx(idx); // Start draining the current video's fill
       setVideoProgress(0); // Reset progress before switching
       setSelectedTravelExample(nextIdx);
-    }, 2550);
+    }, 3800);
   };
 
   // Track video progress during playback
@@ -826,7 +833,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                   className="p-2 rounded-lg transition-all duration-200 flex items-center justify-center min-h-[60px] relative overflow-hidden bg-muted/30 hover:bg-muted/50"
                 >
                   {/* Static border for selected item (not during animation) */}
-                  {selectedTravelExample === idx && !isNextWithBorder && (
+                  {selectedTravelExample === idx && !isNextWithBorder && !isPrevWithBorder && (
                     <div className="absolute inset-0 rounded-lg border-2 border-primary/50 pointer-events-none" />
                   )}
                   {/* Progress fill on current playing video */}
@@ -861,7 +868,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       className="absolute inset-0 rounded-lg border-2 border-primary/50 pointer-events-none"
                       style={{ 
                         clipPath: 'inset(0 0% 0 0)',
-                        animation: 'hideBorderLeftToRight 2.5s ease-out forwards',
+                        animation: 'hideBorderLeftToRight 3.75s ease-out forwards',
                       }}
                     />
                   )}
@@ -871,7 +878,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       className="absolute inset-0 rounded-lg border-2 border-primary/50 pointer-events-none"
                       style={{ 
                         clipPath: 'inset(0 100% 0 0)',
-                        animation: 'revealBorderLeftToRight 2.5s ease-out forwards',
+                        animation: 'revealBorderLeftToRight 3.75s ease-out forwards',
                       }}
                     />
                   )}
