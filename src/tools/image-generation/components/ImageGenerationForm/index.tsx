@@ -153,6 +153,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
   const [openPromptModalWithAIExpanded, setOpenPromptModalWithAIExpanded] = useState(false);
   const [imagesPerPrompt, setImagesPerPrompt] = useState(8); // Default to 8 for automated mode
+  const [promptMultiplier, setPromptMultiplier] = useState(1); // How many images per prompt in automated mode
   const [steps, setSteps] = useState(12); // Default to 12 steps for local generation
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -2377,7 +2378,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           shortPrompt: p.shortPrompt || (combinedFull.substring(0, 30) + (combinedFull.length > 30 ? "..." : ""))
         };
       }), 
-      imagesPerPrompt: 1, // Always 1 image per prompt in automated mode
+      imagesPerPrompt: promptMultiplier,
       loras: lorasForApi,
       shot_id: associatedShotId || undefined,
       model_name: 'qwen-image',
@@ -2394,7 +2395,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     const legacyGenerationData = {
       prompts: batchTaskParams.prompts,
-      imagesPerPrompt: 1,
+      imagesPerPrompt: promptMultiplier,
       loras: lorasForApi,
       fullSelectedLoras: loraManager.selectedLoras,
       generationMode: selectedModel,
@@ -2490,7 +2491,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             shortPrompt: p.shortPrompt || (combinedFull.substring(0, 30) + (combinedFull.length > 30 ? "..." : ""))
           };
         }), 
-        imagesPerPrompt: 1, // Always 1 image per prompt in automated mode
+        imagesPerPrompt: promptMultiplier,
         loras: lorasForApi,
         shot_id: associatedShotId || undefined,
         model_name: 'qwen-image',
@@ -2507,7 +2508,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
       const legacyGenerationData = {
         prompts: batchTaskParams.prompts,
-        imagesPerPrompt: 1,
+        imagesPerPrompt: promptMultiplier,
         loras: lorasForApi,
         fullSelectedLoras: loraManager.selectedLoras,
         generationMode: selectedModel,
@@ -2613,7 +2614,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               shortPrompt: p.shortPrompt || (combinedFull.substring(0, 30) + (combinedFull.length > 30 ? "..." : ""))
             };
           }), 
-          imagesPerPrompt: 1, // Always 1 image per prompt in automated mode
+          imagesPerPrompt: promptMultiplier,
           loras: lorasForApi,
           shot_id: associatedShotId || undefined,
           model_name: 'qwen-image',
@@ -2630,7 +2631,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         
         const legacyGenerationData = {
           prompts: batchTaskParams.prompts,
-          imagesPerPrompt: 1,
+          imagesPerPrompt: promptMultiplier,
           loras: lorasForApi,
           fullSelectedLoras: loraManager.selectedLoras,
           generationMode: selectedModel,
@@ -2988,6 +2989,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             promptMode={effectivePromptMode}
             onUseExistingPrompts={handleUseExistingPrompts}
             onNewPromptsLikeExisting={handleNewPromptsLikeExisting}
+            promptMultiplier={promptMultiplier}
+            onChangePromptMultiplier={setPromptMultiplier}
           />
         </div>
       </form>

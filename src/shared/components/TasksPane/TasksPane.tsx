@@ -732,7 +732,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     });
   };
 
-  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave, isMobile } = useSlidingPane({
+  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave, isMobile, showBackdrop, closePane } = useSlidingPane({
     side: 'right',
     isLocked: isTasksPaneLocked,
     onToggleLock: () => setIsTasksPaneLocked(!isTasksPaneLocked),
@@ -761,6 +761,23 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   return (
     <>
+      {/* Backdrop overlay to capture taps outside the pane on mobile */}
+      {showBackdrop && (
+        <div
+          className="fixed inset-0 z-[59] touch-none"
+          onTouchStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closePane();
+          }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closePane();
+          }}
+          aria-hidden="true"
+        />
+      )}
       <PaneControlTab
         side="right"
         isLocked={isLocked}

@@ -78,11 +78,13 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
   }, [isSmallMobile, isOpen]);
 
   // Click outside handler for small phones (only when not locked)
+  // We now use BOTH touchstart and pointerdown to ensure we capture
+  // all touch events BEFORE they can reach underlying elements
   useEffect(() => {
     // Don't close on click outside if pane is locked
     if (!isSmallMobile || !isOpen || isLocked) return;
 
-    const handleClickOutside = (event: MouseEvent | PointerEvent) => {
+    const handleClickOutside = (event: TouchEvent | MouseEvent | PointerEvent) => {
       const targetEl = event.target as HTMLElement;
       // Ignore if click is on any pane-control opener/closer
       if (targetEl.closest('[data-pane-control]')) {
@@ -110,8 +112,14 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
       }
     };
 
+    // Listen to touchstart FIRST (fires before pointerdown on touch devices)
+    // This prevents elements behind from receiving the touch and highlighting
+    document.addEventListener('touchstart', handleClickOutside, { capture: true, passive: false });
     document.addEventListener('pointerdown', handleClickOutside, true);
-    return () => document.removeEventListener('pointerdown', handleClickOutside, true);
+    return () => {
+      document.removeEventListener('touchstart', handleClickOutside, true);
+      document.removeEventListener('pointerdown', handleClickOutside, true);
+    };
   }, [isSmallMobile, isOpen, isLocked, additionalRefs]);
 
   // Close on dragstart anywhere (small phones)
@@ -227,6 +235,10 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
     onMouseLeave: handlePaneLeave,
   };
 
+  // Should show a backdrop overlay that captures all touches
+  // Only on small phones when pane is open but NOT locked
+  const showBackdrop = isSmallMobile && isOpen && !isLocked;
+
   return {
     isLocked, // Return actual lock state on all devices
     isOpen,
@@ -237,5 +249,7 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
     handlePaneEnter,
     handlePaneLeave,
     isMobile, // Still return isMobile for backward compatibility
+    showBackdrop, // Whether to show backdrop overlay for tap-outside-to-close
+    closePane: () => setIsOpen(false), // Function to close the pane (for backdrop onClick)
   };
 }; 

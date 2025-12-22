@@ -34,7 +34,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
         <div className="w-20 h-1.5 bg-gradient-to-r from-wes-vintage-gold to-wes-vintage-gold/50 rounded-full animate-pulse-breathe opacity-90"></div>
       </div>
       
-      <div className="space-y-6 text-foreground/70">
+      <div className="space-y-6 text-foreground/70 font-medium">
         <p className="text-sm leading-relaxed">
           Practically for you, <strong>this means three things</strong>:
         </p>

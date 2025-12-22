@@ -295,7 +295,7 @@ const GenerationsPaneComponent: React.FC = () => {
   const shotFilterContentRef = useRef<HTMLDivElement>(null);
   const mediaTypeContentRef = useRef<HTMLDivElement>(null);
 
-  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
+  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave, showBackdrop, closePane } = useSlidingPane({
     side: 'bottom',
     isLocked: isGenerationsPaneLocked,
     onToggleLock: () => setIsGenerationsPaneLocked(!isGenerationsPaneLocked),
@@ -370,6 +370,24 @@ const GenerationsPaneComponent: React.FC = () => {
 
   return (
     <>
+      {/* Backdrop overlay to capture taps outside the pane on mobile (only when open but NOT locked) */}
+      {/* When locked, GenerationsPane allows interaction with outside content */}
+      {showBackdrop && (
+        <div
+          className="fixed inset-0 z-[99] touch-none"
+          onTouchStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closePane();
+          }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closePane();
+          }}
+          aria-hidden="true"
+        />
+      )}
       {/* Hide the control tab when on the generations page or image generation tool page */}
       {!isOnGenerationsPage && !isOnImageGenerationPage && (
         <PaneControlTab

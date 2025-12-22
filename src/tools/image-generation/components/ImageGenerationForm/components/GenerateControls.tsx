@@ -21,6 +21,9 @@ interface GenerateControlsProps {
   // Automated mode with existing prompts
   onUseExistingPrompts?: () => void;
   onNewPromptsLikeExisting?: () => void;
+  // Prompt multiplier (automated mode only)
+  promptMultiplier?: number;
+  onChangePromptMultiplier?: (value: number) => void;
 }
 
 export const GenerateControls: React.FC<GenerateControlsProps> = ({
@@ -36,6 +39,8 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
   promptMode,
   onUseExistingPrompts,
   onNewPromptsLikeExisting,
+  promptMultiplier = 1,
+  onChangePromptMultiplier,
 }) => {
   // Normalize promptMode to handle invalid/empty values from persistence
   const normalizedPromptMode: PromptMode = 
@@ -60,6 +65,27 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
                 disabled={!hasApiKey || isGenerating}
               />
             </div>
+            {normalizedPromptMode === 'automated' && (
+              <div className="w-14 flex-shrink-0">
+                <Select
+                  value={promptMultiplier.toString()}
+                  onValueChange={(value) => onChangePromptMultiplier?.(parseInt(value, 10))}
+                  disabled={!hasApiKey || isGenerating}
+                >
+                  <SelectTrigger variant="retro" className="h-9">
+                    <span className="text-muted-foreground">×</span>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent variant="retro">
+                    <SelectItem variant="retro" value="1">1</SelectItem>
+                    <SelectItem variant="retro" value="2">2</SelectItem>
+                    <SelectItem variant="retro" value="3">3</SelectItem>
+                    <SelectItem variant="retro" value="4">4</SelectItem>
+                    <SelectItem variant="retro" value="5">5</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="w-24">
               <label className="block text-xs font-medium text-foreground mb-1">
                 Steps
@@ -85,16 +111,41 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
             </div>
           </div>
         ) : (
-          // Show only images slider
-          <SliderWithValue
-            label={normalizedPromptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
-            value={imagesPerPrompt}
-            onChange={onChangeImagesPerPrompt}
-            min={1}
-            max={32}
-            step={1}
-            disabled={!hasApiKey || isGenerating}
-          />
+          // Show slider (and multiplier in automated mode)
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <SliderWithValue
+                label={normalizedPromptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
+                value={imagesPerPrompt}
+                onChange={onChangeImagesPerPrompt}
+                min={1}
+                max={32}
+                step={1}
+                disabled={!hasApiKey || isGenerating}
+              />
+            </div>
+            {normalizedPromptMode === 'automated' && (
+              <div className="w-14 flex-shrink-0">
+                <Select
+                  value={promptMultiplier.toString()}
+                  onValueChange={(value) => onChangePromptMultiplier?.(parseInt(value, 10))}
+                  disabled={!hasApiKey || isGenerating}
+                >
+                  <SelectTrigger variant="retro" className="h-9">
+                    <span className="text-muted-foreground">×</span>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent variant="retro">
+                    <SelectItem variant="retro" value="1">1</SelectItem>
+                    <SelectItem variant="retro" value="2">2</SelectItem>
+                    <SelectItem variant="retro" value="3">3</SelectItem>
+                    <SelectItem variant="retro" value="4">4</SelectItem>
+                    <SelectItem variant="retro" value="5">5</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -110,7 +161,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
           : isGenerating
             ? "Creating tasks..."
             : normalizedPromptMode === 'automated'
-              ? `${imagesPerPrompt} New Prompts + Images`
+              ? `${imagesPerPrompt} New Prompts → ${imagesPerPrompt * promptMultiplier} Images`
               : `Generate ${imagesPerPrompt * actionablePromptsCount} ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
       </Button>
 

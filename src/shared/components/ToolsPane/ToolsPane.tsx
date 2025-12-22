@@ -178,7 +178,7 @@ const ToolsPaneComponent: React.FC = () => {
   const { value: generationMethods, isLoading: isLoadingGenerationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudGenerationEnabled = generationMethods.inCloud;
 
-  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
+  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave, showBackdrop, closePane } = useSlidingPane({
     side: 'left',
     isLocked: isShotsPaneLocked,
     onToggleLock: () => setIsShotsPaneLocked(!isShotsPaneLocked),
@@ -234,6 +234,23 @@ const ToolsPaneComponent: React.FC = () => {
 
   return (
     <>
+      {/* Backdrop overlay to capture taps outside the pane on mobile */}
+      {showBackdrop && (
+        <div
+          className="fixed inset-0 z-[59] touch-none"
+          onTouchStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closePane();
+          }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closePane();
+          }}
+          aria-hidden="true"
+        />
+      )}
       <PaneControlTab
         side="left"
         isLocked={isLocked}
