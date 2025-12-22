@@ -20,9 +20,10 @@
 | Function | Purpose | Description |
 |----------|---------|-------------|
 | **`create-task`** | Task creation | Validates credits, creates queued task |
-| **`claim-next-task`** | Worker polling | Returns next available task for processing |
+| **`claim-next-task`** | Worker polling | Returns next available task for processing. Uses model affinity to prefer tasks matching worker's current model |
 | **`complete_task`** | Task completion | Handles task output, creates generations/variants, deducts credits. Supports `create_as_generation` flag to force new generation instead of variant when `based_on` is present |
 | **`update-task-status`** | Status updates | Real-time task status broadcasting |
+| **`update-worker-model`** | Worker model tracking | Workers call this to report their currently loaded model for task affinity matching |
 | **`update-shot-pair-prompts`** | Metadata updates | Updates shot_generations metadata (pair_prompt, enhanced_prompt, etc.) from orchestrator task |
 
 ### Payment Processing

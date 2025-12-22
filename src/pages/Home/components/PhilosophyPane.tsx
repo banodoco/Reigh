@@ -37,10 +37,10 @@ const travelExamples = [
     video: '/916-output.mp4',
   },
   {
-    id: '3-images',
-    label: '3 Images',
-    images: [PLACEHOLDER, PLACEHOLDER, PLACEHOLDER],
-    video: PLACEHOLDER,
+    id: '7-images',
+    label: '7 Images',
+    images: ['/h1-crop.webp', '/h2-crop.webp', '/h3-crop.webp', '/h4-crop.webp', '/h5-crop.webp', '/h6-crop.webp', '/h7-crop.webp'],
+    video: '/h_output.mp4',
   },
 ];
 
@@ -71,6 +71,9 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   selectedExampleStyle,
 }) => {
   const philosophyVideoRef = useRef<HTMLVideoElement | null>(null);
+  const loraVideosRef = useRef<(HTMLVideoElement | null)[]>([]);
+  const loraVideosReadyRef = useRef<boolean[]>([false, false, false, false]);
+  const loraVideosSyncedStartRef = useRef(false);
   
   // State for interactive sections
   const [selectedTravelExample, setSelectedTravelExample] = useState(0);
@@ -78,6 +81,32 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const [selectedReferenceType, setSelectedReferenceType] = useState<typeof referenceTypes[number]>('Style');
   const [selectedReferenceImage, setSelectedReferenceImage] = useState(0);
   const [selectedImageLora, setSelectedImageLora] = useState(0);
+  const [loraVideosEnded, setLoraVideosEnded] = useState(false);
+
+  const maybeStartLoraVideosTogether = () => {
+    if (!isOpen || isOpening) return;
+    if (loraVideosSyncedStartRef.current) return;
+    if (!loraVideosReadyRef.current.every(Boolean)) return;
+
+    loraVideosSyncedStartRef.current = true;
+    setLoraVideosEnded(false);
+    loraVideosRef.current.forEach((v) => {
+      if (v) {
+        v.currentTime = 0;
+        v.play().catch(() => {});
+      }
+    });
+  };
+
+  const replayLoraVideos = () => {
+    setLoraVideosEnded(false);
+    loraVideosRef.current.forEach((v) => {
+      if (v) {
+        v.currentTime = 0;
+        v.play().catch(() => {});
+      }
+    });
+  };
 
   // Play video when pane finishes opening, reset when fully closed
   useEffect(() => {
@@ -94,6 +123,31 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
       }
     }
   }, [isOpen, isOpening, isClosing]);
+
+  // Synchronize lora videos - reset ready state when pane opens
+  useEffect(() => {
+    if (isOpen && !isOpening) {
+      loraVideosReadyRef.current = [false, false, false, false];
+      loraVideosSyncedStartRef.current = false;
+      setLoraVideosEnded(false);
+      loraVideosRef.current.forEach((v, idx) => {
+        if (v && v.readyState >= 3) {
+          loraVideosReadyRef.current[idx] = true;
+        }
+      });
+      maybeStartLoraVideosTogether();
+    } else if (!isOpen) {
+      setLoraVideosEnded(false);
+      loraVideosRef.current.forEach((v) => {
+        if (v) {
+          v.pause();
+          v.currentTime = 0;
+        }
+      });
+      loraVideosReadyRef.current = [false, false, false, false];
+      loraVideosSyncedStartRef.current = false;
+    }
+  }, [isOpen, isOpening]);
 
   return (
     <GlassSidePane isOpen={isOpen} onClose={onClose} side="right" zIndex={60}>
@@ -128,9 +182,9 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               - 3 images: L-shape (2 stacked left, 1 top-right)
               - 4 images: 2x2 grid
         ═══════════════════════════════════════════════════════════════════ */}
-        <div className="space-y-2 mt-4 mb-4">
-          {/* Main travel visualization */}
-          <div className="flex gap-4 items-start justify-center">
+        <div className="space-y-2 !mt-4 mb-4">
+          {/* Main travel visualization - fixed height container */}
+          <div className="flex gap-4 items-center justify-center h-[210px] sm:h-[264px]">
             {/* Left side: Input images with dynamic layout */}
             {(() => {
               const images = selectedTravelExample === 0 
@@ -155,19 +209,39 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 );
               }
               
-              // 3 images: stacked vertically, 4:3 aspect ratio
-              if (imageCount === 3) {
+              // 7 images: row of images at top, video below
+              if (imageCount === 7) {
+                const example = travelExamples[selectedTravelExample];
                 return (
-                  <div className="flex flex-col gap-2">
-                    {images.map((img, idx) => (
-                      <div key={idx} className="w-[69px] h-[52px] sm:w-[112px] sm:h-[84px] flex-shrink-0 overflow-hidden rounded-lg border">
-                        <img 
-                          src={PLACEHOLDER}
-                          alt={`Input image ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
+                  <div className="flex flex-col gap-2 items-center justify-end h-full">
+                    {/* 7 input images in a row */}
+                    <div className="flex gap-1">
+                      {images.map((img, idx) => (
+                        <div key={idx} className="w-[40px] h-[30px] sm:w-[56px] sm:h-[42px] flex-shrink-0 overflow-hidden rounded border">
+                          <img 
+                            src={img}
+                            alt={`Input image ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {/* 4:3 output video */}
+                    <div 
+                      className="w-[240px] h-[172px] sm:w-[296px] sm:h-[212px] flex-shrink-0 relative overflow-hidden rounded-lg border"
+                      style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+                    >
+                      <video 
+                        src={example.video}
+                        poster={images[0]}
+                        muted
+                        loop
+                        autoPlay
+                        playsInline
+                        preload="auto"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                   </div>
                 );
               }
@@ -180,7 +254,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     {/* 4 input images in 2x2 grid, 9:16 aspect */}
                     <div className="grid grid-cols-2 gap-1">
                       {images.map((img, idx) => (
-                        <div key={idx} className="w-[56px] h-[100px] sm:w-[73px] sm:h-[130px] flex-shrink-0 overflow-hidden rounded-lg border">
+                        <div key={idx} className="w-[42px] h-[75px] sm:w-[73px] sm:h-[130px] flex-shrink-0 overflow-hidden rounded-lg border">
                           <img 
                             src={img}
                             alt={`Input image ${idx + 1}`}
@@ -191,7 +265,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     </div>
                     {/* 9:16 output video */}
                     <div 
-                      className="w-[150px] h-[267px] sm:w-[148px] sm:h-[264px] flex-shrink-0 relative overflow-hidden rounded-lg border"
+                      className="w-[117px] h-[208px] sm:w-[148px] sm:h-[264px] flex-shrink-0 relative overflow-hidden rounded-lg border"
                       style={{ transform: 'translateZ(0)', willChange: 'transform' }}
                     >
                       <video 
@@ -212,8 +286,8 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               return null;
             })()}
             
-            {/* Right side: Output video - fixed size (hidden for 4-image layout which has its own) */}
-            {selectedTravelExample !== 1 && (
+            {/* Right side: Output video - fixed size (hidden for 4-image and 7-image layouts which have their own) */}
+            {selectedTravelExample === 0 && (
             <div 
               className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative"
               style={{ transform: 'translateZ(0)', willChange: 'transform' }}
@@ -317,30 +391,48 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                   )}
                 >
                   {/* Mini preview grid matching the layout */}
-                  <div className={cn(
-                    "gap-1",
-                    example.images.length === 2 && "flex flex-row",
-                    example.images.length === 3 && "flex flex-row",
-                    example.images.length === 4 && "flex flex-row"
-                  )}>
-                    {thumbImages.map((img, imgIdx) => (
-                      <div 
-                        key={imgIdx} 
-                        className={cn(
-                          "bg-muted/50 rounded-sm overflow-hidden",
-                          example.images.length === 2 && "w-6 h-6 aspect-square",
-                          example.images.length === 3 && "w-6 aspect-[4/3]",
-                          example.images.length === 4 && "w-4 h-7"
-                        )}
-                      >
-                        <img 
-                          src={img}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
+                  {example.images.length === 7 ? (
+                    // 7 images: 1 2 3 4 / 5 6 7 (centered)
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex gap-0.5">
+                        {thumbImages.slice(0, 4).map((img, imgIdx) => (
+                          <div key={imgIdx} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden">
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                      <div className="flex gap-0.5 justify-center">
+                        {thumbImages.slice(4, 7).map((img, imgIdx) => (
+                          <div key={imgIdx + 4} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden">
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={cn(
+                      "gap-1",
+                      example.images.length === 2 && "flex flex-row",
+                      example.images.length === 4 && "flex flex-row"
+                    )}>
+                      {thumbImages.map((img, imgIdx) => (
+                        <div 
+                          key={imgIdx} 
+                          className={cn(
+                            "bg-muted/50 rounded-sm overflow-hidden",
+                            example.images.length === 2 && "w-6 h-6 aspect-square",
+                            example.images.length === 4 && "w-4 h-7"
+                          )}
+                        >
+                          <img 
+                            src={img}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -400,45 +492,83 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
         {/* ═══════════════════════════════════════════════════════════════════
             SECTION 3: LoRA Selector for Motion Styles
-            - 16:9 video with LoRA selector on the right
+            - Starting/ending images left, 2x2 video grid right
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-relaxed">
             You can also use community-trained LoRAs to <span className="text-wes-vintage-gold">give the motion a distinctive style</span>:
           </p>
           
-          <div className="flex gap-3">
-            {/* LoRA selector (left, right-aligned, fixed width) */}
-            <div className="flex flex-col items-end gap-2 w-28 sm:w-32">
-              {loraOptions.map((lora, idx) => (
-                <button
-                  key={lora.id}
-                  onClick={() => setSelectedLora(idx)}
-                  className={cn(
-                    "w-full px-2 py-2 text-xs rounded-md transition-all duration-200 text-right",
-                    selectedLora === idx
-                      ? "bg-primary/20 text-primary border border-primary/30"
-                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50 border border-transparent"
-                  )}
-                >
-                  {lora.label}
-                </button>
-              ))}
+          <div className="flex gap-4 items-center">
+            {/* Left: Starting and ending images stacked */}
+            <div className="flex flex-col gap-2">
+              {/* Starting image - label above */}
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] italic text-muted-foreground/60">starting</span>
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50">
+                  <img 
+                    src="/lora-3.png"
+                    alt="starting image"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+              {/* Ending image - label below */}
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50">
+                  <img 
+                    src="/lora-4.png"
+                    alt="ending image"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span className="text-[10px] italic text-muted-foreground/60">ending</span>
+              </div>
             </div>
             
-            {/* Video display (16:9) */}
-            <div className="flex-1">
-              <div className="aspect-video bg-muted/30 rounded-lg border border-muted/50 overflow-hidden">
-                <video 
-                  key={loraOptions[selectedLora].id}
-                  src={loraOptions[selectedLora].video}
-                  muted
-                  loop
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
+            {/* Right: 2x2 grid of videos with labels */}
+            <div className="flex-1 relative">
+              <div className="grid grid-cols-2 gap-0 rounded-lg border border-muted/50 overflow-hidden">
+                {loraOptions.map((lora, idx) => (
+                  <div key={lora.id} className="relative aspect-square bg-muted/30 overflow-hidden">
+                    <video 
+                      ref={(el) => { loraVideosRef.current[idx] = el; }}
+                      src={lora.video}
+                      muted
+                      playsInline
+                      preload="auto"
+                      onCanPlay={() => {
+                        loraVideosReadyRef.current[idx] = true;
+                        maybeStartLoraVideosTogether();
+                      }}
+                      onEnded={() => {
+                        if (idx === 0) setLoraVideosEnded(true);
+                      }}
+                      className="w-full h-full object-cover"
+                    />
+                    <span className={cn(
+                      "absolute text-[10px] text-white bg-black/70 px-1.5 py-0.5 w-24 h-8 flex items-center justify-center text-center leading-tight z-10",
+                      idx === 0 && "bottom-0 right-0 rounded-tl",
+                      idx === 1 && "bottom-0 left-0 rounded-tr",
+                      idx === 2 && "top-0 right-0 rounded-bl",
+                      idx === 3 && "top-0 left-0 rounded-br"
+                    )}>{lora.label.replace(/-/g, ' ')}</span>
+                  </div>
+                ))}
               </div>
+              {/* Play button overlay */}
+              {loraVideosEnded && (
+                <button
+                  onClick={replayLoraVideos}
+                  className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg transition-opacity duration-300 z-20"
+                >
+                  <div className="w-7 h-7 rounded-full border border-white bg-black/50 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
         </div>

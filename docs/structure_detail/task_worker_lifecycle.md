@@ -36,9 +36,11 @@ For a complete step-by-step breakdown with error handling, see: [**Task Processi
 
 ### 2. Worker Polling & Task Processing
 - **External Workers** (Headless-Wan2GP) poll via `claim_next_task` Edge Function:
-  - Finds oldest `Queued` task using `func_claim_available_task`
+  - Uses **model affinity**: prefers tasks matching worker's `current_model` to avoid model reloads
+  - Falls back to FIFO (oldest first) if no model match or worker hasn't reported a model
   - Updates to `In Progress` with `worker_id`
   - Returns task details
+- **Model Tracking**: Workers call `update-worker-model` after loading a model to enable affinity matching
 - **Task Processing** now uses **Database Triggers** (instant):
   - When task status → `Complete`: SQL trigger `create_generation_on_task_complete` runs
   - Creates generations and shot_generations automatically in the database

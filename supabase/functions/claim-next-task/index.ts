@@ -26,7 +26,8 @@ declare const Deno: any;
  * Headers: Authorization: Bearer <JWT or PAT>
  * Body: {
  *   worker_id?: string,        // Optional worker ID for service role
- *   run_type?: 'gpu' | 'api'  // Optional: filter tasks by execution environment
+ *   run_type?: 'gpu' | 'api', // Optional: filter tasks by execution environment
+ *   same_model_only?: boolean // Optional: only claim tasks matching worker's current_model (for model affinity)
  * }
  * 
  * Returns:
@@ -81,6 +82,7 @@ serve(async (req) => {
 
   const workerId = requestBody.worker_id || `edge_${crypto.randomUUID()}`;
   const runType = requestBody.run_type || null; // 'gpu', 'api', or null (no filtering)
+  const sameModelOnly = requestBody.same_model_only || false; // Only claim tasks matching worker's current model
 
   let callerId: string | null = null;
   let isServiceRole = false;
@@ -149,7 +151,8 @@ serve(async (req) => {
       const pathType = runType === 'api' ? 'API' : 'GPU';
       logger.info(`Claiming task (service-role, ${pathType} path)`, { 
         worker_id: workerId, 
-        run_type: runType 
+        run_type: runType,
+        same_model_only: sameModelOnly
       });
       
       let claimResult, claimError;
@@ -158,7 +161,8 @@ serve(async (req) => {
           .rpc('claim_next_task_service_role', {
             p_worker_id: workerId,
             p_include_active: false,
-            p_run_type: runType
+            p_run_type: runType,
+            p_same_model_only: sameModelOnly
           });
         
         claimResult = rpcResponse.data;
@@ -180,7 +184,8 @@ serve(async (req) => {
       if (!claimResult || claimResult.length === 0) {
         logger.info("No eligible tasks available", { 
           worker_id: workerId, 
-          run_type: runType 
+          run_type: runType,
+          same_model_only: sameModelOnly
         });
         
         // Add detailed debugging analysis
