@@ -47,6 +47,9 @@ const getThumbPath = (src: string): string => {
   if (src.endsWith('-poster.jpg')) {
     return `/thumbs/${src.slice(1).replace('.jpg', '-thumb.jpg')}`;
   }
+  if (src.startsWith('/example-image')) {
+    return `/thumbs/${src.slice(1).replace('.jpg', '-thumb.jpg')}`;
+  }
   return src; // No thumb available, use original
 };
 
@@ -293,6 +296,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   selectedExampleStyle,
 }) => {
   const philosophyVideoRef = useRef<HTMLVideoElement | null>(null);
+  const travelVideoRefs = useRef<(HTMLVideoElement | null)[]>([null, null, null]);
   const loraVideosRef = useRef<(HTMLVideoElement | null)[]>([]);
   const loraVideosReadyRef = useRef<boolean[]>([false, false, false, false]);
   const loraVideosSyncedStartRef = useRef(false);
@@ -304,6 +308,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const [selectedReferenceImage, setSelectedReferenceImage] = useState(0);
   const [selectedImageLora, setSelectedImageLora] = useState(0);
   const [loraPlaying, setLoraPlaying] = useState(false);
+  const [travelVideoEnded, setTravelVideoEnded] = useState<Set<number>>(new Set([0, 1, 2])); // All start with play button visible
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [loadedVideos, setLoadedVideos] = useState<Set<string>>(new Set());
   const loadedImagesRef = useRef<Set<string>>(new Set());
@@ -324,6 +329,23 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
   const handleVideoLoad = (src: string) => {
     setLoadedVideos(prev => new Set(prev).add(src));
+  };
+
+  const playTravelVideo = (idx: number) => {
+    const video = travelVideoRefs.current[idx];
+    if (video) {
+      video.currentTime = 0;
+      setTravelVideoEnded(prev => {
+        const next = new Set(prev);
+        next.delete(idx);
+        return next;
+      });
+      video.play().catch(() => {});
+    }
+  };
+
+  const handleTravelVideoEnded = (idx: number) => {
+    setTravelVideoEnded(prev => new Set(prev).add(idx));
   };
 
   const toggleLoraPlay = () => {
@@ -363,16 +385,30 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
     }
   }, [isOpen]);
 
-  // Play philosophy video when pane finishes opening
+  // Play travel video when pane finishes opening
   useEffect(() => {
-    if (isOpen && !isOpening && philosophyVideoRef.current) {
-      philosophyVideoRef.current.currentTime = 0;
-      philosophyVideoRef.current.play().catch(() => {});
-    } else if (!isOpen && !isClosing && philosophyVideoRef.current) {
-      philosophyVideoRef.current.pause();
-      philosophyVideoRef.current.currentTime = 0;
+    if (isOpen && !isOpening) {
+      // Play the currently selected travel video
+      playTravelVideo(selectedTravelExample);
+    } else if (!isOpen && !isClosing) {
+      // Stop all travel videos when closed
+      travelVideoRefs.current.forEach(v => {
+        if (v) {
+          v.pause();
+          v.currentTime = 0;
+        }
+      });
+      // Reset all play buttons to visible
+      setTravelVideoEnded(new Set([0, 1, 2]));
     }
   }, [isOpen, isOpening, isClosing]);
+
+  // Play video when switching tabs
+  useEffect(() => {
+    if (isOpen && !isOpening) {
+      playTravelVideo(selectedTravelExample);
+    }
+  }, [selectedTravelExample]);
 
   return (
     <GlassSidePane isOpen={isOpen} onClose={onClose} side="right" zIndex={60}>
@@ -471,18 +507,46 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       className="w-[240px] h-[172px] sm:w-[296px] sm:h-[212px] flex-shrink-0 relative overflow-hidden rounded-lg border"
                       style={{ transform: 'translateZ(0)', willChange: 'transform' }}
                     >
-                      {!loadedVideos.has(example.video) && <Skeleton className="absolute inset-0" />}
                       <video 
+                        ref={(el) => { travelVideoRefs.current[2] = el; }}
                         src={example.video}
-                        poster={example.poster}
                         muted
-                        loop
-                        autoPlay
                         playsInline
                         preload="metadata"
-                        className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedVideos.has(example.video) && "opacity-0")}
-                        onCanPlay={() => handleVideoLoad(example.video)}
+                        className="w-full h-full object-cover"
+                        onEnded={() => handleTravelVideoEnded(2)}
                       />
+                      {/* Poster overlay - thumbnail loads instantly, full fades in */}
+                      <img 
+                        src={getThumbPath(example.poster)}
+                        alt=""
+                        className={cn(
+                          "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
+                          !travelVideoEnded.has(2) && "opacity-0"
+                        )}
+                      />
+                      <img 
+                        ref={(imgEl) => handleImageRef(imgEl, example.poster)}
+                        src={example.poster}
+                        alt=""
+                        onLoad={() => handleImageLoad(example.poster)}
+                        className={cn(
+                          "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
+                          (!travelVideoEnded.has(2) || !loadedImages.has(example.poster)) && "opacity-0"
+                        )}
+                      />
+                      {/* Play button overlay */}
+                      <button
+                        onClick={() => playTravelVideo(2)}
+                        className={cn(
+                          "absolute inset-0 bg-black/40 flex items-center justify-center text-white hover:bg-black/50 transition-all duration-300",
+                          travelVideoEnded.has(2) ? "opacity-100" : "opacity-0 pointer-events-none"
+                        )}
+                      >
+                        <svg className="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 );
@@ -519,18 +583,46 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       className="w-[117px] h-[208px] sm:w-[148px] sm:h-[264px] flex-shrink-0 relative overflow-hidden rounded-lg border"
                       style={{ transform: 'translateZ(0)', willChange: 'transform' }}
                     >
-                      {!loadedVideos.has(example.video) && <Skeleton className="absolute inset-0" />}
                       <video 
+                        ref={(el) => { travelVideoRefs.current[1] = el; }}
                         src={example.video}
-                        poster={example.poster}
                         muted
-                        loop
-                        autoPlay
                         playsInline
                         preload="metadata"
-                        className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedVideos.has(example.video) && "opacity-0")}
-                        onCanPlay={() => handleVideoLoad(example.video)}
+                        className="w-full h-full object-cover"
+                        onEnded={() => handleTravelVideoEnded(1)}
                       />
+                      {/* Poster overlay - thumbnail loads instantly, full fades in */}
+                      <img 
+                        src={getThumbPath(example.poster)}
+                        alt=""
+                        className={cn(
+                          "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
+                          !travelVideoEnded.has(1) && "opacity-0"
+                        )}
+                      />
+                      <img 
+                        ref={(imgEl) => handleImageRef(imgEl, example.poster)}
+                        src={example.poster}
+                        alt=""
+                        onLoad={() => handleImageLoad(example.poster)}
+                        className={cn(
+                          "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
+                          (!travelVideoEnded.has(1) || !loadedImages.has(example.poster)) && "opacity-0"
+                        )}
+                      />
+                      {/* Play button overlay */}
+                      <button
+                        onClick={() => playTravelVideo(1)}
+                        className={cn(
+                          "absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center text-white hover:bg-black/50 transition-all duration-300",
+                          travelVideoEnded.has(1) ? "opacity-100" : "opacity-0 pointer-events-none"
+                        )}
+                      >
+                        <svg className="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 );
@@ -542,79 +634,50 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             {/* Right side: Output video - fixed size (hidden for 4-image and 7-image layouts which have their own) */}
             {selectedTravelExample === 0 && (
             <div 
-              className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative"
+              className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative overflow-hidden rounded-lg border"
               style={{ transform: 'translateZ(0)', willChange: 'transform' }}
             >
               <video 
-                key={selectedTravelExample === 0 ? selectedExampleStyle : travelExamples[selectedTravelExample].id}
+                key={selectedExampleStyle}
                 ref={(video) => {
-                  if (selectedTravelExample === 0) {
-                    philosophyVideoRef.current = video;
-                  }
-                  if (video && isOpen) {
-                    const playButton = video.nextElementSibling as HTMLElement | null;
-                    if (playButton) {
-                      playButton.style.display = 'none';
-                      playButton.style.opacity = '0';
-                    }
-                  }
+                  philosophyVideoRef.current = video;
+                  travelVideoRefs.current[0] = video;
                 }}
-                src={selectedTravelExample === 0 ? currentExample.video : PLACEHOLDER}
-                poster={selectedTravelExample === 0 ? currentExample.image1 : PLACEHOLDER}
+                src={currentExample.video}
                 muted
                 playsInline
                 preload="auto"
                 crossOrigin="anonymous"
                 disableRemotePlayback
-                onCanPlay={(e) => {
-                  const v = e.currentTarget as HTMLVideoElement;
-                  if (v.paused && isOpen && !isOpening) v.play().catch(() => {});
-                }}
-                onPlay={(e) => {
-                  const video = e.target as HTMLVideoElement;
-                  const playButton = video.nextElementSibling as HTMLElement | null;
-                  if (playButton) {
-                    playButton.style.display = 'none';
-                    playButton.style.opacity = '0';
-                  }
-                  video.style.opacity = '1';
-                }}
-                onLoadStart={(e) => {
-                  const video = e.target as HTMLVideoElement;
-                  video.style.opacity = '1';
-                }}
-                onEnded={(e) => {
-                  const playButton = (e.target as HTMLElement).nextElementSibling as HTMLElement | null;
-                  if (playButton) {
-                    playButton.style.display = 'flex';
-                    playButton.style.backdropFilter = 'blur(0px)';
-                    playButton.style.opacity = '1';
-                    let blurAmount = 0;
-                    const blurInterval = setInterval(() => {
-                      blurAmount += 0.05;
-                      playButton.style.backdropFilter = `blur(${blurAmount}px)`;
-                      if (blurAmount >= 2) clearInterval(blurInterval);
-                    }, 100);
-                  }
-                }}
-                className="w-full h-full object-cover border rounded-lg transition-opacity duration-75"
+                onEnded={() => handleTravelVideoEnded(0)}
+                className="w-full h-full object-cover"
               />
+              {/* Poster overlay - thumbnail loads instantly, full fades in */}
+              <img 
+                src={getThumbPath(currentExample.image1)}
+                alt=""
+                className={cn(
+                  "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
+                  !travelVideoEnded.has(0) && "opacity-0"
+                )}
+              />
+              <img 
+                ref={(imgEl) => handleImageRef(imgEl, currentExample.image1)}
+                src={currentExample.image1}
+                alt=""
+                onLoad={() => handleImageLoad(currentExample.image1)}
+                className={cn(
+                  "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
+                  (!travelVideoEnded.has(0) || !loadedImages.has(currentExample.image1)) && "opacity-0"
+                )}
+              />
+              {/* Play button overlay */}
               <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const video = e.currentTarget.previousElementSibling as HTMLVideoElement | null;
-                  if (video) {
-                    video.currentTime = 0;
-                    video.play();
-                    e.currentTarget.style.opacity = '0';
-                    setTimeout(() => {
-                      e.currentTarget.style.display = 'none';
-                    }, 300);
-                  }
-                }}
-                className="absolute inset-0 bg-black/40 rounded-lg items-center justify-center text-white hover:bg-black/50 transition-all duration-500 opacity-0"
-                style={{ display: 'none' }}
+                onClick={() => playTravelVideo(0)}
+                className={cn(
+                  "absolute inset-0 bg-black/40 flex items-center justify-center text-white hover:bg-black/50 transition-all duration-300",
+                  travelVideoEnded.has(0) ? "opacity-100" : "opacity-0 pointer-events-none"
+                )}
               >
                 <svg className="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z"/>
