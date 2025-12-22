@@ -74,6 +74,7 @@ const MotionComparison = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [fadeOpacity, setFadeOpacity] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLVideoElement>(null);
   const videoOutputRef = useRef<HTMLVideoElement>(null);
@@ -93,6 +94,7 @@ const MotionComparison = () => {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current || !isPlaying) return;
+    setIsAnimating(false); // Stop animation when user drags
     const rect = containerRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     setSliderPos((x / rect.width) * 100);
@@ -100,6 +102,7 @@ const MotionComparison = () => {
   
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!containerRef.current || !isPlaying) return;
+    setIsAnimating(false); // Stop animation when user drags
     const rect = containerRef.current.getBoundingClientRect();
     const touchX = e.touches[0].clientX;
     const x = Math.max(0, Math.min(touchX - rect.left, rect.width));
@@ -112,6 +115,7 @@ const MotionComparison = () => {
     setIsPlaying(nextIsPlaying);
     
     if (nextIsPlaying) {
+      setIsAnimating(true);
       setSliderPos(20); // Start showing 80% of the result
       videoInputRef.current?.play().catch(() => {});
       videoOutputRef.current?.play().catch(() => {});
@@ -130,6 +134,7 @@ const MotionComparison = () => {
          }
       }
     } else {
+      setIsAnimating(true);
       videoInputRef.current?.pause();
       videoOutputRef.current?.pause();
       setSliderPos(50);
@@ -166,7 +171,7 @@ const MotionComparison = () => {
 
       {/* Input Video (Left / Foreground) - Clipped */}
       <div 
-        className="absolute inset-0 overflow-hidden"
+        className={cn("absolute inset-0 overflow-hidden", isAnimating && "transition-[clip-path] duration-500 ease-out")}
         style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
       >
         <video 
@@ -191,7 +196,7 @@ const MotionComparison = () => {
       {/* Slider Handle - Only visible when playing */}
       {isPlaying && (
         <div 
-          className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(0,0,0,0.5)] pointer-events-none z-10"
+          className={cn("absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(0,0,0,0.5)] pointer-events-none z-10", isAnimating && "transition-[left] duration-500 ease-out")}
           style={{ left: `${sliderPos}%` }}
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/50 shadow-lg">
@@ -289,21 +294,26 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   };
 
   const toggleLoraPlay = () => {
-    const nextPlaying = !loraPlaying;
-    setLoraPlaying(nextPlaying);
-    
-    if (nextPlaying) {
-      // Play all videos from the start
-      loraVideosRef.current.forEach(v => {
-        if (v) {
-          v.currentTime = 0;
-          v.play().catch(() => {});
-        }
-      });
-    } else {
+    if (loraPlaying) {
+      // Pause
+      setLoraPlaying(false);
       loraVideosRef.current.forEach(v => {
         if (v) v.pause();
       });
+    } else {
+      // Play - wait for video to actually start playing before hiding button
+      const video = loraVideosRef.current[0];
+      if (video) {
+        video.currentTime = 0;
+        const onPlaying = () => {
+          setLoraPlaying(true);
+          video.removeEventListener('playing', onPlaying);
+        };
+        video.addEventListener('playing', onPlaying);
+        video.play().catch(() => {
+          video.removeEventListener('playing', onPlaying);
+        });
+      }
     }
   };
 
@@ -733,13 +743,21 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 <video 
                   ref={(el) => { if (el) loraVideosRef.current[0] = el; }}
                   src="/lora-grid-combined.mp4"
-                  poster="/lora-grid-combined-poster.jpg"
                   muted
                   playsInline
-                  preload="metadata"
+                  preload="auto"
                   onCanPlay={() => handleVideoLoad('/lora-grid-combined.mp4')}
                   onEnded={() => setLoraPlaying(false)}
-                  className={cn("w-full h-full object-cover transition-opacity duration-300")}
+                  className="w-full h-full object-cover"
+                />
+                {/* Poster overlay - stays visible until playing */}
+                <img 
+                  src="/lora-grid-combined-poster.jpg"
+                  alt=""
+                  className={cn(
+                    "absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none",
+                    loraPlaying ? "opacity-0" : "opacity-100"
+                  )}
                 />
                 
                 {/* Labels overlay */}
