@@ -420,6 +420,33 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
     }
   }, [selectedTravelExample]);
 
+  // Preload critical images when pane opens
+  useEffect(() => {
+    if (isOpen) {
+      const imagesToPreload = [
+        // Travel video posters
+        currentExample.image1,
+        currentExample.image2,
+        '/916-output-poster.jpg',
+        '/h-output-poster.jpg',
+        // 4-image input images
+        '/916-1.jpg', '/916-2.jpg', '/916-3.jpg', '/916-4.jpg',
+        // 7-image input images
+        '/h1-crop.webp', '/h2-crop.webp', '/h3-crop.webp', '/h4-crop.webp',
+        '/h5-crop.webp', '/h6-crop.webp', '/h7-crop.webp',
+        // LoRA section images
+        '/lora-3.webp', '/lora-4.webp', '/lora-grid-combined-poster.jpg',
+      ];
+      imagesToPreload.forEach(src => {
+        const img = new Image();
+        img.onload = () => handleImageLoad(src);
+        img.src = src;
+        // If already cached, onload fires synchronously or check complete
+        if (img.complete) handleImageLoad(src);
+      });
+    }
+  }, [isOpen, currentExample.image1, currentExample.image2]);
+
   return (
     <GlassSidePane isOpen={isOpen} onClose={onClose} side="right" zIndex={60}>
       {/* Header */}
@@ -526,7 +553,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         className="w-full h-full object-cover"
                         onEnded={() => handleTravelVideoEnded(2)}
                       />
-                      {/* Poster overlay - only show before first play */}
+                      {/* Thumbnail - only show before first play */}
                       <img
                         src={getThumbPath(example.poster)}
                         alt=""
@@ -535,6 +562,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                           (!travelVideoEnded.has(2) || travelVideoPlayed.has(2)) && "opacity-0"
                         )}
                       />
+                      {/* Full poster - only show before first play */}
                       <img
                         ref={(imgEl) => handleImageRef(imgEl, example.poster)}
                         src={example.poster}
@@ -602,7 +630,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         className="w-full h-full object-cover"
                         onEnded={() => handleTravelVideoEnded(1)}
                       />
-                      {/* Poster overlay - only show before first play */}
+                      {/* Thumbnail - only show before first play */}
                       <img
                         src={getThumbPath(example.poster)}
                         alt=""
@@ -611,6 +639,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                           (!travelVideoEnded.has(1) || travelVideoPlayed.has(1)) && "opacity-0"
                         )}
                       />
+                      {/* Full poster - only show before first play */}
                       <img
                         ref={(imgEl) => handleImageRef(imgEl, example.poster)}
                         src={example.poster}
@@ -662,7 +691,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 onEnded={() => handleTravelVideoEnded(0)}
                 className="w-full h-full object-cover"
               />
-              {/* Poster overlay - only show before first play */}
+              {/* Thumbnail - only show before first play */}
               <img
                 src={getThumbPath(currentExample.image1)}
                 alt=""
@@ -671,6 +700,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                   (!travelVideoEnded.has(0) || travelVideoPlayed.has(0)) && "opacity-0"
                 )}
               />
+              {/* Full poster - only show before first play */}
               <img
                 ref={(imgEl) => handleImageRef(imgEl, currentExample.image1)}
                 src={currentExample.image1}
@@ -780,9 +810,8 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
             You can use <span className="text-wes-vintage-gold">reference videos to steer the motion</span> - here's an example of how images and video references combine:
           </p>
           
-          <div className="flex gap-3 w-full">
-            <div className="space-y-1 flex-[2]">
-              <span className="text-xs text-muted-foreground/70">Input Images</span>
+          <div className="flex gap-3 w-full items-center">
+            <div className="flex-[2]">
               <div className="aspect-square grid grid-cols-4 grid-rows-4 gap-1">
                 {Array.from({ length: 16 }).map((_, idx) => {
                   const imgNum = String(idx + 1).padStart(3, '0');
@@ -809,10 +838,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               </div>
             </div>
             
-            <div className="space-y-1 flex-[3]">
-              <div className="flex justify-between">
-                <span className="text-xs text-muted-foreground/70">Motion & Output</span>
-              </div>
+            <div className="flex-[3]">
               <MotionComparison />
             </div>
           </div>
