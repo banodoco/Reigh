@@ -41,6 +41,12 @@ const getThumbPath = (src: string): string => {
   if (src.startsWith('/h') && src.includes('-crop.webp')) {
     return `/thumbs/${src.slice(1).replace('.webp', '-thumb.webp')}`;
   }
+  if (src.startsWith('/lora-') && src.endsWith('.webp')) {
+    return `/thumbs/${src.slice(1).replace('.webp', '-thumb.webp')}`;
+  }
+  if (src.endsWith('-poster.jpg')) {
+    return `/thumbs/${src.slice(1).replace('.jpg', '-thumb.jpg')}`;
+  }
   return src; // No thumb available, use original
 };
 
@@ -176,7 +182,6 @@ const MotionComparison = () => {
       <video 
         ref={videoOutputRef}
         src="/motion-output.mp4"
-        poster="/motion-output-poster.jpg"
         className="absolute inset-0 w-full h-full object-cover"
         loop
         muted={isMuted}
@@ -184,6 +189,12 @@ const MotionComparison = () => {
         preload="metadata"
         onTimeUpdate={handleTimeUpdate}
         onSeeked={() => setFadeOpacity(0)}
+      />
+      {/* Output poster overlay - thumbnail first, then full */}
+      <img 
+        src={getThumbPath('/motion-output-poster.jpg')}
+        alt=""
+        className={cn("absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300", isPlaying && "opacity-0")}
       />
 
       {/* Input Video (Left / Foreground) - Clipped */}
@@ -194,7 +205,6 @@ const MotionComparison = () => {
         <video 
           ref={videoInputRef}
           src="/motion-input.mp4"
-          poster="/motion-input-poster.jpg"
           className="absolute inset-0 w-full h-full object-cover"
           loop
           muted={isMuted}
@@ -207,6 +217,12 @@ const MotionComparison = () => {
                 video.playbackRate = video.duration / videoOutputRef.current.duration;
              }
           }}
+        />
+        {/* Input poster overlay - thumbnail first */}
+        <img 
+          src={getThumbPath('/motion-input-poster.jpg')}
+          alt=""
+          className={cn("absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300", isPlaying && "opacity-0")}
         />
       </div>
 
@@ -433,12 +449,18 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     <div className="flex gap-1">
                       {images.map((img, idx) => (
                         <div key={idx} className="w-[40px] h-[30px] sm:w-[56px] sm:h-[42px] flex-shrink-0 overflow-hidden rounded border relative">
-                          {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
+                          {/* Thumbnail loads first */}
+                          <img 
+                            src={getThumbPath(img)}
+                            alt=""
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                          {/* Full image fades in on top when loaded */}
                           <img 
                             ref={(imgEl) => handleImageRef(imgEl, img)}
                             src={img}
                             alt={`Input image ${idx + 1}`}
-                            className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(img) && "opacity-0")}
+                            className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(img) && "opacity-0")}
                             onLoad={() => handleImageLoad(img)}
                           />
                         </div>
@@ -475,12 +497,18 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                     <div className="grid grid-cols-2 gap-1">
                       {images.map((img, idx) => (
                         <div key={idx} className="w-[42px] h-[75px] sm:w-[73px] sm:h-[130px] flex-shrink-0 overflow-hidden rounded-lg border relative">
-                          {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
+                          {/* Thumbnail loads first */}
+                          <img 
+                            src={getThumbPath(img)}
+                            alt=""
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                          {/* Full image fades in on top when loaded */}
                           <img 
                             ref={(imgEl) => handleImageRef(imgEl, img)}
                             src={img}
                             alt={`Input image ${idx + 1}`}
-                            className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(img) && "opacity-0")}
+                            className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(img) && "opacity-0")}
                             onLoad={() => handleImageLoad(img)}
                           />
                         </div>
@@ -688,12 +716,18 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                   const imgSrc = `/introduction-images/${imgNum}.${idx === 13 ? 'png' : 'jpg'}`;
                   return (
                     <div key={idx} className="aspect-square bg-muted/30 rounded border border-muted/50 overflow-hidden relative">
-                      {!loadedImages.has(imgSrc) && <Skeleton className="absolute inset-0" />}
+                      {/* Thumbnail loads first */}
+                      <img 
+                        src={getThumbPath(imgSrc)}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      {/* Full image fades in on top when loaded */}
                       <img 
                         ref={(imgEl) => handleImageRef(imgEl, imgSrc)}
                         src={imgSrc} 
                         alt={`Input ${idx + 1}`}
-                        className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(imgSrc) && "opacity-0")}
+                        className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(imgSrc) && "opacity-0")}
                         onLoad={() => handleImageLoad(imgSrc)}
                       />
                     </div>
@@ -727,12 +761,18 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[10px] italic text-muted-foreground/60">starting</span>
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50 relative">
-                  {!loadedImages.has('/lora-3.webp') && <Skeleton className="absolute inset-0" />}
+                  {/* Thumbnail loads first */}
+                  <img 
+                    src={getThumbPath('/lora-3.webp')}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {/* Full image fades in on top when loaded */}
                   <img 
                     ref={(imgEl) => handleImageRef(imgEl, '/lora-3.webp')}
                     src="/lora-3.webp"
                     alt="starting image"
-                    className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has('/lora-3.webp') && "opacity-0")}
+                    className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-300", !loadedImages.has('/lora-3.webp') && "opacity-0")}
                     onLoad={() => handleImageLoad('/lora-3.webp')}
                   />
                 </div>
@@ -740,12 +780,18 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
               {/* Ending image - label below */}
               <div className="flex flex-col items-center gap-1">
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-muted/50 relative">
-                  {!loadedImages.has('/lora-4.webp') && <Skeleton className="absolute inset-0" />}
+                  {/* Thumbnail loads first */}
+                  <img 
+                    src={getThumbPath('/lora-4.webp')}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {/* Full image fades in on top when loaded */}
                   <img 
                     ref={(imgEl) => handleImageRef(imgEl, '/lora-4.webp')}
                     src="/lora-4.webp"
                     alt="ending image"
-                    className={cn("w-full h-full object-cover transition-opacity duration-300", !loadedImages.has('/lora-4.webp') && "opacity-0")}
+                    className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-300", !loadedImages.has('/lora-4.webp') && "opacity-0")}
                     onLoad={() => handleImageLoad('/lora-4.webp')}
                   />
                 </div>
@@ -767,13 +813,23 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                   onEnded={() => setLoraPlaying(false)}
                   className="w-full h-full object-cover"
                 />
-                {/* Poster overlay - stays visible until playing */}
+                {/* Poster overlay - thumbnail loads first, full poster fades in */}
                 <img 
-                  src="/lora-grid-combined-poster.jpg"
+                  src={getThumbPath('/lora-grid-combined-poster.jpg')}
                   alt=""
                   className={cn(
-                    "absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none",
+                    "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
                     loraPlaying ? "opacity-0" : "opacity-100"
+                  )}
+                />
+                <img 
+                  ref={(imgEl) => handleImageRef(imgEl, '/lora-grid-combined-poster.jpg')}
+                  src="/lora-grid-combined-poster.jpg"
+                  alt=""
+                  onLoad={() => handleImageLoad('/lora-grid-combined-poster.jpg')}
+                  className={cn(
+                    "absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none",
+                    loraPlaying || !loadedImages.has('/lora-grid-combined-poster.jpg') ? "opacity-0" : "opacity-100"
                   )}
                 />
                 
