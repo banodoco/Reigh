@@ -719,10 +719,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                   {/* Mini preview grid matching the layout */}
                   {example.images.length === 7 ? (
                     // 7 images: 1 2 3 4 / 5 6 7 (centered)
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-0.5 overflow-hidden">
                       <div className="flex gap-0.5">
                         {thumbImages.slice(0, 4).map((img, imgIdx) => (
-                          <div key={imgIdx} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative">
+                          <div key={imgIdx} className="w-5 h-[14px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
                             {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                             <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
                           </div>
@@ -730,7 +730,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                       </div>
                       <div className="flex gap-0.5 justify-center">
                         {thumbImages.slice(4, 7).map((img, imgIdx) => (
-                          <div key={imgIdx + 4} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative">
+                          <div key={imgIdx + 4} className="w-5 h-[14px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
                             {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
                             <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
                           </div>
