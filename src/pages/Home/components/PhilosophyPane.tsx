@@ -310,7 +310,11 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const [loraPlaying, setLoraPlaying] = useState(false);
   const [travelVideoEnded, setTravelVideoEnded] = useState<Set<number>>(new Set([0, 1, 2])); // All start with play button visible
   const [travelVideoPlayed, setTravelVideoPlayed] = useState<Set<number>>(new Set()); // Track which have played at least once
-  const [autoAdvanceProgress, setAutoAdvanceProgress] = useState<number | null>(null); // null = not progressing, 0-100 = progress %
+  const [nextAdvanceIdx, setNextAdvanceIdx] = useState<number | null>(null); // Which selector is showing border animation
+  const [prevAdvanceIdx, setPrevAdvanceIdx] = useState<number | null>(null); // Which selector is losing border animation
+  const [drainingIdx, setDrainingIdx] = useState<number | null>(null); // Which selector's fill is draining
+  const [videoProgress, setVideoProgress] = useState<number>(0); // 0-100% progress of current video
+  const autoAdvanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastProgressUpdateRef = useRef<number>(0);
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [loadedVideos, setLoadedVideos] = useState<Set<string>>(new Set());
@@ -337,7 +341,17 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const playTravelVideo = (idx: number) => {
     const video = travelVideoRefs.current[idx];
     if (video) {
+      // Cancel any pending auto-advance if user manually replays
+      if (autoAdvanceTimeoutRef.current) {
+        clearTimeout(autoAdvanceTimeoutRef.current);
+        autoAdvanceTimeoutRef.current = null;
+      }
+      setNextAdvanceIdx(null);
+      setPrevAdvanceIdx(null);
+      setDrainingIdx(null);
+      
       video.currentTime = 0;
+      setVideoProgress(0); // Reset progress when starting
       // Wait for video to actually start playing before hiding poster
       const onPlaying = () => {
         setTravelVideoEnded(prev => {
@@ -357,31 +371,46 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
   const handleTravelVideoEnded = (idx: number) => {
     setTravelVideoEnded(prev => new Set(prev).add(idx));
+    setDrainingIdx(null); // Clear any draining animation when video ends
     
-    // Pause 2.5 seconds at 100%, then advance to next
-    setTimeout(() => {
-      setAutoAdvanceProgress(null);
-      const nextIdx = (idx + 1) % travelExamples.length;
+    // Start border animation on next selector, remove from current
+    const nextIdx = (idx + 1) % travelExamples.length;
+    setNextAdvanceIdx(nextIdx);
+    setPrevAdvanceIdx(idx);
+    
+    // Timeout slightly longer than animation (2.5s) so animation completes before switch
+    autoAdvanceTimeoutRef.current = setTimeout(() => {
+      setNextAdvanceIdx(null);
+      setPrevAdvanceIdx(null);
+      setDrainingIdx(idx); // Start draining the current video's fill
+      setVideoProgress(0); // Reset progress before switching
       setSelectedTravelExample(nextIdx);
-    }, 2500);
+    }, 2550);
   };
 
-  // Track video progress during playback - fill current selector (throttled to reduce re-renders)
+  // Track video progress during playback
   const handleVideoTimeUpdate = (idx: number, video: HTMLVideoElement) => {
     if (idx !== selectedTravelExample || !video.duration) return;
     
     const now = Date.now();
-    // Throttle updates to every 100ms - CSS transition smooths between updates
     if (now - lastProgressUpdateRef.current < 100) return;
     lastProgressUpdateRef.current = now;
     
     const progress = (video.currentTime / video.duration) * 100;
-    setAutoAdvanceProgress(progress);
+    setVideoProgress(progress);
   };
 
   // Cancel auto-advance when user manually selects a different example
+  // No animations on manual selection - just switch immediately
   const handleSelectExample = (idx: number) => {
-    setAutoAdvanceProgress(null);
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current);
+      autoAdvanceTimeoutRef.current = null;
+    }
+    setNextAdvanceIdx(null);
+    setPrevAdvanceIdx(null);
+    setDrainingIdx(null); // No drain animation on manual click
+    setVideoProgress(0);
     setSelectedTravelExample(idx);
   };
 
@@ -438,8 +467,15 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
       // Reset all play buttons to visible and show posters again
       setTravelVideoEnded(new Set([0, 1, 2]));
       setTravelVideoPlayed(new Set());
-      // Reset auto-advance progress
-      setAutoAdvanceProgress(null);
+      // Cancel any pending auto-advance
+      if (autoAdvanceTimeoutRef.current) {
+        clearTimeout(autoAdvanceTimeoutRef.current);
+        autoAdvanceTimeoutRef.current = null;
+      }
+      setNextAdvanceIdx(null);
+      setPrevAdvanceIdx(null);
+      setDrainingIdx(null);
+      setVideoProgress(0);
     }
   }, [isOpen, isOpening, isClosing]);
 
@@ -479,6 +515,17 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
   return (
     <GlassSidePane isOpen={isOpen} onClose={onClose} side="right" zIndex={60}>
+      {/* Keyframes for border reveal/hide - left to right wave */}
+      <style>{`
+        @keyframes revealBorderLeftToRight {
+          from { clip-path: inset(0 100% 0 0); }
+          to { clip-path: inset(0 0% 0 0); }
+        }
+        @keyframes hideBorderLeftToRight {
+          from { clip-path: inset(0 0% 0 0); }
+          to { clip-path: inset(0 0% 0 100%); }
+        }
+      `}</style>
       {/* Header */}
       <div className="mt-8 sm:mt-10 mb-6 relative z-10">
         <h2 className="text-2xl sm:text-3xl font-theme-heading text-primary leading-tight mb-5">
@@ -768,26 +815,63 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 ? [currentExample.image1, currentExample.image2] 
                 : example.images;
               
-              const isCurrentWithProgress = selectedTravelExample === idx && autoAdvanceProgress !== null;
+              const isNextWithBorder = nextAdvanceIdx === idx;
+              const isPrevWithBorder = prevAdvanceIdx === idx;
+              const isDraining = drainingIdx === idx;
               
               return (
                 <button
                   key={example.id}
                   onClick={() => handleSelectExample(idx)}
-                  className={cn(
-                    "p-2 rounded-lg transition-all duration-200 flex items-center justify-center min-h-[60px] relative overflow-hidden",
-                    selectedTravelExample === idx
-                      ? "bg-muted/30 ring-2 ring-primary/50"
-                      : "bg-muted/30 hover:bg-muted/50"
-                  )}
+                  className="p-2 rounded-lg transition-all duration-200 flex items-center justify-center min-h-[60px] relative overflow-hidden bg-muted/30 hover:bg-muted/50"
                 >
-                  {/* Progress fill on current selection */}
-                  {isCurrentWithProgress && (
+                  {/* Static border for selected item (not during animation) */}
+                  {selectedTravelExample === idx && !isNextWithBorder && (
+                    <div className="absolute inset-0 rounded-lg border-2 border-primary/50 pointer-events-none" />
+                  )}
+                  {/* Progress fill on current playing video */}
+                  {selectedTravelExample === idx && !travelVideoEnded.has(idx) && (
                     <div 
-                      className="absolute inset-0 bg-primary/20"
+                      className="absolute inset-0 bg-primary/20 rounded-lg"
                       style={{ 
-                        clipPath: `inset(0 ${100 - autoAdvanceProgress}% 0 0)`,
-                        transition: 'clip-path 100ms linear',
+                        clipPath: `inset(0 ${100 - videoProgress}% 0 0)`,
+                        transition: 'clip-path 500ms ease-out',
+                      }}
+                    />
+                  )}
+                  {/* Fill stays at 100% during countdown before draining */}
+                  {isPrevWithBorder && !isDraining && (
+                    <div 
+                      className="absolute inset-0 bg-primary/20 rounded-lg"
+                    />
+                  )}
+                  {/* Draining fill on previous video - shrinks from left as new video plays */}
+                  {isDraining && (
+                    <div 
+                      className="absolute inset-0 bg-primary/20 rounded-lg"
+                      style={{ 
+                        clipPath: `inset(0 0 0 ${videoProgress}%)`,
+                        transition: 'clip-path 500ms ease-out',
+                      }}
+                    />
+                  )}
+                  {/* Border being removed left-to-right */}
+                  {isPrevWithBorder && (
+                    <div 
+                      className="absolute inset-0 rounded-lg border-2 border-primary/50 pointer-events-none"
+                      style={{ 
+                        clipPath: 'inset(0 0% 0 0)',
+                        animation: 'hideBorderLeftToRight 2.5s ease-out forwards',
+                      }}
+                    />
+                  )}
+                  {/* Border revealed left-to-right like a wave */}
+                  {isNextWithBorder && selectedTravelExample !== idx && (
+                    <div 
+                      className="absolute inset-0 rounded-lg border-2 border-primary/50 pointer-events-none"
+                      style={{ 
+                        clipPath: 'inset(0 100% 0 0)',
+                        animation: 'revealBorderLeftToRight 2.5s ease-out forwards',
                       }}
                     />
                   )}
