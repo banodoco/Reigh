@@ -282,6 +282,17 @@
     text-transform: lowercase !important;
   }
 
+  /* iOS overscroll fix - ensure background extends into safe areas */
+  html {
+    background-color: hsl(var(--background));
+    /* Prevent rubber-band scrolling on iOS */
+    overscroll-behavior-y: none;
+    /* Ensure full height coverage including safe areas */
+    min-height: 100vh;
+    /* Support iOS safe areas */
+    min-height: -webkit-fill-available;
+  }
+
   body {
     @apply text-foreground font-cocogoose font-light antialiased;
     font-family: 'Cocogoose', 'CocogooseNumbers', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -289,6 +300,11 @@
     /* Removed decorative gradients that were creating visible grid artifacts */
     letter-spacing: 0.015em;
     position: relative;
+    /* Prevent rubber-band scrolling on iOS */
+    overscroll-behavior-y: none;
+    /* Ensure body extends to at least viewport height including safe areas */
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
 
   /* Fix Radix UI scroll lock interfering with Select scroll on mobile */
@@ -311,6 +327,13 @@
     font-weight: var(--theme-body-weight, 350) !important;
     /* Ensure background extends into safe areas on iOS */
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Ensure root element extends full height */
+  #root {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    background-color: hsl(var(--background));
   }
   
   /* Force numbers to use system fonts since Cocogoose trial doesn't include them */
