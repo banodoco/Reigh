@@ -111,6 +111,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Memory profile preference (persistent)
   const [memoryProfile, setMemoryProfile] = usePersistentState<string>("memory-profile", "4");
   
+  // Windows shell type preference (persistent)
+  const [windowsShell, setWindowsShell] = usePersistentState<string>("windows-shell", "cmd");
+  
   // Settings section toggle (Generation vs Transactions vs Preferences)
   const [settingsSection, setSettingsSection] = useState<'app' | 'transactions' | 'preferences'>('app');
   
@@ -438,11 +441,16 @@ Please be very specific with file paths, command syntax, and verification steps 
       const torchInstall = gpuType === "nvidia-50" 
         ? `pip install --no-cache-dir torch==${pytorchVersion} torchvision torchaudio --index-url ${pytorchIndexUrl}`
         : `pip install --no-cache-dir torch torchvision torchaudio --index-url ${pytorchIndexUrl}`;
+      
+      // Shell-specific activation command
+      const activateCmd = windowsShell === "powershell" 
+        ? `.\\venv\\Scripts\\Activate.ps1`
+        : `venv\\Scripts\\activate.bat`;
         
       return `git clone https://github.com/peteromallet/Headless-Wan2GP.git
 cd Headless-Wan2GP
 python -m venv venv
-venv\\Scripts\\activate.bat
+${activateCmd}
 ${torchInstall}
 pip install --no-cache-dir -r Wan2GP/requirements.txt
 pip install --no-cache-dir -r requirements.txt
@@ -473,8 +481,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
     const profileFlag = ` --wgp-profile ${memoryProfile}`;
     
     if (computerType === "windows") {
+      // Shell-specific activation command
+      const activateCmd = windowsShell === "powershell" 
+        ? `.\\venv\\Scripts\\Activate.ps1`
+        : `venv\\Scripts\\activate.bat`;
+        
       return `git pull
-venv\\Scripts\\activate.bat
+${activateCmd}
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux / Mac command
@@ -780,7 +793,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                   {/* Installation section */}
                   <div className="space-y-3">
                     {/* System Configuration Row */}
-                    <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-4'} gap-2`}>
+                    <div className={`grid ${isMobile ? 'grid-cols-2' : computerType === 'windows' ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
                       {/* Computer Type */}
                       <div>
                         <Label className="text-xs text-blue-600 dark:text-blue-400 mb-1 block">Computer:</Label>
@@ -865,6 +878,22 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                         </Select>
                       </div>
 
+                      {/* Windows Shell Type (only shown for Windows) */}
+                      {computerType === "windows" && (
+                        <div>
+                          <Label className="text-xs text-rose-600 dark:text-rose-400 mb-1 block">Shell:</Label>
+                          <Select value={windowsShell} onValueChange={setWindowsShell}>
+                            <SelectTrigger variant="retro" size="sm" colorScheme="rose" className="w-full h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent variant="retro">
+                              <SelectItem variant="retro" value="cmd">Command Prompt</SelectItem>
+                              <SelectItem variant="retro" value="powershell">PowerShell</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
                       {/* Debug Logs Toggle */}
                       <div>
                         <Label className="text-xs text-amber-600 dark:text-amber-400 mb-1 block">Debug:</Label>
@@ -886,6 +915,16 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                         </button>
                       </div>
                     </div>
+                    
+                    {/* PowerShell Execution Policy Notice */}
+                    {computerType === "windows" && windowsShell === "powershell" && (
+                      <div className="p-2 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-lg">
+                        <p className="text-xs text-rose-800 dark:text-rose-300">
+                          <strong>PowerShell note:</strong> If activation fails, run this once first:{" "}
+                          <code className="bg-rose-100 dark:bg-rose-900 px-1 rounded">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code>
+                        </p>
+                      </div>
+                    )}
                     
                     {/* Mac Notice */}
                     {computerType === "mac" && (
