@@ -447,7 +447,7 @@ ${torchInstall}
 pip install --no-cache-dir -r Wan2GP/requirements.txt
 pip install --no-cache-dir -r requirements.txt
 echo Checking CUDA availability...
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA devices: {torch.cuda.device_count()}'); print(f'CUDA device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
+python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))"
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux command (existing)
@@ -456,9 +456,10 @@ cd Headless-Wan2GP && \\
 apt-get update && apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
 source venv/bin/activate && \\
-pip install --no-cache-dir torch==${pytorchVersion} torchvision torchaudio -f ${pytorchIndexUrl} && \\
+pip install --no-cache-dir torch==${pytorchVersion} torchvision torchaudio --index-url ${pytorchIndexUrl} && \\
 pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 pip install --no-cache-dir -r requirements.txt && \\
+python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))" && \\
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
   --supabase-access-token ${token}${debugFlag}${profileFlag}`;
