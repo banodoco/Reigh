@@ -433,15 +433,14 @@ Please be very specific with file paths, command syntax, and verification steps 
     const debugFlag = showDebugLogs ? ' --debug' : '';
     const profileFlag = ` --wgp-profile ${memoryProfile}`;
     
-    // Determine PyTorch version based on GPU type
-    const pytorchVersion = gpuType === "nvidia-50" ? "2.7.0" : "2.6.0";
     const pytorchIndexUrl = "https://download.pytorch.org/whl/cu124";
     
+    // PyTorch install: pin to 2.7.0 for 50 series (Blackwell), latest for others
+    const torchInstall = gpuType === "nvidia-50" 
+      ? `pip install --no-cache-dir torch==2.7.0 torchvision torchaudio --index-url ${pytorchIndexUrl}`
+      : `pip install --no-cache-dir torch torchvision torchaudio --index-url ${pytorchIndexUrl}`;
+    
     if (computerType === "windows") {
-      const torchInstall = gpuType === "nvidia-50" 
-        ? `pip install --no-cache-dir torch==${pytorchVersion} torchvision torchaudio --index-url ${pytorchIndexUrl}`
-        : `pip install --no-cache-dir torch torchvision torchaudio --index-url ${pytorchIndexUrl}`;
-      
       // Shell-specific activation command
       const activateCmd = windowsShell === "powershell" 
         ? `.\\venv\\Scripts\\Activate.ps1`
@@ -458,13 +457,13 @@ echo Checking CUDA availability...
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))"
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
-      // Linux command (existing)
+      // Linux command
       return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
 cd Headless-Wan2GP && \\
-apt-get update && apt-get install -y python3.10-venv ffmpeg && \\
+sudo apt-get update && sudo apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
 source venv/bin/activate && \\
-pip install --no-cache-dir torch==${pytorchVersion} torchvision torchaudio --index-url ${pytorchIndexUrl} && \\
+${torchInstall} && \\
 pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 pip install --no-cache-dir -r requirements.txt && \\
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))" && \\
