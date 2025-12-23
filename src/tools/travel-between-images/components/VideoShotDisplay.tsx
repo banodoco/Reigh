@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { isVideoGeneration } from '@/shared/lib/typeGuards';
+import { isVideoGeneration, isPositioned } from '@/shared/lib/typeGuards';
 import { VideoGenerationModal } from '@/shared/components/VideoGenerationModal';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -223,13 +223,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     }
   };
 
-  // Thumbnail mosaic: show non-video images; sort positioned first by timeline_frame,
-  // then unpositioned (uploads can arrive unpositioned).
+  // Thumbnail mosaic: show only positioned non-video images (images with valid timeline_frame)
+  // Filter out videos AND unpositioned images (position removed = should not show in shot list)
   const displayImages = (shot.images || [])
-    .filter(img => !isVideoGeneration(img))
+    .filter(img => !isVideoGeneration(img) && isPositioned(img))
     .sort((a, b) => {
-      const fa = a.timeline_frame ?? Number.POSITIVE_INFINITY;
-      const fb = b.timeline_frame ?? Number.POSITIVE_INFINITY;
+      const fa = a.timeline_frame ?? 0;
+      const fb = b.timeline_frame ?? 0;
       return fa - fb;
     });
 
