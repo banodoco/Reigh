@@ -282,6 +282,14 @@
     text-transform: lowercase !important;
   }
 
+  /* Support modern viewport units for iOS browser chrome handling */
+  /* dvh (dynamic viewport height) adjusts automatically when browser chrome shows/hides */
+  /* Fallback to 100vh for older browsers, then override with dvh where supported */
+  html {
+    height: 100vh;
+    height: 100dvh;
+  }
+
   body {
     @apply text-foreground font-cocogoose font-light antialiased;
     font-family: 'Cocogoose', 'CocogooseNumbers', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -289,6 +297,8 @@
     /* Removed decorative gradients that were creating visible grid artifacts */
     letter-spacing: 0.015em;
     position: relative;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   /* Fix Radix UI scroll lock interfering with Select scroll on mobile */
@@ -309,6 +319,13 @@
   body {
     font-family: var(--theme-font-family, 'Cocogoose', 'Inter', sans-serif) !important;
     font-weight: var(--theme-body-weight, 350) !important;
+  }
+
+  /* Ensure root element has proper background coverage for iOS */
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: hsl(var(--background));
   }
   
   /* Force numbers to use system fonts since Cocogoose trial doesn't include them */
