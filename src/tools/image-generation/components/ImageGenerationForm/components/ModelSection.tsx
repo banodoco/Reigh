@@ -136,6 +136,100 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
     <div className="space-y-3">
       {/* Thumbnail gallery */}
       <div className="grid grid-cols-4 gap-2">
+        {/* Add reference button with search button - NOW FIRST */}
+        <div className="relative aspect-square">
+          <label
+            className={cn(
+              'w-full h-full flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded-lg transition-all duration-200',
+              isGenerating || isUploadingStyleReference
+                ? 'border-gray-200 cursor-not-allowed opacity-50'
+                : isDraggingOverAdd
+                ? 'border-purple-500 bg-purple-500/20 dark:bg-purple-500/30 scale-105 shadow-lg cursor-pointer'
+                : 'border-gray-300 cursor-pointer'
+            )}
+            title="Click to upload or drag & drop"
+            onDragEnter={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              if (!isGenerating && !isUploadingStyleReference) {
+                setIsDraggingOverAdd(true)
+              }
+            }}
+            onDragOver={e => {
+              e.preventDefault()
+              e.stopPropagation()
+            }}
+            onDragLeave={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsDraggingOverAdd(false)
+            }}
+            onDrop={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsDraggingOverAdd(false)
+              if (!isGenerating && !isUploadingStyleReference) {
+                const files = Array.from(e.dataTransfer.files).filter(f =>
+                  f.type.startsWith('image/')
+                )
+                if (files.length > 0) {
+                  onAddReference(files)
+                }
+              }
+            }}
+          >
+            {isDraggingOverAdd ? (
+              <Upload className="h-6 w-6 text-purple-600 dark:text-purple-400 animate-bounce" />
+            ) : (
+              <div className="relative w-full h-full">
+                {/* Diagonal divider line */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-[141%] h-px bg-gray-300 dark:bg-gray-600 rotate-45 transform origin-center" />
+                </div>
+
+                {/* Plus icon - top right - pointer-events-none so clicks pass through to label */}
+                <div className="absolute top-[15%] right-[15%] pointer-events-none">
+                  <Plus className="h-5 w-5 text-gray-400" />
+                </div>
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const files = Array.from(e.target.files || [])
+                if (files.length > 0) onAddReference(files)
+                e.target.value = '' // Reset input
+              }}
+              disabled={isGenerating || isUploadingStyleReference}
+            />
+          </label>
+
+          {/* Search icon - bottom left */}
+          {!isDraggingOverAdd && (
+            <button
+              type="button"
+              className={cn(
+                'absolute bottom-[15%] left-[15%] p-0.5 rounded',
+                (isGenerating || isUploadingStyleReference) &&
+                  'cursor-not-allowed opacity-40'
+              )}
+              title="Search reference images"
+              onClick={e => {
+                e.preventDefault()
+                e.stopPropagation()
+                if (!isGenerating && !isUploadingStyleReference) {
+                  onOpenDatasetBrowser()
+                }
+              }}
+              disabled={isGenerating || isUploadingStyleReference}
+            >
+              <Search className="h-4 w-4 text-gray-400" />
+            </button>
+          )}
+        </div>
+
         {/* Show skeleton placeholders OR actual references */}
         {(() => {
           // If we have NO refs yet, show all skeletons
@@ -153,14 +247,17 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
               </div>
             ));
           }
-          
-          // We have SOME refs - render them + placeholder skeletons for remaining
+
+          // We have SOME refs - render them in REVERSE ORDER (newest first) + placeholder skeletons for remaining
           const remainingSkeletons = Math.max(0, referenceCount - references.length);
           console.log('[GridDebug] 🖼️ Rendering', references.length, 'refs +', remainingSkeletons, 'skeletons');
-          
+
+          // Reverse the references array so newest appears first
+          const reversedReferences = [...references].reverse();
+
           return (
             <>
-              {references.map(ref => {
+              {reversedReferences.map(ref => {
             const isSelected = selectedReferenceId === ref.id;
             // Use thumbnail for grid display, fallback to original or processed
             const imageUrl = ref.thumbnailUrl || ref.styleReferenceImageOriginal || ref.styleReferenceImage;
@@ -172,7 +269,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
                 className={cn(
                   "relative cursor-pointer rounded-lg border-2 overflow-hidden group",
                   "aspect-square transition-all hover:scale-105",
-isSelected
+                  isSelected
                     ? "border-purple-500 dark:border-purple-400 ring-2 ring-purple-500 dark:ring-purple-400 shadow-lg"
                     : "border-border hover:border-purple-300 dark:hover:border-purple-600"
                 )}
@@ -352,100 +449,6 @@ isSelected
             </>
           );
         })()}
-        
-        {/* Add reference button with search button */}
-        <div className="relative aspect-square">
-          <label
-            className={cn(
-              'w-full h-full flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded-lg transition-all duration-200',
-              isGenerating || isUploadingStyleReference
-                ? 'border-gray-200 cursor-not-allowed opacity-50'
-                : isDraggingOverAdd
-                ? 'border-purple-500 bg-purple-500/20 dark:bg-purple-500/30 scale-105 shadow-lg cursor-pointer'
-                : 'border-gray-300 cursor-pointer'
-            )}
-            title="Click to upload or drag & drop"
-            onDragEnter={e => {
-              e.preventDefault()
-              e.stopPropagation()
-              if (!isGenerating && !isUploadingStyleReference) {
-                setIsDraggingOverAdd(true)
-              }
-            }}
-            onDragOver={e => {
-              e.preventDefault()
-              e.stopPropagation()
-            }}
-            onDragLeave={e => {
-              e.preventDefault()
-              e.stopPropagation()
-              setIsDraggingOverAdd(false)
-            }}
-            onDrop={e => {
-              e.preventDefault()
-              e.stopPropagation()
-              setIsDraggingOverAdd(false)
-              if (!isGenerating && !isUploadingStyleReference) {
-                const files = Array.from(e.dataTransfer.files).filter(f =>
-                  f.type.startsWith('image/')
-                )
-                if (files.length > 0) {
-                  onAddReference(files)
-                }
-              }
-            }}
-          >
-            {isDraggingOverAdd ? (
-              <Upload className="h-6 w-6 text-purple-600 dark:text-purple-400 animate-bounce" />
-            ) : (
-              <div className="relative w-full h-full">
-                {/* Diagonal divider line */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-[141%] h-px bg-gray-300 dark:bg-gray-600 rotate-45 transform origin-center" />
-                </div>
-
-                {/* Plus icon - top right - pointer-events-none so clicks pass through to label */}
-                <div className="absolute top-[15%] right-[15%] pointer-events-none">
-                  <Plus className="h-5 w-5 text-gray-400" />
-                </div>
-              </div>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={e => {
-                const files = Array.from(e.target.files || [])
-                if (files.length > 0) onAddReference(files)
-                e.target.value = '' // Reset input
-              }}
-              disabled={isGenerating || isUploadingStyleReference}
-            />
-          </label>
-
-          {/* Search icon - bottom left */}
-          {!isDraggingOverAdd && (
-            <button
-              type="button"
-              className={cn(
-                'absolute bottom-[15%] left-[15%] p-0.5 rounded',
-                (isGenerating || isUploadingStyleReference) &&
-                  'cursor-not-allowed opacity-40'
-              )}
-              title="Search reference images"
-              onClick={e => {
-                e.preventDefault()
-                e.stopPropagation()
-                if (!isGenerating && !isUploadingStyleReference) {
-                  onOpenDatasetBrowser()
-                }
-              }}
-              disabled={isGenerating || isUploadingStyleReference}
-            >
-              <Search className="h-4 w-4 text-gray-400" />
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -548,58 +551,13 @@ const StyleReferenceSection: React.FC<{
     {/* New Multiple References UI - Two column layout when reference exists OR loading */}
     {showMultiReference && (referenceCount > 0 || references.length > 0) && (
       <div className="space-y-4">
-        {/* First Row: Thumbnails and Preview */}
-        <div className="flex gap-4 flex-col md:flex-row">
-          {/* Left side - Thumbnails */}
-          <div className="flex-[2]">
-            <ReferenceSelector
-              references={references}
-              selectedReferenceId={selectedReferenceId}
-              onSelectReference={onSelectReference}
-              onAddReference={onStyleUpload}
-              onDeleteReference={onDeleteReference}
-              onToggleVisibility={onToggleVisibility}
-              isGenerating={isGenerating}
-              isUploadingStyleReference={isUploadingStyleReference}
-              onOpenDatasetBrowser={() => setShowDatasetBrowser(true)}
-              isLoadingReferenceData={isLoadingReferenceData}
-              referenceCount={referenceCount}
-            />
-          </div>
-          
-          {/* Right side - Large preview (hidden on small screens) */}
-          <div className="flex-1 hidden md:block">
-            <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
-              {isLoadingReferenceData ? (
-                // Show skeleton while loading
-                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center animate-pulse">
-                  <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-gray-400"></div>
-                </div>
-              ) : styleReferenceImage ? (
-                // Show actual image once loaded
-                <img
-                  src={styleReferenceImage}
-                  alt="Selected reference"
-                  className="w-full h-full object-contain"
-                  style={{ objectFit: 'contain' }}
-                />
-              ) : (
-                // Fallback if no image but references exist
-                <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                  <Images className="h-8 w-8 text-gray-400" />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Second Row: Settings in Two Columns */}
+        {/* First Row: Settings in Two Columns */}
         <div className="flex gap-4 flex-col md:flex-row">
           {/* Left column - Reference Mode Selector */}
           <div className="flex-1 space-y-2">
             <Label className="text-sm font-medium">How would you like to use this reference?</Label>
-            <RadioGroup 
-              value={referenceMode} 
+            <RadioGroup
+              value={referenceMode}
               onValueChange={(value) => {
                 if (!onReferenceModeChange) return;
                 const mode = value as ReferenceMode;
@@ -643,7 +601,7 @@ const StyleReferenceSection: React.FC<{
                 numberInputClassName="w-16"
               />
             )}
-            
+
             {/* Style, Subject, and Scene strength sliders - only show in custom mode */}
             {referenceMode === 'custom' && (
               <div className="space-y-3">
@@ -693,7 +651,7 @@ const StyleReferenceSection: React.FC<{
                 />
               </div>
             )}
-            
+
             {/* Show subject description and/or style-boost terms based on mode */}
             {styleReferenceImage && (referenceMode === 'style' || referenceMode === 'subject') && (
               <div className="space-y-4">
@@ -715,7 +673,7 @@ const StyleReferenceSection: React.FC<{
                     />
                   </div>
                 )}
-                
+
                 {/* Show style-boost terms field when in style mode */}
                 {referenceMode === 'style' && (
                   <div className="space-y-2">
@@ -734,6 +692,51 @@ const StyleReferenceSection: React.FC<{
                 )}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Second Row: Thumbnails and Preview */}
+        <div className="flex gap-4 flex-col md:flex-row">
+          {/* Left side - Thumbnails */}
+          <div className="flex-[2]">
+            <ReferenceSelector
+              references={references}
+              selectedReferenceId={selectedReferenceId}
+              onSelectReference={onSelectReference}
+              onAddReference={onStyleUpload}
+              onDeleteReference={onDeleteReference}
+              onToggleVisibility={onToggleVisibility}
+              isGenerating={isGenerating}
+              isUploadingStyleReference={isUploadingStyleReference}
+              onOpenDatasetBrowser={() => setShowDatasetBrowser(true)}
+              isLoadingReferenceData={isLoadingReferenceData}
+              referenceCount={referenceCount}
+            />
+          </div>
+
+          {/* Right side - Large preview (hidden on small screens) */}
+          <div className="flex-1 hidden md:block">
+            <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
+              {isLoadingReferenceData ? (
+                // Show skeleton while loading
+                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center animate-pulse">
+                  <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                </div>
+              ) : styleReferenceImage ? (
+                // Show actual image once loaded
+                <img
+                  src={styleReferenceImage}
+                  alt="Selected reference"
+                  className="w-full h-full object-contain"
+                  style={{ objectFit: 'contain' }}
+                />
+              ) : (
+                // Fallback if no image but references exist
+                <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                  <Images className="h-8 w-8 text-gray-400" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
