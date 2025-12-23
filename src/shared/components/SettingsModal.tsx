@@ -435,10 +435,10 @@ Please be very specific with file paths, command syntax, and verification steps 
     
     const pytorchIndexUrl = "https://download.pytorch.org/whl/cu124";
     
-    // PyTorch install: pin to 2.7.0 for 50 series (Blackwell), latest for others
+    // PyTorch install: pin to 2.7.0 for 50 series (Blackwell), 2.6.0 for others
     const torchInstall = gpuType === "nvidia-50" 
       ? `pip install --no-cache-dir torch==2.7.0 torchvision torchaudio --index-url ${pytorchIndexUrl}`
-      : `pip install --no-cache-dir torch torchvision torchaudio --index-url ${pytorchIndexUrl}`;
+      : `pip install --no-cache-dir torch==2.6.0 torchvision torchaudio --index-url ${pytorchIndexUrl}`;
     
     if (computerType === "windows") {
       // Shell-specific activation command
