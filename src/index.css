@@ -309,6 +309,8 @@
   body {
     font-family: var(--theme-font-family, 'Cocogoose', 'Inter', sans-serif) !important;
     font-weight: var(--theme-body-weight, 350) !important;
+    /* Ensure background extends into safe areas on iOS */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   
   /* Force numbers to use system fonts since Cocogoose trial doesn't include them */
