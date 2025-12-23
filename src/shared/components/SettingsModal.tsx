@@ -924,9 +924,8 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     {/* PowerShell Execution Policy Notice */}
                     {computerType === "windows" && windowsShell === "powershell" && (
                       <div className="p-2 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-lg">
-                        <p className="text-xs text-rose-800 dark:text-rose-300">
-                          <strong>PowerShell note:</strong> If activation fails, run this once first:{" "}
-                          <code className="bg-rose-100 dark:bg-rose-900 px-1 rounded">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code>
+                        <p className="text-xs text-rose-700 dark:text-rose-400">
+                          If activation fails, run once: <code className="bg-rose-100 dark:bg-rose-900 px-1 rounded text-[10px]">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code>
                         </p>
                       </div>
                     )}
