@@ -925,7 +925,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                     {computerType === "windows" && windowsShell === "powershell" && (
                       <div className="p-2 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-lg">
                         <p className="text-xs text-rose-700 dark:text-rose-400">
-                          If activation fails, run once: <code className="bg-rose-100 dark:bg-rose-900 px-1 rounded text-[10px]">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code>
+                          If activation fails, run once: <code className="text-[10px]">Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code>
                         </p>
                       </div>
                     )}
