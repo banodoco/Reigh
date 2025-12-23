@@ -481,17 +481,22 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
     const profileFlag = ` --wgp-profile ${memoryProfile}`;
     
     if (computerType === "windows") {
-      // Shell-specific activation command
+      // Shell-specific activation and directory check
+      const cdCheck = windowsShell === "powershell"
+        ? `if (!(Test-Path worker.py)) { cd Headless-Wan2GP }`
+        : `if not exist worker.py cd Headless-Wan2GP`;
       const activateCmd = windowsShell === "powershell" 
         ? `.\\venv\\Scripts\\Activate.ps1`
         : `venv\\Scripts\\activate.bat`;
         
-      return `git pull
+      return `${cdCheck}
+git pull
 ${activateCmd}
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
-      // Linux / Mac command
-      return `git pull && \\
+      // Linux / Mac command - auto-cd if not in correct folder
+      return `[ ! -f "worker.py" ] && cd Headless-Wan2GP
+git pull && \\
 source venv/bin/activate && \\
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
@@ -1153,7 +1158,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                         <div className="space-y-4">
                           <div>                              
 <p className="text-sm text-muted-foreground mb-4">
-                              Run from inside the <code className="bg-muted px-1 rounded text-xs">Headless-Wan2GP</code> folder:
+                              Start your local worker (auto-detects folder):
                             </p>
                           </div>
 
