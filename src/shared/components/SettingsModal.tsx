@@ -111,8 +111,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Memory profile preference (persistent)
   const [memoryProfile, setMemoryProfile] = usePersistentState<string>("memory-profile", "4");
   
-  // Windows shell type preference (persistent)
-  const [windowsShell, setWindowsShell] = usePersistentState<string>("windows-shell", "cmd");
+  // Windows shell type preference (persistent) - default to PowerShell as most users use it now
+  const [windowsShell, setWindowsShell] = usePersistentState<string>("windows-shell", "powershell");
   
   // Settings section toggle (Generation vs Transactions vs Preferences)
   const [settingsSection, setSettingsSection] = useState<'app' | 'transactions' | 'preferences'>('app');
@@ -436,9 +436,10 @@ Please be very specific with file paths, command syntax, and verification steps 
     const pytorchIndexUrl = "https://download.pytorch.org/whl/cu124";
     
     // PyTorch install: pin to 2.7.0 for 50 series (Blackwell), 2.6.0 for others
+    // Use python -m pip to ensure we use the venv's pip, not system pip
     const torchInstall = gpuType === "nvidia-50" 
-      ? `pip install --no-cache-dir torch==2.7.0 torchvision torchaudio --index-url ${pytorchIndexUrl}`
-      : `pip install --no-cache-dir torch==2.6.0 torchvision torchaudio --index-url ${pytorchIndexUrl}`;
+      ? `python -m pip install --no-cache-dir torch==2.7.0 torchvision torchaudio --index-url ${pytorchIndexUrl}`
+      : `python -m pip install --no-cache-dir torch==2.6.0 torchvision torchaudio --index-url ${pytorchIndexUrl}`;
     
     if (computerType === "windows") {
       // Shell-specific activation command
@@ -451,8 +452,8 @@ cd Headless-Wan2GP
 python -m venv venv
 ${activateCmd}
 ${torchInstall}
-pip install --no-cache-dir -r Wan2GP/requirements.txt
-pip install --no-cache-dir -r requirements.txt
+python -m pip install --no-cache-dir -r Wan2GP/requirements.txt
+python -m pip install --no-cache-dir -r requirements.txt
 echo Checking CUDA availability...
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))"
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
@@ -464,8 +465,8 @@ sudo apt-get update && sudo apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
 source venv/bin/activate && \\
 ${torchInstall} && \\
-pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
-pip install --no-cache-dir -r requirements.txt && \\
+python -m pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
+python -m pip install --no-cache-dir -r requirements.txt && \\
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))" && \\
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
@@ -1152,7 +1153,7 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                         <div className="space-y-4">
                           <div>                              
 <p className="text-sm text-muted-foreground mb-4">
-                              Use this command to start your local worker:
+                              Run from inside the <code className="bg-muted px-1 rounded text-xs">Headless-Wan2GP</code> folder:
                             </p>
                           </div>
 
