@@ -938,44 +938,42 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
         {/* ═══════════════════════════════════════════════════════════════════
             SECTION 2: Reference Videos for Motion Control
-            - 3 columns, all 4:3 aspect ratio, same height, full width
-            - Image grid: 4 cols × 3 rows (12 images) = 4:3 aspect ratio
-            - Videos: 4:3 aspect ratio
+            - Images displayed above videos in rows
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-3">
           <p className="text-sm leading-7">
             You can use <span className="text-wes-vintage-gold">reference videos to steer the motion</span> - here's an example of how images and video references combine:
           </p>
-          
-          <div className="flex gap-3 w-full items-center">
-            <div className="flex-[2]">
-              <div className="aspect-square grid grid-cols-4 grid-rows-4 gap-1">
-                {Array.from({ length: 16 }).map((_, idx) => {
-                  const imgNum = String(idx + 1).padStart(3, '0');
-                  const imgSrc = `/introduction-images/${imgNum}.${idx === 13 ? 'png' : 'jpg'}`;
-                  return (
-                    <div key={idx} className="aspect-square bg-muted/30 rounded border border-muted/50 overflow-hidden relative">
-                      {/* Thumbnail loads first */}
-                      <img 
-                        src={getThumbPath(imgSrc)}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                      {/* Full image fades in on top when loaded */}
-                      <img 
-                        ref={(imgEl) => handleImageRef(imgEl, imgSrc)}
-                        src={imgSrc} 
-                        alt={`Input ${idx + 1}`}
-                        className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(imgSrc) && "opacity-0")}
-                        onLoad={() => handleImageLoad(imgSrc)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+
+          <div className="space-y-3">
+            {/* Images row - displayed in a single row */}
+            <div className="grid grid-cols-8 gap-1">
+              {Array.from({ length: 16 }).map((_, idx) => {
+                const imgNum = String(idx + 1).padStart(3, '0');
+                const imgSrc = `/introduction-images/${imgNum}.${idx === 13 ? 'png' : 'jpg'}`;
+                return (
+                  <div key={idx} className="aspect-square bg-muted/30 rounded border border-muted/50 overflow-hidden relative">
+                    {/* Thumbnail loads first */}
+                    <img
+                      src={getThumbPath(imgSrc)}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    {/* Full image fades in on top when loaded */}
+                    <img
+                      ref={(imgEl) => handleImageRef(imgEl, imgSrc)}
+                      src={imgSrc}
+                      alt={`Input ${idx + 1}`}
+                      className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-300", !loadedImages.has(imgSrc) && "opacity-0")}
+                      onLoad={() => handleImageLoad(imgSrc)}
+                    />
+                  </div>
+                );
+              })}
             </div>
-            
-            <div className="flex-[3]">
+
+            {/* Video comparison row */}
+            <div className="w-full">
               <MotionComparison />
             </div>
           </div>
