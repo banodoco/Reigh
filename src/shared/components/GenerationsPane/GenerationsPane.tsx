@@ -432,8 +432,6 @@ const GenerationsPaneComponent: React.FC = () => {
           height: `${generationsPaneHeight}px`,
           left: isShotsPaneLocked ? `${shotsPaneWidth}px` : 0,
           right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
-          // Add safe area padding at bottom for iPhone to prevent white line on overscroll
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
         className={cn(
           `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-300 ease-smooth flex flex-col pointer-events-auto`,
