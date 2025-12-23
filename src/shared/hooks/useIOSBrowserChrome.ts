@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Hook to detect iOS browser chrome visibility state
+ * Hook to detect mobile browser chrome visibility state
  *
- * On iOS Safari and Chrome, the browser UI (address bar, toolbars) can hide when scrolling down,
- * causing a white line to appear at the bottom of fixed elements.
+ * Note: Despite the name, this hook now handles ALL mobile browsers with address bar
+ * hiding behavior, including:
+ * - iOS Safari and Chrome (iPhone, iPad, iPod)
+ * - Android Chrome and Firefox
+ *
+ * On these browsers, the browser UI (address bar, toolbars) can hide when scrolling
+ * down, causing a white line to appear at the bottom of fixed elements.
  *
  * This hook detects when the browser chrome is hiding and returns:
  * - isIOSBrowserChromeHiding: true when the viewport is expanding (chrome hiding)
@@ -12,25 +17,46 @@ import { useEffect, useState } from 'react';
  *
  * Detection method:
  * - Compares window.innerHeight changes during scroll
- * - On iOS, window.innerHeight increases when browser chrome hides
- * - Uses visualViewport API as fallback for better accuracy
+ * - On mobile browsers, window.innerHeight increases when browser chrome hides
+ * - Uses visualViewport API for better accuracy where available
+ *
+ * Note: The CSS dvh units handle most cases automatically, but this hook provides
+ * fine-grained control for edge cases where JavaScript detection is needed.
+ *
+ * Supported devices:
+ * - iPhone (all models with Safari or Chrome)
+ * - iPad (all models with Safari or Chrome)
+ * - Android phones/tablets (Chrome, Firefox)
  *
  * References:
  * - https://nicolas-hoizey.com/articles/2015/02/18/viewport-height-is-taller-than-the-visible-part-of-the-document-in-some-mobile-browsers/
  * - https://gist.github.com/claus/622a938d21d80f367251dc2eaaa1b2a9
  * - https://css-tricks.com/the-trick-to-viewport-units-on-mobile/
+ * - https://developer.chrome.com/blog/url-bar-resizing
+ * - https://medium.com/@tharunbalaji110/understanding-mobile-viewport-units-a-complete-guide-to-svh-lvh-and-dvh-0c905d96e21a
  */
 export function useIOSBrowserChrome() {
   const [isIOSBrowserChromeHiding, setIsIOSBrowserChromeHiding] = useState(false);
   const [bottomOffset, setBottomOffset] = useState(0);
 
   useEffect(() => {
-    // Only run on iOS devices (Safari or Chrome)
+    // Detect mobile browsers that exhibit address bar hiding behavior
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const isIOSChrome = /CriOS/.test(navigator.userAgent);
     const isIOSSafari = /Safari/.test(navigator.userAgent) && !/CriOS/.test(navigator.userAgent);
 
-    if (!isIOS || (!isIOSChrome && !isIOSSafari)) {
+    // Android detection (Chrome, Firefox, and other browsers)
+    const isAndroid = /Android/.test(navigator.userAgent);
+    const isAndroidChrome = isAndroid && /Chrome/.test(navigator.userAgent) && !/Edge|EdgA/.test(navigator.userAgent);
+    const isAndroidFirefox = isAndroid && /Firefox/.test(navigator.userAgent);
+
+    // Only run on devices with address bar hiding behavior
+    const isMobileBrowserWithAddressBar =
+      (isIOS && (isIOSChrome || isIOSSafari)) ||
+      isAndroidChrome ||
+      isAndroidFirefox;
+
+    if (!isMobileBrowserWithAddressBar) {
       return;
     }
 
@@ -42,11 +68,11 @@ export function useIOSBrowserChrome() {
       const currentHeight = window.innerHeight;
       const currentScrollY = window.scrollY;
 
-      // When scrolling down on iOS, browser chrome hides and innerHeight increases
+      // When scrolling down on mobile, browser chrome hides and innerHeight increases
       const isScrollingDown = currentScrollY > lastScrollY;
       const heightIncreased = currentHeight > initialHeight;
 
-      // Chrome is hiding when scrolling down and height is increasing
+      // Chrome/address bar is hiding when scrolling down and height is increasing
       const chromeHiding = isScrollingDown && heightIncreased;
 
       // Calculate the offset (difference between current and initial height)
