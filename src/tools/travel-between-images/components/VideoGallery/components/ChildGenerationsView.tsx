@@ -298,15 +298,23 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         randomSeed: joinRandomSeed = true,
     } = joinSettings.settings;
     
+    // Helper to check if a generation is a travel segment (not a join output)
+    // Segments have segment_index in params; join outputs have created_from containing 'join'
+    const isSegment = useCallback((child: any): boolean => {
+        const params = child.params as any;
+        // Check if it's a segment by presence of segment_index
+        const hasSegmentIndex = typeof params?.segment_index === 'number';
+        // Check if it's a join output by created_from marker
+        const isJoinOutput = params?.created_from?.includes('join') ||
+                            params?.is_single_join === true ||
+                            params?.variant_type?.includes('join');
+        return hasSegmentIndex && !isJoinOutput;
+    }, []);
+
     // Calculate validation result for join clips based on segment frame counts
     const joinValidationResult = useMemo((): ValidationResult | null => {
-        // Filter to only segments (exclude join outputs)
-        // Join outputs have URLs with patterns like: {uuid}_joined.mp4 or /joined.mp4
-        const segmentsOnly = sortedChildren.filter(child => {
-            const url = child.location || '';
-            const isJoinOutput = url.includes('_joined.mp4') || url.includes('/joined.mp4') || url.includes('_joined_');
-            return !isJoinOutput;
-        });
+        // Filter to only segments (exclude join outputs) using params-based detection
+        const segmentsOnly = sortedChildren.filter(isSegment);
         
         if (segmentsOnly.length < 2) return null;
         
@@ -818,17 +826,20 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
         try {
             // Filter out previous join outputs - only include actual travel segments
-            // Join outputs have URLs with patterns like: {uuid}_joined.mp4 or /joined.mp4
+            // Use params-based detection: segments have segment_index, join outputs have created_from='join'
             const segmentsOnly = sortedChildren.filter(child => {
-                const url = child.location || '';
-                const isJoinOutput = url.includes('_joined.mp4') || url.includes('/joined.mp4') || url.includes('_joined_');
-                if (isJoinOutput) {
-                    console.log('[JoinClips] Filtering out join output:', {
+                const isValidSegment = isSegment(child);
+                if (!isValidSegment) {
+                    console.log('[JoinClips] Filtering out non-segment:', {
                         childId: child.id?.substring(0, 8),
-                        url: url.substring(url.lastIndexOf('/') + 1),
+                        params: {
+                            segment_index: (child.params as any)?.segment_index,
+                            created_from: (child.params as any)?.created_from,
+                            is_single_join: (child.params as any)?.is_single_join,
+                        },
                     });
                 }
-                return !isJoinOutput;
+                return isValidSegment;
             });
 
             // CRITICAL: Fetch fresh URLs from database to ensure we get current main variants
