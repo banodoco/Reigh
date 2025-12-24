@@ -292,13 +292,10 @@ export async function fetchGenerations(
     
     // Add positioned filter if needed
     if (filters.excludePositioned) {
-      // Show only unpositioned items: value is null (no position)
-      // Handle BOTH data formats:
-      // - Single value format: { "shot_id": null } → shot_data->>shotId IS NULL (JSON null becomes SQL NULL via ->>)
-      // - Array format: { "shot_id": [null] } → shot_data->shotId @> '[null]' (array contains null)
-      countQuery = countQuery.or(
-        `shot_data->>${filters.shotId}.is.null,shot_data->${filters.shotId}.cs.[null]`
-      );
+      // Show only unpositioned items: array contains null OR -1 (sentinel for unpositioned)
+      // Use PostgREST 'cs.' operator (contains) to check if array contains null or -1
+      // Note: We need OR logic since an item might have [null] or [-1] or both
+      countQuery = countQuery.or(`shot_data->${filters.shotId}.cs.[null],shot_data->${filters.shotId}.cs.[-1]`);
     }
   }
 
@@ -397,16 +394,13 @@ export async function fetchGenerations(
     // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
     // Check that the key exists (generation is in this shot)
     dataQuery = dataQuery.not(`shot_data->${filters.shotId}`, 'is', null);
-    
+
     // Add positioned filter if needed
     if (filters.excludePositioned) {
-      // Show only unpositioned items: value is null (no position)
-      // Handle BOTH data formats:
-      // - Single value format: { "shot_id": null } → shot_data->>shotId IS NULL (JSON null becomes SQL NULL via ->>)
-      // - Array format: { "shot_id": [null] } → shot_data->shotId @> '[null]' (array contains null)
-      dataQuery = dataQuery.or(
-        `shot_data->>${filters.shotId}.is.null,shot_data->${filters.shotId}.cs.[null]`
-      );
+      // Show only unpositioned items: array contains null OR -1 (sentinel for unpositioned)
+      // Use PostgREST 'cs.' operator (contains) to check if array contains null or -1
+      // Note: We need OR logic since an item might have [null] or [-1] or both
+      dataQuery = dataQuery.or(`shot_data->${filters.shotId}.cs.[null],shot_data->${filters.shotId}.cs.[-1]`);
     }
   }
 
