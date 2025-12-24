@@ -292,9 +292,10 @@ export async function fetchGenerations(
     
     // Add positioned filter if needed
     if (filters.excludePositioned) {
-      // Show only unpositioned items: array contains null
-      // Use PostgREST 'cs.' operator (contains) to check if array contains null
-      countQuery = countQuery.filter(`shot_data->${filters.shotId}`, 'cs', '[null]');
+      // Show only unpositioned items: array must contain null (unpositioned entry)
+      // PostgREST's 'cs' operator with '[null]' doesn't work reliably
+      // Use contains() with proper JSON structure instead
+      countQuery = countQuery.contains('shot_data', { [filters.shotId]: [null] });
     }
   }
 
@@ -396,9 +397,10 @@ export async function fetchGenerations(
     
     // Add positioned filter if needed
     if (filters.excludePositioned) {
-      // Show only unpositioned items: array contains null
-      // Use PostgREST 'cs.' operator (contains) to check if array contains null
-      dataQuery = dataQuery.filter(`shot_data->${filters.shotId}`, 'cs', '[null]');
+      // Show only unpositioned items: array must contain null (unpositioned entry)
+      // PostgREST's 'cs' operator with '[null]' doesn't work reliably
+      // Use contains() with proper JSON structure instead
+      dataQuery = dataQuery.contains('shot_data', { [filters.shotId]: [null] });
     }
   }
 
