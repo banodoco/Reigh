@@ -299,16 +299,9 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     } = joinSettings.settings;
     
     // Helper to check if a generation is a travel segment (not a join output)
-    // Segments have segment_index in params; join outputs have created_from containing 'join'
+    // Segments have segment_index in params; join outputs don't
     const isSegment = useCallback((child: any): boolean => {
-        const params = child.params as any;
-        // Check if it's a segment by presence of segment_index
-        const hasSegmentIndex = typeof params?.segment_index === 'number';
-        // Check if it's a join output by created_from marker
-        const isJoinOutput = params?.created_from?.includes('join') ||
-                            params?.is_single_join === true ||
-                            params?.variant_type?.includes('join');
-        return hasSegmentIndex && !isJoinOutput;
+        return typeof (child.params as any)?.segment_index === 'number';
     }, []);
 
     // Calculate validation result for join clips based on segment frame counts
