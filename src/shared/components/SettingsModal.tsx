@@ -433,13 +433,12 @@ Please be very specific with file paths, command syntax, and verification steps 
     const debugFlag = showDebugLogs ? ' --debug' : '';
     const profileFlag = ` --wgp-profile ${memoryProfile}`;
     
-    const pytorchIndexUrl = "https://download.pytorch.org/whl/cu124";
-    
-    // PyTorch install: pin to 2.7.0 for 50 series (Blackwell), 2.6.0 for others
+    // PyTorch install: 50 series needs cu128, ≤40 series uses cu124
+    // Don't pin version - let pip grab the latest available in each index
     // Use python -m pip to ensure we use the venv's pip, not system pip
-    const torchInstall = gpuType === "nvidia-50" 
-      ? `python -m pip install --no-cache-dir torch==2.7.0 torchvision torchaudio --index-url ${pytorchIndexUrl}`
-      : `python -m pip install --no-cache-dir torch==2.6.0 torchvision torchaudio --index-url ${pytorchIndexUrl}`;
+    const torchInstall = gpuType === "nvidia-50"
+      ? `python -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128`
+      : `python -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124`;
     
     if (computerType === "windows") {
       // Shell-specific activation command
