@@ -304,10 +304,16 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         return typeof (child.params as any)?.segment_index === 'number';
     }, []);
 
+    // Filter sortedChildren to only include segments (exclude join outputs)
+    // This ensures the child generation view only displays main variants (segments)
+    const sortedSegments = React.useMemo(() => {
+        return sortedChildren.filter(isSegment);
+    }, [sortedChildren, isSegment]);
+
     // Calculate validation result for join clips based on segment frame counts
     const joinValidationResult = useMemo((): ValidationResult | null => {
-        // Filter to only segments (exclude join outputs) using params-based detection
-        const segmentsOnly = sortedChildren.filter(isSegment);
+        // Use sortedSegments which already filters to only segments
+        const segmentsOnly = sortedSegments;
         
         if (segmentsOnly.length < 2) return null;
         
@@ -333,7 +339,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             joinGapFrames,
             joinReplaceMode
         );
-    }, [sortedChildren, joinContextFrames, joinGapFrames, joinReplaceMode]);
+    }, [sortedSegments, joinContextFrames, joinGapFrames, joinReplaceMode]);
 
     // Fetch parent generation details to check for final output
     const { data: parentGeneration } = useQuery({
@@ -456,15 +462,15 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         console.log('[SegmentSlots] Computing segment slots', {
             hasExpectedData: !!expectedSegmentData,
             expectedCount: expectedSegmentData?.count,
-            actualChildrenCount: sortedChildren.length,
-            childOrders: sortedChildren.map(c => (c as any).child_order),
+            actualChildrenCount: sortedSegments.length,
+            childOrders: sortedSegments.map(c => (c as any).child_order),
             timestamp: Date.now()
         });
-        
+
         if (!expectedSegmentData || expectedSegmentData.count === 0) {
-            // No expected data, just show what we have
-            console.log('[SegmentSlots] No expected data, showing all children as-is');
-            return sortedChildren.map((child, index) => ({
+            // No expected data, just show what we have (segments only)
+            console.log('[SegmentSlots] No expected data, showing all segments as-is');
+            return sortedSegments.map((child, index) => ({
                 type: 'child' as const,
                 child,
                 index: (child as any).child_order ?? index,
@@ -474,12 +480,12 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         // Create slots for all expected segments
         const slots: SegmentSlot[] = [];
         const childrenByOrder = new Map<number, GenerationRow>();
-        
+
         // Map children by their child_order if valid, otherwise track for fallback
         const childrenWithoutValidOrder: GenerationRow[] = [];
         const usedOrders = new Set<number>();
-        
-        sortedChildren.forEach(child => {
+
+        sortedSegments.forEach(child => {
             const order = (child as any).child_order;
             
             // Check if this child has a valid, unique order
@@ -556,7 +562,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         });
 
         return slots;
-    }, [sortedChildren, expectedSegmentData]);
+    }, [sortedSegments, expectedSegmentData]);
 
     // Count completed vs total segments
     const segmentProgress = React.useMemo(() => {
@@ -813,30 +819,17 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     };
 
     const handleConfirmJoin = async () => {
-        if (!projectId || sortedChildren.length < 2) return;
+        if (!projectId || sortedSegments.length < 2) return;
 
         setIsJoiningClips(true);
 
         try {
-            // Filter out previous join outputs - only include actual travel segments
-            // Use params-based detection: segments have segment_index, join outputs have created_from='join'
-            const segmentsOnly = sortedChildren.filter(child => {
-                const isValidSegment = isSegment(child);
-                if (!isValidSegment) {
-                    console.log('[JoinClips] Filtering out non-segment:', {
-                        childId: child.id?.substring(0, 8),
-                        params: {
-                            segment_index: (child.params as any)?.segment_index,
-                            created_from: (child.params as any)?.created_from,
-                            is_single_join: (child.params as any)?.is_single_join,
-                        },
-                    });
-                }
-                return isValidSegment;
-            });
+            // Use sortedSegments which already filters out join outputs
+            // sortedSegments only includes items with segment_index in params
+            const segmentsOnly = sortedSegments;
 
             // CRITICAL: Fetch fresh URLs from database to ensure we get current main variants
-            // The cached sortedChildren may have stale URLs if user recently changed a variant
+            // The cached sortedSegments may have stale URLs if user recently changed a variant
             const segmentIds = segmentsOnly.map(c => c.id).filter(Boolean);
             const { data: freshSegments, error: fetchError } = await supabase
                 .from('generations')
@@ -879,8 +872,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             }
 
             console.log('[JoinClips] Creating join task with fresh URLs:', {
-                totalChildrenBeforeFilter: sortedChildren.length,
-                segmentsAfterFilter: segmentsOnly.length,
+                totalSegments: sortedSegments.length,
+                segmentsUsed: segmentsOnly.length,
                 clipCount: clips.length,
                 clipUrls: clips.map(c => c.url.substring(c.url.lastIndexOf('/') + 1)),
                 usedFreshUrls: clips.map(c => {
@@ -1142,7 +1135,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             </div>
 
             {/* Join Clips Section */}
-            {sortedChildren.length >= 2 && sortedChildren.some(c => c.location) && (
+            {sortedSegments.length >= 2 && sortedSegments.some(c => c.location) && (
                 <div className="max-w-7xl mx-auto px-4 pb-4">
                     <div className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm">
                         <JoinClipsSettingsForm 
