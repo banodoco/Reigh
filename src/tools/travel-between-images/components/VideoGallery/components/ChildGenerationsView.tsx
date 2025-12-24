@@ -301,9 +301,11 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     // Calculate validation result for join clips based on segment frame counts
     const joinValidationResult = useMemo((): ValidationResult | null => {
         // Filter to only segments (exclude join outputs)
+        // Join outputs have URLs with patterns like: {uuid}_joined.mp4 or /joined.mp4
         const segmentsOnly = sortedChildren.filter(child => {
             const url = child.location || '';
-            return !url.includes('/joined_');
+            const isJoinOutput = url.includes('_joined.mp4') || url.includes('/joined.mp4') || url.includes('_joined_');
+            return !isJoinOutput;
         });
         
         if (segmentsOnly.length < 2) return null;
@@ -816,10 +818,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
         try {
             // Filter out previous join outputs - only include actual travel segments
-            // Join outputs have URLs containing "joined_" in their filename
+            // Join outputs have URLs with patterns like: {uuid}_joined.mp4 or /joined.mp4
             const segmentsOnly = sortedChildren.filter(child => {
                 const url = child.location || '';
-                const isJoinOutput = url.includes('/joined_');
+                const isJoinOutput = url.includes('_joined.mp4') || url.includes('/joined.mp4') || url.includes('_joined_');
                 if (isJoinOutput) {
                     console.log('[JoinClips] Filtering out join output:', {
                         childId: child.id?.substring(0, 8),
