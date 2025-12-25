@@ -157,7 +157,7 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
       <div className="flex flex-col gap-0.5 relative z-10">
         <div className="flex gap-0.5">
           {images.slice(0, 4).map((img, imgIdx) => (
-            <div key={imgIdx} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
+            <div key={imgIdx} className="w-4 h-3 sm:w-6 sm:h-[18px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
               {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
               <img
                 src={img}
@@ -170,7 +170,7 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
         </div>
         <div className="flex gap-0.5 justify-center">
           {images.slice(4, 7).map((img, imgIdx) => (
-            <div key={imgIdx + 4} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
+            <div key={imgIdx + 4} className="w-4 h-3 sm:w-6 sm:h-[18px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
               {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
               <img
                 src={img}
@@ -188,7 +188,7 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
   // 2 or 4 images: horizontal row
   return (
     <div className={cn(
-      "gap-1 relative z-10",
+      "gap-0.5 sm:gap-1 relative z-10",
       imageCount === 2 && "flex flex-row",
       imageCount === 4 && "flex flex-row"
     )}>
@@ -197,9 +197,9 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
           key={imgIdx}
           className={cn(
             "bg-muted/50 rounded-sm overflow-hidden relative",
-            imageCount === 2 && exampleId === '2-images' && "w-10 h-10 aspect-square",
-            imageCount === 2 && exampleId !== '2-images' && "w-6 h-6 aspect-square",
-            imageCount === 4 && "w-6 h-10"
+            imageCount === 2 && exampleId === '2-images' && "w-8 h-8 sm:w-10 sm:h-10 aspect-square",
+            imageCount === 2 && exampleId !== '2-images' && "w-5 h-5 sm:w-6 sm:h-6 aspect-square",
+            imageCount === 4 && "w-4 h-7 sm:w-6 sm:h-10"
           )}
         >
           {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
