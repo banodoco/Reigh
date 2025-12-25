@@ -1,6 +1,9 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { GlassSidePane } from './GlassSidePane';
 import { cn } from '@/lib/utils';
+import { useTravelAutoAdvance, AUTO_ADVANCE_ANIMATION_DURATION } from './useTravelAutoAdvance';
+import { VideoWithPoster, getThumbPath } from './VideoWithPoster';
+import { TravelSelector } from './TravelSelector';
 
 interface ExampleStyle {
   prompt: string;
@@ -26,32 +29,6 @@ const PLACEHOLDER = '/placeholder.svg';
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={cn("animate-pulse bg-muted/50 rounded", className)} />
 );
-
-// Helper to get thumbnail path for an image
-const getThumbPath = (src: string): string => {
-  if (src.startsWith('/introduction-images/')) {
-    const name = src.split('/').pop()!;
-    const ext = name.split('.').pop();
-    const base = name.replace(`.${ext}`, '');
-    return `/thumbs/${base}-thumb.${ext}`;
-  }
-  if (src.startsWith('/916-')) {
-    return `/thumbs/${src.slice(1).replace('.jpg', '-thumb.jpg')}`;
-  }
-  if (src.startsWith('/h') && src.includes('-crop.webp')) {
-    return `/thumbs/${src.slice(1).replace('.webp', '-thumb.webp')}`;
-  }
-  if (src.startsWith('/lora-') && src.endsWith('.webp')) {
-    return `/thumbs/${src.slice(1).replace('.webp', '-thumb.webp')}`;
-  }
-  if (src.endsWith('-poster.jpg')) {
-    return `/thumbs/${src.slice(1).replace('.jpg', '-thumb.jpg')}`;
-  }
-  if (src.startsWith('/example-image')) {
-    return `/thumbs/${src.slice(1).replace('.jpg', '-thumb.jpg')}`;
-  }
-  return src; // No thumb available, use original
-};
 
 // Dummy data for the different sections
 const travelExamples = [
@@ -300,7 +277,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const loraVideosRef = useRef<(HTMLVideoElement | null)[]>([]);
   const loraVideosReadyRef = useRef<boolean[]>([false, false, false, false]);
   const loraVideosSyncedStartRef = useRef(false);
-  
+
   // State for interactive sections
   const [selectedTravelExample, setSelectedTravelExample] = useState(0);
   const [selectedLora, setSelectedLora] = useState(0);
@@ -308,59 +285,42 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
   const [selectedReferenceImage, setSelectedReferenceImage] = useState(0);
   const [selectedImageLora, setSelectedImageLora] = useState(0);
   const [loraPlaying, setLoraPlaying] = useState(false);
-  const [travelVideoEnded, setTravelVideoEnded] = useState<Set<number>>(new Set([0, 1, 2])); // All start with play button visible
-  const [travelVideoPlayed, setTravelVideoPlayed] = useState<Set<number>>(new Set()); // Track which have played at least once
-  const [nextAdvanceIdx, setNextAdvanceIdx] = useState<number | null>(null); // Which selector is showing border animation
-  const [prevAdvanceIdx, setPrevAdvanceIdx] = useState<number | null>(null); // Which selector is losing border animation
-  const [drainingIdx, setDrainingIdx] = useState<number | null>(null); // Which selector's fill is draining
-  const [videoProgress, setVideoProgress] = useState<number>(0); // 0-100% progress of current video
-  const autoAdvanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastProgressUpdateRef = useRef<number>(0);
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
   const [loadedVideos, setLoadedVideos] = useState<Set<string>>(new Set());
   const loadedImagesRef = useRef<Set<string>>(new Set());
 
-  const handleImageLoad = (src: string) => {
+  // Auto-advance animation state (extracted to hook)
+  const autoAdvance = useTravelAutoAdvance({
+    totalExamples: travelExamples.length,
+    onExampleChange: setSelectedTravelExample,
+  });
+
+  const handleImageLoad = useCallback((src: string) => {
     if (!loadedImagesRef.current.has(src)) {
       loadedImagesRef.current.add(src);
       setLoadedImages(prev => new Set(prev).add(src));
     }
-  };
+  }, []);
 
   // Handle cached images that don't fire onLoad on mobile
-  const handleImageRef = (img: HTMLImageElement | null, src: string) => {
+  const handleImageRef = useCallback((img: HTMLImageElement | null, src: string) => {
     if (img && img.complete && img.naturalWidth > 0 && !loadedImagesRef.current.has(src)) {
       handleImageLoad(src);
     }
-  };
+  }, [handleImageLoad]);
 
-  const handleVideoLoad = (src: string) => {
+  const handleVideoLoad = useCallback((src: string) => {
     setLoadedVideos(prev => new Set(prev).add(src));
-  };
+  }, []);
 
-  const playTravelVideo = (idx: number) => {
+  const playTravelVideo = useCallback((idx: number) => {
     const video = travelVideoRefs.current[idx];
     if (video) {
-      // Cancel any pending auto-advance if user manually replays
-      if (autoAdvanceTimeoutRef.current) {
-        clearTimeout(autoAdvanceTimeoutRef.current);
-        autoAdvanceTimeoutRef.current = null;
-        // Only clear animation states if we're canceling an auto-advance
-        setNextAdvanceIdx(null);
-        setPrevAdvanceIdx(null);
-      }
-      // Don't clear drainingIdx here - it needs to persist for the drain animation
-      
       video.currentTime = 0;
-      setVideoProgress(0); // Reset progress when starting
+      autoAdvance.setVideoProgress(0);
       // Wait for video to actually start playing before hiding poster
       const onPlaying = () => {
-        setTravelVideoEnded(prev => {
-          const next = new Set(prev);
-          next.delete(idx);
-          return next;
-        });
-        setTravelVideoPlayed(prev => new Set(prev).add(idx));
+        autoAdvance.handleVideoStarted(idx);
         video.removeEventListener('playing', onPlaying);
       };
       video.addEventListener('playing', onPlaying);
@@ -368,58 +328,25 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         video.removeEventListener('playing', onPlaying);
       });
     }
-  };
+  }, [autoAdvance]);
 
-  const handleTravelVideoEnded = (idx: number) => {
-    setTravelVideoEnded(prev => new Set(prev).add(idx));
-    setDrainingIdx(null); // Clear any draining animation when video ends
-
-    // Start border animation on next selector, remove from current
-    const nextIdx = (idx + 1) % travelExamples.length;
-    setNextAdvanceIdx(nextIdx);
-    setPrevAdvanceIdx(idx);
-
+  const handleTravelVideoEnded = useCallback((idx: number) => {
     // Preload the next video during countdown so it's ready to play
+    const nextIdx = (idx + 1) % travelExamples.length;
     const nextVideo = travelVideoRefs.current[nextIdx];
     if (nextVideo) {
       nextVideo.load();
     }
+    autoAdvance.handleVideoEnded(idx);
+  }, [autoAdvance]);
 
-    // Timeout slightly longer than animation (3.75s) so animation completes before switch
-    autoAdvanceTimeoutRef.current = setTimeout(() => {
-      setNextAdvanceIdx(null);
-      setPrevAdvanceIdx(null);
-      setDrainingIdx(idx); // Start draining the current video's fill
-      setVideoProgress(0); // Reset progress before switching
-      setSelectedTravelExample(nextIdx);
-    }, 3800);
-  };
+  const handleVideoTimeUpdate = useCallback((idx: number, video: HTMLVideoElement) => {
+    autoAdvance.handleVideoTimeUpdate(idx, video.currentTime, video.duration, selectedTravelExample);
+  }, [autoAdvance, selectedTravelExample]);
 
-  // Track video progress during playback
-  const handleVideoTimeUpdate = (idx: number, video: HTMLVideoElement) => {
-    if (idx !== selectedTravelExample || !video.duration) return;
-    
-    const now = Date.now();
-    if (now - lastProgressUpdateRef.current < 100) return;
-    lastProgressUpdateRef.current = now;
-    
-    const progress = (video.currentTime / video.duration) * 100;
-    setVideoProgress(progress);
-  };
-
-  // Cancel auto-advance when user manually selects a different example
-  // No animations on manual selection - just switch immediately
-  const handleSelectExample = (idx: number) => {
-    if (autoAdvanceTimeoutRef.current) {
-      clearTimeout(autoAdvanceTimeoutRef.current);
-      autoAdvanceTimeoutRef.current = null;
-    }
-    setNextAdvanceIdx(null);
-    setPrevAdvanceIdx(null);
-    setDrainingIdx(null); // No drain animation on manual click
-    setVideoProgress(0);
-    setSelectedTravelExample(idx);
-  };
+  const handleSelectExample = useCallback((idx: number) => {
+    autoAdvance.handleManualSelect(idx);
+  }, [autoAdvance]);
 
   const toggleLoraPlay = () => {
     if (loraPlaying) {
@@ -471,20 +398,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
           v.currentTime = 0;
         }
       });
-      // Reset all play buttons to visible and show posters again
-      setTravelVideoEnded(new Set([0, 1, 2]));
-      setTravelVideoPlayed(new Set());
-      // Cancel any pending auto-advance
-      if (autoAdvanceTimeoutRef.current) {
-        clearTimeout(autoAdvanceTimeoutRef.current);
-        autoAdvanceTimeoutRef.current = null;
-      }
-      setNextAdvanceIdx(null);
-      setPrevAdvanceIdx(null);
-      setDrainingIdx(null);
-      setVideoProgress(0);
+      // Reset all animation state
+      autoAdvance.resetAll();
     }
-  }, [isOpen, isOpening, isClosing]);
+  }, [isOpen, isOpening, isClosing, autoAdvance, playTravelVideo, selectedTravelExample]);
 
   // Play video when switching tabs
   useEffect(() => {
@@ -644,7 +561,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         alt=""
                         className={cn(
                           "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                          (!travelVideoEnded.has(2) || travelVideoPlayed.has(2)) && "opacity-0"
+                          (!autoAdvance.videoEnded.has(2) || autoAdvance.videoPlayed.has(2)) && "opacity-0"
                         )}
                       />
                       {/* Full poster - only show before first play */}
@@ -655,7 +572,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         onLoad={() => handleImageLoad(example.poster)}
                         className={cn(
                           "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                          (!travelVideoEnded.has(2) || travelVideoPlayed.has(2) || !loadedImages.has(example.poster)) && "opacity-0"
+                          (!autoAdvance.videoEnded.has(2) || autoAdvance.videoPlayed.has(2) || !loadedImages.has(example.poster)) && "opacity-0"
                         )}
                       />
                       {/* Play button overlay */}
@@ -663,7 +580,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         onClick={() => playTravelVideo(2)}
                         className={cn(
                           "absolute inset-0 bg-black/40 flex items-center justify-center text-white hover:bg-black/50 transition-all duration-300",
-                          travelVideoEnded.has(2) ? "opacity-100" : "opacity-0 pointer-events-none"
+                          autoAdvance.videoEnded.has(2) ? "opacity-100" : "opacity-0 pointer-events-none"
                         )}
                       >
                         <svg className="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
@@ -722,7 +639,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         alt=""
                         className={cn(
                           "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                          (!travelVideoEnded.has(1) || travelVideoPlayed.has(1)) && "opacity-0"
+                          (!autoAdvance.videoEnded.has(1) || autoAdvance.videoPlayed.has(1)) && "opacity-0"
                         )}
                       />
                       {/* Full poster - only show before first play */}
@@ -733,7 +650,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         onLoad={() => handleImageLoad(example.poster)}
                         className={cn(
                           "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                          (!travelVideoEnded.has(1) || travelVideoPlayed.has(1) || !loadedImages.has(example.poster)) && "opacity-0"
+                          (!autoAdvance.videoEnded.has(1) || autoAdvance.videoPlayed.has(1) || !loadedImages.has(example.poster)) && "opacity-0"
                         )}
                       />
                       {/* Play button overlay */}
@@ -741,7 +658,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                         onClick={() => playTravelVideo(1)}
                         className={cn(
                           "absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center text-white hover:bg-black/50 transition-all duration-300",
-                          travelVideoEnded.has(1) ? "opacity-100" : "opacity-0 pointer-events-none"
+                          autoAdvance.videoEnded.has(1) ? "opacity-100" : "opacity-0 pointer-events-none"
                         )}
                       >
                         <svg className="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
@@ -784,7 +701,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 alt=""
                 className={cn(
                   "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                  (!travelVideoEnded.has(0) || travelVideoPlayed.has(0)) && "opacity-0"
+                  (!autoAdvance.videoEnded.has(0) || autoAdvance.videoPlayed.has(0)) && "opacity-0"
                 )}
               />
               {/* Full poster - only show before first play */}
@@ -795,7 +712,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 onLoad={() => handleImageLoad(currentExample.image1)}
                 className={cn(
                   "absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300",
-                  (!travelVideoEnded.has(0) || travelVideoPlayed.has(0) || !loadedImages.has(currentExample.image1)) && "opacity-0"
+                  (!autoAdvance.videoEnded.has(0) || autoAdvance.videoPlayed.has(0) || !loadedImages.has(currentExample.image1)) && "opacity-0"
                 )}
               />
               {/* Play button overlay */}
@@ -803,7 +720,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
                 onClick={() => playTravelVideo(0)}
                 className={cn(
                   "absolute inset-0 bg-black/40 flex items-center justify-center text-white hover:bg-black/50 transition-all duration-300",
-                  travelVideoEnded.has(0) ? "opacity-100" : "opacity-0 pointer-events-none"
+                  autoAdvance.videoEnded.has(0) ? "opacity-100" : "opacity-0 pointer-events-none"
                 )}
               >
                 <svg className="w-8 h-8 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
@@ -815,125 +732,19 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
           </div>
 
           {/* Example selector with thumbnail previews - below visualization, full width */}
-          <div className="grid grid-cols-3 gap-2 w-full pt-4">
-            {travelExamples.map((example, idx) => {
-              // Get thumbnail images for the selector
-              const thumbImages = idx === 0 
-                ? [currentExample.image1, currentExample.image2] 
-                : example.images;
-              
-              const isNextWithBorder = nextAdvanceIdx === idx;
-              const isPrevWithBorder = prevAdvanceIdx === idx;
-              const isDraining = drainingIdx === idx;
-              
-              return (
-                <button
-                  key={example.id}
-                  onClick={() => handleSelectExample(idx)}
-                  className="p-2 rounded-lg transition-all duration-200 flex items-center justify-center min-h-[60px] relative overflow-hidden bg-muted/30 hover:bg-muted/50"
-                >
-                  {/* Static border for selected item (not during animation) */}
-                  {selectedTravelExample === idx && !isNextWithBorder && !isPrevWithBorder && (
-                    <div className="absolute inset-0 rounded-lg border-2 border-primary/50 pointer-events-none" />
-                  )}
-                  {/* Progress fill on current playing video */}
-                  {selectedTravelExample === idx && !travelVideoEnded.has(idx) && (
-                    <div 
-                      className="absolute inset-0 bg-primary/20 rounded-lg"
-                      style={{ 
-                        clipPath: `inset(0 ${100 - videoProgress}% 0 0)`,
-                        transition: 'clip-path 500ms ease-out',
-                      }}
-                    />
-                  )}
-                  {/* Fill stays at 100% during countdown before draining */}
-                  {isPrevWithBorder && !isDraining && (
-                    <div 
-                      className="absolute inset-0 bg-primary/20 rounded-lg"
-                    />
-                  )}
-                  {/* Draining fill on previous video - shrinks from left as new video plays */}
-                  {isDraining && (
-                    <div 
-                      className="absolute inset-0 bg-primary/20 rounded-lg"
-                      style={{ 
-                        clipPath: `inset(0 0 0 ${videoProgress}%)`,
-                        transition: 'clip-path 500ms ease-out',
-                      }}
-                    />
-                  )}
-                  {/* Border being removed left-to-right */}
-                  {isPrevWithBorder && (
-                    <div 
-                      className="absolute inset-0 rounded-lg border-2 border-primary/50 pointer-events-none"
-                      style={{ 
-                        clipPath: 'inset(0 0% 0 0)',
-                        animation: 'hideBorderLeftToRight 3.75s ease-out forwards',
-                      }}
-                    />
-                  )}
-                  {/* Border revealed left-to-right like a wave */}
-                  {isNextWithBorder && selectedTravelExample !== idx && (
-                    <div 
-                      className="absolute inset-0 rounded-lg border-2 border-primary/50 pointer-events-none"
-                      style={{ 
-                        clipPath: 'inset(0 100% 0 0)',
-                        animation: 'revealBorderLeftToRight 3.75s ease-out forwards',
-                      }}
-                    />
-                  )}
-                  {/* Mini preview grid matching the layout */}
-                  {example.images.length === 7 ? (
-                    // 7 images: 1 2 3 4 / 5 6 7 (centered)
-                    <div className="flex flex-col gap-0.5 relative z-10">
-                      <div className="flex gap-0.5">
-                        {thumbImages.slice(0, 4).map((img, imgIdx) => (
-                          <div key={imgIdx} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
-                            {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
-                            <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex gap-0.5 justify-center">
-                        {thumbImages.slice(4, 7).map((img, imgIdx) => (
-                          <div key={imgIdx + 4} className="w-6 h-[18px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
-                            {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
-                            <img src={img} alt="" className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")} onLoad={() => handleImageLoad(img)} />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={cn(
-                      "gap-1 relative z-10",
-                      example.images.length === 2 && "flex flex-row",
-                      example.images.length === 4 && "flex flex-row"
-                    )}>
-                      {thumbImages.map((img, imgIdx) => (
-                        <div 
-                          key={imgIdx} 
-                          className={cn(
-                            "bg-muted/50 rounded-sm overflow-hidden relative",
-                            example.images.length === 2 && example.id === '2-images' && "w-10 h-10 aspect-square",
-                            example.images.length === 2 && example.id !== '2-images' && "w-6 h-6 aspect-square",
-                            example.images.length === 4 && "w-6 h-10"
-                          )}
-                        >
-                          {!loadedImages.has(img) && <Skeleton className="absolute inset-0" />}
-                          <img 
-                            src={img}
-                            alt=""
-                            className={cn("w-full h-full object-cover", !loadedImages.has(img) && "opacity-0")}
-                            onLoad={() => handleImageLoad(img)}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <TravelSelector
+            examples={travelExamples}
+            selectedIndex={selectedTravelExample}
+            onSelect={handleSelectExample}
+            nextAdvanceIdx={autoAdvance.nextAdvanceIdx}
+            prevAdvanceIdx={autoAdvance.prevAdvanceIdx}
+            drainingIdx={autoAdvance.drainingIdx}
+            videoProgress={autoAdvance.videoProgress}
+            videoEnded={autoAdvance.videoEnded}
+            loadedImages={loadedImages}
+            onImageLoad={handleImageLoad}
+            twoImageImages={[currentExample.image1, currentExample.image2]}
+          />
         </div>
 
         {/* ═══════════════════════════════════════════════════════════════════
