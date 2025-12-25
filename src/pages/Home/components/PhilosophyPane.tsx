@@ -313,14 +313,24 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
     setLoadedVideos(prev => new Set(prev).add(src));
   }, []);
 
+  // Destructure stable function references from the hook
+  const {
+    setVideoProgress,
+    handleVideoStarted,
+    handleVideoEnded: onVideoEnded,
+    handleVideoTimeUpdate: onVideoTimeUpdate,
+    handleManualSelect,
+    resetAll,
+  } = autoAdvance;
+
   const playTravelVideo = useCallback((idx: number) => {
     const video = travelVideoRefs.current[idx];
     if (video) {
       video.currentTime = 0;
-      autoAdvance.setVideoProgress(0);
+      setVideoProgress(0);
       // Wait for video to actually start playing before hiding poster
       const onPlaying = () => {
-        autoAdvance.handleVideoStarted(idx);
+        handleVideoStarted(idx);
         video.removeEventListener('playing', onPlaying);
       };
       video.addEventListener('playing', onPlaying);
@@ -328,7 +338,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         video.removeEventListener('playing', onPlaying);
       });
     }
-  }, [autoAdvance]);
+  }, [setVideoProgress, handleVideoStarted]);
 
   const handleTravelVideoEnded = useCallback((idx: number) => {
     // Preload the next video during countdown so it's ready to play
@@ -337,16 +347,16 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
     if (nextVideo) {
       nextVideo.load();
     }
-    autoAdvance.handleVideoEnded(idx);
-  }, [autoAdvance]);
+    onVideoEnded(idx);
+  }, [onVideoEnded]);
 
   const handleVideoTimeUpdate = useCallback((idx: number, video: HTMLVideoElement) => {
-    autoAdvance.handleVideoTimeUpdate(idx, video.currentTime, video.duration, selectedTravelExample);
-  }, [autoAdvance, selectedTravelExample]);
+    onVideoTimeUpdate(idx, video.currentTime, video.duration, selectedTravelExample);
+  }, [onVideoTimeUpdate, selectedTravelExample]);
 
   const handleSelectExample = useCallback((idx: number) => {
-    autoAdvance.handleManualSelect(idx);
-  }, [autoAdvance]);
+    handleManualSelect(idx);
+  }, [handleManualSelect]);
 
   const toggleLoraPlay = () => {
     if (loraPlaying) {
@@ -385,12 +395,18 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
     }
   }, [isOpen]);
 
-  // Play travel video when pane finishes opening
+  // Play travel video when pane finishes opening OR when switching tabs
   useEffect(() => {
     if (isOpen && !isOpening) {
       // Play the currently selected travel video
       playTravelVideo(selectedTravelExample);
-    } else if (!isOpen && !isClosing) {
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isOpening, selectedTravelExample]);
+
+  // Reset when pane closes
+  useEffect(() => {
+    if (!isOpen && !isClosing) {
       // Stop all travel videos when closed
       travelVideoRefs.current.forEach(v => {
         if (v) {
@@ -399,16 +415,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         }
       });
       // Reset all animation state
-      autoAdvance.resetAll();
+      resetAll();
     }
-  }, [isOpen, isOpening, isClosing, autoAdvance, playTravelVideo, selectedTravelExample]);
-
-  // Play video when switching tabs
-  useEffect(() => {
-    if (isOpen && !isOpening) {
-      playTravelVideo(selectedTravelExample);
-    }
-  }, [selectedTravelExample]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isClosing]);
 
   // Preload critical images when pane opens
   useEffect(() => {
@@ -439,7 +449,7 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 
   return (
     <GlassSidePane isOpen={isOpen} onClose={onClose} side="right" zIndex={60}>
-      {/* Keyframes for border reveal/hide - left to right wave */}
+      {/* Keyframes for border reveal/hide and fill drain - left to right wave */}
       <style>{`
         @keyframes revealBorderLeftToRight {
           from { clip-path: inset(0 100% 0 0); }
@@ -448,6 +458,10 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
         @keyframes hideBorderLeftToRight {
           from { clip-path: inset(0 0% 0 0); }
           to { clip-path: inset(0 0% 0 100%); }
+        }
+        @keyframes drainFillLeftToRight {
+          from { clip-path: inset(0 0 0 0); }
+          to { clip-path: inset(0 0 0 100%); }
         }
       `}</style>
       {/* Header */}

@@ -88,18 +88,13 @@ const SelectorButton: React.FC<SelectorButtonProps> = ({
         />
       )}
 
-      {/* Fill stays at 100% during countdown before draining */}
-      {isPrevWithBorder && !isDraining && (
-        <div className="absolute inset-0 bg-primary/20 rounded-lg" />
-      )}
-
-      {/* Draining fill on previous video - shrinks from left as new video plays */}
+      {/* Draining fill - animates alongside border during countdown */}
       {isDraining && (
         <div
           className="absolute inset-0 bg-primary/20 rounded-lg"
           style={{
-            clipPath: `inset(0 0 0 ${videoProgress}%)`,
-            transition: 'clip-path 500ms ease-out',
+            clipPath: 'inset(0 0 0 0)',
+            animation: `drainFillLeftToRight ${AUTO_ADVANCE_ANIMATION_DURATION} ease-out forwards`,
           }}
         />
       )}

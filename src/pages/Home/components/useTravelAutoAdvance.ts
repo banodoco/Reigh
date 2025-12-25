@@ -65,18 +65,18 @@ export function useTravelAutoAdvance({
 
   const handleVideoEnded = useCallback((idx: number) => {
     setVideoEnded(prev => new Set(prev).add(idx));
-    setDrainingIdx(null);
 
-    // Start border animation on next selector, remove from current
+    // Start border animation AND fill drain on current selector simultaneously
     const nextIdx = (idx + 1) % totalExamples;
     setNextAdvanceIdx(nextIdx);
     setPrevAdvanceIdx(idx);
+    setDrainingIdx(idx); // Drain fill at same time as border
 
     // After animation completes, switch to next video
     autoAdvanceTimeoutRef.current = setTimeout(() => {
       setNextAdvanceIdx(null);
       setPrevAdvanceIdx(null);
-      setDrainingIdx(idx); // Start draining the current video's fill
+      setDrainingIdx(null); // Clear drain state
       setVideoProgress(0);
       onExampleChange(nextIdx);
     }, AUTO_ADVANCE_DELAY_MS);
