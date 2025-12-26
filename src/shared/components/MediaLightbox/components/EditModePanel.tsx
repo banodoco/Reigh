@@ -229,7 +229,6 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 handleExitMagicEditMode();
               }
             }}
-            size="sm"
           >
             <SegmentedControlItem value="info">
               Info
