@@ -73,6 +73,7 @@ import {
   NavigationArrows,
   OpenEditModeButton,
   TaskDetailsPanelWrapper,
+  VideoEditPanel,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -2213,123 +2214,37 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   style={{ width: '40%' }}
                 >
                   {isInVideoEditMode ? (
-                    <div className="h-full flex flex-col">
-                      {/* Header with close button */}
-                      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background flex-shrink-0">
-                        <div className="flex items-center gap-2">
-                          <Film className="w-5 h-5 text-primary" />
-                          <h2 className="text-lg font-light">Edit Video</h2>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleExitVideoEditMode}
-                          className="h-8 w-8 p-0 hover:bg-muted"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      {/* Sub-mode selector: Trim | Regenerate - like image edit has Text | Inpaint | Annotate | Reposition */}
-                      <div className="px-4 pt-4 pb-2 flex-shrink-0">
-                        <div className="grid grid-cols-2 gap-1 border border-border rounded-lg overflow-hidden bg-muted/30">
-                          <button
-                            onClick={handleEnterVideoTrimMode}
-                            className={cn(
-                              "flex items-center justify-center gap-1.5 px-3 py-2 text-sm transition-all",
-                              videoEditSubMode === 'trim'
-                                ? "bg-background text-foreground font-medium shadow-sm"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                            )}
-                          >
-                            <Scissors className="h-4 w-4" />
-                            Trim
-                          </button>
-                          <button
-                            onClick={handleEnterVideoRegenerateMode}
-                            className={cn(
-                              "flex items-center justify-center gap-1.5 px-3 py-2 text-sm transition-all",
-                              videoEditSubMode === 'regenerate'
-                                ? "bg-background text-foreground font-medium shadow-sm"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                            )}
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                            Regenerate
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Sub-mode content */}
-                      <div className="flex-1 overflow-y-auto">
-                        {videoEditSubMode === 'trim' ? (
-                          <TrimControlsPanel
-                            trimState={trimState}
-                            onStartTrimChange={setStartTrim}
-                            onEndTrimChange={setEndTrim}
-                            onResetTrim={resetTrim}
-                            trimmedDuration={trimmedDuration}
-                            hasTrimChanges={hasTrimChanges}
-                            onSave={saveTrimmedVideo}
-                            isSaving={isSavingTrim}
-                            saveProgress={trimSaveProgress}
-                            saveError={trimSaveError}
-                            saveSuccess={trimSaveSuccess}
-                            onClose={handleExitVideoEditMode}
-                            variant="desktop"
-                            videoUrl={effectiveVideoUrl}
-                            currentTime={trimCurrentTime}
-                            videoRef={trimVideoRef}
-                            hideHeader
-                          />
-                        ) : (
-                          <VideoPortionEditor
-                            gapFrames={videoEditing.editSettings.settings.gapFrameCount || 12}
-                            setGapFrames={(val) => videoEditing.editSettings.updateField('gapFrameCount', val)}
-                            contextFrames={videoEditing.editSettings.settings.contextFrameCount || 8}
-                            setContextFrames={(val) => {
-                              const maxGap = Math.max(1, 81 - (val * 2));
-                              const gapFrames = videoEditing.editSettings.settings.gapFrameCount || 12;
-                              const newGapFrames = gapFrames > maxGap ? maxGap : gapFrames;
-                              videoEditing.editSettings.updateFields({
-                                contextFrameCount: val,
-                                gapFrameCount: newGapFrames
-                              });
-                            }}
-                            maxContextFrames={videoEditing.maxContextFrames}
-                            negativePrompt={videoEditing.editSettings.settings.negativePrompt || ''}
-                            setNegativePrompt={(val) => videoEditing.editSettings.updateField('negativePrompt', val)}
-                            enhancePrompt={videoEditing.editSettings.settings.enhancePrompt}
-                            setEnhancePrompt={(val) => videoEditing.editSettings.updateField('enhancePrompt', val)}
-                            selections={videoEditing.selections}
-                            onUpdateSelectionSettings={videoEditing.handleUpdateSelectionSettings}
-                            availableLoras={videoEditing.availableLoras}
-                            projectId={selectedProjectId}
-                            loraManager={videoEditing.loraManager}
-                            onGenerate={videoEditing.handleGenerate}
-                            isGenerating={videoEditing.isGenerating}
-                            generateSuccess={videoEditing.generateSuccess}
-                            isGenerateDisabled={!videoEditing.isValid}
-                            validationErrors={videoEditing.validationErrors}
-                          />
-                        )}
-                      </div>
-
-                      {/* Variants section - show in edit mode too */}
-                      {variants && variants.length >= 1 && (
-                        <div className="flex-shrink-0 overflow-y-auto max-h-[200px] border-t border-border">
-                          <div className="p-4 pt-2">
-                            <VariantSelector
-                              variants={variants}
-                              activeVariantId={activeVariant?.id || null}
-                              onVariantSelect={setActiveVariantId}
-                              onMakePrimary={setPrimaryVariant}
-                              isLoading={isLoadingVariants}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <VideoEditPanel
+                      variant="desktop"
+                      videoEditSubMode={videoEditSubMode!}
+                      onEnterTrimMode={handleEnterVideoTrimMode}
+                      onEnterRegenerateMode={handleEnterVideoRegenerateMode}
+                      onClose={handleExitVideoEditMode}
+                      // Trim props
+                      trimState={trimState}
+                      onStartTrimChange={setStartTrim}
+                      onEndTrimChange={setEndTrim}
+                      onResetTrim={resetTrim}
+                      trimmedDuration={trimmedDuration}
+                      hasTrimChanges={hasTrimChanges}
+                      onSaveTrim={saveTrimmedVideo}
+                      isSavingTrim={isSavingTrim}
+                      trimSaveProgress={trimSaveProgress}
+                      trimSaveError={trimSaveError}
+                      trimSaveSuccess={trimSaveSuccess}
+                      videoUrl={effectiveVideoUrl}
+                      trimCurrentTime={trimCurrentTime}
+                      trimVideoRef={trimVideoRef}
+                      // Regenerate props
+                      videoEditing={videoEditing}
+                      projectId={selectedProjectId}
+                      // Variants props
+                      variants={variants}
+                      activeVariantId={activeVariant?.id || null}
+                      onVariantSelect={setActiveVariantId}
+                      onMakePrimary={setPrimaryVariant}
+                      isLoadingVariants={isLoadingVariants}
+                    />
                   ) : isSpecialEditMode ? (
                     <EditModePanel
                       sourceGenerationData={sourceGenerationData}
@@ -2754,105 +2669,37 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   style={{ height: '50%' }}
                 >
                   {isInVideoEditMode ? (
-                    <div className="h-full flex flex-col">
-                      {/* Sub-mode selector: Trim | Regenerate - Mobile */}
-                      <div className="px-4 pt-4 pb-2 flex-shrink-0 border-b border-border">
-                        <div className="grid grid-cols-2 gap-1 border border-border rounded-lg overflow-hidden bg-muted/30">
-                          <button
-                            onClick={handleEnterVideoTrimMode}
-                            className={cn(
-                              "flex items-center justify-center gap-1.5 px-3 py-2 text-sm transition-all",
-                              videoEditSubMode === 'trim'
-                                ? "bg-background text-foreground font-medium shadow-sm"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                            )}
-                          >
-                            <Scissors className="h-4 w-4" />
-                            Trim
-                          </button>
-                          <button
-                            onClick={handleEnterVideoRegenerateMode}
-                            className={cn(
-                              "flex items-center justify-center gap-1.5 px-3 py-2 text-sm transition-all",
-                              videoEditSubMode === 'regenerate'
-                                ? "bg-background text-foreground font-medium shadow-sm"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                            )}
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                            Regenerate
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Sub-mode content - Mobile */}
-                      <div className="flex-1 overflow-y-auto">
-                        {videoEditSubMode === 'trim' ? (
-                          <TrimControlsPanel
-                            trimState={trimState}
-                            onStartTrimChange={setStartTrim}
-                            onEndTrimChange={setEndTrim}
-                            onResetTrim={resetTrim}
-                            trimmedDuration={trimmedDuration}
-                            hasTrimChanges={hasTrimChanges}
-                            onSave={saveTrimmedVideo}
-                            isSaving={isSavingTrim}
-                            saveProgress={trimSaveProgress}
-                            saveError={trimSaveError}
-                            saveSuccess={trimSaveSuccess}
-                            onClose={handleExitVideoEditMode}
-                            variant="mobile"
-                            videoUrl={effectiveVideoUrl}
-                            currentTime={trimCurrentTime}
-                            videoRef={trimVideoRef}
-                            hideHeader
-                          />
-                        ) : (
-                          <VideoPortionEditor
-                            gapFrames={videoEditing.editSettings.settings.gapFrameCount || 12}
-                            setGapFrames={(val) => videoEditing.editSettings.updateField('gapFrameCount', val)}
-                            contextFrames={videoEditing.editSettings.settings.contextFrameCount || 8}
-                            setContextFrames={(val) => {
-                              const maxGap = Math.max(1, 81 - (val * 2));
-                              const gapFrames = videoEditing.editSettings.settings.gapFrameCount || 12;
-                              const newGapFrames = gapFrames > maxGap ? maxGap : gapFrames;
-                              videoEditing.editSettings.updateFields({
-                                contextFrameCount: val,
-                                gapFrameCount: newGapFrames
-                              });
-                            }}
-                            maxContextFrames={videoEditing.maxContextFrames}
-                            negativePrompt={videoEditing.editSettings.settings.negativePrompt || ''}
-                            setNegativePrompt={(val) => videoEditing.editSettings.updateField('negativePrompt', val)}
-                            enhancePrompt={videoEditing.editSettings.settings.enhancePrompt}
-                            setEnhancePrompt={(val) => videoEditing.editSettings.updateField('enhancePrompt', val)}
-                            selections={videoEditing.selections}
-                            onUpdateSelectionSettings={videoEditing.handleUpdateSelectionSettings}
-                            availableLoras={videoEditing.availableLoras}
-                            projectId={selectedProjectId}
-                            loraManager={videoEditing.loraManager}
-                            onGenerate={videoEditing.handleGenerate}
-                            isGenerating={videoEditing.isGenerating}
-                            generateSuccess={videoEditing.generateSuccess}
-                            isGenerateDisabled={!videoEditing.isValid}
-                            validationErrors={videoEditing.validationErrors}
-                          />
-                        )}
-                      </div>
-
-                      {/* Variants section - show in edit mode too - Mobile */}
-                      {variants && variants.length >= 1 && (
-                        <div className="flex-shrink-0 overflow-y-auto max-h-[120px] border-t border-border px-3 pb-2">
-                          <VariantSelector
-                            variants={variants}
-                            activeVariantId={activeVariant?.id || null}
-                            onVariantSelect={setActiveVariantId}
-                            onMakePrimary={setPrimaryVariant}
-                            isLoading={isLoadingVariants}
-                          />
-                        </div>
-                      )}
-                    </div>
+                    <VideoEditPanel
+                      variant="mobile"
+                      videoEditSubMode={videoEditSubMode!}
+                      onEnterTrimMode={handleEnterVideoTrimMode}
+                      onEnterRegenerateMode={handleEnterVideoRegenerateMode}
+                      onClose={handleExitVideoEditMode}
+                      // Trim props
+                      trimState={trimState}
+                      onStartTrimChange={setStartTrim}
+                      onEndTrimChange={setEndTrim}
+                      onResetTrim={resetTrim}
+                      trimmedDuration={trimmedDuration}
+                      hasTrimChanges={hasTrimChanges}
+                      onSaveTrim={saveTrimmedVideo}
+                      isSavingTrim={isSavingTrim}
+                      trimSaveProgress={trimSaveProgress}
+                      trimSaveError={trimSaveError}
+                      trimSaveSuccess={trimSaveSuccess}
+                      videoUrl={effectiveVideoUrl}
+                      trimCurrentTime={trimCurrentTime}
+                      trimVideoRef={trimVideoRef}
+                      // Regenerate props
+                      videoEditing={videoEditing}
+                      projectId={selectedProjectId}
+                      // Variants props
+                      variants={variants}
+                      activeVariantId={activeVariant?.id || null}
+                      onVariantSelect={setActiveVariantId}
+                      onMakePrimary={setPrimaryVariant}
+                      isLoadingVariants={isLoadingVariants}
+                    />
                   ) : isSpecialEditMode ? (
                     <EditModePanel
                       sourceGenerationData={sourceGenerationData}

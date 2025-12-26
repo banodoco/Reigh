@@ -44,3 +44,6 @@ export type { OpenEditModeButtonProps } from './OpenEditModeButton';
 
 export { TaskDetailsPanelWrapper } from './TaskDetailsPanelWrapper';
 export type { TaskDetailsPanelWrapperProps } from './TaskDetailsPanelWrapper';
+
+export { VideoEditPanel } from './VideoEditPanel';
+export type { VideoEditPanelProps } from './VideoEditPanel';
