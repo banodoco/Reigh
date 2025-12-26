@@ -2788,7 +2788,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isDeleting={isDeleting}
                     mediaId={media.id}
                     onClose={onClose}
-                    showCloseButton={showCloseButton}
                   />
 
                     {/* Bottom Left Controls - Edit & Upscale */}
