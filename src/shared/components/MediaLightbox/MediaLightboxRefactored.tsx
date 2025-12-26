@@ -50,6 +50,7 @@ import {
   useEditSettingsPersistence,
   useRepositionMode,
   useSwipeNavigation,
+  useButtonGroupProps,
 } from './hooks';
 
 // Import all extracted components
@@ -1166,6 +1167,48 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
+  // Centralized button group props - prevents prop divergence across layout branches
+  const buttonGroupProps = useButtonGroupProps({
+    // Shared base props
+    isVideo,
+    readOnly,
+    isSpecialEditMode,
+    selectedProjectId,
+    isCloudMode,
+    mediaId: media.id,
+
+    // TopLeft & BottomLeft - Edit mode
+    handleEnterMagicEditMode,
+
+    // TopRight - Download & Delete
+    showDownload,
+    handleDownload,
+    onDelete,
+    handleDelete,
+    isDeleting,
+    onClose,
+
+    // BottomLeft - Upscale
+    isUpscaling,
+    isPendingUpscale,
+    hasUpscaledVersion,
+    showingUpscaled,
+    handleUpscale,
+    handleToggleUpscaled,
+
+    // BottomRight - Star & References
+    localStarred,
+    handleToggleStar,
+    toggleStarPending: toggleStarMutation.isPending,
+    isAddingToReferences,
+    addToReferencesSuccess,
+    handleAddToReferences,
+    handleAddToJoin,
+    isAddingToJoin,
+    addToJoinSuccess,
+    onGoToJoin: handleGoToJoin,
+  });
+
   const handleApplySettings = () => {
     if (onApplySettings) {
       onApplySettings(media.metadata);
@@ -2007,14 +2050,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   })()}
 
                     {/* Top Left Controls - Edit button */}
-                    <TopLeftControls
-                      isVideo={isVideo}
-                      readOnly={readOnly}
-                      isSpecialEditMode={isSpecialEditMode}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={isCloudMode}
-                      handleEnterMagicEditMode={handleEnterMagicEditMode}
-                    />
+                    <TopLeftControls {...buttonGroupProps.topLeft} />
 
                     {/* Floating Tool Controls - Tablet (landscape with sidebar) */}
                     {isSpecialEditMode && shouldShowSidePanel && (
@@ -2046,55 +2082,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     )}
 
                     {/* Bottom Left Controls - Edit & Upscale */}
-                    <BottomLeftControls
-                      isVideo={isVideo}
-                      readOnly={readOnly}
-                      isSpecialEditMode={isSpecialEditMode}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={isCloudMode}
-                      handleEnterMagicEditMode={handleEnterMagicEditMode}
-                      isUpscaling={isUpscaling}
-                      isPendingUpscale={isPendingUpscale}
-                      hasUpscaledVersion={hasUpscaledVersion}
-                      showingUpscaled={showingUpscaled}
-                      handleUpscale={handleUpscale}
-                      handleToggleUpscaled={handleToggleUpscaled}
-                    />
+                    <BottomLeftControls {...buttonGroupProps.bottomLeft} />
 
                     {/* Bottom Right Controls - Star & Add to References */}
-                    <BottomRightControls
-                      isVideo={isVideo}
-                      readOnly={readOnly}
-                      isSpecialEditMode={isSpecialEditMode}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={isCloudMode}
-                      localStarred={localStarred}
-                      handleToggleStar={handleToggleStar}
-                      toggleStarPending={toggleStarMutation.isPending}
-                      isAddingToReferences={isAddingToReferences}
-                      addToReferencesSuccess={addToReferencesSuccess}
-                      handleAddToReferences={handleAddToReferences}
-                      handleAddToJoin={handleAddToJoin}
-                      isAddingToJoin={isAddingToJoin}
-                      addToJoinSuccess={addToJoinSuccess}
-                      onGoToJoin={handleGoToJoin}
-                    />
+                    <BottomRightControls {...buttonGroupProps.bottomRight} />
 
                     {/* Top Right Controls - Download, Delete & Close */}
-                    <TopRightControls
-                      isVideo={isVideo}
-                      readOnly={readOnly}
-                      isSpecialEditMode={isSpecialEditMode}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={isCloudMode}
-                      showDownload={showDownload}
-                      handleDownload={handleDownload}
-                      onDelete={onDelete}
-                      handleDelete={handleDelete}
-                      isDeleting={isDeleting}
-                      mediaId={media.id}
-                      onClose={onClose}
-                    />
+                    <TopRightControls {...buttonGroupProps.topRight} />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
                     <WorkflowControlsBar
@@ -2333,65 +2327,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                     {/* Mobile Stacked Layout - All button groups (matching desktop) */}
                     {/* Top Left Controls - Edit button */}
-                    <TopLeftControls
-                      isVideo={isVideo}
-                      readOnly={readOnly}
-                      isSpecialEditMode={isSpecialEditMode}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={isCloudMode}
-                      handleEnterMagicEditMode={handleEnterMagicEditMode}
-                    />
+                    <TopLeftControls {...buttonGroupProps.topLeft} />
 
                     {/* Top Right Controls - Download, Delete & Close */}
-                    <TopRightControls
-                      isVideo={isVideo}
-                      readOnly={readOnly}
-                      isSpecialEditMode={isSpecialEditMode}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={isCloudMode}
-                      showDownload={showDownload}
-                      handleDownload={handleDownload}
-                      onDelete={onDelete}
-                      handleDelete={handleDelete}
-                      isDeleting={isDeleting}
-                      mediaId={media.id}
-                      onClose={onClose}
-                    />
+                    <TopRightControls {...buttonGroupProps.topRight} />
 
                     {/* Bottom Left Controls - Edit & Upscale */}
-                    <BottomLeftControls
-                      isVideo={isVideo}
-                      readOnly={readOnly}
-                      isSpecialEditMode={isSpecialEditMode}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={isCloudMode}
-                      handleEnterMagicEditMode={handleEnterMagicEditMode}
-                      isUpscaling={isUpscaling}
-                      isPendingUpscale={isPendingUpscale}
-                      hasUpscaledVersion={hasUpscaledVersion}
-                      showingUpscaled={showingUpscaled}
-                      handleUpscale={handleUpscale}
-                      handleToggleUpscaled={handleToggleUpscaled}
-                    />
+                    <BottomLeftControls {...buttonGroupProps.bottomLeft} />
 
                     {/* Bottom Right Controls - Star & Add to References */}
-                    <BottomRightControls
-                      isVideo={isVideo}
-                      readOnly={readOnly}
-                      isSpecialEditMode={isSpecialEditMode}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={isCloudMode}
-                      localStarred={localStarred}
-                      handleToggleStar={handleToggleStar}
-                      toggleStarPending={toggleStarMutation.isPending}
-                      isAddingToReferences={isAddingToReferences}
-                      addToReferencesSuccess={addToReferencesSuccess}
-                      handleAddToReferences={handleAddToReferences}
-                      handleAddToJoin={handleAddToJoin}
-                      isAddingToJoin={isAddingToJoin}
-                      addToJoinSuccess={addToJoinSuccess}
-                      onGoToJoin={handleGoToJoin}
-                    />
+                    <BottomRightControls {...buttonGroupProps.bottomRight} />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
                     <WorkflowControlsBar
@@ -2765,65 +2710,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                   {/* Regular Mobile Layout - All button groups (matching desktop) */}
                   {/* Top Left Controls - Edit button */}
-                  <TopLeftControls
-                    isVideo={isVideo}
-                    readOnly={readOnly}
-                    isSpecialEditMode={isSpecialEditMode}
-                    selectedProjectId={selectedProjectId}
-                    isCloudMode={isCloudMode}
-                    handleEnterMagicEditMode={handleEnterMagicEditMode}
-                  />
+                  <TopLeftControls {...buttonGroupProps.topLeft} />
 
                   {/* Top Right Controls - Download, Delete & Close */}
-                  <TopRightControls
-                    isVideo={isVideo}
-                    readOnly={readOnly}
-                    isSpecialEditMode={isSpecialEditMode}
-                    selectedProjectId={selectedProjectId}
-                    isCloudMode={isCloudMode}
-                    showDownload={showDownload}
-                    handleDownload={handleDownload}
-                    onDelete={onDelete}
-                    handleDelete={handleDelete}
-                    isDeleting={isDeleting}
-                    mediaId={media.id}
-                    onClose={onClose}
-                  />
+                  <TopRightControls {...buttonGroupProps.topRight} />
 
-                    {/* Bottom Left Controls - Edit & Upscale */}
-                  <BottomLeftControls
-                    isVideo={isVideo}
-                    readOnly={readOnly}
-                    isSpecialEditMode={isSpecialEditMode}
-                    selectedProjectId={selectedProjectId}
-                    isCloudMode={isCloudMode}
-                    handleEnterMagicEditMode={handleEnterMagicEditMode}
-                    isUpscaling={isUpscaling}
-                    isPendingUpscale={isPendingUpscale}
-                    hasUpscaledVersion={hasUpscaledVersion}
-                    showingUpscaled={showingUpscaled}
-                    handleUpscale={handleUpscale}
-                    handleToggleUpscaled={handleToggleUpscaled}
-                  />
+                  {/* Bottom Left Controls - Edit & Upscale */}
+                  <BottomLeftControls {...buttonGroupProps.bottomLeft} />
 
                   {/* Bottom Right Controls - Star & Add to References */}
-                  <BottomRightControls
-                    isVideo={isVideo}
-                    readOnly={readOnly}
-                    isSpecialEditMode={isSpecialEditMode}
-                    selectedProjectId={selectedProjectId}
-                    isCloudMode={isCloudMode}
-                    localStarred={localStarred}
-                    handleToggleStar={handleToggleStar}
-                    toggleStarPending={toggleStarMutation.isPending}
-                    isAddingToReferences={isAddingToReferences}
-                    addToReferencesSuccess={addToReferencesSuccess}
-                    handleAddToReferences={handleAddToReferences}
-                    handleAddToJoin={handleAddToJoin}
-                    isAddingToJoin={isAddingToJoin}
-                    addToJoinSuccess={addToJoinSuccess}
-                    onGoToJoin={handleGoToJoin}
-                  />
+                  <BottomRightControls {...buttonGroupProps.bottomRight} />
 
                   {/* Bottom Workflow Controls (hidden in special edit modes) */}
                   <WorkflowControlsBar

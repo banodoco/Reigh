@@ -65,7 +65,9 @@ export type {
 } from './useRepositionMode';
 
 export { useSwipeNavigation } from './useSwipeNavigation';
-export type { 
-  UseSwipeNavigationProps, 
+export type {
+  UseSwipeNavigationProps,
   UseSwipeNavigationReturn,
 } from './useSwipeNavigation';
+
+export { useButtonGroupProps } from './useButtonGroupProps';
