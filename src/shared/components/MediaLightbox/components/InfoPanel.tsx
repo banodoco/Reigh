@@ -9,6 +9,7 @@
 
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
+import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 import { X } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
@@ -113,38 +114,19 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
     if (!showImageEditTools || readOnly || isVideo) return null;
 
     return (
-      <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-        <button
-          onClick={() => {
-            if (isInpaintMode) {
-              onExitInpaintMode();
-            }
-          }}
-          className={cn(
-            "px-3 py-1.5 text-sm rounded transition-colors",
-            !isInpaintMode
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-          )}
-        >
-          Info
-        </button>
-        <button
-          onClick={() => {
-            if (!isInpaintMode) {
-              onEnterInpaintMode();
-            }
-          }}
-          className={cn(
-            "px-3 py-1.5 text-sm rounded transition-colors",
-            isInpaintMode
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-          )}
-        >
-          Edit
-        </button>
-      </div>
+      <SegmentedControl
+        value={isInpaintMode ? 'edit' : 'info'}
+        onValueChange={(value) => {
+          if (value === 'info' && isInpaintMode) {
+            onExitInpaintMode();
+          } else if (value === 'edit' && !isInpaintMode) {
+            onEnterInpaintMode();
+          }
+        }}
+      >
+        <SegmentedControlItem value="info">Info</SegmentedControlItem>
+        <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
+      </SegmentedControl>
     );
   };
 
@@ -153,34 +135,19 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
     if (!isVideo || readOnly) return null;
 
     return (
-      <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-        <button
-          onClick={onExitVideoEditMode}
-          className={cn(
-            "px-3 py-1.5 text-sm rounded transition-colors",
-            !isInVideoEditMode
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-          )}
-        >
-          Info
-        </button>
-        <button
-          onClick={() => {
-            if (!isInVideoEditMode) {
-              onEnterVideoEditMode();
-            }
-          }}
-          className={cn(
-            "px-3 py-1.5 text-sm rounded transition-colors",
-            isInVideoEditMode
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-          )}
-        >
-          Edit
-        </button>
-      </div>
+      <SegmentedControl
+        value={isInVideoEditMode ? 'edit' : 'info'}
+        onValueChange={(value) => {
+          if (value === 'info' && isInVideoEditMode) {
+            onExitVideoEditMode();
+          } else if (value === 'edit' && !isInVideoEditMode) {
+            onEnterVideoEditMode();
+          }
+        }}
+      >
+        <SegmentedControlItem value="info">Info</SegmentedControlItem>
+        <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
+      </SegmentedControl>
     );
   };
 
