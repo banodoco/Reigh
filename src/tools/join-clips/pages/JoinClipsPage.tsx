@@ -7,7 +7,8 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Checkbox } from '@/shared/components/ui/checkbox';
-import { Upload, Film, X, Play, Plus, GripVertical, Trash2 } from 'lucide-react';
+import { Upload, Film, X, Plus, GripVertical, Trash2 } from 'lucide-react';
+import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,8 +17,9 @@ import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { JoinClipsSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
-import { useGenerations, useDeleteGeneration, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration, useCreateGeneration, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
 import { ImageGallery } from '@/shared/components/ImageGallery';
+import MediaLightbox from '@/shared/components/MediaLightbox';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { SKELETON_COLUMNS } from '@/shared/components/ImageGallery/utils';
@@ -118,6 +120,7 @@ interface SortableClipProps {
   onDrop: (e: React.DragEvent, clipId: string) => void;
   onPromptChange: (clipId: string, prompt: string) => void;
   setClips: React.Dispatch<React.SetStateAction<VideoClip[]>>;
+  onOpenInLightbox: (clip: VideoClip) => void;
 }
 
 const SortableClip: React.FC<SortableClipProps> = ({
@@ -144,6 +147,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
   onDrop,
   onPromptChange,
   setClips,
+  onOpenInLightbox,
 }) => {
   // Check if this is the last clip and it's empty
   const isLastClip = index === clips.length - 1;
@@ -186,7 +190,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
               </div>
             )}
             <div className="text-sm font-medium text-muted-foreground">
-              {isAddAnotherClip ? 'Add another clip' : isLoopedSecondClip ? 'Clip #2 (Looped)' : `Clip #${index + 1}`}
+              {isAddAnotherClip ? 'Add clip' : isLoopedSecondClip ? 'Clip #2 (Looped)' : `Clip #${index + 1}`}
             </div>
           </div>
           {clip.url && !isAddAnotherClip && (
@@ -217,7 +221,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
                 htmlFor={`loop-first-clip-${clip.id}`}
                 className="text-xs text-muted-foreground cursor-pointer select-none"
               >
-                Just loop first clip
+                Loop first clip
               </label>
             </div>
           )}
@@ -250,63 +254,33 @@ const SortableClip: React.FC<SortableClipProps> = ({
                 fileInputRefs.current[clip.id]?.click();
               }
             }}
+            onDoubleClick={() => {
+              // Open in lightbox on double-click if clip has video
+              if (clip.url) {
+                onOpenInLightbox(clip);
+              }
+            }}
           >
             {uploadingClipId === clip.id ? (
               <UploadingVideoState />
             ) : clip.url ? (
               <>
-                {!clip.loaded && <VideoContainerSkeleton />}
-                {!clip.playing && clip.posterUrl ? (
-                  <>
-                    <img
-                      src={clip.posterUrl}
-                      alt="Video poster"
-                      className={cn(
-                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
-                        clip.loaded ? 'opacity-100' : 'opacity-0'
-                      )}
-                      onLoad={() => {
-                        setClips(prev => prev.map(c => 
-                          c.id === clip.id ? { ...c, loaded: true } : c
-                        ));
-                      }}
-                    />
-                    <div 
-                      className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
-                      onClick={() => {
-                        setClips(prev => prev.map(c => 
-                          c.id === clip.id ? { ...c, playing: true } : c
-                        ));
-                      }}
-                    >
-                      <div className="bg-black/50 rounded-full p-3 hover:bg-black/70 transition-colors">
-                        <Play className="h-8 w-8 text-white" fill="white" />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <video
-                    ref={el => { videoRefs.current[clip.id] = el; }}
-                    src={clip.url}
-                    controls
-                    autoPlay={clip.playing}
-                    preload="metadata"
-                    playsInline
-                    muted
-                    className={cn(
-                      'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
-                      clip.loaded ? 'opacity-100' : 'opacity-0'
-                    )}
-                    onLoadedData={() => {
-                      setClips(prev => prev.map(c => 
-                        c.id === clip.id ? { ...c, loaded: true } : c
-                      ));
-                    }}
-                  />
-                )}
+                <HoverScrubVideo
+                  src={clip.url}
+                  poster={clip.posterUrl}
+                  className="absolute inset-0 w-full h-full"
+                  videoClassName="object-contain"
+                  onDoubleClick={() => onOpenInLightbox(clip)}
+                  preload="metadata"
+                  onLoadedData={() => {
+                    setClips(prev => prev.map(c =>
+                      c.id === clip.id ? { ...c, loaded: true } : c
+                    ));
+                  }}
+                />
                 {/* Final frame thumbnail in bottom right corner */}
                 {clip.finalFrameUrl && (
-                  <div className="absolute bottom-2 right-2 w-16 h-10 rounded border-2 border-white shadow-lg overflow-hidden z-10">
+                  <div className="absolute bottom-2 right-2 w-16 h-10 rounded border-2 border-white shadow-lg overflow-hidden z-10 pointer-events-none">
                     <img
                       src={clip.finalFrameUrl}
                       alt="Final frame"
@@ -387,6 +361,7 @@ const JoinClipsPage: React.FC = () => {
   // Local state for clips list
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [uploadingClipId, setUploadingClipId] = useState<string | null>(null);
+  const [lightboxClip, setLightboxClip] = useState<VideoClip | null>(null);
   
   // Track if we've already loaded from settings to prevent re-loading
   const hasLoadedFromSettings = useRef(false);
@@ -436,7 +411,89 @@ const JoinClipsPage: React.FC = () => {
       setCachedClipsCountState(getCachedClipsCount(selectedProjectId));
     }
   }, [selectedProjectId]);
-  
+
+  // Check for pending join clips from lightbox "Add to Join" button
+  useEffect(() => {
+    const checkPendingJoinClips = async () => {
+      try {
+        const pendingData = localStorage.getItem('pendingJoinClips');
+        if (!pendingData) return;
+
+        const pendingClips: Array<{ videoUrl: string; thumbnailUrl?: string; generationId: string; timestamp: number }> =
+          JSON.parse(pendingData);
+
+        // Filter to only recent clips (within last 5 minutes)
+        const recentClips = pendingClips.filter(clip => Date.now() - clip.timestamp < 5 * 60 * 1000);
+
+        if (recentClips.length === 0) {
+          localStorage.removeItem('pendingJoinClips');
+          return;
+        }
+
+        // Process each pending clip
+        for (const { videoUrl, thumbnailUrl } of recentClips) {
+          // Extract video duration
+          const videoElement = document.createElement('video');
+          videoElement.preload = 'metadata';
+          const durationPromise = new Promise<number>((resolve) => {
+            videoElement.onloadedmetadata = () => {
+              resolve(videoElement.duration);
+            };
+            videoElement.onerror = () => {
+              resolve(0);
+            };
+            videoElement.src = videoUrl;
+          });
+          const durationSeconds = await durationPromise;
+
+          // Find first empty clip slot or add a new one
+          const newClipId = generateUUID();
+          setClips(prev => {
+            // Find first clip without a URL
+            const emptyClipIndex = prev.findIndex(clip => !clip.url);
+            if (emptyClipIndex !== -1) {
+              // Fill the empty slot
+              return prev.map((clip, idx) =>
+                idx === emptyClipIndex
+                  ? {
+                      ...clip,
+                      url: videoUrl,
+                      posterUrl: thumbnailUrl,
+                      durationSeconds,
+                      loaded: false,
+                      playing: false,
+                    }
+                  : clip
+              );
+            } else {
+              // Add a new clip
+              return [
+                ...prev,
+                {
+                  id: newClipId,
+                  url: videoUrl,
+                  posterUrl: thumbnailUrl,
+                  durationSeconds,
+                  loaded: false,
+                  playing: false,
+                },
+              ];
+            }
+          });
+
+          console.log('[JoinClips] Added clip from lightbox:', videoUrl);
+        }
+
+        // Clear processed clips
+        localStorage.removeItem('pendingJoinClips');
+      } catch (error) {
+        console.error('[JoinClips] Failed to process pending join clips:', error);
+      }
+    };
+
+    checkPendingJoinClips();
+  }, []);
+
   // Transition prompts (one for each pair) - still managed locally as they're tied to clip IDs
   const [transitionPrompts, setTransitionPrompts] = useState<TransitionPrompt[]>([]);
   
@@ -569,6 +626,9 @@ const JoinClipsPage: React.FC = () => {
   
   // Delete mutation for gallery items
   const deleteGenerationMutation = useDeleteGeneration();
+
+  // Create mutation for uploaded clips
+  const createGenerationMutation = useCreateGeneration();
   const handleDeleteGeneration = useCallback((id: string) => {
     deleteGenerationMutation.mutate(id);
   }, [deleteGenerationMutation]);
@@ -1056,11 +1116,25 @@ const JoinClipsPage: React.FC = () => {
         .from(MEDIA_BUCKET)
         .getPublicUrl(finalFrameFileName);
       
-      toast({
-        title: 'Video uploaded',
-        description: 'Your video has been saved',
-      });
-      
+      // Create a generation record so the video appears in the gallery
+      if (selectedProjectId) {
+        try {
+          await createGenerationMutation.mutateAsync({
+            imageUrl: videoUrl,
+            fileName: file.name,
+            fileType: 'video',
+            fileSize: file.size,
+            projectId: selectedProjectId,
+            prompt: 'Uploaded clip for Join',
+            thumbnailUrl: posterUrl,
+          });
+          console.log('[JoinClips] Generation record created for uploaded clip');
+        } catch (genError) {
+          console.error('[JoinClips] Failed to create generation record:', genError);
+          // Don't fail the upload if generation creation fails
+        }
+      }
+
       console.log('[JoinClips] Video uploaded with duration:', durationSeconds, 'seconds');
       return { videoUrl, posterUrl, finalFrameUrl, durationSeconds };
     } catch (error) {
@@ -1525,6 +1599,7 @@ const JoinClipsPage: React.FC = () => {
                     onDrop={handleDrop}
                     onPromptChange={handlePromptChange}
                     setClips={setClips}
+                    onOpenInLightbox={setLightboxClip}
                   />
                 ))}
               </div>
@@ -1710,6 +1785,22 @@ const JoinClipsPage: React.FC = () => {
           return null;
         })()}
       </div>
+
+      {/* Lightbox for viewing clips */}
+      {lightboxClip && (
+        <MediaLightbox
+          media={{
+            id: lightboxClip.id,
+            imageUrl: lightboxClip.url,
+            location: lightboxClip.url,
+            thumbUrl: lightboxClip.posterUrl,
+            type: 'video',
+          }}
+          onClose={() => setLightboxClip(null)}
+          showNavigation={false}
+          showDownload
+        />
+      )}
     </PageFadeIn>
   );
 };

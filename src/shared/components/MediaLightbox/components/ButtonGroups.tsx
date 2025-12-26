@@ -13,6 +13,8 @@ import {
   EyeOff,
   Trash2,
   X,
+  Film,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
@@ -231,6 +233,11 @@ interface BottomRightControlsProps extends BaseButtonGroupProps {
   isAddingToReferences: boolean;
   addToReferencesSuccess: boolean;
   handleAddToReferences: () => Promise<void>;
+  // Add to Join Clips
+  handleAddToJoin?: () => void;
+  isAddingToJoin?: boolean;
+  addToJoinSuccess?: boolean;
+  onGoToJoin?: () => void;
 }
 
 export const BottomRightControls: React.FC<BottomRightControlsProps> = ({
@@ -244,6 +251,10 @@ export const BottomRightControls: React.FC<BottomRightControlsProps> = ({
   isAddingToReferences,
   addToReferencesSuccess,
   handleAddToReferences,
+  handleAddToJoin,
+  isAddingToJoin,
+  addToJoinSuccess,
+  onGoToJoin,
 }) => {
   // Keep visible in edit mode - users can star and add to references while editing
   return (
@@ -271,8 +282,8 @@ export const BottomRightControls: React.FC<BottomRightControlsProps> = ({
               onClick={handleAddToReferences}
               disabled={isAddingToReferences || addToReferencesSuccess}
               className={`transition-colors ${
-                addToReferencesSuccess 
-                  ? 'bg-green-600/80 hover:bg-green-600 text-white' 
+                addToReferencesSuccess
+                  ? 'bg-green-600/80 hover:bg-green-600 text-white'
                   : 'bg-black/50 hover:bg-black/70 text-white'
               }`}
             >
@@ -287,6 +298,36 @@ export const BottomRightControls: React.FC<BottomRightControlsProps> = ({
           </TooltipTrigger>
           <TooltipContent className="z-[100001]">
             {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {/* Add to Join Clips Button (videos only) */}
+      {!readOnly && isVideo && handleAddToJoin && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={addToJoinSuccess && onGoToJoin ? onGoToJoin : handleAddToJoin}
+              disabled={isAddingToJoin}
+              className={`transition-colors ${
+                addToJoinSuccess
+                  ? 'bg-green-600/80 hover:bg-green-600 text-white'
+                  : 'bg-black/50 hover:bg-black/70 text-white'
+              }`}
+            >
+              {isAddingToJoin ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : addToJoinSuccess ? (
+                <ArrowRight className="h-4 w-4" />
+              ) : (
+                <Film className="h-4 w-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="z-[100001]">
+            {isAddingToJoin ? 'Adding...' : addToJoinSuccess ? 'Added! Go to Join Clips' : 'Add to Join Clips'}
           </TooltipContent>
         </Tooltip>
       )}

@@ -7,10 +7,11 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shar
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Trash2, 
+import { useNavigate } from 'react-router-dom';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Trash2,
   Move,
   Edit3,
   Pencil,
@@ -21,6 +22,8 @@ import {
   X,
   Film,
   Plus,
+  Scissors,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -166,7 +169,7 @@ interface MediaLightboxProps {
   // Tasks pane integration (desktop only)
   tasksPaneOpen?: boolean;
   tasksPaneWidth?: number;
-  // Video trim functionality (optional, only for segment videos)
+  // Video trim functionality - deprecated, trim is now always available for videos
   showVideoTrimEditor?: boolean;
   onTrimModeChange?: (isTrimMode: boolean) => void;
   // Initial video trim mode (opens lightbox directly in trim mode)
@@ -269,14 +272,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Basic hooks
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { selectedProjectId } = useProject();
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
 
-  // Video trim mode state (only used when showVideoTrimEditor is true)
-  const [isVideoTrimMode, setIsVideoTrimMode] = useState(initialVideoTrimMode);
-  
+  // Video edit mode - unified state for video editing with sub-modes (like image edit has text/inpaint/annotate/reposition)
+  // Sub-modes: 'trim' for trimming video, 'regenerate' for portion regeneration
+  const [videoEditSubMode, setVideoEditSubMode] = useState<'trim' | 'regenerate' | null>(
+    initialVideoTrimMode ? 'trim' : null
+  );
+
+  // Derived states for compatibility with existing code
+  const isVideoTrimMode = videoEditSubMode === 'trim';
+  const isInVideoEditMode = videoEditSubMode !== null; // True when in any video edit sub-mode
+
   // Video ref and currentTime for trim mode (similar to videoEditing pattern)
   const trimVideoRef = useRef<HTMLVideoElement>(null);
   const [trimCurrentTime, setTrimCurrentTime] = useState(0);
@@ -729,6 +740,47 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleAddToReferences,
   } = referencesHook;
 
+  // Add to Join Clips functionality
+  const [isAddingToJoin, setIsAddingToJoin] = useState(false);
+  const [addToJoinSuccess, setAddToJoinSuccess] = useState(false);
+  const handleAddToJoin = useCallback(() => {
+    if (!media || !isVideo) return;
+
+    setIsAddingToJoin(true);
+    try {
+      // Get the video URL from the media object
+      const videoUrl = (media as any).url || media.imageUrl || media.location;
+      const thumbnailUrl = (media as any).thumbUrl || (media as any).thumbnail_url;
+
+      // Get existing pending clips or start fresh
+      const existingData = localStorage.getItem('pendingJoinClips');
+      const pendingClips: Array<{ videoUrl: string; thumbnailUrl?: string; generationId: string; timestamp: number }> =
+        existingData ? JSON.parse(existingData) : [];
+
+      // Add new clip (avoid duplicates by generationId)
+      if (!pendingClips.some(clip => clip.generationId === media.id)) {
+        pendingClips.push({
+          videoUrl,
+          thumbnailUrl,
+          generationId: media.id,
+          timestamp: Date.now(),
+        });
+        localStorage.setItem('pendingJoinClips', JSON.stringify(pendingClips));
+      }
+
+      setAddToJoinSuccess(true);
+      setTimeout(() => setAddToJoinSuccess(false), 2000);
+    } catch (error) {
+      console.error('[MediaLightbox] Failed to add to join:', error);
+    } finally {
+      setIsAddingToJoin(false);
+    }
+  }, [media, isVideo]);
+
+  const handleGoToJoin = useCallback(() => {
+    navigate('/tools/join-clips');
+  }, [navigate]);
+
   // Generation lineage hook
   const lineageHook = useGenerationLineage({ media });
   const {
@@ -824,7 +876,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   } = shotPositioningHook;
 
   // ========================================
-  // VIDEO TRIM HOOKS (only when showVideoTrimEditor is true)
+  // VIDEO TRIM HOOKS (available for all videos)
   // ========================================
 
   // Video trimming hook - manage trim state
@@ -861,14 +913,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [isVideoTrimMode, trimState.startTrim, trimState.endTrim, trimState.videoDuration]);
 
   // Get the effective media URL (active variant or current media)
-  // For videos with trim editor, use active variant
+  // For videos in trim mode, use active variant if available
   // For images with selected edit variant, also use that variant
   const effectiveVideoUrl = useMemo(() => {
-    if (showVideoTrimEditor && activeVariant) {
+    if (isVideo && activeVariant) {
       return activeVariant.location;
     }
     return effectiveImageUrl;
-  }, [showVideoTrimEditor, activeVariant, effectiveImageUrl]);
+  }, [isVideo, activeVariant, effectiveImageUrl]);
 
   // For images, use the active variant's location when a variant is explicitly selected
   const effectiveMediaUrl = useMemo(() => {
@@ -975,11 +1027,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     return taskDetailsData;
   }, [taskDetailsData, activeVariant]);
 
-  // Handle entering/exiting video trim mode
-  const handleEnterVideoTrimMode = useCallback(() => {
-    setIsVideoTrimMode(true);
+  // Handle entering video edit mode (unified) - defaults to trim sub-mode
+  const handleEnterVideoEditMode = useCallback(() => {
+    setVideoEditSubMode('trim');
     onTrimModeChange?.(true);
-    
+
     // Try to capture video duration from already-loaded video element
     setTimeout(() => {
       const videoElements = document.querySelectorAll('video');
@@ -991,34 +1043,53 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }, 100);
   }, [onTrimModeChange, setVideoDuration]);
 
+  // Handle exiting video edit mode entirely
+  const handleExitVideoEditMode = useCallback(() => {
+    setVideoEditSubMode(null);
+    resetTrim();
+    videoEditing.setIsVideoEditMode(false);
+    onTrimModeChange?.(false);
+  }, [resetTrim, videoEditing, onTrimModeChange]);
+
+  // Handle switching to trim sub-mode
+  const handleEnterVideoTrimMode = useCallback(() => {
+    setVideoEditSubMode('trim');
+    videoEditing.setIsVideoEditMode(false);
+    onTrimModeChange?.(true);
+
+    // Try to capture video duration
+    setTimeout(() => {
+      const videoElements = document.querySelectorAll('video');
+      videoElements.forEach((video) => {
+        if (Number.isFinite(video.duration) && video.duration > 0) {
+          setVideoDuration(video.duration);
+        }
+      });
+    }, 100);
+  }, [videoEditing, onTrimModeChange, setVideoDuration]);
+
+  // Handle switching to regenerate sub-mode
+  const handleEnterVideoRegenerateMode = useCallback(() => {
+    setVideoEditSubMode('regenerate');
+    videoEditing.setIsVideoEditMode(true);
+    resetTrim();
+  }, [videoEditing, resetTrim]);
+
+  // Legacy handler for exiting trim mode specifically
   const handleExitVideoTrimMode = useCallback(() => {
-    setIsVideoTrimMode(false);
+    setVideoEditSubMode(null);
     resetTrim();
     onTrimModeChange?.(false);
   }, [resetTrim, onTrimModeChange]);
 
-  // Handle entering/exiting video edit mode (for regenerating portions)
-  // Uses the hook's mode state
-  const handleEnterVideoEditMode = useCallback(() => {
-    videoEditing.setIsVideoEditMode(true);
-    // Exit trim mode if active
-    if (isVideoTrimMode) {
-      setIsVideoTrimMode(false);
-      resetTrim();
-    }
-  }, [isVideoTrimMode, resetTrim, videoEditing]);
+  // Track if we're in any video edit sub-mode (trim or regenerate)
+  const isVideoTrimModeActive = isVideo && isVideoTrimMode;
+  const isVideoRegenerateModeActive = isVideo && videoEditSubMode === 'regenerate';
 
-  const handleExitVideoEditMode = useCallback(() => {
-    videoEditing.setIsVideoEditMode(false);
-  }, [videoEditing]);
-
-  // Track if we're in any special edit mode (including video trim)
-  const isVideoTrimModeActive = showVideoTrimEditor && isVideo && isVideoTrimMode;
-  
-  // Track if we're in video edit mode (for regenerating portions) - uses hook state
+  // Track if we're in video edit mode (for regenerating portions) - sync with hook state
   const isVideoEditModeActive = isVideo && videoEditing.isVideoEditMode;
-  
-  // Alias for template usage
+
+  // Alias for template usage - true when in regenerate sub-mode
   const isVideoEditMode = videoEditing.isVideoEditMode;
 
   // Combined special edit mode (for hiding certain UI elements)
@@ -1954,7 +2025,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onImageLoad={setImageDimensions}
                       onVideoLoadedMetadata={(e) => {
                         const video = e.currentTarget;
-                        if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
+                        if (Number.isFinite(video.duration) && video.duration > 0) {
                           setVideoDuration(video.duration);
                         }
                       }}
@@ -2079,6 +2150,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isAddingToReferences={isAddingToReferences}
                       addToReferencesSuccess={addToReferencesSuccess}
                       handleAddToReferences={handleAddToReferences}
+                      handleAddToJoin={handleAddToJoin}
+                      isAddingToJoin={isAddingToJoin}
+                      addToJoinSuccess={addToJoinSuccess}
+                      onGoToJoin={handleGoToJoin}
                     />
 
                     {/* Top Right Controls - Download, Delete & Close */}
@@ -2137,26 +2212,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
                   style={{ width: '40%' }}
                 >
-                  {isVideoTrimModeActive ? (
-                    <TrimControlsPanel
-                      trimState={trimState}
-                      onStartTrimChange={setStartTrim}
-                      onEndTrimChange={setEndTrim}
-                      onResetTrim={resetTrim}
-                      trimmedDuration={trimmedDuration}
-                      hasTrimChanges={hasTrimChanges}
-                      onSave={saveTrimmedVideo}
-                      isSaving={isSavingTrim}
-                      saveProgress={trimSaveProgress}
-                      saveError={trimSaveError}
-                      saveSuccess={trimSaveSuccess}
-                      onClose={handleExitVideoTrimMode}
-                      variant="desktop"
-                      videoUrl={effectiveVideoUrl}
-                      currentTime={trimCurrentTime}
-                      videoRef={trimVideoRef}
-                    />
-                  ) : isVideoEditModeActive ? (
+                  {isInVideoEditMode ? (
                     <div className="h-full flex flex-col">
                       {/* Header with close button */}
                       <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background flex-shrink-0">
@@ -2167,42 +2223,96 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={onClose}
+                          onClick={handleExitVideoEditMode}
                           className="h-8 w-8 p-0 hover:bg-muted"
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
+
+                      {/* Sub-mode selector: Trim | Regenerate - like image edit has Text | Inpaint | Annotate | Reposition */}
+                      <div className="px-4 pt-4 pb-2 flex-shrink-0">
+                        <div className="grid grid-cols-2 gap-1 border border-border rounded-lg overflow-hidden bg-muted/30">
+                          <button
+                            onClick={handleEnterVideoTrimMode}
+                            className={cn(
+                              "flex items-center justify-center gap-1.5 px-3 py-2 text-sm transition-all",
+                              videoEditSubMode === 'trim'
+                                ? "bg-background text-foreground font-medium shadow-sm"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                            )}
+                          >
+                            <Scissors className="h-4 w-4" />
+                            Trim
+                          </button>
+                          <button
+                            onClick={handleEnterVideoRegenerateMode}
+                            className={cn(
+                              "flex items-center justify-center gap-1.5 px-3 py-2 text-sm transition-all",
+                              videoEditSubMode === 'regenerate'
+                                ? "bg-background text-foreground font-medium shadow-sm"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                            )}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Regenerate
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Sub-mode content */}
                       <div className="flex-1 overflow-y-auto">
-                      <VideoPortionEditor
-                        gapFrames={videoEditing.editSettings.settings.gapFrameCount || 12}
-                        setGapFrames={(val) => videoEditing.editSettings.updateField('gapFrameCount', val)}
-                        contextFrames={videoEditing.editSettings.settings.contextFrameCount || 8}
-                        setContextFrames={(val) => {
-                          const maxGap = Math.max(1, 81 - (val * 2));
-                          const gapFrames = videoEditing.editSettings.settings.gapFrameCount || 12;
-                          const newGapFrames = gapFrames > maxGap ? maxGap : gapFrames;
-                          videoEditing.editSettings.updateFields({ 
-                            contextFrameCount: val, 
-                            gapFrameCount: newGapFrames 
-                          });
-                        }}
-                        maxContextFrames={videoEditing.maxContextFrames}
-                        negativePrompt={videoEditing.editSettings.settings.negativePrompt || ''}
-                        setNegativePrompt={(val) => videoEditing.editSettings.updateField('negativePrompt', val)}
-                        enhancePrompt={videoEditing.editSettings.settings.enhancePrompt}
-                        setEnhancePrompt={(val) => videoEditing.editSettings.updateField('enhancePrompt', val)}
-                        selections={videoEditing.selections}
-                        onUpdateSelectionSettings={videoEditing.handleUpdateSelectionSettings}
-                        availableLoras={videoEditing.availableLoras}
-                        projectId={selectedProjectId}
-                        loraManager={videoEditing.loraManager}
-                        onGenerate={videoEditing.handleGenerate}
-                        isGenerating={videoEditing.isGenerating}
-                        generateSuccess={videoEditing.generateSuccess}
-                        isGenerateDisabled={!videoEditing.isValid}
-                        validationErrors={videoEditing.validationErrors}
-                      />
+                        {videoEditSubMode === 'trim' ? (
+                          <TrimControlsPanel
+                            trimState={trimState}
+                            onStartTrimChange={setStartTrim}
+                            onEndTrimChange={setEndTrim}
+                            onResetTrim={resetTrim}
+                            trimmedDuration={trimmedDuration}
+                            hasTrimChanges={hasTrimChanges}
+                            onSave={saveTrimmedVideo}
+                            isSaving={isSavingTrim}
+                            saveProgress={trimSaveProgress}
+                            saveError={trimSaveError}
+                            saveSuccess={trimSaveSuccess}
+                            onClose={handleExitVideoEditMode}
+                            variant="desktop"
+                            videoUrl={effectiveVideoUrl}
+                            currentTime={trimCurrentTime}
+                            videoRef={trimVideoRef}
+                            hideHeader
+                          />
+                        ) : (
+                          <VideoPortionEditor
+                            gapFrames={videoEditing.editSettings.settings.gapFrameCount || 12}
+                            setGapFrames={(val) => videoEditing.editSettings.updateField('gapFrameCount', val)}
+                            contextFrames={videoEditing.editSettings.settings.contextFrameCount || 8}
+                            setContextFrames={(val) => {
+                              const maxGap = Math.max(1, 81 - (val * 2));
+                              const gapFrames = videoEditing.editSettings.settings.gapFrameCount || 12;
+                              const newGapFrames = gapFrames > maxGap ? maxGap : gapFrames;
+                              videoEditing.editSettings.updateFields({
+                                contextFrameCount: val,
+                                gapFrameCount: newGapFrames
+                              });
+                            }}
+                            maxContextFrames={videoEditing.maxContextFrames}
+                            negativePrompt={videoEditing.editSettings.settings.negativePrompt || ''}
+                            setNegativePrompt={(val) => videoEditing.editSettings.updateField('negativePrompt', val)}
+                            enhancePrompt={videoEditing.editSettings.settings.enhancePrompt}
+                            setEnhancePrompt={(val) => videoEditing.editSettings.updateField('enhancePrompt', val)}
+                            selections={videoEditing.selections}
+                            onUpdateSelectionSettings={videoEditing.handleUpdateSelectionSettings}
+                            availableLoras={videoEditing.availableLoras}
+                            projectId={selectedProjectId}
+                            loraManager={videoEditing.loraManager}
+                            onGenerate={videoEditing.handleGenerate}
+                            isGenerating={videoEditing.isGenerating}
+                            generateSuccess={videoEditing.generateSuccess}
+                            isGenerateDisabled={!videoEditing.isValid}
+                            validationErrors={videoEditing.validationErrors}
+                          />
+                        )}
                       </div>
                     </div>
                   ) : isSpecialEditMode ? (
@@ -2301,52 +2411,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               </button>
                             </div>
                           )}
-                          {/* Video controls: Trim and Edit (for videos) */}
+                          {/* Video controls: Info | Edit toggle (like images) */}
                           {isVideo && !readOnly && (
                             <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                               <button
                                 onClick={() => {
-                                  if (isVideoTrimMode) {
-                                    handleExitVideoTrimMode();
-                                  }
-                                  if (isVideoEditMode) {
-                                    handleExitVideoEditMode();
-                                  }
+                                  handleExitVideoEditMode();
                                 }}
                                 className={cn(
                                   "px-3 py-1.5 text-sm rounded transition-colors",
-                                  !isVideoTrimMode && !isVideoEditMode 
-                                    ? "bg-background text-foreground shadow-sm" 
+                                  !isInVideoEditMode
+                                    ? "bg-background text-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                                 )}
                               >
                                 Info
                               </button>
-                              {showVideoTrimEditor && (
-                                <button
-                                  onClick={() => {
-                                    if (isVideoEditMode) handleExitVideoEditMode();
-                                    handleEnterVideoTrimMode();
-                                  }}
-                                  className={cn(
-                                    "px-3 py-1.5 text-sm rounded transition-colors",
-                                    isVideoTrimMode 
-                                      ? "bg-background text-foreground shadow-sm" 
-                                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                  )}
-                                >
-                                  Trim
-                                </button>
-                              )}
                               <button
                                 onClick={() => {
-                                  if (isVideoTrimMode) handleExitVideoTrimMode();
-                                  handleEnterVideoEditMode();
+                                  if (!isInVideoEditMode) {
+                                    handleEnterVideoEditMode();
+                                  }
                                 }}
                                 className={cn(
                                   "px-3 py-1.5 text-sm rounded transition-colors",
-                                  isVideoEditMode 
-                                    ? "bg-background text-foreground shadow-sm" 
+                                  isInVideoEditMode
+                                    ? "bg-background text-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                                 )}
                               >
@@ -2478,7 +2568,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         className="max-w-full max-h-full shadow-wes border border-border/20"
                         onLoadedMetadata={(e) => {
                           const video = e.currentTarget;
-                          if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
+                          if (Number.isFinite(video.duration) && video.duration > 0) {
                             setVideoDuration(video.duration);
                           }
                         }}
@@ -2592,6 +2682,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isAddingToReferences={isAddingToReferences}
                       addToReferencesSuccess={addToReferencesSuccess}
                       handleAddToReferences={handleAddToReferences}
+                      handleAddToJoin={handleAddToJoin}
+                      isAddingToJoin={isAddingToJoin}
+                      addToJoinSuccess={addToJoinSuccess}
+                      onGoToJoin={handleGoToJoin}
                     />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
@@ -2753,52 +2847,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               </button>
                             </div>
                           )}
-                          {/* Video controls: Trim and Edit (for videos on mobile) */}
+                          {/* Video controls: Info | Edit toggle (like images) - Mobile */}
                           {isVideo && !readOnly && (
                             <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                               <button
                                 onClick={() => {
-                                  if (isVideoTrimMode) {
-                                    handleExitVideoTrimMode();
-                                  }
-                                  if (isVideoEditMode) {
-                                    handleExitVideoEditMode();
-                                  }
+                                  handleExitVideoEditMode();
                                 }}
                                 className={cn(
                                   "px-3 py-1.5 text-sm rounded transition-colors",
-                                  !isVideoTrimMode && !isVideoEditMode 
-                                    ? "bg-background text-foreground shadow-sm" 
+                                  !isInVideoEditMode
+                                    ? "bg-background text-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                                 )}
                               >
                                 Info
                               </button>
-                              {showVideoTrimEditor && (
-                                <button
-                                  onClick={() => {
-                                    if (isVideoEditMode) handleExitVideoEditMode();
-                                    handleEnterVideoTrimMode();
-                                  }}
-                                  className={cn(
-                                    "px-3 py-1.5 text-sm rounded transition-colors",
-                                    isVideoTrimMode 
-                                      ? "bg-background text-foreground shadow-sm" 
-                                      : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                  )}
-                                >
-                                  Clip
-                                </button>
-                              )}
                               <button
                                 onClick={() => {
-                                  if (isVideoTrimMode) handleExitVideoTrimMode();
-                                  handleEnterVideoEditMode();
+                                  if (!isInVideoEditMode) {
+                                    handleEnterVideoEditMode();
+                                  }
                                 }}
                                 className={cn(
                                   "px-3 py-1.5 text-sm rounded transition-colors",
-                                  isVideoEditMode 
-                                    ? "bg-background text-foreground shadow-sm" 
+                                  isInVideoEditMode
+                                    ? "bg-background text-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                                 )}
                               >
@@ -3018,7 +3092,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
                       onLoadedMetadata={(e) => {
                         const video = e.currentTarget;
-                        if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
+                        if (Number.isFinite(video.duration) && video.duration > 0) {
                           setVideoDuration(video.duration);
                         }
                       }}
@@ -3216,6 +3290,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isAddingToReferences={isAddingToReferences}
                     addToReferencesSuccess={addToReferencesSuccess}
                     handleAddToReferences={handleAddToReferences}
+                    handleAddToJoin={handleAddToJoin}
+                    isAddingToJoin={isAddingToJoin}
+                    addToJoinSuccess={addToJoinSuccess}
+                    onGoToJoin={handleGoToJoin}
                   />
 
                   {/* Bottom Workflow Controls (hidden in special edit modes) */}

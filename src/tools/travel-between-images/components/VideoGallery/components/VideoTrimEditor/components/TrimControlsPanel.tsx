@@ -29,6 +29,7 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
   videoUrl,
   currentTime: externalCurrentTime,
   videoRef: externalVideoRef,
+  hideHeader = false,
 }) => {
   const isMobile = variant === 'mobile';
   // Internal video ref for frame extraction (hidden video element)
@@ -295,21 +296,23 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
       {/* Hidden canvas for frame capture */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Header with close button */}
-      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
-        <div className="flex items-center gap-2">
-          <Scissors className="w-5 h-5 text-primary" />
-          <h2 className={cn(headerSize, 'font-light')}>Trim Video</h2>
+      {/* Header with close button - hidden when embedded in parent panel */}
+      {!hideHeader && (
+        <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
+          <div className="flex items-center gap-2">
+            <Scissors className="w-5 h-5 text-primary" />
+            <h2 className={cn(headerSize, 'font-light')}>Trim Video</h2>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="h-8 w-8 p-0 hover:bg-muted"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-8 w-8 p-0 hover:bg-muted"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+      )}
 
       <div className={cn(padding, spacing)}>
         {/* Instructions */}

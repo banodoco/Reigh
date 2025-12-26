@@ -117,6 +117,8 @@ export interface TrimControlsPanelProps {
   currentTime?: number;
   /** Video ref for scrubbing/seeking */
   videoRef?: React.RefObject<HTMLVideoElement>;
+  /** Hide the header (when embedded in a parent panel with its own header) */
+  hideHeader?: boolean;
 }
 
 /**
