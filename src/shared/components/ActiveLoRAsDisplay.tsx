@@ -133,12 +133,12 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
               </div>
               
               {/* Strength slider at the bottom spanning full width */}
-              <SliderWithValue 
+              <SliderWithValue
                 label={`Strength`}
                 value={lora.strength}
                 onChange={(newStrength) => onLoraStrengthChange(lora.id, newStrength)}
-                min={0} 
-                max={2} 
+                min={0}
+                max={2}
                 step={0.05}
                 disabled={isGenerating}
                 variant="secondary"

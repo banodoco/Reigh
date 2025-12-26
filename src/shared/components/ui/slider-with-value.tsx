@@ -28,7 +28,7 @@ const SliderWithValue = ({
   variant = "primary",
   hideLabel = false,
   formatValue,
-  numberInputClassName = "w-16",
+  numberInputClassName = "w-20",
 }: SliderWithValueProps) => {
   // Local state to manage input value for smooth typing (handles "1." vs "1" cases)
   const [inputValue, setInputValue] = useState(
@@ -93,7 +93,7 @@ const SliderWithValue = ({
             <div className="flex flex-col h-full border-l border-border">
               <button
                 type="button"
-                className="flex-1 px-1 hover:bg-muted/50 active:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-2 hover:bg-muted/50 active:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
                   const newVal = Math.min(max, value + step);
                   onChange(newVal);
@@ -105,7 +105,7 @@ const SliderWithValue = ({
               </button>
               <button
                 type="button"
-                className="flex-1 px-1 hover:bg-muted/50 active:bg-muted transition-colors border-t border-border disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-2 hover:bg-muted/50 active:bg-muted transition-colors border-t border-border disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
                   const newVal = Math.max(min, value - step);
                   onChange(newVal);
