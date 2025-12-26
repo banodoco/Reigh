@@ -76,6 +76,8 @@ import {
   VideoEditPanel,
   InfoPanel,
   ControlsPanel,
+  VideoEditModeDisplay,
+  VideoTrimModeDisplay,
 } from './components';
 import { FlexContainer, MediaWrapper, LightboxLayout } from './components/layouts';
 import type { LayoutMode } from './components/layouts';
@@ -1920,108 +1922,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                   {/* Media Content */}
                   {isVideo && isVideoEditModeActive ? (
-                    // Video edit mode: Show video with timeline overlay (DESKTOP)
-                    // Video is paused by default and follows timeline marker position
-                    <div className="relative w-full h-full flex flex-col items-center justify-center">
-                      <video
-                        ref={videoEditing.videoRef}
-                        src={effectiveVideoUrl}
-                        poster={activeVariant?.thumbnail_url || media.thumbUrl}
-                        muted
-                        playsInline
-                        controls
-                        preload="auto"
-                        className="max-w-full max-h-[calc(100%-140px)] object-contain shadow-wes border border-border/20 rounded"
-                        onLoadedMetadata={(e) => {
-                          const video = e.currentTarget;
-                          if (Number.isFinite(video.duration) && video.duration > 0) {
-                            setVideoDuration(video.duration);
-                            // Seek to start of first selection when video loads
-                            if (videoEditing.selections.length > 0 && videoEditing.selections[0].start > 0) {
-                              video.currentTime = videoEditing.selections[0].start;
-                            }
-                          }
-                        }}
-                      />
-                      
-                      {/* Timeline overlay for portion selection */}
-                      {trimState.videoDuration > 0 && (
-                        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
-                          <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
-                            <MultiPortionTimeline
-                              duration={trimState.videoDuration}
-                              selections={videoEditing.selections}
-                              activeSelectionId={videoEditing.activeSelectionId}
-                              onSelectionChange={videoEditing.handleUpdateSelection}
-                              onSelectionClick={videoEditing.setActiveSelectionId}
-                              onRemoveSelection={videoEditing.handleRemoveSelection}
-                              videoRef={videoEditing.videoRef}
-                              videoUrl={effectiveVideoUrl}
-                              fps={16}
-                            />
-                            
-                            {/* Add selection button */}
-                            <button
-                              onClick={videoEditing.handleAddSelection}
-                              className="mt-2 flex items-center gap-1 text-xs text-white/70 hover:text-white transition-colors"
-                            >
-                              <Plus className="w-3 h-3" />
-                              Add another portion
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <VideoEditModeDisplay
+                      videoRef={videoEditing.videoRef}
+                      videoUrl={effectiveVideoUrl}
+                      posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
+                      videoDuration={trimState.videoDuration}
+                      onLoadedMetadata={setVideoDuration}
+                      selections={videoEditing.selections}
+                      activeSelectionId={videoEditing.activeSelectionId}
+                      onSelectionChange={videoEditing.handleUpdateSelection}
+                      onSelectionClick={videoEditing.setActiveSelectionId}
+                      onRemoveSelection={videoEditing.handleRemoveSelection}
+                      onAddSelection={videoEditing.handleAddSelection}
+                    />
                   ) : isVideo && isVideoTrimModeActive ? (
-                    // Video trim mode: Video plays within trimmed region and loops (DESKTOP)
-                    // Controls are in the TrimControlsPanel on the side
-                    <video
-                      ref={trimVideoRef}
-                      src={effectiveVideoUrl}
-                      poster={activeVariant?.thumbnail_url || media.thumbUrl}
-                      muted
-                      playsInline
-                      controls
-                      autoPlay
-                      loop={false}
-                      preload="auto"
-                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
-                      onLoadedMetadata={(e) => {
-                        const video = e.currentTarget;
-                        if (Number.isFinite(video.duration) && video.duration > 0) {
-                          setVideoDuration(video.duration);
-                          // Seek to start of keep region when video loads
-                          video.currentTime = trimState.startTrim;
-                        }
-                      }}
-                      onTimeUpdate={(e) => {
-                        const video = e.currentTarget;
-                        setTrimCurrentTime(video.currentTime);
-                        
-                        // Constrain playback to keep region (startTrim to duration - endTrim)
-                        const keepStart = trimState.startTrim;
-                        const keepEnd = trimState.videoDuration - trimState.endTrim;
-                        
-                        if (video.currentTime >= keepEnd) {
-                          // Loop back to start of keep region and ensure playing
-                          video.currentTime = keepStart;
-                          if (video.paused) {
-                            video.play().catch(() => {});
-                          }
-                        } else if (video.currentTime < keepStart) {
-                          // Jump to start of keep region if before it
-                          video.currentTime = keepStart;
-                          if (video.paused) {
-                            video.play().catch(() => {});
-                          }
-                        }
-                      }}
-                      onEnded={(e) => {
-                        // If video reaches the actual end, loop back to keep region start
-                        const video = e.currentTarget;
-                        video.currentTime = trimState.startTrim;
-                        video.play().catch(() => {});
-                      }}
+                    <VideoTrimModeDisplay
+                      videoRef={trimVideoRef}
+                      videoUrl={effectiveVideoUrl}
+                      posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
+                      trimState={trimState}
+                      onLoadedMetadata={setVideoDuration}
+                      onTimeUpdate={setTrimCurrentTime}
                     />
                   ) : (
                     <MediaDisplayWithCanvas
@@ -2678,108 +2599,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {/* Media Display - The wrapper now handles centering */}
                 {isVideo ? (
                   isVideoEditModeActive ? (
-                    // Video edit mode: Use regular video element with ref for seeking control + timeline overlay
-                    // Video is paused by default and follows timeline marker position
-                    <div className="relative w-full h-full flex flex-col items-center justify-center">
-                      <video
-                        ref={videoEditing.videoRef}
-                        src={effectiveVideoUrl}
-                        poster={activeVariant?.thumbnail_url || media.thumbUrl}
-                        muted
-                        playsInline
-                        controls
-                        preload="auto"
-                        className="max-w-full max-h-[calc(100%-140px)] object-contain shadow-wes border border-border/20 rounded"
-                        onLoadedMetadata={(e) => {
-                          const video = e.currentTarget;
-                          if (Number.isFinite(video.duration) && video.duration > 0) {
-                            setVideoDuration(video.duration);
-                            // Seek to start of first selection when video loads
-                            if (videoEditing.selections.length > 0 && videoEditing.selections[0].start > 0) {
-                              video.currentTime = videoEditing.selections[0].start;
-                            }
-                          }
-                        }}
-                      />
-                      
-                      {/* Timeline overlay for portion selection */}
-                      {trimState.videoDuration > 0 && (
-                        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
-                          <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
-                            <MultiPortionTimeline
-                              duration={trimState.videoDuration}
-                              selections={videoEditing.selections}
-                              activeSelectionId={videoEditing.activeSelectionId}
-                              onSelectionChange={videoEditing.handleUpdateSelection}
-                              onSelectionClick={videoEditing.setActiveSelectionId}
-                              onRemoveSelection={videoEditing.handleRemoveSelection}
-                              videoRef={videoEditing.videoRef}
-                              videoUrl={effectiveVideoUrl}
-                              fps={16}
-                            />
-                            
-                            {/* Add selection button */}
-                            <button
-                              onClick={videoEditing.handleAddSelection}
-                              className="mt-2 flex items-center gap-1 text-xs text-white/70 hover:text-white transition-colors"
-                            >
-                              <Plus className="w-3 h-3" />
-                              Add another portion
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <VideoEditModeDisplay
+                      videoRef={videoEditing.videoRef}
+                      videoUrl={effectiveVideoUrl}
+                      posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
+                      videoDuration={trimState.videoDuration}
+                      onLoadedMetadata={setVideoDuration}
+                      selections={videoEditing.selections}
+                      activeSelectionId={videoEditing.activeSelectionId}
+                      onSelectionChange={videoEditing.handleUpdateSelection}
+                      onSelectionClick={videoEditing.setActiveSelectionId}
+                      onRemoveSelection={videoEditing.handleRemoveSelection}
+                      onAddSelection={videoEditing.handleAddSelection}
+                    />
                   ) : isVideoTrimModeActive ? (
-                    // Video trim mode: Video plays within trimmed region and loops
-                    // Controls are in the TrimControlsPanel on the side
-                    <video
-                      ref={trimVideoRef}
-                      src={effectiveVideoUrl}
-                      poster={activeVariant?.thumbnail_url || media.thumbUrl}
-                      muted
-                      playsInline
-                      controls
-                      autoPlay
-                      loop={false}
-                      preload="auto"
-                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
-                      onLoadedMetadata={(e) => {
-                        const video = e.currentTarget;
-                        if (Number.isFinite(video.duration) && video.duration > 0) {
-                          setVideoDuration(video.duration);
-                          // Seek to start of keep region when video loads
-                          video.currentTime = trimState.startTrim;
-                        }
-                      }}
-                      onTimeUpdate={(e) => {
-                        const video = e.currentTarget;
-                        setTrimCurrentTime(video.currentTime);
-                        
-                        // Constrain playback to keep region (startTrim to duration - endTrim)
-                        const keepStart = trimState.startTrim;
-                        const keepEnd = trimState.videoDuration - trimState.endTrim;
-                        
-                        if (video.currentTime >= keepEnd) {
-                          // Loop back to start of keep region and ensure playing
-                          video.currentTime = keepStart;
-                          if (video.paused) {
-                            video.play().catch(() => {});
-                          }
-                        } else if (video.currentTime < keepStart) {
-                          // Jump to start of keep region if before it
-                          video.currentTime = keepStart;
-                          if (video.paused) {
-                            video.play().catch(() => {});
-                          }
-                        }
-                      }}
-                      onEnded={(e) => {
-                        // If video reaches the actual end, loop back to keep region start
-                        const video = e.currentTarget;
-                        video.currentTime = trimState.startTrim;
-                        video.play().catch(() => {});
-                      }}
+                    <VideoTrimModeDisplay
+                      videoRef={trimVideoRef}
+                      videoUrl={effectiveVideoUrl}
+                      posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
+                      trimState={trimState}
+                      onLoadedMetadata={setVideoDuration}
+                      onTimeUpdate={setTrimCurrentTime}
                     />
                   ) : (
                     // Normal video display with StyledVideoPlayer
