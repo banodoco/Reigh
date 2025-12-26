@@ -54,9 +54,6 @@ export type { InfoPanelProps } from './InfoPanel';
 export { ControlsPanel } from './ControlsPanel';
 export type { ControlsPanelProps } from './ControlsPanel';
 
-export { MediaOverlayControls } from './MediaOverlayControls';
-export type { MediaOverlayControlsProps } from './MediaOverlayControls';
-
 export { VideoEditModeDisplay } from './VideoEditModeDisplay';
 export type { VideoEditModeDisplayProps } from './VideoEditModeDisplay';
 

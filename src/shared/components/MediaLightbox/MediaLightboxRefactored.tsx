@@ -79,8 +79,7 @@ import {
   VideoEditModeDisplay,
   VideoTrimModeDisplay,
 } from './components';
-import { FlexContainer, MediaWrapper, LightboxLayout } from './components/layouts';
-import type { LayoutMode } from './components/layouts';
+import { FlexContainer, MediaWrapper } from './components/layouts';
 
 // Import utils
 import { downloadMedia } from './utils';
@@ -1103,17 +1102,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Should show side panel (includes video trim mode and video edit mode)
   const shouldShowSidePanelWithTrim = shouldShowSidePanel || isVideoTrimModeActive || isVideoEditModeActive;
-
-  // Compute layout mode for LightboxLayout
-  const layoutMode: LayoutMode = React.useMemo(() => {
-    if (shouldShowSidePanelWithTrim) {
-      return 'desktop-sidepanel';
-    }
-    if ((showTaskDetails || isSpecialEditMode) && isMobile) {
-      return 'mobile-stacked';
-    }
-    return 'mobile-fullscreen';
-  }, [shouldShowSidePanelWithTrim, showTaskDetails, isSpecialEditMode, isMobile]);
 
   // DEBUG: Log variants state for troubleshooting variant display issues
   React.useEffect(() => {
