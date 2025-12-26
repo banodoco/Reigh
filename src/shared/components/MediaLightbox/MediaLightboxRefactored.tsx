@@ -954,7 +954,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       refetchVariants();
       // Set the newly created variant as the active one
       setActiveVariantId(newVariantId);
-      setIsVideoTrimMode(false);
+      setVideoEditSubMode(null);
       onTrimModeChange?.(false);
     },
   });
