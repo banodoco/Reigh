@@ -26,6 +26,9 @@ const TARGET_ASPECT_RATIOS: TargetAspectRatio[] = [
   { name: "Landscape 16:9", apiString: "landscape_16_9", ratio: 16 / 9 },
 ];
 
+// Tolerance for aspect ratio matching - if within this, skip re-encoding
+const ASPECT_RATIO_TOLERANCE = 0.01;
+
 export const cropImageToClosestAspectRatio = async (
   inputFile: File
 ): Promise<CropResult | null> => {
@@ -58,10 +61,20 @@ export const cropImageToClosestAspectRatio = async (
           }
         }
 
+        // If aspect ratio already matches within tolerance, skip re-encoding to preserve quality
+        if (minDiff < ASPECT_RATIO_TOLERANCE) {
+          console.log(`[ImageCropper] Aspect ratio matches ${closestTarget.name} within tolerance, skipping re-encode`);
+          const croppedImageUrl = URL.createObjectURL(inputFile);
+          resolve({
+            croppedFile: inputFile,
+            apiImageSize: closestTarget.apiString,
+            croppedImageUrl,
+          });
+          return;
+        }
+
         let cropX = 0;
         let cropY = 0;
-        const cropWidth = originalWidth;
-        const cropHeight = originalHeight;
         let newCanvasWidth = originalWidth;
         let newCanvasHeight = originalHeight;
 
@@ -77,7 +90,6 @@ export const cropImageToClosestAspectRatio = async (
           newCanvasHeight = originalWidth / closestTarget.ratio;
           cropY = (originalHeight - newCanvasHeight) / 2;
         }
-        // If aspect ratios are the same, no crop needed, dimensions remain original
 
         const canvas = document.createElement("canvas");
         canvas.width = Math.round(newCanvasWidth);
@@ -88,6 +100,10 @@ export const cropImageToClosestAspectRatio = async (
           reject(new Error("Failed to get canvas context"));
           return;
         }
+
+        // Use high-quality image smoothing for any scaling
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
         // Draw the cropped portion of the image onto the canvas
         ctx.drawImage(
@@ -102,9 +118,13 @@ export const cropImageToClosestAspectRatio = async (
           canvas.height // destination height
         );
 
+        // Preserve original format, fallback to JPEG for unsupported types
         const outputMime = /^(image\/(jpeg|png|webp))$/i.test(inputFile.type)
           ? inputFile.type
           : 'image/jpeg';
+
+        // Use maximum quality (1.0) for JPEG/WebP to minimize quality loss
+        const quality = 1.0;
 
         canvas.toBlob(
           async (blob) => {
@@ -113,7 +133,7 @@ export const cropImageToClosestAspectRatio = async (
               // to encode to an unsupported format (e.g. HEIC). Fallback by creating a
               // Data URL and converting that back into a Blob encoded as JPEG.
               try {
-                const dataUrl = canvas.toDataURL(outputMime, 0.95);
+                const dataUrl = canvas.toDataURL(outputMime, quality);
                 blob = await (await fetch(dataUrl)).blob();
               } catch (err) {
                 reject(new Error("Failed to create blob from canvas"));
@@ -135,7 +155,7 @@ export const cropImageToClosestAspectRatio = async (
             });
           },
           outputMime,
-          0.95 // quality
+          quality
         );
       };
       img.onerror = (err) => {
@@ -156,6 +176,11 @@ export const cropImageToClosestAspectRatio = async (
 
 /**
  * Crops an image to a specific aspect ratio (for project dimensions).
+ * Preserves quality by:
+ * - Skipping re-encoding if aspect ratio already matches
+ * - Using maximum quality (1.0) when re-encoding is necessary
+ * - Preserving original format (PNG/WebP stay lossless)
+ *
  * @param inputFile The image file to crop
  * @param targetAspectRatio The target aspect ratio as a number (width / height)
  * @returns Promise with the cropped file and image URL
@@ -187,6 +212,18 @@ export const cropImageToProjectAspectRatio = async (
         const originalHeight = img.height;
         const originalAspectRatio = originalWidth / originalHeight;
 
+        // If aspect ratio already matches within tolerance, skip re-encoding to preserve quality
+        const aspectDiff = Math.abs(originalAspectRatio - targetAspectRatio);
+        if (aspectDiff < ASPECT_RATIO_TOLERANCE) {
+          console.log(`[ImageCropper] Aspect ratio matches target (${targetAspectRatio.toFixed(3)}) within tolerance, skipping re-encode`);
+          const croppedImageUrl = URL.createObjectURL(inputFile);
+          resolve({
+            croppedFile: inputFile,
+            croppedImageUrl,
+          });
+          return;
+        }
+
         let cropX = 0;
         let cropY = 0;
         let newCanvasWidth = originalWidth;
@@ -204,7 +241,6 @@ export const cropImageToProjectAspectRatio = async (
           newCanvasHeight = originalWidth / targetAspectRatio;
           cropY = (originalHeight - newCanvasHeight) / 2;
         }
-        // If aspect ratios are the same, no crop needed
 
         const canvas = document.createElement("canvas");
         canvas.width = Math.round(newCanvasWidth);
@@ -215,6 +251,10 @@ export const cropImageToProjectAspectRatio = async (
           reject(new Error("Failed to get canvas context"));
           return;
         }
+
+        // Use high-quality image smoothing for any scaling
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
         // Draw the cropped portion of the image onto the canvas
         ctx.drawImage(
@@ -229,15 +269,19 @@ export const cropImageToProjectAspectRatio = async (
           canvas.height // destination height
         );
 
+        // Preserve original format, fallback to JPEG for unsupported types
         const outputMime = /^(image\/(jpeg|png|webp))$/i.test(inputFile.type)
           ? inputFile.type
           : 'image/jpeg';
+
+        // Use maximum quality (1.0) for JPEG/WebP to minimize quality loss
+        const quality = 1.0;
 
         canvas.toBlob(
           async (blob) => {
             if (!blob) {
               try {
-                const dataUrl = canvas.toDataURL(outputMime, 0.95);
+                const dataUrl = canvas.toDataURL(outputMime, quality);
                 blob = await (await fetch(dataUrl)).blob();
               } catch (err) {
                 reject(new Error("Failed to create blob from canvas"));
@@ -258,7 +302,7 @@ export const cropImageToProjectAspectRatio = async (
             });
           },
           outputMime,
-          0.95 // quality
+          quality
         );
       };
       img.onerror = (err) => {
