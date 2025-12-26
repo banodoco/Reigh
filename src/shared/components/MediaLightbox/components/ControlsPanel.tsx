@@ -1,0 +1,367 @@
+/**
+ * ControlsPanel Component
+ *
+ * Router component that renders the appropriate panel based on current mode:
+ * - VideoEditPanel: when in video edit mode (trim/regenerate)
+ * - EditModePanel: when in image edit mode (inpaint/annotate/reposition)
+ * - InfoPanel: default info view with task details and variants
+ *
+ * This eliminates the duplicated ternary logic between desktop and mobile layouts.
+ */
+
+import React from 'react';
+import { VideoEditPanel } from './VideoEditPanel';
+import { EditModePanel } from './EditModePanel';
+import { InfoPanel } from './InfoPanel';
+import type { VideoEditPanelProps } from './VideoEditPanel';
+import type { EditModePanelProps } from './EditModePanel';
+import type { InfoPanelProps } from './InfoPanel';
+
+// Mode detection props
+interface ModeProps {
+  isInVideoEditMode: boolean;
+  isSpecialEditMode: boolean;
+}
+
+// Combine all panel props (omitting variant since we handle it)
+export interface ControlsPanelProps extends ModeProps {
+  /** Layout variant - passed through to child panels */
+  variant: 'desktop' | 'mobile';
+
+  // VideoEditPanel props
+  videoEditSubMode: 'trim' | 'regenerate' | null;
+  onEnterTrimMode: () => void;
+  onEnterRegenerateMode: () => void;
+  onExitVideoEditMode: () => void;
+  // Trim props
+  trimState: VideoEditPanelProps['trimState'];
+  onStartTrimChange: VideoEditPanelProps['onStartTrimChange'];
+  onEndTrimChange: VideoEditPanelProps['onEndTrimChange'];
+  onResetTrim: VideoEditPanelProps['onResetTrim'];
+  trimmedDuration: VideoEditPanelProps['trimmedDuration'];
+  hasTrimChanges: VideoEditPanelProps['hasTrimChanges'];
+  onSaveTrim: VideoEditPanelProps['onSaveTrim'];
+  isSavingTrim: VideoEditPanelProps['isSavingTrim'];
+  trimSaveProgress: VideoEditPanelProps['trimSaveProgress'];
+  trimSaveError: VideoEditPanelProps['trimSaveError'];
+  trimSaveSuccess: VideoEditPanelProps['trimSaveSuccess'];
+  videoUrl: VideoEditPanelProps['videoUrl'];
+  trimCurrentTime: VideoEditPanelProps['trimCurrentTime'];
+  trimVideoRef: VideoEditPanelProps['trimVideoRef'];
+  // Regenerate props
+  videoEditing: VideoEditPanelProps['videoEditing'];
+  projectId: VideoEditPanelProps['projectId'];
+
+  // EditModePanel props
+  sourceGenerationData: EditModePanelProps['sourceGenerationData'];
+  onOpenExternalGeneration: EditModePanelProps['onOpenExternalGeneration'];
+  allShots: EditModePanelProps['allShots'];
+  isCurrentMediaPositioned: EditModePanelProps['isCurrentMediaPositioned'];
+  onReplaceInShot: EditModePanelProps['onReplaceInShot'];
+  sourcePrimaryVariant: EditModePanelProps['sourcePrimaryVariant'];
+  onMakeMainVariant: EditModePanelProps['onMakeMainVariant'];
+  canMakeMainVariant: EditModePanelProps['canMakeMainVariant'];
+  editMode: EditModePanelProps['editMode'];
+  setEditMode: EditModePanelProps['setEditMode'];
+  setIsInpaintMode: EditModePanelProps['setIsInpaintMode'];
+  inpaintPrompt: EditModePanelProps['inpaintPrompt'];
+  setInpaintPrompt: EditModePanelProps['setInpaintPrompt'];
+  inpaintNumGenerations: EditModePanelProps['inpaintNumGenerations'];
+  setInpaintNumGenerations: EditModePanelProps['setInpaintNumGenerations'];
+  loraMode: EditModePanelProps['loraMode'];
+  setLoraMode: EditModePanelProps['setLoraMode'];
+  customLoraUrl: EditModePanelProps['customLoraUrl'];
+  setCustomLoraUrl: EditModePanelProps['setCustomLoraUrl'];
+  isGeneratingInpaint: EditModePanelProps['isGeneratingInpaint'];
+  inpaintGenerateSuccess: EditModePanelProps['inpaintGenerateSuccess'];
+  isCreatingMagicEditTasks: EditModePanelProps['isCreatingMagicEditTasks'];
+  magicEditTasksCreated: EditModePanelProps['magicEditTasksCreated'];
+  brushStrokes: EditModePanelProps['brushStrokes'];
+  handleExitMagicEditMode: EditModePanelProps['handleExitMagicEditMode'];
+  handleUnifiedGenerate: EditModePanelProps['handleUnifiedGenerate'];
+  handleGenerateAnnotatedEdit: EditModePanelProps['handleGenerateAnnotatedEdit'];
+  handleGenerateReposition: EditModePanelProps['handleGenerateReposition'];
+  isGeneratingReposition: EditModePanelProps['isGeneratingReposition'];
+  repositionGenerateSuccess: EditModePanelProps['repositionGenerateSuccess'];
+  hasTransformChanges: EditModePanelProps['hasTransformChanges'];
+  handleSaveAsVariant: EditModePanelProps['handleSaveAsVariant'];
+  isSavingAsVariant: EditModePanelProps['isSavingAsVariant'];
+  saveAsVariantSuccess: EditModePanelProps['saveAsVariantSuccess'];
+  createAsGeneration: EditModePanelProps['createAsGeneration'];
+  onCreateAsGenerationChange: EditModePanelProps['onCreateAsGenerationChange'];
+
+  // InfoPanel props
+  isVideo: InfoPanelProps['isVideo'];
+  showImageEditTools: InfoPanelProps['showImageEditTools'];
+  readOnly: InfoPanelProps['readOnly'];
+  isInpaintMode: InfoPanelProps['isInpaintMode'];
+  onExitInpaintMode: InfoPanelProps['onExitInpaintMode'];
+  onEnterInpaintMode: InfoPanelProps['onEnterInpaintMode'];
+  onEnterVideoEditMode: InfoPanelProps['onEnterVideoEditMode'];
+  onClose: InfoPanelProps['onClose'];
+  taskDetailsData: InfoPanelProps['taskDetailsData'];
+  generationName: InfoPanelProps['generationName'];
+  onGenerationNameChange: InfoPanelProps['onGenerationNameChange'];
+  isEditingGenerationName: InfoPanelProps['isEditingGenerationName'];
+  onEditingGenerationNameChange: InfoPanelProps['onEditingGenerationNameChange'];
+  derivedItems: InfoPanelProps['derivedItems'];
+  replaceImages: InfoPanelProps['replaceImages'];
+  onReplaceImagesChange: InfoPanelProps['onReplaceImagesChange'];
+  onSwitchToPrimary: InfoPanelProps['onSwitchToPrimary'];
+  variantsSectionRef: InfoPanelProps['variantsSectionRef'];
+
+  // Shared props (used by multiple panels)
+  currentMediaId: string;
+  currentShotId?: string;
+  derivedGenerations: any;
+  paginatedDerived: any;
+  derivedPage: number;
+  derivedTotalPages: number;
+  onSetDerivedPage: (page: number | ((prev: number) => number)) => void;
+  variants: any[];
+  activeVariant: any;
+  primaryVariant: any;
+  onVariantSelect: (variantId: string) => void;
+  onMakePrimary: (variantId: string) => Promise<void>;
+  isLoadingVariants: boolean;
+}
+
+export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
+  const {
+    variant,
+    isInVideoEditMode,
+    isSpecialEditMode,
+    // VideoEditPanel props
+    videoEditSubMode,
+    onEnterTrimMode,
+    onEnterRegenerateMode,
+    onExitVideoEditMode,
+    trimState,
+    onStartTrimChange,
+    onEndTrimChange,
+    onResetTrim,
+    trimmedDuration,
+    hasTrimChanges,
+    onSaveTrim,
+    isSavingTrim,
+    trimSaveProgress,
+    trimSaveError,
+    trimSaveSuccess,
+    videoUrl,
+    trimCurrentTime,
+    trimVideoRef,
+    videoEditing,
+    projectId,
+    // EditModePanel props
+    sourceGenerationData,
+    onOpenExternalGeneration,
+    allShots,
+    isCurrentMediaPositioned,
+    onReplaceInShot,
+    sourcePrimaryVariant,
+    onMakeMainVariant,
+    canMakeMainVariant,
+    editMode,
+    setEditMode,
+    setIsInpaintMode,
+    inpaintPrompt,
+    setInpaintPrompt,
+    inpaintNumGenerations,
+    setInpaintNumGenerations,
+    loraMode,
+    setLoraMode,
+    customLoraUrl,
+    setCustomLoraUrl,
+    isGeneratingInpaint,
+    inpaintGenerateSuccess,
+    isCreatingMagicEditTasks,
+    magicEditTasksCreated,
+    brushStrokes,
+    handleExitMagicEditMode,
+    handleUnifiedGenerate,
+    handleGenerateAnnotatedEdit,
+    handleGenerateReposition,
+    isGeneratingReposition,
+    repositionGenerateSuccess,
+    hasTransformChanges,
+    handleSaveAsVariant,
+    isSavingAsVariant,
+    saveAsVariantSuccess,
+    createAsGeneration,
+    onCreateAsGenerationChange,
+    // InfoPanel props
+    isVideo,
+    showImageEditTools,
+    readOnly,
+    isInpaintMode,
+    onExitInpaintMode,
+    onEnterInpaintMode,
+    onEnterVideoEditMode,
+    onClose,
+    taskDetailsData,
+    generationName,
+    onGenerationNameChange,
+    isEditingGenerationName,
+    onEditingGenerationNameChange,
+    derivedItems,
+    replaceImages,
+    onReplaceImagesChange,
+    onSwitchToPrimary,
+    variantsSectionRef,
+    // Shared props
+    currentMediaId,
+    currentShotId,
+    derivedGenerations,
+    paginatedDerived,
+    derivedPage,
+    derivedTotalPages,
+    onSetDerivedPage,
+    variants,
+    activeVariant,
+    primaryVariant,
+    onVariantSelect,
+    onMakePrimary,
+    isLoadingVariants,
+  } = props;
+
+  // Route to VideoEditPanel
+  if (isInVideoEditMode && videoEditSubMode) {
+    return (
+      <VideoEditPanel
+        variant={variant}
+        videoEditSubMode={videoEditSubMode}
+        onEnterTrimMode={onEnterTrimMode}
+        onEnterRegenerateMode={onEnterRegenerateMode}
+        onClose={onExitVideoEditMode}
+        // Trim props
+        trimState={trimState}
+        onStartTrimChange={onStartTrimChange}
+        onEndTrimChange={onEndTrimChange}
+        onResetTrim={onResetTrim}
+        trimmedDuration={trimmedDuration}
+        hasTrimChanges={hasTrimChanges}
+        onSaveTrim={onSaveTrim}
+        isSavingTrim={isSavingTrim}
+        trimSaveProgress={trimSaveProgress}
+        trimSaveError={trimSaveError}
+        trimSaveSuccess={trimSaveSuccess}
+        videoUrl={videoUrl}
+        trimCurrentTime={trimCurrentTime}
+        trimVideoRef={trimVideoRef}
+        // Regenerate props
+        videoEditing={videoEditing}
+        projectId={projectId}
+        // Variants props
+        variants={variants}
+        activeVariantId={activeVariant?.id || null}
+        onVariantSelect={onVariantSelect}
+        onMakePrimary={onMakePrimary}
+        isLoadingVariants={isLoadingVariants}
+      />
+    );
+  }
+
+  // Route to EditModePanel (image editing)
+  if (isSpecialEditMode) {
+    return (
+      <EditModePanel
+        sourceGenerationData={sourceGenerationData}
+        onOpenExternalGeneration={onOpenExternalGeneration}
+        currentShotId={currentShotId}
+        allShots={allShots}
+        currentMediaId={currentMediaId}
+        isCurrentMediaPositioned={isCurrentMediaPositioned}
+        onReplaceInShot={onReplaceInShot}
+        sourcePrimaryVariant={sourcePrimaryVariant}
+        onMakeMainVariant={onMakeMainVariant}
+        canMakeMainVariant={canMakeMainVariant}
+        editMode={editMode}
+        setEditMode={setEditMode}
+        setIsInpaintMode={setIsInpaintMode}
+        inpaintPrompt={inpaintPrompt}
+        setInpaintPrompt={setInpaintPrompt}
+        inpaintNumGenerations={inpaintNumGenerations}
+        setInpaintNumGenerations={setInpaintNumGenerations}
+        loraMode={loraMode}
+        setLoraMode={setLoraMode}
+        customLoraUrl={customLoraUrl}
+        setCustomLoraUrl={setCustomLoraUrl}
+        isGeneratingInpaint={isGeneratingInpaint}
+        inpaintGenerateSuccess={inpaintGenerateSuccess}
+        isCreatingMagicEditTasks={isCreatingMagicEditTasks}
+        magicEditTasksCreated={magicEditTasksCreated}
+        brushStrokes={brushStrokes}
+        handleExitMagicEditMode={handleExitMagicEditMode}
+        handleUnifiedGenerate={handleUnifiedGenerate}
+        handleGenerateAnnotatedEdit={handleGenerateAnnotatedEdit}
+        handleGenerateReposition={handleGenerateReposition}
+        isGeneratingReposition={isGeneratingReposition}
+        repositionGenerateSuccess={repositionGenerateSuccess}
+        hasTransformChanges={hasTransformChanges}
+        handleSaveAsVariant={handleSaveAsVariant}
+        isSavingAsVariant={isSavingAsVariant}
+        saveAsVariantSuccess={saveAsVariantSuccess}
+        derivedGenerations={derivedGenerations}
+        paginatedDerived={paginatedDerived}
+        derivedPage={derivedPage}
+        derivedTotalPages={derivedTotalPages}
+        setDerivedPage={onSetDerivedPage}
+        variants={variants}
+        activeVariantId={activeVariant?.id || null}
+        onVariantSelect={onVariantSelect}
+        onMakePrimary={onMakePrimary}
+        isLoadingVariants={isLoadingVariants}
+        onClose={onClose}
+        variant={variant}
+        createAsGeneration={createAsGeneration}
+        onCreateAsGenerationChange={onCreateAsGenerationChange}
+      />
+    );
+  }
+
+  // Default: InfoPanel
+  return (
+    <InfoPanel
+      variant={variant}
+      // Header props
+      isVideo={isVideo}
+      showImageEditTools={showImageEditTools}
+      readOnly={readOnly}
+      isInpaintMode={isInpaintMode}
+      isInVideoEditMode={isInVideoEditMode}
+      onExitInpaintMode={onExitInpaintMode}
+      onEnterInpaintMode={onEnterInpaintMode}
+      onExitVideoEditMode={onExitVideoEditMode}
+      onEnterVideoEditMode={onEnterVideoEditMode}
+      onClose={onClose}
+      // TaskDetails props
+      taskDetailsData={taskDetailsData}
+      generationName={generationName}
+      onGenerationNameChange={onGenerationNameChange}
+      isEditingGenerationName={isEditingGenerationName}
+      onEditingGenerationNameChange={onEditingGenerationNameChange}
+      derivedItems={derivedItems}
+      derivedGenerations={derivedGenerations}
+      paginatedDerived={paginatedDerived}
+      derivedPage={derivedPage}
+      derivedTotalPages={derivedTotalPages}
+      onSetDerivedPage={onSetDerivedPage}
+      onNavigateToGeneration={onOpenExternalGeneration}
+      currentMediaId={currentMediaId}
+      currentShotId={currentShotId}
+      replaceImages={replaceImages}
+      onReplaceImagesChange={onReplaceImagesChange}
+      activeVariant={activeVariant}
+      primaryVariant={primaryVariant}
+      onSwitchToPrimary={onSwitchToPrimary}
+      // Variants props
+      variants={variants}
+      onVariantSelect={onVariantSelect}
+      onMakePrimary={onMakePrimary}
+      isLoadingVariants={isLoadingVariants}
+      variantsSectionRef={variantsSectionRef}
+    />
+  );
+};
+
+export default ControlsPanel;

@@ -50,3 +50,6 @@ export type { VideoEditPanelProps } from './VideoEditPanel';
 
 export { InfoPanel } from './InfoPanel';
 export type { InfoPanelProps } from './InfoPanel';
+
+export { ControlsPanel } from './ControlsPanel';
+export type { ControlsPanelProps } from './ControlsPanel';
