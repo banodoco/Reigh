@@ -47,3 +47,6 @@ export type { TaskDetailsPanelWrapperProps } from './TaskDetailsPanelWrapper';
 
 export { VideoEditPanel } from './VideoEditPanel';
 export type { VideoEditPanelProps } from './VideoEditPanel';
+
+export { InfoPanel } from './InfoPanel';
+export type { InfoPanelProps } from './InfoPanel';

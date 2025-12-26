@@ -74,6 +74,7 @@ import {
   OpenEditModeButton,
   TaskDetailsPanelWrapper,
   VideoEditPanel,
+  InfoPanel,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -2299,166 +2300,49 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onCreateAsGenerationChange={setCreateAsGeneration}
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col">
-                      {/* Top bar with Info/Edit Toggle + Close (right) - Sticky */}
-                      <div className="flex-shrink-0 flex items-center justify-between border-b border-border p-4 bg-background">
-                        <div></div>
-                        
-                        {/* Info | Edit | Trim Toggle and Close Button */}
-                        <div className="flex items-center gap-3">
-                          {showImageEditTools && !readOnly && !isVideo && (
-                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-                              <button
-                                onClick={() => {
-                                  if (isInpaintMode) {
-                                    handleExitInpaintMode();
-                                  }
-                                }}
-                                className={cn(
-                                  "px-3 py-1.5 text-sm rounded transition-colors",
-                                  !isInpaintMode
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                )}
-                              >
-                                Info
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (!isInpaintMode) {
-                                    setIsInpaintMode(true);
-                                    setEditMode('inpaint');
-                                  }
-                                }}
-                                className={cn(
-                                  "px-3 py-1.5 text-sm rounded transition-colors",
-                                  isInpaintMode
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                )}
-                              >
-                                Edit
-                              </button>
-                            </div>
-                          )}
-                          {/* Video controls: Info | Edit toggle (like images) */}
-                          {isVideo && !readOnly && (
-                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-                              <button
-                                onClick={() => {
-                                  handleExitVideoEditMode();
-                                }}
-                                className={cn(
-                                  "px-3 py-1.5 text-sm rounded transition-colors",
-                                  !isInVideoEditMode
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                )}
-                              >
-                                Info
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (!isInVideoEditMode) {
-                                    handleEnterVideoEditMode();
-                                  }
-                                }}
-                                className={cn(
-                                  "px-3 py-1.5 text-sm rounded transition-colors",
-                                  isInVideoEditMode
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                )}
-                              >
-                                Edit
-                              </button>
-                            </div>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onClose}
-                            className="h-8 w-8 p-0 hover:bg-muted"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                    {/* Split layout when variants available, otherwise full height for task details */}
-                    {variants && variants.length >= 1 ? (
-                      <div className="flex-1 flex flex-col min-h-0">
-                        {/* Task details - takes remaining space after variants, scrollable */}
-                        <div className="flex-1 overflow-y-auto min-h-0">
-                          <TaskDetailsPanelWrapper
-                            taskDetailsData={adjustedTaskDetailsData}
-                            generationName={generationName}
-                            onGenerationNameChange={handleGenerationNameChange}
-                            isEditingGenerationName={isEditingGenerationName}
-                            onEditingGenerationNameChange={setIsEditingGenerationName}
-                            derivedItems={derivedItems}
-                            derivedGenerations={derivedGenerations}
-                            paginatedDerived={paginatedDerived}
-                            derivedPage={derivedPage}
-                            derivedTotalPages={derivedTotalPages}
-                            onSetDerivedPage={setDerivedPage}
-                            onNavigateToGeneration={onOpenExternalGeneration}
-                            onVariantSelect={setActiveVariantId}
-                            currentMediaId={media.id}
-                            currentShotId={selectedShotId || shotId}
-                            replaceImages={replaceImages}
-                            onReplaceImagesChange={setReplaceImages}
-                            onClose={onClose}
-                            variant="desktop"
-                            activeVariant={activeVariant}
-                            primaryVariant={primaryVariant}
-                            onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
-                          />
-                        </div>
-                        
-                        {/* Variants section - shrink-to-fit content, max 200px height, scrollable if needed */}
-                        <div ref={variantsSectionRef} className="flex-shrink-0 overflow-y-auto max-h-[200px]">
-                          <div className="p-4 pt-2">
-                            <VariantSelector
-                              variants={variants}
-                              activeVariantId={activeVariant?.id || null}
-                              onVariantSelect={setActiveVariantId}
-                              onMakePrimary={setPrimaryVariant}
-                              isLoading={isLoadingVariants}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      /* No variants - full height for task details */
-                      <div className="flex-1 overflow-y-auto">
-                        <TaskDetailsPanelWrapper
-                          taskDetailsData={adjustedTaskDetailsData}
-                          generationName={generationName}
-                          onGenerationNameChange={handleGenerationNameChange}
-                          isEditingGenerationName={isEditingGenerationName}
-                          onEditingGenerationNameChange={setIsEditingGenerationName}
-                          derivedItems={derivedItems}
-                          derivedGenerations={derivedGenerations}
-                          paginatedDerived={paginatedDerived}
-                          derivedPage={derivedPage}
-                          derivedTotalPages={derivedTotalPages}
-                          onSetDerivedPage={setDerivedPage}
-                          onNavigateToGeneration={onOpenExternalGeneration}
-                          onVariantSelect={setActiveVariantId}
-                          currentMediaId={media.id}
-                          currentShotId={selectedShotId || shotId}
-                          replaceImages={replaceImages}
-                          onReplaceImagesChange={setReplaceImages}
-                          onClose={onClose}
-                          variant="desktop"
-                          activeVariant={activeVariant}
-                          primaryVariant={primaryVariant}
-                          onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
-                        />
-                      </div>
-                    )}
-                    </div>
+                    <InfoPanel
+                      variant="desktop"
+                      // Header props
+                      isVideo={isVideo}
+                      showImageEditTools={showImageEditTools}
+                      readOnly={readOnly}
+                      isInpaintMode={isInpaintMode}
+                      isInVideoEditMode={isInVideoEditMode}
+                      onExitInpaintMode={handleExitInpaintMode}
+                      onEnterInpaintMode={() => {
+                        setIsInpaintMode(true);
+                        setEditMode('inpaint');
+                      }}
+                      onExitVideoEditMode={handleExitVideoEditMode}
+                      onEnterVideoEditMode={handleEnterVideoEditMode}
+                      onClose={onClose}
+                      // TaskDetails props
+                      taskDetailsData={adjustedTaskDetailsData}
+                      generationName={generationName}
+                      onGenerationNameChange={handleGenerationNameChange}
+                      isEditingGenerationName={isEditingGenerationName}
+                      onEditingGenerationNameChange={setIsEditingGenerationName}
+                      derivedItems={derivedItems}
+                      derivedGenerations={derivedGenerations}
+                      paginatedDerived={paginatedDerived}
+                      derivedPage={derivedPage}
+                      derivedTotalPages={derivedTotalPages}
+                      onSetDerivedPage={setDerivedPage}
+                      onNavigateToGeneration={onOpenExternalGeneration}
+                      currentMediaId={media.id}
+                      currentShotId={selectedShotId || shotId}
+                      replaceImages={replaceImages}
+                      onReplaceImagesChange={setReplaceImages}
+                      activeVariant={activeVariant}
+                      primaryVariant={primaryVariant}
+                      onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
+                      // Variants props
+                      variants={variants}
+                      onVariantSelect={setActiveVariantId}
+                      onMakePrimary={setPrimaryVariant}
+                      isLoadingVariants={isLoadingVariants}
+                      variantsSectionRef={variantsSectionRef}
+                    />
                   )}
                 </div>
               </div>
@@ -2754,107 +2638,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onCreateAsGenerationChange={setCreateAsGeneration}
                     />
                   ) : (
-                    <div className="w-full">
-                      {/* Top bar with Variants count (left) and Info/Edit Toggle + Close (right) - Sticky */}
-                      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
-                        {/* Variants count - scrolls to variants section */}
-                        {variants && variants.length >= 1 ? (
-                          <button
-                            onClick={() => variantsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
-                          >
-                            <span>{variants.length} variants</span>
-                            <svg className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                            </svg>
-                          </button>
-                        ) : (
-                          <div></div>
-                        )}
-                        
-                        {/* Info | Edit Toggle and Close Button */}
-                        <div className="flex items-center gap-3">
-                          {showImageEditTools && !readOnly && !isVideo && (
-                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-                              <button
-                                onClick={() => {
-                                  if (isInpaintMode) {
-                                    handleExitInpaintMode();
-                                  }
-                                }}
-                                className={cn(
-                                  "px-3 py-1.5 text-sm rounded transition-colors",
-                                  !isInpaintMode
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                )}
-                              >
-                                Info
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (!isInpaintMode) {
-                                    setIsInpaintMode(true);
-                                    setEditMode('inpaint');
-                                  }
-                                }}
-                                className={cn(
-                                  "px-3 py-1.5 text-sm rounded transition-colors",
-                                  isInpaintMode
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                )}
-                              >
-                                Edit
-                              </button>
-                            </div>
-                          )}
-                          {/* Video controls: Info | Edit toggle (like images) - Mobile */}
-                          {isVideo && !readOnly && (
-                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-                              <button
-                                onClick={() => {
-                                  handleExitVideoEditMode();
-                                }}
-                                className={cn(
-                                  "px-3 py-1.5 text-sm rounded transition-colors",
-                                  !isInVideoEditMode
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                )}
-                              >
-                                Info
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (!isInVideoEditMode) {
-                                    handleEnterVideoEditMode();
-                                  }
-                                }}
-                                className={cn(
-                                  "px-3 py-1.5 text-sm rounded transition-colors",
-                                  isInVideoEditMode
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                                )}
-                              >
-                                Edit
-                              </button>
-                            </div>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onClose}
-                            className="h-8 w-8 p-0 hover:bg-muted"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    
-                    {/* Variant Selector (for images/videos with multiple variants) - Mobile */}
-                    <TaskDetailsPanelWrapper
+                    <InfoPanel
+                      variant="mobile"
+                      // Header props
+                      isVideo={isVideo}
+                      showImageEditTools={showImageEditTools}
+                      readOnly={readOnly}
+                      isInpaintMode={isInpaintMode}
+                      isInVideoEditMode={isInVideoEditMode}
+                      onExitInpaintMode={handleExitInpaintMode}
+                      onEnterInpaintMode={() => {
+                        setIsInpaintMode(true);
+                        setEditMode('inpaint');
+                      }}
+                      onExitVideoEditMode={handleExitVideoEditMode}
+                      onEnterVideoEditMode={handleEnterVideoEditMode}
+                      onClose={onClose}
+                      // TaskDetails props
                       taskDetailsData={adjustedTaskDetailsData}
                       generationName={generationName}
                       onGenerationNameChange={handleGenerationNameChange}
@@ -2867,31 +2667,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       derivedTotalPages={derivedTotalPages}
                       onSetDerivedPage={setDerivedPage}
                       onNavigateToGeneration={onOpenExternalGeneration}
-                      onVariantSelect={setActiveVariantId}
                       currentMediaId={media.id}
                       currentShotId={selectedShotId || shotId}
                       replaceImages={replaceImages}
                       onReplaceImagesChange={setReplaceImages}
-                      onClose={onClose}
-                      variant="mobile"
                       activeVariant={activeVariant}
                       primaryVariant={primaryVariant}
                       onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
+                      // Variants props
+                      variants={variants}
+                      onVariantSelect={setActiveVariantId}
+                      onMakePrimary={setPrimaryVariant}
+                      isLoadingVariants={isLoadingVariants}
+                      variantsSectionRef={variantsSectionRef}
                     />
-                    
-                    {/* Variants section - below task details, small fixed height on mobile */}
-                    {variants && variants.length >= 1 && (
-                      <div ref={variantsSectionRef} className="px-3 pb-2 -mt-2 max-h-[120px] overflow-y-auto flex-shrink-0">
-                        <VariantSelector
-                          variants={variants}
-                          activeVariantId={activeVariant?.id || null}
-                          onVariantSelect={setActiveVariantId}
-                          onMakePrimary={setPrimaryVariant}
-                          isLoading={isLoadingVariants}
-                        />
-                      </div>
-                    )}
-                    </div>
                   )}
                 </div>
               </div>
