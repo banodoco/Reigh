@@ -410,7 +410,7 @@ export const SortableImageItem = React.memo(
       prevProps.projectAspectRatio === nextProps.projectAspectRatio &&
       // Image URL changes (e.g., thumbnail loaded)
       prevProps.image.thumbUrl === nextProps.image.thumbUrl &&
-      prevProps.image.imageUrl === nextProps.imageUrl;
+      prevProps.image.imageUrl === nextProps.image.imageUrl;
 
     console.warn('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
       imageId: nextProps.image.id?.substring(0, 8),
@@ -432,6 +432,10 @@ export const SortableImageItem = React.memo(
         aspectRatio: prevProps.projectAspectRatio !== nextProps.projectAspectRatio,
         thumbUrl: prevProps.image.thumbUrl !== nextProps.image.thumbUrl,
         imageUrl: prevProps.image.imageUrl !== nextProps.image.imageUrl,
+        // Callback stability (these shouldn't change but worth checking)
+        onDelete: prevProps.onDelete !== nextProps.onDelete,
+        onClick: prevProps.onClick !== nextProps.onClick,
+        onDoubleClick: prevProps.onDoubleClick !== nextProps.onDoubleClick,
       }
     });
 
