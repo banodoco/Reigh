@@ -197,7 +197,6 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
             videoUrl={videoUrl}
             currentTime={trimCurrentTime}
             videoRef={trimVideoRef}
-            hideHeader
           />
         )}
         {videoEditSubMode === 'replace' && (
