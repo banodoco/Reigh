@@ -296,17 +296,16 @@ export const TrimControlsPanel: React.FC<TrimControlsPanelProps> = ({
       {/* Hidden canvas for frame capture */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Header - hidden when embedded in parent panel */}
-      {!hideHeader && (
-        <div className="flex items-center gap-2 px-4 pt-4">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <Scissors className="w-5 h-5 text-primary" />
-            Trim Video
-          </h3>
-        </div>
-      )}
-
-      <div className={cn(padding, spacing)}>
+      <div className="p-4 space-y-4">
+        {/* Header - hidden when embedded in parent panel */}
+        {!hideHeader && (
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-medium flex items-center gap-2">
+              <Scissors className="w-5 h-5 text-primary" />
+              Trim Video
+            </h3>
+          </div>
+        )}
         {/* Instructions */}
         <p className={cn(labelSize, 'text-muted-foreground')}>
           Drag the handles to trim the beginning or end of the video. 

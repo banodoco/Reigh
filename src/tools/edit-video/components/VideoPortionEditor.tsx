@@ -307,26 +307,13 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
 
     return (
         <TooltipProvider>
-        <div className="p-6 space-y-6">
-            {/* Header with close button */}
-            <div className="flex items-center justify-between">
+        <div className="p-4 space-y-4">
+            {/* Header */}
+            <div className="flex items-center gap-2">
                 <h3 className="text-lg font-medium flex items-center gap-2">
                     <Wand2 className="w-5 h-5 text-primary" />
                     {selections.length > 1 ? 'Replace Portions' : 'Replace Portion'}
                 </h3>
-                {onClose && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                        }}
-                        className="h-8 w-8 p-0 hover:bg-muted"
-                    >
-                        <X className="h-4 w-4" />
-                    </Button>
-                )}
             </div>
             
             {/* Per-Segment Settings - Show first! */}
