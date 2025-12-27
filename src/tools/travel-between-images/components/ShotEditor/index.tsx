@@ -377,7 +377,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // All shot images - use query data when available, fall back to context images during transition
   // This prevents the "flash to empty" when navigating between shots
-  const allShotImages = fullShotImages.length > 0 ? fullShotImages : contextImages;
+  // PERF: Memoize to prevent ShotImagesEditor re-renders when reference doesn't actually change
+  const allShotImages = React.useMemo(() => {
+    return fullShotImages.length > 0 ? fullShotImages : contextImages;
+  }, [fullShotImages, contextImages]);
   
   // Selector data with fallbacks derived from contextImages during transitions
   // This prevents UI flicker when navigating between shots
