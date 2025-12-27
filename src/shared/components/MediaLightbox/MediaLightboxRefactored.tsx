@@ -1116,18 +1116,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     const taskParams = adjustedTaskDetailsData.task.params as Record<string, any>;
     const orchestratorDetails = taskParams.orchestrator_details || {};
+    const individualSegmentParams = taskParams.individual_segment_params || {};
 
     // Extract input image URLs and generation IDs from task params
+    // Priority: individual_segment_params > top-level > orchestrator_details
     const inputImagePaths = taskParams.input_image_paths_resolved ||
                            orchestratorDetails.input_image_paths_resolved || [];
     const inputImageGenIds = taskParams.input_image_generation_ids ||
                             orchestratorDetails.input_image_generation_ids || [];
 
-    // For video regeneration, use first and last images (or first two for single segment)
-    const startImageUrl = inputImagePaths[0];
-    const endImageUrl = inputImagePaths.length > 1 ? inputImagePaths[inputImagePaths.length - 1] : inputImagePaths[0];
+    // For segment regeneration, check for explicit start/end URLs first
+    // These are set by individual_travel_segment tasks
+    const explicitStartUrl = individualSegmentParams.start_image_url || taskParams.start_image_url;
+    const explicitEndUrl = individualSegmentParams.end_image_url || taskParams.end_image_url;
+
+    // Use explicit URLs if available, otherwise fall back to array extraction
+    const startImageUrl = explicitStartUrl || inputImagePaths[0];
+    const endImageUrl = explicitEndUrl || (inputImagePaths.length > 1 ? inputImagePaths[inputImagePaths.length - 1] : inputImagePaths[0]);
     const startImageGenId = inputImageGenIds[0];
     const endImageGenId = inputImageGenIds.length > 1 ? inputImageGenIds[inputImageGenIds.length - 1] : inputImageGenIds[0];
+
+    console.log('[MediaLightbox] [RegenerateImages] Image extraction:', {
+      hasIndividualSegmentParams: !!taskParams.individual_segment_params,
+      explicitStartUrl: explicitStartUrl?.substring(0, 50),
+      explicitEndUrl: explicitEndUrl?.substring(0, 50),
+      inputImagePathsCount: inputImagePaths.length,
+      finalStartUrl: startImageUrl?.substring(0, 50),
+      finalEndUrl: endImageUrl?.substring(0, 50),
+    });
 
     // Resolution priority: shot > project (effectiveRegenerateResolution) > stale params
     const staleResolution = taskParams.parsed_resolution_wh || orchestratorDetails.parsed_resolution_wh;

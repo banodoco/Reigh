@@ -5,19 +5,14 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Separator } from '@/shared/components/ui/separator';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
-import { Input } from '@/shared/components/ui/input';
-import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
-import { Switch } from '@/shared/components/ui/switch';
-import { Slider } from '@/shared/components/ui/slider';
-import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers, RotateCcw, Clock, Scissors } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
-import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { JoinClipsSettingsForm, DEFAULT_JOIN_CLIPS_PHASE_CONFIG, BUILTIN_JOIN_CLIPS_DEFAULT_ID } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import { useJoinClipsSettings } from '@/tools/join-clips/hooks/useJoinClipsSettings';
@@ -33,15 +28,12 @@ import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { MotionPresetSelector, type BuiltinPreset } from '@/shared/components/MotionPresetSelector';
-import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
-import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
-import { PhaseConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
-import { quantizeFrameCount, framesToSeconds } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
 import { createMobileTapHandler, deriveInputImages } from '../utils/gallery-utils';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+import { normalizeSegmentParams } from '@/shared/lib/normalizeSegmentParams';
+import { SegmentRegenerateControls } from '@/shared/components/SegmentRegenerateControls';
 
 // TypeScript declaration for global mobile video preload map
 declare global {
@@ -49,40 +41,6 @@ declare global {
     mobileVideoPreloadMap?: Map<number, () => void>;
   }
 }
-
-// =============================================================================
-// BUILT-IN PRESETS FOR SEGMENT REGENERATION
-// Uses the same defaults as Video Travel Tool (I2V and VACE modes)
-// =============================================================================
-
-const BUILTIN_I2V_PRESET_ID = '__builtin_segment_i2v_default__';
-const BUILTIN_VACE_PRESET_ID = '__builtin_segment_vace_default__';
-
-const BUILTIN_I2V_PRESET: BuiltinPreset = {
-  id: BUILTIN_I2V_PRESET_ID,
-  metadata: {
-    name: 'Basic',
-    description: 'Standard I2V generation',
-    phaseConfig: DEFAULT_PHASE_CONFIG,
-    generationTypeMode: 'i2v',
-  }
-};
-
-const BUILTIN_VACE_PRESET: BuiltinPreset = {
-  id: BUILTIN_VACE_PRESET_ID,
-  metadata: {
-    name: 'Basic',
-    description: 'Standard VACE generation with structure video',
-    phaseConfig: DEFAULT_VACE_PHASE_CONFIG,
-    generationTypeMode: 'vace',
-  }
-};
-
-// Helper to detect generation mode from model name
-const detectGenerationMode = (modelName?: string): 'i2v' | 'vace' => {
-  if (!modelName) return 'i2v';
-  return modelName.toLowerCase().includes('vace') ? 'vace' : 'i2v';
-};
 
 interface ChildGenerationsViewProps {
     parentGenerationId: string;
@@ -1409,10 +1367,8 @@ interface SegmentCardProps {
 }
 
 const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio }) => {
-    const { toast } = useToast();
     const isMobile = useIsMobile();
-    const [params, setParams] = useState<any>(child.params || {});
-    
+
     // Calculate aspect ratio style for video container based on project/shot dimensions
     const aspectRatioStyle = useMemo(() => {
         if (!aspectRatio) {
@@ -1424,19 +1380,14 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
         }
         return { aspectRatio: '16/9' }; // Fallback to 16:9
     }, [aspectRatio]);
-    const [isDirty, setIsDirty] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [showAdvanced, setShowAdvanced] = useState(false);
-    const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
-    const [isRegenerating, setIsRegenerating] = useState(false);
-    const [regenerateSuccess, setRegenerateSuccess] = useState(false);
 
     // Extract generation IDs for this segment's input images
     const segmentGenerationIds = useMemo(() => {
-        const orchestratorDetails = params.orchestrator_details || {};
-        const allGenerationIds = orchestratorDetails.input_image_generation_ids || params.input_image_generation_ids || [];
-        const allFallbackUrls = orchestratorDetails.input_image_paths_resolved || params.input_image_paths_resolved || [];
-        
+        const childParams = child.params as any || {};
+        const orchestratorDetails = childParams.orchestrator_details || {};
+        const allGenerationIds = orchestratorDetails.input_image_generation_ids || childParams.input_image_generation_ids || [];
+        const allFallbackUrls = orchestratorDetails.input_image_paths_resolved || childParams.input_image_paths_resolved || [];
+
         // For segment at index N, we need images[N] and images[N+1]
         return {
             startGenId: allGenerationIds[index] as string | undefined,
@@ -1444,7 +1395,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
             startFallbackUrl: allFallbackUrls[index] as string | undefined,
             endFallbackUrl: allFallbackUrls[index + 1] as string | undefined,
         };
-    }, [params, index]);
+    }, [child.params, index]);
 
     // Fetch fresh URLs from database for segment input images (always use main variant)
     const { data: freshGenerationUrls } = useQuery({
@@ -1505,439 +1456,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
             hasImages: !!(startUrl || endUrl),
         };
     }, [segmentGenerationIds, freshGenerationUrls, index]);
-    
-    // Detect generation mode from model name (I2V vs VACE)
-    const generationMode = useMemo(() => {
-        const modelName = params.model_name || params.orchestrator_details?.model_name;
-        return detectGenerationMode(modelName);
-    }, [params.model_name, params.orchestrator_details?.model_name]);
-    
-    // Get the appropriate built-in preset based on generation mode
-    const builtinPreset = useMemo(() => {
-        return generationMode === 'vace' ? BUILTIN_VACE_PRESET : BUILTIN_I2V_PRESET;
-    }, [generationMode]);
-    
-    const builtinPresetId = useMemo(() => {
-        return generationMode === 'vace' ? BUILTIN_VACE_PRESET_ID : BUILTIN_I2V_PRESET_ID;
-    }, [generationMode]);
-    
-    // Motion control state - derived from params
-    const [motionMode, setMotionMode] = useState<'basic' | 'advanced'>(() => {
-        const orchestrator = params.orchestrator_details || {};
-        if (orchestrator.advanced_mode || params.advanced_mode) return 'advanced';
-        // Check motion_mode from params (may have been saved from previous regeneration)
-        const savedMotionMode = orchestrator.motion_mode || params.motion_mode;
-        if (savedMotionMode === 'advanced') return 'advanced';
-        return 'basic';
-    });
-    // Derive advancedMode from motionMode - single source of truth
-    const advancedMode = motionMode === 'advanced';
-    const [amountOfMotion, setAmountOfMotion] = useState(() => {
-        const orchestrator = params.orchestrator_details || {};
-        const rawValue = params.amount_of_motion ?? orchestrator.amount_of_motion ?? 0.5;
-        return Math.round(rawValue * 100);
-    });
-    const [phaseConfig, setPhaseConfig] = useState<PhaseConfig | undefined>(() => {
-        // Try to extract phase config from params
-        const orchestrator = params.orchestrator_details || {};
-        if (orchestrator.phase_config) return orchestrator.phase_config;
-        if (params.phase_config) return params.phase_config;
-        return undefined;
-    });
-    const [selectedPhasePresetId, setSelectedPhasePresetId] = useState<string | null>(() => {
-        // Try to restore preset ID from params (if previously saved)
-        const orchestrator = params.orchestrator_details || {};
-        return orchestrator.selected_phase_preset_id || params.selected_phase_preset_id || null;
-    });
-    const [randomSeed, setRandomSeed] = useState(() => {
-        // Try to restore random seed setting from params
-        const orchestrator = params.orchestrator_details || {};
-        const savedRandomSeed = orchestrator.random_seed ?? params.random_seed;
-        return savedRandomSeed !== undefined ? savedRandomSeed : true;
-    });
-    
-    // LoRA state - derived from params.additional_loras
-    const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>(() => {
-        const lorasObj = params.additional_loras || params.orchestrator_details?.additional_loras || {};
-        return Object.entries(lorasObj).map(([url, strength]) => {
-            const filename = url.split('/').pop()?.replace('.safetensors', '') || url;
-            return {
-                id: url,
-                name: filename,
-                path: url,
-                strength: typeof strength === 'number' ? strength : 1.0,
-            };
-        });
-    });
-    
-    // Handlers for motion control (aligned with MotionPresetSelector API)
-    const handleMotionModeChange = useCallback((mode: 'basic' | 'advanced') => {
-        setMotionMode(mode);
-        setIsDirty(true);
-        // Initialize phaseConfig when switching to advanced using appropriate default
-        if (mode === 'advanced' && !phaseConfig) {
-            setPhaseConfig(builtinPreset.metadata.phaseConfig);
-        }
-    }, [phaseConfig, builtinPreset]);
-    
-    const handleAmountOfMotionChange = useCallback((value: number) => {
-        setAmountOfMotion(value);
-        setIsDirty(true);
-    }, []);
-    
-    const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
-        setPhaseConfig(config);
-        setIsDirty(true);
-    }, []);
-    
-    const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, _metadata?: any) => {
-        setSelectedPhasePresetId(presetId);
-        setPhaseConfig(config);
-        setIsDirty(true);
-    }, []);
-    
-    const handlePhasePresetRemove = useCallback(() => {
-        setSelectedPhasePresetId(null);
-        setIsDirty(true);
-    }, []);
-    
-    const handleRandomSeedChange = useCallback((value: boolean) => {
-        setRandomSeed(value);
-        setIsDirty(true);
-    }, []);
-    
-    // LoRA handlers
-    const handleAddLoraClick = useCallback(() => {
-        setIsLoraModalOpen(true);
-    }, []);
-    
-    const handleRemoveLora = useCallback((loraId: string) => {
-        setSelectedLoras(prev => prev.filter(l => l.id !== loraId));
-        setIsDirty(true);
-    }, []);
-    
-    const handleLoraStrengthChange = useCallback((loraId: string, strength: number) => {
-        setSelectedLoras(prev => prev.map(l => l.id === loraId ? { ...l, strength } : l));
-        setIsDirty(true);
-    }, []);
-    
-    // Handle LoRA selection from modal
-    const handleLoraSelect = useCallback((lora: LoraModel) => {
-        setSelectedLoras(prev => {
-            // Check if already selected
-            if (prev.some(l => l.id === lora.id || l.path === lora.path)) {
-                return prev;
-            }
-            return [...prev, {
-                id: lora.id || lora.path,
-                name: lora.name,
-                path: lora.path,
-                strength: lora.default_strength || 1.0,
-            }];
-        });
-        setIsDirty(true);
-    }, []);
-
-    // Handle segment regeneration
-    const handleRegenerateSegment = useCallback(async () => {
-        if (!projectId) {
-            toast({
-                title: "Error",
-                description: "No project selected",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        setIsRegenerating(true);
-        setRegenerateSuccess(false);
-
-        try {
-            // IMPORTANT: We must use fresh URLs from generations.location (main variant)
-            // Do NOT fall back to cached URLs from params - those may be stale
-            const { startGenId, endGenId } = segmentGenerationIds;
-            
-            // Require generation IDs to ensure we can fetch the current main variant
-            if (!startGenId || !endGenId) {
-                throw new Error("Missing generation IDs for input images. Cannot determine current main variant.");
-            }
-            
-            // Check that fresh URLs have been fetched from the database
-            const startFreshUrl = freshGenerationUrls?.[startGenId]?.location;
-            const endFreshUrl = freshGenerationUrls?.[endGenId]?.location;
-            
-            if (!startFreshUrl || !endFreshUrl) {
-                throw new Error("Fresh image URLs not loaded yet. Please wait a moment and try again.");
-            }
-            
-            const startImageUrl = startFreshUrl;
-            const endImageUrl = endFreshUrl;
-
-            console.log('[RegenerateSegment] Using fresh image URLs from generations.location (main variant):', {
-                startImageUrl: startImageUrl?.substring(0, 50),
-                endImageUrl: endImageUrl?.substring(0, 50),
-                startGenId: startGenId?.substring(0, 8),
-                endGenId: endGenId?.substring(0, 8),
-            });
-
-            // Convert selectedLoras to the format expected by the task
-            const lorasForTask = selectedLoras.map(lora => ({
-                path: lora.path || lora.id,
-                strength: lora.strength,
-            }));
-
-            // CRITICAL: Always use the CURRENT project resolution for regeneration
-            // The orchestrator_details.parsed_resolution_wh may be stale (from an old orchestrator run)
-            // We want regenerated segments to match the current project dimensions
-            const staleResolution = params.parsed_resolution_wh ||
-                                    params.orchestrator_details?.parsed_resolution_wh;
-            const finalResolution = projectResolution || staleResolution;
-
-            const paramsWithResolution = finalResolution
-                ? {
-                    ...params,
-                    parsed_resolution_wh: finalResolution,
-                    orchestrator_details: {
-                        ...(params.orchestrator_details || {}),
-                        parsed_resolution_wh: finalResolution,
-                    },
-                }
-                : params;
-
-            console.log('[RegenerateSegment] Resolution:', {
-                staleResolution,
-                projectResolution,
-                finalResolution,
-                usingProjectResolution: !!projectResolution,
-            });
-
-            // CRITICAL: Log the exact prompt values being sent from UI state
-            // This ensures the user-input prompts are the ones actually sent
-            const uiBasePrompt = params.base_prompt || params.prompt || '';
-            const uiNegativePrompt = params.negative_prompt || '';
-            
-            console.log('[RegenerateSegment] [SegmentPromptDebug] Creating individual_travel_segment task:', {
-                projectId,
-                parentGenerationId,
-                childGenerationId: child.id,
-                segmentIndex: index,
-                startImageUrl: startImageUrl?.substring(0, 50),
-                endImageUrl: endImageUrl?.substring(0, 50),
-                startGenId: startGenId?.substring(0, 8),
-                endGenId: endGenId?.substring(0, 8),
-                numFrames: params.num_frames,
-                hasOriginalParams: !!params,
-                loraCount: lorasForTask.length,
-                projectResolution,
-                usingProjectResolution: !!projectResolution,
-                // Log prompt values explicitly for debugging
-                uiBasePrompt: uiBasePrompt?.substring(0, 100) + (uiBasePrompt?.length > 100 ? '...' : ''),
-                uiNegativePrompt: uiNegativePrompt?.substring(0, 50) + (uiNegativePrompt?.length > 50 ? '...' : ''),
-                promptSource: 'UI params state (user-editable)',
-            });
-
-            // Pass the full original params so the task structure matches travel_segment exactly
-            // All UI-editable values are passed as EXPLICIT OVERRIDES - these take precedence
-            await createIndividualTravelSegmentTask({
-                project_id: projectId,
-                parent_generation_id: parentGenerationId,
-                child_generation_id: child.id,
-                segment_index: index,
-                start_image_url: startImageUrl,
-                end_image_url: endImageUrl,
-                // Include generation IDs for clickable images (if available)
-                start_image_generation_id: startGenId,
-                end_image_generation_id: endGenId,
-                // Pass the full original params with updated resolution - the function will extract what it needs
-                originalParams: paramsWithResolution,
-                // ALL overrides from UI state (everything editable in SegmentCard)
-                // CRITICAL: These are the user-input values that MUST take precedence
-                base_prompt: uiBasePrompt,
-                negative_prompt: uiNegativePrompt,
-                num_frames: params.num_frames,
-                seed: randomSeed ? undefined : (params.seed_to_use || params.seed), // Use original seed if not random
-                random_seed: randomSeed,
-                amount_of_motion: amountOfMotion / 100, // Convert from 0-100 to 0-1
-                advanced_mode: advancedMode,
-                phase_config: phaseConfig,
-                motion_mode: motionMode,
-                selected_phase_preset_id: selectedPhasePresetId,
-                loras: lorasForTask,
-            });
-
-            setRegenerateSuccess(true);
-            toast({
-                title: "Regeneration started",
-                description: `Segment ${index + 1} is being regenerated. Check the Tasks pane for progress.`,
-            });
-
-            // Clear success state after 3 seconds
-            setTimeout(() => setRegenerateSuccess(false), 3000);
-
-        } catch (error: any) {
-            console.error('[RegenerateSegment] Error:', error);
-            toast({
-                title: "Error",
-                description: error.message || "Failed to start regeneration",
-                variant: "destructive",
-            });
-        } finally {
-            setIsRegenerating(false);
-        }
-    }, [
-        projectId, 
-        parentGenerationId, 
-        child.id, 
-        index, 
-        params, 
-        selectedLoras, 
-        segmentGenerationIds,
-        freshGenerationUrls,
-        amountOfMotion,
-        advancedMode, 
-        phaseConfig, 
-        motionMode,
-        selectedPhasePresetId,
-        randomSeed,
-        projectResolution,
-        toast
-    ]);
-    
-    // Update local state when child prop changes
-    useEffect(() => {
-        setParams(child.params || {});
-        setIsDirty(false);
-    }, [child.params]);
-
-    // Check for extended params (expanded arrays from orchestrator) if standard params are missing
-    useEffect(() => {
-        console.log('[SegmentCardPopulation] Starting population check', {
-            childId: child.id?.substring(0, 8),
-            hasParams: !!child.params,
-            paramsKeys: child.params ? Object.keys(child.params) : [],
-            timestamp: Date.now()
-        });
-        
-        if (!child.params) {
-            console.log('[SegmentCardPopulation] No params found, skipping');
-            return;
-        }
-        
-        const currentParams = child.params as any;
-        const orchestratorDetails = currentParams.orchestrator_details || {};
-        const segmentIndex = currentParams.segment_index;
-        
-        console.log('[SegmentCardPopulation] Params inspection', {
-            childId: child.id?.substring(0, 8),
-            hasOrchestratorDetails: !!orchestratorDetails,
-            orchestratorDetailsKeys: Object.keys(orchestratorDetails),
-            segmentIndex,
-            currentNumFrames: currentParams.num_frames,
-            currentPrompt: currentParams.prompt?.substring(0, 50),
-            currentBasePrompt: currentParams.base_prompt?.substring(0, 50),
-            segmentFramesExpanded: orchestratorDetails.segment_frames_expanded,
-            basePromptsExpanded: orchestratorDetails.base_prompts_expanded,
-            enhancedPromptsExpanded: orchestratorDetails.enhanced_prompts_expanded?.map((p: string) => p?.substring(0, 30)),
-            timestamp: Date.now()
-        });
-        
-        let updates: any = {};
-        let hasUpdates = false;
-        
-        // Check if we need to populate missing fields from orchestrator arrays
-        if (segmentIndex !== undefined) {
-            console.log('[SegmentCardPopulation] Segment index found:', segmentIndex);
-            
-            // Populate frames if missing
-            if (!currentParams.num_frames && orchestratorDetails.segment_frames_expanded && orchestratorDetails.segment_frames_expanded[segmentIndex]) {
-                console.log('[SegmentCardPopulation] Populating num_frames from segment_frames_expanded[' + segmentIndex + ']:', orchestratorDetails.segment_frames_expanded[segmentIndex]);
-                updates.num_frames = orchestratorDetails.segment_frames_expanded[segmentIndex];
-                hasUpdates = true;
-            } else if (!currentParams.num_frames && orchestratorDetails.segment_frames_target) {
-                console.log('[SegmentCardPopulation] Populating num_frames from segment_frames_target:', orchestratorDetails.segment_frames_target);
-                updates.num_frames = orchestratorDetails.segment_frames_target;
-                hasUpdates = true;
-            } else {
-                console.log('[SegmentCardPopulation] NOT populating num_frames', {
-                    hasCurrentNumFrames: !!currentParams.num_frames,
-                    hasSegmentFramesExpanded: !!orchestratorDetails.segment_frames_expanded,
-                    hasSegmentFramesTarget: !!orchestratorDetails.segment_frames_target,
-                    segmentFramesExpandedValue: orchestratorDetails.segment_frames_expanded?.[segmentIndex]
-                });
-            }
-            
-             // Populate base_prompt if missing or empty
-            // Try enhanced_prompts_expanded first, then base_prompts_expanded
-            if (!currentParams.base_prompt || currentParams.base_prompt === "") {
-                if (orchestratorDetails.enhanced_prompts_expanded && orchestratorDetails.enhanced_prompts_expanded[segmentIndex]) {
-                    console.log('[SegmentCardPopulation] Populating base_prompt from enhanced_prompts_expanded[' + segmentIndex + ']:', orchestratorDetails.enhanced_prompts_expanded[segmentIndex]?.substring(0, 50));
-                    updates.base_prompt = orchestratorDetails.enhanced_prompts_expanded[segmentIndex];
-                    hasUpdates = true;
-                } else if (orchestratorDetails.base_prompts_expanded && orchestratorDetails.base_prompts_expanded[segmentIndex]) {
-                    console.log('[SegmentCardPopulation] Populating base_prompt from base_prompts_expanded[' + segmentIndex + ']:', orchestratorDetails.base_prompts_expanded[segmentIndex]?.substring(0, 50));
-                    updates.base_prompt = orchestratorDetails.base_prompts_expanded[segmentIndex];
-                    hasUpdates = true;
-                } else if (orchestratorDetails.base_prompt) {
-                    console.log('[SegmentCardPopulation] Populating base_prompt from orchestrator_details.base_prompt:', orchestratorDetails.base_prompt?.substring(0, 50));
-                    updates.base_prompt = orchestratorDetails.base_prompt;
-                    hasUpdates = true;
-                } else {
-                    console.log('[SegmentCardPopulation] NOT populating base_prompt', {
-                        hasCurrentBasePrompt: !!currentParams.base_prompt,
-                        currentBasePromptEmpty: currentParams.base_prompt === "",
-                        hasEnhancedPromptsExpanded: !!orchestratorDetails.enhanced_prompts_expanded,
-                        hasBasePromptsExpanded: !!orchestratorDetails.base_prompts_expanded,
-                        hasOrchestratorBasePrompt: !!orchestratorDetails.base_prompt
-                    });
-                }
-            } else {
-                console.log('[SegmentCardPopulation] base_prompt already exists, not populating');
-            }
-        } else {
-            console.log('[SegmentCardPopulation] No segment index found, cannot populate from expanded arrays');
-        }
-        
-        if (hasUpdates) {
-            console.log('[SegmentCardPopulation] Applying updates:', updates);
-            setParams(prev => ({ ...prev, ...updates }));
-            // We don't set dirty here as this is just initializing display values
-        } else {
-            console.log('[SegmentCardPopulation] No updates needed');
-        }
-    }, [child.params, child.id]);
-
-    const handleChange = (key: string, value: any) => {
-        setParams(prev => ({ ...prev, [key]: value }));
-        setIsDirty(true);
-    };
-
-    const handleSave = async () => {
-        setIsSaving(true);
-        try {
-            const { error } = await supabase
-                .from('generations')
-                .update({ params })
-                .eq('id', child.id);
-
-            if (error) throw error;
-
-            toast({
-                title: "Saved",
-                description: `Segment ${index + 1} settings updated`,
-            });
-            setIsDirty(false);
-            onUpdate();
-        } catch (error) {
-            console.error('Error updating segment:', error);
-            toast({
-                title: "Error",
-                description: "Failed to save settings",
-                variant: "destructive",
-            });
-        } finally {
-            setIsSaving(false);
-        }
-    };
 
     return (
         <Card className="overflow-hidden flex flex-col">
@@ -2006,239 +1524,30 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                     />
             </div>
 
-            {/* Settings Form */}
-            <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
-                {/* Input Images - Clickable thumbnails */}
-                {segmentImages.hasImages && (
-                    <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-muted-foreground">Input Images:</Label>
-                        <div className="flex gap-2">
-                            {segmentImages.start && (
-                                <button
-                                    onClick={() => {
-                                        console.log('[SegmentImageFlow] START image clicked for segment', index);
-                                        console.log('[SegmentImageFlow] START image URL:', segmentImages.start?.url);
-                                        console.log('[SegmentImageFlow] START image generationId:', segmentImages.start?.generationId);
-                                        console.log('[SegmentImageFlow] Full segmentImages object:', segmentImages);
-                                        onImageLightboxOpen(0, segmentImages);
-                                    }}
-                                    className="relative w-16 h-16 rounded-md overflow-hidden border border-border/50 hover:border-primary/50 transition-colors group"
-                                    title="View start image"
-                                >
-                                    <img 
-                                        src={segmentImages.start.url} 
-                                        alt="Start frame"
-                                        className="w-full h-full object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                                    <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">Start</span>
-                                </button>
-                            )}
-                            {segmentImages.end && (
-                                <button
-                                    onClick={() => {
-                                        console.log('[SegmentImageFlow] END image clicked for segment', index);
-                                        console.log('[SegmentImageFlow] END image URL:', segmentImages.end?.url);
-                                        console.log('[SegmentImageFlow] END image generationId:', segmentImages.end?.generationId);
-                                        console.log('[SegmentImageFlow] Full segmentImages object:', segmentImages);
-                                        onImageLightboxOpen(1, segmentImages);
-                                    }}
-                                    className="relative w-16 h-16 rounded-md overflow-hidden border border-border/50 hover:border-primary/50 transition-colors group"
-                                    title="View end image"
-                                >
-                                    <img 
-                                        src={segmentImages.end.url} 
-                                        alt="End frame"
-                                        className="w-full h-full object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                                    <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">End</span>
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                <div className="space-y-2 flex-1">
-                    <Label className="text-xs font-medium">Prompt:</Label>
-                    <Textarea
-                        value={params.base_prompt || params.prompt || ''}
-                        onChange={(e) => {
-                            // Update both base_prompt and prompt to keep them in sync
-                            setParams(prev => ({
-                                ...prev,
-                                base_prompt: e.target.value,
-                                prompt: e.target.value
-                            }));
-                            setIsDirty(true);
-                        }}
-                        className="h-20 text-sm resize-none"
-                        placeholder="Describe this segment..."
-                        clearable
-                        onClear={() => {
-                            setParams(prev => ({ ...prev, base_prompt: '', prompt: '' }));
-                            setIsDirty(true);
-                        }}
-                        voiceInput
-                        voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
-                        onVoiceResult={(result) => {
-                            setParams(prev => ({
-                                ...prev,
-                                base_prompt: result.prompt || result.transcription,
-                                prompt: result.prompt || result.transcription
-                            }));
-                            setIsDirty(true);
-                        }}
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <Label className="text-xs font-medium">Frames:</Label>
-                        <span className="text-xs text-muted-foreground">
-                            {params.num_frames || 0} ({framesToSeconds(params.num_frames || 0)})
-                        </span>
-                    </div>
-                    {/* Frame counts are quantized to 4N+1 format for Wan model compatibility */}
-                    <Slider
-                        value={[quantizeFrameCount(params.num_frames || 9, 9)]}
-                        onValueChange={([value]) => handleChange('num_frames', quantizeFrameCount(value, 9))}
-                        min={9}
-                        max={81}
-                        step={4}
-                        className="w-full"
-                    />
-                </div>
-
-                <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-                    <CollapsibleTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-between h-9 text-xs font-medium"
-                        >
-                            <span>Advanced Settings</span>
-                            {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-4 pt-3">
-                        {/* Generation Settings Section */}
-                        <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
-                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Generation Settings:</Label>
-                            
-                            {/* Negative Prompt */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-medium">Negative Prompt:</Label>
-                                <Textarea
-                                    value={params.negative_prompt || ''}
-                                    onChange={(e) => handleChange('negative_prompt', e.target.value)}
-                                    className="h-16 text-xs resize-none"
-                                    placeholder="Things to avoid..."
-                                    clearable
-                                    onClear={() => handleChange('negative_prompt', '')}
-                                    voiceInput
-                                    voiceContext="This is a negative prompt - things to AVOID in video generation. List unwanted qualities as a comma-separated list."
-                                    onVoiceResult={(result) => {
-                                        handleChange('negative_prompt', result.prompt || result.transcription);
-                                    }}
-                                />
-                            </div>
-
-                            {/* Model & Resolution Info (read-only) */}
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div className="flex flex-col">
-                                    <span className="text-muted-foreground">Model</span>
-                                    <span className="font-medium truncate" title={params.model_name || 'Default'}>
-                                        {(params.model_name || 'wan_2_2_i2v').replace('wan_2_2_', '').replace(/_/g, ' ')}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-muted-foreground">Resolution</span>
-                                    <span className="font-medium">
-                                        {params.parsed_resolution_wh || params.orchestrator_details?.parsed_resolution_wh || 'Auto'}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Seed Info */}
-                            <div className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground">Seed</span>
-                                <span className="font-mono font-medium">
-                                    {params.seed_to_use || params.orchestrator_details?.seed_base || 'Random'}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Motion Settings - Using shared MotionPresetSelector */}
-                        <MotionPresetSelector
-                            builtinPreset={builtinPreset}
-                            featuredPresetIds={[]}
-                            generationTypeMode={generationMode}
-                            selectedPhasePresetId={selectedPhasePresetId}
-                            phaseConfig={phaseConfig ?? builtinPreset.metadata.phaseConfig}
-                            motionMode={motionMode}
-                            onPresetSelect={handlePhasePresetSelect}
-                            onPresetRemove={handlePhasePresetRemove}
-                            onModeChange={handleMotionModeChange}
-                            onPhaseConfigChange={handlePhaseConfigChange}
-                            availableLoras={availableLoras}
-                            randomSeed={randomSeed}
-                            onRandomSeedChange={handleRandomSeedChange}
-                            queryKeyPrefix={`segment-${index}-presets`}
-                            renderBasicModeContent={() => (
-                                <div className="space-y-3">
-                                    <ActiveLoRAsDisplay
-                                        selectedLoras={selectedLoras}
-                                        onRemoveLora={handleRemoveLora}
-                                        onLoraStrengthChange={handleLoraStrengthChange}
-                                        availableLoras={availableLoras}
-                                    />
-                                    <button
-                                        onClick={handleAddLoraClick}
-                                        className="w-full text-sm text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 rounded-lg py-2 transition-colors"
-                                    >
-                                        Add or manage LoRAs
-                                    </button>
-                                </div>
-                            )}
-                        />
-                        
-                        {/* LoRA Selector Modal */}
-                        <LoraSelectorModal
-                            isOpen={isLoraModalOpen}
-                            onClose={() => setIsLoraModalOpen(false)}
-                            onSelect={handleLoraSelect}
-                            availableLoras={availableLoras}
-                            selectedLoras={selectedLoras.map(l => l.id)}
-                        />
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* Regenerate Segment Button */}
-                <Button
-                    size="sm"
-                    onClick={handleRegenerateSegment}
-                    disabled={isRegenerating}
-                    className="w-full gap-2"
-                    variant={regenerateSuccess ? "outline" : "default"}
-                >
-                    {isRegenerating ? (
-                        <>
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Starting...
-                        </>
-                    ) : regenerateSuccess ? (
-                        <>
-                            <Check className="w-3 h-3 text-green-500" />
-                            Task Created
-                        </>
-                    ) : (
-                        <>
-                            <RotateCcw className="w-3 h-3" />
-                            Regenerate Segment
-                        </>
-                    )}
-                </Button>
+            {/* Settings Form - Using shared SegmentRegenerateControls */}
+            <CardContent className="p-4 flex-1 flex flex-col">
+                <SegmentRegenerateControls
+                    initialParams={child.params || {}}
+                    projectId={projectId}
+                    generationId={parentGenerationId}
+                    childGenerationId={child.id}
+                    segmentIndex={index}
+                    startImageUrl={segmentImages.start?.url}
+                    endImageUrl={segmentImages.end?.url}
+                    startImageGenerationId={segmentImages.start?.generationId}
+                    endImageGenerationId={segmentImages.end?.generationId}
+                    projectResolution={projectResolution}
+                    queryKeyPrefix={`segment-${index}-presets`}
+                    onStartImageClick={segmentImages.start ? () => {
+                        console.log('[SegmentImageFlow] START image clicked for segment', index);
+                        onImageLightboxOpen(0, segmentImages);
+                    } : undefined}
+                    onEndImageClick={segmentImages.end ? () => {
+                        console.log('[SegmentImageFlow] END image clicked for segment', index);
+                        onImageLightboxOpen(1, segmentImages);
+                    } : undefined}
+                    buttonLabel="Regenerate Segment"
+                />
             </CardContent>
         </Card>
     );
