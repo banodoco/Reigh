@@ -1658,18 +1658,29 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 strength: lora.strength,
             }));
 
-            // Build originalParams with current project resolution if available
-            // This ensures regenerated segments use the project's aspect ratio settings
-            const paramsWithResolution = projectResolution 
+            // CRITICAL: Preserve the original segment's resolution to avoid dimension mismatches
+            // Only fall back to project resolution if the original doesn't have one
+            const originalResolution = params.parsed_resolution_wh ||
+                                       params.orchestrator_details?.parsed_resolution_wh;
+            const finalResolution = originalResolution || projectResolution;
+
+            const paramsWithResolution = finalResolution
                 ? {
                     ...params,
-                    parsed_resolution_wh: projectResolution,
+                    parsed_resolution_wh: finalResolution,
                     orchestrator_details: {
                         ...(params.orchestrator_details || {}),
-                        parsed_resolution_wh: projectResolution,
+                        parsed_resolution_wh: finalResolution,
                     },
                 }
                 : params;
+
+            console.log('[RegenerateSegment] Resolution resolution:', {
+                originalResolution,
+                projectResolution,
+                finalResolution,
+                usingOriginal: !!originalResolution,
+            });
 
             // CRITICAL: Log the exact prompt values being sent from UI state
             // This ensures the user-input prompts are the ones actually sent
