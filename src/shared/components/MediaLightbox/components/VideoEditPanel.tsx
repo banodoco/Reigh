@@ -147,8 +147,8 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
-            <Scissors className="h-4 w-4" />
-            Trim
+            <Scissors className="h-3.5 w-3.5" />
+            <span className="truncate">Trim Video</span>
           </button>
           <button
             onClick={onEnterReplaceMode}
@@ -159,8 +159,8 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
-            <RefreshCw className="h-4 w-4" />
-            Replace
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span className="truncate">Replace Portion</span>
           </button>
           <button
             onClick={onEnterRegenerateMode}
@@ -171,8 +171,8 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
-            <RotateCcw className="h-4 w-4" />
-            Regenerate
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span className="truncate">Regenerate Video</span>
           </button>
         </div>
       </div>
