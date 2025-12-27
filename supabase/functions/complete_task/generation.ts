@@ -495,8 +495,8 @@ export async function createGenerationFromTask(
     }
 
     // ===== SPECIAL CASE HANDLERS =====
-    
-    // SPECIAL CASE 1: individual_travel_segment with child_generation_id
+
+    // SPECIAL CASE 1a: individual_travel_segment with child_generation_id - create variant on existing child
     if (taskData.task_type === TASK_TYPES.INDIVIDUAL_TRAVEL_SEGMENT && taskData.params?.child_generation_id) {
       const childGenId = taskData.params.child_generation_id;
       console.log(`[GenMigration] individual_travel_segment - creating variant for child generation ${childGenId}`);
@@ -516,11 +516,35 @@ export async function createGenerationFromTask(
         };
 
         await createVariant(supabase, childGen.id, publicUrl, thumbnailUrl || null, variantParams, true, VARIANT_TYPES.INDIVIDUAL_SEGMENT, null);
-        
+
         console.log(`[GenMigration] Successfully created variant for child generation ${childGenId}`);
 
         await supabase.from('tasks').update({ generation_created: true }).eq('id', taskId);
         return childGen;
+      }
+    }
+
+    // SPECIAL CASE 1b: individual_travel_segment with parent_generation_id but NO child_generation_id
+    // This creates a NEW child generation under the parent (from MediaLightbox Regenerate tab)
+    // We set parentGenerationId/isChild/childOrder here and fall through to standard generation creation
+    let individualSegmentParentId: string | null = null;
+    let individualSegmentChildOrder: number | null = null;
+
+    if (taskData.task_type === TASK_TYPES.INDIVIDUAL_TRAVEL_SEGMENT && !taskData.params?.child_generation_id) {
+      const parentGenId = taskData.params?.parent_generation_id ||
+                          taskData.params?.orchestrator_details?.parent_generation_id;
+
+      if (parentGenId) {
+        console.log(`[GenMigration] individual_travel_segment (new child) - will create child generation under parent ${parentGenId}`);
+
+        // Get the segment_index for child_order
+        const segmentIndex = taskData.params?.segment_index;
+        individualSegmentChildOrder = segmentIndex !== undefined && segmentIndex !== null
+          ? parseInt(String(segmentIndex), 10)
+          : null;
+        individualSegmentParentId = parentGenId;
+
+        console.log(`[GenMigration] individual_travel_segment will use parent_generation_id=${parentGenId}, child_order=${individualSegmentChildOrder}`);
       }
     }
 
@@ -666,6 +690,11 @@ export async function createGenerationFromTask(
       }
     }
 
+    // Use individualSegmentParentId/childOrder from SPECIAL CASE 1b if set, otherwise fall back to orchestrator values
+    const finalParentGenerationId = individualSegmentParentId || parentGenerationId;
+    const finalIsChild = !!individualSegmentParentId || isChild;
+    const finalChildOrder = individualSegmentChildOrder ?? childOrder;
+
     const generationRecord = {
       id: newGenerationId,
       tasks: [taskId],
@@ -676,9 +705,9 @@ export async function createGenerationFromTask(
       thumbnail_url: thumbnailUrl,
       name: generationName,
       based_on: basedOnGenerationId,
-      parent_generation_id: parentGenerationId,
-      is_child: isChild,
-      child_order: childOrder,
+      parent_generation_id: finalParentGenerationId,
+      is_child: finalIsChild,
+      child_order: finalChildOrder,
       created_at: new Date().toISOString()
     };
 
@@ -691,7 +720,7 @@ export async function createGenerationFromTask(
     // The ChildGenerationsView component fetches children correctly using the parent_generation_id relationship.
 
     // Link to shot if applicable (not for child generations)
-    if (shotId && !isChild) {
+    if (shotId && !finalIsChild) {
       await linkGenerationToShot(supabase, shotId, newGeneration.id, addInPosition);
     }
 

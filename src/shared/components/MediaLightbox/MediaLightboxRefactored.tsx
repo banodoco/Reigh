@@ -1133,6 +1133,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     const staleResolution = taskParams.parsed_resolution_wh || orchestratorDetails.parsed_resolution_wh;
     const resolution = effectiveRegenerateResolution || staleResolution;
 
+    // For child segments, use the parent generation ID (not the segment's own ID)
+    // This ensures new regenerations are linked to the correct parent
+    const parentGenerationId = orchestratorDetails.parent_generation_id ||
+                               taskParams.parent_generation_id ||
+                               actualGenerationId;
+
     console.log('[MediaLightbox] [ResolutionDebug] regenerateForm resolution computation:', {
       effectiveRegenerateResolution,
       taskParamsResolution: taskParams.parsed_resolution_wh,
@@ -1140,13 +1146,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       staleResolution,
       finalResolution: resolution,
       source: effectiveRegenerateResolution ? 'SHOT' : 'STALE_PARAMS',
+      parentGenerationId,
+      actualGenerationId,
+      isChildSegment: parentGenerationId !== actualGenerationId,
     });
 
     return (
       <SegmentRegenerateForm
         params={taskParams}
         projectId={selectedProjectId || null}
-        generationId={actualGenerationId}
+        generationId={parentGenerationId}
         segmentIndex={taskParams.segment_index ?? 0}
         startImageUrl={startImageUrl}
         endImageUrl={endImageUrl}
