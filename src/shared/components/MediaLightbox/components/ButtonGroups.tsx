@@ -9,10 +9,7 @@ import {
   ImagePlus,
   Pencil,
   ArrowUpCircle,
-  Eye,
-  EyeOff,
   Trash2,
-  X,
   Film,
   ArrowRight,
 } from 'lucide-react';
@@ -159,9 +156,9 @@ interface BottomLeftControlsProps extends BaseButtonGroupProps {
   isUpscaling: boolean;
   isPendingUpscale: boolean;
   hasUpscaledVersion: boolean;
-  showingUpscaled: boolean;
+  showingUpscaled: boolean; // Kept for API compatibility, but not used
   handleUpscale: () => Promise<void>;
-  handleToggleUpscaled: () => void;
+  handleToggleUpscaled: () => void; // Kept for API compatibility, but not used
 }
 
 export const BottomLeftControls: React.FC<BottomLeftControlsProps> = ({
@@ -173,9 +170,7 @@ export const BottomLeftControls: React.FC<BottomLeftControlsProps> = ({
   isUpscaling,
   isPendingUpscale,
   hasUpscaledVersion,
-  showingUpscaled,
   handleUpscale,
-  handleToggleUpscaled,
 }) => {
   if (isSpecialEditMode) {
     return null;
@@ -186,16 +181,21 @@ export const BottomLeftControls: React.FC<BottomLeftControlsProps> = ({
     return null;
   }
 
+  // Don't show button if already upscaled (no toggle functionality)
+  if (hasUpscaledVersion) {
+    return null;
+  }
+
   return (
     <div className="absolute bottom-4 left-4 flex items-center space-x-2 z-10">
-      {/* Upscale Button */}
+      {/* Upscale Button - only shows when not yet upscaled */}
       <Tooltip>
         <TooltipTrigger asChild>
           <span>
             <Button
               variant="secondary"
               size="sm"
-              onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
+              onClick={handleUpscale}
               disabled={isUpscaling || isPendingUpscale}
               className={cn(
                 "transition-colors text-white",
@@ -206,8 +206,6 @@ export const BottomLeftControls: React.FC<BottomLeftControlsProps> = ({
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : isPendingUpscale ? (
                 <CheckCircle className="h-4 w-4" />
-              ) : hasUpscaledVersion ? (
-                showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
               ) : (
                 <ArrowUpCircle className="h-4 w-4" />
               )}
@@ -215,7 +213,7 @@ export const BottomLeftControls: React.FC<BottomLeftControlsProps> = ({
           </span>
         </TooltipTrigger>
         <TooltipContent className="z-[100001]">
-          {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
+          {isUpscaling ? 'Creating upscale task...' : isPendingUpscale ? 'Upscale in progress' : 'Upscale image'}
         </TooltipContent>
       </Tooltip>
     </div>

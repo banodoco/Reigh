@@ -40,31 +40,37 @@ export const useUpscale = ({
   isVideo,
 }: UseUpscaleProps): UseUpscaleReturn => {
   const [isUpscaling, setIsUpscaling] = useState(false);
-  const [showingUpscaled, setShowingUpscaled] = useState(true); // Default to showing primary (which is upscaled after upscale)
-  
+
   // With variants, the media.url IS already the best version (primary variant)
   // We can detect if it's been upscaled by checking the name or variant info
   // For now, check if name includes 'Upscaled' as a heuristic
-  const hasUpscaledVersion = (media as any).name === 'Upscaled' || 
+  const hasUpscaledVersion = (media as any).name === 'Upscaled' ||
                              (media as any).variant_type === 'upscaled';
-  
+
   // The URL from media is already the primary variant (upscaled if available)
   const primaryUrl = (media as any).url || media.imageUrl || media.location || '';
-  
+
   // Track pending upscale tasks using localStorage
-  const [isPendingUpscale, setIsPendingUpscale] = useState(() => {
+  const [isPendingUpscale, setIsPendingUpscale] = useState(false);
+
+  // Reset state when media.id changes (navigation between items)
+  useEffect(() => {
+    // Reset isUpscaling when navigating to a new item
+    setIsUpscaling(false);
+
+    // Check localStorage for pending state for this specific media item
     try {
       const pending = localStorage.getItem(`upscale-pending-${media.id}`);
-      console.log('[ImageUpscale] Initial pending state from localStorage:', {
+      console.log('[ImageUpscale] Media changed, checking pending state:', {
         mediaId: media.id,
         pending,
         isPending: pending === 'true'
       });
-      return pending === 'true';
+      setIsPendingUpscale(pending === 'true');
     } catch {
-      return false;
+      setIsPendingUpscale(false);
     }
-  });
+  }, [media.id]);
 
   // Log upscale state changes
   useEffect(() => {
@@ -73,12 +79,10 @@ export const useUpscale = ({
       hasUpscaledVersion,
       isPendingUpscale,
       isUpscaling,
-      showingUpscaled,
       mediaName: (media as any).name,
-      mediaKeys: Object.keys(media),
       timestamp: Date.now()
     });
-  }, [media.id, hasUpscaledVersion, isPendingUpscale, isUpscaling, showingUpscaled, media]);
+  }, [media.id, hasUpscaledVersion, isPendingUpscale, isUpscaling, media]);
 
   // Clear pending state when upscaled version becomes available
   // With variants, we detect this by checking if the media name changed to 'Upscaled'
@@ -155,14 +159,11 @@ export const useUpscale = ({
     }
   };
 
-  // Handle toggling between upscaled and original
-  // NOTE: With variants, this would need to switch the primary variant
-  // For now, this is a no-op since location already points to the best version
+  // Toggle functionality removed - always show the best version (upscaled if available)
+  // The variant system means media.location already points to the primary (upscaled) version
   const handleToggleUpscaled = () => {
-    // TODO: Implement variant switching when UI is ready
-    // For now, just toggle the state (doesn't change the actual image shown)
-    setShowingUpscaled(!showingUpscaled);
-    console.log('[ImageUpscale] Toggle requested - variant switching not yet implemented');
+    // No-op - toggle removed, keeping for API compatibility
+    console.log('[ImageUpscale] Toggle removed - always showing best version');
   };
 
   // The effective URL is always the primary URL (which is upscaled if that's primary)
@@ -181,7 +182,7 @@ export const useUpscale = ({
 
   return {
     isUpscaling,
-    showingUpscaled,
+    showingUpscaled: true, // Always show best version (toggle removed)
     isPendingUpscale,
     hasUpscaledVersion,
     upscaledUrl: hasUpscaledVersion ? primaryUrl : null, // If upscaled is primary, the URL is the upscaled one
