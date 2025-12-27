@@ -312,7 +312,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium flex items-center gap-2">
                     <Wand2 className="w-5 h-5 text-primary" />
-                    {selections.length > 1 ? 'Regenerate Portions' : 'Regenerate Portion'}
+                    {selections.length > 1 ? 'Replace Portions' : 'Replace Portion'}
                 </h3>
                 {onClose && (
                     <Button

@@ -85,6 +85,10 @@ export interface SegmentRegenerateControlsProps {
   onEndImageClick?: () => void;
   /** Button label text */
   buttonLabel?: string;
+  /** Whether to show a header (default: false) */
+  showHeader?: boolean;
+  /** Custom header title (default: "Regenerate Video") */
+  headerTitle?: string;
 }
 
 export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps> = ({
@@ -102,6 +106,8 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   onStartImageClick,
   onEndImageClick,
   buttonLabel = 'Regenerate Segment',
+  showHeader = false,
+  headerTitle = 'Regenerate Video',
 }) => {
   const { toast } = useToast();
 
@@ -375,6 +381,16 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
   return (
     <div className="space-y-4">
+      {/* Header */}
+      {showHeader && (
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-medium flex items-center gap-2">
+            <RotateCcw className="w-5 h-5 text-primary" />
+            {headerTitle}
+          </h3>
+        </div>
+      )}
+
       {/* Input Images with Frames Slider in between */}
       {(startImageUrl || endImageUrl) && (
         <div className="flex items-center gap-2">
