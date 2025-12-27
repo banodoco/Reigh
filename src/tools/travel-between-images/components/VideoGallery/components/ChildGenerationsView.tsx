@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { Card, CardContent } from '@/shared/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1901,10 +1902,35 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
     return (
         <Card className="overflow-hidden flex flex-col">
             {/* Video Preview */}
-            <div 
+            <div
                 className="relative bg-black group"
                 style={aspectRatioStyle}
             >
+                    {/* Top right overlay - Variant count and NEW badge */}
+                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+                        {/* NEW badge - shown if created within last 2 minutes */}
+                        {child.created_at && (Date.now() - new Date(child.created_at).getTime()) < 2 * 60 * 1000 && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-green-500 text-white rounded font-semibold">
+                                NEW
+                            </span>
+                        )}
+                        {/* Variant count badge */}
+                        {(child as any).derivedCount && (child as any).derivedCount > 0 && (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="h-6 w-6 rounded-full bg-black/50 text-white text-[10px] font-medium flex items-center justify-center backdrop-blur-sm cursor-help">
+                                            {(child as any).derivedCount}
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                        <p>{(child as any).derivedCount} variant{(child as any).derivedCount !== 1 ? 's' : ''}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
+                    </div>
+
                     {/* Trim button - bottom right overlay, appears on hover */}
                     <Button
                         variant="secondary"
