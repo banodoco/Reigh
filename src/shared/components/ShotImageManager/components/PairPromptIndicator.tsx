@@ -24,7 +24,7 @@ interface PairPromptIndicatorProps {
  * PairPromptIndicator - Shows a visual indicator between consecutive images in batch/mobile views
  * Displays pair information and can be clicked to open the PairPromptModal
  */
-export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
+const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
   pairIndex,
   frames,
   startFrame,
@@ -151,4 +151,25 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
     </div>
   );
 };
+
+// Memoize to prevent re-renders when only callbacks change (which are inline in parent)
+export const PairPromptIndicator = React.memo(
+  PairPromptIndicatorComponent,
+  (prevProps, nextProps) => {
+    // Only compare value props, not callbacks (which are unstable inline functions)
+    return (
+      prevProps.pairIndex === nextProps.pairIndex &&
+      prevProps.frames === nextProps.frames &&
+      prevProps.startFrame === nextProps.startFrame &&
+      prevProps.endFrame === nextProps.endFrame &&
+      prevProps.pairPrompt === nextProps.pairPrompt &&
+      prevProps.pairNegativePrompt === nextProps.pairNegativePrompt &&
+      prevProps.enhancedPrompt === nextProps.enhancedPrompt &&
+      prevProps.defaultPrompt === nextProps.defaultPrompt &&
+      prevProps.defaultNegativePrompt === nextProps.defaultNegativePrompt &&
+      prevProps.isMobile === nextProps.isMobile &&
+      prevProps.className === nextProps.className
+    );
+  }
+);
 
