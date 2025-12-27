@@ -1658,11 +1658,12 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 strength: lora.strength,
             }));
 
-            // CRITICAL: Preserve the original segment's resolution to avoid dimension mismatches
-            // Only fall back to project resolution if the original doesn't have one
-            const originalResolution = params.parsed_resolution_wh ||
-                                       params.orchestrator_details?.parsed_resolution_wh;
-            const finalResolution = originalResolution || projectResolution;
+            // CRITICAL: Always use the CURRENT project resolution for regeneration
+            // The orchestrator_details.parsed_resolution_wh may be stale (from an old orchestrator run)
+            // We want regenerated segments to match the current project dimensions
+            const staleResolution = params.parsed_resolution_wh ||
+                                    params.orchestrator_details?.parsed_resolution_wh;
+            const finalResolution = projectResolution || staleResolution;
 
             const paramsWithResolution = finalResolution
                 ? {
@@ -1675,11 +1676,11 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                 }
                 : params;
 
-            console.log('[RegenerateSegment] Resolution resolution:', {
-                originalResolution,
+            console.log('[RegenerateSegment] Resolution:', {
+                staleResolution,
                 projectResolution,
                 finalResolution,
-                usingOriginal: !!originalResolution,
+                usingProjectResolution: !!projectResolution,
             });
 
             // CRITICAL: Log the exact prompt values being sent from UI state
