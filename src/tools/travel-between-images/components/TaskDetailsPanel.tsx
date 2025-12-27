@@ -36,14 +36,14 @@ interface TaskDetailsPanelProps {
   showUserImage?: boolean;
 }
 
-const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ 
-  task, 
-  isLoading, 
-  error, 
-  inputImages, 
-  replaceImages, 
-  onReplaceImagesChange, 
-  onApplySettingsFromTask, 
+const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
+  task,
+  isLoading,
+  error,
+  inputImages,
+  replaceImages,
+  onReplaceImagesChange,
+  onApplySettingsFromTask,
   taskId,
   className = "",
   basedOnSection,
@@ -58,6 +58,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   const [showDetailedParams, setShowDetailedParams] = useState(false);
   const [showAllImages, setShowAllImages] = useState(false);
   const [showFullPrompt, setShowFullPrompt] = useState(false);
+  const [idCopied, setIdCopied] = useState(false);
   const [showFullNegativePrompt, setShowFullNegativePrompt] = useState(false);
   const [paramsCopied, setParamsCopied] = useState(false);
   
@@ -128,7 +129,25 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   return (
     <div className={`flex flex-col h-full ${className}`}>
       <div className="flex-shrink-0 p-4 border-b">
-        <h3 className="text-lg font-light">Generation Task Details</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-light">Generation Task Details</h3>
+          {taskId && (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(taskId);
+                setIdCopied(true);
+                setTimeout(() => setIdCopied(false), 2000);
+              }}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                idCopied
+                  ? "text-green-400"
+                  : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+              }`}
+            >
+              {idCopied ? 'copied' : 'id'}
+            </button>
+          )}
+        </div>
       </div>
       
       <ScrollArea className="flex-1 p-4 overflow-y-auto">

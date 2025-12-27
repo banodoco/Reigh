@@ -60,6 +60,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const [showFullPrompt, setShowFullPrompt] = useState(false);
   const [showFullNegativePrompt, setShowFullNegativePrompt] = useState(false);
   const [paramsCopied, setParamsCopied] = useState(false);
+  const [idCopied, setIdCopied] = useState(false);
 
   // Use the new hooks
   const getTaskIdMutation = useGetTaskIdForGeneration();
@@ -172,7 +173,25 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
       >
         <div className={modal.headerClass}>
           <DialogHeader>
-            <DialogTitle className="text-xl font-light">Generation Task Details</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-xl font-light">Generation Task Details</DialogTitle>
+              {taskId && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(taskId);
+                    setIdCopied(true);
+                    setTimeout(() => setIdCopied(false), 2000);
+                  }}
+                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                    idCopied
+                      ? "text-green-400"
+                      : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                  }`}
+                >
+                  {idCopied ? 'copied' : 'id'}
+                </button>
+              )}
+            </div>
             <p id="task-details-description" className="sr-only">
               View details about the task that generated this video, including input images, settings, and parameters.
             </p>
