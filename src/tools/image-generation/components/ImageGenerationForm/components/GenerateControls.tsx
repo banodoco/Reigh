@@ -161,8 +161,8 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
           : isGenerating
             ? "Creating tasks..."
             : normalizedPromptMode === 'automated'
-              ? `${imagesPerPrompt} New Prompts → ${imagesPerPrompt * promptMultiplier} Images`
-              : `Generate ${imagesPerPrompt * actionablePromptsCount} ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
+              ? `Generate ${imagesPerPrompt * promptMultiplier} New ${imagesPerPrompt * promptMultiplier === 1 ? 'Image' : 'Images'}`
+              : `Generate ${imagesPerPrompt * actionablePromptsCount} New ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
       </Button>
 
       {/* Existing prompts buttons - only shown in automated mode when there are non-empty prompts */}
