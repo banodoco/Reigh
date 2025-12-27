@@ -152,7 +152,6 @@ export const useVariants = ({
         });
       }
       
-      toast.success('Set as primary variant');
     },
     onError: (error) => {
       console.error('[useVariants] Failed to set primary variant:', error);

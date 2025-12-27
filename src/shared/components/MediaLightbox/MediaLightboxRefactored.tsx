@@ -5,7 +5,8 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -79,6 +80,7 @@ import {
   ControlsPanel,
   VideoEditModeDisplay,
   VideoTrimModeDisplay,
+  SegmentRegenerateForm,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -253,6 +255,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // REFACTORED: All logic extracted to hooks
   // ========================================
 
+  // Debug log for shotId prop
+  console.log('[MediaLightbox] [ResolutionDebug] Props received:', {
+    shotId: shotId?.substring(0, 8),
+    mediaId: media?.id?.substring(0, 8),
+    isVideo: media?.type === 'video' || media?.location?.includes('.mp4'),
+  });
+
   // Refs
   const contentRef = useRef<HTMLDivElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -285,8 +294,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const isCloudMode = generationMethods.inCloud;
 
   // Video edit mode - unified state for video editing with sub-modes (like image edit has text/inpaint/annotate/reposition)
-  // Sub-modes: 'trim' for trimming video, 'regenerate' for portion regeneration
-  const [videoEditSubMode, setVideoEditSubMode] = useState<'trim' | 'regenerate' | null>(
+  // Sub-modes: 'trim' for trimming video, 'replace' for portion replacement, 'regenerate' for full regeneration
+  const [videoEditSubMode, setVideoEditSubMode] = useState<'trim' | 'replace' | 'regenerate' | null>(
     initialVideoTrimMode ? 'trim' : null
   );
 
@@ -1033,6 +1042,121 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     return taskDetailsData;
   }, [taskDetailsData, activeVariant]);
 
+  // Fetch shot's aspect ratio for regeneration resolution (shot resolution > project resolution)
+  const { data: shotAspectRatioData, isLoading: isLoadingShotAspectRatio } = useQuery({
+    queryKey: ['shot-aspect-ratio', shotId],
+    queryFn: async () => {
+      if (!shotId) return null;
+      console.log('[MediaLightbox] [ResolutionDebug] Fetching shot aspect ratio for:', shotId?.substring(0, 8));
+      const { data, error } = await supabase
+        .from('shots')
+        .select('aspect_ratio')
+        .eq('id', shotId)
+        .single();
+      if (error) {
+        console.warn('[MediaLightbox] [ResolutionDebug] Error fetching shot aspect ratio:', error);
+        return null;
+      }
+      console.log('[MediaLightbox] [ResolutionDebug] Shot aspect ratio fetched:', {
+        shotId: shotId?.substring(0, 8),
+        aspectRatio: data?.aspect_ratio,
+      });
+      return data?.aspect_ratio;
+    },
+    enabled: !!shotId && isVideo,
+    staleTime: 60000, // Cache for 1 minute
+  });
+
+  // Compute effective resolution for regeneration: shot > project > stale params
+  const effectiveRegenerateResolution = useMemo(() => {
+    // Handle both cached formats: string (from this query) or object (from ChildGenerationsView cache)
+    const aspectRatio = typeof shotAspectRatioData === 'string'
+      ? shotAspectRatioData
+      : shotAspectRatioData?.aspect_ratio;
+
+    console.log('[MediaLightbox] [ResolutionDebug] Computing effectiveRegenerateResolution:', {
+      shotId: shotId?.substring(0, 8),
+      shotAspectRatioData,
+      resolvedAspectRatio: aspectRatio,
+      isLoadingShotAspectRatio,
+      isVideo,
+    });
+
+    // Priority 1: Shot's aspect ratio
+    if (aspectRatio) {
+      const shotResolution = ASPECT_RATIO_TO_RESOLUTION[aspectRatio];
+      console.log('[MediaLightbox] [ResolutionDebug] Shot aspect ratio lookup:', {
+        aspectRatio,
+        mappedResolution: shotResolution,
+        availableRatios: Object.keys(ASPECT_RATIO_TO_RESOLUTION),
+      });
+      if (shotResolution) {
+        console.log('[MediaLightbox] [ResolutionDebug] ✅ Using SHOT resolution for regeneration:', {
+          shotId: shotId?.substring(0, 8),
+          aspectRatio,
+          resolution: shotResolution
+        });
+        return shotResolution;
+      }
+    }
+    // Priority 2: Fall back to project resolution (handled in SegmentRegenerateForm)
+    console.log('[MediaLightbox] [ResolutionDebug] ⚠️ No shot resolution, will use project/params fallback');
+    return undefined;
+  }, [shotAspectRatioData, shotId, isLoadingShotAspectRatio, isVideo]);
+
+  // Create regenerate form for video edit panel
+  const regenerateForm = useMemo(() => {
+    if (!isVideo || !adjustedTaskDetailsData?.task?.params) {
+      console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (not video or no params)', {
+        isVideo,
+        hasTaskParams: !!adjustedTaskDetailsData?.task?.params,
+      });
+      return null;
+    }
+
+    const taskParams = adjustedTaskDetailsData.task.params as Record<string, any>;
+    const orchestratorDetails = taskParams.orchestrator_details || {};
+
+    // Extract input image URLs and generation IDs from task params
+    const inputImagePaths = taskParams.input_image_paths_resolved ||
+                           orchestratorDetails.input_image_paths_resolved || [];
+    const inputImageGenIds = taskParams.input_image_generation_ids ||
+                            orchestratorDetails.input_image_generation_ids || [];
+
+    // For video regeneration, use first and last images (or first two for single segment)
+    const startImageUrl = inputImagePaths[0];
+    const endImageUrl = inputImagePaths.length > 1 ? inputImagePaths[inputImagePaths.length - 1] : inputImagePaths[0];
+    const startImageGenId = inputImageGenIds[0];
+    const endImageGenId = inputImageGenIds.length > 1 ? inputImageGenIds[inputImageGenIds.length - 1] : inputImageGenIds[0];
+
+    // Resolution priority: shot > project (effectiveRegenerateResolution) > stale params
+    const staleResolution = taskParams.parsed_resolution_wh || orchestratorDetails.parsed_resolution_wh;
+    const resolution = effectiveRegenerateResolution || staleResolution;
+
+    console.log('[MediaLightbox] [ResolutionDebug] regenerateForm resolution computation:', {
+      effectiveRegenerateResolution,
+      taskParamsResolution: taskParams.parsed_resolution_wh,
+      orchestratorResolution: orchestratorDetails.parsed_resolution_wh,
+      staleResolution,
+      finalResolution: resolution,
+      source: effectiveRegenerateResolution ? 'SHOT' : 'STALE_PARAMS',
+    });
+
+    return (
+      <SegmentRegenerateForm
+        params={taskParams}
+        projectId={selectedProjectId || null}
+        generationId={actualGenerationId}
+        segmentIndex={taskParams.segment_index ?? 0}
+        startImageUrl={startImageUrl}
+        endImageUrl={endImageUrl}
+        startImageGenerationId={startImageGenId}
+        endImageGenerationId={endImageGenId}
+        projectResolution={resolution}
+      />
+    );
+  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution]);
+
   // Handle entering video edit mode (unified) - defaults to trim sub-mode
   const handleEnterVideoEditMode = useCallback(() => {
     setVideoEditSubMode('trim');
@@ -1074,10 +1198,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }, 100);
   }, [videoEditing, onTrimModeChange, setVideoDuration]);
 
-  // Handle switching to regenerate sub-mode
+  // Handle switching to replace (portion) sub-mode
+  const handleEnterVideoReplaceMode = useCallback(() => {
+    setVideoEditSubMode('replace');
+    videoEditing.setIsVideoEditMode(true);
+    resetTrim();
+  }, [videoEditing, resetTrim]);
+
+  // Handle switching to regenerate (full segment) sub-mode
   const handleEnterVideoRegenerateMode = useCallback(() => {
     setVideoEditSubMode('regenerate');
-    videoEditing.setIsVideoEditMode(true);
+    videoEditing.setIsVideoEditMode(false);
     resetTrim();
   }, [videoEditing, resetTrim]);
 
@@ -1088,8 +1219,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     onTrimModeChange?.(false);
   }, [resetTrim, onTrimModeChange]);
 
-  // Track if we're in any video edit sub-mode (trim or regenerate)
+  // Track if we're in any video edit sub-mode (trim, replace, or regenerate)
   const isVideoTrimModeActive = isVideo && isVideoTrimMode;
+  const isVideoReplaceModeActive = isVideo && videoEditSubMode === 'replace';
   const isVideoRegenerateModeActive = isVideo && videoEditSubMode === 'regenerate';
 
   // Track if we're in video edit mode (for regenerating portions) - sync with hook state
@@ -2137,6 +2269,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     // VideoEditPanel props
                     videoEditSubMode={videoEditSubMode}
                     onEnterTrimMode={handleEnterVideoTrimMode}
+                    onEnterReplaceMode={handleEnterVideoReplaceMode}
                     onEnterRegenerateMode={handleEnterVideoRegenerateMode}
                     onExitVideoEditMode={handleExitVideoEditMode}
                     trimState={trimState}
@@ -2155,6 +2288,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     trimVideoRef={trimVideoRef}
                     videoEditing={videoEditing}
                     projectId={selectedProjectId}
+                    regenerateForm={regenerateForm}
                     // EditModePanel props
                     sourceGenerationData={sourceGenerationData}
                     onOpenExternalGeneration={onOpenExternalGeneration}
@@ -2395,6 +2529,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     // VideoEditPanel props
                     videoEditSubMode={videoEditSubMode}
                     onEnterTrimMode={handleEnterVideoTrimMode}
+                    onEnterReplaceMode={handleEnterVideoReplaceMode}
                     onEnterRegenerateMode={handleEnterVideoRegenerateMode}
                     onExitVideoEditMode={handleExitVideoEditMode}
                     trimState={trimState}
@@ -2413,6 +2548,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     trimVideoRef={trimVideoRef}
                     videoEditing={videoEditing}
                     projectId={selectedProjectId}
+                    regenerateForm={regenerateForm}
                     // EditModePanel props
                     sourceGenerationData={sourceGenerationData}
                     onOpenExternalGeneration={onOpenExternalGeneration}

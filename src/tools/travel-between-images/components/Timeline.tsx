@@ -523,7 +523,6 @@ const Timeline: React.FC<TimelineProps> = ({
       // Call parent's onAddToShot with the target shot ID from the callback
       // Position is undefined to let the mutation calculate the correct position for the TARGET shot
       await onAddToShot(targetShotId as any, generationId as any, undefined as any);
-      toast.success('Added to shot');
       return true;
     } catch (error) {
       console.error('[Timeline] Error adding to shot:', error);
@@ -552,7 +551,6 @@ const Timeline: React.FC<TimelineProps> = ({
 
       // Call parent's onAddToShotWithoutPosition with the target shot ID from callback
       await onAddToShotWithoutPosition(targetShotId as any, generationId as any);
-      toast.success('Added to shot (unpositioned)');
       return true;
     } catch (error) {
       console.error('[Timeline] Error adding to shot without position:', error);

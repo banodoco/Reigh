@@ -212,7 +212,6 @@ export const useShotSettings = (
       if (sourceSettings) {
         // Apply all fields from source
         autoSave.updateFields(sourceSettings);
-        toast.success('Settings applied');
       } else {
         toast.error('Source shot has no settings');
       }
@@ -244,7 +243,6 @@ export const useShotSettings = (
       
       if (projectDefaults) {
         autoSave.updateFields(projectDefaults);
-        toast.success('Project defaults applied');
       } else {
         toast.error('Project has no default settings');
       }
@@ -258,7 +256,6 @@ export const useShotSettings = (
   const resetToDefaults = useCallback(() => {
     console.log('[useShotSettings] 🔄 Resetting to defaults');
     autoSave.updateFields(DEFAULT_SETTINGS);
-    toast.info('Settings reset to defaults');
   }, [autoSave]);
   
   // Memoize return value

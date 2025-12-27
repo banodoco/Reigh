@@ -59,3 +59,6 @@ export type { VideoEditModeDisplayProps } from './VideoEditModeDisplay';
 
 export { VideoTrimModeDisplay } from './VideoTrimModeDisplay';
 export type { VideoTrimModeDisplayProps, TrimState } from './VideoTrimModeDisplay';
+
+export { SegmentRegenerateForm } from './SegmentRegenerateForm';
+export type { SegmentRegenerateFormProps } from './SegmentRegenerateForm';

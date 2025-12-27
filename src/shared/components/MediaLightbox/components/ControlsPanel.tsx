@@ -29,10 +29,12 @@ export interface ControlsPanelProps extends ModeProps {
   variant: 'desktop' | 'mobile';
 
   // VideoEditPanel props
-  videoEditSubMode: 'trim' | 'regenerate' | null;
+  videoEditSubMode: 'trim' | 'replace' | 'regenerate' | null;
   onEnterTrimMode: () => void;
+  onEnterReplaceMode: () => void;
   onEnterRegenerateMode: () => void;
   onExitVideoEditMode: () => void;
+  regenerateForm?: React.ReactNode;
   // Trim props
   trimState: VideoEditPanelProps['trimState'];
   onStartTrimChange: VideoEditPanelProps['onStartTrimChange'];
@@ -134,8 +136,10 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     // VideoEditPanel props
     videoEditSubMode,
     onEnterTrimMode,
+    onEnterReplaceMode,
     onEnterRegenerateMode,
     onExitVideoEditMode,
+    regenerateForm,
     trimState,
     onStartTrimChange,
     onEndTrimChange,
@@ -231,6 +235,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         variant={variant}
         videoEditSubMode={videoEditSubMode}
         onEnterTrimMode={onEnterTrimMode}
+        onEnterReplaceMode={onEnterReplaceMode}
         onEnterRegenerateMode={onEnterRegenerateMode}
         onClose={onExitVideoEditMode}
         // Trim props
@@ -248,9 +253,11 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         videoUrl={videoUrl}
         trimCurrentTime={trimCurrentTime}
         trimVideoRef={trimVideoRef}
-        // Regenerate props
+        // Replace (portion) props
         videoEditing={videoEditing}
         projectId={projectId}
+        // Regenerate props
+        regenerateForm={regenerateForm}
         // Variants props
         variants={variants}
         activeVariantId={activeVariant?.id || null}

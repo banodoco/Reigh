@@ -2,14 +2,14 @@
  * VideoEditPanel Component
  *
  * Unified video editing panel for both desktop and mobile layouts.
- * Handles Trim and Regenerate sub-modes with variant display.
+ * Handles Trim, Replace Portion, and Regenerate sub-modes with variant display.
  *
  * Follows the same pattern as EditModePanel with variant prop for responsive behavior.
  */
 
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { Film, X, Scissors, RefreshCw } from 'lucide-react';
+import { Film, X, Scissors, RefreshCw, RotateCcw } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
 // Import video editing components
@@ -25,11 +25,14 @@ export interface VideoEditPanelProps {
   /** Layout variant */
   variant: 'desktop' | 'mobile';
 
-  /** Current sub-mode: trim or regenerate */
-  videoEditSubMode: 'trim' | 'regenerate';
+  /** Current sub-mode: trim, replace (portion replacement), or regenerate (full segment) */
+  videoEditSubMode: 'trim' | 'replace' | 'regenerate';
 
   /** Handler to switch to trim mode */
   onEnterTrimMode: () => void;
+
+  /** Handler to switch to replace (portion) mode */
+  onEnterReplaceMode: () => void;
 
   /** Handler to switch to regenerate mode */
   onEnterRegenerateMode: () => void;
@@ -53,9 +56,12 @@ export interface VideoEditPanelProps {
   trimCurrentTime: number;
   trimVideoRef: React.RefObject<HTMLVideoElement>;
 
-  // Regenerate mode props
+  // Replace (portion) mode props
   videoEditing: UseVideoEditingReturn;
   projectId: string | undefined;
+
+  // Regenerate mode props
+  regenerateForm?: React.ReactNode;
 
   // Variants props
   variants: GenerationVariant[];
@@ -69,6 +75,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   variant,
   videoEditSubMode,
   onEnterTrimMode,
+  onEnterReplaceMode,
   onEnterRegenerateMode,
   onClose,
   // Trim props
@@ -86,9 +93,11 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   videoUrl,
   trimCurrentTime,
   trimVideoRef,
-  // Regenerate props
+  // Replace (portion) props
   videoEditing,
   projectId,
+  // Regenerate props
+  regenerateForm,
   // Variants props
   variants,
   activeVariantId,
@@ -123,16 +132,16 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
         </div>
       )}
 
-      {/* Sub-mode selector: Trim | Regenerate */}
+      {/* Sub-mode selector: Trim | Replace | Regenerate */}
       <div className={cn(
         "px-4 pt-4 pb-2 flex-shrink-0",
         isMobile && "border-b border-border"
       )}>
-        <div className="grid grid-cols-2 gap-1 border border-border rounded-lg overflow-hidden bg-muted/30">
+        <div className="grid grid-cols-3 gap-1 border border-border rounded-lg overflow-hidden bg-muted/30">
           <button
             onClick={onEnterTrimMode}
             className={cn(
-              "flex items-center justify-center gap-1.5 px-3 py-2 text-sm transition-all",
+              "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
               videoEditSubMode === 'trim'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -142,15 +151,27 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
             Trim
           </button>
           <button
-            onClick={onEnterRegenerateMode}
+            onClick={onEnterReplaceMode}
             className={cn(
-              "flex items-center justify-center gap-1.5 px-3 py-2 text-sm transition-all",
-              videoEditSubMode === 'regenerate'
+              "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
+              videoEditSubMode === 'replace'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
             <RefreshCw className="h-4 w-4" />
+            Replace
+          </button>
+          <button
+            onClick={onEnterRegenerateMode}
+            className={cn(
+              "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
+              videoEditSubMode === 'regenerate'
+                ? "bg-background text-foreground font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+          >
+            <RotateCcw className="h-4 w-4" />
             Regenerate
           </button>
         </div>
@@ -158,7 +179,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
 
       {/* Sub-mode content */}
       <div className="flex-1 overflow-y-auto">
-        {videoEditSubMode === 'trim' ? (
+        {videoEditSubMode === 'trim' && (
           <TrimControlsPanel
             trimState={trimState}
             onStartTrimChange={onStartTrimChange}
@@ -178,7 +199,8 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
             videoRef={trimVideoRef}
             hideHeader
           />
-        ) : (
+        )}
+        {videoEditSubMode === 'replace' && (
           <VideoPortionEditor
             gapFrames={videoEditing.editSettings.settings.gapFrameCount || 12}
             setGapFrames={(val) => videoEditing.editSettings.updateField('gapFrameCount', val)}
@@ -209,6 +231,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
             validationErrors={videoEditing.validationErrors}
           />
         )}
+        {videoEditSubMode === 'regenerate' && regenerateForm}
       </div>
 
       {/* Variants section */}

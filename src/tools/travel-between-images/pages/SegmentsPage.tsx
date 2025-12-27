@@ -52,6 +52,7 @@ const SegmentsPage: React.FC = () => {
             parentGenerationId={parentId}
             projectId={selectedProjectId}
             onBack={handleBack}
+            shotId={shotId}
         />
     );
 };

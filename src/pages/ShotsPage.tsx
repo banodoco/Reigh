@@ -167,7 +167,6 @@ const ShotsPage: React.FC = () => {
         // timelineFrame not passed - mutation calculates using centralized calculateNextAvailableFrame
       });
 
-      toast.success('Added to shot with position');
       await refreshSelectedShotImages();
       return true;
     } catch (error) {
@@ -202,7 +201,6 @@ const ShotsPage: React.FC = () => {
         project_id: selectedProjectId,
       });
 
-      toast.success('Added to shot (unpositioned)');
       await refreshSelectedShotImages();
       return true;
     } catch (error) {
