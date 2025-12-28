@@ -1032,7 +1032,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       return {
         task: {
           id: activeVariant.id,
-          taskType: variantParams.created_from || variantParams.tool_type || activeVariant.variant_type || 'variant',
+          // Note: created_from (e.g. 'join_clips_complete') is NOT a task type - it's metadata about how
+          // the variant was created. Only use tool_type or variant_type which are valid task types.
+          taskType: variantParams.tool_type || activeVariant.variant_type || 'variant',
           params: variantParams,
           status: 'Complete',
           createdAt: activeVariant.created_at,
