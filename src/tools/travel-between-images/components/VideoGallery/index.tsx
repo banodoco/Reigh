@@ -1140,4 +1140,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   );
 };
 
-export default VideoOutputsGallery;
+// Memoize to prevent re-renders when parent (ShotEditor) re-renders due to unrelated state changes
+// (e.g., drag state changes in Timeline/ShotImageManager)
+export default React.memo(VideoOutputsGallery);
