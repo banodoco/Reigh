@@ -55,7 +55,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   const isCharacterAnimateTask = task?.taskType === 'animate_character';
   
   // Check if this is a join clips task (orchestrator or segment)
-  const isJoinClipsTask = task?.taskType === 'join_clips_orchestrator' || task?.taskType === 'join_clips_segment' || task?.taskType === 'join_clips';
+  // Note: 'clip_join' is the variant_type stored on generations created by join clips
+  const isJoinClipsTask = task?.taskType === 'join_clips_orchestrator' || task?.taskType === 'join_clips_segment' || task?.taskType === 'join_clips' || task?.taskType === 'clip_join';
   
   // Get LoRAs from the correct location (try all possible paths)
   // For individual_travel_segment, check individual_segment_params first (UI overrides)
