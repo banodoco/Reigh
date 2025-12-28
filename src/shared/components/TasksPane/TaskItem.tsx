@@ -499,24 +499,33 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         // This handles individual_travel_segment with make_primary_variant=false
         const { data: variantByLocation, error: variantError } = await supabase
           .from('generation_variants')
-          .select('*, generations!inner(*)')
-          .eq('location', task.outputLocation);
+          .select('id, generation_id, location, thumbnail_url, is_primary, params')
+          .eq('location', task.outputLocation)
+          .limit(1);
 
         if (!variantError && variantByLocation && variantByLocation.length > 0) {
-          console.log('[TaskItem] Found video in generation_variants by location', {
-            variantId: variantByLocation[0].id.substring(0, 8),
-            generationId: variantByLocation[0].generation_id.substring(0, 8),
-          });
-          // Return the parent generation but with the variant's location
           const variant = variantByLocation[0];
-          const generation = (variant as any).generations;
-          return [{
-            ...generation,
-            location: variant.location,
-            thumbnail_url: variant.thumbnail_url || generation.thumbnail_url,
-            _variant_id: variant.id,
-            _variant_is_primary: variant.is_primary,
-          }];
+          console.log('[TaskItem] Found video in generation_variants by location', {
+            variantId: variant.id.substring(0, 8),
+            generationId: variant.generation_id.substring(0, 8),
+          });
+
+          // Fetch the parent generation separately (safer than join syntax)
+          const { data: parentGen, error: parentError } = await supabase
+            .from('generations')
+            .select('*')
+            .eq('id', variant.generation_id)
+            .single();
+
+          if (!parentError && parentGen) {
+            return [{
+              ...parentGen,
+              location: variant.location,
+              thumbnail_url: variant.thumbnail_url || parentGen.thumbnail_url,
+              _variant_id: variant.id,
+              _variant_is_primary: variant.is_primary,
+            }];
+          }
         }
       }
 
