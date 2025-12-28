@@ -707,13 +707,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
             // 4. Refetch to update the list
             refetch();
-
-            toast({
-                title: 'Segment deleted',
-                description: previousSegment
-                    ? 'Segment removed. Previous segment now connects to the next image.'
-                    : 'Segment removed.',
-            });
         } catch (error) {
             console.error('[ChildGenerationsView] Error deleting segment:', error);
             toast({
