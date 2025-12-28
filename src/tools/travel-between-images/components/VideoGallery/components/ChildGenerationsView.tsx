@@ -612,6 +612,18 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         // Extract the deleted segment's image URLs for bridging
         const deletedSegmentImages = extractSegmentImages(deletedParams, 0);
 
+        // Debug: Log all segments and their child_order values
+        console.log('[SegmentDelete] All segments child_order values:', sortedSegments.map(s => ({
+            id: s.id.substring(0, 8),
+            child_order: (s as any).child_order,
+            isBeingDeleted: s.id === childId,
+        })));
+        console.log('[SegmentDelete] Looking for prev/next:', {
+            deletedChildOrder,
+            lookingForPrev: deletedChildOrder - 1,
+            lookingForNext: deletedChildOrder + 1,
+        });
+
         // Find previous and next segments for bridging
         const previousSegment = sortedSegments.find(c => (c as any).child_order === deletedChildOrder - 1);
         const nextSegment = sortedSegments.find(c => (c as any).child_order === deletedChildOrder + 1);
