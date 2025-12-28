@@ -919,8 +919,19 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Local state for prompts when no shot is selected
   const [noShotPrompts, setNoShotPrompts] = useState<PromptEntry[]>([]);
   const [noShotMasterPrompt, setNoShotMasterPrompt] = useState('');
-  const [isGeneratingAutomatedPrompts, setIsGeneratingAutomatedPrompts] = useState(false);
-  const [automatedJustQueued, setAutomatedJustQueued] = useState(false);
+  // Button state for automated mode: idle → submitting → success → idle
+  type AutomatedButtonState = 'idle' | 'submitting' | 'success';
+  const [automatedButtonState, setAutomatedButtonState] = useState<AutomatedButtonState>('idle');
+  const buttonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (buttonTimeoutRef.current) {
+        clearTimeout(buttonTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Removed unused currentShotId that was causing unnecessary re-renders
   const { data: shots } = useListShots(selectedProjectId);
@@ -2591,12 +2602,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const capturedSelectedLoras = loraManager.selectedLoras;
       const capturedSelectedModel = selectedModel;
 
-      // Show loading state "Submitting..." for 1 second, then success state for 2 seconds
-      setIsGeneratingAutomatedPrompts(true);
-      setTimeout(() => {
-        setIsGeneratingAutomatedPrompts(false);
-        setAutomatedJustQueued(true);
-        setTimeout(() => setAutomatedJustQueued(false), 2000);
+      // Button state: submitting (1s) → success (2s) → idle
+      // Clear any existing timeout first
+      if (buttonTimeoutRef.current) {
+        clearTimeout(buttonTimeoutRef.current);
+      }
+      setAutomatedButtonState('submitting');
+      buttonTimeoutRef.current = setTimeout(() => {
+        setAutomatedButtonState('success');
+        buttonTimeoutRef.current = setTimeout(() => {
+          setAutomatedButtonState('idle');
+        }, 2000);
       }, 1000);
 
       // Add incoming task immediately - appears as filler in TasksPane
@@ -3027,9 +3043,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             imagesPerPrompt={imagesPerPrompt}
             onChangeImagesPerPrompt={handleSliderChange(setImagesPerPrompt)}
             actionablePromptsCount={actionablePromptsCount}
-            isGenerating={isGenerating || isGeneratingAutomatedPrompts}
+            isGenerating={isGenerating || automatedButtonState === 'submitting'}
             hasApiKey={hasApiKey}
-            justQueued={justQueued || automatedJustQueued}
+            justQueued={justQueued || automatedButtonState === 'success'}
             steps={steps}
             onChangeSteps={setSteps}
             showStepsDropdown={isLocalGenerationEnabled}
