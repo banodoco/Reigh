@@ -5,6 +5,8 @@ interface WaitForTasksOptions {
   timeout?: number;
   /** Polling interval in ms (default: 100) */
   pollInterval?: number;
+  /** AbortSignal for cancellation (e.g., on component unmount) */
+  signal?: AbortSignal;
 }
 
 /**
@@ -15,7 +17,7 @@ interface WaitForTasksOptions {
  * @param projectId - The project ID to check tasks for
  * @param taskIds - Array of task IDs to wait for
  * @param options - Configuration options
- * @returns Promise that resolves when at least one task ID is found, or timeout occurs
+ * @returns Promise that resolves to true when found, false on timeout/abort
  */
 export async function waitForTasksInCache(
   queryClient: QueryClient,
@@ -23,7 +25,7 @@ export async function waitForTasksInCache(
   taskIds: string[],
   options: WaitForTasksOptions = {}
 ): Promise<boolean> {
-  const { timeout = 5000, pollInterval = 100 } = options;
+  const { timeout = 5000, pollInterval = 100, signal } = options;
 
   if (taskIds.length === 0) {
     return true;
@@ -34,6 +36,12 @@ export async function waitForTasksInCache(
 
   return new Promise((resolve) => {
     const checkTasks = () => {
+      // Check for abort
+      if (signal?.aborted) {
+        resolve(false);
+        return;
+      }
+
       // Check if any of the task IDs appear in any paginated task queries
       const queries = queryClient.getQueriesData<{ tasks?: Array<{ id: string }> }>({
         queryKey: ['tasks', 'paginated', projectId],
