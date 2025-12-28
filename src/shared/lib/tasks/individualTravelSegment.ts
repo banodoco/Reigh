@@ -1,8 +1,9 @@
-import { 
-  createTask, 
+import {
+  createTask,
   TaskValidationError,
-  resolveProjectResolution 
+  resolveProjectResolution
 } from "../taskCreation";
+import { supabase } from '@/integrations/supabase/client';
 import { PhaseConfig } from '@/tools/travel-between-images/settings';
 
 /**
@@ -353,16 +354,44 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
     // 1. Validate parameters
     validateIndividualTravelSegmentParams(params);
 
-    // 2. Resolve project resolution (use original if available)
-    const origResolution = params.originalParams?.parsed_resolution_wh || 
+    // 2. Look up existing child at this segment_index (to create variant instead of new child)
+    // If child_generation_id wasn't explicitly provided, check if one exists
+    let effectiveChildGenerationId = params.child_generation_id;
+    if (!effectiveChildGenerationId && params.parent_generation_id && params.segment_index !== undefined) {
+      const { data: existingChild } = await supabase
+        .from('generations')
+        .select('id')
+        .eq('parent_generation_id', params.parent_generation_id)
+        .eq('child_order', params.segment_index)
+        .limit(1)
+        .single();
+
+      if (existingChild) {
+        effectiveChildGenerationId = existingChild.id;
+        console.log("[IndividualTravelSegment] Found existing child at segment_index:", {
+          parent_generation_id: params.parent_generation_id,
+          segment_index: params.segment_index,
+          existing_child_id: effectiveChildGenerationId,
+        });
+      }
+    }
+
+    // Update params with the effective child_generation_id
+    const paramsWithChild = {
+      ...params,
+      child_generation_id: effectiveChildGenerationId,
+    };
+
+    // 3. Resolve project resolution (use original if available)
+    const origResolution = params.originalParams?.parsed_resolution_wh ||
                           params.originalParams?.orchestrator_details?.parsed_resolution_wh;
     const { resolution: finalResolution } = await resolveProjectResolution(
-      params.project_id, 
+      params.project_id,
       origResolution
     );
 
-    // 3. Build task params matching travel_segment structure
-    const taskParams = buildIndividualTravelSegmentParams(params, finalResolution);
+    // 4. Build task params matching travel_segment structure
+    const taskParams = buildIndividualTravelSegmentParams(paramsWithChild, finalResolution);
 
     console.log("[IndividualTravelSegment] Built task params:", {
       model_name: taskParams.model_name,
@@ -370,6 +399,7 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
       num_frames: taskParams.num_frames,
       seed_to_use: taskParams.seed_to_use,
       parsed_resolution_wh: taskParams.parsed_resolution_wh,
+      child_generation_id: taskParams.child_generation_id,
       origResolution,
       finalResolution,
       hasPhaseConfig: !!taskParams.phase_config,
@@ -377,7 +407,7 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
       additionalLorasCount: Object.keys(taskParams.additional_loras as Record<string, number> || {}).length,
     });
 
-    // 4. Create task using unified create-task function
+    // 5. Create task using unified create-task function
     const result = await createTask({
       project_id: params.project_id,
       task_type: 'individual_travel_segment',
