@@ -84,6 +84,16 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const currentProject = projects.find(p => p.id === projectId);
     const projectAspectRatio = currentProject?.aspectRatio;
     const projectResolution = projectAspectRatio ? ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio] : undefined;
+
+    // [ResolutionDebug] Log where list view resolution comes from
+    console.log('[ChildGenerationsView] [ResolutionDebug] List view resolution computation:', {
+        projectId,
+        hasCurrentProject: !!currentProject,
+        projectAspectRatio,
+        projectResolution,
+        availableResolutions: Object.keys(ASPECT_RATIO_TO_RESOLUTION),
+        source: projectResolution ? 'PROJECT_ASPECT_RATIO' : 'UNDEFINED',
+    });
     
     // Refs for mobile double-tap detection
     const lastTouchTimeRef = React.useRef<number>(0);
@@ -346,20 +356,21 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     }, [shotIdProp, parentGeneration?.params]);
     
     // Fetch shot's aspect ratio if we have a shot_id (takes priority over project)
+    // NOTE: Select only 'aspect_ratio' to match MediaLightbox query shape for cache consistency
     const { data: shotData } = useQuery({
         queryKey: ['shot-aspect-ratio', parentShotId],
         queryFn: async () => {
             if (!parentShotId) return null;
             const { data, error } = await supabase
                 .from('shots')
-                .select('id, aspect_ratio')
+                .select('aspect_ratio')
                 .eq('id', parentShotId)
                 .single();
             if (error) {
                 console.error('[ChildGenerationsView] Error fetching shot aspect ratio:', error);
                 return null;
             }
-            return data;
+            return data?.aspect_ratio; // Return just the string for consistency
         },
         enabled: !!parentShotId,
     });
@@ -370,24 +381,25 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         shotIdProp: shotIdProp?.substring(0, 8),
         parentShotId: parentShotId?.substring(0, 8),
         shotDataLoaded: !!shotData,
-        shotAspectRatio: shotData?.aspect_ratio,
+        shotAspectRatio: shotData, // Now a string directly
         projectAspectRatio,
         projectResolution,
     });
 
     const effectiveResolution = useMemo(() => {
+        // shotData is now a string (aspect_ratio) for cache consistency
         console.log('[ChildGenerationsView] [ResolutionDebug] Computing effectiveResolution:', {
             parentShotId: parentShotId?.substring(0, 8),
-            shotDataAspectRatio: shotData?.aspect_ratio,
+            shotDataAspectRatio: shotData,
             projectResolution,
         });
 
-        // Priority 1: Shot's aspect ratio
-        if (shotData?.aspect_ratio) {
-            const resolution = ASPECT_RATIO_TO_RESOLUTION[shotData.aspect_ratio];
+        // Priority 1: Shot's aspect ratio (shotData is the aspect_ratio string directly)
+        if (shotData) {
+            const resolution = ASPECT_RATIO_TO_RESOLUTION[shotData];
             console.log('[ChildGenerationsView] [ResolutionDebug] ✅ Using SHOT resolution:', {
                 shotId: parentShotId?.substring(0, 8),
-                aspectRatio: shotData.aspect_ratio,
+                aspectRatio: shotData,
                 resolution
             });
             return resolution;
@@ -403,18 +415,18 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         // Priority 3: Let the task creation logic handle it (fetches from project)
         console.log('[ChildGenerationsView] [ResolutionDebug] ❌ No resolution available');
         return undefined;
-    }, [shotData?.aspect_ratio, projectResolution, projectAspectRatio, parentShotId]);
-    
+    }, [shotData, projectResolution, projectAspectRatio, parentShotId]);
+
     // Aspect ratio priority for video players: shot's aspect_ratio > project's aspect_ratio > default "16:9"
     const effectiveAspectRatio = useMemo(() => {
-        if (shotData?.aspect_ratio) {
-            return shotData.aspect_ratio;
+        if (shotData) {
+            return shotData;
         }
         if (projectAspectRatio) {
             return projectAspectRatio;
         }
         return '16:9';
-    }, [shotData?.aspect_ratio, projectAspectRatio]);
+    }, [shotData, projectAspectRatio]);
 
     // Extract expected segment count and data from parent's orchestrator_details
     const expectedSegmentData = React.useMemo(() => {

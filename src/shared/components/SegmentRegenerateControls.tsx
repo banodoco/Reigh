@@ -114,6 +114,17 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   // Use shared normalization utility
   const [params, setParams] = useState<any>(() => getNormalizedParams(initialParams, { segmentIndex }));
   const [isDirty, setIsDirty] = useState(false);
+
+  // [ResolutionDebug] Log what resolution this component received on mount
+  console.log('[SegmentRegenerateControls] [ResolutionDebug] Component received props:', {
+    projectResolutionProp: projectResolution,
+    initialParamsResolution: initialParams?.parsed_resolution_wh,
+    initialOrchestratorResolution: initialParams?.orchestrator_details?.parsed_resolution_wh,
+    generationId: generationId?.substring(0, 8),
+    childGenerationId: childGenerationId?.substring(0, 8),
+    segmentIndex,
+    queryKeyPrefix,
+  });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -296,18 +307,34 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         strength: lora.strength,
       }));
 
-      // Use current project resolution, fallback to stale resolution
+      // IMPORTANT: Only use projectResolution prop (from shot/project), NOT stale params!
+      // If projectResolution is undefined, let the task creation logic (resolveProjectResolution)
+      // fetch the correct resolution from the project. This prevents race conditions where
+      // stale params have a different resolution than the current project/shot.
       const staleResolution = params.parsed_resolution_wh ||
                               params.orchestrator_details?.parsed_resolution_wh;
-      const finalResolution = projectResolution || staleResolution;
 
-      const paramsWithResolution = finalResolution
+      // [ResolutionDebug] Log resolution priority chain
+      console.log('[SegmentRegenerateControls] [ResolutionDebug] Resolution computation:', {
+        projectResolutionProp: projectResolution,
+        paramsResolution: params.parsed_resolution_wh,
+        orchestratorResolution: params.orchestrator_details?.parsed_resolution_wh,
+        staleResolution,
+        finalResolution: projectResolution || '(will be fetched by task creation)',
+        source: projectResolution ? 'PROJECT_RESOLUTION_PROP' : 'TASK_CREATION_WILL_FETCH',
+        generationId,
+        segmentIndex,
+      });
+
+      // Only set resolution in params if we have a reliable source (shot/project)
+      // Otherwise, leave it undefined so task creation fetches from project
+      const paramsWithResolution = projectResolution
         ? {
             ...params,
-            parsed_resolution_wh: finalResolution,
+            parsed_resolution_wh: projectResolution,
             orchestrator_details: {
               ...(params.orchestrator_details || {}),
-              parsed_resolution_wh: finalResolution,
+              parsed_resolution_wh: projectResolution,
             },
           }
         : params;
@@ -536,7 +563,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
               </div>
               <div className="flex flex-col">
                 <span className="text-muted-foreground">Resolution</span>
-                <span className="font-medium">
+                <span className="font-medium" title={`Source: ${projectResolution ? 'Project/Shot' : (params.parsed_resolution_wh || params.orchestrator_details?.parsed_resolution_wh) ? 'Task Params' : 'Auto'}`}>
                   {projectResolution || params.parsed_resolution_wh || params.orchestrator_details?.parsed_resolution_wh || 'Auto'}
                 </span>
               </div>

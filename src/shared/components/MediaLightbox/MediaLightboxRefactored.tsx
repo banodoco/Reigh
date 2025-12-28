@@ -1146,9 +1146,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       finalEndUrl: endImageUrl?.substring(0, 50),
     });
 
-    // Resolution priority: shot > project (effectiveRegenerateResolution) > stale params
+    // IMPORTANT: Only pass shot resolution, NOT stale params!
+    // If shot resolution is undefined, let task creation logic (resolveProjectResolution)
+    // fetch the correct resolution from the project. This prevents race conditions where
+    // stale params have a different resolution than the current project/shot.
     const staleResolution = taskParams.parsed_resolution_wh || orchestratorDetails.parsed_resolution_wh;
-    const resolution = effectiveRegenerateResolution || staleResolution;
 
     // For child segments, use the parent generation ID (not the segment's own ID)
     // This ensures new regenerations are linked to the correct parent
@@ -1161,8 +1163,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       taskParamsResolution: taskParams.parsed_resolution_wh,
       orchestratorResolution: orchestratorDetails.parsed_resolution_wh,
       staleResolution,
-      finalResolution: resolution,
-      source: effectiveRegenerateResolution ? 'SHOT' : 'STALE_PARAMS',
+      finalResolution: effectiveRegenerateResolution || '(will be fetched by task creation)',
+      source: effectiveRegenerateResolution ? 'SHOT' : 'TASK_CREATION_WILL_FETCH',
       parentGenerationId,
       actualGenerationId,
       isChildSegment: parentGenerationId !== actualGenerationId,
@@ -1183,7 +1185,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         endImageUrl={endImageUrl}
         startImageGenerationId={startImageGenId}
         endImageGenerationId={endImageGenId}
-        projectResolution={resolution}
+        projectResolution={effectiveRegenerateResolution}
       />
     );
   }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution]);
