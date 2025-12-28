@@ -126,6 +126,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   settingsLoading,
   getShotVideoCount,
   invalidateVideoCountsCache,
+  onDragStateChange,
 }) => {
   // [RefactorMetrics] Track render count for baseline measurements
   useRenderCount('ShotEditor');
@@ -1522,6 +1523,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onAddToShot={handleAddToShot}
             onAddToShotWithoutPosition={handleAddToShotWithoutPosition}
             onCreateShot={handleCreateShot}
+            onDragStateChange={onDragStateChange}
           />
         </div>
 

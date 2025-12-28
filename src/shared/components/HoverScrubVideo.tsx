@@ -159,28 +159,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   }, [isMobile, src, poster, disableScrubbing, thumbnailMode]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    console.log('[SegmentCardPopulation] handleMouseMove called', {
-      src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
-      isMobile,
-      thumbnailMode,
-      disableScrubbing,
-      autoplayOnHover,
-      loadOnDemand,
-      hasLoadedOnDemand,
-      hasVideoRef: !!videoRef.current,
-      hasContainerRef: !!containerRef.current,
-      duration,
-      timestamp: Date.now()
-    });
-    
     // Skip hover interactions on mobile devices or when scrubbing is disabled
     if (isMobile || thumbnailMode || disableScrubbing || autoplayOnHover) {
-      console.log('[SegmentCardPopulation] Skipping mouse move - conditions not met', {
-        isMobile,
-        thumbnailMode,
-        disableScrubbing,
-        autoplayOnHover
-      });
       return;
     }
 
@@ -191,17 +171,12 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     }
 
     if (loadOnDemand && !hasLoadedOnDemand) {
-      console.log('[SegmentCardPopulation] Load on demand - setting hasLoadedOnDemand');
       setHasLoadedOnDemand(true);
       // Fall through to allow scrubbing on the very first interaction
       // effectively treating the first hover as the "load trigger" AND the "scrub trigger"
     }
 
     if (!videoRef.current || !containerRef.current) {
-      console.log('[SegmentCardPopulation] Missing refs', {
-        hasVideoRef: !!videoRef.current,
-        hasContainerRef: !!containerRef.current
-      });
       return;
     }
 
@@ -224,26 +199,13 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     }
 
     if (!Number.isFinite(duration) || duration <= 0) {
-      console.log('[SegmentCardPopulation] Duration is invalid, skipping scrubbing (mouse position stored for later)', { duration });
-      
       // Force load if video is stuck in HAVE_NOTHING state, even if preload is metadata
       // This fixes cases where the browser suspended loading or network is slow
       if (videoRef.current && videoRef.current.readyState === 0) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[VideoStallFix] Force loading video during scrub because duration is invalid and readyState is 0', {
-            src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src'
-          });
-        }
         videoRef.current.load();
       }
       return;
     }
-    
-    console.log('[SegmentCardPopulation] Processing mouse move for scrubbing', {
-      duration,
-      videoReadyState: videoRef.current.readyState,
-      timestamp: Date.now()
-    });
 
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -256,7 +218,6 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
     // Validate targetTime before setting currentTime
     if (!Number.isFinite(targetTime)) {
-      console.warn('[SegmentCardPopulation] Calculated targetTime is not finite, skipping', { targetTime, progress, duration });
       return;
     }
 
@@ -279,38 +240,16 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover, preloadProp, src]);
 
   const handleMouseEnter = useCallback(() => {
-    console.log('[SegmentCardPopulation] handleMouseEnter called', {
-      src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
-      isMobile,
-      disableScrubbing,
-      autoplayOnHover,
-      timestamp: Date.now()
-    });
-    
     // Skip hover interactions on mobile devices or when scrubbing is disabled
     if (isMobile || disableScrubbing) {
-      console.log('[SegmentCardPopulation] Skipping mouse enter', {
-        isMobile,
-        disableScrubbing
-      });
-      if (isMobile) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[MobileVideoAutoplay] Mouse enter detected on mobile (should be ignored)', {
-            src,
-            timestamp: Date.now()
-          });
-        }
-      }
       return;
     }
 
     if (autoplayOnHover) {
-      console.log('[SegmentCardPopulation] Autoplay on hover enabled, playing video');
       videoRef.current?.play();
       return;
     }
-    
-    console.log('[SegmentCardPopulation] Setting isHoveringRef to true');
+
     isHoveringRef.current = true;
     if (videoRef.current) {
       // Fix for video stalling: Prime video loading on first hover
@@ -384,37 +323,14 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
-      console.log('[SegmentCardPopulation] handleLoadedMetadata called', {
-        src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
-        videoDuration: videoRef.current.duration,
-        videoPaused: videoRef.current.paused,
-        videoReadyState: videoRef.current.readyState,
-        disableScrubbing,
-        isHovering: isHoveringRef.current,
-        lastMouseX: lastMouseXRef.current,
-        timestamp: Date.now()
-      });
-      
-      if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
-        console.log('[MobileVideoAutoplay] handleLoadedMetadata called', {
-          isMobile,
-          videoPaused: videoRef.current.paused,
-          videoCurrentTime: videoRef.current.currentTime,
-          videoDuration: videoRef.current.duration,
-          videoSrc: videoRef.current.src,
-          timestamp: Date.now()
-        });
-      }
-
       const newDuration = videoRef.current.duration;
-      
+
       // Only set duration if valid
       if (!Number.isFinite(newDuration) || newDuration <= 0) {
         return;
       }
-      
+
       setDuration(newDuration);
-      console.log('[SegmentCardPopulation] Duration set to:', newDuration);
       
       // FIX: Recalculate scrubber position if user was hovering while metadata was loading
       // This fixes the issue where the scrubber doesn't appear on first hover of the first video
@@ -422,24 +338,15 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         const rect = containerRef.current.getBoundingClientRect();
         const progress = Math.max(0, Math.min(1, lastMouseXRef.current / rect.width));
         const targetTime = progress * newDuration;
-        
+
         // Validate targetTime
         if (!Number.isFinite(targetTime)) {
-          console.warn('[ScrubberFix] Calculated targetTime is not finite, skipping seek', { targetTime, progress, newDuration });
           return;
         }
-        
-        console.log('[ScrubberFix] Recalculating scrubber after metadata loaded while hovering', {
-          src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
-          progress,
-          targetTime,
-          newDuration,
-          timestamp: Date.now()
-        });
-        
+
         setScrubberPosition(progress * 100);
         setScrubberVisible(true);
-        
+
         // Also seek to the position
         if (videoRef.current) {
           videoRef.current.pause();
@@ -643,20 +550,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            console.log('[MobileVideoAutoplay] Video thumbnail became visible on mobile', {
-              src: video.src,
-              videoPaused: video.paused,
-              disableScrubbing,
-              timestamp: Date.now()
-            });
-            
             // Ensure video thumbnail is paused when it comes into view on mobile
             if (!video.paused) {
-              console.warn('[MobileVideoAutoplay] Video thumbnail was playing when it became visible, pausing it', {
-                src: video.src,
-                disableScrubbing,
-                timestamp: Date.now()
-              });
               video.pause();
             }
           }
@@ -678,12 +573,6 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
     const intervalId = setInterval(() => {
       if (videoRef.current && !videoRef.current.paused) {
-        console.warn('[MobileVideoAutoplay] Periodic check found video playing on mobile thumbnail, pausing it', {
-          src: videoRef.current.src,
-          currentTime: videoRef.current.currentTime,
-          disableScrubbing,
-          timestamp: Date.now()
-        });
         videoRef.current.pause();
       }
     }, 1000);
@@ -693,20 +582,6 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     };
   }, [isMobile, src, disableScrubbing]);
 
-  // Log component render state
-  React.useEffect(() => {
-    console.log('[SegmentCardPopulation] HoverScrubVideo render state', {
-      src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
-      hasValidVideoSrc,
-      displaySrc: displaySrc?.substring(displaySrc.lastIndexOf('/') + 1) || 'no-src',
-      isMobile,
-      disableScrubbing,
-      thumbnailMode,
-      duration,
-      willAttachHandlers: !(isMobile || disableScrubbing || thumbnailMode),
-      timestamp: Date.now()
-    });
-  }, [src, hasValidVideoSrc, displaySrc, isMobile, disableScrubbing, thumbnailMode, duration]);
 
   return (
     <div

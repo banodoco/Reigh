@@ -36,6 +36,8 @@ export interface ShotImageManagerProps {
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
+  /** Callback to notify parent of drag state changes - used to suppress query refetches during drag */
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
 export interface DerivedNavContext {

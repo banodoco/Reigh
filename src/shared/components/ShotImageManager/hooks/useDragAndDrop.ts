@@ -22,6 +22,8 @@ interface UseDragAndDropProps {
   setOptimisticOrder: (images: GenerationRow[]) => void;
   setIsOptimisticUpdate: (isUpdate: boolean) => void;
   setReconciliationId: (fn: (prev: number) => number) => void;
+  /** Callback to notify parent of drag state changes - used to suppress query refetches during drag */
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
 export function useDragAndDrop({
@@ -33,7 +35,8 @@ export function useDragAndDrop({
   setLastSelectedIndex,
   setOptimisticOrder,
   setIsOptimisticUpdate,
-  setReconciliationId
+  setReconciliationId,
+  onDragStateChange
 }: UseDragAndDropProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   
@@ -78,7 +81,10 @@ export function useDragAndDrop({
     });
     
     setActiveId(draggedItemId);
-    
+
+    // Notify parent that drag has started - used to suppress query refetches
+    onDragStateChange?.(true);
+
     const activatorEvent = (event as any)?.activatorEvent as (MouseEvent | PointerEvent | undefined);
     const isModifierPressed = activatorEvent?.metaKey || activatorEvent?.ctrlKey;
     
@@ -113,7 +119,10 @@ export function useDragAndDrop({
     });
     
     setActiveId(null);
-    
+
+    // Notify parent that drag has ended - re-enable query refetches
+    onDragStateChange?.(false);
+
     if (!over || active.id === over.id) {
       console.log('[BatchModeReorderFlow] [NO_CHANGE] ℹ️ No reorder needed - same position or invalid target');
       return;

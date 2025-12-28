@@ -196,6 +196,9 @@ export interface ShotEditorProps {
   onVariantNameChange?: (name: string) => void;
   isGeneratingVideo?: boolean;
   videoJustQueued?: boolean;
+
+  // Drag state callback - used to suppress query refetches during drag operations
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
 // Internal state interface for the shot editor

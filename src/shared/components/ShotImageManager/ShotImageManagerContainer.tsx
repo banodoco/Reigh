@@ -81,7 +81,8 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
     setLastSelectedIndex: selection.setLastSelectedIndex,
     setOptimisticOrder: optimistic.setOptimisticOrder,
     setIsOptimisticUpdate: optimistic.setIsOptimisticUpdate,
-    setReconciliationId: optimistic.setReconciliationId
+    setReconciliationId: optimistic.setReconciliationId,
+    onDragStateChange: props.onDragStateChange
   });
   
   // Batch operations management

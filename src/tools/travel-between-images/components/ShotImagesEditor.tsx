@@ -115,6 +115,8 @@ interface ShotImagesEditorProps {
   onAddToShot?: (shotId: string, generationId: string, position: number) => Promise<void>;
   onAddToShotWithoutPosition?: (shotId: string, generationId: string) => Promise<boolean>;
   onCreateShot?: (name: string) => Promise<string>;
+  /** Callback to notify parent of drag state changes - used to suppress query refetches during drag */
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
 // Force TypeScript to re-evaluate this interface
@@ -171,6 +173,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onAddToShot,
   onAddToShotWithoutPosition,
   onCreateShot,
+  onDragStateChange,
 }) => {
   // [ZoomDebug] Track ShotImagesEditor mounts to detect unwanted remounts
   const shotImagesEditorMountRef = React.useRef(0);
@@ -1152,6 +1155,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       console.error('[ClearEnhancedPrompt-Batch] ❌ Error:', error);
                     }
                   }}
+                  onDragStateChange={onDragStateChange}
                 />
                 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

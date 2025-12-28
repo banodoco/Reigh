@@ -65,22 +65,6 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   activeDragId = null,
   dropTargetIndex = null,
 }) => {
-  console.log('[DataTrace] 🖼️  ImageGrid rendering:', {
-    imagesCount: images.length,
-    imageIds: images.map(img => img.id?.substring(0, 8)), // shot_generations.id
-  });
-  
-  console.log('[PairIndicatorDebug] ImageGrid render:', {
-    imagesCount: images.length,
-    hasOnPairClick: !!onPairClick,
-    hasPairPrompts: !!pairPrompts,
-    hasEnhancedPrompts: !!enhancedPrompts,
-    pairPromptsKeys: pairPrompts ? Object.keys(pairPrompts) : [],
-    enhancedPromptsKeys: enhancedPrompts ? Object.keys(enhancedPrompts) : [],
-    defaultPrompt: defaultPrompt?.substring(0, 50),
-    defaultNegativePrompt: defaultNegativePrompt?.substring(0, 50),
-  });
-
   return (
     <div
       className={cn("grid gap-3", gridColsClass)}
@@ -102,13 +86,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
         const displayTimeSeconds = index * durationPerPairSeconds;
         const actualTimelineFrame = (image as any).timeline_frame;
         const isLastImage = index === images.length - 1;
-        
-        console.log('[DataTrace] 🎨 Rendering image item:', {
-          index,
-          imageKey: imageKey?.substring(0, 8),
-          imageId: image.id?.substring(0, 8),
-        });
-        
+
         // Get pair data for the indicator after this image
         const pairPrompt = pairPrompts?.[index];
         const enhancedPrompt = enhancedPrompts?.[index];

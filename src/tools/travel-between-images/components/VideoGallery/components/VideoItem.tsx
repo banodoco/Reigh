@@ -941,7 +941,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   }
 
   return (
-    <div className="relative group">
+    <div className="relative group" style={{ contain: 'layout style paint' }}>
       <div
         className="bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative"
         style={aspectRatioStyle}

@@ -1182,6 +1182,10 @@ const VideoTravelToolPage: React.FC = () => {
   // Prevents timeline position resets and "signal is aborted" errors
   const [isShotOperationInProgress, setIsShotOperationInProgress] = useState(false);
   const operationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Track drag state to suppress query refetches during drag operations
+  // This prevents the "AbortError" and lag caused by realtime invalidations during drag
+  const [isDraggingInTimeline, setIsDraggingInTimeline] = useState(false);
   
   // Helper to signal that a shot operation has occurred
   // This is called after mutations complete to prevent immediate query refetch
@@ -1231,8 +1235,9 @@ const VideoTravelToolPage: React.FC = () => {
   const fullImagesQuery = useAllShotGenerations(
     needsFullImageData ? (selectedShot?.id || null) : null,
     {
-      // Disable refetch during shot operations to prevent race conditions with timeline
-      disableRefetch: isShotOperationInProgress
+      // Disable refetch during shot operations or drag to prevent race conditions
+      // This fixes the "AbortError" and lag caused by realtime invalidations during drag
+      disableRefetch: isShotOperationInProgress || isDraggingInTimeline
     }
   );
   const fullShotImages = fullImagesQuery.data || [];
@@ -1735,7 +1740,7 @@ const VideoTravelToolPage: React.FC = () => {
               settingsLoading={shotSettings.status !== 'ready' || shotSettings.shotId !== currentShotId}
               getShotVideoCount={getShotVideoCount}
               invalidateVideoCountsCache={invalidateOnVideoChanges}
-              // afterEachPromptText props removed - not in ShotEditorProps interface
+              onDragStateChange={setIsDraggingInTimeline}
             />
               </>
             ) : (isNewlyCreatedShot || hashLoadingGrace) ? (
