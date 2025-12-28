@@ -17,6 +17,7 @@ import { Switch } from '@/shared/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { ChevronDown, ChevronUp, Loader2, Check, RotateCcw } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { MotionPresetSelector, type BuiltinPreset } from '@/shared/components/MotionPresetSelector';
@@ -112,6 +113,12 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 }) => {
   const { toast } = useToast();
 
+  // Persist makePrimaryVariant setting at project level
+  const { settings: projectSettings, update: updateProjectSettings } = useToolSettings<{ makePrimaryVariant?: boolean }>(
+    'travel-between-images',
+    { projectId: projectId || undefined, enabled: !!projectId }
+  );
+
   // Use shared normalization utility
   const [params, setParams] = useState<any>(() => getNormalizedParams(initialParams, { segmentIndex }));
   const [isDirty, setIsDirty] = useState(false);
@@ -194,7 +201,25 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   });
 
   // Make primary variant - whether the new regeneration should replace the current video
-  const [makePrimaryVariant, setMakePrimaryVariant] = useState(true);
+  // Persisted at project level via useToolSettings
+  const [makePrimaryVariant, setMakePrimaryVariant] = useState(() =>
+    projectSettings?.makePrimaryVariant ?? true
+  );
+
+  // Sync state with project settings when loaded
+  useEffect(() => {
+    if (projectSettings?.makePrimaryVariant !== undefined) {
+      setMakePrimaryVariant(projectSettings.makePrimaryVariant);
+    }
+  }, [projectSettings?.makePrimaryVariant]);
+
+  // Handler to update both local state and persist to project settings
+  const handleMakePrimaryVariantChange = useCallback((checked: boolean) => {
+    setMakePrimaryVariant(checked);
+    if (projectId) {
+      updateProjectSettings('project', { makePrimaryVariant: checked });
+    }
+  }, [projectId, updateProjectSettings]);
 
   // LoRA state - derived from params.additional_loras
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>(() => {
@@ -637,7 +662,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         <Switch
           id="make-primary"
           checked={makePrimaryVariant}
-          onCheckedChange={setMakePrimaryVariant}
+          onCheckedChange={handleMakePrimaryVariantChange}
         />
       </div>
 
