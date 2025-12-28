@@ -176,23 +176,6 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     isDragDisabled && "cursor-default"
   );
 
-  console.log('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
-    imageId: image.id?.substring(0, 8),
-    isSelected,
-    isDragDisabled,
-    isMobile,
-    hasOnClick: !!onClick,
-    finalClassName,
-    classNameIncludes: {
-      hasRing4: finalClassName.includes('ring-4'),
-      hasRingOrange: finalClassName.includes('ring-orange-500'),
-      hasBgOrange: finalClassName.includes('bg-orange-500/15'),
-      hasBorderOrange: finalClassName.includes('border-orange-500'),
-    },
-    cnResult: isSelected ? "ring-4 ring-orange-500 ring-offset-2 ring-offset-background bg-orange-500/15 border-orange-500" : "NO_SELECTION_CLASSES",
-    timestamp: Date.now()
-  });
-
   return (
     <div
       ref={setNodeRef}
@@ -205,18 +188,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
         // Check if the click originated from a button or its children
         const target = e.target as HTMLElement;
         const isButtonClick = target.closest('button') !== null;
-        
-        console.log('[SelectionDebug:SortableImageItem] onClick triggered', {
-          imageId: image.id?.substring(0, 8),
-          isSelected,
-          hasOnClickHandler: !!onClick,
-          eventTarget: target?.tagName || 'unknown',
-          isButtonClick,
-          buttonElement: target.closest('button')?.title || 'none',
-          actualDOMClasses: (e.currentTarget as HTMLElement)?.className || 'NO_CLASSES',
-          timestamp: Date.now()
-        });
-        
+
         // Don't trigger onClick if the click came from a button
         if (!isButtonClick) {
           onClick?.(e);
@@ -226,32 +198,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
         // Check if the pointer down originated from a button or its children
         const target = e.target as HTMLElement;
         const isButtonClick = target.closest('button') !== null;
-        
-        // Add DOM inspection after render
-        setTimeout(() => {
-          const element = e.currentTarget as HTMLElement;
-          if (!element) {
-            console.log('[SelectionDebug:SortableImageItem] Element is null, component may have been unmounted');
-            return;
-          }
-          console.log('[SelectionDebug:SortableImageItem] DOM INSPECTION POST-RENDER', {
-            imageId: image.id?.substring(0, 8),
-            isSelected,
-            isButtonClick,
-            actualDOMClasses: element.className,
-            computedStyles: {
-              borderColor: window.getComputedStyle(element).borderColor,
-              backgroundColor: window.getComputedStyle(element).backgroundColor,
-              boxShadow: window.getComputedStyle(element).boxShadow,
-              outline: window.getComputedStyle(element).outline,
-            },
-            dataAttributes: {
-              selected: element.getAttribute('data-selected'),
-              imageId: element.getAttribute('data-image-id'),
-            }
-          });
-        }, 100);
-        
+
         // Don't trigger onPointerDown if the click came from a button
         if (!isButtonClick) {
           onPointerDown?.(e);
@@ -396,9 +343,8 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
 export const SortableImageItem = React.memo(
   SortableImageItemComponent,
   (prevProps, nextProps) => {
-    // Log deep render trace for debugging (can be removed once optimized)
     // Use image.id (shot_generations.id) - unique per entry
-    const shouldSkipRender = 
+    return (
       prevProps.image.id === nextProps.image.id &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.isDragDisabled === nextProps.isDragDisabled &&
@@ -408,37 +354,8 @@ export const SortableImageItem = React.memo(
       prevProps.duplicateSuccessImageId === nextProps.duplicateSuccessImageId &&
       prevProps.shouldLoad === nextProps.shouldLoad &&
       prevProps.projectAspectRatio === nextProps.projectAspectRatio &&
-      // Image URL changes (e.g., thumbnail loaded)
       prevProps.image.thumbUrl === nextProps.image.thumbUrl &&
-      prevProps.image.imageUrl === nextProps.image.imageUrl;
-
-    console.warn('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
-      imageId: nextProps.image.id?.substring(0, 8),
-      isSelected: nextProps.isSelected,
-      isDragDisabled: nextProps.isDragDisabled,
-      isMobile: false,
-      hasOnClick: !!nextProps.onClick,
-      hasOnDoubleClick: !!nextProps.onDoubleClick,
-      shouldSkipRender,
-      propsChanged: {
-        id: prevProps.image.id !== nextProps.image.id,
-        isSelected: prevProps.isSelected !== nextProps.isSelected,
-        isDragDisabled: prevProps.isDragDisabled !== nextProps.isDragDisabled,
-        timeline_frame: prevProps.timeline_frame !== nextProps.timeline_frame,
-        displayTimeSeconds: prevProps.displayTimeSeconds !== nextProps.displayTimeSeconds,
-        duplicating: prevProps.duplicatingImageId !== nextProps.duplicatingImageId,
-        success: prevProps.duplicateSuccessImageId !== nextProps.duplicateSuccessImageId,
-        shouldLoad: prevProps.shouldLoad !== nextProps.shouldLoad,
-        aspectRatio: prevProps.projectAspectRatio !== nextProps.projectAspectRatio,
-        thumbUrl: prevProps.image.thumbUrl !== nextProps.image.thumbUrl,
-        imageUrl: prevProps.image.imageUrl !== nextProps.image.imageUrl,
-        // Callback stability (these shouldn't change but worth checking)
-        onDelete: prevProps.onDelete !== nextProps.onDelete,
-        onClick: prevProps.onClick !== nextProps.onClick,
-        onDoubleClick: prevProps.onDoubleClick !== nextProps.onDoubleClick,
-      }
-    });
-
-    return shouldSkipRender; // Return true to SKIP render, false to render
+      prevProps.image.imageUrl === nextProps.image.imageUrl
+    );
   }
 ); 
