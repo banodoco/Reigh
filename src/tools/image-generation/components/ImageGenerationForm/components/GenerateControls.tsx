@@ -157,7 +157,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
         disabled={isGenerating || !hasApiKey || (normalizedPromptMode === 'managed' && actionablePromptsCount === 0)}
       >
         {justQueued
-          ? "Added to queue!"
+          ? "Creating tasks!"
           : isGenerating
             ? "Creating tasks..."
             : normalizedPromptMode === 'automated'

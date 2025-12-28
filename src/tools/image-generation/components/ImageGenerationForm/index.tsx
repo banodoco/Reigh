@@ -920,6 +920,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [noShotPrompts, setNoShotPrompts] = useState<PromptEntry[]>([]);
   const [noShotMasterPrompt, setNoShotMasterPrompt] = useState('');
   const [isGeneratingAutomatedPrompts, setIsGeneratingAutomatedPrompts] = useState(false);
+  const [automatedJustQueued, setAutomatedJustQueued] = useState(false);
 
   // Removed unused currentShotId that was causing unnecessary re-renders
   const { data: shots } = useListShots(selectedProjectId);
@@ -2590,8 +2591,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const capturedSelectedLoras = loraManager.selectedLoras;
       const capturedSelectedModel = selectedModel;
 
-      // Show loading state in button briefly then show filler in TasksPane
-      setIsGeneratingAutomatedPrompts(true);
+      // Show success state in button for 2 seconds
+      setAutomatedJustQueued(true);
+      setTimeout(() => setAutomatedJustQueued(false), 2000);
 
       // Add incoming task immediately - appears as filler in TasksPane
       const truncatedPrompt = capturedMasterPrompt.length > 50
@@ -2691,7 +2693,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         } finally {
           // Remove the incoming task filler
           removeIncomingTask(incomingTaskId);
-          setIsGeneratingAutomatedPrompts(false);
         }
       })();
 
@@ -3024,7 +3025,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             actionablePromptsCount={actionablePromptsCount}
             isGenerating={isGenerating || isGeneratingAutomatedPrompts}
             hasApiKey={hasApiKey}
-            justQueued={justQueued}
+            justQueued={justQueued || automatedJustQueued}
             steps={steps}
             onChangeSteps={setSteps}
             showStepsDropdown={isLocalGenerationEnabled}
