@@ -804,6 +804,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     setShowTaskDetailsModal(true);
   }, []);
 
+  // Stable handler for viewing segments - prevents VideoItem re-renders during parent re-renders
+  const handleViewSegments = useCallback((video: GenerationRow) => {
+    navigate(`/tools/travel-between-images/segments/${video.id}`);
+  }, [navigate]);
+
   // ===============================================================================
   // EFFECT HANDLERS
   // ===============================================================================
@@ -1001,9 +1006,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     onApplySettingsFromTask={onApplySettingsFromTask}
                     existingShareSlug={video.id ? shareSlugs[video.id] : undefined}
                     onShareCreated={handleShareCreated}
-                    onViewSegments={(video) => {
-                      navigate(`/tools/travel-between-images/segments/${video.id}`);
-                    }}
+                    onViewSegments={handleViewSegments}
                     deleteTooltip="Delete video permanently"
                   />
                 );
