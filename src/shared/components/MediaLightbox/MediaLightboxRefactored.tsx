@@ -1015,12 +1015,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     // Check if we're viewing a variant that was created by a task (has source_task_id in params)
     const variantParams = activeVariant?.params as Record<string, any> | undefined;
     const isTaskCreatedVariant = activeVariant && variantParams && (
-      variantParams.source_task_id || 
+      variantParams.source_task_id ||
       variantParams.created_from ||
       (activeVariant.variant_type && activeVariant.variant_type !== 'original')
     );
-    
+
     if (isTaskCreatedVariant && variantParams) {
+      // Check if taskDetailsData already has the correct task (e.g., when opened from TasksPane)
+      // If so, use the original task's params which have full configuration data
+      const hasMatchingTaskData = taskDetailsData?.taskId === variantParams.source_task_id && taskDetailsData?.task?.params;
+
       console.log('[VariantTaskDetails] Showing task details for variant:', {
         variantId: activeVariant.id?.substring(0, 8),
         variantType: activeVariant.variant_type,
@@ -1028,14 +1032,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         sourceTaskId: variantParams.source_task_id?.substring(0, 8),
         createdFrom: variantParams.created_from,
         hasOnApplySettings: !!taskDetailsData?.onApplySettingsFromTask,
+        hasMatchingTaskData,
+        taskDetailsTaskId: taskDetailsData?.taskId?.substring(0, 8),
       });
+
+      // Use original task params if we have matching task data (preserves full config like join clips settings)
+      // Otherwise fall back to variant params (which may be incomplete)
+      const effectiveParams = hasMatchingTaskData ? taskDetailsData.task.params : variantParams;
+
       return {
         task: {
           id: activeVariant.id,
           // Note: created_from (e.g. 'join_clips_complete') is NOT a task type - it's metadata about how
           // the variant was created. Only use tool_type or variant_type which are valid task types.
           taskType: variantParams.tool_type || activeVariant.variant_type || 'variant',
-          params: variantParams,
+          params: effectiveParams,
           status: 'Complete',
           createdAt: activeVariant.created_at,
         },
@@ -1047,7 +1058,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         onApplySettingsFromTask: taskDetailsData?.onApplySettingsFromTask,
       };
     }
-    
+
     // For all other cases, use the generation's task details as-is
     return taskDetailsData;
   }, [taskDetailsData, activeVariant]);
