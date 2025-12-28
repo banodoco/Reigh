@@ -612,28 +612,53 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         // Extract the deleted segment's image URLs for bridging
         const deletedSegmentImages = extractSegmentImages(deletedParams, 0);
 
-        console.log('[ChildGenerationsView] Deleting segment:', {
-            childId: childId.substring(0, 8),
-            childOrder: deletedChildOrder,
-            parentGenerationId: parentGenerationId.substring(0, 8),
-            deletedStartUrl: deletedSegmentImages.startUrl?.substring(0, 50),
-            deletedEndUrl: deletedSegmentImages.endUrl?.substring(0, 50),
+        // Find previous and next segments for bridging
+        const previousSegment = sortedSegments.find(c => (c as any).child_order === deletedChildOrder - 1);
+        const nextSegment = sortedSegments.find(c => (c as any).child_order === deletedChildOrder + 1);
+
+        // Extract images from adjacent segments for logging
+        const prevSegmentImages = previousSegment ? extractSegmentImages((previousSegment.params as any) || {}, 0) : null;
+        const nextSegmentImages = nextSegment ? extractSegmentImages((nextSegment.params as any) || {}, 0) : null;
+
+        console.log('[SegmentDelete] Starting deletion:', {
+            deletingSegment: {
+                id: childId.substring(0, 8),
+                childOrder: deletedChildOrder,
+                startImage: deletedSegmentImages.startUrl?.substring(0, 60),
+                endImage: deletedSegmentImages.endUrl?.substring(0, 60),
+            },
+            previousSegment: previousSegment ? {
+                id: previousSegment.id.substring(0, 8),
+                childOrder: (previousSegment as any).child_order,
+                startImage: prevSegmentImages?.startUrl?.substring(0, 60),
+                endImage: prevSegmentImages?.endUrl?.substring(0, 60),
+            } : null,
+            nextSegment: nextSegment ? {
+                id: nextSegment.id.substring(0, 8),
+                childOrder: (nextSegment as any).child_order,
+                startImage: nextSegmentImages?.startUrl?.substring(0, 60),
+                endImage: nextSegmentImages?.endUrl?.substring(0, 60),
+            } : null,
+            totalSegments: sortedSegments.length,
         });
 
         setDeletingChildId(childId);
 
         try {
             // 1. Bridge images - update adjacent segment to maintain continuity
-            // Find previous and next segments
-            const previousSegment = sortedSegments.find(c => (c as any).child_order === deletedChildOrder - 1);
-            const nextSegment = sortedSegments.find(c => (c as any).child_order === deletedChildOrder + 1);
-
             if (previousSegment && deletedSegmentImages.endUrl) {
                 // Update previous segment's end_image to deleted segment's end_image
                 // This bridges: [A → B] + [B → C (deleted)] + [C → D] becomes [A → C] + [C → D]
-                console.log('[ChildGenerationsView] Bridging: updating previous segment end_image to', deletedSegmentImages.endUrl.substring(0, 50));
-
                 const prevParams = (previousSegment.params as any) || {};
+                const oldEndImage = prevSegmentImages?.endUrl;
+
+                console.log('[SegmentDelete] Bridging previous segment:', {
+                    segmentId: previousSegment.id.substring(0, 8),
+                    oldEndImage: oldEndImage?.substring(0, 60),
+                    newEndImage: deletedSegmentImages.endUrl?.substring(0, 60),
+                    willChange: oldEndImage !== deletedSegmentImages.endUrl,
+                });
+
                 const updatedParams = {
                     ...prevParams,
                     end_image_url: deletedSegmentImages.endUrl,
@@ -652,13 +677,22 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     .eq('id', previousSegment.id);
 
                 if (bridgeError) {
-                    console.error('[ChildGenerationsView] Error bridging previous segment:', bridgeError);
+                    console.error('[SegmentDelete] Error bridging previous segment:', bridgeError);
+                } else {
+                    console.log('[SegmentDelete] ✓ Successfully bridged previous segment');
                 }
             } else if (!previousSegment && nextSegment && deletedSegmentImages.startUrl) {
                 // Deleting the first segment - update next segment's start_image
-                console.log('[ChildGenerationsView] Bridging: updating next segment start_image to', deletedSegmentImages.startUrl.substring(0, 50));
-
                 const nextParams = (nextSegment.params as any) || {};
+                const oldStartImage = nextSegmentImages?.startUrl;
+
+                console.log('[SegmentDelete] Bridging next segment (deleting first):', {
+                    segmentId: nextSegment.id.substring(0, 8),
+                    oldStartImage: oldStartImage?.substring(0, 60),
+                    newStartImage: deletedSegmentImages.startUrl?.substring(0, 60),
+                    willChange: oldStartImage !== deletedSegmentImages.startUrl,
+                });
+
                 const updatedParams = {
                     ...nextParams,
                     start_image_url: deletedSegmentImages.startUrl,
@@ -676,12 +710,23 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     .eq('id', nextSegment.id);
 
                 if (bridgeError) {
-                    console.error('[ChildGenerationsView] Error bridging next segment:', bridgeError);
+                    console.error('[SegmentDelete] Error bridging next segment:', bridgeError);
+                } else {
+                    console.log('[SegmentDelete] ✓ Successfully bridged next segment');
                 }
+            } else {
+                console.log('[SegmentDelete] No bridging needed:', {
+                    hasPreviousSegment: !!previousSegment,
+                    hasNextSegment: !!nextSegment,
+                    hasDeletedEndUrl: !!deletedSegmentImages.endUrl,
+                    hasDeletedStartUrl: !!deletedSegmentImages.startUrl,
+                });
             }
 
             // 2. Delete the generation
+            console.log('[SegmentDelete] Deleting generation...');
             await deleteGeneration.mutateAsync(childId);
+            console.log('[SegmentDelete] ✓ Generation deleted');
 
             // 3. Update child_order for siblings with higher order (shift down)
             const siblingsToUpdate = sortedSegments.filter(c => {
@@ -690,7 +735,11 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             });
 
             if (siblingsToUpdate.length > 0) {
-                console.log('[ChildGenerationsView] Updating child_order for', siblingsToUpdate.length, 'siblings');
+                console.log('[SegmentDelete] Reordering siblings:', siblingsToUpdate.map(s => ({
+                    id: s.id.substring(0, 8),
+                    oldOrder: (s as any).child_order,
+                    newOrder: (s as any).child_order - 1,
+                })));
 
                 for (const sibling of siblingsToUpdate) {
                     const currentOrder = (sibling as any).child_order;
@@ -700,12 +749,14 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         .eq('id', sibling.id);
 
                     if (error) {
-                        console.error('[ChildGenerationsView] Error updating child_order:', error);
+                        console.error('[SegmentDelete] Error updating child_order:', error);
                     }
                 }
+                console.log('[SegmentDelete] ✓ Siblings reordered');
             }
 
             // 4. Refetch to update the list
+            console.log('[SegmentDelete] ✓ Deletion complete, refetching...');
             refetch();
         } catch (error) {
             console.error('[ChildGenerationsView] Error deleting segment:', error);
