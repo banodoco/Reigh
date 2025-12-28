@@ -1119,9 +1119,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     const individualSegmentParams = taskParams.individual_segment_params || {};
 
     // Extract input image URLs and generation IDs from task params
-    // Priority: individual_segment_params > top-level > orchestrator_details
-    const inputImagePaths = taskParams.input_image_paths_resolved ||
+    // Priority: individual_segment_params > top-level > orchestrator_details > passed inputImages
+    // The fallback to adjustedTaskDetailsData.inputImages is critical for parent videos
+    // after "Join Segments" - the join task doesn't have original input images, but
+    // the caller (ChildGenerationsView) derives them from generation params
+    let inputImagePaths = taskParams.input_image_paths_resolved ||
                            orchestratorDetails.input_image_paths_resolved || [];
+
+    // Fall back to passed inputImages if task params don't have them
+    if (inputImagePaths.length === 0 && adjustedTaskDetailsData.inputImages?.length > 0) {
+        console.log('[MediaLightbox] [RegenerateImages] Using passed inputImages as fallback:', adjustedTaskDetailsData.inputImages.length);
+        inputImagePaths = adjustedTaskDetailsData.inputImages;
+    }
+
     const inputImageGenIds = taskParams.input_image_generation_ids ||
                             orchestratorDetails.input_image_generation_ids || [];
 

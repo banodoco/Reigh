@@ -612,7 +612,35 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const { data: parentTaskMapping } = useTaskFromUnifiedCache(isParentLightboxOpen ? parentGenerationId : '');
     const parentTaskId = typeof parentTaskMapping?.taskId === 'string' ? parentTaskMapping.taskId : '';
     const { data: parentTask, isLoading: isLoadingParentTask, error: parentTaskError } = useGetTask(parentTaskId);
-    const parentInputImages: string[] = useMemo(() => deriveInputImages(parentTask), [parentTask]);
+
+    // Derive input images - prefer task params, but fall back to generation params
+    // This is critical because after "Join Segments", the latest task is the join task
+    // which doesn't have the original input images. The generation's params still have
+    // the orchestrator_details from the original orchestrator task.
+    const parentInputImages: string[] = useMemo(() => {
+        // First try task params
+        const fromTask = deriveInputImages(parentTask);
+        if (fromTask.length > 0) {
+            console.log('[ChildGenerationsView] parentInputImages from task:', fromTask.length);
+            return fromTask;
+        }
+
+        // Fall back to generation params (orchestrator_details stores original input images)
+        const genParams = parentGeneration?.params as any;
+        if (genParams) {
+            const orchestratorDetails = genParams.orchestrator_details || {};
+            const inputPaths = genParams.input_image_paths_resolved ||
+                              orchestratorDetails.input_image_paths_resolved ||
+                              [];
+            if (inputPaths.length > 0) {
+                console.log('[ChildGenerationsView] parentInputImages from generation params:', inputPaths.length);
+                return inputPaths;
+            }
+        }
+
+        console.log('[ChildGenerationsView] parentInputImages: none found');
+        return [];
+    }, [parentTask, parentGeneration?.params]);
 
     // Get task data for segment input image lightbox
     const segmentImageGenerationId = segmentImageLightbox 
@@ -1394,15 +1422,25 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
     const segmentGenerationIds = useMemo(() => {
         const childParams = child.params as any || {};
         const orchestratorDetails = childParams.orchestrator_details || {};
+        const individualSegmentParams = childParams.individual_segment_params || {};
+
+        // Check for explicit start/end URLs first (set by individual_travel_segment tasks)
+        const explicitStartUrl = individualSegmentParams.start_image_url || childParams.start_image_url;
+        const explicitEndUrl = individualSegmentParams.end_image_url || childParams.end_image_url;
+        const explicitStartGenId = individualSegmentParams.start_image_generation_id || childParams.start_image_generation_id;
+        const explicitEndGenId = individualSegmentParams.end_image_generation_id || childParams.end_image_generation_id;
+
+        // Fall back to array extraction if no explicit URLs
         const allGenerationIds = orchestratorDetails.input_image_generation_ids || childParams.input_image_generation_ids || [];
         const allFallbackUrls = orchestratorDetails.input_image_paths_resolved || childParams.input_image_paths_resolved || [];
 
         // For segment at index N, we need images[N] and images[N+1]
+        // Use explicit URLs if available, otherwise fall back to array indexing
         return {
-            startGenId: allGenerationIds[index] as string | undefined,
-            endGenId: allGenerationIds[index + 1] as string | undefined,
-            startFallbackUrl: allFallbackUrls[index] as string | undefined,
-            endFallbackUrl: allFallbackUrls[index + 1] as string | undefined,
+            startGenId: explicitStartGenId || allGenerationIds[index] as string | undefined,
+            endGenId: explicitEndGenId || allGenerationIds[index + 1] as string | undefined,
+            startFallbackUrl: explicitStartUrl || allFallbackUrls[index] as string | undefined,
+            endFallbackUrl: explicitEndUrl || allFallbackUrls[index + 1] as string | undefined,
         };
     }, [child.params, index]);
 
