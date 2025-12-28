@@ -28,7 +28,7 @@ import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { createMobileTapHandler, deriveInputImages } from '../utils/gallery-utils';
+import { createMobileTapHandler, deriveInputImages, extractSegmentImages } from '../utils/gallery-utils';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
@@ -1418,37 +1418,17 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
         return { aspectRatio: '16/9' }; // Fallback to 16:9
     }, [aspectRatio]);
 
-    // Extract generation IDs for this segment's input images
-    const segmentGenerationIds = useMemo(() => {
-        const childParams = child.params as any || {};
-        const orchestratorDetails = childParams.orchestrator_details || {};
-        const individualSegmentParams = childParams.individual_segment_params || {};
-
-        // Check for explicit start/end URLs first (set by individual_travel_segment tasks)
-        const explicitStartUrl = individualSegmentParams.start_image_url || childParams.start_image_url;
-        const explicitEndUrl = individualSegmentParams.end_image_url || childParams.end_image_url;
-        const explicitStartGenId = individualSegmentParams.start_image_generation_id || childParams.start_image_generation_id;
-        const explicitEndGenId = individualSegmentParams.end_image_generation_id || childParams.end_image_generation_id;
-
-        // Fall back to array extraction if no explicit URLs
-        const allGenerationIds = orchestratorDetails.input_image_generation_ids || childParams.input_image_generation_ids || [];
-        const allFallbackUrls = orchestratorDetails.input_image_paths_resolved || childParams.input_image_paths_resolved || [];
-
-        // For segment at index N, we need images[N] and images[N+1]
-        // Use explicit URLs if available, otherwise fall back to array indexing
-        return {
-            startGenId: explicitStartGenId || allGenerationIds[index] as string | undefined,
-            endGenId: explicitEndGenId || allGenerationIds[index + 1] as string | undefined,
-            startFallbackUrl: explicitStartUrl || allFallbackUrls[index] as string | undefined,
-            endFallbackUrl: explicitEndUrl || allFallbackUrls[index + 1] as string | undefined,
-        };
-    }, [child.params, index]);
+    // Extract input images using shared utility (handles both explicit URLs and array formats)
+    const segmentImageInfo = useMemo(() =>
+        extractSegmentImages(child.params, index),
+        [child.params, index]
+    );
 
     // Fetch fresh URLs from database for segment input images (always use main variant)
     const { data: freshGenerationUrls } = useQuery({
-        queryKey: ['segment-input-generations', segmentGenerationIds.startGenId, segmentGenerationIds.endGenId],
+        queryKey: ['segment-input-generations', segmentImageInfo.startGenId, segmentImageInfo.endGenId],
         queryFn: async () => {
-            const idsToFetch = [segmentGenerationIds.startGenId, segmentGenerationIds.endGenId].filter(Boolean) as string[];
+            const idsToFetch = [segmentImageInfo.startGenId, segmentImageInfo.endGenId].filter(Boolean) as string[];
             if (idsToFetch.length === 0) return {};
             
             const { data, error } = await supabase
@@ -1469,26 +1449,25 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
             console.log('[SegmentImageFlow] Fetched fresh generation URLs:', {
                 idsRequested: idsToFetch,
                 urlsFound: Object.keys(urlMap).length,
-                startUrl: segmentGenerationIds.startGenId ? urlMap[segmentGenerationIds.startGenId]?.location?.substring(0, 50) : 'no-id',
-                endUrl: segmentGenerationIds.endGenId ? urlMap[segmentGenerationIds.endGenId]?.location?.substring(0, 50) : 'no-id',
+                startUrl: segmentImageInfo.startGenId ? urlMap[segmentImageInfo.startGenId]?.location?.substring(0, 50) : 'no-id',
+                endUrl: segmentImageInfo.endGenId ? urlMap[segmentImageInfo.endGenId]?.location?.substring(0, 50) : 'no-id',
             });
             
             return urlMap;
         },
-        enabled: !!(segmentGenerationIds.startGenId || segmentGenerationIds.endGenId),
+        enabled: !!(segmentImageInfo.startGenId || segmentImageInfo.endGenId),
         staleTime: 10000, // Refresh every 10 seconds to pick up variant changes
     });
 
-    // Build segmentImages using fresh URLs (from main variant) with fallback to cached URLs
+    // Build segmentImages using fresh URLs (from main variant) with fallback to utility-extracted URLs
     const segmentImages = useMemo(() => {
-        const { startGenId, endGenId, startFallbackUrl, endFallbackUrl } = segmentGenerationIds;
-        
-        // Use fresh URL if available, otherwise fall back to cached URL
-        const startUrl = (startGenId && freshGenerationUrls?.[startGenId]?.location) 
-            || startFallbackUrl;
-        const endUrl = (endGenId && freshGenerationUrls?.[endGenId]?.location) 
-            || endFallbackUrl;
-        
+        const { startGenId, endGenId, startUrl: fallbackStartUrl, endUrl: fallbackEndUrl } = segmentImageInfo;
+
+        // Use fresh URL from database if available (ensures we get current main variant),
+        // otherwise fall back to URL from params
+        const startUrl = (startGenId && freshGenerationUrls?.[startGenId]?.location) || fallbackStartUrl;
+        const endUrl = (endGenId && freshGenerationUrls?.[endGenId]?.location) || fallbackEndUrl;
+
         console.log('[SegmentImageFlow] Building segmentImages for segment', index);
         console.log('[SegmentImageFlow] Using fresh URLs:', {
             startUsedFresh: !!(startGenId && freshGenerationUrls?.[startGenId]?.location),
@@ -1496,13 +1475,13 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
             startUrl: startUrl?.substring(0, 50),
             endUrl: endUrl?.substring(0, 50),
         });
-        
+
         return {
             start: startUrl ? { url: startUrl, generationId: startGenId } : null,
             end: endUrl ? { url: endUrl, generationId: endGenId } : null,
             hasImages: !!(startUrl || endUrl),
         };
-    }, [segmentGenerationIds, freshGenerationUrls, index]);
+    }, [segmentImageInfo, freshGenerationUrls, index]);
 
     return (
         <Card className="overflow-hidden flex flex-col">

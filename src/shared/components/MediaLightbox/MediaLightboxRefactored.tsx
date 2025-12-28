@@ -86,6 +86,7 @@ import { FlexContainer, MediaWrapper } from './components/layouts';
 
 // Import utils
 import { downloadMedia } from './utils';
+import { extractSegmentImages } from '@/tools/travel-between-images/components/VideoGallery/utils/gallery-utils';
 
 // Import video trim components (conditional for segment videos)
 import {
@@ -1116,41 +1117,31 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     const taskParams = adjustedTaskDetailsData.task.params as Record<string, any>;
     const orchestratorDetails = taskParams.orchestrator_details || {};
-    const individualSegmentParams = taskParams.individual_segment_params || {};
 
-    // Extract input image URLs and generation IDs from task params
-    // Priority: individual_segment_params > top-level > orchestrator_details > passed inputImages
-    // The fallback to adjustedTaskDetailsData.inputImages is critical for parent videos
-    // after "Join Segments" - the join task doesn't have original input images, but
-    // the caller (ChildGenerationsView) derives them from generation params
-    let inputImagePaths = taskParams.input_image_paths_resolved ||
-                           orchestratorDetails.input_image_paths_resolved || [];
+    // Use shared utility to extract segment images (handles explicit URLs and array formats)
+    const segmentIndex = taskParams.segment_index ?? 0;
+    let segmentImageInfo = extractSegmentImages(taskParams, segmentIndex);
 
     // Fall back to passed inputImages if task params don't have them
-    if (inputImagePaths.length === 0 && adjustedTaskDetailsData.inputImages?.length > 0) {
+    // This is critical for parent videos after "Join Segments" - the join task
+    // doesn't have original input images, but the caller derives them from generation params
+    if (!segmentImageInfo.hasImages && adjustedTaskDetailsData.inputImages?.length > 0) {
         console.log('[MediaLightbox] [RegenerateImages] Using passed inputImages as fallback:', adjustedTaskDetailsData.inputImages.length);
-        inputImagePaths = adjustedTaskDetailsData.inputImages;
+        const passedImages = adjustedTaskDetailsData.inputImages;
+        segmentImageInfo = {
+            startUrl: passedImages[0],
+            endUrl: passedImages.length > 1 ? passedImages[passedImages.length - 1] : passedImages[0],
+            startGenId: undefined,
+            endGenId: undefined,
+            hasImages: passedImages.length > 0,
+        };
     }
 
-    const inputImageGenIds = taskParams.input_image_generation_ids ||
-                            orchestratorDetails.input_image_generation_ids || [];
-
-    // For segment regeneration, check for explicit start/end URLs first
-    // These are set by individual_travel_segment tasks
-    const explicitStartUrl = individualSegmentParams.start_image_url || taskParams.start_image_url;
-    const explicitEndUrl = individualSegmentParams.end_image_url || taskParams.end_image_url;
-
-    // Use explicit URLs if available, otherwise fall back to array extraction
-    const startImageUrl = explicitStartUrl || inputImagePaths[0];
-    const endImageUrl = explicitEndUrl || (inputImagePaths.length > 1 ? inputImagePaths[inputImagePaths.length - 1] : inputImagePaths[0]);
-    const startImageGenId = inputImageGenIds[0];
-    const endImageGenId = inputImageGenIds.length > 1 ? inputImageGenIds[inputImageGenIds.length - 1] : inputImageGenIds[0];
+    const { startUrl: startImageUrl, endUrl: endImageUrl, startGenId: startImageGenId, endGenId: endImageGenId } = segmentImageInfo;
 
     console.log('[MediaLightbox] [RegenerateImages] Image extraction:', {
-      hasIndividualSegmentParams: !!taskParams.individual_segment_params,
-      explicitStartUrl: explicitStartUrl?.substring(0, 50),
-      explicitEndUrl: explicitEndUrl?.substring(0, 50),
-      inputImagePathsCount: inputImagePaths.length,
+      segmentIndex,
+      hasImages: segmentImageInfo.hasImages,
       finalStartUrl: startImageUrl?.substring(0, 50),
       finalEndUrl: endImageUrl?.substring(0, 50),
     });

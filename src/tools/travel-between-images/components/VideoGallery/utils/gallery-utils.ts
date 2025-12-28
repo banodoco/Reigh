@@ -114,6 +114,75 @@ export const deriveInputImages = (task: any): string[] => {
 };
 
 /**
+ * Result of extracting segment input images from params
+ */
+export interface SegmentImageInfo {
+  startUrl: string | undefined;
+  endUrl: string | undefined;
+  startGenId: string | undefined;
+  endGenId: string | undefined;
+  hasImages: boolean;
+}
+
+/**
+ * Extract segment input images from task/generation params
+ *
+ * This is the single source of truth for getting start/end images for a segment.
+ * It handles multiple storage formats:
+ * 1. Explicit URLs (start_image_url, end_image_url) - used by individual segment tasks
+ * 2. Array indexing (input_image_paths_resolved[index]) - used by orchestrator tasks
+ *
+ * @param params - Task or generation params object
+ * @param segmentIndex - Optional segment index for array-based extraction (default: 0)
+ * @returns SegmentImageInfo with start/end URLs and generation IDs
+ */
+export const extractSegmentImages = (params: any, segmentIndex: number = 0): SegmentImageInfo => {
+  const cleanUrl = (url: string | undefined): string | undefined => {
+    if (typeof url !== 'string') return undefined;
+    // Remove surrounding quotes if present
+    return url.replace(/^["']|["']$/g, '');
+  };
+
+  const p = params || {};
+  const orchestratorDetails = p.orchestrator_details || {};
+  const individualSegmentParams = p.individual_segment_params || {};
+
+  // Priority 1: Explicit URLs (set by individual_travel_segment tasks)
+  const explicitStartUrl = cleanUrl(individualSegmentParams.start_image_url || p.start_image_url);
+  const explicitEndUrl = cleanUrl(individualSegmentParams.end_image_url || p.end_image_url);
+  const explicitStartGenId = individualSegmentParams.start_image_generation_id || p.start_image_generation_id;
+  const explicitEndGenId = individualSegmentParams.end_image_generation_id || p.end_image_generation_id;
+
+  // Priority 2: Array-based extraction (orchestrator tasks store all images in arrays)
+  const allUrls = orchestratorDetails.input_image_paths_resolved ||
+                  p.input_image_paths_resolved ||
+                  [];
+  const allGenIds = orchestratorDetails.input_image_generation_ids ||
+                    p.input_image_generation_ids ||
+                    [];
+
+  // For segment at index N, we need images[N] (start) and images[N+1] (end)
+  const arrayStartUrl = cleanUrl(allUrls[segmentIndex]);
+  const arrayEndUrl = cleanUrl(allUrls[segmentIndex + 1]);
+  const arrayStartGenId = allGenIds[segmentIndex];
+  const arrayEndGenId = allGenIds[segmentIndex + 1];
+
+  // Use explicit values if available, otherwise fall back to array
+  const startUrl = explicitStartUrl || arrayStartUrl;
+  const endUrl = explicitEndUrl || arrayEndUrl;
+  const startGenId = explicitStartGenId || arrayStartGenId;
+  const endGenId = explicitEndGenId || arrayEndGenId;
+
+  return {
+    startUrl,
+    endUrl,
+    startGenId,
+    endGenId,
+    hasImages: !!(startUrl || endUrl),
+  };
+};
+
+/**
  * Handle hover preview opening details
  */
 export const createHoverDetailsHandler = (
