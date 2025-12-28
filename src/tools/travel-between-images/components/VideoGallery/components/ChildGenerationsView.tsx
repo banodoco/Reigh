@@ -1561,14 +1561,21 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 if (!shouldRenderSegmentLightbox || !lightboxSlot) return null;
                 
                 const childMedia = lightboxSlot.child;
-                console.log('[MobileTapFlow:ChildView] ✅ RENDERING MediaLightbox for segment', { 
-                    index: lightboxIndex, 
+                // IMPORTANT: Clear parent_generation_id so MediaLightbox fetches variants
+                // for THIS child segment, not the parent. Travel-between-images variants
+                // are created on the child generation (via child_generation_id in complete_task).
+                const childMediaForLightbox = {
+                    ...childMedia,
+                    parent_generation_id: undefined, // Fetch variants for child, not parent
+                };
+                console.log('[MobileTapFlow:ChildView] ✅ RENDERING MediaLightbox for segment', {
+                    index: lightboxIndex,
                     childId: childMedia?.id,
                     timestamp: Date.now()
                 });
                 return (
                     <MediaLightbox
-                        media={childMedia}
+                        media={childMediaForLightbox}
                         onClose={handleLightboxClose}
                         onNext={handleLightboxNext}
                         onPrevious={handleLightboxPrev}

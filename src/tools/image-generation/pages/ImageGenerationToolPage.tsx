@@ -525,10 +525,10 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   };
 
-  const handleNewGenerate = async (formData: any) => {
+  const handleNewGenerate = async (formData: any): Promise<string[]> => {
     const generateStartTime = Date.now();
     const generateId = `gen-${generateStartTime}-${Math.random().toString(36).slice(2, 6)}`;
-    
+
     console.log(`[GenerationDiag:${generateId}] 🚀 GENERATION START:`, {
       selectedProjectId,
       generationMode: formData.generationMode,
@@ -540,7 +540,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
     if (!selectedProjectId) {
       toast.error("No project selected. Please select a project before generating images.");
-      return;
+      return [];
     }
 
     const { generationMode, associatedShotId, batchTaskParams, ...restOfFormData } = formData;
@@ -553,11 +553,13 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
     // Always use the unified task creation approach
     setLocalIsGenerating(true);
+    let createdTaskIds: string[] = [];
     try {
       // Use the batch params from the form (should always be present now)
       if (batchTaskParams) {
         console.log('[ImageGeneration] Using unified batch task creation for model:', generationMode);
-        await createBatchImageGenerationTasks(batchTaskParams);
+        const createdTasks = await createBatchImageGenerationTasks(batchTaskParams);
+        createdTaskIds = createdTasks.map((t: any) => t.id);
       } else {
         // This should not happen with the updated form, but provide a safety fallback
         console.error('[ImageGeneration] Missing batchTaskParams - this indicates a form integration issue');
@@ -566,14 +568,15 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
       // Invalidate generations to ensure they refresh when tasks complete
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
-      
+
       const generateDuration = Date.now() - generateStartTime;
       console.log(`[GenerationDiag:${generateId}] ✅ GENERATION COMPLETE:`, {
         duration: `${generateDuration}ms`,
         tasksCreated: batchTaskParams?.prompts?.length * batchTaskParams?.imagesPerPrompt || 0,
+        taskIds: createdTaskIds,
         timestamp: Date.now()
       });
-      
+
       console.log('[ImageGeneration] Image generation tasks created successfully');
       setLocalJustQueued(true);
       if (localQueuedTimeoutRef.current) {
@@ -583,9 +586,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         setLocalJustQueued(false);
         localQueuedTimeoutRef.current = null;
       }, 3000);
+
+      return createdTaskIds;
     } catch (error) {
       console.error('[ImageGeneration] Error creating tasks:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to create tasks.');
+      return [];
     } finally {
       setLocalIsGenerating(false);
     }

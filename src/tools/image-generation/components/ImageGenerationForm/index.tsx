@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
 import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
 import { useSubmitButtonState } from '@/shared/hooks/useSubmitButtonState';
+import { waitForTasksInCache } from '@/shared/lib/waitForTasks';
 import { useHydratedReferences } from '../../hooks/useHydratedReferences';
 
 // Import extracted components
@@ -66,7 +67,7 @@ const LazyPromptEditorModal = React.lazy(() =>
 );
 
 interface ImageGenerationFormProps {
-  onGenerate: (formData: any) => void;
+  onGenerate: (formData: any) => Promise<string[]> | string[] | void;
   isGenerating?: boolean;
   hasApiKey?: boolean;
   apiKey?: string;
@@ -2683,10 +2684,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           };
 
           console.log('[ImageGenerationForm] Automated mode: Queuing', newPrompts.length, 'images (1 per prompt)');
-          onGenerate(legacyGenerationData);
+          const taskIds = await onGenerate(legacyGenerationData);
 
-          // Small delay to allow real tasks to appear before removing filler
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Wait for tasks to appear in UI before removing filler (up to 5s)
+          if (taskIds && taskIds.length > 0) {
+            console.log('[ImageGenerationForm] Waiting for tasks to appear in UI:', taskIds.length, 'tasks');
+            await waitForTasksInCache(queryClient, capturedProjectId, taskIds, { timeout: 5000 });
+          }
 
         } catch (error) {
           console.error('[ImageGenerationForm] Automated mode: Error generating prompts:', error);
