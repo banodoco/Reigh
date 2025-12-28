@@ -69,7 +69,6 @@ import {
   TopRightControls,
   BottomLeftControls,
   BottomRightControls,
-  DerivedGenerationsGrid,
   EditModePanel,
   ShotSelectorControls,
   WorkflowControlsBar,
@@ -413,7 +412,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // This ensures edit-video variants show correctly when viewing from TasksPane
   const variantsHook = useVariants({
     generationId: variantFetchGenerationId,
-    enabled: true, // Always enabled to support variant display in DerivedGenerationsGrid
+    enabled: true, // Always enabled to support variant display in VariantSelector
   });
   const {
     variants,
@@ -425,8 +424,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setPrimaryVariant,
   } = variantsHook;
 
-  // Mutation to mark variants as viewed (removes NEW badge)
-  const markVariantViewed = useMarkVariantViewed();
+  // Hook to mark variants as viewed (removes NEW badge)
+  const { markViewed } = useMarkVariantViewed();
 
   // Wrap setActiveVariantId with logging and mark-as-viewed
   const setActiveVariantId = React.useCallback((variantId: string) => {
@@ -437,10 +436,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     });
     // Mark variant as viewed when selected (fire-and-forget)
     if (variantId) {
-      markVariantViewed.mutate(variantId);
+      markViewed(variantId);
     }
     rawSetActiveVariantId(variantId);
-  }, [rawSetActiveVariantId, activeVariant, variants, markVariantViewed]);
+  }, [rawSetActiveVariantId, activeVariant, variants, markViewed]);
   
   // Log when activeVariant changes
   React.useEffect(() => {

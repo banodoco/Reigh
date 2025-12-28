@@ -1029,13 +1029,20 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 </div>
               )}
               
-              {/* Variant Count - show below variant name */}
+              {/* Variant Count + NEW badge - show below variant name */}
               {image.derivedCount && image.derivedCount > 1 && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help">
-                        {image.derivedCount}
+                      <div className="flex items-center gap-1">
+                        <div className="bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help">
+                          {image.derivedCount}
+                        </div>
+                        {image.hasUnviewedVariants && (
+                          <div className="bg-yellow-500 text-black text-[8px] font-bold px-1 py-0.5 rounded">
+                            NEW
+                          </div>
+                        )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -1044,7 +1051,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   </Tooltip>
                 </TooltipProvider>
               )}
-              
+
               {/* Shot Navigation Button */}
               {image.shot_id && simplifiedShotOptions.length > 0 && (
                 <button 
@@ -1437,15 +1444,22 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 </Button>
               )}
               
-              {/* Variant Count + Info Button Row (for non-video content) */}
+              {/* Variant Count + NEW badge + Info Button Row (for non-video content) */}
               <div className="flex flex-row items-center gap-1.5">
-                {/* Variant Count - positioned to the left of Info button */}
+                {/* Variant Count + NEW badge - positioned to the left of Info button */}
                 {!isVideoContent && image.derivedCount && image.derivedCount > 1 && (
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="bg-black/50 text-white text-[10px] font-medium px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help opacity-0 group-hover:opacity-100 transition-opacity">
-                          {image.derivedCount}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="bg-black/50 text-white text-[10px] font-medium px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help">
+                            {image.derivedCount}
+                          </div>
+                          {image.hasUnviewedVariants && (
+                            <div className="bg-yellow-500 text-black text-[8px] font-bold px-1 py-0.5 rounded">
+                              NEW
+                            </div>
+                          )}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent side="left">
@@ -1454,7 +1468,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                
+
                 {/* Info tooltip (shown on hover) */}
               {image.metadata && (
                 isMobile ? (

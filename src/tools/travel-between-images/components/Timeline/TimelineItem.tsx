@@ -483,13 +483,20 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
               )}
 
               {/* Duplicate Button */}
-              {/* Variant Count - top left */}
+              {/* Variant Count + NEW badge - top left */}
               {(image as any).derivedCount && (image as any).derivedCount > 1 && (
-                <div 
-                  className="absolute top-1 left-1 h-5 w-5 rounded-full bg-black/60 text-white text-[9px] font-medium flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none"
+                <div
+                  className="absolute top-1 left-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none"
                   title={`${(image as any).derivedCount} variants`}
                 >
-                  {(image as any).derivedCount}
+                  <div className="h-5 w-5 rounded-full bg-black/60 text-white text-[9px] font-medium flex items-center justify-center backdrop-blur-sm">
+                    {(image as any).derivedCount}
+                  </div>
+                  {(image as any).hasUnviewedVariants && (
+                    <div className="bg-yellow-500 text-black text-[7px] font-bold px-1 py-0.5 rounded">
+                      NEW
+                    </div>
+                  )}
                 </div>
               )}
               

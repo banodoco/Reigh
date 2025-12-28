@@ -20,6 +20,7 @@ import { ExamplesPane } from './components/ExamplesPane';
 // Hooks & Constants
 import { usePaneState } from './hooks/usePaneState';
 import { useVideoPreload } from './hooks/useVideoPreload';
+import { useHomePagePreload } from './hooks/useHomePagePreload';
 import { exampleStyles } from './constants';
 
 export default function HomePage() {
@@ -65,6 +66,9 @@ export default function HomePage() {
 
   // Pane Logic Hook
   const paneState = usePaneState();
+
+  // Preload home page thumbnails (only when this component mounts)
+  useHomePagePreload();
   
   // Background video ref for dynamic playback rate
   const videoRef = useRef<HTMLVideoElement>(null);

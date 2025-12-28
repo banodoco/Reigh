@@ -23,7 +23,7 @@ export const useTaskType = (taskType: string) => {
         .from('task_types')
         .select('id, name, content_type, tool_type, display_name, category')
         .eq('name', taskType)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.warn(`Failed to fetch task type info for ${taskType}:`, error);

@@ -21,9 +21,6 @@ export type { FloatingToolControlsProps } from './FloatingToolControls';
 
 export { TopLeftControls, TopRightControls, BottomLeftControls, BottomRightControls } from './ButtonGroups';
 
-export { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
-export type { DerivedGenerationsGridProps } from './DerivedGenerationsGrid';
-
 export { ActiveVariantDisplay } from './ActiveVariantDisplay';
 export type { VariantInfo } from './TaskDetailsPanelWrapper';
 

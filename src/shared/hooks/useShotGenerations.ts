@@ -209,11 +209,12 @@ export const useAllShotGenerations = (
         .abortSignal(signal);
       
       if (response.error) {
-        console.error('[DataTrace] ❌ NETWORK FETCH ERROR:', response.error);
+        // Abort errors are expected during rapid invalidations - silently return cached data
         if (response.error.code === '20' || response.error.message?.includes('abort')) {
           const cachedData = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', stableShotId]);
           return cachedData || [];
         }
+        console.error('[DataTrace] ❌ NETWORK FETCH ERROR:', response.error);
         throw response.error;
       }
 
