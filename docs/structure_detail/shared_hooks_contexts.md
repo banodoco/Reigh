@@ -65,6 +65,7 @@
 | **`useLastAffectedShot`** | Shot tracking | Recently modified shot reference |
 | **`useClickRipple`** | Click ripple effect | Reusable golden circle expand animation on click |
 | **`useDoubleTapWithSelection`** | Double-tap detection | Instant selection + double-tap to open (iPad/tablets) |
+| **`useSubmitButtonState`** | Button state machine | Submitting → Success → Idle transitions with cleanup |
 
 ### 🔄 Real-time & Resources
 
@@ -90,6 +91,7 @@
 | **`LastAffectedShotContext`** | Recent shot tracking | `App.tsx` | `const { lastShot } = useLastAffectedShot()` |
 | **`CurrentShotContext`** | Active shot selection | Tool-specific | `const { currentShot } = useCurrentShot()` |
 | **`ThemeContext`** | Theme management | `App.tsx` | `const { theme, setTheme } = useTheme()` |
+| **`IncomingTasksContext`** | Pending task creation tracking | `App.tsx` | `const { addIncomingTask, removeIncomingTask } = useIncomingTasks()` |
 
 ### Context Usage Example
 
@@ -118,6 +120,63 @@ export function MyComponent() {
   );
 }
 ```
+
+### 🚀 **Background Task Submission Pattern**
+
+For tools with long-running preparation phases (e.g., AI prompt generation), use `useIncomingTasks` + `useSubmitButtonState` together:
+
+```typescript
+import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
+import { useSubmitButtonState } from '@/shared/hooks/useSubmitButtonState';
+
+function MyToolForm() {
+  const { addIncomingTask, removeIncomingTask } = useIncomingTasks();
+  const submitButton = useSubmitButtonState();
+
+  const handleSubmit = () => {
+    // 1. Button feedback: Submitting... (1s) → Success! (2s) → normal
+    submitButton.trigger();
+
+    // 2. Filler task appears immediately in TasksPane
+    const incomingId = addIncomingTask({
+      taskType: 'my_task_type',
+      label: 'Processing request...',
+      expectedCount: 5, // optional
+    });
+
+    // 3. Background work (fire-and-forget)
+    (async () => {
+      try {
+        const result = await doExpensivePreparation(); // e.g., AI calls
+        await createActualTasks(result);
+        await new Promise(r => setTimeout(r, 500)); // let real tasks appear
+      } catch (error) {
+        toast.error('Failed to create tasks');
+      } finally {
+        removeIncomingTask(incomingId);
+      }
+    })();
+  };
+
+  return (
+    <Button
+      onClick={handleSubmit}
+      disabled={submitButton.isSubmitting}
+      variant={submitButton.isSuccess ? "success" : "default"}
+    >
+      {submitButton.isSuccess ? "Creating tasks!"
+        : submitButton.isSubmitting ? "Submitting..."
+        : "Generate"}
+    </Button>
+  );
+}
+```
+
+**Key Features:**
+- Button shows immediate feedback without blocking UI
+- Filler task in TasksPane shows user that work is happening
+- Filler disappears when real tasks appear (or on error)
+- Proper cleanup on component unmount
 
 ### 🎯 **ShotsContext: Centralized Data Management**
 

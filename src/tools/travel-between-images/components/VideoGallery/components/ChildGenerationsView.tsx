@@ -610,7 +610,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         const deletedParams = childToDelete.params as any || {};
 
         // Extract the deleted segment's image URLs for bridging
-        const deletedSegmentImages = extractSegmentImages(deletedParams, 0);
+        // IMPORTANT: Pass the segment's child_order so extractSegmentImages uses correct array index
+        const deletedSegmentImages = extractSegmentImages(deletedParams, deletedChildOrder ?? 0);
 
         // Debug: Log all segments and their child_order values
         console.log('[SegmentDelete] All segments child_order values:', sortedSegments.map(s => ({
@@ -629,8 +630,11 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         const nextSegment = sortedSegments.find(c => (c as any).child_order === deletedChildOrder + 1);
 
         // Extract images from adjacent segments for logging
-        const prevSegmentImages = previousSegment ? extractSegmentImages((previousSegment.params as any) || {}, 0) : null;
-        const nextSegmentImages = nextSegment ? extractSegmentImages((nextSegment.params as any) || {}, 0) : null;
+        // IMPORTANT: Pass each segment's child_order so extractSegmentImages uses correct array index
+        const prevChildOrder = previousSegment ? (previousSegment as any).child_order ?? 0 : 0;
+        const nextChildOrder = nextSegment ? (nextSegment as any).child_order ?? 0 : 0;
+        const prevSegmentImages = previousSegment ? extractSegmentImages((previousSegment.params as any) || {}, prevChildOrder) : null;
+        const nextSegmentImages = nextSegment ? extractSegmentImages((nextSegment.params as any) || {}, nextChildOrder) : null;
 
         // Helper to get last part of URL (the unique filename)
         const urlTail = (url: string | undefined) => url ? '...' + url.slice(-40) : undefined;
