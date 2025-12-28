@@ -84,6 +84,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   return (
     <div
       className={cn("grid gap-3", gridColsClass)}
+      style={{ contain: 'content' }}
       onDoubleClick={(e) => {
         // Only deselect if double-clicking on the grid itself, not on an image
         if (e.target === e.currentTarget) {

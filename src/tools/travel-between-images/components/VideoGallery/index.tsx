@@ -969,8 +969,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           />
         ) : (
           <>
-            {/* Video grid */}
-            <div className={`grid ${gridColumnConfig.classes} gap-2 sm:gap-3 md:gap-4`}>
+            {/* Video grid - CSS containment isolates from drag layout recalcs */}
+            <div
+              className={`grid ${gridColumnConfig.classes} gap-2 sm:gap-3 md:gap-4`}
+              style={{ contain: 'content' }}
+            >
               {displaySortedVideoOutputs.map((video, index) => {
                 const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
 
