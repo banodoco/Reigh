@@ -57,6 +57,10 @@ export interface GeneratedImageWithMetadata {
   all_shot_associations?: Array<{ shot_id: string; position: number | null; timeline_frame?: number | null }>;
   based_on?: string | null; // ID of source generation for lineage tracking (magic edits, variations)
   derivedCount?: number; // Number of generations based on this one
+  // Parent/child relationship fields (for travel-between-images segments)
+  is_child?: boolean;
+  parent_generation_id?: string;
+  child_order?: number;
 }
 
 export interface ImageGalleryProps {

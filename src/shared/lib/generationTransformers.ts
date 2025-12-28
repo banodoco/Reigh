@@ -88,6 +88,10 @@ export interface RawGeneration {
   based_on?: string | null;
   name?: string | null;
   derivedCount?: number; // Number of generations/variants based on this one
+  // Parent/child relationship fields
+  is_child?: boolean | null;
+  parent_generation_id?: string | null;
+  child_order?: number | null;
   // JSONB column mapping shot_id -> array of timeline_frames
   // Each generation can appear multiple times in the same shot (different positions)
   // Example: { "shot_id_123": [120, 420, null] } means 3 entries: at frame 120, 420, and one unpositioned
@@ -242,6 +246,10 @@ export function transformGeneration(
     timeline_frame: null, // Will be set if shot context provided
     name: item.name || item.params?.name || undefined,
     derivedCount: item.derivedCount || 0, // Number of generations/variants based on this one
+    // Parent/child relationship fields
+    is_child: item.is_child ?? undefined,
+    parent_generation_id: item.parent_generation_id ?? undefined,
+    child_order: item.child_order ?? undefined,
   };
 
   // Handle shot associations - prefer JSONB shot_data over JOIN shot_generations
