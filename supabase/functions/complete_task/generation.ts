@@ -515,7 +515,11 @@ export async function createGenerationFromTask(
           created_from: 'individual_segment_regeneration',
         };
 
-        await createVariant(supabase, childGen.id, publicUrl, thumbnailUrl || null, variantParams, true, VARIANT_TYPES.INDIVIDUAL_SEGMENT, null);
+        // Respect make_primary_variant flag from UI (defaults to true for backward compatibility)
+        const makePrimary = taskData.params?.make_primary_variant ?? true;
+        console.log(`[GenMigration] Creating variant with isPrimary=${makePrimary}`);
+
+        await createVariant(supabase, childGen.id, publicUrl, thumbnailUrl || null, variantParams, makePrimary, VARIANT_TYPES.INDIVIDUAL_SEGMENT, null);
 
         console.log(`[GenMigration] Successfully created variant for child generation ${childGenId}`);
 

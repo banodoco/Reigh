@@ -46,9 +46,12 @@ export interface IndividualTravelSegmentParams {
   motion_mode?: 'basic' | 'presets' | 'advanced';
   selected_phase_preset_id?: string | null;
   loras?: Array<{ path: string; strength: number }>;
-  
+
   // Optional generation name for the variant
   generation_name?: string;
+
+  // Whether the new variant should be set as primary (default: true for backward compatibility)
+  make_primary_variant?: boolean;
 }
 
 // Maximum frames allowed per segment (81-frame limit)
@@ -285,6 +288,9 @@ function buildIndividualTravelSegmentParams(
   if (params.generation_name) {
     taskParams.generation_name = params.generation_name;
   }
+
+  // Add make_primary_variant flag (defaults to true for backward compatibility)
+  taskParams.make_primary_variant = params.make_primary_variant ?? true;
 
   // Build individual_segment_params - all UI overrides in one place
   // GPU worker should check these first before falling back to top-level values

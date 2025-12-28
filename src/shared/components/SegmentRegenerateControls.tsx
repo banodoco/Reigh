@@ -13,6 +13,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
+import { Switch } from '@/shared/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { ChevronDown, ChevronUp, Loader2, Check, RotateCcw } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
@@ -192,6 +193,9 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     return savedRandomSeed !== undefined ? savedRandomSeed : true;
   });
 
+  // Make primary variant - whether the new regeneration should replace the current video
+  const [makePrimaryVariant, setMakePrimaryVariant] = useState(true);
+
   // LoRA state - derived from params.additional_loras
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>(() => {
     const lorasObj = params.additional_loras || params.orchestrator_details?.additional_loras || {};
@@ -364,6 +368,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         motion_mode: motionMode,
         selected_phase_preset_id: selectedPhasePresetId,
         loras: lorasForTask,
+        make_primary_variant: makePrimaryVariant,
       });
 
       setRegenerateSuccess(true);
@@ -396,6 +401,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     motionMode,
     selectedPhasePresetId,
     randomSeed,
+    makePrimaryVariant,
     projectResolution,
     toast
   ]);
@@ -622,6 +628,18 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
           />
         </CollapsibleContent>
       </Collapsible>
+
+      {/* Make Primary Variant Toggle */}
+      <div className="flex items-center justify-between py-2">
+        <Label htmlFor="make-primary" className="text-sm cursor-pointer">
+          Make primary variant
+        </Label>
+        <Switch
+          id="make-primary"
+          checked={makePrimaryVariant}
+          onCheckedChange={setMakePrimaryVariant}
+        />
+      </div>
 
       {/* Regenerate Button */}
       <Button
