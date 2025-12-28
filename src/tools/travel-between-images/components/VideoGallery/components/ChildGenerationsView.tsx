@@ -767,9 +767,61 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 console.log('[SegmentDelete] ✓ Siblings reordered');
             }
 
-            // 4. Refetch to update the list
+            // 4. Update parent's orchestrator_details to reflect fewer expected segments
+            if (parentGeneration?.params) {
+                const parentParams = parentGeneration.params as any;
+                const orchestratorDetails = parentParams.orchestrator_details;
+
+                if (orchestratorDetails) {
+                    const oldCount = orchestratorDetails.num_new_segments_to_generate || 0;
+                    const newCount = Math.max(0, oldCount - 1);
+
+                    // Remove the deleted segment from arrays (at deletedChildOrder index)
+                    const removeAtIndex = (arr: any[] | undefined, idx: number) => {
+                        if (!arr || !Array.isArray(arr)) return arr;
+                        return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
+                    };
+
+                    const updatedOrchestratorDetails = {
+                        ...orchestratorDetails,
+                        num_new_segments_to_generate: newCount,
+                        segment_frames_expanded: removeAtIndex(orchestratorDetails.segment_frames_expanded, deletedChildOrder),
+                        enhanced_prompts_expanded: removeAtIndex(orchestratorDetails.enhanced_prompts_expanded, deletedChildOrder),
+                        base_prompts_expanded: removeAtIndex(orchestratorDetails.base_prompts_expanded, deletedChildOrder),
+                        // Note: input_image_paths_resolved has N+1 images for N segments
+                        // When deleting segment at index i, we remove image at index i+1 (the end image that gets bridged)
+                        input_image_paths_resolved: removeAtIndex(orchestratorDetails.input_image_paths_resolved, deletedChildOrder + 1),
+                    };
+
+                    console.log('[SegmentDelete] Updating parent orchestrator_details:', {
+                        oldCount,
+                        newCount,
+                        deletedChildOrder,
+                    });
+
+                    const { error: parentUpdateError } = await supabase
+                        .from('generations')
+                        .update({
+                            params: {
+                                ...parentParams,
+                                orchestrator_details: updatedOrchestratorDetails,
+                            }
+                        })
+                        .eq('id', parentGenerationId);
+
+                    if (parentUpdateError) {
+                        console.error('[SegmentDelete] Error updating parent:', parentUpdateError);
+                    } else {
+                        console.log('[SegmentDelete] ✓ Parent orchestrator_details updated');
+                    }
+                }
+            }
+
+            // 5. Refetch to update the list and invalidate parent query
             console.log('[SegmentDelete] ✓ Deletion complete, refetching...');
             refetch();
+            // Invalidate parent generation query so expectedSegmentData updates
+            queryClient.invalidateQueries({ queryKey: ['generation', parentGenerationId] });
         } catch (error) {
             console.error('[ChildGenerationsView] Error deleting segment:', error);
             toast({
@@ -780,7 +832,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         } finally {
             setDeletingChildId(null);
         }
-    }, [sortedSegments, parentGenerationId, deleteGeneration, refetch, toast]);
+    }, [sortedSegments, parentGenerationId, parentGeneration, deleteGeneration, refetch, toast, queryClient]);
 
     // Get current slot for lightbox (must be after segmentSlots is defined)
     const currentSlot = lightboxIndex !== null ? segmentSlots[lightboxIndex] : null;
