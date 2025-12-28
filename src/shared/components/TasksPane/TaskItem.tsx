@@ -530,6 +530,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       }
 
       // Fallback: Search by task ID in the tasks JSONB array
+      console.log('[TaskItem] Fallback: searching generations by task ID in JSONB', {
+        taskId: task.id.substring(0, 8),
+      });
       const { data, error } = await supabase
         .from('generations')
         .select('*')
@@ -538,14 +541,31 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('[ShowVideoDebug] Error fetching video generations:', error);
+        console.error('[TaskItem] Error fetching video generations:', error);
         return null;
       }
 
+      console.log('[TaskItem] Fallback query result', {
+        taskId: task.id.substring(0, 8),
+        found: data?.length || 0,
+      });
       return data || [];
     },
     enabled: shouldFetchVideo && taskInfo.isVideoTask && task.status === 'Complete',
   });
+
+  // Log when videoGenerations changes
+  React.useEffect(() => {
+    if (task.taskType === 'individual_travel_segment') {
+      console.log('[TaskItem] videoGenerations updated', {
+        taskId: task.id.substring(0, 8),
+        isLoading: isLoadingVideoGen,
+        hasData: !!videoGenerations,
+        count: videoGenerations?.length || 0,
+        firstId: videoGenerations?.[0]?.id?.substring(0, 8) || 'none',
+      });
+    }
+  }, [videoGenerations, isLoadingVideoGen, task.id, task.taskType]);
 
   // Extract travel-specific data
   const travelData = React.useMemo(() => {
@@ -838,16 +858,36 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   const handleViewVideo = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
+    console.log('[TaskItem] handleViewVideo clicked', {
+      taskId: task.id.substring(0, 8),
+      taskType: task.taskType,
+      hasOnOpenVideoLightbox: !!onOpenVideoLightbox,
+      hasVideoOutputs: !!travelData.videoOutputs,
+      videoOutputsLength: travelData.videoOutputs?.length || 0,
+      shouldFetchVideo,
+      isLoadingVideoGen,
+      childGenerationId: taskParams.parsed?.child_generation_id?.substring(0, 8) || 'none',
+    });
+
     // Reset hover state immediately
     setIsHoveringTaskItem(false);
-    
+
     // If video data is already loaded, open lightbox immediately
     if (onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+      console.log('[TaskItem] Opening lightbox immediately with videoOutputs', {
+        firstOutputId: travelData.videoOutputs[0]?.id?.substring(0, 8),
+        firstOutputLocation: travelData.videoOutputs[0]?.location?.substring(0, 60),
+        variantId: (travelData.videoOutputs[0] as any)?._variant_id?.substring(0, 8) || 'none',
+      });
       onOpenVideoLightbox(task, travelData.videoOutputs, 0);
     } else {
       // Video data not loaded yet - trigger fetch and wait for it
       // This fixes the race condition where user clicks before hovering
+      console.log('[TaskItem] Video data not ready, triggering fetch and waiting', {
+        shouldFetchVideo,
+        waitingForVideoToOpen,
+      });
       if (!isMobile) {
         setActiveTaskId(task.id);
         setIsTasksPaneOpen(true);
@@ -856,10 +896,23 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       setWaitingForVideoToOpen(true);
     }
   };
-  
+
   // Auto-open lightbox when video data becomes available after clicking (not just hovering)
   useEffect(() => {
+    if (waitingForVideoToOpen) {
+      console.log('[TaskItem] waitingForVideoToOpen effect', {
+        taskId: task.id.substring(0, 8),
+        hasVideoOutputs: !!travelData.videoOutputs,
+        videoOutputsLength: travelData.videoOutputs?.length || 0,
+        hasOnOpenVideoLightbox: !!onOpenVideoLightbox,
+      });
+    }
     if (waitingForVideoToOpen && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+      console.log('[TaskItem] Auto-opening lightbox after fetch', {
+        taskId: task.id.substring(0, 8),
+        firstOutputId: travelData.videoOutputs[0]?.id?.substring(0, 8),
+        variantId: (travelData.videoOutputs[0] as any)?._variant_id?.substring(0, 8) || 'none',
+      });
       if (onOpenVideoLightbox) {
         onOpenVideoLightbox(task, travelData.videoOutputs, 0);
       }
