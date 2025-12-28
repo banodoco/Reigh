@@ -20,6 +20,7 @@ export interface GenerationVariant {
   variant_type: string | null;
   name: string | null;
   created_at: string;
+  viewed_at: string | null;
 }
 
 /**

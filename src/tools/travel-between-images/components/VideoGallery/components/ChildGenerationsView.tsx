@@ -1846,8 +1846,8 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
             >
                     {/* Top right overlay - Variant count and NEW badge */}
                     <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
-                        {/* NEW badge - shown if created within last 2 minutes */}
-                        {child.created_at && (Date.now() - new Date(child.created_at).getTime()) < 2 * 60 * 1000 && (
+                        {/* NEW badge - shown if any variants haven't been viewed */}
+                        {(child as any).hasUnviewedVariants && (
                             <span className="text-[10px] px-1.5 py-0.5 bg-green-500 text-white rounded font-semibold">
                                 NEW
                             </span>

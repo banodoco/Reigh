@@ -232,13 +232,15 @@ async function fetchShotSpecificGenerations({
     });
   
   // Fetch counts of generations/variants based on each generation (for "X variants" display)
+  // Also fetches whether any variants are unviewed (for NEW badge)
   const generationIds = items.map(item => item.id) || [];
-  const derivedCounts = await calculateDerivedCounts(generationIds);
+  const { derivedCounts, hasUnviewedVariants } = await calculateDerivedCounts(generationIds);
 
-  // Add derivedCount to each item
+  // Add derivedCount and hasUnviewedVariants to each item
   items = items.map(item => ({
     ...item,
     derivedCount: derivedCounts[item.id] || 0,
+    hasUnviewedVariants: hasUnviewedVariants[item.id] || false,
   }));
   
   console.log('[VideoGenMissing] Raw transformed items before sorting and filtering:', {

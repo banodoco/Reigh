@@ -24,22 +24,34 @@ import { supabase } from '@/integrations/supabase/client';
 import { stripQueryParameters } from '@/shared/lib/utils';
 
 /**
+ * Result type for calculateDerivedCounts
+ */
+export interface DerivedCountsResult {
+  /** Count of variants/derivatives per generation */
+  derivedCounts: Record<string, number>;
+  /** Whether each generation has any unviewed variants (viewed_at IS NULL) */
+  hasUnviewedVariants: Record<string, boolean>;
+}
+
+/**
  * Calculate derivedCount for generations (how many variants/derivatives exist)
- * 
+ * Also tracks whether any variants are unviewed (for NEW badge display)
+ *
  * Queries both:
  * - generations table (based_on relationships)
  * - generation_variants table (edit variants)
- * 
+ *
  * @param generationIds - Array of generation IDs to count variants for
- * @returns Record mapping generation ID to variant count
+ * @returns Object with derivedCounts and hasUnviewedVariants maps
  */
 export async function calculateDerivedCounts(
   generationIds: string[]
-): Promise<Record<string, number>> {
+): Promise<DerivedCountsResult> {
   const derivedCounts: Record<string, number> = {};
+  const hasUnviewedVariants: Record<string, boolean> = {};
 
   if (generationIds.length === 0) {
-    return derivedCounts;
+    return { derivedCounts, hasUnviewedVariants };
   }
 
   // Count from generations table (based_on relationships)
@@ -55,20 +67,24 @@ export async function calculateDerivedCounts(
     });
   }
 
-  // Count from generation_variants table (edit variants)
+  // Count from generation_variants table (edit variants) + check viewed_at
   const { data: variantCountsData, error: variantCountsError } = await supabase
     .from('generation_variants')
-    .select('generation_id')
+    .select('generation_id, viewed_at')
     .in('generation_id', generationIds);
 
   if (!variantCountsError && variantCountsData) {
     variantCountsData.forEach((item: any) => {
       const genId = item.generation_id;
       derivedCounts[genId] = (derivedCounts[genId] || 0) + 1;
+      // If any variant has viewed_at === null, mark as having unviewed variants
+      if (item.viewed_at === null) {
+        hasUnviewedVariants[genId] = true;
+      }
     });
   }
 
-  return derivedCounts;
+  return { derivedCounts, hasUnviewedVariants };
 }
 
 

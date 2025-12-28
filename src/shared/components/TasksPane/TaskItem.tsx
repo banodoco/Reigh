@@ -51,7 +51,7 @@ interface TaskItemProps {
   isNew?: boolean;
   isActive?: boolean;
   onOpenImageLightbox?: (task: Task, media: GenerationRow) => void;
-  onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number) => void;
+  onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number, initialVariantId?: string) => void;
   isMobileActive?: boolean; // For mobile two-step tap interaction
   onMobileActiveChange?: (taskId: string | null) => void;
   // Project indicator for "All Projects" mode
@@ -142,7 +142,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     
     const isVideoTask = contentType === 'video';
     const isImageTask = contentType === 'image';
-    const isCompletedVideoTask = isVideoTask && task.status === 'Complete' && !!task.outputLocation;
+    // For individual_travel_segment tasks with child_generation_id, show button even without outputLocation
+    // (because the variant may not be primary, so outputLocation won't be synced to the task)
+    const hasChildGenerationId = task.taskType === 'individual_travel_segment' && !!taskParams.parsed?.child_generation_id;
+    const isCompletedVideoTask = isVideoTask && task.status === 'Complete' && (!!task.outputLocation || hasChildGenerationId);
     const isCompletedImageTask = isImageTask && task.status === 'Complete';
     // Show tooltips for all video and image tasks
     const showsTooltip = (isVideoTask || isImageTask);
@@ -591,20 +594,27 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     // Convert video generations from database to GenerationRow format
     const videoOutputs = videoGenerations?.map(gen => {
       const genAny = gen as any; // Type assertion for database fields not in type definition
-      
-      // Use task params parent_generation_id (original input) over generation's parent_generation_id (placeholder)
-      const effectiveParentGenId = taskParentGenerationId || genAny.parent_generation_id;
-      
+
+      // For individual_travel_segment: variants are stored ON the segment generation itself
+      // Do NOT pass parent_generation_id so MediaLightbox uses the segment's ID for variant fetching
+      // For other tasks: use task params parent_generation_id (original input) over generation's parent (placeholder)
+      const isIndividualSegment = task.taskType === 'individual_travel_segment';
+      const effectiveParentGenId = isIndividualSegment
+        ? undefined  // Let MediaLightbox use the segment's own ID
+        : (taskParentGenerationId || genAny.parent_generation_id);
+
       // DEBUG: Log what we're getting from the database
       console.log('[VariantFetchDebug] Video generation from DB:', {
         id: gen.id?.substring(0, 8),
+        taskType: task.taskType,
+        isIndividualSegment,
         hasParentGenerationId: !!genAny.parent_generation_id,
         parentGenerationId: genAny.parent_generation_id?.substring(0, 8) || 'none',
         taskParentGenerationId: taskParentGenerationId?.substring(0, 8) || 'none',
         effectiveParentGenId: effectiveParentGenId?.substring(0, 8) || 'none',
         allKeys: Object.keys(gen).join(', '),
       });
-      
+
       return {
         id: gen.id,
         location: gen.location,
@@ -616,9 +626,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         taskId: genAny.task_id, // ✅ Include taskId for proper task details display
         metadata: gen.params || {},
         name: genAny.name || undefined, // ✅ Include variant name from generation record
-        // CRITICAL: Include parent_generation_id for variant fetching in MediaLightbox
-        // Prefer task params parent (original input) over generation's parent (placeholder)
+        // CRITICAL: For individual_travel_segment, don't set parent_generation_id
+        // (variants are on the segment itself, not a parent)
+        // For other tasks: include parent_generation_id for variant fetching in MediaLightbox
         parent_generation_id: effectiveParentGenId || undefined,
+        // Preserve variant info for initial variant selection in MediaLightbox
+        _variant_id: genAny._variant_id,
+        _variant_is_primary: genAny._variant_is_primary,
       } as GenerationRow;
     }) || null;
     
@@ -875,12 +889,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
 
     // If video data is already loaded, open lightbox immediately
     if (onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+      const initialVariantId = (travelData.videoOutputs[0] as any)?._variant_id;
       console.log('[TaskItem] Opening lightbox immediately with videoOutputs', {
         firstOutputId: travelData.videoOutputs[0]?.id?.substring(0, 8),
         firstOutputLocation: travelData.videoOutputs[0]?.location?.substring(0, 60),
-        variantId: (travelData.videoOutputs[0] as any)?._variant_id?.substring(0, 8) || 'none',
+        variantId: initialVariantId?.substring(0, 8) || 'none',
       });
-      onOpenVideoLightbox(task, travelData.videoOutputs, 0);
+      onOpenVideoLightbox(task, travelData.videoOutputs, 0, initialVariantId);
     } else {
       // Video data not loaded yet - trigger fetch and wait for it
       // This fixes the race condition where user clicks before hovering
@@ -908,13 +923,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       });
     }
     if (waitingForVideoToOpen && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+      const initialVariantId = (travelData.videoOutputs[0] as any)?._variant_id;
       console.log('[TaskItem] Auto-opening lightbox after fetch', {
         taskId: task.id.substring(0, 8),
         firstOutputId: travelData.videoOutputs[0]?.id?.substring(0, 8),
-        variantId: (travelData.videoOutputs[0] as any)?._variant_id?.substring(0, 8) || 'none',
+        variantId: initialVariantId?.substring(0, 8) || 'none',
       });
       if (onOpenVideoLightbox) {
-        onOpenVideoLightbox(task, travelData.videoOutputs, 0);
+        onOpenVideoLightbox(task, travelData.videoOutputs, 0, initialVariantId);
       }
       setWaitingForVideoToOpen(false); // Reset the flag
     }
@@ -979,7 +995,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         // For completed video tasks - open video lightbox if video data is available
         if (taskInfo.isCompletedVideoTask && onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
           onMobileActiveChange?.(null); // Clear active state
-          onOpenVideoLightbox(task, travelData.videoOutputs, 0);
+          const initialVariantId = (travelData.videoOutputs[0] as any)?._variant_id;
+          onOpenVideoLightbox(task, travelData.videoOutputs, 0, initialVariantId);
           return;
         }
         
@@ -1397,7 +1414,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       setIsHoveringTaskItem(false);
       
       if (taskInfo.isVideoTask && hasClickableContent && onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
-        onOpenVideoLightbox(task, travelData.videoOutputs, 0);
+        const initialVariantId = (travelData.videoOutputs[0] as any)?._variant_id;
+        onOpenVideoLightbox(task, travelData.videoOutputs, 0, initialVariantId);
       } else if (!taskInfo.isVideoTask && hasClickableContent && onOpenImageLightbox && generationData) {
         onOpenImageLightbox(task, generationData);
       }

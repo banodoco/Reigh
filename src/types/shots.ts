@@ -62,6 +62,7 @@ export interface GenerationRow {
   timeline_frame?: number; // Position in timeline (from shot_generations table)
   starred?: boolean; // Whether this generation is starred
   derivedCount?: number; // Number of generations based on this one
+  hasUnviewedVariants?: boolean; // Whether any variants have viewed_at === null (for NEW badge)
   based_on?: string | null; // ID of source generation for lineage tracking (magic edits, variations)
   params?: any; // JSON parameters for the generation (prompt, settings, etc.)
   created_at?: string; // DB column name

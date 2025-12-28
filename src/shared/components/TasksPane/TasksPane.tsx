@@ -230,6 +230,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     task: Task;
     media: GenerationRow | GenerationRow[];
     videoIndex?: number;
+    initialVariantId?: string;  // For opening directly to a specific variant
   } | null>(null);
   
   // Mobile two-step tap interaction state
@@ -437,8 +438,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     setIsTasksPaneOpenProgrammatic(true);
   };
 
-  const handleOpenVideoLightbox = (task: Task, media: GenerationRow[], videoIndex: number) => {
-    setLightboxData({ type: 'video', task, media, videoIndex });
+  const handleOpenVideoLightbox = (task: Task, media: GenerationRow[], videoIndex: number, initialVariantId?: string) => {
+    setLightboxData({ type: 'video', task, media, videoIndex, initialVariantId });
     setActiveTaskId(task.id);
     setIsTasksPaneOpenProgrammatic(true);
   };
@@ -1096,6 +1097,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             onOpenExternalGeneration={handleOpenExternalGeneration}
             tasksPaneOpen={true}
             tasksPaneWidth={tasksPaneWidth}
+            initialVariantId={lightboxData.initialVariantId}
           />,
           document.body
         );

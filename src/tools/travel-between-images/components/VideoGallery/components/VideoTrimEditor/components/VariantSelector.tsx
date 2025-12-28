@@ -56,12 +56,13 @@ const getVariantLabel = (variant: GenerationVariant): string => {
 
 type RelationshipFilter = 'all' | 'parents' | 'children';
 
-// Check if variant was created within the last 2 minutes
-const isNewVariant = (createdAt: string): boolean => {
-  const created = new Date(createdAt).getTime();
-  const now = Date.now();
-  const twoMinutesMs = 2 * 60 * 1000;
-  return (now - created) < twoMinutesMs;
+// Check if variant is "new" (hasn't been viewed yet)
+// For currently active variant, always return false for instant feedback
+const isNewVariant = (variant: GenerationVariant, activeVariantId: string | null): boolean => {
+  // Active variant is being viewed right now, so not "new"
+  if (variant.id === activeVariantId) return false;
+  // Variant is new if it hasn't been viewed (viewed_at is null)
+  return variant.viewed_at === null;
 };
 
 // Get human-readable time ago string
@@ -343,7 +344,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
         )}
 
         {/* Variants grid - 4 per row, scrollable */}
-        <div className="grid grid-cols-4 gap-1 w-full overflow-y-auto flex-1 min-h-0">
+        {/* p-0.5 ensures ring-2 on selected variant isn't clipped on any side */}
+        <div className="grid grid-cols-4 gap-1 w-full overflow-y-auto flex-1 min-h-0 p-0.5">
           {paginatedVariants.map((variant) => {
             const isActive = variant.id === activeVariantId;
             const isPrimary = variant.is_primary;
@@ -424,7 +426,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                   )}
 
                   {/* NEW badge or time ago for variants */}
-                  {isNewVariant(variant.created_at) ? (
+                  {isNewVariant(variant, activeVariantId) ? (
                     <div className="absolute bottom-0.5 left-0.5 bg-yellow-500 text-black text-[8px] font-bold px-1 rounded pointer-events-none">
                       NEW
                     </div>

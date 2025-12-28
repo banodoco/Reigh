@@ -32,6 +32,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
+import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 
 // Import all extracted hooks
 import {
@@ -423,16 +424,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     refetch: refetchVariants,
     setPrimaryVariant,
   } = variantsHook;
-  
-  // Wrap setActiveVariantId with logging
+
+  // Mutation to mark variants as viewed (removes NEW badge)
+  const markVariantViewed = useMarkVariantViewed();
+
+  // Wrap setActiveVariantId with logging and mark-as-viewed
   const setActiveVariantId = React.useCallback((variantId: string) => {
     console.log('[VariantClickDebug] setActiveVariantId called:', {
       variantId: variantId?.substring(0, 8),
       currentActiveVariant: activeVariant?.id?.substring(0, 8),
       variantsCount: variants?.length,
     });
+    // Mark variant as viewed when selected (fire-and-forget)
+    if (variantId) {
+      markVariantViewed.mutate(variantId);
+    }
     rawSetActiveVariantId(variantId);
-  }, [rawSetActiveVariantId, activeVariant, variants]);
+  }, [rawSetActiveVariantId, activeVariant, variants, markVariantViewed]);
   
   // Log when activeVariant changes
   React.useEffect(() => {

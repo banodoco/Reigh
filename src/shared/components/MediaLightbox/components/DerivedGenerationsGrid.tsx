@@ -19,10 +19,12 @@ export interface DerivedGenerationsGridProps {
   onVariantSelect?: (variantId: string) => void;
   currentMediaId: string;
   currentShotId?: string; // To check if items are positioned in current shot
+  /** Currently active variant ID - used to hide NEW badge on selected variant */
+  activeVariantId?: string | null;
   variant?: 'desktop' | 'mobile';
   title?: string;
   showTopBorder?: boolean; // Whether to show the top border (when task details are present above)
-  
+
   /** @deprecated Use derivedItems instead */
   derivedGenerations?: GenerationRow[];
 }
@@ -79,6 +81,7 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
   onVariantSelect,
   currentMediaId,
   currentShotId,
+  activeVariantId,
   variant = 'desktop',
   title,
   showTopBorder = true,
@@ -214,9 +217,14 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
               assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
             );
           
-          // Check if item is new (created in last 2 minutes)
-          const isNew = createdAt && 
-            (Date.now() - new Date(createdAt).getTime()) < 2 * 60 * 1000;
+          // Check if item is new:
+          // - For variants: NEW if not yet viewed (viewedAt is null) AND not currently selected
+          // - For generations: NEW if created in last 2 minutes (legacy behavior)
+          const viewedAt = isNewFormat && isVariant ? derived.viewedAt : undefined;
+          const isCurrentlySelected = isVariant && activeVariantId === itemId;
+          const isNew = isVariant
+            ? !viewedAt && !isCurrentlySelected // Variant is NEW if not viewed and not currently selected
+            : (createdAt && (Date.now() - new Date(createdAt).getTime()) < 2 * 60 * 1000);
 
           // Get variant icon if it's a variant
           const VariantIcon = isVariant ? getVariantTypeIcon(variantType) : null;

@@ -123,16 +123,17 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           generation: sg.generation as any
         }));
 
-      // Calculate derivedCount for each generation
+      // Calculate derivedCount and hasUnviewedVariants for each generation
       const generationIds = shotGenerationsData.map(sg => sg.generation_id);
-      const derivedCounts = await calculateDerivedCounts(generationIds);
-      
-      // Add derivedCount to each generation
+      const { derivedCounts, hasUnviewedVariants } = await calculateDerivedCounts(generationIds);
+
+      // Add derivedCount and hasUnviewedVariants to each generation
       const enrichedData = shotGenerationsData.map(sg => ({
         ...sg,
         generation: {
           ...sg.generation,
           derivedCount: derivedCounts[sg.generation_id] || 0,
+          hasUnviewedVariants: hasUnviewedVariants[sg.generation_id] || false,
         }
       }));
 

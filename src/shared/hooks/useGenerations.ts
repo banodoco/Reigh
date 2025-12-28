@@ -441,17 +441,19 @@ export async function fetchGenerations(
   }
 
   // Fetch counts of generations/variants based on each generation (for "X variants" display)
+  // Also fetches whether any variants are unviewed (for NEW badge)
   const generationIds = finalData.map(d => d.id) || [];
-  const derivedCounts = await calculateDerivedCounts(generationIds);
+  const { derivedCounts, hasUnviewedVariants } = await calculateDerivedCounts(generationIds);
 
   // Use shared transformer instead of inline transformation logic
   const items = finalData?.map((item: any) => {
-    // Add derivedCount to the raw data before transforming
+    // Add derivedCount and hasUnviewedVariants to the raw data before transforming
     const itemWithDerivedCount = {
       ...item,
       derivedCount: derivedCounts[item.id] || 0,
+      hasUnviewedVariants: hasUnviewedVariants[item.id] || false,
     };
-    
+
     // Transform using shared function - handles all the complex logic
     return transformGeneration(itemWithDerivedCount as RawGeneration, {
       shotId: filters?.shotId,
@@ -992,14 +994,16 @@ export interface DerivedItem {
   derivedCount: number;
   starred?: boolean;
   prompt?: string;
-  
+
   /** Discriminator: 'generation' for old based_on, 'variant' for new variant edits */
   itemType: 'generation' | 'variant';
-  
+
   /** Variant-specific fields */
   variantType?: string;
   variantName?: string;
-  
+  /** When variant was first viewed (null = not viewed, shows NEW badge) */
+  viewedAt?: string | null;
+
   /** Generation-specific fields */
   basedOn?: string;
   shot_id?: string;
@@ -1045,7 +1049,7 @@ export async function fetchDerivedItems(
     // 2. Edit variants (new mode - variants with edit types, excluding primary/original)
     supabase
       .from('generation_variants')
-      .select('id, location, thumbnail_url, created_at, variant_type, name, params, is_primary')
+      .select('id, location, thumbnail_url, created_at, variant_type, name, params, is_primary, viewed_at')
       .eq('generation_id', sourceGenerationId)
       .in('variant_type', EDIT_VARIANT_TYPES)
       .eq('is_primary', false) // Exclude primary - that's the "current" version
@@ -1133,6 +1137,7 @@ export async function fetchDerivedItems(
     itemType: 'variant' as const,
     variantType: variant.variant_type,
     variantName: variant.name,
+    viewedAt: variant.viewed_at, // null = not viewed, shows NEW badge
   }));
 
   // Merge and sort by created_at (newest first), with starred generations at top

@@ -130,7 +130,7 @@ interface TaskListProps {
   currentPage?: number; // Add current page to track pagination changes
   activeTaskId?: string | null; // Currently active/viewed task ID
   onOpenImageLightbox?: (task: Task, media: GenerationRow) => void; // NEW
-  onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number) => void; // NEW
+  onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number, initialVariantId?: string) => void; // NEW
   // Mobile two-step tap interaction state
   mobileActiveTaskId?: string | null;
   onMobileActiveTaskChange?: (taskId: string | null) => void;

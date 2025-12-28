@@ -231,15 +231,16 @@ export const useAllShotGenerations = (
         .map(mapShotGenerationToRow)
         .filter(Boolean) as GenerationRow[];
 
-      // Calculate derivedCount for each generation
+      // Calculate derivedCount and hasUnviewedVariants for each generation
       const generationIds = baseResult.map(r => r.generation_id).filter(Boolean) as string[];
       const { calculateDerivedCounts } = await import('@/shared/lib/generationTransformers');
-      const derivedCounts = await calculateDerivedCounts(generationIds);
-      
-      // Add derivedCount to each item
+      const { derivedCounts, hasUnviewedVariants } = await calculateDerivedCounts(generationIds);
+
+      // Add derivedCount and hasUnviewedVariants to each item
       const result: GenerationRow[] = baseResult.map(item => ({
         ...item,
         derivedCount: derivedCounts[item.generation_id || ''] || 0,
+        hasUnviewedVariants: hasUnviewedVariants[item.generation_id || ''] || false,
       }));
 
       const duration = Date.now() - startTime;
