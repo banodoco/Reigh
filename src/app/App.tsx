@@ -18,6 +18,7 @@ import { CurrentShotProvider } from '@/shared/contexts/CurrentShotContext';
 import { ToolPageHeaderProvider } from '@/shared/contexts/ToolPageHeaderContext';
 import { ShotsProvider } from '@/shared/contexts/ShotsContext';
 import { GenerationTaskProvider } from '@/shared/contexts/GenerationTaskContext';
+import { IncomingTasksProvider } from '@/shared/contexts/IncomingTasksContext';
 // [MobileStallFix] Import debug utilities for console debugging
 import '@/shared/lib/mobileProjectDebug';
 import { getNetworkStatusManager } from '@/shared/lib/NetworkStatusManager';
@@ -258,16 +259,18 @@ function App() {
         <SimpleRealtimeProvider>
           <ShotsProvider>
             <GenerationTaskProvider>
-              <PanesProvider>
-                <LastAffectedShotProvider>
-                  <CurrentShotProvider>
-                    <ToolPageHeaderProvider>
-                      <RefactorMetricsCollector />
-                      <AppInternalContent />
-                    </ToolPageHeaderProvider>
-                  </CurrentShotProvider>
-                </LastAffectedShotProvider>
-              </PanesProvider>
+              <IncomingTasksProvider>
+                <PanesProvider>
+                  <LastAffectedShotProvider>
+                    <CurrentShotProvider>
+                      <ToolPageHeaderProvider>
+                        <RefactorMetricsCollector />
+                        <AppInternalContent />
+                      </ToolPageHeaderProvider>
+                    </CurrentShotProvider>
+                  </LastAffectedShotProvider>
+                </PanesProvider>
+              </IncomingTasksProvider>
             </GenerationTaskProvider>
           </ShotsProvider>
         </SimpleRealtimeProvider>

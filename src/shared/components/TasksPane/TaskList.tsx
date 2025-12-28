@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { type PaginatedTasksResponse } from '@/shared/hooks/useTasks';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import TaskItem from './TaskItem';
+import IncomingTaskItem from './IncomingTaskItem';
 import { TaskStatus, Task } from '@/types/tasks';
 import { Button } from '@/shared/components/ui/button';
 import { ScrollArea } from "@/shared/components/ui/scroll-area"
@@ -11,6 +12,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { FilterGroup } from './TasksPane';
 import { GenerationRow } from '@/types/shots';
 import { cn } from '@/shared/lib/utils';
+import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
 
 // Realistic task item skeleton that mimics the TaskItem layout
 interface TaskItemSkeletonProps {
@@ -138,9 +140,9 @@ interface TaskListProps {
   projectNameMap?: Record<string, string>;
 }
 
-const TaskList: React.FC<TaskListProps> = ({ 
-  filterStatuses, 
-  activeFilter, 
+const TaskList: React.FC<TaskListProps> = ({
+  filterStatuses,
+  activeFilter,
   statusCounts,
   paginatedData,
   isLoading = false,
@@ -155,6 +157,7 @@ const TaskList: React.FC<TaskListProps> = ({
   projectNameMap = {},
 }) => {
   const { selectedProjectId } = useProject();
+  const { incomingTasks } = useIncomingTasks();
 
   // State to track tasks that have just been added for flash effect
   const [newTaskIds, setNewTaskIds] = useState<Set<string>>(new Set());
@@ -340,18 +343,28 @@ const TaskList: React.FC<TaskListProps> = ({
         <TaskListSkeleton activeFilter={activeFilter} />
       )}
       
-      {!showSkeleton && filteredTasks.length === 0 && !summaryMessage && (
+      {!showSkeleton && filteredTasks.length === 0 && !summaryMessage && !(activeFilter === 'Processing' && incomingTasks.length > 0) && (
         <p className="text-zinc-400 text-center">{getEmptyMessage()}</p>
       )}
 
-      {!showSkeleton && filteredTasks.length > 0 && (
+      {!showSkeleton && (filteredTasks.length > 0 || (activeFilter === 'Processing' && incomingTasks.length > 0)) && (
         <div className="flex-grow -mr-4">
           <ScrollArea className="h-full pr-4">
+              {/* Incoming/filler tasks - only show on Processing filter */}
+              {activeFilter === 'Processing' && incomingTasks.map((incoming, idx) => (
+                <React.Fragment key={incoming.id}>
+                  <IncomingTaskItem task={incoming} />
+                  {(idx < incomingTasks.length - 1 || filteredTasks.length > 0) && (
+                    <div className="h-0 border-b border-zinc-700/40 my-1" />
+                  )}
+                </React.Fragment>
+              ))}
+              {/* Real tasks */}
               {filteredTasks.map((task: Task, idx: number) => (
                   <React.Fragment key={task.id}>
-                    <TaskItem 
-                      task={task} 
-                      isNew={newTaskIds.has(task.id)} 
+                    <TaskItem
+                      task={task}
+                      isNew={newTaskIds.has(task.id)}
                       isActive={task.id === activeTaskId}
                       onOpenImageLightbox={onOpenImageLightbox}
                       onOpenVideoLightbox={onOpenVideoLightbox}
