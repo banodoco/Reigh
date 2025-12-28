@@ -435,7 +435,54 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     queryKey: ['video-generations-for-task', task.id, task.outputLocation],
     queryFn: async () => {
       if (!taskInfo.isVideoTask || task.status !== 'Complete') return null;
-      
+
+      // For individual_travel_segment tasks with child_generation_id, fetch that generation directly
+      // This handles the case where make_primary_variant=false (variant location != generation location)
+      const childGenerationId = taskParams.parsed?.child_generation_id;
+      if (task.taskType === 'individual_travel_segment' && childGenerationId) {
+        console.log('[TaskItem] individual_travel_segment: fetching child generation directly', {
+          childGenerationId: childGenerationId.substring(0, 8),
+          taskId: task.id.substring(0, 8),
+        });
+
+        // Fetch the child generation with its variants to get the correct video URL
+        const { data: childGen, error: childError } = await supabase
+          .from('generations')
+          .select('*, generation_variants(*)')
+          .eq('id', childGenerationId)
+          .single();
+
+        if (!childError && childGen) {
+          // Find the variant created by this task (by source_task_id in params) or primary variant
+          const variants = (childGen as any).generation_variants || [];
+          const taskVariant = variants.find((v: any) => v.params?.source_task_id === task.id);
+          const primaryVariant = variants.find((v: any) => v.is_primary);
+          const targetVariant = taskVariant || primaryVariant;
+
+          console.log('[TaskItem] individual_travel_segment: found generation with variants', {
+            generationId: childGen.id.substring(0, 8),
+            variantCount: variants.length,
+            taskVariantId: taskVariant?.id?.substring(0, 8) || 'none',
+            primaryVariantId: primaryVariant?.id?.substring(0, 8) || 'none',
+            targetVariantLocation: targetVariant?.location ? 'has URL' : 'no URL',
+          });
+
+          // If we found a specific variant for this task, use its location
+          // Otherwise fall back to generation's location (which may be from a different variant)
+          if (targetVariant) {
+            return [{
+              ...childGen,
+              location: targetVariant.location,
+              thumbnail_url: targetVariant.thumbnail_url || childGen.thumbnail_url,
+              // Store variant info for reference
+              _variant_id: targetVariant.id,
+              _variant_is_primary: targetVariant.is_primary,
+            }];
+          }
+          return [childGen];
+        }
+      }
+
       // Try to find generation by output location first (most reliable)
       if (task.outputLocation) {
         const { data: byLocation, error: locError } = await supabase
@@ -443,12 +490,36 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
           .select('*')
           .eq('location', task.outputLocation)
           .eq('project_id', task.projectId);
-        
+
         if (!locError && byLocation && byLocation.length > 0) {
           return byLocation;
         }
+
+        // If not found in generations, check generation_variants by location
+        // This handles individual_travel_segment with make_primary_variant=false
+        const { data: variantByLocation, error: variantError } = await supabase
+          .from('generation_variants')
+          .select('*, generations!inner(*)')
+          .eq('location', task.outputLocation);
+
+        if (!variantError && variantByLocation && variantByLocation.length > 0) {
+          console.log('[TaskItem] Found video in generation_variants by location', {
+            variantId: variantByLocation[0].id.substring(0, 8),
+            generationId: variantByLocation[0].generation_id.substring(0, 8),
+          });
+          // Return the parent generation but with the variant's location
+          const variant = variantByLocation[0];
+          const generation = (variant as any).generations;
+          return [{
+            ...generation,
+            location: variant.location,
+            thumbnail_url: variant.thumbnail_url || generation.thumbnail_url,
+            _variant_id: variant.id,
+            _variant_is_primary: variant.is_primary,
+          }];
+        }
       }
-      
+
       // Fallback: Search by task ID in the tasks JSONB array
       const { data, error } = await supabase
         .from('generations')
@@ -456,12 +527,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         .filter('tasks', 'cs', JSON.stringify([task.id]))
         .eq('project_id', task.projectId)
         .order('created_at', { ascending: false });
-      
+
       if (error) {
         console.error('[ShowVideoDebug] Error fetching video generations:', error);
         return null;
       }
-      
+
       return data || [];
     },
     enabled: shouldFetchVideo && taskInfo.isVideoTask && task.status === 'Complete',
