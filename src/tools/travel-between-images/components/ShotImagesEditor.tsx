@@ -175,6 +175,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onCreateShot,
   onDragStateChange,
 }) => {
+  // Track local drag state to suppress hook reloads during drag operations
+  // This is forwarded via onDragStateChange but we also need it locally for useEnhancedShotPositions
+  const [isDragInProgress, setIsDragInProgress] = useState(false);
+
+  // Wrapper to track drag state locally AND forward to parent
+  const handleDragStateChange = useCallback((isDragging: boolean) => {
+    setIsDragInProgress(isDragging);
+    onDragStateChange?.(isDragging);
+  }, [onDragStateChange]);
   // [ZoomDebug] Track ShotImagesEditor mounts to detect unwanted remounts
   const shotImagesEditorMountRef = React.useRef(0);
   React.useEffect(() => {
@@ -403,7 +412,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // Enhanced position management
   // Centralized position management - shared between Timeline and ShotImageManager
   // When preloadedImages is provided, use new utility hook; otherwise use legacy hook
-  const legacyHookData = useEnhancedShotPositions(preloadedImages ? null : selectedShotId);
+  // CRITICAL: Pass isDragInProgress to suppress realtime/query reloads during drag operations
+  const legacyHookData = useEnhancedShotPositions(preloadedImages ? null : selectedShotId, isDragInProgress);
   
   // NEW: Use utility hook when preloaded images are provided
   // CRITICAL: Pass the same generations array that we use for display
@@ -901,7 +911,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // Pass shared hook data to prevent creating duplicate instances
                 // BUT: Only pass if not using preloaded images (to avoid filtering conflict)
                 hookData={preloadedImages ? undefined : hookData}
-                onDragStateChange={onDragStateChange}
+                onDragStateChange={handleDragStateChange}
                 onPairClick={(pairIndex, pairData) => {
                   setPairPromptModalData({
                     isOpen: true,
@@ -1156,7 +1166,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       console.error('[ClearEnhancedPrompt-Batch] ❌ Error:', error);
                     }
                   }}
-                  onDragStateChange={onDragStateChange}
+                  onDragStateChange={handleDragStateChange}
                 />
                 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

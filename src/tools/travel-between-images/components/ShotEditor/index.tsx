@@ -199,6 +199,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   parentOnSelectionChangeRef.current = parentOnSelectionChange;
   const onSteerableMotionSettingsChangeRef = useRef(onSteerableMotionSettingsChange);
   onSteerableMotionSettingsChangeRef.current = onSteerableMotionSettingsChange;
+
+  // Track local drag state to suppress hook reloads during drag operations
+  // This is forwarded via onDragStateChange but we also need it locally for useEnhancedShotPositions
+  const [isDragInProgress, setIsDragInProgress] = useState(false);
+
+  // Wrapper to track drag state locally AND forward to parent
+  const handleDragStateChange = useCallback((isDragging: boolean) => {
+    setIsDragInProgress(isDragging);
+    onDragStateChange?.(isDragging);
+  }, [onDragStateChange]);
   
   // Compute effective aspect ratio: prioritize shot-level over project-level
   // This ensures videos in VideoOutputsGallery, items in Timeline, and other components
@@ -484,7 +494,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // No local caching or debouncing needed
   
   // Get pair prompts data for checking if all pairs have prompts
-  const { pairPrompts, shotGenerations, clearAllEnhancedPrompts, updatePairPromptsByIndex, loadPositions } = useEnhancedShotPositions(selectedShotId);
+  // CRITICAL: Pass isDragInProgress to suppress realtime/query reloads during drag operations
+  const { pairPrompts, shotGenerations, clearAllEnhancedPrompts, updatePairPromptsByIndex, loadPositions } = useEnhancedShotPositions(selectedShotId, isDragInProgress);
   
   // Wrap onBatchVideoPromptChange to also clear all enhanced prompts when base prompt changes
   const handleBatchVideoPromptChangeWithClear = useCallback(async (newPrompt: string) => {
@@ -1523,7 +1534,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onAddToShot={handleAddToShot}
             onAddToShotWithoutPosition={handleAddToShotWithoutPosition}
             onCreateShot={handleCreateShot}
-            onDragStateChange={onDragStateChange}
+            onDragStateChange={handleDragStateChange}
           />
         </div>
 
