@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useGenerations } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
 import { GenerationRow } from '@/types/shots';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Separator } from '@/shared/components/ui/separator';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
-import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -73,6 +73,9 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         startImage: { url: string; generationId?: string; based_on?: string | null } | null;
         endImage: { url: string; generationId?: string; based_on?: string | null } | null;
     } | null>(null);
+    // State for segment deletion
+    const [deletingChildId, setDeletingChildId] = useState<string | null>(null);
+    const deleteGeneration = useDeleteGeneration();
     const isMobile = useIsMobile();
     const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth } = usePanes();
     
@@ -593,7 +596,72 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         const prevPos = (currentPosInChildSlots - 1 + childSlotIndices.length) % childSlotIndices.length;
         return childSlotIndices[prevPos];
     });
-    
+
+    // Handle segment deletion with child_order reordering
+    const handleDeleteSegment = useCallback(async (childId: string) => {
+        // Find the child being deleted to get its child_order
+        const childToDelete = sortedSegments.find(c => c.id === childId);
+        if (!childToDelete) {
+            console.error('[ChildGenerationsView] Cannot find child to delete:', childId);
+            return;
+        }
+
+        const deletedChildOrder = (childToDelete as any).child_order;
+        console.log('[ChildGenerationsView] Deleting segment:', {
+            childId: childId.substring(0, 8),
+            childOrder: deletedChildOrder,
+            parentGenerationId: parentGenerationId.substring(0, 8),
+        });
+
+        setDeletingChildId(childId);
+
+        try {
+            // 1. Delete the generation
+            await deleteGeneration.mutateAsync(childId);
+
+            // 2. Update child_order for siblings with higher order (shift down)
+            // Get siblings with higher child_order
+            const siblingsToUpdate = sortedSegments.filter(c => {
+                const order = (c as any).child_order;
+                return order !== undefined && order > deletedChildOrder;
+            });
+
+            if (siblingsToUpdate.length > 0) {
+                console.log('[ChildGenerationsView] Updating child_order for', siblingsToUpdate.length, 'siblings');
+
+                // Update each sibling's child_order
+                for (const sibling of siblingsToUpdate) {
+                    const currentOrder = (sibling as any).child_order;
+                    const { error } = await supabase
+                        .from('generations')
+                        .update({ child_order: currentOrder - 1 })
+                        .eq('id', sibling.id);
+
+                    if (error) {
+                        console.error('[ChildGenerationsView] Error updating child_order:', error);
+                    }
+                }
+            }
+
+            // 3. Refetch to update the list
+            refetch();
+
+            toast({
+                title: 'Segment deleted',
+                description: 'The segment has been removed.',
+            });
+        } catch (error) {
+            console.error('[ChildGenerationsView] Error deleting segment:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to delete segment. Please try again.',
+                variant: 'destructive',
+            });
+        } finally {
+            setDeletingChildId(null);
+        }
+    }, [sortedSegments, parentGenerationId, deleteGeneration, refetch, toast]);
+
     // Get current slot for lightbox (must be after segmentSlots is defined)
     const currentSlot = lightboxIndex !== null ? segmentSlots[lightboxIndex] : null;
     const segmentLightboxVideoId = currentSlot?.type === 'child' ? currentSlot.child.id : null;
@@ -1106,6 +1174,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 }}
                                                 onMobileTap={handleMobileTap}
                                                 onUpdate={refetch}
+                                                onDelete={handleDeleteSegment}
+                                                isDeleting={deletingChildId === slot.child.id}
                                                 availableLoras={availableLoras}
                                                 projectResolution={effectiveResolution}
                                                 aspectRatio={effectiveAspectRatio}
@@ -1396,6 +1466,8 @@ interface SegmentCardProps {
     onLightboxOpenWithTrim: () => void;
     onMobileTap: (index: number) => void;
     onUpdate: () => void;
+    onDelete: (childId: string) => void;
+    isDeleting: boolean;
     availableLoras: LoraModel[];
     onImageLightboxOpen: (imageIndex: 0 | 1, images: { start: { url: string; generationId?: string } | null; end: { url: string; generationId?: string } | null }) => void;
     projectResolution?: string; // Resolution derived from project's aspect ratio
@@ -1403,7 +1475,7 @@ interface SegmentCardProps {
 }
 
 // Memoized to prevent re-renders when parent state changes (e.g., lightbox index)
-const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio }) => {
+const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio }) => {
     const isMobile = useIsMobile();
 
     // child.params is synced from the primary variant via database trigger
@@ -1520,19 +1592,37 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                         )}
                     </div>
 
-                    {/* Trim button - bottom right overlay, appears on hover */}
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        className="absolute bottom-2 right-2 z-10 h-7 px-2 gap-1 bg-black/60 hover:bg-black/80 text-white border-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onLightboxOpenWithTrim();
-                        }}
-                    >
-                        <Scissors className="h-3.5 w-3.5" />
-                        <span className="text-xs">Trim</span>
-                    </Button>
+                    {/* Action buttons - bottom right overlay, appears on hover */}
+                    <div className="absolute bottom-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 px-2 gap-1 bg-black/60 hover:bg-black/80 text-white border-0"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onLightboxOpenWithTrim();
+                            }}
+                        >
+                            <Scissors className="h-3.5 w-3.5" />
+                            <span className="text-xs">Trim</span>
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 px-2 gap-1 bg-black/60 hover:bg-red-600 text-white border-0"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(child.id);
+                            }}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                            )}
+                        </Button>
+                    </div>
                     <VideoItem
                         video={child}
                         index={index}
