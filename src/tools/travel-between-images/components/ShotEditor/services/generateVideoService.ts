@@ -210,6 +210,33 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     return { success: false, error: 'No project selected' };
   }
 
+  // CRITICAL: Wait for any pending mutations (add/reorder/delete images) to complete before submitting task
+  // This prevents race conditions where the user adds/reorders images and immediately clicks Generate,
+  // causing the task to be submitted with stale data (before the mutation commits to the database)
+  const pendingMutations = queryClient.isMutating();
+
+  if (pendingMutations > 0) {
+    console.log('[TaskSubmission] ⏳ Waiting for pending mutations to complete...', { count: pendingMutations });
+
+    const maxWaitTime = 5000; // 5 second max wait
+    const pollInterval = 50; // Check every 50ms
+    let totalWaitTime = 0;
+
+    while (queryClient.isMutating() > 0 && totalWaitTime < maxWaitTime) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      totalWaitTime += pollInterval;
+    }
+
+    if (queryClient.isMutating() > 0) {
+      console.warn('[TaskSubmission] ⚠️ Mutations still pending after timeout, proceeding anyway');
+    } else {
+      console.log('[TaskSubmission] ✅ All mutations completed after', totalWaitTime, 'ms');
+    }
+
+    // Small additional delay to ensure database consistency after mutation completes
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
   // CRITICAL: Refresh shot data from database before task submission to ensure we have the latest images
   console.log('[TaskSubmission] Refreshing shot data before video generation...');
   try {
