@@ -659,15 +659,21 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
         setDeletingChildId(childId);
 
+        // Track results for final summary
+        const results: { step: string; success: boolean; details?: string }[] = [];
+
         try {
             // 1. Bridge images - update adjacent segment to maintain continuity
+            let bridgeTarget: 'previous' | 'next' | 'none' = 'none';
+            let expectedBridgeUrl: string | undefined;
+
             if (previousSegment && deletedSegmentImages.endUrl) {
-                // Update previous segment's end_image to deleted segment's end_image
-                // This bridges: [A → B] + [B → C (deleted)] + [C → D] becomes [A → C] + [C → D]
+                bridgeTarget = 'previous';
+                expectedBridgeUrl = deletedSegmentImages.endUrl;
                 const prevParams = (previousSegment.params as any) || {};
                 const oldEndImage = prevSegmentImages?.endUrl;
 
-                console.log('[SegmentDelete] Bridging previous segment:', {
+                console.log('[SegmentDelete] Step 1: Bridging previous segment', {
                     segmentId: previousSegment.id.substring(0, 8),
                     oldEndImage: urlTail(oldEndImage),
                     newEndImage: urlTail(deletedSegmentImages.endUrl),
@@ -678,7 +684,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     ...prevParams,
                     end_image_url: deletedSegmentImages.endUrl,
                     end_image_generation_id: deletedSegmentImages.endGenId,
-                    // Also update in individual_segment_params if it exists
                     individual_segment_params: {
                         ...(prevParams.individual_segment_params || {}),
                         end_image_url: deletedSegmentImages.endUrl,
@@ -692,16 +697,30 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     .eq('id', previousSegment.id);
 
                 if (bridgeError) {
-                    console.error('[SegmentDelete] Error bridging previous segment:', bridgeError);
+                    results.push({ step: 'Bridge previous segment', success: false, details: bridgeError.message });
                 } else {
-                    console.log('[SegmentDelete] ✓ Successfully bridged previous segment');
+                    // Verify the update
+                    const { data: verifyData } = await supabase
+                        .from('generations')
+                        .select('params')
+                        .eq('id', previousSegment.id)
+                        .single();
+
+                    const verifiedUrl = verifyData?.params?.end_image_url;
+                    const verified = verifiedUrl === expectedBridgeUrl;
+                    results.push({
+                        step: 'Bridge previous segment',
+                        success: verified,
+                        details: verified ? urlTail(verifiedUrl) : `Expected ${urlTail(expectedBridgeUrl)}, got ${urlTail(verifiedUrl)}`
+                    });
                 }
             } else if (!previousSegment && nextSegment && deletedSegmentImages.startUrl) {
-                // Deleting the first segment - update next segment's start_image
+                bridgeTarget = 'next';
+                expectedBridgeUrl = deletedSegmentImages.startUrl;
                 const nextParams = (nextSegment.params as any) || {};
                 const oldStartImage = nextSegmentImages?.startUrl;
 
-                console.log('[SegmentDelete] Bridging next segment (deleting first):', {
+                console.log('[SegmentDelete] Step 1: Bridging next segment (deleting first)', {
                     segmentId: nextSegment.id.substring(0, 8),
                     oldStartImage: urlTail(oldStartImage),
                     newStartImage: urlTail(deletedSegmentImages.startUrl),
@@ -725,23 +744,44 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     .eq('id', nextSegment.id);
 
                 if (bridgeError) {
-                    console.error('[SegmentDelete] Error bridging next segment:', bridgeError);
+                    results.push({ step: 'Bridge next segment', success: false, details: bridgeError.message });
                 } else {
-                    console.log('[SegmentDelete] ✓ Successfully bridged next segment');
+                    // Verify the update
+                    const { data: verifyData } = await supabase
+                        .from('generations')
+                        .select('params')
+                        .eq('id', nextSegment.id)
+                        .single();
+
+                    const verifiedUrl = verifyData?.params?.start_image_url;
+                    const verified = verifiedUrl === expectedBridgeUrl;
+                    results.push({
+                        step: 'Bridge next segment',
+                        success: verified,
+                        details: verified ? urlTail(verifiedUrl) : `Expected ${urlTail(expectedBridgeUrl)}, got ${urlTail(verifiedUrl)}`
+                    });
                 }
             } else {
-                console.log('[SegmentDelete] No bridging needed:', {
-                    hasPreviousSegment: !!previousSegment,
-                    hasNextSegment: !!nextSegment,
-                    hasDeletedEndUrl: !!deletedSegmentImages.endUrl,
-                    hasDeletedStartUrl: !!deletedSegmentImages.startUrl,
-                });
+                results.push({ step: 'Bridge (skipped)', success: true, details: 'No adjacent segment to bridge' });
             }
 
             // 2. Delete the generation
-            console.log('[SegmentDelete] Deleting generation...');
+            console.log('[SegmentDelete] Step 2: Deleting generation...');
             await deleteGeneration.mutateAsync(childId);
-            console.log('[SegmentDelete] ✓ Generation deleted');
+
+            // Verify deletion
+            const { data: deletedCheck } = await supabase
+                .from('generations')
+                .select('id')
+                .eq('id', childId)
+                .single();
+
+            const deleteVerified = !deletedCheck;
+            results.push({
+                step: 'Delete generation',
+                success: deleteVerified,
+                details: deleteVerified ? childId.substring(0, 8) : 'Generation still exists!'
+            });
 
             // 3. Update child_order for siblings with higher order (shift down)
             const siblingsToUpdate = sortedSegments.filter(c => {
@@ -750,24 +790,43 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             });
 
             if (siblingsToUpdate.length > 0) {
-                console.log('[SegmentDelete] Reordering siblings:', siblingsToUpdate.map(s => ({
-                    id: s.id.substring(0, 8),
-                    oldOrder: (s as any).child_order,
-                    newOrder: (s as any).child_order - 1,
-                })));
+                console.log('[SegmentDelete] Step 3: Reordering', siblingsToUpdate.length, 'siblings');
 
+                let reorderSuccess = true;
                 for (const sibling of siblingsToUpdate) {
                     const currentOrder = (sibling as any).child_order;
+                    const expectedNewOrder = currentOrder - 1;
+
                     const { error } = await supabase
                         .from('generations')
-                        .update({ child_order: currentOrder - 1 })
+                        .update({ child_order: expectedNewOrder })
                         .eq('id', sibling.id);
 
                     if (error) {
-                        console.error('[SegmentDelete] Error updating child_order:', error);
+                        reorderSuccess = false;
                     }
                 }
-                console.log('[SegmentDelete] ✓ Siblings reordered');
+
+                // Verify reordering
+                const siblingIds = siblingsToUpdate.map(s => s.id);
+                const { data: verifyReorder } = await supabase
+                    .from('generations')
+                    .select('id, child_order')
+                    .in('id', siblingIds);
+
+                const reorderVerified = verifyReorder?.every((s: any) => {
+                    const original = siblingsToUpdate.find(o => o.id === s.id);
+                    const expectedOrder = ((original as any)?.child_order ?? 0) - 1;
+                    return s.child_order === expectedOrder;
+                });
+
+                results.push({
+                    step: 'Reorder siblings',
+                    success: reorderSuccess && !!reorderVerified,
+                    details: `${siblingsToUpdate.length} siblings → ${verifyReorder?.map((s: any) => s.child_order).join(', ')}`
+                });
+            } else {
+                results.push({ step: 'Reorder (skipped)', success: true, details: 'No siblings to reorder' });
             }
 
             // 4. Update parent's orchestrator_details to reflect fewer expected segments
@@ -779,7 +838,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     const oldCount = orchestratorDetails.num_new_segments_to_generate || 0;
                     const newCount = Math.max(0, oldCount - 1);
 
-                    // Remove the deleted segment from arrays (at deletedChildOrder index)
                     const removeAtIndex = (arr: any[] | undefined, idx: number) => {
                         if (!arr || !Array.isArray(arr)) return arr;
                         return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
@@ -791,16 +849,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         segment_frames_expanded: removeAtIndex(orchestratorDetails.segment_frames_expanded, deletedChildOrder),
                         enhanced_prompts_expanded: removeAtIndex(orchestratorDetails.enhanced_prompts_expanded, deletedChildOrder),
                         base_prompts_expanded: removeAtIndex(orchestratorDetails.base_prompts_expanded, deletedChildOrder),
-                        // Note: input_image_paths_resolved has N+1 images for N segments
-                        // When deleting segment at index i, we remove image at index i+1 (the end image that gets bridged)
                         input_image_paths_resolved: removeAtIndex(orchestratorDetails.input_image_paths_resolved, deletedChildOrder + 1),
                     };
 
-                    console.log('[SegmentDelete] Updating parent orchestrator_details:', {
-                        oldCount,
-                        newCount,
-                        deletedChildOrder,
-                    });
+                    console.log('[SegmentDelete] Step 4: Updating parent segment count', oldCount, '→', newCount);
 
                     const { error: parentUpdateError } = await supabase
                         .from('generations')
@@ -813,17 +865,44 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         .eq('id', parentGenerationId);
 
                     if (parentUpdateError) {
-                        console.error('[SegmentDelete] Error updating parent:', parentUpdateError);
+                        results.push({ step: 'Update parent', success: false, details: parentUpdateError.message });
                     } else {
-                        console.log('[SegmentDelete] ✓ Parent orchestrator_details updated');
+                        // Verify parent update
+                        const { data: verifyParent } = await supabase
+                            .from('generations')
+                            .select('params')
+                            .eq('id', parentGenerationId)
+                            .single();
+
+                        const verifiedCount = verifyParent?.params?.orchestrator_details?.num_new_segments_to_generate;
+                        const parentVerified = verifiedCount === newCount;
+                        results.push({
+                            step: 'Update parent',
+                            success: parentVerified,
+                            details: `segment count: ${oldCount} → ${verifiedCount} (expected ${newCount})`
+                        });
                     }
+                } else {
+                    results.push({ step: 'Update parent (skipped)', success: true, details: 'No orchestrator_details' });
                 }
+            } else {
+                results.push({ step: 'Update parent (skipped)', success: true, details: 'No parent params' });
             }
 
-            // 5. Refetch to update the list and invalidate parent query
-            console.log('[SegmentDelete] ✓ Deletion complete, refetching...');
+            // 5. Final summary
+            const allSuccess = results.every(r => r.success);
+            console.log(
+                `[SegmentDelete] ══════════════════════════════════════════\n` +
+                `[SegmentDelete] ${allSuccess ? '✅ ALL STEPS SUCCESSFUL' : '❌ SOME STEPS FAILED'}\n` +
+                `[SegmentDelete] ══════════════════════════════════════════`
+            );
+            results.forEach(r => {
+                console.log(`[SegmentDelete] ${r.success ? '✓' : '✗'} ${r.step}: ${r.details || ''}`);
+            });
+            console.log('[SegmentDelete] ══════════════════════════════════════════');
+
+            // 6. Refetch to update the list and invalidate parent query
             refetch();
-            // Invalidate parent generation query so expectedSegmentData updates
             queryClient.invalidateQueries({ queryKey: ['generation', parentGenerationId] });
         } catch (error) {
             console.error('[ChildGenerationsView] Error deleting segment:', error);

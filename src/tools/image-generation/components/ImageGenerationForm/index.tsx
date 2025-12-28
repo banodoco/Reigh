@@ -30,6 +30,7 @@ import { nanoid } from 'nanoid';
 import { supabase } from "@/integrations/supabase/client";
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
 import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
+import { useSubmitButtonState } from '@/shared/hooks/useSubmitButtonState';
 import { useHydratedReferences } from '../../hooks/useHydratedReferences';
 
 // Import extracted components
@@ -919,19 +920,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Local state for prompts when no shot is selected
   const [noShotPrompts, setNoShotPrompts] = useState<PromptEntry[]>([]);
   const [noShotMasterPrompt, setNoShotMasterPrompt] = useState('');
-  // Button state for automated mode: idle → submitting → success → idle
-  type AutomatedButtonState = 'idle' | 'submitting' | 'success';
-  const [automatedButtonState, setAutomatedButtonState] = useState<AutomatedButtonState>('idle');
-  const buttonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (buttonTimeoutRef.current) {
-        clearTimeout(buttonTimeoutRef.current);
-      }
-    };
-  }, []);
+  // Button state for automated mode: idle → submitting → success → idle
+  const automatedSubmitButton = useSubmitButtonState();
 
   // Removed unused currentShotId that was causing unnecessary re-renders
   const { data: shots } = useListShots(selectedProjectId);
@@ -2602,18 +2593,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const capturedSelectedLoras = loraManager.selectedLoras;
       const capturedSelectedModel = selectedModel;
 
-      // Button state: submitting (1s) → success (2s) → idle
-      // Clear any existing timeout first
-      if (buttonTimeoutRef.current) {
-        clearTimeout(buttonTimeoutRef.current);
-      }
-      setAutomatedButtonState('submitting');
-      buttonTimeoutRef.current = setTimeout(() => {
-        setAutomatedButtonState('success');
-        buttonTimeoutRef.current = setTimeout(() => {
-          setAutomatedButtonState('idle');
-        }, 2000);
-      }, 1000);
+      // Trigger button state: submitting (1s) → success (2s) → idle
+      automatedSubmitButton.trigger();
 
       // Add incoming task immediately - appears as filler in TasksPane
       const truncatedPrompt = capturedMasterPrompt.length > 50
@@ -3043,9 +3024,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             imagesPerPrompt={imagesPerPrompt}
             onChangeImagesPerPrompt={handleSliderChange(setImagesPerPrompt)}
             actionablePromptsCount={actionablePromptsCount}
-            isGenerating={isGenerating || automatedButtonState === 'submitting'}
+            isGenerating={isGenerating || automatedSubmitButton.isSubmitting}
             hasApiKey={hasApiKey}
-            justQueued={justQueued || automatedButtonState === 'success'}
+            justQueued={justQueued || automatedSubmitButton.isSuccess}
             steps={steps}
             onChangeSteps={setSteps}
             showStepsDropdown={isLocalGenerationEnabled}
