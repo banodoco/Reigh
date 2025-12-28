@@ -279,6 +279,71 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         return sortedChildren.filter(isSegment);
     }, [sortedChildren, isSegment]);
 
+    // Extract task IDs from all children for batch fetching
+    // Each child generation has a `tasks` array - we want the first task (the one that created it)
+    const childTaskIds = useMemo(() => {
+        const taskIds: string[] = [];
+        sortedSegments.forEach(child => {
+            // tasks field from generation - can be array or stored in metadata
+            const tasks = (child as any).tasks || (child as any).metadata?.tasks;
+            const taskId = Array.isArray(tasks) && tasks.length > 0 ? tasks[0] : null;
+            if (taskId) {
+                taskIds.push(taskId);
+            }
+        });
+        return taskIds;
+    }, [sortedSegments]);
+
+    // Batch fetch task params for all children
+    // This is the SOURCE OF TRUTH for regeneration params (immutable task data)
+    const { data: childTasksMap } = useQuery({
+        queryKey: ['child-segment-tasks', parentGenerationId, childTaskIds],
+        queryFn: async () => {
+            if (childTaskIds.length === 0) return {};
+
+            console.log('[ChildGenerationsView] Batch fetching tasks for children:', {
+                parentGenerationId: parentGenerationId.substring(0, 8),
+                taskCount: childTaskIds.length,
+            });
+
+            const { data, error } = await supabase
+                .from('tasks')
+                .select('id, params')
+                .in('id', childTaskIds);
+
+            if (error) {
+                console.error('[ChildGenerationsView] Error fetching child tasks:', error);
+                return {};
+            }
+
+            // Build map: generationId -> task params
+            // We need to map taskId back to generationId
+            const taskParamsById: Record<string, any> = {};
+            data?.forEach(task => {
+                taskParamsById[task.id] = task.params;
+            });
+
+            // Now build generationId -> params map
+            const generationParamsMap: Record<string, any> = {};
+            sortedSegments.forEach(child => {
+                const tasks = (child as any).tasks || (child as any).metadata?.tasks;
+                const taskId = Array.isArray(tasks) && tasks.length > 0 ? tasks[0] : null;
+                if (taskId && taskParamsById[taskId]) {
+                    generationParamsMap[child.id] = taskParamsById[taskId];
+                }
+            });
+
+            console.log('[ChildGenerationsView] Built generation->task params map:', {
+                mappedCount: Object.keys(generationParamsMap).length,
+                totalChildren: sortedSegments.length,
+            });
+
+            return generationParamsMap;
+        },
+        enabled: childTaskIds.length > 0,
+        staleTime: 5 * 60 * 1000, // 5 minutes - task params don't change
+    });
+
     // Calculate validation result for join clips based on segment frame counts
     const joinValidationResult = useMemo((): ValidationResult | null => {
         // Use sortedSegments which already filters to only segments
@@ -1109,6 +1174,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 availableLoras={availableLoras}
                                                 projectResolution={effectiveResolution}
                                                 aspectRatio={effectiveAspectRatio}
+                                                taskParams={childTasksMap?.[slot.child.id]}
                                                 onImageLightboxOpen={(imageIndex, images) => {
                                                     console.log('[SegmentImageFlow] onImageLightboxOpen called in parent');
                                                     console.log('[SegmentImageFlow] imageIndex:', imageIndex);
@@ -1400,11 +1466,17 @@ interface SegmentCardProps {
     onImageLightboxOpen: (imageIndex: 0 | 1, images: { start: { url: string; generationId?: string } | null; end: { url: string; generationId?: string } | null }) => void;
     projectResolution?: string; // Resolution derived from project's aspect ratio
     aspectRatio?: string; // Aspect ratio string like "16:9" for video player containers
+    /** Task params from the task that created this child - SOURCE OF TRUTH for regeneration */
+    taskParams?: Record<string, any>;
 }
 
 // Memoized to prevent re-renders when parent state changes (e.g., lightbox index)
-const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio }) => {
+const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, taskParams }) => {
     const isMobile = useIsMobile();
+
+    // Use task params as SOURCE OF TRUTH, fall back to child.params for backwards compatibility
+    // Task params are immutable and reliable, generation params can drift
+    const effectiveParams = taskParams || child.params || {};
 
     // Calculate aspect ratio style for video container based on project/shot dimensions
     const aspectRatioStyle = useMemo(() => {
@@ -1420,8 +1492,8 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
 
     // Extract input images using shared utility (handles both explicit URLs and array formats)
     const segmentImageInfo = useMemo(() =>
-        extractSegmentImages(child.params, index),
-        [child.params, index]
+        extractSegmentImages(effectiveParams, index),
+        [effectiveParams, index]
     );
 
     // Fetch fresh URLs from database for segment input images (always use main variant)
@@ -1553,7 +1625,7 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
             {/* Settings Form - Using shared SegmentRegenerateControls */}
             <CardContent className="p-4 flex-1 flex flex-col">
                 <SegmentRegenerateControls
-                    initialParams={child.params || {}}
+                    initialParams={effectiveParams}
                     projectId={projectId}
                     generationId={parentGenerationId}
                     childGenerationId={child.id}
