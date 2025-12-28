@@ -901,6 +901,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // Pass shared hook data to prevent creating duplicate instances
                 // BUT: Only pass if not using preloaded images (to avoid filtering conflict)
                 hookData={preloadedImages ? undefined : hookData}
+                onDragStateChange={onDragStateChange}
                 onPairClick={(pairIndex, pairData) => {
                   setPairPromptModalData({
                     isOpen: true,

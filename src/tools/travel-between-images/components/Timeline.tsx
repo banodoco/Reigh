@@ -124,6 +124,8 @@ export interface TimelineProps {
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
   onClearEnhancedPrompt?: (pairIndex: number) => void;
+  /** Callback to notify parent of drag state changes - used to suppress query refetches during drag */
+  onDragStateChange?: (isDragging: boolean) => void;
   // Action handlers
   onImageDelete: (imageId: string) => void;
   onImageDuplicate: (imageId: string, timeline_frame: number) => void;
@@ -185,6 +187,7 @@ const Timeline: React.FC<TimelineProps> = ({
   defaultPrompt,
   defaultNegativePrompt,
   onClearEnhancedPrompt,
+  onDragStateChange,
   onImageDelete,
   onImageDuplicate,
   duplicatingImageId,
@@ -257,7 +260,11 @@ const Timeline: React.FC<TimelineProps> = ({
   // Local state for shot selector dropdown (separate from the shot being viewed)
   const [lightboxSelectedShotId, setLightboxSelectedShotId] = useState<string | undefined>(selectedShotId || shotId);
   const [isDragInProgress, setIsDragInProgress] = useState<boolean>(false);
-  
+
+  // Notify parent when drag state changes - used to suppress query refetches
+  useEffect(() => {
+    onDragStateChange?.(isDragInProgress);
+  }, [isDragInProgress, onDragStateChange]);
 
   // Refs (removed initialContextFrames - no longer needed for auto-adjustment)
 
