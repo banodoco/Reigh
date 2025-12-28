@@ -632,24 +632,27 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         const prevSegmentImages = previousSegment ? extractSegmentImages((previousSegment.params as any) || {}, 0) : null;
         const nextSegmentImages = nextSegment ? extractSegmentImages((nextSegment.params as any) || {}, 0) : null;
 
+        // Helper to get last part of URL (the unique filename)
+        const urlTail = (url: string | undefined) => url ? '...' + url.slice(-40) : undefined;
+
         console.log('[SegmentDelete] Starting deletion:', {
             deletingSegment: {
                 id: childId.substring(0, 8),
                 childOrder: deletedChildOrder,
-                startImage: deletedSegmentImages.startUrl?.substring(0, 60),
-                endImage: deletedSegmentImages.endUrl?.substring(0, 60),
+                startImage: urlTail(deletedSegmentImages.startUrl),
+                endImage: urlTail(deletedSegmentImages.endUrl),
             },
             previousSegment: previousSegment ? {
                 id: previousSegment.id.substring(0, 8),
                 childOrder: (previousSegment as any).child_order,
-                startImage: prevSegmentImages?.startUrl?.substring(0, 60),
-                endImage: prevSegmentImages?.endUrl?.substring(0, 60),
+                startImage: urlTail(prevSegmentImages?.startUrl),
+                endImage: urlTail(prevSegmentImages?.endUrl),
             } : null,
             nextSegment: nextSegment ? {
                 id: nextSegment.id.substring(0, 8),
                 childOrder: (nextSegment as any).child_order,
-                startImage: nextSegmentImages?.startUrl?.substring(0, 60),
-                endImage: nextSegmentImages?.endUrl?.substring(0, 60),
+                startImage: urlTail(nextSegmentImages?.startUrl),
+                endImage: urlTail(nextSegmentImages?.endUrl),
             } : null,
             totalSegments: sortedSegments.length,
         });
@@ -666,8 +669,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
                 console.log('[SegmentDelete] Bridging previous segment:', {
                     segmentId: previousSegment.id.substring(0, 8),
-                    oldEndImage: oldEndImage?.substring(0, 60),
-                    newEndImage: deletedSegmentImages.endUrl?.substring(0, 60),
+                    oldEndImage: urlTail(oldEndImage),
+                    newEndImage: urlTail(deletedSegmentImages.endUrl),
                     willChange: oldEndImage !== deletedSegmentImages.endUrl,
                 });
 
@@ -700,8 +703,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
                 console.log('[SegmentDelete] Bridging next segment (deleting first):', {
                     segmentId: nextSegment.id.substring(0, 8),
-                    oldStartImage: oldStartImage?.substring(0, 60),
-                    newStartImage: deletedSegmentImages.startUrl?.substring(0, 60),
+                    oldStartImage: urlTail(oldStartImage),
+                    newStartImage: urlTail(deletedSegmentImages.startUrl),
                     willChange: oldStartImage !== deletedSegmentImages.startUrl,
                 });
 
