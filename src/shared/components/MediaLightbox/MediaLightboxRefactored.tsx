@@ -1167,11 +1167,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       isChildSegment: parentGenerationId !== actualGenerationId,
     });
 
+    // If viewing a child segment, pass its ID so regeneration creates a variant instead of new child
+    const isChildSegment = parentGenerationId !== actualGenerationId;
+    const childGenerationId = isChildSegment ? actualGenerationId : undefined;
+
     return (
       <SegmentRegenerateForm
         params={taskParams}
         projectId={selectedProjectId || null}
         generationId={parentGenerationId}
+        childGenerationId={childGenerationId}
         segmentIndex={taskParams.segment_index ?? 0}
         startImageUrl={startImageUrl}
         endImageUrl={endImageUrl}

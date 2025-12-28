@@ -15,6 +15,8 @@ export interface SegmentRegenerateFormProps {
   projectId: string | null;
   /** Generation ID to use as parent for the variant */
   generationId: string;
+  /** Optional existing child generation ID (for Replace mode - creates variant instead of new child) */
+  childGenerationId?: string;
   /** Optional segment index (defaults to 0 for single-segment videos) */
   segmentIndex?: number;
   /** Start image URL for the segment */
@@ -33,6 +35,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   params: initialParams,
   projectId,
   generationId,
+  childGenerationId,
   segmentIndex = 0,
   startImageUrl,
   endImageUrl,
@@ -46,6 +49,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         initialParams={initialParams}
         projectId={projectId}
         generationId={generationId}
+        childGenerationId={childGenerationId}
         segmentIndex={segmentIndex}
         startImageUrl={startImageUrl}
         endImageUrl={endImageUrl}

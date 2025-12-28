@@ -49,6 +49,12 @@ interface ChildGenerationsViewProps {
     shotId?: string | null;
 }
 
+// Stable empty function reference to avoid re-renders from inline () => {}
+const noop = () => {};
+
+// Stable empty object for taskDetailsData.onApplySettingsFromTask
+const noopTaskApply = () => {};
+
 export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     parentGenerationId,
     projectId,
@@ -119,7 +125,9 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 }
             }
         );
-    }, [lightboxIndex, isParentLightboxOpen]);
+    // Note: lightboxIndex and isParentLightboxOpen are captured but only used for logging
+    // which is stripped in production, so they don't need to be dependencies
+    }, []);
     
     // Fetch available LoRAs for the motion control
     const publicLorasQuery = useListPublicResources('lora');
@@ -1013,12 +1021,12 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                     onMobileTap={handleMobileTap}
                                     onDelete={handleClearParentOutput}
                                     deletingVideoId={null}
-                                    onHoverStart={() => { }}
-                                    onHoverEnd={() => { }}
-                                    onMobileModalOpen={() => { }}
+                                    onHoverStart={noop}
+                                    onHoverEnd={noop}
+                                    onMobileModalOpen={noop}
                                     selectedVideoForDetails={null}
                                     showTaskDetailsModal={false}
-                                    onApplySettingsFromTask={() => { }}
+                                    onApplySettingsFromTask={noop}
                                     hideActions={false}
                                     deleteTooltip="Clear output (keeps segments, allows re-joining)"
                                 />
@@ -1224,7 +1232,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             error: segmentTaskError,
                             inputImages: segmentInputImages,
                             taskId: segmentTaskId || null,
-                            onApplySettingsFromTask: () => {}, // Not applicable in this context
+                            onApplySettingsFromTask: noop, // Not applicable in this context
                             onClose: handleLightboxClose
                         }}
                     />
@@ -1265,7 +1273,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             error: parentTaskError,
                             inputImages: parentInputImages,
                             taskId: parentTaskId || null,
-                            onApplySettingsFromTask: () => {}, // Not applicable in this context
+                            onApplySettingsFromTask: noop, // Not applicable in this context
                             onClose: () => setIsParentLightboxOpen(false)
                         }}
                     />
@@ -1366,7 +1374,8 @@ interface SegmentCardProps {
     aspectRatio?: string; // Aspect ratio string like "16:9" for video player containers
 }
 
-const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio }) => {
+// Memoized to prevent re-renders when parent state changes (e.g., lightbox index)
+const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio }) => {
     const isMobile = useIsMobile();
 
     // Calculate aspect ratio style for video container based on project/shot dimensions
@@ -1512,14 +1521,14 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
                         projectId={projectId}
                         onLightboxOpen={() => onLightboxOpen()}
                         onMobileTap={onMobileTap}
-                        onDelete={() => { }}
+                        onDelete={noop}
                         deletingVideoId={null}
-                        onHoverStart={() => { }}
-                        onHoverEnd={() => { }}
-                        onMobileModalOpen={() => { }}
+                        onHoverStart={noop}
+                        onHoverEnd={noop}
+                        onMobileModalOpen={noop}
                         selectedVideoForDetails={null}
                         showTaskDetailsModal={false}
-                        onApplySettingsFromTask={() => { }}
+                        onApplySettingsFromTask={noop}
                         hideActions={true}
                     />
             </div>
@@ -1551,7 +1560,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, pare
             </CardContent>
         </Card>
     );
-};
+});
 
 // Placeholder component for pending/missing segments
 interface SegmentPlaceholderProps {
@@ -1564,7 +1573,8 @@ interface SegmentPlaceholderProps {
     aspectRatio?: string; // Aspect ratio string like "16:9" for video container
 }
 
-const SegmentPlaceholder: React.FC<SegmentPlaceholderProps> = ({
+// Memoized to prevent re-renders when parent state changes
+const SegmentPlaceholder: React.FC<SegmentPlaceholderProps> = React.memo(({
     index,
     expectedFrames,
     expectedPrompt,
@@ -1654,4 +1664,4 @@ const SegmentPlaceholder: React.FC<SegmentPlaceholderProps> = ({
             </CardContent>
         </Card>
     );
-};
+});
