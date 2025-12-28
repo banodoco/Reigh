@@ -2591,9 +2591,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const capturedSelectedLoras = loraManager.selectedLoras;
       const capturedSelectedModel = selectedModel;
 
-      // Show success state in button for 2 seconds
-      setAutomatedJustQueued(true);
-      setTimeout(() => setAutomatedJustQueued(false), 2000);
+      // Show loading state "Submitting..." for 1 second, then success state for 2 seconds
+      setIsGeneratingAutomatedPrompts(true);
+      setTimeout(() => {
+        setIsGeneratingAutomatedPrompts(false);
+        setAutomatedJustQueued(true);
+        setTimeout(() => setAutomatedJustQueued(false), 2000);
+      }, 1000);
 
       // Add incoming task immediately - appears as filler in TasksPane
       const truncatedPrompt = capturedMasterPrompt.length > 50

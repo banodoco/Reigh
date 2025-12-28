@@ -159,7 +159,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
         {justQueued
           ? "Creating tasks!"
           : isGenerating
-            ? "Creating tasks..."
+            ? "Submitting..."
             : normalizedPromptMode === 'automated'
               ? `Generate ${imagesPerPrompt * promptMultiplier} New ${imagesPerPrompt * promptMultiplier === 1 ? 'Image' : 'Images'}`
               : `Generate ${imagesPerPrompt * actionablePromptsCount} New ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
