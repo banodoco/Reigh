@@ -1009,7 +1009,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     },
   });
 
-  // For variants, show the variant's params instead of the original task
+  // Extract source_task_id from active variant for fetching task data
+  const variantSourceTaskId = useMemo(() => {
+    const variantParams = activeVariant?.params as Record<string, any> | undefined;
+    return variantParams?.source_task_id || null;
+  }, [activeVariant?.params]);
+
+  // Fetch the variant's source task when it differs from taskDetailsData
+  // This ensures we always show the correct task params for the current variant
+  const { data: variantSourceTask, isLoading: isLoadingVariantTask } = useQuery({
+    queryKey: ['variant-source-task', variantSourceTaskId],
+    queryFn: async () => {
+      if (!variantSourceTaskId) return null;
+      console.log('[VariantTaskDetails] Fetching source task for variant:', variantSourceTaskId.substring(0, 8));
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', variantSourceTaskId)
+        .single();
+      if (error) {
+        console.error('[VariantTaskDetails] Error fetching source task:', error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!variantSourceTaskId && variantSourceTaskId !== taskDetailsData?.taskId,
+    staleTime: 60000, // Cache for 1 minute
+  });
+
+  // For variants, show the variant's source task params instead of the original task
   // But ALWAYS preserve onApplySettingsFromTask so the Apply button shows
   const adjustedTaskDetailsData = useMemo(() => {
     // Check if we're viewing a variant that was created by a task (has source_task_id in params)
@@ -1022,8 +1050,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     if (isTaskCreatedVariant && variantParams) {
       // Check if taskDetailsData already has the correct task (e.g., when opened from TasksPane)
-      // If so, use the original task's params which have full configuration data
       const hasMatchingTaskData = taskDetailsData?.taskId === variantParams.source_task_id && taskDetailsData?.task?.params;
+
+      // Determine the best source of task params:
+      // 1. If taskDetailsData matches, use its params (already have full data)
+      // 2. If we fetched the source task, use its params
+      // 3. Fall back to variant params (may be incomplete)
+      let effectiveParams = variantParams;
+      let effectiveTaskType = variantParams.tool_type || activeVariant.variant_type || 'variant';
+
+      if (hasMatchingTaskData) {
+        effectiveParams = taskDetailsData.task.params;
+        effectiveTaskType = taskDetailsData.task.taskType || effectiveTaskType;
+      } else if (variantSourceTask?.params) {
+        // Parse params if they're a string
+        effectiveParams = typeof variantSourceTask.params === 'string'
+          ? JSON.parse(variantSourceTask.params)
+          : variantSourceTask.params;
+        effectiveTaskType = variantSourceTask.task_type || effectiveTaskType;
+      }
 
       console.log('[VariantTaskDetails] Showing task details for variant:', {
         variantId: activeVariant.id?.substring(0, 8),
@@ -1033,24 +1078,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         createdFrom: variantParams.created_from,
         hasOnApplySettings: !!taskDetailsData?.onApplySettingsFromTask,
         hasMatchingTaskData,
+        hasFetchedSourceTask: !!variantSourceTask,
+        effectiveTaskType,
         taskDetailsTaskId: taskDetailsData?.taskId?.substring(0, 8),
       });
-
-      // Use original task params if we have matching task data (preserves full config like join clips settings)
-      // Otherwise fall back to variant params (which may be incomplete)
-      const effectiveParams = hasMatchingTaskData ? taskDetailsData.task.params : variantParams;
 
       return {
         task: {
           id: activeVariant.id,
-          // Note: created_from (e.g. 'join_clips_complete') is NOT a task type - it's metadata about how
-          // the variant was created. Only use tool_type or variant_type which are valid task types.
-          taskType: variantParams.tool_type || activeVariant.variant_type || 'variant',
+          taskType: effectiveTaskType,
           params: effectiveParams,
           status: 'Complete',
           createdAt: activeVariant.created_at,
         },
-        isLoading: false,
+        isLoading: isLoadingVariantTask,
         error: null,
         inputImages: variantParams.image ? [variantParams.image] : [],
         taskId: variantParams.source_task_id || activeVariant.id,
@@ -1061,7 +1102,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     // For all other cases, use the generation's task details as-is
     return taskDetailsData;
-  }, [taskDetailsData, activeVariant]);
+  }, [taskDetailsData, activeVariant, variantSourceTask, isLoadingVariantTask]);
 
   // Fetch shot's aspect ratio for regeneration resolution (shot resolution > project resolution)
   const { data: shotAspectRatioData, isLoading: isLoadingShotAspectRatio } = useQuery({
