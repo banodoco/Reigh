@@ -1153,7 +1153,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             />
           ) : !readOnly ? (
             <div
-              className="relative h-10 mt-1"
+              className="relative h-10"
               style={{
                 width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
                 minWidth: '100%',

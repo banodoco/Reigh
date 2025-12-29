@@ -262,7 +262,18 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [isJoiningClips, setIsJoiningClips] = useState(false);
     const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
     const queryClient = useQueryClient();
-    
+
+    // Get audio settings for the shot (to pass audio URL to join task)
+    const { settings: audioSettings } = useToolSettings<{
+        url?: string;
+        metadata?: { duration: number; name?: string };
+    }>('travel-audio', {
+        projectId: projectId || '',
+        shotId: shotIdProp || undefined,
+        enabled: !!shotIdProp && !!projectId
+    });
+    const audioUrl = audioSettings?.url || null;
+
     // Use project-persisted join clips settings (shared with JoinClipsPage)
     const joinSettings = useJoinClipsSettings(projectId);
     const {
@@ -1250,6 +1261,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 loras: lorasForTask.length,
                 resolution: resolutionTuple,
                 effectiveResolution,
+                audioUrl: audioUrl ? audioUrl.substring(audioUrl.lastIndexOf('/') + 1) : null,
             });
 
             await createJoinClipsTask({
@@ -1273,6 +1285,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 use_input_video_fps: false,
                 ...(lorasForTask.length > 0 && { loras: lorasForTask }),
                 ...(resolutionTuple && { resolution: resolutionTuple }),
+                // Pass audio URL from timeline to mix into final joined video
+                ...(audioUrl && { audio_url: audioUrl }),
             });
 
             toast({

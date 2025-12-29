@@ -3,8 +3,8 @@ import { TIMELINE_PADDING_OFFSET } from './constants';
 import { Button } from '@/shared/components/ui/button';
 import { Play, Pause, Trash2, Volume2 } from 'lucide-react';
 
-// Frame rate for timeline (Wan model uses 25fps)
-const FRAME_RATE = 25;
+// Frame rate for timeline (matches time-utils.ts FPS constant)
+const FRAME_RATE = 16;
 
 interface AudioMetadata {
   duration: number;
@@ -164,7 +164,7 @@ export const AudioStrip: React.FC<AudioStripProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative h-10 mt-1 select-none"
+      className="relative h-10 select-none"
       style={{
         width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
         minWidth: '100%',
