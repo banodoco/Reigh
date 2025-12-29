@@ -1009,26 +1009,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     },
   });
 
-  // Extract source_task_id from active variant for fetching task data
-  // Check multiple possible fields where task ID might be stored
-  const variantSourceTaskId = useMemo(() => {
+  // Extract source_task_id and check if variant already has orchestrator_details
+  const { variantSourceTaskId, variantHasOrchestratorDetails } = useMemo(() => {
     const variantParams = activeVariant?.params as Record<string, any> | undefined;
     // Try multiple possible field names for the source task ID
     const taskId = variantParams?.source_task_id ||
                    variantParams?.orchestrator_task_id ||
                    variantParams?.task_id ||
                    null;
+    const hasOrchestratorDetails = !!variantParams?.orchestrator_details;
     console.log('[VariantTaskDetails] Extracted source task ID:', {
       variantId: activeVariant?.id?.substring(0, 8),
       variantType: activeVariant?.variant_type,
       sourceTaskId: taskId?.substring(0, 8) || 'none',
+      hasOrchestratorDetails,
       paramsKeys: variantParams ? Object.keys(variantParams).slice(0, 10).join(', ') : 'none',
     });
-    return taskId;
+    return { variantSourceTaskId: taskId, variantHasOrchestratorDetails: hasOrchestratorDetails };
   }, [activeVariant?.params, activeVariant?.id, activeVariant?.variant_type]);
 
   // Fetch the variant's source task when it differs from taskDetailsData
-  // This ensures we always show the correct task params for the current variant
+  // Skip fetch if variant already has orchestrator_details (e.g., clip_join variants)
   const { data: variantSourceTask, isLoading: isLoadingVariantTask } = useQuery({
     queryKey: ['variant-source-task', variantSourceTaskId],
     queryFn: async () => {
@@ -1045,7 +1046,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       }
       return data;
     },
-    enabled: !!variantSourceTaskId && variantSourceTaskId !== taskDetailsData?.taskId,
+    // Don't fetch if: no task ID, already have matching taskDetailsData, or variant has orchestrator_details
+    enabled: !!variantSourceTaskId && variantSourceTaskId !== taskDetailsData?.taskId && !variantHasOrchestratorDetails,
     staleTime: 60000, // Cache for 1 minute
   });
 
@@ -1076,12 +1078,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
       if (hasMatchingTaskData) {
         effectiveParams = taskDetailsData.task.params;
-      } else if (variantSourceTask?.params) {
-        // Parse params if they're a string
+      } else if (!variantParams.orchestrator_details && variantSourceTask?.params) {
+        // Only use fetched task params if variant doesn't already have orchestrator_details
+        // clip_join variants store orchestrator_details directly, so we don't want to overwrite
         effectiveParams = typeof variantSourceTask.params === 'string'
           ? JSON.parse(variantSourceTask.params)
           : variantSourceTask.params;
       }
+      // Otherwise keep variantParams which may already have orchestrator_details (e.g., clip_join)
 
       console.log('[VariantTaskDetails] Showing task details for variant:', {
         variantId: activeVariant.id?.substring(0, 8),
