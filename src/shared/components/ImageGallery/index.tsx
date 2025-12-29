@@ -328,12 +328,16 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     ).filter(Boolean),
     [paginationHook.paginatedImages]
   );
-  const { getBadgeData } = useVariantBadges(paginatedGenerationIds);
+  const { getBadgeData, isLoading: isBadgeDataLoading } = useVariantBadges(paginatedGenerationIds);
 
-  // Merge badge data with paginated images
+  // Merge badge data with paginated images (only when badge data is loaded)
   const paginatedImagesWithBadges = useMemo(() => {
     if (!paginationHook.paginatedImages) return [];
     return paginationHook.paginatedImages.map(img => {
+      // Don't merge badge data while loading - prevents showing "0" badges
+      if (isBadgeDataLoading) {
+        return img;
+      }
       const generationId = (img as any).generation_id || img.id;
       const badgeData = getBadgeData(generationId);
       return {
@@ -343,7 +347,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
         unviewedVariantCount: badgeData.unviewedVariantCount,
       };
     });
-  }, [paginationHook.paginatedImages, getBadgeData]);
+  }, [paginationHook.paginatedImages, getBadgeData, isBadgeDataLoading]);
 
   // Calculate effective page for progressive loading
   const effectivePage = paginationHook.isServerPagination
