@@ -79,8 +79,10 @@ export function useMarkVariantViewed() {
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       queryClient.invalidateQueries({ queryKey: ['shot-positions'] });
 
-      // Also invalidate variant-badges to refetch accurate counts
-      queryClient.invalidateQueries({ queryKey: ['variant-badges'] });
+      // NOTE: We intentionally do NOT invalidate variant-badges here.
+      // The optimistic update in onMutate already updated the badge count.
+      // Invalidating would trigger a refetch that could race with the DB update.
+      // Badge data will sync naturally when staleTime (30s) expires.
     },
     onError: (error) => {
       console.error('[useMarkVariantViewed] Failed:', error);
