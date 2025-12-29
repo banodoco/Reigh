@@ -307,7 +307,8 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
 
     return (
         <TooltipProvider>
-        <div className="p-4 space-y-4">
+        <div className="w-full">
+            <div className="p-4 space-y-4">
             {/* Header */}
             <div className="flex items-center gap-2">
                 <h3 className="text-lg font-medium flex items-center gap-2">
@@ -552,31 +553,29 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                     </ul>
                 </div>
             )}
-            
-            {/* Generate Button - Sticky at bottom */}
-            <div className="sticky bottom-0 pt-4 pb-4 -mx-6 px-6 bg-gradient-to-t from-background via-background to-transparent">
-                <Button
-                    onClick={onGenerate}
-                    disabled={isGenerateDisabled || isGenerating || generateSuccess}
-                    className={cn("w-full shadow-lg gap-2 h-12", 
-                        generateSuccess && "bg-green-500 hover:bg-green-600"
-                    )}
-                    size="lg"
-                >
-                    {isGenerating ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : generateSuccess ? (
-                        <Check className="w-5 h-5" />
-                    ) : (
-                        <Film className="w-5 h-5" />
-                    )}
-                    <span className="font-medium">
-                        {generateSuccess 
-                            ? 'Task Created' 
-                            : `Regenerate ${selections.length} segment${selections.length > 1 ? 's' : ''}`
-                        }
-                    </span>
-                </Button>
+
+            {/* Generate Button - Regular layout, not sticky/floating */}
+            <Button
+                onClick={onGenerate}
+                disabled={isGenerateDisabled || isGenerating || generateSuccess}
+                className={cn("w-full gap-2",
+                    generateSuccess && "bg-green-600 hover:bg-green-600"
+                )}
+            >
+                {isGenerating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                ) : generateSuccess ? (
+                    <Check className="w-4 h-4" />
+                ) : (
+                    <Film className="w-4 h-4" />
+                )}
+                <span>
+                    {generateSuccess
+                        ? 'Task Created'
+                        : `Replace ${selections.length} segment${selections.length > 1 ? 's' : ''}`
+                    }
+                </span>
+            </Button>
             </div>
         </div>
         </TooltipProvider>
