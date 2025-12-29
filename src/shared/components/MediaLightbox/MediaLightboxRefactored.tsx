@@ -1087,16 +1087,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       }
       // Otherwise keep variantParams which may already have orchestrator_details (e.g., clip_join)
 
-      console.log('[VariantTaskDetails] Showing task details for variant:', {
+      // DEBUG: Using console.error so it shows in production
+      const isJoinClipsTaskType = ['join_clips_orchestrator', 'join_clips_segment', 'join_clips', 'clip_join'].includes(effectiveTaskType);
+      console.error('[VariantTaskDetails] DEBUG - Task details for variant:', {
         variantId: activeVariant.id?.substring(0, 8),
         variantType: activeVariant.variant_type,
-        isPrimary: activeVariant.is_primary,
-        sourceTaskId: variantParams.source_task_id?.substring(0, 8),
-        createdFrom: variantParams.created_from,
-        hasOnApplySettings: !!taskDetailsData?.onApplySettingsFromTask,
-        hasMatchingTaskData,
-        hasFetchedSourceTask: !!variantSourceTask,
         effectiveTaskType,
+        isJoinClipsTaskType,
+        hasOrchestratorDetails: !!effectiveParams?.orchestrator_details,
+        orchestratorDetailsKeys: effectiveParams?.orchestrator_details ? Object.keys(effectiveParams.orchestrator_details).slice(0, 10) : null,
+        hasContextFrameCount: !!effectiveParams?.orchestrator_details?.context_frame_count,
+        contextFrameCount: effectiveParams?.orchestrator_details?.context_frame_count,
+        hasMatchingTaskData,
+        variantHasOrchestratorDetails,
+        hasFetchedSourceTask: !!variantSourceTask,
+        effectiveParamsKeys: Object.keys(effectiveParams || {}).slice(0, 10),
+        sourceTaskId: variantParams.source_task_id?.substring(0, 8),
         taskDetailsTaskId: taskDetailsData?.taskId?.substring(0, 8),
       });
 

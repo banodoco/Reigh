@@ -950,6 +950,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 </SelectTrigger>
                 <SelectContent variant="zinc">
                   <SelectItem variant="zinc" value="all" className="!text-xs">All task types</SelectItem>
+                  {taskTypeOptions.length > 0 && (
+                    <SelectSeparator className="bg-zinc-700" />
+                  )}
                   {taskTypeOptions.map((type) => (
                     <SelectItem variant="zinc" key={type.value} value={type.value} className="!text-xs">
                       {type.label}

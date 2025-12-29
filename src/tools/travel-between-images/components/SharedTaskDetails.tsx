@@ -57,7 +57,20 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   // Check if this is a join clips task (orchestrator or segment)
   // Note: 'clip_join' is the variant_type stored on generations created by join clips
   const isJoinClipsTask = task?.taskType === 'join_clips_orchestrator' || task?.taskType === 'join_clips_segment' || task?.taskType === 'join_clips' || task?.taskType === 'clip_join';
-  
+
+  // DEBUG: Log what SharedTaskDetails receives (console.error for production visibility)
+  console.error('[SharedTaskDetails] DEBUG - Received task:', {
+    taskType: task?.taskType,
+    isJoinClipsTask,
+    isCharacterAnimateTask,
+    hasOrchestratorDetails: !!orchestratorDetails,
+    hasOrchestratorPayload: !!orchestratorPayload,
+    orchestratorDetailsKeys: orchestratorDetails ? Object.keys(orchestratorDetails).slice(0, 10) : null,
+    contextFrameCount: orchestratorDetails?.context_frame_count,
+    gapFrameCount: orchestratorDetails?.gap_frame_count,
+    paramsKeys: task?.params ? Object.keys(task.params).slice(0, 10) : null,
+  });
+
   // Get LoRAs from the correct location (try all possible paths)
   // For individual_travel_segment, check individual_segment_params first (UI overrides)
   const additionalLoras = (
