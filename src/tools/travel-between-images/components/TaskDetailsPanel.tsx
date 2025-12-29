@@ -161,8 +161,11 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
               const isVideoTask = contentType === 'video';
               
               // Legacy fallback for tasks before content_type was added
-              const isLegacyVideoTask = task.taskType === 'travel_orchestrator' || 
+              // Also include join_clips types and clip_join variant type
+              const isLegacyVideoTask = task.taskType === 'travel_orchestrator' ||
                                        task.taskType?.includes('travel') ||
+                                       task.taskType?.includes('join_clips') ||
+                                       task.taskType === 'clip_join' ||
                                        inputImages.length > 0;
               
               const shouldShowVideoDetails = isVideoTask || isLegacyVideoTask;
