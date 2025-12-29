@@ -1123,6 +1123,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       };
     }
 
+    // If variants are still loading, return taskDetailsData but mark as loading
+    // This prevents showing wrong task type that then switches after variants load
+    // ALSO check if we're waiting for initialVariantId to be applied (clicked a specific variant)
+    const waitingForInitialVariant = initialVariantId &&
+      (!activeVariant || activeVariant.id !== initialVariantId);
+
+    if ((isLoadingVariants && !activeVariant) || waitingForInitialVariant) {
+      console.error('[VariantTaskDetails] DEBUG - Still loading/waiting for initial variant:', {
+        taskType: taskDetailsData?.task?.taskType,
+        isLoadingVariants,
+        waitingForInitialVariant,
+        initialVariantId: initialVariantId?.substring(0, 8),
+        activeVariantId: activeVariant?.id?.substring(0, 8),
+      });
+      return taskDetailsData ? { ...taskDetailsData, isLoading: true } : taskDetailsData;
+    }
+
     // For all other cases, use the generation's task details as-is
     console.error('[VariantTaskDetails] DEBUG - Returning original taskDetailsData (not adjusted):', {
       taskType: taskDetailsData?.task?.taskType,
@@ -1131,7 +1148,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       activeVariantType: activeVariant?.variant_type,
     });
     return taskDetailsData;
-  }, [taskDetailsData, activeVariant, variantSourceTask, isLoadingVariantTask]);
+  }, [taskDetailsData, activeVariant, variantSourceTask, isLoadingVariantTask, isLoadingVariants, initialVariantId]);
 
   // Fetch shot's aspect ratio for regeneration resolution (shot resolution > project resolution)
   const { data: shotAspectRatioData, isLoading: isLoadingShotAspectRatio } = useQuery({
