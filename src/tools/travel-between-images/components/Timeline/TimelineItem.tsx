@@ -483,20 +483,23 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
               )}
 
               {/* Duplicate Button */}
-              {/* Variant Count + NEW badge - top left */}
+              {/* "X new" badge + Variant Count - top left */}
               {(image as any).derivedCount && (image as any).derivedCount > 1 && (
-                <div
-                  className="absolute top-1 left-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none"
-                  title={`${(image as any).derivedCount} variants`}
-                >
-                  <div className="h-5 w-5 rounded-full bg-black/60 text-white text-[9px] font-medium flex items-center justify-center backdrop-blur-sm">
-                    {(image as any).derivedCount}
-                  </div>
-                  {(image as any).hasUnviewedVariants && (
-                    <div className="bg-yellow-500 text-black text-[7px] font-bold px-1 py-0.5 rounded">
-                      NEW
+                <div className="absolute top-1 left-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
+                  {(image as any).hasUnviewedVariants && (image as any).unviewedVariantCount > 0 && (
+                    <div
+                      className="bg-yellow-500 text-black text-[7px] font-bold px-1 py-0.5 rounded"
+                      title={`${(image as any).unviewedVariantCount} unviewed variant${(image as any).unviewedVariantCount !== 1 ? 's' : ''}`}
+                    >
+                      {(image as any).unviewedVariantCount} new
                     </div>
                   )}
+                  <div
+                    className="h-5 w-5 rounded-full bg-black/60 text-white text-[9px] font-medium flex items-center justify-center backdrop-blur-sm"
+                    title={`${(image as any).derivedCount} variants`}
+                  >
+                    {(image as any).derivedCount}
+                  </div>
                 </div>
               )}
               

@@ -232,17 +232,9 @@ export const useAllShotGenerations = (
         .map(mapShotGenerationToRow)
         .filter(Boolean) as GenerationRow[];
 
-      // Calculate derivedCount and hasUnviewedVariants for each generation
-      const generationIds = baseResult.map(r => r.generation_id).filter(Boolean) as string[];
-      const { calculateDerivedCounts } = await import('@/shared/lib/generationTransformers');
-      const { derivedCounts, hasUnviewedVariants } = await calculateDerivedCounts(generationIds);
-
-      // Add derivedCount and hasUnviewedVariants to each item
-      const result: GenerationRow[] = baseResult.map(item => ({
-        ...item,
-        derivedCount: derivedCounts[item.generation_id || ''] || 0,
-        hasUnviewedVariants: hasUnviewedVariants[item.generation_id || ''] || false,
-      }));
+      // Badge data (derivedCount, hasUnviewedVariants, unviewedVariantCount) is now loaded
+      // lazily via useVariantBadges hook to avoid blocking gallery display
+      const result = baseResult;
 
       const duration = Date.now() - startTime;
       

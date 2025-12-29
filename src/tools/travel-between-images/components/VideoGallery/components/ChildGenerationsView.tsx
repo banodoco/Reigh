@@ -1844,13 +1844,22 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                 className="relative bg-black group"
                 style={aspectRatioStyle}
             >
-                    {/* Top right overlay - Variant count and NEW badge */}
+                    {/* Top right overlay - NEW badge and Variant count */}
                     <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
-                        {/* NEW badge - shown if any variants haven't been viewed */}
-                        {(child as any).hasUnviewedVariants && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-green-500 text-white rounded font-semibold">
-                                NEW
-                            </span>
+                        {/* "X new" badge - shown if any variants haven't been viewed */}
+                        {(child as any).hasUnviewedVariants && (child as any).unviewedVariantCount > 0 && (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="text-[10px] px-1.5 py-0.5 bg-yellow-500 text-black rounded font-bold cursor-help">
+                                            {(child as any).unviewedVariantCount} new
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                        <p>{(child as any).unviewedVariantCount} unviewed variant{(child as any).unviewedVariantCount !== 1 ? 's' : ''}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         )}
                         {/* Variant count badge */}
                         {(child as any).derivedCount && (child as any).derivedCount > 0 && (

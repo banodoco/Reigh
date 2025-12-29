@@ -31,6 +31,8 @@ export interface DerivedCountsResult {
   derivedCounts: Record<string, number>;
   /** Whether each generation has any unviewed variants (viewed_at IS NULL) */
   hasUnviewedVariants: Record<string, boolean>;
+  /** Count of unviewed variants per generation */
+  unviewedVariantCounts: Record<string, number>;
 }
 
 /**
@@ -49,9 +51,10 @@ export async function calculateDerivedCounts(
 ): Promise<DerivedCountsResult> {
   const derivedCounts: Record<string, number> = {};
   const hasUnviewedVariants: Record<string, boolean> = {};
+  const unviewedVariantCounts: Record<string, number> = {};
 
   if (generationIds.length === 0) {
-    return { derivedCounts, hasUnviewedVariants };
+    return { derivedCounts, hasUnviewedVariants, unviewedVariantCounts };
   }
 
   // Count from generations table (based_on relationships)
@@ -77,14 +80,15 @@ export async function calculateDerivedCounts(
     variantCountsData.forEach((item: any) => {
       const genId = item.generation_id;
       derivedCounts[genId] = (derivedCounts[genId] || 0) + 1;
-      // If any variant has viewed_at === null, mark as having unviewed variants
+      // If any variant has viewed_at === null, mark as having unviewed variants and count them
       if (item.viewed_at === null) {
         hasUnviewedVariants[genId] = true;
+        unviewedVariantCounts[genId] = (unviewedVariantCounts[genId] || 0) + 1;
       }
     });
   }
 
-  return { derivedCounts, hasUnviewedVariants };
+  return { derivedCounts, hasUnviewedVariants, unviewedVariantCounts };
 }
 
 
@@ -104,6 +108,8 @@ export interface RawGeneration {
   based_on?: string | null;
   name?: string | null;
   derivedCount?: number; // Number of generations/variants based on this one
+  hasUnviewedVariants?: boolean; // Whether any variants have viewed_at === null (for NEW badge)
+  unviewedVariantCount?: number; // Count of unviewed variants
   // Parent/child relationship fields
   is_child?: boolean | null;
   parent_generation_id?: string | null;
@@ -262,6 +268,8 @@ export function transformGeneration(
     timeline_frame: null, // Will be set if shot context provided
     name: item.name || item.params?.name || undefined,
     derivedCount: item.derivedCount || 0, // Number of generations/variants based on this one
+    hasUnviewedVariants: item.hasUnviewedVariants || false, // For NEW badge display
+    unviewedVariantCount: item.unviewedVariantCount || 0, // Count for tooltip
     // Parent/child relationship fields
     is_child: item.is_child ?? undefined,
     parent_generation_id: item.parent_generation_id ?? undefined,

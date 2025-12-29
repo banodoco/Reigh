@@ -440,22 +440,13 @@ export async function fetchGenerations(
     hasMore = (offset + limit) < totalCount;
   }
 
-  // Fetch counts of generations/variants based on each generation (for "X variants" display)
-  // Also fetches whether any variants are unviewed (for NEW badge)
-  const generationIds = finalData.map(d => d.id) || [];
-  const { derivedCounts, hasUnviewedVariants } = await calculateDerivedCounts(generationIds);
+  // Badge data (derivedCount, hasUnviewedVariants, unviewedVariantCount) is now loaded
+  // lazily via useVariantBadges hook to avoid blocking gallery display
 
   // Use shared transformer instead of inline transformation logic
   const items = finalData?.map((item: any) => {
-    // Add derivedCount and hasUnviewedVariants to the raw data before transforming
-    const itemWithDerivedCount = {
-      ...item,
-      derivedCount: derivedCounts[item.id] || 0,
-      hasUnviewedVariants: hasUnviewedVariants[item.id] || false,
-    };
-
     // Transform using shared function - handles all the complex logic
-    return transformGeneration(itemWithDerivedCount as RawGeneration, {
+    return transformGeneration(item as RawGeneration, {
       shotId: filters?.shotId,
     });
   }) || [];

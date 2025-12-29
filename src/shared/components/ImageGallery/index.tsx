@@ -8,6 +8,7 @@ import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { useBackgroundThumbnailGenerator } from '@/shared/hooks/useBackgroundThumbnailGenerator';
+import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { cn } from "@/shared/lib/utils";
 import { ImageGalleryPagination } from "@/shared/components/ImageGalleryPagination";
@@ -318,6 +319,31 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     projectId: selectedProjectId,
     enabled: !!selectedProjectId && (paginationHook.paginatedImages?.length || 0) > 0,
   });
+
+  // Lazy-load variant badge data (derivedCount, hasUnviewedVariants, unviewedVariantCount)
+  // This allows images to display immediately while badge data loads in background
+  const paginatedGenerationIds = useMemo(() =>
+    (paginationHook.paginatedImages || []).map(img =>
+      (img as any).generation_id || img.id
+    ).filter(Boolean),
+    [paginationHook.paginatedImages]
+  );
+  const { getBadgeData } = useVariantBadges(paginatedGenerationIds);
+
+  // Merge badge data with paginated images
+  const paginatedImagesWithBadges = useMemo(() => {
+    if (!paginationHook.paginatedImages) return [];
+    return paginationHook.paginatedImages.map(img => {
+      const generationId = (img as any).generation_id || img.id;
+      const badgeData = getBadgeData(generationId);
+      return {
+        ...img,
+        derivedCount: badgeData.derivedCount,
+        hasUnviewedVariants: badgeData.hasUnviewedVariants,
+        unviewedVariantCount: badgeData.unviewedVariantCount,
+      };
+    });
+  }, [paginationHook.paginatedImages, getBadgeData]);
 
   // Calculate effective page for progressive loading
   const effectivePage = paginationHook.isServerPagination
@@ -692,7 +718,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
         <ImageGalleryGrid
           // Data props
           images={images}
-          paginatedImages={paginationHook.paginatedImages}
+          paginatedImages={paginatedImagesWithBadges}
           filteredImages={filtersHook.filteredImages}
           
           // Layout props

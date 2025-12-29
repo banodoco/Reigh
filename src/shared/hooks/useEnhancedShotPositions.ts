@@ -123,21 +123,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           generation: sg.generation as any
         }));
 
-      // Calculate derivedCount and hasUnviewedVariants for each generation
-      const generationIds = shotGenerationsData.map(sg => sg.generation_id);
-      const { derivedCounts, hasUnviewedVariants } = await calculateDerivedCounts(generationIds);
+      // Badge data (derivedCount, hasUnviewedVariants, unviewedVariantCount) is now loaded
+      // lazily via useVariantBadges hook to avoid blocking gallery display
 
-      // Add derivedCount and hasUnviewedVariants to each generation
-      const enrichedData = shotGenerationsData.map(sg => ({
-        ...sg,
-        generation: {
-          ...sg.generation,
-          derivedCount: derivedCounts[sg.generation_id] || 0,
-          hasUnviewedVariants: hasUnviewedVariants[sg.generation_id] || false,
-        }
-      }));
-
-      setShotGenerations(enrichedData as ShotGeneration[]);
+      setShotGenerations(shotGenerationsData as ShotGeneration[]);
 
 
     } catch (err) {
