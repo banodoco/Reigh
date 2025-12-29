@@ -395,6 +395,15 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // Track when video is fully visible to prevent flashing
   const [videoFullyVisible, setVideoFullyVisible] = useState(false);
 
+  // Reset transition state when video changes to prevent cross-video state contamination
+  const prevVideoIdRef = useRef(video.id);
+  useEffect(() => {
+    if (prevVideoIdRef.current !== video.id) {
+      setVideoFullyVisible(false);
+      prevVideoIdRef.current = video.id;
+    }
+  }, [video.id]);
+
   // ===============================================================================
   // MOBILE PRELOADING STATE - Video preloading on first tap
   // ===============================================================================
@@ -807,10 +816,19 @@ export const VideoItem = React.memo<VideoItemProps>(({
     }
   }, [shareSlug, taskMapping, video.id, toast, onShareCreated]);
 
+  // Use ref to persist timeout across re-renders and prevent race conditions
+  const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
+    // Clear any existing timeout to prevent stale callbacks
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current);
+      transitionTimeoutRef.current = null;
+    }
+
     if (videoPosterLoaded) {
       // Delay hiding thumbnail until video transition completes
-      const timer = setTimeout(() => {
+      transitionTimeoutRef.current = setTimeout(() => {
         setVideoFullyVisible(true);
         if (process.env.NODE_ENV === 'development') {
           console.log(`🎬 [VideoLifecycle] Video ${index + 1} - TRANSITION_COMPLETE:`, {
@@ -821,9 +839,15 @@ export const VideoItem = React.memo<VideoItemProps>(({
             timestamp: Date.now()
           });
         }
-      }, 350); // Slightly longer than the 300ms transition
+        transitionTimeoutRef.current = null;
+      }, 350); // Slightly longer than the 200ms transition
 
-      return () => clearTimeout(timer);
+      return () => {
+        if (transitionTimeoutRef.current) {
+          clearTimeout(transitionTimeoutRef.current);
+          transitionTimeoutRef.current = null;
+        }
+      };
     } else {
       setVideoFullyVisible(false);
     }
