@@ -68,8 +68,10 @@ export const TaskDetailsPanelWrapper: React.FC<TaskDetailsPanelWrapperProps> = (
   onReplaceImagesChange,
   onClose,
 }) => {
-  // DEBUG: Log what TaskDetailsPanelWrapper receives
-  console.error('[TaskDetailsPanelWrapper] DEBUG - Received taskDetailsData:', {
+  // DEBUG: Log what TaskDetailsPanelWrapper receives with render count
+  const renderCountRef = React.useRef(0);
+  renderCountRef.current += 1;
+  console.error(`[TaskDetailsPanelWrapper] DEBUG render #${renderCountRef.current}:`, {
     taskType: taskDetailsData?.task?.taskType,
     taskId: taskDetailsData?.task?.id?.substring(0, 8),
     isLoading: taskDetailsData?.isLoading,

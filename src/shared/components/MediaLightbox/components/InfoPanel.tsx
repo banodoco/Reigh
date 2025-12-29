@@ -103,8 +103,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   isLoadingVariants,
   variantsSectionRef,
 }) => {
-  // DEBUG: Log what InfoPanel receives
-  console.error('[InfoPanel] DEBUG - taskDetailsData:', {
+  // DEBUG: Log what InfoPanel receives with variant identifier
+  const renderCountRef = React.useRef(0);
+  renderCountRef.current += 1;
+  console.error(`[InfoPanel:${variant}] DEBUG render #${renderCountRef.current}:`, {
     taskType: taskDetailsData?.task?.taskType,
     taskId: taskDetailsData?.task?.id?.substring(0, 8),
     isLoading: taskDetailsData?.isLoading,

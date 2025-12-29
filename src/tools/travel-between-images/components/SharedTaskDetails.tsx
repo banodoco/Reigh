@@ -41,25 +41,29 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   onEditingGenerationNameChange,
   availableLoras,
 }) => {
+  // DEBUG: Render count for tracking re-renders
+  const renderCountRef = React.useRef(0);
+  renderCountRef.current += 1;
+
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [characterVideoLoaded, setCharacterVideoLoaded] = useState(false);
-  
+
   // Helper to safely access orchestrator payload from multiple possible locations (memoized)
   const orchestratorPayload = useMemo(() => task?.params?.full_orchestrator_payload as any, [task?.params?.full_orchestrator_payload]);
   const orchestratorDetails = useMemo(() => task?.params?.orchestrator_details as any, [task?.params?.orchestrator_details]);
   // For individual_travel_segment tasks, UI overrides are stored in individual_segment_params
   const individualSegmentParams = useMemo(() => task?.params?.individual_segment_params as any, [task?.params?.individual_segment_params]);
   const isIndividualSegmentTask = task?.taskType === 'individual_travel_segment';
-  
+
   // Check if this is a character animate task
   const isCharacterAnimateTask = task?.taskType === 'animate_character';
-  
+
   // Check if this is a join clips task (orchestrator or segment)
   // Note: 'clip_join' is the variant_type stored on generations created by join clips
   const isJoinClipsTask = task?.taskType === 'join_clips_orchestrator' || task?.taskType === 'join_clips_segment' || task?.taskType === 'join_clips' || task?.taskType === 'clip_join';
 
   // DEBUG: Log what SharedTaskDetails receives (console.error for production visibility)
-  console.error(`[SharedTaskDetails] DEBUG (${variant}) - Received task:`, {
+  console.error(`[SharedTaskDetails:${variant}] DEBUG render #${renderCountRef.current}:`, {
     variant, // 'panel', 'modal', 'hover' - tells us which component instance
     taskType: task?.taskType,
     taskId: task?.id?.substring(0, 8),
