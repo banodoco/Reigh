@@ -394,6 +394,8 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
         queryClient.invalidateQueries({ queryKey: ['generation-variants', generationId] });
         queryClient.invalidateQueries({ queryKey: ['generation', generationId] });
       });
+      // Also invalidate variant-badges so the "X new" badges update
+      queryClient.invalidateQueries({ queryKey: ['variant-badges'] });
 
       // IMPORTANT: When a variant becomes primary, the generation's location changes
       // This affects Timeline/Batch mode displays, so invalidate shot-generations

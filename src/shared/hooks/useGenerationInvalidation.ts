@@ -246,6 +246,8 @@ export async function invalidateVariantChange(
   // 1. Invalidate variant-specific queries
   queryClient.invalidateQueries({ queryKey: ['generation-variants', generationId] });
   queryClient.invalidateQueries({ queryKey: ['generation', generationId] });
+  // Also invalidate variant-badges so the "X new" badges update
+  queryClient.invalidateQueries({ queryKey: ['variant-badges'] });
   
   // 2. If we know the shot, refetch it immediately for faster UI update
   if (shotId) {
