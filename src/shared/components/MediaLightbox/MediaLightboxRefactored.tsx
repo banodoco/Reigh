@@ -1010,10 +1010,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   });
 
   // Extract source_task_id from active variant for fetching task data
+  // Check multiple possible fields where task ID might be stored
   const variantSourceTaskId = useMemo(() => {
     const variantParams = activeVariant?.params as Record<string, any> | undefined;
-    return variantParams?.source_task_id || null;
-  }, [activeVariant?.params]);
+    // Try multiple possible field names for the source task ID
+    const taskId = variantParams?.source_task_id ||
+                   variantParams?.orchestrator_task_id ||
+                   variantParams?.task_id ||
+                   null;
+    console.log('[VariantTaskDetails] Extracted source task ID:', {
+      variantId: activeVariant?.id?.substring(0, 8),
+      variantType: activeVariant?.variant_type,
+      sourceTaskId: taskId?.substring(0, 8) || 'none',
+      paramsKeys: variantParams ? Object.keys(variantParams).slice(0, 10).join(', ') : 'none',
+    });
+    return taskId;
+  }, [activeVariant?.params, activeVariant?.id, activeVariant?.variant_type]);
 
   // Fetch the variant's source task when it differs from taskDetailsData
   // This ensures we always show the correct task params for the current variant
@@ -1056,18 +1068,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       // 1. If taskDetailsData matches, use its params (already have full data)
       // 2. If we fetched the source task, use its params
       // 3. Fall back to variant params (may be incomplete)
+      // IMPORTANT: Always use the variant's type for display, not the source task's type
+      // (e.g., clip_join variant should show as clip_join, not join_clips_orchestrator)
       let effectiveParams = variantParams;
-      let effectiveTaskType = variantParams.tool_type || activeVariant.variant_type || 'variant';
+      const effectiveTaskType = variantParams.tool_type || activeVariant.variant_type || 'variant';
 
       if (hasMatchingTaskData) {
         effectiveParams = taskDetailsData.task.params;
-        effectiveTaskType = taskDetailsData.task.taskType || effectiveTaskType;
       } else if (variantSourceTask?.params) {
         // Parse params if they're a string
         effectiveParams = typeof variantSourceTask.params === 'string'
           ? JSON.parse(variantSourceTask.params)
           : variantSourceTask.params;
-        effectiveTaskType = variantSourceTask.task_type || effectiveTaskType;
       }
 
       console.log('[VariantTaskDetails] Showing task details for variant:', {
