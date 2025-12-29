@@ -1336,7 +1336,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const isAnySpecialEditMode = isSpecialEditMode || isVideoTrimModeActive || isVideoEditModeActive;
 
   // Should show side panel (includes video trim mode and video edit mode)
-  const shouldShowSidePanelWithTrim = shouldShowSidePanel || isVideoTrimModeActive || isVideoEditModeActive;
+  // On mobile, use stacked layout even for video editing modes to match image edit behavior
+  const shouldShowSidePanelWithTrim = !isMobile && (shouldShowSidePanel || isVideoTrimModeActive || isVideoEditModeActive);
 
   // DEBUG: Log variants state for troubleshooting variant display issues
   React.useEffect(() => {
@@ -2467,8 +2468,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   />
                 </div>
               </div>
-            ) : (showTaskDetails || isSpecialEditMode) && isMobile ? (
-              // Mobile layout with task details or special edit modes - stacked
+            ) : (showTaskDetails || isSpecialEditMode || isVideoTrimModeActive || isVideoEditModeActive) && isMobile ? (
+              // Mobile layout with task details, special edit modes, or video edit modes - stacked
               <div className="w-full h-full flex flex-col bg-black/90">
                 {/* Media section - Top (50% height) with swipe navigation */}
                 <div 
@@ -2492,22 +2493,47 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 >
                   {/* Media Content - same as above but adapted for mobile */}
                     {isVideo ? (
-                      <StyledVideoPlayer
-                        src={effectiveVideoUrl}
-                        poster={activeVariant?.thumbnail_url || media.thumbUrl}
-                        loop
-                        muted
-                        autoPlay
-                        playsInline
-                        preload="auto"
-                        className="max-w-full max-h-full shadow-wes border border-border/20"
-                        onLoadedMetadata={(e) => {
-                          const video = e.currentTarget;
-                          if (Number.isFinite(video.duration) && video.duration > 0) {
-                            setVideoDuration(video.duration);
-                          }
-                        }}
-                      />
+                      isVideoEditModeActive ? (
+                        <VideoEditModeDisplay
+                          videoRef={videoEditing.videoRef}
+                          videoUrl={effectiveVideoUrl}
+                          posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
+                          videoDuration={trimState.videoDuration}
+                          onLoadedMetadata={setVideoDuration}
+                          selections={videoEditing.selections}
+                          activeSelectionId={videoEditing.activeSelectionId}
+                          onSelectionChange={videoEditing.handleUpdateSelection}
+                          onSelectionClick={videoEditing.setActiveSelectionId}
+                          onRemoveSelection={videoEditing.handleRemoveSelection}
+                          onAddSelection={videoEditing.handleAddSelection}
+                        />
+                      ) : isVideoTrimModeActive ? (
+                        <VideoTrimModeDisplay
+                          videoRef={trimVideoRef}
+                          videoUrl={effectiveVideoUrl}
+                          posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
+                          trimState={trimState}
+                          onLoadedMetadata={setVideoDuration}
+                          onTimeUpdate={setTrimCurrentTime}
+                        />
+                      ) : (
+                        <StyledVideoPlayer
+                          src={effectiveVideoUrl}
+                          poster={activeVariant?.thumbnail_url || media.thumbUrl}
+                          loop
+                          muted
+                          autoPlay
+                          playsInline
+                          preload="auto"
+                          className="max-w-full max-h-full shadow-wes border border-border/20"
+                          onLoadedMetadata={(e) => {
+                            const video = e.currentTarget;
+                            if (Number.isFinite(video.duration) && video.duration > 0) {
+                              setVideoDuration(video.duration);
+                            }
+                          }}
+                        />
+                      )
                     ) : (
                     <MediaDisplayWithCanvas
                       effectiveImageUrl={effectiveMediaUrl}
