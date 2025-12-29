@@ -103,6 +103,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   isLoadingVariants,
   variantsSectionRef,
 }) => {
+  // DEBUG: Log what InfoPanel receives
+  console.error('[InfoPanel] DEBUG - taskDetailsData:', {
+    taskType: taskDetailsData?.task?.taskType,
+    taskId: taskDetailsData?.task?.id?.substring(0, 8),
+    isLoading: taskDetailsData?.isLoading,
+    hasOrchestratorDetails: !!taskDetailsData?.task?.params?.orchestrator_details,
+  });
+
   const isMobile = variant === 'mobile';
   const hasVariants = variants && variants.length >= 1;
 

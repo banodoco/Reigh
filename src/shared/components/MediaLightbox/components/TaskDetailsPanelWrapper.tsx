@@ -68,6 +68,14 @@ export const TaskDetailsPanelWrapper: React.FC<TaskDetailsPanelWrapperProps> = (
   onReplaceImagesChange,
   onClose,
 }) => {
+  // DEBUG: Log what TaskDetailsPanelWrapper receives
+  console.error('[TaskDetailsPanelWrapper] DEBUG - Received taskDetailsData:', {
+    taskType: taskDetailsData?.task?.taskType,
+    taskId: taskDetailsData?.task?.id?.substring(0, 8),
+    isLoading: taskDetailsData?.isLoading,
+    hasOrchestratorDetails: !!taskDetailsData?.task?.params?.orchestrator_details,
+  });
+
   return (
     <TaskDetailsPanel
       task={taskDetailsData?.task}
