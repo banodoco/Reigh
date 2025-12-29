@@ -59,8 +59,10 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   const isJoinClipsTask = task?.taskType === 'join_clips_orchestrator' || task?.taskType === 'join_clips_segment' || task?.taskType === 'join_clips' || task?.taskType === 'clip_join';
 
   // DEBUG: Log what SharedTaskDetails receives (console.error for production visibility)
-  console.error('[SharedTaskDetails] DEBUG - Received task:', {
+  console.error(`[SharedTaskDetails] DEBUG (${variant}) - Received task:`, {
+    variant, // 'panel', 'modal', 'hover' - tells us which component instance
     taskType: task?.taskType,
+    taskId: task?.id?.substring(0, 8),
     isJoinClipsTask,
     isCharacterAnimateTask,
     hasOrchestratorDetails: !!orchestratorDetails,
