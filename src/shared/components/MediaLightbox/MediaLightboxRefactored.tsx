@@ -1068,10 +1068,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       // 1. If taskDetailsData matches, use its params (already have full data)
       // 2. If we fetched the source task, use its params
       // 3. Fall back to variant params (may be incomplete)
-      // IMPORTANT: Always use the variant's type for display, not the source task's type
-      // (e.g., clip_join variant should show as clip_join, not join_clips_orchestrator)
+      // IMPORTANT: Use variant_type for display (e.g., 'clip_join'), NOT tool_type
+      // tool_type is the tool that launched the task (e.g., 'travel-between-images'),
+      // which is different from what kind of variant this is
       let effectiveParams = variantParams;
-      const effectiveTaskType = variantParams.tool_type || activeVariant.variant_type || 'variant';
+      const effectiveTaskType = activeVariant.variant_type || 'variant';
 
       if (hasMatchingTaskData) {
         effectiveParams = taskDetailsData.task.params;
