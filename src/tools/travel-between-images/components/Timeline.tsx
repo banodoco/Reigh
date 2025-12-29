@@ -146,6 +146,13 @@ export interface TimelineProps {
     structureType: 'flow' | 'canny' | 'depth',
     resourceId?: string
   ) => void;
+  // Audio strip props
+  audioUrl?: string | null;
+  audioMetadata?: { duration: number; name?: string } | null;
+  onAudioChange?: (
+    audioUrl: string | null,
+    metadata: { duration: number; name?: string } | null
+  ) => void;
   // Image upload handler for empty state
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
@@ -200,6 +207,10 @@ const Timeline: React.FC<TimelineProps> = ({
   structureVideoMotionStrength,
   structureVideoType,
   onStructureVideoChange,
+  // Audio strip props
+  audioUrl,
+  audioMetadata,
+  onAudioChange,
   onImageUpload,
   isUploadingImage,
   uploadProgress = 0,
@@ -878,6 +889,9 @@ const Timeline: React.FC<TimelineProps> = ({
         structureVideoMotionStrength={structureVideoMotionStrength}
         structureVideoType={structureVideoType}
         onStructureVideoChange={onStructureVideoChange}
+        audioUrl={audioUrl}
+        audioMetadata={audioMetadata}
+        onAudioChange={onAudioChange}
         hasNoImages={hasNoImages}
         readOnly={readOnly}
         isUploadingImage={isUploadingImage}

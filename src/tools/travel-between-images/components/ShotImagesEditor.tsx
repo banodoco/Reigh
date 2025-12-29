@@ -107,6 +107,13 @@ interface ShotImagesEditorProps {
     structureType: 'flow' | 'canny' | 'depth',
     resourceId?: string
   ) => void;
+  /** Audio strip props */
+  audioUrl?: string | null;
+  audioMetadata?: { duration: number; name?: string } | null;
+  onAudioChange?: (
+    audioUrl: string | null,
+    metadata: { duration: number; name?: string } | null
+  ) => void;
   /** Callback when selection state changes */
   onSelectionChange?: (hasSelection: boolean) => void;
   /** Shot management for external generation viewing */
@@ -166,6 +173,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   structureVideoMotionStrength: propStructureVideoMotionStrength = 1.0,
   structureVideoType: propStructureVideoType = 'flow',
   onStructureVideoChange: propOnStructureVideoChange,
+  // Audio strip props
+  audioUrl: propAudioUrl,
+  audioMetadata: propAudioMetadata,
+  onAudioChange: propOnAudioChange,
   onSelectionChange,
   // Shot management for external generation viewing
   allShots,
@@ -981,6 +992,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 structureVideoMotionStrength={propStructureVideoMotionStrength}
                 structureVideoType={propStructureVideoType}
                 onStructureVideoChange={propOnStructureVideoChange}
+                // Audio strip props
+                audioUrl={propAudioUrl}
+                audioMetadata={propAudioMetadata}
+                onAudioChange={propOnAudioChange}
                 // Image upload for empty state
                 onImageUpload={onImageUpload}
                 isUploadingImage={isUploadingImage}

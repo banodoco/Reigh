@@ -36,6 +36,7 @@ import { useGenerationActions } from './hooks/useGenerationActions';
 import { useLoraSync } from './hooks/useLoraSync';
 import { useApplySettingsHandler } from './hooks/useApplySettingsHandler';
 import { useStructureVideo } from './hooks/useStructureVideo';
+import { useAudio } from './hooks/useAudio';
 import { Header } from './ui/Header';
 import { ImageManagerSkeleton } from './ui/Skeleton';
 import { filterAndSortShotImages, getNonVideoImages, getVideoOutputs } from './utils/generation-utils';
@@ -228,6 +229,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     handleStructureVideoChange,
     isLoading: isStructureVideoSettingsLoading,
   } = useStructureVideo({
+    projectId,
+    shotId: selectedShot?.id,
+  });
+
+  // Audio management (extracted to hook)
+  const {
+    audioUrl,
+    audioMetadata,
+    handleAudioChange,
+    isLoading: isAudioSettingsLoading,
+  } = useAudio({
     projectId,
     shotId: selectedShot?.id,
   });
@@ -1528,6 +1540,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             structureVideoMotionStrength={structureVideoMotionStrength}
             structureVideoType={structureVideoType}
             onStructureVideoChange={handleStructureVideoChange}
+            // Audio strip props
+            audioUrl={audioUrl}
+            audioMetadata={audioMetadata}
+            onAudioChange={handleAudioChange}
             // Shot management for external generation viewing
             allShots={shots}
             onShotChange={handleShotChange}

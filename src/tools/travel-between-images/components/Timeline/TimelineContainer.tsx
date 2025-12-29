@@ -14,6 +14,7 @@ import PairRegion from './PairRegion';
 import TimelineItem from './TimelineItem';
 import { GuidanceVideoStrip } from './GuidanceVideoStrip';
 import { GuidanceVideoUploader } from './GuidanceVideoUploader';
+import { AudioStrip } from './AudioStrip';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
 import { Button } from '@/shared/components/ui/button';
@@ -132,6 +133,13 @@ interface TimelineContainerProps {
     structureType: 'flow' | 'canny' | 'depth',
     resourceId?: string
   ) => void;
+  // Audio strip props
+  audioUrl?: string | null;
+  audioMetadata?: { duration: number; name?: string } | null;
+  onAudioChange?: (
+    audioUrl: string | null,
+    metadata: { duration: number; name?: string } | null
+  ) => void;
   // Empty state flag for blur effect
   hasNoImages?: boolean;
   // Read-only mode - disables all interactions
@@ -175,6 +183,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   structureVideoMotionStrength = 1.0,
   structureVideoType = 'flow',
   onStructureVideoChange,
+  audioUrl,
+  audioMetadata,
+  onAudioChange,
   hasNoImages = false
 }) => {
   // [ZoomDebug] Track component mounts to detect unwanted remounts
@@ -1123,6 +1134,78 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               onZoomToStart={handleZoomToStart}
               hasNoImages={hasNoImages}
             />
+          ) : null
+        )}
+
+        {/* Audio strip - below guidance video */}
+        {onAudioChange && (
+          audioUrl ? (
+            <AudioStrip
+              audioUrl={audioUrl}
+              audioMetadata={audioMetadata || null}
+              onRemove={() => onAudioChange(null, null)}
+              fullMin={fullMin}
+              fullMax={fullMax}
+              fullRange={fullRange}
+              containerWidth={containerWidth}
+              zoomLevel={zoomLevel}
+              readOnly={readOnly}
+            />
+          ) : !readOnly ? (
+            <div
+              className="relative h-10 mt-1"
+              style={{
+                width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
+                minWidth: '100%',
+              }}
+            >
+              <div
+                className="absolute inset-y-1 bg-muted/30 hover:bg-muted/50 rounded transition-colors flex items-center justify-center"
+                style={{
+                  left: TIMELINE_PADDING_OFFSET,
+                  right: TIMELINE_PADDING_OFFSET
+                }}
+              >
+                <label className="cursor-pointer text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5">
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        // Create a temporary audio element to get duration
+                        const audio = new Audio();
+                        const audioUrl = URL.createObjectURL(file);
+                        audio.src = audioUrl;
+
+                        await new Promise<void>((resolve, reject) => {
+                          audio.addEventListener('loadedmetadata', () => resolve());
+                          audio.addEventListener('error', () => reject(new Error('Failed to load audio')));
+                        });
+
+                        // Upload to storage
+                        const { uploadVideoToStorage } = await import('@/shared/lib/videoUploader');
+                        const uploadedUrl = await uploadVideoToStorage(file, projectId!, shotId);
+
+                        URL.revokeObjectURL(audioUrl);
+
+                        onAudioChange(uploadedUrl, {
+                          duration: audio.duration,
+                          name: file.name
+                        });
+                        e.target.value = '';
+                      } catch (error) {
+                        console.error('Error uploading audio:', error);
+                      }
+                    }}
+                  />
+                  <Plus className="h-3 w-3" />
+                  Add Audio
+                </label>
+              </div>
+            </div>
           ) : null
         )}
 

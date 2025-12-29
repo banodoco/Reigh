@@ -97,6 +97,9 @@ export interface JoinClipsTaskParams {
   source_video_duration?: number;
   source_video_total_frames?: number;
   portions_to_regenerate?: PortionToRegenerate[];
+
+  // Audio to mix into the final joined video
+  audio_url?: string;
 }
 
 /**
@@ -337,6 +340,11 @@ function buildJoinClipsPayload(
     orchestratorDetails.source_video_duration = params.source_video_duration;
     orchestratorDetails.source_video_total_frames = params.source_video_total_frames;
     orchestratorDetails.portions_to_regenerate = params.portions_to_regenerate;
+  }
+
+  // Audio to mix into the final joined video
+  if (params.audio_url) {
+    orchestratorDetails.audio_url = params.audio_url;
   }
 
   const totalJoins = Math.max(clipSequence.length - 1, 0);

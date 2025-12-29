@@ -24,6 +24,7 @@ import {
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useLoraManager, type LoraModel, type ActiveLora } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePanes } from '@/shared/contexts/PanesContext';
