@@ -890,14 +890,9 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // Determine poster image source: prefer thumbnail, fallback to video poster frame
   const posterImageSrc = (() => {
     if (video.thumbUrl) return video.thumbUrl; // Use thumbnail if available
-    
-    // On mobile, we cannot use video URL as image source
-    if (shouldUsePosterOnMobile) {
-      return video.imageUrl || null;
-    }
-
-    if (video.location) return video.location; // Use video URL (browser will show first frame)
-    return video.imageUrl; // Final fallback
+    if (video.imageUrl) return video.imageUrl; // Try imageUrl next
+    if (video.location) return video.location; // Use video URL as final fallback (browser will extract first frame)
+    return null; // No source available
   })();
 
   // NEW: Check if we should show collage (parent with no output but has segments)
@@ -919,16 +914,12 @@ export const VideoItem = React.memo<VideoItemProps>(({
     timestamp: Date.now()
   });
 
-  // Normalize URLs and append a stable identifier to avoid cross-item cache bleed
+  // Normalize URLs - don't add query parameters as they break browser caching
   const resolvedPosterUrl = posterImageSrc ? getDisplayUrl(posterImageSrc) : '/placeholder.svg';
-  const posterSrcStable = resolvedPosterUrl
-    ? `${resolvedPosterUrl}${resolvedPosterUrl.includes('?') ? '&' : '?'}vid=${encodeURIComponent(video.id || '')}`
-    : resolvedPosterUrl;
+  const posterSrcStable = resolvedPosterUrl;
 
   const resolvedThumbUrl = video.thumbUrl ? getDisplayUrl(video.thumbUrl) : null;
-  const thumbSrcStable = resolvedThumbUrl
-    ? `${resolvedThumbUrl}${resolvedThumbUrl.includes('?') ? '&' : '?'}vid=${encodeURIComponent(video.id || '')}`
-    : null;
+  const thumbSrcStable = resolvedThumbUrl;
 
   if (process.env.NODE_ENV === 'development' && shouldUsePosterOnMobile) {
     console.log('[AutoplayDebugger:GALLERY] 📱 Using poster optimization', {
@@ -1058,8 +1049,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 src={posterSrcStable || resolvedPosterUrl}
                 alt="Video poster"
                 loading="eager"
-                decoding="sync"
-                className="w-full h-full object-cover transition-opacity duration-300"
+                decoding="async"
+                className="w-full h-full object-cover transition-opacity duration-200"
                 style={{ opacity: 0 }}
                 onLoad={(e) => {
                   (e.target as HTMLImageElement).style.opacity = '1';
@@ -1081,61 +1072,25 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 src={thumbSrcStable || resolvedThumbUrl || ''}
                 alt="Video thumbnail"
                 loading="eager"
-                decoding="sync"
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none ${videoFullyVisible ? 'opacity-0' : 'opacity-100'
+                decoding="async"
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 pointer-events-none ${videoFullyVisible ? 'opacity-0' : 'opacity-100'
                   }`}
                 onLoad={() => {
                   setThumbnailLoaded(true);
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log(`🎬 [VideoLifecycle] Video ${index + 1} - THUMBNAIL_LOADED:`, {
-                      videoId: video.id,
-                      thumbnailUrl: video.thumbUrl,
-                      phase: 'THUMBNAIL_LOADED',
-                      nextPhase: 'Will transition to video when ready',
-                      wasInitiallyCached: isInitiallyCached,
-                      inPreloaderCache,
-                      inBrowserCache,
-                      timestamp: Date.now()
-                    });
-                    console.log(`[VideoGalleryPreload] THUMBNAIL_LOADED - URL: ${video.thumbUrl}`);
-                  }
                 }}
                 onError={() => {
                   setThumbnailError(true);
-                  if (process.env.NODE_ENV === 'development') {
-                    console.warn(`🎬 [VideoLifecycle] Video ${index + 1} - THUMBNAIL_FAILED:`, {
-                      videoId: video.id,
-                      thumbnailUrl: video.thumbUrl,
-                      phase: 'THUMBNAIL_FAILED',
-                      fallback: 'Will show video loading directly',
-                      timestamp: Date.now()
-                    });
-                    console.warn(`[VideoGalleryPreload] THUMBNAIL_FAILED - URL: ${video.thumbUrl}`);
-                  }
                 }}
               />
             )}
 
             {/* Loading placeholder - shows until thumbnail or video poster is ready */}
-            {/* Don't show loading if thumbnail was initially cached */}
-            {!thumbnailLoaded && !videoPosterLoaded && !isInitiallyCached && (() => {
-              console.log(`[VideoGalleryPreload] VIDEO_ITEM_SHOWING_LOADING_SPINNER:`, {
-                videoId: video.id?.substring(0, 8),
-                thumbnailLoaded,
-                videoPosterLoaded,
-                isInitiallyCached,
-                hasThumbnail,
-                inPreloaderCache,
-                inBrowserCache,
-                reason: 'thumbnailLoaded=false AND videoPosterLoaded=false AND isInitiallyCached=false',
-                timestamp: Date.now()
-              });
-              return (
-                <div className={`absolute inset-0 bg-gray-200 flex items-center justify-center z-10 transition-opacity duration-300 pointer-events-none ${videoFullyVisible ? 'opacity-0' : 'opacity-100'}`}>
-                  <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
-                </div>
-              );
-            })()}
+            {/* Only show spinner if we truly have nothing to display yet */}
+            {!thumbnailLoaded && !videoPosterLoaded && !isInitiallyCached && hasThumbnail && (
+              <div className={`absolute inset-0 bg-gray-200 flex items-center justify-center z-10 transition-opacity duration-300 pointer-events-none ${videoFullyVisible ? 'opacity-0' : 'opacity-100'}`}>
+                <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+              </div>
+            )}
 
             {/* Only render video when it's time to load */}
             {shouldLoad && (
