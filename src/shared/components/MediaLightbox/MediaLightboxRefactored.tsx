@@ -435,11 +435,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       variantsCount: variants?.length,
     });
     // Mark variant as viewed when selected (fire-and-forget)
+    // Pass generationId for optimistic badge update
     if (variantId) {
-      markViewed(variantId);
+      const generationId = media.generation_id || media.id;
+      markViewed({ variantId, generationId });
     }
     rawSetActiveVariantId(variantId);
-  }, [rawSetActiveVariantId, activeVariant, variants, markViewed]);
+  }, [rawSetActiveVariantId, activeVariant, variants, markViewed, media]);
   
   // Log when activeVariant changes
   React.useEffect(() => {
