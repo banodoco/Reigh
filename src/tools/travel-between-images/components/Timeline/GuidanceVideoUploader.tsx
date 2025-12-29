@@ -21,8 +21,8 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
   // Just a small spacer for visual separation
 
   return (
-    <div 
-      className="relative h-16 mb-0"
+    <div
+      className="relative h-2 mb-0"
       style={{
         width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
         minWidth: '100%',

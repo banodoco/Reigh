@@ -1152,60 +1152,57 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               readOnly={readOnly}
             />
           ) : !readOnly ? (
-            <div
-              className="relative h-10"
+            <label
+              className="relative block h-8 mb-3 cursor-pointer"
               style={{
                 width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
                 minWidth: '100%',
               }}
             >
+              <input
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    // Create a temporary audio element to get duration
+                    const audio = new Audio();
+                    const audioUrl = URL.createObjectURL(file);
+                    audio.src = audioUrl;
+
+                    await new Promise<void>((resolve, reject) => {
+                      audio.addEventListener('loadedmetadata', () => resolve());
+                      audio.addEventListener('error', () => reject(new Error('Failed to load audio')));
+                    });
+
+                    // Upload to storage
+                    const { uploadVideoToStorage } = await import('@/shared/lib/videoUploader');
+                    const uploadedUrl = await uploadVideoToStorage(file, projectId!, shotId);
+
+                    URL.revokeObjectURL(audioUrl);
+
+                    onAudioChange(uploadedUrl, {
+                      duration: audio.duration,
+                      name: file.name
+                    });
+                    e.target.value = '';
+                  } catch (error) {
+                    console.error('Error uploading audio:', error);
+                  }
+                }}
+              />
               <div
-                className="absolute inset-y-1 bg-muted/30 hover:bg-muted/50 rounded transition-colors flex items-center justify-center"
+                className="absolute inset-y-0 flex items-center justify-center text-xs text-muted-foreground hover:text-foreground"
                 style={{
                   left: TIMELINE_PADDING_OFFSET,
                   right: TIMELINE_PADDING_OFFSET
                 }}
               >
-                <label className="cursor-pointer text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5">
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      try {
-                        // Create a temporary audio element to get duration
-                        const audio = new Audio();
-                        const audioUrl = URL.createObjectURL(file);
-                        audio.src = audioUrl;
-
-                        await new Promise<void>((resolve, reject) => {
-                          audio.addEventListener('loadedmetadata', () => resolve());
-                          audio.addEventListener('error', () => reject(new Error('Failed to load audio')));
-                        });
-
-                        // Upload to storage
-                        const { uploadVideoToStorage } = await import('@/shared/lib/videoUploader');
-                        const uploadedUrl = await uploadVideoToStorage(file, projectId!, shotId);
-
-                        URL.revokeObjectURL(audioUrl);
-
-                        onAudioChange(uploadedUrl, {
-                          duration: audio.duration,
-                          name: file.name
-                        });
-                        e.target.value = '';
-                      } catch (error) {
-                        console.error('Error uploading audio:', error);
-                      }
-                    }}
-                  />
-                  <Plus className="h-3 w-3" />
-                  Add Audio
-                </label>
+                Add Audio
               </div>
-            </div>
+            </label>
           ) : null
         )}
 

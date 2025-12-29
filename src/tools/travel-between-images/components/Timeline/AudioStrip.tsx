@@ -164,7 +164,7 @@ export const AudioStrip: React.FC<AudioStripProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative h-10 select-none"
+      className="relative h-10 mt-9 mb-1 select-none"
       style={{
         width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
         minWidth: '100%',
