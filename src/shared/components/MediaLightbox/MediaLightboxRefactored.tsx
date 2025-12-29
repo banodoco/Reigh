@@ -1018,13 +1018,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                    variantParams?.task_id ||
                    null;
     const hasOrchestratorDetails = !!variantParams?.orchestrator_details;
-    console.error('[VariantTaskDetails] DEBUG - Extracted source task ID:', {
-      variantId: activeVariant?.id?.substring(0, 8),
-      variantType: activeVariant?.variant_type,
-      sourceTaskId: taskId?.substring(0, 8) || 'none',
-      hasOrchestratorDetails,
-      paramsKeys: variantParams ? Object.keys(variantParams).slice(0, 10).join(', ') : 'none',
-    });
     return { variantSourceTaskId: taskId, variantHasOrchestratorDetails: hasOrchestratorDetails };
   }, [activeVariant?.params, activeVariant?.id, activeVariant?.variant_type]);
 
@@ -1034,7 +1027,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     queryKey: ['variant-source-task', variantSourceTaskId],
     queryFn: async () => {
       if (!variantSourceTaskId) return null;
-      console.error('[VariantTaskDetails] DEBUG - Fetching source task for variant:', variantSourceTaskId.substring(0, 8));
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
@@ -1087,25 +1079,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       }
       // Otherwise keep variantParams which may already have orchestrator_details (e.g., clip_join)
 
-      // DEBUG: Using console.error so it shows in production
-      const isJoinClipsTaskType = ['join_clips_orchestrator', 'join_clips_segment', 'join_clips', 'clip_join'].includes(effectiveTaskType);
-      console.error('[VariantTaskDetails] DEBUG - RETURNING ADJUSTED variant data:', {
-        variantId: activeVariant.id?.substring(0, 8),
-        variantType: activeVariant.variant_type,
-        effectiveTaskType,
-        isJoinClipsTaskType,
-        hasOrchestratorDetails: !!effectiveParams?.orchestrator_details,
-        orchestratorDetailsKeys: effectiveParams?.orchestrator_details ? Object.keys(effectiveParams.orchestrator_details).slice(0, 10) : null,
-        hasContextFrameCount: !!effectiveParams?.orchestrator_details?.context_frame_count,
-        contextFrameCount: effectiveParams?.orchestrator_details?.context_frame_count,
-        hasMatchingTaskData,
-        variantHasOrchestratorDetails,
-        hasFetchedSourceTask: !!variantSourceTask,
-        effectiveParamsKeys: Object.keys(effectiveParams || {}).slice(0, 10),
-        sourceTaskId: variantParams.source_task_id?.substring(0, 8),
-        taskDetailsTaskId: taskDetailsData?.taskId?.substring(0, 8),
-      });
-
       return {
         task: {
           id: activeVariant.id,
@@ -1130,23 +1103,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       (!activeVariant || activeVariant.id !== initialVariantId);
 
     if ((isLoadingVariants && !activeVariant) || waitingForInitialVariant) {
-      console.error('[VariantTaskDetails] DEBUG - Still loading/waiting for initial variant:', {
-        taskType: taskDetailsData?.task?.taskType,
-        isLoadingVariants,
-        waitingForInitialVariant,
-        initialVariantId: initialVariantId?.substring(0, 8),
-        activeVariantId: activeVariant?.id?.substring(0, 8),
-      });
       return taskDetailsData ? { ...taskDetailsData, isLoading: true } : taskDetailsData;
     }
 
     // For all other cases, use the generation's task details as-is
-    console.error('[VariantTaskDetails] DEBUG - Returning original taskDetailsData (not adjusted):', {
-      taskType: taskDetailsData?.task?.taskType,
-      taskId: taskDetailsData?.task?.id?.substring(0, 8),
-      hasActiveVariant: !!activeVariant,
-      activeVariantType: activeVariant?.variant_type,
-    });
     return taskDetailsData;
   }, [taskDetailsData, activeVariant, variantSourceTask, isLoadingVariantTask, isLoadingVariants, initialVariantId]);
 

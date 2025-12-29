@@ -3,6 +3,7 @@ import { Button } from '@/shared/components/ui/button';
 import { framesToSeconds } from './Timeline/utils/time-utils';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { getDisplayNameFromUrl } from '../utils/loraDisplayUtils';
+import { isJoinClipsTaskType, isCharacterAnimateTaskType } from '@/shared/lib/taskTypeUtils';
 
 interface SharedTaskDetailsProps {
   task: any;
@@ -41,10 +42,6 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   onEditingGenerationNameChange,
   availableLoras,
 }) => {
-  // DEBUG: Render count for tracking re-renders
-  const renderCountRef = React.useRef(0);
-  renderCountRef.current += 1;
-
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [characterVideoLoaded, setCharacterVideoLoaded] = useState(false);
 
@@ -56,26 +53,10 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   const isIndividualSegmentTask = task?.taskType === 'individual_travel_segment';
 
   // Check if this is a character animate task
-  const isCharacterAnimateTask = task?.taskType === 'animate_character';
+  const isCharacterAnimateTask = isCharacterAnimateTaskType(task?.taskType);
 
-  // Check if this is a join clips task (orchestrator or segment)
-  // Note: 'clip_join' is the variant_type stored on generations created by join clips
-  const isJoinClipsTask = task?.taskType === 'join_clips_orchestrator' || task?.taskType === 'join_clips_segment' || task?.taskType === 'join_clips' || task?.taskType === 'clip_join';
-
-  // DEBUG: Log what SharedTaskDetails receives (console.error for production visibility)
-  console.error(`[SharedTaskDetails:${variant}] DEBUG render #${renderCountRef.current}:`, {
-    variant, // 'panel', 'modal', 'hover' - tells us which component instance
-    taskType: task?.taskType,
-    taskId: task?.id?.substring(0, 8),
-    isJoinClipsTask,
-    isCharacterAnimateTask,
-    hasOrchestratorDetails: !!orchestratorDetails,
-    hasOrchestratorPayload: !!orchestratorPayload,
-    orchestratorDetailsKeys: orchestratorDetails ? Object.keys(orchestratorDetails).slice(0, 10) : null,
-    contextFrameCount: orchestratorDetails?.context_frame_count,
-    gapFrameCount: orchestratorDetails?.gap_frame_count,
-    paramsKeys: task?.params ? Object.keys(task.params).slice(0, 10) : null,
-  });
+  // Check if this is a join clips task (orchestrator, segment, or clip_join variant)
+  const isJoinClipsTask = isJoinClipsTaskType(task?.taskType);
 
   // Get LoRAs from the correct location (try all possible paths)
   // For individual_travel_segment, check individual_segment_params first (UI overrides)

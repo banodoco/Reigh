@@ -14,6 +14,7 @@ import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useTaskType } from '@/shared/hooks/useTaskType';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
+import { isVideoTaskType } from '@/shared/lib/taskTypeUtils';
 
 interface TaskDetailsPanelProps {
   task: Task | null;
@@ -161,13 +162,9 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
               const isVideoTask = contentType === 'video';
               
               // Legacy fallback for tasks before content_type was added
-              // Also include join_clips types and clip_join variant type
-              const isLegacyVideoTask = task.taskType === 'travel_orchestrator' ||
-                                       task.taskType?.includes('travel') ||
-                                       task.taskType?.includes('join_clips') ||
-                                       task.taskType === 'clip_join' ||
-                                       inputImages.length > 0;
-              
+              // Uses centralized isVideoTaskType utility
+              const isLegacyVideoTask = isVideoTaskType(task.taskType) || inputImages.length > 0;
+
               const shouldShowVideoDetails = isVideoTask || isLegacyVideoTask;
               
               if (shouldShowVideoDetails) {
