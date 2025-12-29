@@ -1018,7 +1018,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                    variantParams?.task_id ||
                    null;
     const hasOrchestratorDetails = !!variantParams?.orchestrator_details;
-    console.log('[VariantTaskDetails] Extracted source task ID:', {
+    console.error('[VariantTaskDetails] DEBUG - Extracted source task ID:', {
       variantId: activeVariant?.id?.substring(0, 8),
       variantType: activeVariant?.variant_type,
       sourceTaskId: taskId?.substring(0, 8) || 'none',
@@ -1034,7 +1034,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     queryKey: ['variant-source-task', variantSourceTaskId],
     queryFn: async () => {
       if (!variantSourceTaskId) return null;
-      console.log('[VariantTaskDetails] Fetching source task for variant:', variantSourceTaskId.substring(0, 8));
+      console.error('[VariantTaskDetails] DEBUG - Fetching source task for variant:', variantSourceTaskId.substring(0, 8));
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
