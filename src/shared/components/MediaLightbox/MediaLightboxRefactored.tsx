@@ -1089,7 +1089,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
       // DEBUG: Using console.error so it shows in production
       const isJoinClipsTaskType = ['join_clips_orchestrator', 'join_clips_segment', 'join_clips', 'clip_join'].includes(effectiveTaskType);
-      console.error('[VariantTaskDetails] DEBUG - Task details for variant:', {
+      console.error('[VariantTaskDetails] DEBUG - RETURNING ADJUSTED variant data:', {
         variantId: activeVariant.id?.substring(0, 8),
         variantType: activeVariant.variant_type,
         effectiveTaskType,
@@ -1124,6 +1124,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
 
     // For all other cases, use the generation's task details as-is
+    console.error('[VariantTaskDetails] DEBUG - Returning original taskDetailsData (not adjusted):', {
+      taskType: taskDetailsData?.task?.taskType,
+      taskId: taskDetailsData?.task?.id?.substring(0, 8),
+      hasActiveVariant: !!activeVariant,
+      activeVariantType: activeVariant?.variant_type,
+    });
     return taskDetailsData;
   }, [taskDetailsData, activeVariant, variantSourceTask, isLoadingVariantTask]);
 
