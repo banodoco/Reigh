@@ -490,9 +490,10 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
       {/* Input Images with Frames Slider in between */}
       {(startImageUrl || endImageUrl || onStartImageUpload || onEndImageUpload) && (
-        <div className="flex items-center gap-2">
-          {/* Start Image - 1/4 width */}
-          <div className="w-1/4 relative aspect-video">
+        <div className="@container">
+          <div className="grid grid-cols-2 gap-2 @[280px]:grid-cols-3">
+          {/* Start Image - 1/3 width on wide, 1/2 on narrow */}
+          <div className="relative aspect-video">
             {startImageUrl ? (
               <button
                 onClick={onStartImageClick}
@@ -547,10 +548,10 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
             ) : null}
           </div>
 
-          {/* Frames Slider - 1/2 width */}
-          <div className="w-1/2 flex flex-col justify-center space-y-1 px-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-medium">Frames:</Label>
+          {/* Frames Slider - 1/3 width on wide, full width on narrow (spans 2 cols, shown last) */}
+          <div className="order-last col-span-2 @[280px]:order-none @[280px]:col-span-1 flex flex-col justify-center space-y-1">
+            <div className="flex flex-col items-center text-center">
+              <Label className="text-xs font-medium">Frames</Label>
               <span className="text-xs text-muted-foreground">
                 {params.num_frames || 0} ({framesToSeconds(params.num_frames || 0)})
               </span>
@@ -565,8 +566,8 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
             />
           </div>
 
-          {/* End Image - 1/4 width */}
-          <div className="w-1/4 relative aspect-video">
+          {/* End Image - 1/3 width on wide, 1/2 on narrow */}
+          <div className="relative aspect-video">
             {endImageUrl ? (
               <button
                 onClick={onEndImageClick}
@@ -619,6 +620,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                 <span className="text-[10px] text-muted-foreground">End</span>
               </button>
             ) : null}
+          </div>
           </div>
         </div>
       )}
