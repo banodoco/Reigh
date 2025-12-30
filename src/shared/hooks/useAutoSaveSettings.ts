@@ -490,39 +490,30 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     }
 
     // Check if user typed during loading (before we had loaded once)
-    // If so, merge their edits over the DB settings and schedule a save
     const pendingEdits = pendingSettingsRef.current;
     const hasPendingForThisEntity = pendingEdits && pendingEntityIdRef.current === entityId;
 
     if (hasPendingForThisEntity) {
-      console.log('[useAutoSaveSettings] 📥 Loaded from DB (merging with user edits during loading):', {
+      // IMPORTANT: We intentionally do NOT merge pending edits with DB settings.
+      //
+      // The pendingEdits contains the FULL settings object (including defaults for
+      // unchanged fields), not just the changed fields. Merging would overwrite
+      // real DB values with defaults, causing data loss.
+      //
+      // Instead, we prioritize DB settings and clear pending refs. If user made an
+      // edit during loading, they'll see the DB values and can re-apply their change.
+      // This is safer than risking overwriting all saved settings with defaults.
+      console.log('[useAutoSaveSettings] 📥 Loaded from DB (discarding pending edits to prevent data loss):', {
         toolId,
         entityId: entityId.substring(0, 8),
       });
 
-      // Merge: DB settings as base, user edits on top
-      const mergedSettings = {
-        ...clonedSettings,
-        ...pendingEdits,
-      };
-
-      setSettings(mergedSettings);
-      loadedSettingsRef.current = JSON.parse(JSON.stringify(clonedSettings)); // Original DB state
-      pendingSettingsRef.current = mergedSettings; // Track merged as pending
+      setSettings(clonedSettings);
+      loadedSettingsRef.current = JSON.parse(JSON.stringify(clonedSettings));
+      pendingSettingsRef.current = null;
+      pendingEntityIdRef.current = null;
       setStatus('ready');
       setError(null);
-
-      // Schedule save for the merged settings
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      saveTimeoutRef.current = setTimeout(async () => {
-        try {
-          await saveImmediateRef.current(mergedSettings);
-        } catch (err) {
-          console.error('[useAutoSaveSettings] Pending save failed:', err);
-        }
-      }, debounceMs);
     } else {
       console.log('[useAutoSaveSettings] 📥 Loaded from DB:', {
         toolId,

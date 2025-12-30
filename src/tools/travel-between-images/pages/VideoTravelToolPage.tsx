@@ -1092,10 +1092,10 @@ const VideoTravelToolPage: React.FC = () => {
   // CRITICAL: Skip during settings loading or if settings aren't for current shot
   // to prevent race condition where loaded settings get immediately overwritten
   useEffect(() => {
-    if (shotSettings.status === 'loading' || shotSettings.shotId !== currentShotId) {
-      return; // Don't auto-disable while settings are loading or stale
+    if (shotSettings.status !== 'ready' || shotSettings.shotId !== currentShotId) {
+      return; // Don't auto-disable while settings are loading/idle or stale
     }
-    
+
     if (!isCloudGenerationEnabled && turboMode) {
       console.log('[VideoTravelToolPage] Auto-disabling turbo mode - cloud generation is disabled');
       shotSettingsRef.current.updateField('turboMode', false);
@@ -1106,10 +1106,10 @@ const VideoTravelToolPage: React.FC = () => {
   // CRITICAL: Skip during settings loading or if settings aren't for current shot
   // to prevent race condition where loaded settings get immediately overwritten
   useEffect(() => {
-    if (shotSettings.status === 'loading' || shotSettings.shotId !== currentShotId) {
-      return; // Don't auto-disable while settings are loading or stale
+    if (shotSettings.status !== 'ready' || shotSettings.shotId !== currentShotId) {
+      return; // Don't auto-disable while settings are loading/idle or stale
     }
-    
+
     if (turboMode && advancedMode) {
       console.log('[VideoTravelToolPage] Auto-disabling advanced mode - turbo mode is active');
       shotSettingsRef.current.updateFields({
