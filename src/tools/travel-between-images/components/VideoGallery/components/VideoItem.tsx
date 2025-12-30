@@ -1373,7 +1373,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
             )}
 
             {/* Variant Count - positioned above Info button */}
-            {(video as any).derivedCount && (video as any).derivedCount > 1 && (
+            {(video as any).derivedCount > 1 && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
