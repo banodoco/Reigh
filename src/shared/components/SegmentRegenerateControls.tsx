@@ -15,7 +15,7 @@ import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
-import { ChevronDown, ChevronUp, Loader2, Check, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Check, RotateCcw, Upload } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
@@ -85,6 +85,14 @@ export interface SegmentRegenerateControlsProps {
   onStartImageClick?: () => void;
   /** Optional click handler for end image */
   onEndImageClick?: () => void;
+  /** Optional upload handler for start image */
+  onStartImageUpload?: (file: File) => Promise<void>;
+  /** Optional upload handler for end image */
+  onEndImageUpload?: (file: File) => Promise<void>;
+  /** Whether start image upload is in progress */
+  isUploadingStartImage?: boolean;
+  /** Whether end image upload is in progress */
+  isUploadingEndImage?: boolean;
   /** Button label text */
   buttonLabel?: string;
   /** Whether to show a header (default: false) */
@@ -107,13 +115,42 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   queryKeyPrefix = 'segment-regenerate',
   onStartImageClick,
   onEndImageClick,
+  onStartImageUpload,
+  onEndImageUpload,
+  isUploadingStartImage,
+  isUploadingEndImage,
   buttonLabel = 'Regenerate Segment',
   showHeader = false,
   headerTitle = 'Regenerate Video',
 }) => {
   const { toast } = useToast();
 
-  
+  // File input refs for image uploads
+  const startImageInputRef = React.useRef<HTMLInputElement>(null);
+  const endImageInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Handle file selection for start image
+  const handleStartImageFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/') && onStartImageUpload) {
+      await onStartImageUpload(file);
+    }
+    if (startImageInputRef.current) {
+      startImageInputRef.current.value = '';
+    }
+  }, [onStartImageUpload]);
+
+  // Handle file selection for end image
+  const handleEndImageFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('image/') && onEndImageUpload) {
+      await onEndImageUpload(file);
+    }
+    if (endImageInputRef.current) {
+      endImageInputRef.current.value = '';
+    }
+  }, [onEndImageUpload]);
+
   // Use shared normalization utility
   const [params, setParams] = useState<any>(() => getNormalizedParams(initialParams, { segmentIndex }));
   const [isDirty, setIsDirty] = useState(false);
@@ -435,30 +472,80 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         </div>
       )}
 
+      {/* Hidden file inputs for image uploads */}
+      <input
+        ref={startImageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleStartImageFileSelect}
+      />
+      <input
+        ref={endImageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleEndImageFileSelect}
+      />
+
       {/* Input Images with Frames Slider in between */}
-      {(startImageUrl || endImageUrl) && (
+      {(startImageUrl || endImageUrl || onStartImageUpload || onEndImageUpload) && (
         <div className="flex items-center gap-2">
           {/* Start Image - 1/4 width */}
-          {startImageUrl && (
-            <button
-              onClick={onStartImageClick}
-              disabled={!onStartImageClick}
-              className={`w-1/4 relative aspect-video bg-muted/30 rounded-lg overflow-hidden border border-border/50 ${
-                onStartImageClick ? 'hover:border-primary/50 transition-colors cursor-pointer group' : ''
-              }`}
-              title={onStartImageClick ? "View start image" : undefined}
-            >
-              <img
-                src={startImageUrl}
-                alt="Start frame"
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              {onStartImageClick && (
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-              )}
-              <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">Start</span>
-            </button>
-          )}
+          <div className="w-1/4 relative aspect-video">
+            {startImageUrl ? (
+              <button
+                onClick={onStartImageClick}
+                disabled={!onStartImageClick}
+                className={`w-full h-full relative bg-muted/30 rounded-lg overflow-hidden border border-border/50 ${
+                  onStartImageClick ? 'hover:border-primary/50 transition-colors cursor-pointer group' : ''
+                }`}
+                title={onStartImageClick ? "View start image" : undefined}
+              >
+                <img
+                  src={startImageUrl}
+                  alt="Start frame"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                {onStartImageClick && (
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                )}
+                <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">Start</span>
+                {/* Upload button overlay */}
+                {onStartImageUpload && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startImageInputRef.current?.click();
+                    }}
+                    disabled={isUploadingStartImage}
+                    className="absolute top-1 right-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
+                    title="Replace start image"
+                  >
+                    {isUploadingStartImage ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Upload className="h-3 w-3" />
+                    )}
+                  </button>
+                )}
+              </button>
+            ) : onStartImageUpload ? (
+              <button
+                onClick={() => startImageInputRef.current?.click()}
+                disabled={isUploadingStartImage}
+                className="w-full h-full bg-muted/30 rounded-lg border-2 border-dashed border-border/50 hover:border-primary/50 transition-colors flex flex-col items-center justify-center gap-1 cursor-pointer"
+                title="Upload start image"
+              >
+                {isUploadingStartImage ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : (
+                  <Upload className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className="text-[10px] text-muted-foreground">Start</span>
+              </button>
+            ) : null}
+          </div>
 
           {/* Frames Slider - 1/2 width */}
           <div className="w-1/2 flex flex-col justify-center space-y-1 px-2">
@@ -479,26 +566,60 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
           </div>
 
           {/* End Image - 1/4 width */}
-          {endImageUrl && (
-            <button
-              onClick={onEndImageClick}
-              disabled={!onEndImageClick}
-              className={`w-1/4 relative aspect-video bg-muted/30 rounded-lg overflow-hidden border border-border/50 ${
-                onEndImageClick ? 'hover:border-primary/50 transition-colors cursor-pointer group' : ''
-              }`}
-              title={onEndImageClick ? "View end image" : undefined}
-            >
-              <img
-                src={endImageUrl}
-                alt="End frame"
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              {onEndImageClick && (
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-              )}
-              <span className="absolute bottom-0.5 right-0.5 text-[10px] bg-black/60 text-white px-1 rounded">End</span>
-            </button>
-          )}
+          <div className="w-1/4 relative aspect-video">
+            {endImageUrl ? (
+              <button
+                onClick={onEndImageClick}
+                disabled={!onEndImageClick}
+                className={`w-full h-full relative bg-muted/30 rounded-lg overflow-hidden border border-border/50 ${
+                  onEndImageClick ? 'hover:border-primary/50 transition-colors cursor-pointer group' : ''
+                }`}
+                title={onEndImageClick ? "View end image" : undefined}
+              >
+                <img
+                  src={endImageUrl}
+                  alt="End frame"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+                {onEndImageClick && (
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                )}
+                <span className="absolute bottom-0.5 right-0.5 text-[10px] bg-black/60 text-white px-1 rounded">End</span>
+                {/* Upload button overlay */}
+                {onEndImageUpload && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      endImageInputRef.current?.click();
+                    }}
+                    disabled={isUploadingEndImage}
+                    className="absolute top-1 right-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
+                    title="Replace end image"
+                  >
+                    {isUploadingEndImage ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Upload className="h-3 w-3" />
+                    )}
+                  </button>
+                )}
+              </button>
+            ) : onEndImageUpload ? (
+              <button
+                onClick={() => endImageInputRef.current?.click()}
+                disabled={isUploadingEndImage}
+                className="w-full h-full bg-muted/30 rounded-lg border-2 border-dashed border-border/50 hover:border-primary/50 transition-colors flex flex-col items-center justify-center gap-1 cursor-pointer"
+                title="Upload end image"
+              >
+                {isUploadingEndImage ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : (
+                  <Upload className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className="text-[10px] text-muted-foreground">End</span>
+              </button>
+            ) : null}
+          </div>
         </div>
       )}
 

@@ -37,6 +37,7 @@ import { normalizeSegmentParams } from '@/shared/lib/normalizeSegmentParams';
 import { SegmentRegenerateControls } from '@/shared/components/SegmentRegenerateControls';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
 import { uploadVideoToStorage } from '@/shared/lib/videoUploader';
+import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 
 // TypeScript declaration for global mobile video preload map
@@ -82,6 +83,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const deleteGeneration = useDeleteGeneration();
     // State for segment replacement via upload
     const [replacingChildId, setReplacingChildId] = useState<string | null>(null);
+    // State for segment input image uploads: { childId: 'start' | 'end' }
+    const [uploadingSegmentImage, setUploadingSegmentImage] = useState<{ childId: string; position: 'start' | 'end' } | null>(null);
     const isMobile = useIsMobile();
     const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth } = usePanes();
     
@@ -1032,6 +1035,81 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         }
     }, [projectId, shotIdProp, queryClient, refetch, toast]);
 
+    // Handle segment input image upload (start or end)
+    const handleSegmentImageUpload = useCallback(async (
+        childId: string,
+        position: 'start' | 'end',
+        file: File
+    ) => {
+        if (!projectId) {
+            toast({
+                title: 'Error',
+                description: 'No project selected',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setUploadingSegmentImage({ childId, position });
+        try {
+            console.log(`[ChildGenerationsView] Uploading ${position} image for segment:`, childId.substring(0, 8));
+
+            // Upload the image
+            const imageUrl = await uploadImageToStorage(file, 3, (progress) => {
+                console.log(`[ChildGenerationsView] Image upload progress: ${progress}%`);
+            });
+
+            console.log('[ChildGenerationsView] Image uploaded:', imageUrl.substring(0, 50));
+
+            // Find the segment and update its params
+            const segment = sortedSegments.find(s => s.id === childId);
+            if (!segment) {
+                throw new Error('Segment not found');
+            }
+
+            const currentParams = segment.params as any || {};
+            const paramKey = position === 'start' ? 'start_image_url' : 'end_image_url';
+            const genIdKey = position === 'start' ? 'start_image_generation_id' : 'end_image_generation_id';
+
+            // Update params with the new image URL, clearing the generation ID since it's now a standalone image
+            const updatedParams = {
+                ...currentParams,
+                [paramKey]: imageUrl,
+                [genIdKey]: null, // Clear generation ID since this is now an uploaded image
+                individual_segment_params: {
+                    ...(currentParams.individual_segment_params || {}),
+                    [paramKey]: imageUrl,
+                    [genIdKey]: null,
+                },
+            };
+
+            // Update the generation in the database
+            const { error: updateError } = await supabase
+                .from('generations')
+                .update({ params: updatedParams })
+                .eq('id', childId);
+
+            if (updateError) {
+                throw new Error(`Failed to update segment params: ${updateError.message}`);
+            }
+
+            console.log(`[ChildGenerationsView] Updated ${position} image for segment:`, childId.substring(0, 8));
+
+            // Refetch to update the UI
+            refetch();
+
+        } catch (error) {
+            console.error('[ChildGenerationsView] Error uploading segment image:', error);
+            toast({
+                title: 'Error',
+                description: error instanceof Error ? error.message : 'Failed to upload image',
+                variant: 'destructive',
+            });
+        } finally {
+            setUploadingSegmentImage(null);
+        }
+    }, [projectId, sortedSegments, refetch, toast]);
+
     // Get current slot for lightbox (must be after segmentSlots is defined)
     const currentSlot = lightboxIndex !== null ? segmentSlots[lightboxIndex] : null;
     const segmentLightboxVideoId = currentSlot?.type === 'child' ? currentSlot.child.id : null;
@@ -1567,6 +1645,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 }}
                                                 onReplace={handleReplaceSegment}
                                                 isReplacing={replacingChildId === slot.child.id}
+                                                onStartImageUpload={(file) => handleSegmentImageUpload(slot.child.id, 'start', file)}
+                                                onEndImageUpload={(file) => handleSegmentImageUpload(slot.child.id, 'end', file)}
+                                                isUploadingStartImage={uploadingSegmentImage?.childId === slot.child.id && uploadingSegmentImage?.position === 'start'}
+                                                isUploadingEndImage={uploadingSegmentImage?.childId === slot.child.id && uploadingSegmentImage?.position === 'end'}
                                             />
                                         );
                                     } else {
@@ -1856,10 +1938,14 @@ interface SegmentCardProps {
     aspectRatio?: string; // Aspect ratio string like "16:9" for video player containers
     onReplace: (childId: string, file: File) => Promise<void>;
     isReplacing: boolean;
+    onStartImageUpload?: (file: File) => Promise<void>;
+    onEndImageUpload?: (file: File) => Promise<void>;
+    isUploadingStartImage?: boolean;
+    isUploadingEndImage?: boolean;
 }
 
 // Memoized to prevent re-renders when parent state changes (e.g., lightbox index)
-const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, onReplace, isReplacing }) => {
+const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, onReplace, isReplacing, onStartImageUpload, onEndImageUpload, isUploadingStartImage, isUploadingEndImage }) => {
     const isMobile = useIsMobile();
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -2097,6 +2183,10 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                         console.log('[SegmentImageFlow] END image clicked for segment', index);
                         onImageLightboxOpen(1, segmentImages);
                     } : undefined}
+                    onStartImageUpload={onStartImageUpload}
+                    onEndImageUpload={onEndImageUpload}
+                    isUploadingStartImage={isUploadingStartImage}
+                    isUploadingEndImage={isUploadingEndImage}
                     buttonLabel="Regenerate Segment"
                 />
             </CardContent>
