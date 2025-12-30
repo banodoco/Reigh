@@ -788,8 +788,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       const completed = subtasks?.filter(t => t.status === 'Complete').length || 0;
       const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-      toast({ title: 'Progress', description: `${percent}% Complete (${completed}/${total})`, variant: 'default' });
-
       // Show inline for 5s
       setProgressPercent(percent);
       setTimeout(() => setProgressPercent(null), 5000);

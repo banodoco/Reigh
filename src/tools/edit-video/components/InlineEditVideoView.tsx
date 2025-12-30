@@ -3,7 +3,7 @@ import { GenerationRow } from '@/types/shots';
 import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
-import { Loader2, Check, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Check, Plus, Trash2, Play, Pause } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { TooltipProvider } from '@/shared/components/ui/tooltip';
 import { VideoPortionEditor } from './VideoPortionEditor';
@@ -129,17 +129,28 @@ export function InlineEditVideoView({
   // Currently active selection for editing
   const [activeSelectionId, setActiveSelectionId] = useState<string | null>(null);
   
+  // Track if video is playing
+  const [isPlaying, setIsPlaying] = useState(false);
+
   // Track video time updates for overlay display
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    
+
     const handleTimeUpdate = () => {
       setCurrentVideoTime(video.currentTime);
     };
-    
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+
     video.addEventListener('timeupdate', handleTimeUpdate);
-    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+    };
   }, []);
   
   // Check if current time is in a regeneration zone and which segment
@@ -728,6 +739,24 @@ export function InlineEditVideoView({
                 )}
               </div>
             )}
+
+            {/* Play/Pause button overlay - center, shows on hover (desktop only) */}
+            {videoReady && !useStackedLayout && (
+              <button
+                onClick={() => {
+                  const video = videoRef.current;
+                  if (!video) return;
+                  if (video.paused) {
+                    video.play().catch(() => {});
+                  } else {
+                    video.pause();
+                  }
+                }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-16 h-16 flex items-center justify-center rounded-full bg-black/50 text-white/80 hover:bg-black/70 hover:text-white transition-all opacity-0 hover:opacity-100 focus:opacity-100"
+              >
+                {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
+              </button>
+            )}
             
             {/* Video Player with progressive loading - thumbnail first, then video */}
             <div className={cn(
@@ -762,12 +791,12 @@ export function InlineEditVideoView({
                 playsInline // Prevents fullscreen on iOS when video plays
                 poster={thumbnailUrl} // Fallback poster
                 className={cn(
-                  "max-w-full object-contain rounded-lg",
+                  "max-w-full object-contain rounded-lg cursor-pointer",
                   "[&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden",
-                  useStackedLayout 
+                  useStackedLayout
                     ? isTablet
-                      ? "max-h-[30vh] cursor-pointer" // Smaller on tablet
-                      : "max-h-full cursor-pointer"
+                      ? "max-h-[30vh]" // Smaller on tablet
+                      : "max-h-full"
                     : "max-h-[40vh]", // Slightly smaller than original to accommodate buffer
                   // Hide video until ready if we have a thumbnail showing
                   thumbnailUrl && !videoReady ? "absolute opacity-0 pointer-events-none" : ""
@@ -780,8 +809,8 @@ export function InlineEditVideoView({
                 preload="metadata"
                 // Prevent double-click fullscreen on mobile/tablet
                 onDoubleClick={useStackedLayout ? (e) => e.preventDefault() : undefined}
-                // On mobile/tablet, tap to play/pause (no autoplay)
-                onClick={useStackedLayout ? (e) => {
+                // Click to play/pause on all devices
+                onClick={(e) => {
                   e.preventDefault();
                   const video = e.currentTarget;
                   if (video.paused) {
@@ -791,7 +820,7 @@ export function InlineEditVideoView({
                   } else {
                     video.pause();
                   }
-                } : undefined}
+                }}
               />
             </div>
           </div>

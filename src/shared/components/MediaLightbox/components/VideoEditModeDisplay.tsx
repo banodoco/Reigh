@@ -7,9 +7,10 @@
  * Used in desktop layout when in video edit/regenerate mode.
  */
 
-import React from 'react';
-import { Plus } from 'lucide-react';
-import { MultiPortionTimeline } from '@/shared/components/VideoPortionTimeline';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Play, Pause, Trash2 } from 'lucide-react';
+import { MultiPortionTimeline, formatTime } from '@/shared/components/VideoPortionTimeline';
+import { cn } from '@/shared/lib/utils';
 
 export interface VideoEditModeDisplayProps {
   /** Reference to the video element */
@@ -49,7 +50,19 @@ export interface VideoEditModeDisplayProps {
 
   /** Callback to add a new selection */
   onAddSelection: () => void;
+
+  /** Video FPS for frame number calculations */
+  fps?: number;
 }
+
+// Segment colors matching VideoPortionEditor
+const SEGMENT_COLORS = [
+  { bg: 'bg-primary/40', text: 'text-primary' },
+  { bg: 'bg-blue-500/40', text: 'text-blue-400' },
+  { bg: 'bg-green-500/40', text: 'text-green-400' },
+  { bg: 'bg-orange-500/40', text: 'text-orange-400' },
+  { bg: 'bg-purple-500/40', text: 'text-purple-400' },
+];
 
 export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
   videoRef,
@@ -63,7 +76,43 @@ export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
   onSelectionClick,
   onRemoveSelection,
   onAddSelection,
+  fps = 16,
 }) => {
+  // Track current video time for overlay display
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Track video time updates
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleTimeUpdate = () => setCurrentVideoTime(video.currentTime);
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+    };
+  }, [videoRef]);
+
+  // Check if current time is in a regeneration zone and which segment
+  const regenerationZoneInfo = useMemo(() => {
+    const sortedSelections = [...selections].sort((a, b) => a.start - b.start);
+    for (let i = 0; i < sortedSelections.length; i++) {
+      const selection = sortedSelections[i];
+      if (currentVideoTime >= selection.start && currentVideoTime <= selection.end) {
+        return { inZone: true, segmentIndex: i, selectionId: selection.id };
+      }
+    }
+    return { inZone: false, segmentIndex: -1, selectionId: null };
+  }, [currentVideoTime, selections]);
+
   const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
     if (Number.isFinite(video.duration) && video.duration > 0) {
@@ -75,18 +124,65 @@ export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
     }
   };
 
+  const handlePlayPause = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+  };
+
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center">
+      {/* Position overlay - top right */}
+      {videoDuration > 0 && (
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 text-[11px] font-mono text-white/80 bg-black/50 backdrop-blur-sm rounded px-2 py-1">
+          {formatTime(currentVideoTime)}
+          <span className="text-white/50 ml-1">f{Math.round(currentVideoTime * fps)}</span>
+          {' '}
+          <span className={cn(
+            "px-1.5 py-0.5 rounded text-[10px] ml-1",
+            regenerationZoneInfo.inZone
+              ? SEGMENT_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_COLORS.length].bg + ' ' + SEGMENT_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_COLORS.length].text
+              : "bg-white/20 text-white/70"
+          )}>
+            {regenerationZoneInfo.inZone ? `segment ${regenerationZoneInfo.segmentIndex + 1}` : 'keep'}
+          </span>
+          {/* Delete button - only show when in a segment and there's more than 1 */}
+          {regenerationZoneInfo.inZone && selections.length > 1 && regenerationZoneInfo.selectionId && (
+            <button
+              onClick={() => onRemoveSelection(regenerationZoneInfo.selectionId!)}
+              className="ml-1 p-0.5 rounded hover:bg-white/20 text-white/50 hover:text-white transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Play/Pause button overlay - center */}
+      <button
+        onClick={handlePlayPause}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-16 h-16 flex items-center justify-center rounded-full bg-black/50 text-white/80 hover:bg-black/70 hover:text-white transition-all opacity-0 hover:opacity-100 focus:opacity-100"
+        style={{ marginTop: '-70px' }} // Offset for timeline at bottom
+      >
+        {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
+      </button>
+
       <video
         ref={videoRef}
         src={videoUrl}
         poster={posterUrl}
         muted
         playsInline
-        controls
+        controls={false}
         preload="auto"
-        className="max-w-full max-h-[calc(100%-140px)] object-contain shadow-wes border border-border/20 rounded"
+        className="max-w-full max-h-[calc(100%-140px)] object-contain shadow-wes border border-border/20 rounded cursor-pointer"
+        style={{ WebkitAppearance: 'none' }}
         onLoadedMetadata={handleLoadedMetadata}
+        onClick={handlePlayPause}
       />
 
       {/* Timeline overlay for portion selection */}
@@ -102,7 +198,7 @@ export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
               onRemoveSelection={onRemoveSelection}
               videoRef={videoRef}
               videoUrl={videoUrl}
-              fps={16}
+              fps={fps}
             />
 
             {/* Add selection button */}
