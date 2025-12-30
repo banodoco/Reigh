@@ -41,7 +41,9 @@ export interface UseAutoSaveSettingsReturn<T> {
   isDirty: boolean;
   /** Error if status is 'error' */
   error: Error | null;
-  
+  /** Whether the shot had settings stored in DB (vs just defaults/project settings) */
+  hasShotSettings: boolean;
+
   /** Update a single field */
   updateField: <K extends keyof T>(key: K, value: T[K]) => void;
   /** Update multiple fields at once */
@@ -119,6 +121,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     settings: dbSettings,
     isLoading,
     update: updateSettings,
+    hasShotSettings,
   } = useToolSettings<T>(toolId, {
     shotId: scope === 'shot' ? (shotId || undefined) : undefined,
     projectId: projectId || undefined,
@@ -537,9 +540,10 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     entityId: currentEntityIdRef.current,
     isDirty,
     error,
+    hasShotSettings,
     updateField,
     updateFields,
     saveImmediate: () => saveImmediate(),
     revert,
-  }), [settings, status, isDirty, error, updateField, updateFields, saveImmediate, revert]);
+  }), [settings, status, isDirty, error, hasShotSettings, updateField, updateFields, saveImmediate, revert]);
 }

@@ -276,12 +276,16 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
       const projectSettings = (projectResult.data?.settings?.[toolId] as any) ?? {};
       const shotSettings = (shotResult.data?.settings?.[toolId] as any) ?? {};
 
+      // Check if shot actually had settings stored (not just empty object)
+      const hasShotSettings = shotSettings && Object.keys(shotSettings).length > 0;
+
       // [GenerationModeDebug] Log what we're getting from each source
       if (toolId === 'travel-between-images' && ctx.shotId) {
         console.log('[GenerationModeDebug] 🗄️ useToolSettings raw data:', {
           shotId: ctx.shotId?.substring(0, 8),
           shotRawSettings: shotResult.data?.settings,
           shotToolSettings: shotSettings,
+          hasShotSettings,
           shot_generationMode: shotSettings?.generationMode,
           project_generationMode: projectSettings?.generationMode,
           user_generationMode: userSettings?.generationMode,
@@ -298,7 +302,7 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
         projectSettings,
         shotSettings
       );
-      
+
       // [GenerationModeDebug] Log merged result
       if (toolId === 'travel-between-images' && ctx.shotId) {
         console.log('[GenerationModeDebug] 🔀 useToolSettings merged result:', {
@@ -307,8 +311,9 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
           timestamp: Date.now()
         });
       }
-      
-      return merged;
+
+      // Return both the merged settings and metadata about what was found
+      return { settings: merged, hasShotSettings };
     })();
 
     inflightSettingsFetches.set(singleFlightKey, promise);
@@ -343,7 +348,7 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
           ...contextInfo,
         });
         // Return defaults rather than erroring, so UI remains usable
-        return deepMerge({}, toolDefaults[toolId] ?? {});
+        return { settings: deepMerge({}, toolDefaults[toolId] ?? {}), hasShotSettings: false };
       }
 
       if (error?.message?.includes('Failed to fetch')) {
@@ -487,6 +492,8 @@ export function useToolSettings<T>(toolId: string, context?: { projectId?: strin
   error: Error | null;
   update: (scope: SettingsScope, settings: Partial<T>) => Promise<void>;
   isUpdating: boolean;
+  /** Whether the shot had settings stored in DB (vs just defaults/project settings) */
+  hasShotSettings: boolean;
 };
 
 /**
@@ -526,7 +533,7 @@ export function useToolSettings<T>(
   }, []);
 
   // Fetch merged settings using Supabase with mobile optimizations
-  const { data: settings, isLoading, error, fetchStatus, dataUpdatedAt } = useQuery({
+  const { data: queryResult, isLoading, error, fetchStatus, dataUpdatedAt } = useQuery({
     queryKey: ['toolSettings', toolId, projectId, shotId],
     queryFn: async ({ signal }) => {
       console.log('[ShotNavPerf] 🔍 useToolSettings queryFn START', {
@@ -581,11 +588,15 @@ export function useToolSettings<T>(
     networkMode: 'online',
   });
 
+  // Extract settings and hasShotSettings from the query result
+  const settings = queryResult?.settings;
+  const hasShotSettings = queryResult?.hasShotSettings ?? false;
+
   // Log errors for debugging (except expected cancellations)
   if (error && !error?.message?.includes('Request was cancelled')) {
     console.error('[useToolSettings] Query error:', error);
   }
-  
+
   // [ShotNavPerf] Log query status ONLY when it changes (not every render)
   const prevStatusRef = React.useRef<string>('');
   React.useEffect(() => {
@@ -597,6 +608,7 @@ export function useToolSettings<T>(
         isLoading,
         fetchStatus,
         hasData: !!settings,
+        hasShotSettings,
         timestamp: Date.now()
       });
       prevStatusRef.current = statusKey;
@@ -728,5 +740,6 @@ export function useToolSettings<T>(
     error: error as Error | null,
     update,
     isUpdating: updateMutation.isPending,
+    hasShotSettings,
   };
 } 
