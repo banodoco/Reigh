@@ -1,27 +1,14 @@
 /**
  * Video Trim Editor Types
- * 
+ *
  * TypeScript interfaces for the video trimming feature.
  * Following the MediaLightbox pattern for type organization.
  */
 
 import { GenerationRow } from '@/types/shots';
 
-/**
- * A variant of a generation (from generation_variants table)
- */
-export interface GenerationVariant {
-  id: string;
-  generation_id: string;
-  location: string;
-  thumbnail_url: string | null;
-  params: Record<string, any> | null;
-  is_primary: boolean;
-  variant_type: string | null;
-  name: string | null;
-  created_at: string;
-  viewed_at: string | null;
-}
+// Re-export variant types from shared (canonical source)
+export type { GenerationVariant, UseVariantsReturn } from '@/shared/hooks/useVariants';
 
 /**
  * State for video trimming controls
@@ -54,20 +41,6 @@ export interface UseVideoTrimmingReturn {
   previewEndTime: number;
   /** Whether any trimming has been applied */
   hasTrimChanges: boolean;
-}
-
-/**
- * Return type for useVariants hook
- */
-export interface UseVariantsReturn {
-  variants: GenerationVariant[];
-  primaryVariant: GenerationVariant | null;
-  activeVariant: GenerationVariant | null;
-  isLoading: boolean;
-  error: Error | null;
-  refetch: () => void;
-  setActiveVariantId: (variantId: string) => void;
-  setPrimaryVariant: (variantId: string) => Promise<void>;
 }
 
 /**

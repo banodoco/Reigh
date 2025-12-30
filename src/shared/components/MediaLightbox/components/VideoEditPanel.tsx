@@ -17,7 +17,8 @@ import {
   TrimControlsPanel,
   VariantSelector,
 } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor';
-import type { TrimState, GenerationVariant } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/types';
+import type { TrimState } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/types';
+import type { GenerationVariant } from '@/shared/hooks/useVariants';
 import { VideoPortionEditor } from '@/tools/edit-video/components/VideoPortionEditor';
 import type { UseVideoEditingReturn } from '../hooks/useVideoEditing';
 

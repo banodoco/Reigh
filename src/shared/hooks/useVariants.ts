@@ -1,9 +1,11 @@
 /**
  * useVariants Hook
- * 
- * Fetches and manages variants for a generation.
+ *
+ * Centralized hook for fetching and managing variants for a generation.
  * Allows switching between variants and setting the primary variant.
  * Supports realtime updates via SimpleRealtimeManager.
+ *
+ * Used by: MediaLightbox, InlineEditView, and other components that display variants.
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
@@ -11,7 +13,39 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
-import type { GenerationVariant, UseVariantsReturn } from '../types';
+
+/**
+ * A variant of a generation (from generation_variants table)
+ */
+export interface GenerationVariant {
+  id: string;
+  generation_id: string;
+  location: string;
+  thumbnail_url: string | null;
+  params: Record<string, any> | null;
+  is_primary: boolean;
+  variant_type: string | null;
+  name: string | null;
+  created_at: string;
+  viewed_at: string | null;
+}
+
+/**
+ * Return type for useVariants hook
+ */
+export interface UseVariantsReturn {
+  variants: GenerationVariant[];
+  primaryVariant: GenerationVariant | null;
+  activeVariant: GenerationVariant | null;
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => void;
+  setActiveVariantId: (variantId: string | null) => void;
+  setPrimaryVariant: (variantId: string) => Promise<void>;
+}
+
+/** Query key for variant queries - use this for cache consistency */
+export const VARIANTS_QUERY_KEY = 'generation-variants';
 
 interface UseVariantsProps {
   generationId: string | null;
@@ -42,7 +76,7 @@ export const useVariants = ({
     error,
     refetch,
   } = useQuery({
-    queryKey: ['generation-variants', generationId],
+    queryKey: [VARIANTS_QUERY_KEY, generationId],
     queryFn: async () => {
       if (!generationId) return [];
 

@@ -13,7 +13,7 @@ import { GenerationRow } from '@/types/shots';
 import type { LoraMode } from '../hooks';
 import type { SourceVariantData } from '../hooks/useSourceGeneration';
 import { VariantSelector } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/components/VariantSelector';
-import type { GenerationVariant } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/types';
+import type { GenerationVariant } from '@/shared/hooks/useVariants';
 
 export interface EditModePanelProps {
   // Source generation

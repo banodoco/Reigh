@@ -15,7 +15,7 @@ import { cn } from '@/shared/lib/utils';
 
 import { TaskDetailsPanelWrapper } from './TaskDetailsPanelWrapper';
 import { VariantSelector } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/components/VariantSelector';
-import type { GenerationVariant } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/types';
+import type { GenerationVariant } from '@/shared/hooks/useVariants';
 import type { GenerationRow } from '@/types/shots';
 
 export interface InfoPanelProps {
