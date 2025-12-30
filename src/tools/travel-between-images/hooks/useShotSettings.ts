@@ -127,9 +127,45 @@ export const useShotSettings = (
   });
   
   // Save inherited settings to DB immediately if we have them
+  // CRITICAL: Only save if the shot doesn't already have settings in DB
+  // to prevent overwriting existing settings with inherited defaults
+  const hasExistingDbSettings = useRef<boolean | null>(null);
+
+  // Reset the check when shotId changes
+  const prevShotIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (inheritedSettings && shotId && autoSave.status === 'ready') {
-      console.log('[useShotSettings] 💾 Saving inherited settings to DB');
+    if (prevShotIdRef.current !== shotId) {
+      hasExistingDbSettings.current = null;
+      prevShotIdRef.current = shotId;
+    }
+  }, [shotId]);
+
+  useEffect(() => {
+    // Track whether DB had settings when we first loaded
+    if (autoSave.status === 'ready' && hasExistingDbSettings.current === null) {
+      // Check if the loaded settings differ from defaults (meaning DB had data)
+      const loadedSettings = autoSave.settings;
+      const hasNonDefaultValues = loadedSettings && (
+        loadedSettings.batchVideoPrompt ||
+        loadedSettings.selectedLoras?.length > 0 ||
+        loadedSettings.phaseConfig ||
+        loadedSettings.amountOfMotion !== 50
+      );
+      hasExistingDbSettings.current = !!hasNonDefaultValues;
+      console.log('[useShotSettings] 📊 DB settings check:', {
+        hasExisting: hasExistingDbSettings.current,
+        shotId: shotId?.substring(0, 8),
+      });
+    }
+  }, [autoSave.status, autoSave.settings, shotId]);
+
+  useEffect(() => {
+    // Only save inherited settings if:
+    // 1. We have inherited settings
+    // 2. Status is ready
+    // 3. DB did NOT have existing settings (this is a truly new shot)
+    if (inheritedSettings && shotId && autoSave.status === 'ready' && hasExistingDbSettings.current === false) {
+      console.log('[useShotSettings] 💾 Saving inherited settings to DB (new shot confirmed)');
       // Use 'immediate' mode - inherited settings should persist right away
       updateToolSettingsSupabase({
         scope: 'shot',
@@ -139,6 +175,8 @@ export const useShotSettings = (
       }, undefined, 'immediate').catch(err => {
         console.error('[useShotSettings] Failed to save inherited settings:', err);
       });
+    } else if (inheritedSettings && shotId && autoSave.status === 'ready' && hasExistingDbSettings.current === true) {
+      console.log('[useShotSettings] ⚠️ Skipping inherited settings save - shot already has DB settings');
     }
   }, [inheritedSettings, shotId, autoSave.status]);
   
