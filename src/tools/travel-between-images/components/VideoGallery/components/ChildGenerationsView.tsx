@@ -6,7 +6,7 @@ import { Separator } from '@/shared/components/ui/separator';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
-import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -35,6 +35,9 @@ import { useGetTask } from '@/shared/hooks/useTasks';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { normalizeSegmentParams } from '@/shared/lib/normalizeSegmentParams';
 import { SegmentRegenerateControls } from '@/shared/components/SegmentRegenerateControls';
+import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
+import { uploadVideoToStorage } from '@/shared/lib/videoUploader';
+import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 
 // TypeScript declaration for global mobile video preload map
 declare global {
@@ -77,6 +80,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     // State for segment deletion
     const [deletingChildId, setDeletingChildId] = useState<string | null>(null);
     const deleteGeneration = useDeleteGeneration();
+    // State for segment replacement via upload
+    const [replacingChildId, setReplacingChildId] = useState<string | null>(null);
     const isMobile = useIsMobile();
     const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth } = usePanes();
     
@@ -249,14 +254,32 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         }
     }, [data, children]);
 
-    // Sort children by child_order
-    const sortedChildren = React.useMemo(() => {
-        return [...children].sort((a, b) => {
-            const orderA = (a as any).child_order ?? 0;
-            const orderB = (b as any).child_order ?? 0;
-            return orderA - orderB;
-        });
+    // Get generation IDs for badge data loading
+    const childGenerationIds = React.useMemo(() => {
+        return children.map((c: any) => c.id).filter(Boolean);
     }, [children]);
+
+    // Load variant badge data (derivedCount, hasUnviewedVariants, unviewedVariantCount)
+    const { getBadgeData } = useVariantBadges(childGenerationIds, childGenerationIds.length > 0);
+
+    // Sort children by child_order and merge in badge data
+    const sortedChildren = React.useMemo(() => {
+        return [...children]
+            .sort((a, b) => {
+                const orderA = (a as any).child_order ?? 0;
+                const orderB = (b as any).child_order ?? 0;
+                return orderA - orderB;
+            })
+            .map((child: any) => {
+                const badgeData = getBadgeData(child.id);
+                return {
+                    ...child,
+                    derivedCount: badgeData.derivedCount,
+                    hasUnviewedVariants: badgeData.hasUnviewedVariants,
+                    unviewedVariantCount: badgeData.unviewedVariantCount,
+                };
+            });
+    }, [children, getBadgeData]);
 
     // Join Clips State
     const [isJoiningClips, setIsJoiningClips] = useState(false);
@@ -944,6 +967,71 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         }
     }, [sortedSegments, parentGenerationId, parentGeneration, deleteGeneration, refetch, toast, queryClient]);
 
+    // Handle segment replacement via video upload
+    const handleReplaceSegment = useCallback(async (childId: string, file: File) => {
+        if (!projectId) {
+            toast({
+                title: 'Error',
+                description: 'No project selected',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setReplacingChildId(childId);
+        try {
+            console.log('[ChildGenerationsView] Starting video upload for segment:', childId.substring(0, 8));
+
+            // Upload the video
+            const videoUrl = await uploadVideoToStorage(file, projectId, shotIdProp || '', (progress) => {
+                console.log(`[ChildGenerationsView] Upload progress: ${progress}%`);
+            });
+
+            console.log('[ChildGenerationsView] Video uploaded:', videoUrl.substring(0, 50));
+
+            // Update the generation's location with the new URL
+            const { error: updateError } = await supabase
+                .from('generations')
+                .update({ location: videoUrl })
+                .eq('id', childId);
+
+            if (updateError) {
+                throw new Error(`Failed to update generation: ${updateError.message}`);
+            }
+
+            // Also update the primary variant's location
+            const { error: variantError } = await supabase
+                .from('generation_variants')
+                .update({ location: videoUrl })
+                .eq('generation_id', childId)
+                .eq('is_primary', true);
+
+            if (variantError) {
+                console.warn('[ChildGenerationsView] Failed to update variant location:', variantError);
+            }
+
+            // Invalidate caches
+            await invalidateVariantChange(queryClient, {
+                generationId: childId,
+                reason: 'segment-video-replaced',
+            });
+
+            // Refetch to update the UI
+            refetch();
+
+            console.log('[ChildGenerationsView] Segment replaced successfully');
+        } catch (error) {
+            console.error('[ChildGenerationsView] Error replacing segment:', error);
+            toast({
+                title: 'Error',
+                description: error instanceof Error ? error.message : 'Failed to replace segment video',
+                variant: 'destructive',
+            });
+        } finally {
+            setReplacingChildId(null);
+        }
+    }, [projectId, shotIdProp, queryClient, refetch, toast]);
+
     // Get current slot for lightbox (must be after segmentSlots is defined)
     const currentSlot = lightboxIndex !== null ? segmentSlots[lightboxIndex] : null;
     const segmentLightboxVideoId = currentSlot?.type === 'child' ? currentSlot.child.id : null;
@@ -1477,6 +1565,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                         endImage: images.end,
                                                     });
                                                 }}
+                                                onReplace={handleReplaceSegment}
+                                                isReplacing={replacingChildId === slot.child.id}
                                             />
                                         );
                                     } else {
@@ -1764,11 +1854,25 @@ interface SegmentCardProps {
     onImageLightboxOpen: (imageIndex: 0 | 1, images: { start: { url: string; generationId?: string } | null; end: { url: string; generationId?: string } | null }) => void;
     projectResolution?: string; // Resolution derived from project's aspect ratio
     aspectRatio?: string; // Aspect ratio string like "16:9" for video player containers
+    onReplace: (childId: string, file: File) => Promise<void>;
+    isReplacing: boolean;
 }
 
 // Memoized to prevent re-renders when parent state changes (e.g., lightbox index)
-const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio }) => {
+const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, onReplace, isReplacing }) => {
     const isMobile = useIsMobile();
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && file.type.startsWith('video/')) {
+            await onReplace(child.id, file);
+        }
+        // Reset the input so the same file can be selected again
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    }, [child.id, onReplace]);
 
     // child.params is synced from the primary variant via database trigger
     // (see sync_generation_from_primary_variant in variant sync triggers)
@@ -1893,6 +1997,15 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                         )}
                     </div>
 
+                    {/* Hidden file input for video upload */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                    />
+
                     {/* Action buttons - bottom right overlay, appears on hover */}
                     <div className="absolute bottom-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
@@ -1906,6 +2019,22 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                         >
                             <Scissors className="h-3.5 w-3.5" />
                             <span className="text-xs">Trim</span>
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 px-2 gap-1 bg-black/60 hover:bg-black/80 text-white border-0"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                fileInputRef.current?.click();
+                            }}
+                            disabled={isReplacing}
+                        >
+                            {isReplacing ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <Upload className="h-3.5 w-3.5" />
+                            )}
                         </Button>
                         <Button
                             variant="secondary"
