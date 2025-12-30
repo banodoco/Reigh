@@ -36,6 +36,7 @@ import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { normalizeSegmentParams } from '@/shared/lib/normalizeSegmentParams';
 import { SegmentRegenerateControls } from '@/shared/components/SegmentRegenerateControls';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
+import { useVariants } from '@/shared/hooks/useVariants';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 
@@ -1876,10 +1877,14 @@ interface SegmentCardProps {
 const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, onStartImageUpload, onEndImageUpload, isUploadingStartImage, isUploadingEndImage }) => {
     const isMobile = useIsMobile();
 
-    // child.params is synced from the primary variant via database trigger
-    // (see sync_generation_from_primary_variant in variant sync triggers)
-    // This ensures params always match the currently displayed video
-    const childParams = child.params || {};
+    // Fetch variants to get the most recent one's params
+    // Variants are sorted by created_at descending, so variants[0] is most recent
+    const { variants } = useVariants({ generationId: child.id });
+
+    // Use the most recent variant's params for the regeneration form
+    // This ensures the form shows settings from the latest regeneration attempt
+    const mostRecentVariant = variants[0];
+    const childParams = mostRecentVariant?.params || child.params || {};
 
     // Calculate aspect ratio style for video container based on project/shot dimensions
     const aspectRatioStyle = useMemo(() => {
