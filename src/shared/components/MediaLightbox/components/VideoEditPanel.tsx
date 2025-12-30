@@ -116,23 +116,21 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header with close button - Desktop only */}
-      {!isMobile && (
-        <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <Film className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-light">Edit Video</h2>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="h-8 w-8 p-0 hover:bg-muted"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+      {/* Header with close button */}
+      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Film className="w-5 h-5 text-primary" />
+          <h2 className={cn("font-light", isMobile ? "text-base" : "text-lg")}>Edit Video</h2>
         </div>
-      )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          className="h-8 w-8 p-0 hover:bg-muted"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
 
       {/* Sub-mode selector: Trim | Replace | Regenerate */}
       <div className={cn(
