@@ -587,7 +587,7 @@ export function InlineEditVideoView({
       if (cappedContextFrameCount < contextFrameCount) {
         console.log(`[EditVideo] Capped context_frame_count from ${contextFrameCount} to ${cappedContextFrameCount} (min keeper clip: ${minKeeperFrames} frames, safe max: ${safeMaxContextFrames})`);
       }
-      
+
       // Build orchestrator details for edit_video_orchestrator
       const orchestratorDetails: Record<string, unknown> = {
         run_id: generateRunId(),
@@ -630,19 +630,19 @@ export function InlineEditVideoView({
         // Parent generation for tracking
         parent_generation_id: media.id,
       };
-      
+
       // Add LoRAs if provided
       if (lorasForTask.length > 0) {
         orchestratorDetails.loras = lorasForTask;
       }
-      
+
       console.log('[EditVideo] Creating edit_video_orchestrator task:', {
         video_fps: videoFps,
         video_duration: videoDuration,
         total_frames: Math.round(videoDuration * videoFps),
         portions_to_regenerate: portionFrameRanges,
       });
-      
+
       // Create the task using the createTask function
       // Note: tool_type must be at top level for complete_task to pick it up for variant creation
       const result = await createTask({

@@ -185,6 +185,12 @@ interface MediaLightboxProps {
   initialVideoTrimMode?: boolean;
   // Initial variant to display (when opening lightbox from a variant click)
   initialVariantId?: string;
+  /**
+   * When true, fetch variants for this generation itself (media.id) instead of its parent.
+   * Use this when viewing child generations where variants are created on the child
+   * (e.g., travel-between-images segments) rather than the parent (e.g., edit-video).
+   */
+  fetchVariantsForSelf?: boolean;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -251,6 +257,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   initialVideoTrimMode = false,
   // Initial variant to display
   initialVariantId,
+  // Fetch variants for self instead of parent
+  fetchVariantsForSelf = false,
 }) => {
   // ========================================
   // REFACTORED: All logic extracted to hooks
@@ -341,17 +349,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // We need to use media.generation_id (actual generations table ID) for shot operations
   const actualGenerationId = (media as any).generation_id || media.id;
   
-  // For variant fetching: if this is a child generation (has parent_generation_id), 
-  // fetch variants from the parent since that's where edit-video variants are created.
-  // This ensures TasksPane shows the same variants as EditVideoPage gallery.
-  const variantFetchGenerationId = (media as any).parent_generation_id || actualGenerationId;
-  
+  // For variant fetching: determine which generation's variants to show.
+  // - fetchVariantsForSelf=true: fetch variants for this generation (used by travel-between-images children)
+  // - fetchVariantsForSelf=false: fetch from parent if available (used by edit-video children)
+  const variantFetchGenerationId = fetchVariantsForSelf
+    ? actualGenerationId
+    : ((media as any).parent_generation_id || actualGenerationId);
+
   // DEBUG: Log variant fetching context
   console.log('[VariantFetchDebug] Media and variant context:', {
     mediaId: media.id?.substring(0, 8),
     actualGenerationId: actualGenerationId?.substring(0, 8),
     hasParentGenerationId: !!(media as any).parent_generation_id,
     parentGenerationId: (media as any).parent_generation_id?.substring(0, 8) || 'none',
+    fetchVariantsForSelf,
     variantFetchGenerationId: variantFetchGenerationId?.substring(0, 8),
     mediaKeys: Object.keys(media).join(', '),
   });
@@ -996,7 +1007,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { projects } = useProject();
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;
-  
+
   // Video editing hook - handles all video edit state, validation, and generation
   const videoEditing = useVideoEditing({
     media,
@@ -1223,8 +1234,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     // For child segments, use the parent generation ID (not the segment's own ID)
     // This ensures new regenerations are linked to the correct parent
-    // IMPORTANT: Check the generation record's parent_generation_id FIRST (from database)
-    // before falling back to params, since params may not have this field set correctly
+    // Priority: media field > orchestrator/task params > fall back to actualGenerationId
     const parentGenerationId = (media as any).parent_generation_id ||
                                orchestratorDetails.parent_generation_id ||
                                taskParams.parent_generation_id ||

@@ -484,19 +484,19 @@ export const useVideoEditing = ({
         // Parent generation for tracking
         parent_generation_id: media.id,
       };
-      
+
       // Add LoRAs if provided
       if (lorasForTask.length > 0) {
         orchestratorDetails.loras = lorasForTask;
       }
-      
+
       console.log('[VideoEdit] Creating edit_video_orchestrator task:', {
         fps,
         duration: videoDuration,
         portions: portionFrameRanges,
         orchestratorDetails,
       });
-      
+
       // Create the task using the createTask function
       // Note: tool_type and parent_generation_id must be at top level for complete_task variant creation
       const result = await createTask({

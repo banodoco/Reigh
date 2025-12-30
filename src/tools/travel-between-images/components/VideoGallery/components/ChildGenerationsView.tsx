@@ -1691,21 +1691,21 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 if (!shouldRenderSegmentLightbox || !lightboxSlot) return null;
                 
                 const childMedia = lightboxSlot.child;
-                // IMPORTANT: Clear parent_generation_id so MediaLightbox fetches variants
-                // for THIS child segment, not the parent. Travel-between-images variants
-                // are created on the child generation (via child_generation_id in complete_task).
-                const childMediaForLightbox = {
+                // Ensure parent_generation_id is set for regeneration to work correctly
+                // (creates variant instead of new child when regenerating from lightbox)
+                const childMediaWithParent = {
                     ...childMedia,
-                    parent_generation_id: undefined, // Fetch variants for child, not parent
+                    parent_generation_id: parentGenerationId,
                 };
                 console.log('[MobileTapFlow:ChildView] ✅ RENDERING MediaLightbox for segment', {
                     index: lightboxIndex,
                     childId: childMedia?.id,
+                    parentGenerationId,
                     timestamp: Date.now()
                 });
                 return (
                     <MediaLightbox
-                        media={childMediaForLightbox}
+                        media={childMediaWithParent}
                         onClose={handleLightboxClose}
                         onNext={handleLightboxNext}
                         onPrevious={handleLightboxPrev}
@@ -1728,6 +1728,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             onApplySettingsFromTask: noop, // Not applicable in this context
                             onClose: handleLightboxClose
                         }}
+                        fetchVariantsForSelf={true}
                     />
                 );
             })()}
