@@ -48,6 +48,8 @@ interface SelectorButtonProps {
   onImageLoad: (src: string) => void;
   // Custom images for 2-image example
   thumbImages: string[];
+  // Width for dynamic sizing
+  flexGrow: number;
 }
 
 /**
@@ -66,11 +68,13 @@ const SelectorButton: React.FC<SelectorButtonProps> = ({
   loadedImages,
   onImageLoad,
   thumbImages,
+  flexGrow,
 }) => {
   return (
     <button
       onClick={onClick}
-      className="p-2 rounded-lg transition-all duration-200 flex items-center justify-center min-h-[60px] relative overflow-hidden bg-muted/30 hover:bg-muted/50"
+      className="p-2 rounded-lg flex items-center justify-center min-h-[60px] relative overflow-hidden bg-muted/30 hover:bg-muted/50 transition-[flex-grow] duration-300 ease-out"
+      style={{ flexGrow }}
     >
       {/* Static border for selected item (not during animation) */}
       {isSelected && !isNextWithBorder && !isPrevWithBorder && (
@@ -128,6 +132,7 @@ const SelectorButton: React.FC<SelectorButtonProps> = ({
         exampleId={example.id}
         loadedImages={loadedImages}
         onImageLoad={onImageLoad}
+        isSelected={isSelected}
       />
     </button>
   );
@@ -139,6 +144,7 @@ interface ThumbnailGridProps {
   exampleId: string;
   loadedImages: Set<string>;
   onImageLoad: (src: string) => void;
+  isSelected: boolean;
 }
 
 /**
@@ -150,11 +156,14 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
   exampleId,
   loadedImages,
   onImageLoad,
+  isSelected,
 }) => {
   // 7 images: two rows (4 on top, 3 centered below)
   if (imageCount === 7) {
     return (
-      <div className="flex flex-col gap-0.5 relative z-10">
+      <div className="flex flex-col gap-0.5 relative z-10 transition-transform duration-300 ease-out"
+        style={{ transform: isSelected ? 'scale(1.25)' : 'scale(1)' }}
+      >
         <div className="flex gap-0.5">
           {images.slice(0, 4).map((img, imgIdx) => (
             <div key={imgIdx} className="w-4 h-3 sm:w-6 sm:h-[18px] bg-muted/50 rounded-sm overflow-hidden relative flex-shrink-0">
@@ -188,10 +197,12 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
   // 2 or 4 images: horizontal row
   return (
     <div className={cn(
-      "gap-0.5 sm:gap-1 relative z-10",
+      "gap-0.5 sm:gap-1 relative z-10 transition-transform duration-300 ease-out",
       imageCount === 2 && "flex flex-row",
       imageCount === 4 && "flex flex-row"
-    )}>
+    )}
+      style={{ transform: isSelected ? 'scale(1.25)' : 'scale(1)' }}
+    >
       {images.map((img, imgIdx) => (
         <div
           key={imgIdx}
@@ -234,19 +245,23 @@ export const TravelSelector: React.FC<TravelSelectorProps> = ({
   twoImageImages,
 }) => {
   return (
-    <div className="grid grid-cols-3 gap-2 w-full pt-4">
+    <div className="flex gap-2 w-full pt-4">
       {examples.map((example, idx) => {
         // Get thumbnail images for the selector
         const thumbImages = idx === 0 && twoImageImages
           ? twoImageImages
           : example.images;
 
+        // Selected item gets more flex-grow, others get less
+        const isSelected = selectedIndex === idx;
+        const flexGrow = isSelected ? 1.5 : 0.75;
+
         return (
           <SelectorButton
             key={example.id}
             example={example}
             idx={idx}
-            isSelected={selectedIndex === idx}
+            isSelected={isSelected}
             onClick={() => onSelect(idx)}
             isNextWithBorder={nextAdvanceIdx === idx}
             isPrevWithBorder={prevAdvanceIdx === idx}
@@ -256,6 +271,7 @@ export const TravelSelector: React.FC<TravelSelectorProps> = ({
             loadedImages={loadedImages}
             onImageLoad={onImageLoad}
             thumbImages={thumbImages}
+            flexGrow={flexGrow}
           />
         );
       })}
