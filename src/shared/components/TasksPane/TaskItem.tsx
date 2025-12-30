@@ -816,31 +816,33 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
 
     const subtasks = tasksData.filter((t) => {
       const p: any = typeof t.params === 'string' ? JSON.parse(t.params) : t.params || {};
+      // Check all paths where orchestrator reference might be stored (matching backend logic)
+      const taskOrchestratorId = p.orchestrator_task_id_ref ||
+                                  p.orchestrator_task_id ||
+                                  p.orchestrator_details?.orchestrator_task_id ||
+                                  p.originalParams?.orchestrator_details?.orchestrator_task_id;
       const matchesOrchestrator = (
-        (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId || p.orchestrator_task_id_ref === task.id || p.orchestrator_task_id === task.id || (orchestratorRunId && p.orchestrator_run_id === orchestratorRunId))
+        (taskOrchestratorId === orchestratorId || taskOrchestratorId === task.id || (orchestratorRunId && p.orchestrator_run_id === orchestratorRunId))
         && t.id !== task.id
       );
       if (matchesOrchestrator) {
-        console.log('[TaskProgressDebug] Found subtask:', t.id, 'status:', t.status, 'taskType:', t.taskType, 'params:', p);
+        console.log('[TaskProgressDebug] Found subtask:', t.id, 'status:', t.status, 'taskType:', t.taskType, 'orchestratorRef:', taskOrchestratorId);
       }
-      return (
-        (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId || p.orchestrator_task_id_ref === task.id || p.orchestrator_task_id === task.id || (orchestratorRunId && p.orchestrator_run_id === orchestratorRunId))
-        && t.id !== task.id
-      );
+      return matchesOrchestrator;
     });
 
     console.log('[TaskProgressDebug] Found', subtasks.length, 'subtasks');
-    
+
     let percent = 0;
-    
+
     if (subtasks.length === 0) {
       console.log('[TaskProgressDebug] No subtasks found yet, showing 0% progress');
       percent = 0;
     } else {
-      // Progress is based on the ratio of completed subtasks to (total subtasks - 1)
+      // Progress is based on the ratio of completed subtasks to total subtasks
       const completed = subtasks.filter((t) => t.status === 'Complete').length;
       console.log('[TaskProgressDebug] Completed subtasks:', completed);
-      const denominator = Math.max(subtasks.length - 1, 1); // Avoid divide-by-zero and remove the final stitch task
+      const denominator = subtasks.length;
       console.log('[TaskProgressDebug] Denominator:', denominator);
 
       const rawPercent = (completed / denominator) * 100;
