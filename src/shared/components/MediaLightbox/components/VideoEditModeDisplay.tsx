@@ -11,6 +11,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Play, Pause, Trash2 } from 'lucide-react';
 import { MultiPortionTimeline, formatTime } from '@/shared/components/VideoPortionTimeline';
 import { cn } from '@/shared/lib/utils';
+import { SEGMENT_OVERLAY_COLORS } from '@/shared/lib/segmentColors';
 
 export interface VideoEditModeDisplayProps {
   /** Reference to the video element */
@@ -55,14 +56,6 @@ export interface VideoEditModeDisplayProps {
   fps?: number;
 }
 
-// Segment colors matching VideoPortionEditor
-const SEGMENT_COLORS = [
-  { bg: 'bg-primary/40', text: 'text-primary' },
-  { bg: 'bg-blue-500/40', text: 'text-blue-400' },
-  { bg: 'bg-green-500/40', text: 'text-green-400' },
-  { bg: 'bg-orange-500/40', text: 'text-orange-400' },
-  { bg: 'bg-purple-500/40', text: 'text-purple-400' },
-];
 
 export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
   videoRef,
@@ -145,7 +138,7 @@ export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
           <span className={cn(
             "px-1.5 py-0.5 rounded text-[10px] ml-1",
             regenerationZoneInfo.inZone
-              ? SEGMENT_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_COLORS.length].bg + ' ' + SEGMENT_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_COLORS.length].text
+              ? SEGMENT_OVERLAY_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_OVERLAY_COLORS.length].bg + ' ' + SEGMENT_OVERLAY_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_OVERLAY_COLORS.length].text
               : "bg-white/20 text-white/70"
           )}>
             {regenerationZoneInfo.inZone ? `segment ${regenerationZoneInfo.segmentIndex + 1}` : 'keep'}

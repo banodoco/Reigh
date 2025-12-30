@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { generateUUID, generateRunId, createTask } from '@/shared/lib/taskCreation';
 import { MultiPortionTimeline, formatTime, PortionSelection } from '@/shared/components/VideoPortionTimeline';
+import { SEGMENT_OVERLAY_COLORS } from '@/shared/lib/segmentColors';
 import { DEFAULT_VACE_PHASE_CONFIG, buildPhaseConfigWithLoras, BUILTIN_VACE_DEFAULT_ID } from '@/shared/lib/vaceDefaults';
 
 // PortionSelection is now imported from shared component
@@ -165,15 +166,6 @@ export function InlineEditVideoView({
     }
     return { inZone: false, segmentIndex: -1 };
   }, [currentVideoTime, selections]);
-  
-  // Segment colors matching VideoPortionEditor
-  const SEGMENT_COLORS = [
-    { bg: 'bg-primary/40', text: 'text-primary' },
-    { bg: 'bg-blue-500/40', text: 'text-blue-400' },
-    { bg: 'bg-green-500/40', text: 'text-green-400' },
-    { bg: 'bg-orange-500/40', text: 'text-orange-400' },
-    { bg: 'bg-purple-500/40', text: 'text-purple-400' },
-  ];
   
   // Handler to update per-segment settings
   const handleUpdateSelectionSettings = useCallback((id: string, updates: Partial<Pick<PortionSelection, 'gapFrameCount' | 'prompt' | 'name'>>) => {
@@ -716,7 +708,7 @@ export function InlineEditVideoView({
                 <span className={cn(
                   "px-1.5 py-0.5 rounded text-[10px] ml-1",
                   regenerationZoneInfo.inZone
-                    ? SEGMENT_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_COLORS.length].bg + ' ' + SEGMENT_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_COLORS.length].text
+                    ? SEGMENT_OVERLAY_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_OVERLAY_COLORS.length].bg + ' ' + SEGMENT_OVERLAY_COLORS[regenerationZoneInfo.segmentIndex % SEGMENT_OVERLAY_COLORS.length].text
                     : "bg-white/20 text-white/70"
                 )}>
                   {regenerationZoneInfo.inZone ? `segment ${regenerationZoneInfo.segmentIndex + 1}` : 'keep'}

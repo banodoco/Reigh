@@ -14,17 +14,7 @@ import { PortionSelection, formatTime } from '@/shared/components/VideoPortionTi
 import { MotionPresetSelector, type BuiltinPreset } from '@/shared/components/MotionPresetSelector';
 import { PhaseConfig } from '@/tools/travel-between-images/settings';
 import { BUILTIN_VACE_PRESET, VACE_FEATURED_PRESET_IDS } from '@/shared/lib/vaceDefaults';
-
-// Color palette for segments - matches VideoPortionTimeline colors
-const SEGMENT_COLORS = [
-  { bg: 'bg-primary', bgMuted: 'bg-primary/20', text: 'text-primary', border: 'border-primary' },
-  { bg: 'bg-blue-500', bgMuted: 'bg-blue-500/20', text: 'text-blue-500', border: 'border-blue-500' },
-  { bg: 'bg-green-500', bgMuted: 'bg-green-500/20', text: 'text-green-500', border: 'border-green-500' },
-  { bg: 'bg-orange-500', bgMuted: 'bg-orange-500/20', text: 'text-orange-500', border: 'border-orange-500' },
-  { bg: 'bg-purple-500', bgMuted: 'bg-purple-500/20', text: 'text-purple-500', border: 'border-purple-500' },
-];
-
-const getSegmentColor = (index: number) => SEGMENT_COLORS[index % SEGMENT_COLORS.length];
+import { getSegmentFormColor } from '@/shared/lib/segmentColors';
 
 // Thumbnail component for segment preview - supports different sizes
 function SegmentThumbnail({ videoUrl, time, size = 'small' }: { videoUrl: string; time: number; size?: 'small' | 'large' }) {
@@ -322,7 +312,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
                 <div className="space-y-2">
                     <div className="space-y-3">
                         {selections.sort((a, b) => a.start - b.start).map((selection, index) => {
-                            const segmentColor = getSegmentColor(index);
+                            const segmentColor = getSegmentFormColor(index);
                             const segmentFrameCount = selection.gapFrameCount ?? gapFrames;
                             const segmentDuration = formatDuration(segmentFrameCount, fps);
                             
