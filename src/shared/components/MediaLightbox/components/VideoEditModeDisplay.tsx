@@ -136,9 +136,9 @@ export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center">
-      {/* Position overlay - top right */}
+      {/* Position overlay - top left */}
       {videoDuration > 0 && (
-        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 text-[11px] font-mono text-white/80 bg-black/50 backdrop-blur-sm rounded px-2 py-1">
+        <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 text-[11px] font-mono text-white/80 bg-black/50 backdrop-blur-sm rounded px-2 py-1">
           {formatTime(currentVideoTime)}
           <span className="text-white/50 ml-1">f{Math.round(currentVideoTime * fps)}</span>
           {' '}

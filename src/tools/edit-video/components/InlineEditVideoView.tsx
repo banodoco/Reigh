@@ -707,9 +707,9 @@ export function InlineEditVideoView({
             "relative flex items-center justify-center bg-zinc-900 overflow-hidden",
             useStackedLayout ? "w-full" : "flex-shrink rounded-t-lg"
           )}>
-            {/* Playhead info overlay - top right of video */}
+            {/* Playhead info overlay - top left of video */}
             {videoReady && videoDuration > 0 && (
-              <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 text-[11px] font-mono text-white/80 bg-black/50 backdrop-blur-sm rounded px-2 py-1">
+              <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 text-[11px] font-mono text-white/80 bg-black/50 backdrop-blur-sm rounded px-2 py-1">
                 {formatTime(currentVideoTime)}
                 {videoFps && <span className="text-white/50 ml-1">f{Math.round(currentVideoTime * videoFps)}</span>}
                 {' '}
