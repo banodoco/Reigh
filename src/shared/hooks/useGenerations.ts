@@ -838,25 +838,9 @@ export async function fetchDerivedGenerations(
     data: data?.map(d => ({ id: d.id, based_on: (d as any).based_on }))
   });
 
-  // Fetch counts of generations based on each derived generation
+  // Use centralized function to count variants from both generations and generation_variants tables
   const derivedIds = data?.map(d => d.id) || [];
-  let derivedCounts: Record<string, number> = {};
-
-  if (derivedIds.length > 0) {
-    const { data: countsData, error: countsError } = await supabase
-      .from('generations')
-      .select('based_on')
-      .in('based_on', derivedIds);
-
-    if (!countsError && countsData) {
-      // Count how many times each ID appears as based_on
-      derivedCounts = countsData.reduce((acc, item) => {
-        const basedOnId = item.based_on;
-        acc[basedOnId] = (acc[basedOnId] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-    }
-  }
+  const { derivedCounts } = await calculateDerivedCounts(derivedIds);
 
   const items = data?.map((item: any) => {
     const mainUrl = item.location;
@@ -1063,24 +1047,9 @@ export async function fetchDerivedItems(
     sourceGenerationId: sourceGenerationId.substring(0, 8)
   });
 
-  // Fetch derived counts for child generations (how many generations are based on each)
+  // Use centralized function to count variants from both generations and generation_variants tables
   const generationIds = childGenerations.map(d => d.id);
-  let derivedCounts: Record<string, number> = {};
-
-  if (generationIds.length > 0) {
-    const { data: countsData, error: countsError } = await supabase
-      .from('generations')
-      .select('based_on')
-      .in('based_on', generationIds);
-
-    if (!countsError && countsData) {
-      derivedCounts = countsData.reduce((acc, item) => {
-        const basedOnId = item.based_on;
-        acc[basedOnId] = (acc[basedOnId] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-    }
-  }
+  const { derivedCounts } = await calculateDerivedCounts(generationIds);
 
   // Normalize generations to DerivedItem format
   const normalizePosition = (timelineFrame: number | null | undefined) => {

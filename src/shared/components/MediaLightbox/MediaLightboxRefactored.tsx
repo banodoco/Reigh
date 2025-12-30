@@ -1223,7 +1223,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     // For child segments, use the parent generation ID (not the segment's own ID)
     // This ensures new regenerations are linked to the correct parent
-    const parentGenerationId = orchestratorDetails.parent_generation_id ||
+    // IMPORTANT: Check the generation record's parent_generation_id FIRST (from database)
+    // before falling back to params, since params may not have this field set correctly
+    const parentGenerationId = (media as any).parent_generation_id ||
+                               orchestratorDetails.parent_generation_id ||
                                taskParams.parent_generation_id ||
                                actualGenerationId;
 
@@ -1234,6 +1237,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       staleResolution,
       finalResolution: effectiveRegenerateResolution || '(will be fetched by task creation)',
       source: effectiveRegenerateResolution ? 'SHOT' : 'TASK_CREATION_WILL_FETCH',
+      mediaParentGenerationId: (media as any).parent_generation_id,
       parentGenerationId,
       actualGenerationId,
       isChildSegment: parentGenerationId !== actualGenerationId,
@@ -1257,7 +1261,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         projectResolution={effectiveRegenerateResolution}
       />
     );
-  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution]);
+  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media]);
 
   // Handle entering video edit mode (unified) - defaults to trim sub-mode
   const handleEnterVideoEditMode = useCallback(() => {

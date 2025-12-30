@@ -1876,8 +1876,8 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                                 </Tooltip>
                             </TooltipProvider>
                         )}
-                        {/* Variant count badge */}
-                        {(child as any).derivedCount && (child as any).derivedCount > 0 && (
+                        {/* Variant count badge - show when 2+ variants (matches gallery behavior) */}
+                        {(child as any).derivedCount && (child as any).derivedCount > 1 && (
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
