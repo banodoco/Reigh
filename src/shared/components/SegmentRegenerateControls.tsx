@@ -511,7 +511,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                 )}
                 <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">Start</span>
-                {/* Upload button overlay */}
+                {/* Upload button overlay - shows on hover */}
                 {onStartImageUpload && (
                   <button
                     onClick={(e) => {
@@ -519,7 +519,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                       startImageInputRef.current?.click();
                     }}
                     disabled={isUploadingStartImage}
-                    className="absolute top-1 right-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
+                    className="absolute top-1 right-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all opacity-0 group-hover:opacity-100"
                     title="Replace start image"
                   >
                     {isUploadingStartImage ? (
@@ -585,7 +585,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                 )}
                 <span className="absolute bottom-0.5 right-0.5 text-[10px] bg-black/60 text-white px-1 rounded">End</span>
-                {/* Upload button overlay */}
+                {/* Upload button overlay - shows on hover, positioned on left to avoid "End" label */}
                 {onEndImageUpload && (
                   <button
                     onClick={(e) => {
@@ -593,7 +593,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                       endImageInputRef.current?.click();
                     }}
                     disabled={isUploadingEndImage}
-                    className="absolute top-1 right-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
+                    className="absolute top-1 left-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all opacity-0 group-hover:opacity-100"
                     title="Replace end image"
                   >
                     {isUploadingEndImage ? (
