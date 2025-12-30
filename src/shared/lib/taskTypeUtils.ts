@@ -85,3 +85,52 @@ export const getTaskTypeCategory = (taskType: string | null | undefined): 'join_
   // Default to 'image' for image generation task types
   return 'image';
 };
+
+// ============================================================================
+// Orchestrator ID Extraction
+// ============================================================================
+
+/**
+ * Extract the orchestrator task ID from task params.
+ * Checks all known paths where orchestrator reference might be stored.
+ * Matches the backend logic in complete_task/params.ts
+ */
+export const extractOrchestratorTaskId = (params: Record<string, any> | null | undefined): string | null => {
+  if (!params) return null;
+
+  return (
+    params.orchestrator_task_id_ref ||
+    params.orchestrator_details?.orchestrator_task_id ||
+    params.originalParams?.orchestrator_details?.orchestrator_task_id ||
+    params.orchestrator_task_id ||
+    null
+  );
+};
+
+/**
+ * Extract the orchestrator run ID from task params.
+ */
+export const extractOrchestratorRunId = (params: Record<string, any> | null | undefined): string | null => {
+  if (!params) return null;
+
+  return (
+    params.orchestrator_details?.run_id ||
+    params.orchestrator_run_id ||
+    null
+  );
+};
+
+/**
+ * Parse task params, handling both string and object formats
+ */
+export const parseTaskParams = (params: string | Record<string, any> | null | undefined): Record<string, any> => {
+  if (!params) return {};
+  if (typeof params === 'string') {
+    try {
+      return JSON.parse(params);
+    } catch {
+      return {};
+    }
+  }
+  return params;
+};

@@ -9,6 +9,7 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Task, TASK_STATUS } from '@/types/tasks';
 import { getTaskDisplayName, taskSupportsProgress } from '@/shared/lib/taskConfig';
+import { parseTaskParams, extractOrchestratorTaskId, extractOrchestratorRunId } from '@/shared/lib/taskTypeUtils';
 import { useCancelTask } from '@/shared/hooks/useTasks';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePanes } from '@/shared/contexts/PanesContext';
@@ -758,103 +759,48 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     });
   };
 
-  // Fetch tasks directly for progress checking - no more deprecated useListTasks
+  // Check progress for orchestrator tasks by querying subtasks directly
   const handleCheckProgress = async () => {
-    console.log('[TaskProgressDebug] Check Progress clicked for task:', task.id, 'taskType:', task.taskType);
-    console.log('[PollingBreakageIssue] TaskItem progress check - using direct API call instead of deprecated useListTasks');
-    
-    if (!selectedProjectId) {
-      console.error('[TaskProgressDebug] No project selected');
-      return;
-    }
-    
+    if (!selectedProjectId) return;
+
+    // Get orchestrator ID from this task's params
+    const params = parseTaskParams(task.params);
+    const orchestratorDetails = params.orchestrator_details || {};
+    const orchestratorId = orchestratorDetails.orchestrator_task_id || params.orchestrator_task_id || params.task_id || task.id;
+
     try {
-      // Direct API call for progress checking - only fetch what we need
-      const { data: tasks, error } = await supabase
+      // Query subtasks directly using server-side filtering (matches backend logic)
+      const { data: subtasks, error } = await supabase
         .from('tasks')
-        .select('*')
+        .select('id, status')
         .eq('project_id', selectedProjectId)
-        .order('created_at', { ascending: false })
-        .limit(500); // Reasonable limit for progress checking
-        
+        .neq('id', task.id)
+        .or([
+          `params->>orchestrator_task_id_ref.eq.${orchestratorId}`,
+          `params->>orchestrator_task_id.eq.${orchestratorId}`,
+          `params->orchestrator_details->>orchestrator_task_id.eq.${orchestratorId}`,
+        ].join(','));
+
       if (error) throw error;
-      
-      console.log('[TaskProgressDebug] Fetched tasks for progress:', tasks?.length || 0);
-      console.log('[PollingBreakageIssue] TaskItem progress check completed successfully');
-      
-      if (tasks) {
-        computeAndShowProgress(tasks as any);
-      } else {
-        console.log('[TaskProgressDebug] No data available for progress computation');
-        toast({
-          title: "Error",
-          description: "Failed to load tasks for progress computation",
-          variant: "destructive",
-        });
-      }
+
+      // Calculate progress
+      const total = subtasks?.length || 0;
+      const completed = subtasks?.filter(t => t.status === 'Complete').length || 0;
+      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      toast({ title: 'Progress', description: `${percent}% Complete (${completed}/${total})`, variant: 'default' });
+
+      // Show inline for 5s
+      setProgressPercent(percent);
+      setTimeout(() => setProgressPercent(null), 5000);
     } catch (error) {
-      console.error('[TaskProgressDebug] Error fetching tasks for progress:', error);
-      console.error('[PollingBreakageIssue] TaskItem progress check failed:', error);
+      console.error('[TaskItem] Error checking progress:', error);
       toast({
         title: "Error",
-        description: "Failed to load tasks for progress computation",
+        description: "Failed to check progress",
         variant: "destructive",
       });
     }
-  };
-
-  const computeAndShowProgress = (tasksData: Task[]) => {
-    console.log('[TaskProgressDebug] computeAndShowProgress called with', tasksData.length, 'tasks');
-    const pRoot: any = typeof task.params === 'string' ? JSON.parse(task.params) : task.params || {};
-    console.log('[TaskProgressDebug] Task params parsed:', pRoot);
-    const orchestratorDetails = pRoot.orchestrator_details || {};
-    console.log('[TaskProgressDebug] orchestratorDetails:', orchestratorDetails);
-    const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
-    console.log('[TaskProgressDebug] orchestratorId resolved to:', orchestratorId);
-    const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
-    console.log('[TaskProgressDebug] orchestratorRunId:', orchestratorRunId);
-
-    const subtasks = tasksData.filter((t) => {
-      const p: any = typeof t.params === 'string' ? JSON.parse(t.params) : t.params || {};
-      // Check all paths where orchestrator reference might be stored (matching backend logic)
-      const taskOrchestratorId = p.orchestrator_task_id_ref ||
-                                  p.orchestrator_task_id ||
-                                  p.orchestrator_details?.orchestrator_task_id ||
-                                  p.originalParams?.orchestrator_details?.orchestrator_task_id;
-      const matchesOrchestrator = (
-        (taskOrchestratorId === orchestratorId || taskOrchestratorId === task.id || (orchestratorRunId && p.orchestrator_run_id === orchestratorRunId))
-        && t.id !== task.id
-      );
-      if (matchesOrchestrator) {
-        console.log('[TaskProgressDebug] Found subtask:', t.id, 'status:', t.status, 'taskType:', t.taskType, 'orchestratorRef:', taskOrchestratorId);
-      }
-      return matchesOrchestrator;
-    });
-
-    console.log('[TaskProgressDebug] Found', subtasks.length, 'subtasks');
-
-    let percent = 0;
-
-    if (subtasks.length === 0) {
-      console.log('[TaskProgressDebug] No subtasks found yet, showing 0% progress');
-      percent = 0;
-    } else {
-      // Progress is based on the ratio of completed subtasks to total subtasks
-      const completed = subtasks.filter((t) => t.status === 'Complete').length;
-      console.log('[TaskProgressDebug] Completed subtasks:', completed);
-      const denominator = subtasks.length;
-      console.log('[TaskProgressDebug] Denominator:', denominator);
-
-      const rawPercent = (completed / denominator) * 100;
-      percent = Math.round(Math.min(rawPercent, 100));
-      console.log('[TaskProgressDebug] Calculated progress:', percent, '% (raw:', rawPercent, ')');
-    }
-
-    toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
-
-    // Show inline for 5s
-    setProgressPercent(percent);
-    setTimeout(() => setProgressPercent(null), 5000);
   };
 
   // Handler for visiting shot
