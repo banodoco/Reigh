@@ -1,5 +1,5 @@
 import { useToolPageSettings } from '@/shared/hooks/useToolPageSettings';
-import { EditVideoSettings } from '../settings';
+import { EditVideoSettings, BUILTIN_VACE_DEFAULT_ID } from '../settings';
 
 const DEFAULT_EDIT_VIDEO_SETTINGS: EditVideoSettings = {
   contextFrameCount: 16,
@@ -15,6 +15,11 @@ const DEFAULT_EDIT_VIDEO_SETTINGS: EditVideoSettings = {
   prompt: '',
   randomSeed: true,
   enhancePrompt: true,
+  // Motion settings
+  motionMode: 'basic',
+  phaseConfig: undefined,
+  selectedPhasePresetId: BUILTIN_VACE_DEFAULT_ID,
+  // Selected video info
   selectedVideoUrl: undefined,
   selectedVideoPosterUrl: undefined,
   selectedVideoGenerationId: undefined,

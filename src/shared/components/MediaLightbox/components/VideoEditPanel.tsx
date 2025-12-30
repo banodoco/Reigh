@@ -20,6 +20,7 @@ import {
 import type { TrimState } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/types';
 import type { GenerationVariant } from '@/shared/hooks/useVariants';
 import { VideoPortionEditor } from '@/tools/edit-video/components/VideoPortionEditor';
+import { DEFAULT_VACE_PHASE_CONFIG } from '@/shared/lib/vaceDefaults';
 import type { UseVideoEditingReturn } from '../hooks/useVideoEditing';
 
 export interface VideoEditPanelProps {
@@ -221,9 +222,31 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
             setEnhancePrompt={(val) => videoEditing.editSettings.updateField('enhancePrompt', val)}
             selections={videoEditing.selections}
             onUpdateSelectionSettings={videoEditing.handleUpdateSelectionSettings}
+            onAddSelection={videoEditing.handleAddSelection}
+            onRemoveSelection={videoEditing.handleRemoveSelection}
+            videoUrl={videoUrl}
+            fps={16}
             availableLoras={videoEditing.availableLoras}
             projectId={projectId}
             loraManager={videoEditing.loraManager}
+            // Motion settings
+            motionMode={(videoEditing.editSettings.settings.motionMode || 'basic') as 'basic' | 'advanced'}
+            onMotionModeChange={(mode) => videoEditing.editSettings.updateField('motionMode', mode)}
+            phaseConfig={videoEditing.editSettings.settings.phaseConfig ?? DEFAULT_VACE_PHASE_CONFIG}
+            onPhaseConfigChange={(config) => videoEditing.editSettings.updateField('phaseConfig', config)}
+            randomSeed={videoEditing.editSettings.settings.randomSeed ?? true}
+            onRandomSeedChange={(val) => videoEditing.editSettings.updateField('randomSeed', val)}
+            selectedPhasePresetId={videoEditing.editSettings.settings.selectedPhasePresetId ?? null}
+            onPhasePresetSelect={(presetId, config) => {
+              videoEditing.editSettings.updateFields({
+                selectedPhasePresetId: presetId,
+                phaseConfig: config,
+              });
+            }}
+            onPhasePresetRemove={() => {
+              videoEditing.editSettings.updateField('selectedPhasePresetId', null);
+            }}
+            // Actions
             onGenerate={videoEditing.handleGenerate}
             isGenerating={videoEditing.isGenerating}
             generateSuccess={videoEditing.generateSuccess}
