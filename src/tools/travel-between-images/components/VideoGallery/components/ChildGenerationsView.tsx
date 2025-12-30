@@ -36,7 +36,6 @@ import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { normalizeSegmentParams } from '@/shared/lib/normalizeSegmentParams';
 import { SegmentRegenerateControls } from '@/shared/components/SegmentRegenerateControls';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
-import { uploadVideoToStorage } from '@/shared/lib/videoUploader';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 
@@ -81,8 +80,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     // State for segment deletion
     const [deletingChildId, setDeletingChildId] = useState<string | null>(null);
     const deleteGeneration = useDeleteGeneration();
-    // State for segment replacement via upload
-    const [replacingChildId, setReplacingChildId] = useState<string | null>(null);
     // State for segment input image uploads: { childId: 'start' | 'end' }
     const [uploadingSegmentImage, setUploadingSegmentImage] = useState<{ childId: string; position: 'start' | 'end' } | null>(null);
     const isMobile = useIsMobile();
@@ -970,71 +967,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         }
     }, [sortedSegments, parentGenerationId, parentGeneration, deleteGeneration, refetch, toast, queryClient]);
 
-    // Handle segment replacement via video upload
-    const handleReplaceSegment = useCallback(async (childId: string, file: File) => {
-        if (!projectId) {
-            toast({
-                title: 'Error',
-                description: 'No project selected',
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        setReplacingChildId(childId);
-        try {
-            console.log('[ChildGenerationsView] Starting video upload for segment:', childId.substring(0, 8));
-
-            // Upload the video
-            const videoUrl = await uploadVideoToStorage(file, projectId, shotIdProp || '', (progress) => {
-                console.log(`[ChildGenerationsView] Upload progress: ${progress}%`);
-            });
-
-            console.log('[ChildGenerationsView] Video uploaded:', videoUrl.substring(0, 50));
-
-            // Update the generation's location with the new URL
-            const { error: updateError } = await supabase
-                .from('generations')
-                .update({ location: videoUrl })
-                .eq('id', childId);
-
-            if (updateError) {
-                throw new Error(`Failed to update generation: ${updateError.message}`);
-            }
-
-            // Also update the primary variant's location
-            const { error: variantError } = await supabase
-                .from('generation_variants')
-                .update({ location: videoUrl })
-                .eq('generation_id', childId)
-                .eq('is_primary', true);
-
-            if (variantError) {
-                console.warn('[ChildGenerationsView] Failed to update variant location:', variantError);
-            }
-
-            // Invalidate caches
-            await invalidateVariantChange(queryClient, {
-                generationId: childId,
-                reason: 'segment-video-replaced',
-            });
-
-            // Refetch to update the UI
-            refetch();
-
-            console.log('[ChildGenerationsView] Segment replaced successfully');
-        } catch (error) {
-            console.error('[ChildGenerationsView] Error replacing segment:', error);
-            toast({
-                title: 'Error',
-                description: error instanceof Error ? error.message : 'Failed to replace segment video',
-                variant: 'destructive',
-            });
-        } finally {
-            setReplacingChildId(null);
-        }
-    }, [projectId, shotIdProp, queryClient, refetch, toast]);
-
     // Handle segment input image upload (start or end)
     const handleSegmentImageUpload = useCallback(async (
         childId: string,
@@ -1643,8 +1575,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                         endImage: images.end,
                                                     });
                                                 }}
-                                                onReplace={handleReplaceSegment}
-                                                isReplacing={replacingChildId === slot.child.id}
                                                 onStartImageUpload={(file) => handleSegmentImageUpload(slot.child.id, 'start', file)}
                                                 onEndImageUpload={(file) => handleSegmentImageUpload(slot.child.id, 'end', file)}
                                                 isUploadingStartImage={uploadingSegmentImage?.childId === slot.child.id && uploadingSegmentImage?.position === 'start'}
@@ -1936,8 +1866,6 @@ interface SegmentCardProps {
     onImageLightboxOpen: (imageIndex: 0 | 1, images: { start: { url: string; generationId?: string } | null; end: { url: string; generationId?: string } | null }) => void;
     projectResolution?: string; // Resolution derived from project's aspect ratio
     aspectRatio?: string; // Aspect ratio string like "16:9" for video player containers
-    onReplace: (childId: string, file: File) => Promise<void>;
-    isReplacing: boolean;
     onStartImageUpload?: (file: File) => Promise<void>;
     onEndImageUpload?: (file: File) => Promise<void>;
     isUploadingStartImage?: boolean;
@@ -1945,20 +1873,8 @@ interface SegmentCardProps {
 }
 
 // Memoized to prevent re-renders when parent state changes (e.g., lightbox index)
-const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, onReplace, isReplacing, onStartImageUpload, onEndImageUpload, isUploadingStartImage, isUploadingEndImage }) => {
+const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, onStartImageUpload, onEndImageUpload, isUploadingStartImage, isUploadingEndImage }) => {
     const isMobile = useIsMobile();
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-    const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && file.type.startsWith('video/')) {
-            await onReplace(child.id, file);
-        }
-        // Reset the input so the same file can be selected again
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    }, [child.id, onReplace]);
 
     // child.params is synced from the primary variant via database trigger
     // (see sync_generation_from_primary_variant in variant sync triggers)
@@ -2083,15 +1999,6 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                         )}
                     </div>
 
-                    {/* Hidden file input for video upload */}
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="video/*"
-                        className="hidden"
-                        onChange={handleFileSelect}
-                    />
-
                     {/* Action buttons - bottom right overlay, appears on hover */}
                     <div className="absolute bottom-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
@@ -2105,22 +2012,6 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                         >
                             <Scissors className="h-3.5 w-3.5" />
                             <span className="text-xs">Trim</span>
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="h-7 px-2 gap-1 bg-black/60 hover:bg-black/80 text-white border-0"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                fileInputRef.current?.click();
-                            }}
-                            disabled={isReplacing}
-                        >
-                            {isReplacing ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                                <Upload className="h-3.5 w-3.5" />
-                            )}
                         </Button>
                         <Button
                             variant="secondary"
