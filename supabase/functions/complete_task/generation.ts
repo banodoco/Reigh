@@ -687,6 +687,19 @@ export async function createGenerationFromTask(
 
     // Find based_on
     let basedOnGenerationId: string | null = extractBasedOn(taskData.params);
+    if (basedOnGenerationId) {
+      // Verify the based_on generation actually exists (FK constraint requires this)
+      const { data: basedOnGen, error: basedOnError } = await supabase
+        .from('generations')
+        .select('id')
+        .eq('id', basedOnGenerationId)
+        .maybeSingle();
+
+      if (basedOnError || !basedOnGen) {
+        console.warn(`[GenMigration] based_on generation ${basedOnGenerationId} not found, clearing reference`);
+        basedOnGenerationId = null;
+      }
+    }
     if (!basedOnGenerationId) {
       const sourceImageUrl = taskData.params?.image;
       if (sourceImageUrl) {

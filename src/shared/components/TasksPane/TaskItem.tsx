@@ -326,6 +326,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         createdAt: task.createdAt || new Date().toISOString(),
         metadata: task.params || {},
         taskId: task.id,
+        // CRITICAL: Set generation_id to the source generation so that magic edit
+        // uses the correct based_on value (generation ID, not task ID)
+        generation_id: sourceGenerationId || undefined,
         // CRITICAL: Set parent_generation_id for variant fetching
         // MediaLightbox will use this to fetch variants from the source image
         parent_generation_id: sourceGenerationId || undefined,
