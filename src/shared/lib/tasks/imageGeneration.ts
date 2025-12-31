@@ -121,6 +121,11 @@ export interface BatchImageGenerationTaskParams {
   in_this_scene_strength?: number; // Strength for "in this scene" LoRA (0.0-2.0)
   steps?: number; // Number of inference steps
   reference_mode?: 'style' | 'subject' | 'style-character' | 'scene' | 'custom'; // Reference mode to filter settings
+  // Two-pass hires fix settings
+  hires_scale?: number; // Upscale factor (e.g., 2.0 = 2x resolution)
+  hires_steps?: number; // Steps for hires/refinement pass
+  hires_denoise?: number; // Denoising strength for hires pass (0-1)
+  additional_loras?: Record<string, string>; // LoRA URL -> "pass1;pass2" strength string
 }
 
 /**
@@ -235,6 +240,13 @@ export async function calculateTaskResolution(
  */
 export async function createImageGenerationTask(params: ImageGenerationTaskParams): Promise<any> {
   console.log("[createImageGenerationTask] Creating task with params:", params);
+  console.log("[createImageGenerationTask] Hires fix params check:", {
+    hires_scale: params.hires_scale,
+    hires_steps: params.hires_steps,
+    hires_denoise: params.hires_denoise,
+    additional_loras: params.additional_loras,
+    steps: params.steps,
+  });
 
   try {
     // 1. Validate parameters
@@ -308,6 +320,14 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       ...(params.shot_id ? { shot_id: params.shot_id } : {}),
       // Make new image generations unpositioned by default
       add_in_position: false,
+      // Two-pass hires fix settings
+      ...(params.hires_scale !== undefined && { hires_scale: params.hires_scale }),
+      ...(params.hires_steps !== undefined && { hires_steps: params.hires_steps }),
+      ...(params.hires_denoise !== undefined && { hires_denoise: params.hires_denoise }),
+      // Per-phase LoRA strengths for hires fix (overrides additional_loras if provided)
+      ...(params.additional_loras && Object.keys(params.additional_loras).length > 0 && {
+        additional_loras: params.additional_loras
+      }),
     };
     
     console.log("[createImageGenerationTask] Sending clean params to backend:", JSON.stringify(taskParamsToSend, null, 2));
@@ -338,6 +358,13 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
  */
 export async function createBatchImageGenerationTasks(params: BatchImageGenerationTaskParams): Promise<any[]> {
   console.log("[createBatchImageGenerationTasks] Creating batch tasks with params:", params);
+  console.log("[createBatchImageGenerationTasks] Hires fix params check:", {
+    hires_scale: params.hires_scale,
+    hires_steps: params.hires_steps,
+    hires_denoise: params.hires_denoise,
+    additional_loras: params.additional_loras,
+    steps: params.steps,
+  });
 
   try {
     // 1. Validate parameters
@@ -382,7 +409,12 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
               subject_reference_image: params.subject_reference_image || params.style_reference_image,
               ...filteredSettings
             };
-          })())
+          })()),
+          // Two-pass hires fix settings
+          ...(params.hires_scale !== undefined && { hires_scale: params.hires_scale }),
+          ...(params.hires_steps !== undefined && { hires_steps: params.hires_steps }),
+          ...(params.hires_denoise !== undefined && { hires_denoise: params.hires_denoise }),
+          ...(params.additional_loras && { additional_loras: params.additional_loras }),
         } as ImageGenerationTaskParams;
       });
     });

@@ -48,7 +48,9 @@ export interface PersistedFormSettings {
   selectedLorasByMode?: Record<GenerationMode, ActiveLora[]>;
   associatedShotId?: string | null;
   promptMode?: PromptMode;
-  
+  /** Two-pass hires fix configuration for local generation */
+  hiresFixConfig?: HiresFixConfig;
+
   // DEPRECATED: Legacy shot-specific storage (replaced by ImageGenShotSettings)
   // Kept for migration - will be removed after all users migrate
   promptsByShot?: Record<string, PromptEntry[]>;
@@ -181,5 +183,55 @@ export interface PromptInputRowProps {
 // Re-export ActiveLora from shared component
 export type { ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
 
-// Re-export DisplayableMetadata from shared component  
+// Re-export DisplayableMetadata from shared component
 export type { DisplayableMetadata } from "@/shared/components/ImageGallery";
+
+// ============================================================================
+// Hires Fix / Two-Pass Generation Settings
+// ============================================================================
+
+/**
+ * Per-LoRA phase strength override for two-pass hires fix generation.
+ * Allows different LoRA strengths for the initial pass vs the upscaling pass.
+ */
+export interface PhaseLoraStrength {
+  /** References ActiveLora.id for syncing with base LoRA selection */
+  loraId: string;
+  /** LoRA file URL for task payload */
+  loraPath: string;
+  /** Display name */
+  loraName: string;
+  /** Strength for initial pass (0-2) */
+  pass1Strength: number;
+  /** Strength for upscaling/hires pass (0-2) */
+  pass2Strength: number;
+}
+
+/**
+ * Configuration for two-pass hires fix image generation.
+ * When enabled, generates at base resolution then upscales with refinement.
+ */
+export interface HiresFixConfig {
+  /** Whether hires fix is enabled */
+  enabled: boolean;
+  /** Number of inference steps for base pass (default 6) */
+  baseSteps: number;
+  /** Upscale factor for hires pass (e.g., 2.0 = 2x resolution) */
+  hiresScale: number;
+  /** Number of steps for hires/refinement pass (default 6) */
+  hiresSteps: number;
+  /** Denoising strength for hires pass (0-1, default 0.5) */
+  hiresDenoise: number;
+  /** Per-LoRA phase strength overrides */
+  phaseLoraStrengths: PhaseLoraStrength[];
+}
+
+/** Default hires fix configuration */
+export const DEFAULT_HIRES_FIX_CONFIG: HiresFixConfig = {
+  enabled: true,
+  baseSteps: 6,
+  hiresScale: 2.0,
+  hiresSteps: 6,
+  hiresDenoise: 0.5,
+  phaseLoraStrengths: [],
+};

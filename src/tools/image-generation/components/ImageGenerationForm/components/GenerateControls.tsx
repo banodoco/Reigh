@@ -12,10 +12,6 @@ interface GenerateControlsProps {
   isGenerating: boolean;
   hasApiKey: boolean;
   justQueued: boolean;
-  // Steps props for local generation
-  steps?: number;
-  onChangeSteps?: (value: number) => void;
-  showStepsDropdown?: boolean;
   // Prompt mode for slider label
   promptMode: PromptMode;
   // Automated mode with existing prompts
@@ -33,9 +29,6 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
   isGenerating,
   hasApiKey,
   justQueued,
-  steps = 12,
-  onChangeSteps,
-  showStepsDropdown = false,
   promptMode,
   onUseExistingPrompts,
   onNewPromptsLikeExisting,
@@ -43,110 +36,48 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
   onChangePromptMultiplier,
 }) => {
   // Normalize promptMode to handle invalid/empty values from persistence
-  const normalizedPromptMode: PromptMode = 
+  const normalizedPromptMode: PromptMode =
     (promptMode === 'automated' || promptMode === 'managed') ? promptMode : 'automated';
-    
+
   const showExistingPromptButtons = normalizedPromptMode === 'automated' && actionablePromptsCount > 0;
   return (
     <div className="flex flex-col items-center gap-2">
       {/* Slider row - compact inline with button */}
       <div className="w-full max-w-md">
-        {showStepsDropdown ? (
-          // Show both images slider and steps dropdown side by side
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <SliderWithValue
-                label={normalizedPromptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
-                value={imagesPerPrompt}
-                onChange={onChangeImagesPerPrompt}
-                min={1}
-                max={32}
-                step={1}
-                disabled={!hasApiKey || isGenerating}
-              />
-            </div>
-            {normalizedPromptMode === 'automated' && (
-              <div className="w-14 flex-shrink-0">
-                <Select
-                  value={promptMultiplier.toString()}
-                  onValueChange={(value) => onChangePromptMultiplier?.(parseInt(value, 10))}
-                  disabled={!hasApiKey || isGenerating}
-                >
-                  <SelectTrigger variant="retro" className="h-9">
-                    <span className="text-muted-foreground">×</span>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent variant="retro">
-                    <SelectItem variant="retro" value="1">1</SelectItem>
-                    <SelectItem variant="retro" value="2">2</SelectItem>
-                    <SelectItem variant="retro" value="3">3</SelectItem>
-                    <SelectItem variant="retro" value="4">4</SelectItem>
-                    <SelectItem variant="retro" value="5">5</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="w-24">
-              <label className="block text-xs font-medium text-foreground mb-1">
-                Steps
-              </label>
+        <div className="flex gap-2 items-end">
+          <div className="flex-1">
+            <SliderWithValue
+              label={normalizedPromptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
+              value={imagesPerPrompt}
+              onChange={onChangeImagesPerPrompt}
+              min={1}
+              max={32}
+              step={1}
+              disabled={!hasApiKey || isGenerating}
+            />
+          </div>
+          {normalizedPromptMode === 'automated' && (
+            <div className="w-14 flex-shrink-0">
               <Select
-                value={steps.toString()}
-                onValueChange={(value) => onChangeSteps?.(parseInt(value, 10))}
+                value={promptMultiplier.toString()}
+                onValueChange={(value) => onChangePromptMultiplier?.(parseInt(value, 10))}
                 disabled={!hasApiKey || isGenerating}
               >
                 <SelectTrigger variant="retro" className="h-9">
+                  <span className="text-muted-foreground">×</span>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent variant="retro">
-                  <SelectItem variant="retro" value="8">8</SelectItem>
-                  <SelectItem variant="retro" value="12">12</SelectItem>
-                  <SelectItem variant="retro" value="16">16</SelectItem>
-                  <SelectItem variant="retro" value="20">20</SelectItem>
-                  <SelectItem variant="retro" value="24">24</SelectItem>
-                  <SelectItem variant="retro" value="28">28</SelectItem>
-                  <SelectItem variant="retro" value="32">32</SelectItem>
+                  <SelectItem variant="retro" value="1">1</SelectItem>
+                  <SelectItem variant="retro" value="2">2</SelectItem>
+                  <SelectItem variant="retro" value="3">3</SelectItem>
+                  <SelectItem variant="retro" value="4">4</SelectItem>
+                  <SelectItem variant="retro" value="5">5</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
-        ) : (
-          // Show slider (and multiplier in automated mode)
-          <div className="flex gap-2 items-end">
-            <div className="flex-1">
-              <SliderWithValue
-                label={normalizedPromptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
-                value={imagesPerPrompt}
-                onChange={onChangeImagesPerPrompt}
-                min={1}
-                max={32}
-                step={1}
-                disabled={!hasApiKey || isGenerating}
-              />
-            </div>
-            {normalizedPromptMode === 'automated' && (
-              <div className="w-14 flex-shrink-0">
-                <Select
-                  value={promptMultiplier.toString()}
-                  onValueChange={(value) => onChangePromptMultiplier?.(parseInt(value, 10))}
-                  disabled={!hasApiKey || isGenerating}
-                >
-                  <SelectTrigger variant="retro" className="h-9">
-                    <span className="text-muted-foreground">×</span>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent variant="retro">
-                    <SelectItem variant="retro" value="1">1</SelectItem>
-                    <SelectItem variant="retro" value="2">2</SelectItem>
-                    <SelectItem variant="retro" value="3">3</SelectItem>
-                    <SelectItem variant="retro" value="4">4</SelectItem>
-                    <SelectItem variant="retro" value="5">5</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <Button

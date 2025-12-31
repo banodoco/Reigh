@@ -1568,13 +1568,13 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
 
                 {/* Total Steps Display */}
                 <div className="text-sm text-muted-foreground pt-3 mt-3 border-t">
-                  Total Steps: {editablePhaseConfig.steps_per_phase.reduce((a, b) => a + b, 0)}
+                  Total Steps: {(editablePhaseConfig.steps_per_phase || []).reduce((a, b) => a + b, 0)}
                 </div>
               </CardContent>
             </Card>
 
             {/* Per-Phase Settings */}
-            {editablePhaseConfig.phases.map((phase, phaseIdx) => (
+            {(editablePhaseConfig.phases || []).map((phase, phaseIdx) => (
               <Card key={phaseIdx} className="bg-muted/30">
                 <CardContent className="pt-4 px-4 pb-4">
                   <p className="text-xs font-medium text-muted-foreground mb-3">
@@ -1587,15 +1587,15 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                       {/* Steps */}
                       <div className="space-y-1.5">
                         <Label className="text-sm font-light">
-                          Steps: {editablePhaseConfig.steps_per_phase[phaseIdx]}
+                          Steps: {(editablePhaseConfig.steps_per_phase || [])[phaseIdx] ?? 2}
                         </Label>
                         <Slider
                           min={1}
                           max={15}
                           step={1}
-                          value={[editablePhaseConfig.steps_per_phase[phaseIdx]]}
+                          value={[(editablePhaseConfig.steps_per_phase || [])[phaseIdx] ?? 2]}
                           onValueChange={(value) => {
-                            const newSteps = [...editablePhaseConfig.steps_per_phase];
+                            const newSteps = [...(editablePhaseConfig.steps_per_phase || [])];
                             newSteps[phaseIdx] = value[0];
                             setEditablePhaseConfig({
                               ...editablePhaseConfig,
