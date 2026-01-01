@@ -22,19 +22,44 @@ interface ShotsProviderProps {
 export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
-  
+
   const { selectedProjectId } = useProject();
+
+  // Track previous project ID to detect project switches
+  const prevProjectIdRef = React.useRef<string | null>(null);
+  const [isProjectTransitioning, setIsProjectTransitioning] = React.useState(false);
+
+  // Detect project switch and set transitioning state
+  React.useEffect(() => {
+    if (prevProjectIdRef.current !== null && prevProjectIdRef.current !== selectedProjectId) {
+      console.log('[ShotsContext] Project switch detected, showing skeleton loader', {
+        from: prevProjectIdRef.current,
+        to: selectedProjectId
+      });
+      setIsProjectTransitioning(true);
+    }
+    prevProjectIdRef.current = selectedProjectId;
+  }, [selectedProjectId]);
 
   // Load all images per shot (0 = unlimited)
   // Previously limited to 2 on mobile for performance, but this broke expand/collapse UI
   const maxImagesPerShot = 0;
 
   const { data: shots, isLoading: isShotsLoading, error: shotsError, refetch } = useListShots(selectedProjectId, { maxImagesPerShot });
-  
+
   // Load project-wide image stats
   const { data: projectStats, isLoading: isStatsLoading } = useProjectImageStats(selectedProjectId);
 
-  const isLoading = isShotsLoading || isStatsLoading;
+  // Clear transitioning state when new shots data arrives
+  React.useEffect(() => {
+    if (isProjectTransitioning && !isShotsLoading && shots !== undefined) {
+      console.log('[ShotsContext] New project data loaded, clearing transition state');
+      setIsProjectTransitioning(false);
+    }
+  }, [isProjectTransitioning, isShotsLoading, shots]);
+
+  // Show loading during transition or actual loading
+  const isLoading = isShotsLoading || isStatsLoading || isProjectTransitioning;
   const error = shotsError;
 
   // [ShotReorderDebug] Log shots context data changes
