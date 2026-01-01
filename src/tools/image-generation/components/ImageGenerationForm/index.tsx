@@ -1206,6 +1206,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         const newText = typeof newTextOrUpdater === 'function' ? newTextOrUpdater(prev) : newTextOrUpdater;
         return newText;
       });
+      markAsInteracted();
     }
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
   
