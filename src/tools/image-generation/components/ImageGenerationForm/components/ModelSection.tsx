@@ -191,11 +191,22 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   // Pagination state
   const [currentPage, setCurrentPage] = React.useState(0);
 
-  // Calculate pagination - reverse so newest are on page 1
-  const reversedRefs = [...references].reverse();
-  const totalPages = Math.ceil(reversedRefs.length / REFS_PER_PAGE);
+  // Calculate pagination - sort by createdAt descending so newest are on page 1 (stable ordering)
+  const sortedRefs = React.useMemo(() =>
+    [...references].sort((a, b) => {
+      // Sort by createdAt descending (newest first)
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    }),
+    [references]
+  );
+  const totalPages = Math.ceil(sortedRefs.length / REFS_PER_PAGE);
   const startIdx = currentPage * REFS_PER_PAGE;
-  const visibleReferences = reversedRefs.slice(startIdx, startIdx + REFS_PER_PAGE);
+  const visibleReferences = React.useMemo(
+    () => sortedRefs.slice(startIdx, startIdx + REFS_PER_PAGE),
+    [sortedRefs, startIdx]
+  );
 
   // Reset to last valid page if references are removed
   React.useEffect(() => {
