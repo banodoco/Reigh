@@ -56,6 +56,10 @@ import {
   ImageGenShotSettings,
   HiresFixConfig,
   DEFAULT_HIRES_FIX_CONFIG,
+  GenerationSource,
+  TextToImageModel,
+  getLoraTypeForModel,
+  BY_REFERENCE_LORA_TYPE,
 } from "./types";
 
 // Lazy load modals to improve initial bundle size and performance
@@ -273,6 +277,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [referenceMode, setReferenceMode] = useState<ReferenceMode>('custom');
   const [styleBoostTerms, setStyleBoostTerms] = useState<string>('');
   const pendingReferenceModeUpdate = useRef<ReferenceMode | null>(null);
+  // Generation source toggle: by-reference or just-text
+  const [generationSource, setGenerationSource] = useState<GenerationSource>('by-reference');
+  const [selectedTextModel, setSelectedTextModel] = useState<TextToImageModel>('qwen-image');
   const [isUploadingStyleReference, setIsUploadingStyleReference] = useState<boolean>(false);
   // Optimistic local override for style reference image so UI updates immediately
   // undefined => no override, use settings; string|null => explicit override
@@ -2994,6 +3001,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             // Loading state - show placeholders while hydrating
             isLoadingReferenceData={isReferenceDataLoading}
             referenceCount={referenceCount}
+            // Generation source toggle props (cloud mode only)
+            generationSource={generationSource}
+            onGenerationSourceChange={!isLocalGenerationEnabled ? setGenerationSource : undefined}
+            // Just-text mode props
+            selectedTextModel={selectedTextModel}
+            onTextModelChange={setSelectedTextModel}
+            selectedLoras={loraManager.selectedLoras}
+            onOpenLoraModal={() => loraManager.setIsLoraModalOpen(true)}
+            onRemoveLora={(loraId) => loraManager.setSelectedLoras(loraManager.selectedLoras.filter(l => l.id !== loraId))}
+            onUpdateLoraStrength={(loraId, strength) => loraManager.setSelectedLoras(
+              loraManager.selectedLoras.map(l => l.id === loraId ? { ...l, strength } : l)
+            )}
           />
         </div>
 
@@ -3046,7 +3065,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               strength: lora.strength,
             } as LoraModel & { strength: number };
           })}
-          lora_type={"Wan 2.1 14b"}
+          lora_type={generationSource === 'just-text' ? getLoraTypeForModel(selectedTextModel) : BY_REFERENCE_LORA_TYPE}
         />
       </Suspense>
         

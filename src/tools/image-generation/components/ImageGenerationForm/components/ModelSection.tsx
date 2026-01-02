@@ -4,14 +4,113 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
-import { Trash2, Images, Plus, X, Upload, Search, Globe, Lock } from "lucide-react";
+import { Trash2, Images, Plus, X, Upload, Search, Globe, Lock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import FileInput from "@/shared/components/FileInput";
 import { SectionHeader } from "./SectionHeader";
 import { DatasetBrowserModal } from "@/shared/components/DatasetBrowserModal";
 import { cn } from "@/shared/lib/utils";
-import { HydratedReferenceImage, ReferenceMode } from "../types";
+import { HydratedReferenceImage, ReferenceMode, GenerationSource, TextToImageModel, TEXT_TO_IMAGE_MODELS } from "../types";
 import { Resource } from "@/shared/hooks/useResources";
+import { ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
+import { LoraModel } from "@/shared/components/LoraSelectorModal";
+import { Slider } from "@/shared/components/ui/slider";
+
+// Reusable LoRA Grid component (no pagination)
+interface LoraGridProps {
+  selectedLoras: ActiveLora[];
+  onOpenLoraModal: () => void;
+  onRemoveLora: (loraId: string) => void;
+  onUpdateLoraStrength: (loraId: string, strength: number) => void;
+  isGenerating: boolean;
+}
+
+const LoraGrid: React.FC<LoraGridProps> = ({
+  selectedLoras,
+  onOpenLoraModal,
+  onRemoveLora,
+  onUpdateLoraStrength,
+  isGenerating,
+}) => {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">LoRAs {selectedLoras.length > 0 && `(${selectedLoras.length})`}</Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onOpenLoraModal}
+          disabled={isGenerating}
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Add LoRA
+        </Button>
+      </div>
+
+      {selectedLoras.length > 0 ? (
+        <div className="grid grid-cols-4 gap-2">
+          {selectedLoras.map((lora) => (
+            <div
+              key={lora.id}
+              className="relative group rounded-lg border bg-muted/30 overflow-hidden"
+            >
+              {/* Thumbnail */}
+              <div className="aspect-square relative">
+                {lora.previewImageUrl ? (
+                  <img
+                    src={lora.previewImageUrl}
+                    alt={lora.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                    <Images className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
+
+                {/* Remove button overlay */}
+                <button
+                  type="button"
+                  onClick={() => onRemoveLora(lora.id)}
+                  disabled={isGenerating}
+                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+
+              {/* Name and strength */}
+              <div className="p-1.5 space-y-1">
+                <p className="text-[10px] font-medium truncate" title={lora.name}>
+                  {lora.name}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Slider
+                    value={[lora.strength]}
+                    onValueChange={(value) => onUpdateLoraStrength(lora.id, value[0])}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    disabled={isGenerating}
+                    className="flex-1"
+                  />
+                  <span className="text-[9px] text-muted-foreground w-6 text-right">
+                    {lora.strength.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground italic">
+          No LoRAs selected. Add LoRAs to customize the generation style.
+        </p>
+      )}
+    </div>
+  );
+};
 
 interface ModelSectionProps {
   isGenerating: boolean;
@@ -39,6 +138,16 @@ interface ModelSectionProps {
   onUpdateReferenceName?: (id: string, name: string) => void;
   onResourceSelect?: (resource: Resource) => void;
   onToggleVisibility?: (resourceId: string, currentIsPublic: boolean) => void;
+  // Generation source toggle
+  generationSource?: GenerationSource;
+  onGenerationSourceChange?: (source: GenerationSource) => void;
+  // Just-text mode props
+  selectedTextModel?: TextToImageModel;
+  onTextModelChange?: (model: TextToImageModel) => void;
+  selectedLoras?: ActiveLora[];
+  onOpenLoraModal?: () => void;
+  onRemoveLora?: (loraId: string) => void;
+  onUpdateLoraStrength?: (loraId: string, strength: number) => void;
 }
 
 // ReferenceSelector Component - shows thumbnail gallery of references
@@ -56,6 +165,8 @@ interface ReferenceSelectorProps {
   isLoadingReferenceData?: boolean;
   referenceCount?: number; // Number of references from cache (for skeleton)
 }
+
+const REFS_PER_PAGE = 15; // 16 slots total, 1 for add button = 15 refs per page
 
 const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   references,
@@ -77,6 +188,21 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   const [touchedRef, setTouchedRef] = React.useState<string | null>(null);
   // Track touch start position to distinguish taps from scrolls/drags
   const touchStartPos = React.useRef<{ x: number; y: number; refId: string } | null>(null);
+  // Pagination state
+  const [currentPage, setCurrentPage] = React.useState(0);
+
+  // Calculate pagination - reverse so newest are on page 1
+  const reversedRefs = [...references].reverse();
+  const totalPages = Math.ceil(reversedRefs.length / REFS_PER_PAGE);
+  const startIdx = currentPage * REFS_PER_PAGE;
+  const visibleReferences = reversedRefs.slice(startIdx, startIdx + REFS_PER_PAGE);
+
+  // Reset to last valid page if references are removed
+  React.useEffect(() => {
+    if (currentPage >= totalPages && totalPages > 0) {
+      setCurrentPage(totalPages - 1);
+    }
+  }, [references.length, currentPage, totalPages]);
   
   const handleImageLoad = React.useCallback((refId: string) => {
     setLoadedImages(prev => new Set(prev).add(refId));
@@ -234,7 +360,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
         {(() => {
           // If we have NO refs yet, show all skeletons
           if (references.length === 0 && (referenceCount > 0 || isLoadingReferenceData)) {
-            const skeletonCount = Math.max(referenceCount, 1);
+            const skeletonCount = Math.min(Math.max(referenceCount, 1), REFS_PER_PAGE);
             console.log('[GridDebug] 💀 All skeletons:', skeletonCount);
             return Array.from({ length: skeletonCount }).map((_, idx) => (
               <div
@@ -248,16 +374,13 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
             ));
           }
 
-          // We have SOME refs - render them in REVERSE ORDER (newest first) + placeholder skeletons for remaining
+          // We have SOME refs - render them (already reversed at pagination level) + placeholder skeletons for remaining
           const remainingSkeletons = Math.max(0, referenceCount - references.length);
-          console.log('[GridDebug] 🖼️ Rendering', references.length, 'refs +', remainingSkeletons, 'skeletons');
-
-          // Reverse the references array so newest appears first
-          const reversedReferences = [...references].reverse();
+          console.log('[GridDebug] 🖼️ Rendering', visibleReferences.length, 'refs (page', currentPage + 1, 'of', totalPages, ') +', remainingSkeletons, 'skeletons');
 
           return (
             <>
-              {reversedReferences.map(ref => {
+              {visibleReferences.map(ref => {
             const isSelected = selectedReferenceId === ref.id;
             // Use thumbnail for grid display, fallback to original or processed
             const imageUrl = ref.thumbnailUrl || ref.styleReferenceImageOriginal || ref.styleReferenceImage;
@@ -450,6 +573,35 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
           );
         })()}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+            disabled={currentPage === 0 || isGenerating}
+            className="h-7 w-7 p-0"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {currentPage + 1} / {totalPages}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={currentPage >= totalPages - 1 || isGenerating}
+            className="h-7 w-7 p-0"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
@@ -487,6 +639,11 @@ const StyleReferenceSection: React.FC<{
   // Loading state props
   isLoadingReferenceData?: boolean;
   referenceCount?: number;
+  // LoRA props
+  selectedLoras?: ActiveLora[];
+  onOpenLoraModal?: () => void;
+  onRemoveLora?: (loraId: string) => void;
+  onUpdateLoraStrength?: (loraId: string, strength: number) => void;
 }> = ({
   styleReferenceImage,
   styleReferenceStrength,
@@ -518,6 +675,11 @@ const StyleReferenceSection: React.FC<{
   onToggleVisibility,
   isLoadingReferenceData = false,
   referenceCount = 0,
+  // LoRA props
+  selectedLoras = [],
+  onOpenLoraModal,
+  onRemoveLora,
+  onUpdateLoraStrength,
 }) => {
   const [imageLoaded, setImageLoaded] = React.useState(false);
   const [imageError, setImageError] = React.useState(false);
@@ -912,7 +1074,18 @@ const StyleReferenceSection: React.FC<{
     </div>
     )}
     {/* End legacy single reference section */}
-    
+
+    {/* LoRA Grid - shown in by-reference mode */}
+    {onOpenLoraModal && onRemoveLora && onUpdateLoraStrength && (
+      <LoraGrid
+        selectedLoras={selectedLoras}
+        onOpenLoraModal={onOpenLoraModal}
+        onRemoveLora={onRemoveLora}
+        onUpdateLoraStrength={onUpdateLoraStrength}
+        isGenerating={isGenerating}
+      />
+    )}
+
     {/* Dataset Browser Modal */}
     <DatasetBrowserModal
       isOpen={showDatasetBrowser}
@@ -920,6 +1093,62 @@ const StyleReferenceSection: React.FC<{
       onResourceSelect={onResourceSelect}
     />
   </div>
+  );
+};
+
+// Component for "Just Text" mode - model selector and LoRAs
+const JustTextSection: React.FC<{
+  isGenerating: boolean;
+  selectedTextModel: TextToImageModel;
+  onTextModelChange: (model: TextToImageModel) => void;
+  selectedLoras: ActiveLora[];
+  onOpenLoraModal: () => void;
+  onRemoveLora: (loraId: string) => void;
+  onUpdateLoraStrength: (loraId: string, strength: number) => void;
+}> = ({
+  isGenerating,
+  selectedTextModel,
+  onTextModelChange,
+  selectedLoras,
+  onOpenLoraModal,
+  onRemoveLora,
+  onUpdateLoraStrength,
+}) => {
+  return (
+    <div className="space-y-4">
+      {/* Model Selector */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Model</Label>
+        <RadioGroup
+          value={selectedTextModel}
+          onValueChange={(value) => onTextModelChange(value as TextToImageModel)}
+          className="flex flex-wrap gap-3"
+          disabled={isGenerating}
+        >
+          {TEXT_TO_IMAGE_MODELS.map((model) => (
+            <div key={model.id} className="flex items-center space-x-2">
+              <RadioGroupItem value={model.id} id={`model-${model.id}`} />
+              <Label
+                htmlFor={`model-${model.id}`}
+                className="cursor-pointer font-normal"
+                title={model.description}
+              >
+                {model.name}
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
+      </div>
+
+      {/* LoRA Grid */}
+      <LoraGrid
+        selectedLoras={selectedLoras}
+        onOpenLoraModal={onOpenLoraModal}
+        onRemoveLora={onRemoveLora}
+        onUpdateLoraStrength={onUpdateLoraStrength}
+        isGenerating={isGenerating}
+      />
+    </div>
   );
 };
 
@@ -961,42 +1190,102 @@ export const ModelSection: React.FC<ModelSectionProps & {
   onToggleVisibility,
   isLoadingReferenceData,
   referenceCount,
+  // Generation source props
+  generationSource = 'by-reference',
+  onGenerationSourceChange,
+  selectedTextModel = 'flux-dev',
+  onTextModelChange,
+  selectedLoras = [],
+  onOpenLoraModal,
+  onRemoveLora,
+  onUpdateLoraStrength,
 }) => {
   return (
-    <div className="flex-1">
-      {/* Always show Style Reference Section (defaulting to qwen-image model) */}
-      <StyleReferenceSection
-        styleReferenceImage={styleReferenceImage}
-        styleReferenceStrength={styleReferenceStrength}
-        subjectStrength={subjectStrength}
-        subjectDescription={subjectDescription}
-        inThisScene={inThisScene}
-        inThisSceneStrength={inThisSceneStrength}
-        isUploadingStyleReference={isUploadingStyleReference}
-        isGenerating={isGenerating}
-        onStyleUpload={onStyleUpload}
-        onStyleRemove={onStyleRemove}
-        onStyleStrengthChange={onStyleStrengthChange}
-        onSubjectStrengthChange={onSubjectStrengthChange}
-        onSubjectDescriptionChange={onSubjectDescriptionChange}
-        onSubjectDescriptionFocus={onSubjectDescriptionFocus}
-        onSubjectDescriptionBlur={onSubjectDescriptionBlur}
-        onInThisSceneChange={onInThisSceneChange}
-        onInThisSceneStrengthChange={onInThisSceneStrengthChange}
-        referenceMode={referenceMode}
-        onReferenceModeChange={onReferenceModeChange}
-        styleBoostTerms={styleBoostTerms}
-        onStyleBoostTermsChange={onStyleBoostTermsChange}
-        references={references}
-        selectedReferenceId={selectedReferenceId}
-        onSelectReference={onSelectReference}
-        onDeleteReference={onDeleteReference}
-        onUpdateReferenceName={onUpdateReferenceName}
-        onResourceSelect={onResourceSelect}
-        onToggleVisibility={onToggleVisibility}
-        isLoadingReferenceData={isLoadingReferenceData}
-        referenceCount={referenceCount}
-      />
+    <div className="flex-1 space-y-4">
+      {/* Generation Source Toggle */}
+      {onGenerationSourceChange && (
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
+          <button
+            type="button"
+            onClick={() => onGenerationSourceChange('by-reference')}
+            className={cn(
+              "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
+              generationSource === 'by-reference'
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            disabled={isGenerating}
+          >
+            By reference
+          </button>
+          <button
+            type="button"
+            onClick={() => onGenerationSourceChange('just-text')}
+            className={cn(
+              "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
+              generationSource === 'just-text'
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            disabled={isGenerating}
+          >
+            Just text
+          </button>
+        </div>
+      )}
+
+      {/* Conditional content based on generation source */}
+      {generationSource === 'by-reference' ? (
+        <StyleReferenceSection
+          styleReferenceImage={styleReferenceImage}
+          styleReferenceStrength={styleReferenceStrength}
+          subjectStrength={subjectStrength}
+          subjectDescription={subjectDescription}
+          inThisScene={inThisScene}
+          inThisSceneStrength={inThisSceneStrength}
+          isUploadingStyleReference={isUploadingStyleReference}
+          isGenerating={isGenerating}
+          onStyleUpload={onStyleUpload}
+          onStyleRemove={onStyleRemove}
+          onStyleStrengthChange={onStyleStrengthChange}
+          onSubjectStrengthChange={onSubjectStrengthChange}
+          onSubjectDescriptionChange={onSubjectDescriptionChange}
+          onSubjectDescriptionFocus={onSubjectDescriptionFocus}
+          onSubjectDescriptionBlur={onSubjectDescriptionBlur}
+          onInThisSceneChange={onInThisSceneChange}
+          onInThisSceneStrengthChange={onInThisSceneStrengthChange}
+          referenceMode={referenceMode}
+          onReferenceModeChange={onReferenceModeChange}
+          styleBoostTerms={styleBoostTerms}
+          onStyleBoostTermsChange={onStyleBoostTermsChange}
+          references={references}
+          selectedReferenceId={selectedReferenceId}
+          onSelectReference={onSelectReference}
+          onDeleteReference={onDeleteReference}
+          onUpdateReferenceName={onUpdateReferenceName}
+          onResourceSelect={onResourceSelect}
+          onToggleVisibility={onToggleVisibility}
+          isLoadingReferenceData={isLoadingReferenceData}
+          referenceCount={referenceCount}
+          // LoRA props
+          selectedLoras={selectedLoras}
+          onOpenLoraModal={onOpenLoraModal}
+          onRemoveLora={onRemoveLora}
+          onUpdateLoraStrength={onUpdateLoraStrength}
+        />
+      ) : (
+        onTextModelChange && onOpenLoraModal && onRemoveLora && onUpdateLoraStrength && (
+          <JustTextSection
+            isGenerating={isGenerating}
+            selectedTextModel={selectedTextModel}
+            onTextModelChange={onTextModelChange}
+            selectedLoras={selectedLoras}
+            onOpenLoraModal={onOpenLoraModal}
+            onRemoveLora={onRemoveLora}
+            onUpdateLoraStrength={onUpdateLoraStrength}
+          />
+        )
+      )}
     </div>
   );
 };

@@ -20,11 +20,70 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/shared/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
-import { Info, X, Pencil, Trash2 } from 'lucide-react';
+import { Info, X, Pencil, Trash2, Search } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { Slider } from "@/shared/components/ui/slider";
 import { supabase } from '@/integrations/supabase/client';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+
+// Model filter categories - broad matching
+type ModelFilterCategory = 'all' | 'qwen' | 'wan' | 'z-image';
+
+// Map a specific lora_type to its broad filter category
+function getFilterCategory(loraType: string | undefined): ModelFilterCategory {
+  if (!loraType) return 'all';
+  const lower = loraType.toLowerCase();
+  if (lower.includes('qwen')) return 'qwen';
+  if (lower.includes('wan')) return 'wan';
+  if (lower.includes('z-image') || lower === 'z-image') return 'z-image';
+  return 'all';
+}
+
+// Check if a lora matches a filter category
+function matchesFilterCategory(loraType: string | undefined, filter: ModelFilterCategory): boolean {
+  if (filter === 'all') return true;
+  if (!loraType) return false;
+  const lower = loraType.toLowerCase();
+  switch (filter) {
+    case 'qwen': return lower.includes('qwen');
+    case 'wan': return lower.includes('wan');
+    case 'z-image': return lower.includes('z-image') || lower === 'z-image';
+    default: return true;
+  }
+}
+
+// Get sub-filter options for a category
+function getSubFilterOptions(category: ModelFilterCategory): { value: string; label: string }[] {
+  switch (category) {
+    case 'qwen':
+      return [
+        { value: 'all', label: 'All' },
+        { value: 'Qwen Image', label: 'Qwen Image' },
+        { value: 'Qwen Image 2512', label: 'Qwen Image 2512' },
+      ];
+    case 'wan':
+      return [
+        { value: 'all', label: 'All' },
+        { value: 'Wan 2.1 14b', label: 'Wan 2.1 14b' },
+      ];
+    case 'z-image':
+      return [
+        { value: 'all', label: 'All' },
+        { value: 'Z-Image', label: 'Z-Image' },
+      ];
+    default:
+      return [];
+  }
+}
+
+// Check if a lora matches both category and sub-filter
+function matchesFilters(loraType: string | undefined, category: ModelFilterCategory, subFilter: string): boolean {
+  // First check category
+  if (!matchesFilterCategory(loraType, category)) return false;
+  // Then check sub-filter (if not 'all')
+  if (subFilter === 'all') return true;
+  return loraType === subFilter;
+}
 
 // Description Modal Component
 const DescriptionModal: React.FC<{
@@ -127,21 +186,25 @@ interface CommunityLorasTabProps {
   onPageChange?: (page: number, totalPages: number, setPage: (page: number) => void) => void;
 }
 
-const CommunityLorasTab: React.FC<CommunityLorasTabProps & { 
+const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
   onClose: () => void;
   showMyLorasOnly: boolean;
   setShowMyLorasOnly: (value: boolean) => void;
   showAddedLorasOnly: boolean;
   setShowAddedLorasOnly: (value: boolean) => void;
   onProcessedLorasLengthChange: (length: number) => void;
-}> = ({ 
-  loras, 
-  onAddLora, 
-  onRemoveLora, 
+  selectedModelFilter: ModelFilterCategory;
+  setSelectedModelFilter: (value: ModelFilterCategory) => void;
+  selectedSubFilter: string;
+  setSelectedSubFilter: (value: string) => void;
+}> = ({
+  loras,
+  onAddLora,
+  onRemoveLora,
   onUpdateLoraStrength,
   selectedLoras,
-  lora_type, 
-  myLorasResource, 
+  lora_type,
+  myLorasResource,
   createResource,
   updateResource,
   deleteResource,
@@ -152,7 +215,11 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
   showAddedLorasOnly,
   setShowAddedLorasOnly,
   onProcessedLorasLengthChange,
-  onPageChange
+  onPageChange,
+  selectedModelFilter,
+  setSelectedModelFilter,
+  selectedSubFilter,
+  setSelectedSubFilter,
 }) => {
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
@@ -196,13 +263,15 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
 
   // Combine all LoRAs (community + saved + local)
   const allLoras = useMemo(() => {
-    const communityLoras = loras.filter(l => l.lora_type === lora_type);
+    // Filter by selected model filter category and sub-filter
+    const filterByModel = (l: LoraModel) => matchesFilters(l.lora_type, selectedModelFilter, selectedSubFilter);
+    const communityLoras = loras.filter(filterByModel);
     const savedLoras = myLorasResource.data?.map(r => ({
       ...(r.metadata as LoraModel),
       _resourceId: r.id, // Add resource ID for deletion
       created_by: (r.metadata as LoraModel).created_by || { is_you: true },
-    })) || [];
-    const localLoras = localWanLoras.filter(l => l.lora_type === lora_type);
+    })).filter(filterByModel) || [];
+    const localLoras = localWanLoras.filter(filterByModel);
     
     // Create a map to deduplicate by Model ID, prioritizing saved LoRAs (which have _resourceId)
     const loraMap = new Map<string, LoraModel>();
@@ -223,7 +292,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
     });
     
     return Array.from(loraMap.values());
-  }, [loras, myLorasResource.data, localWanLoras, lora_type]);
+  }, [loras, myLorasResource.data, localWanLoras, selectedModelFilter, selectedSubFilter]);
 
   const processedLoras = useMemo(() => {
     let filtered = allLoras;
@@ -329,17 +398,42 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
           className="flex-grow"
         />
         <Select value={sortOption} onValueChange={(value) => setSortOption(value as SortOption)}>
-          <SelectTrigger variant="retro" className="w-[180px]">
+          <SelectTrigger variant="retro" className="w-[140px]">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent variant="retro">
-            <SelectItem variant="retro" value="default">Default Order</SelectItem>
+            <SelectItem variant="retro" value="default">Default</SelectItem>
             <SelectItem variant="retro" value="downloads">Downloads</SelectItem>
             <SelectItem variant="retro" value="likes">Likes</SelectItem>
-            <SelectItem variant="retro" value="lastModified">Last Modified</SelectItem>
-            <SelectItem variant="retro" value="name">Name (A-Z)</SelectItem>
+            <SelectItem variant="retro" value="lastModified">Modified</SelectItem>
+            <SelectItem variant="retro" value="name">Name</SelectItem>
           </SelectContent>
         </Select>
+        {/* Model Filter Dropdown - far right */}
+        <Select value={selectedModelFilter} onValueChange={(v) => setSelectedModelFilter(v as ModelFilterCategory)}>
+          <SelectTrigger variant="retro" className="w-[120px] ml-auto">
+            <SelectValue placeholder="Model" />
+          </SelectTrigger>
+          <SelectContent variant="retro">
+            <SelectItem variant="retro" value="all">All Models</SelectItem>
+            <SelectItem variant="retro" value="qwen">Qwen</SelectItem>
+            <SelectItem variant="retro" value="wan">Wan</SelectItem>
+            <SelectItem variant="retro" value="z-image">Z-Image</SelectItem>
+          </SelectContent>
+        </Select>
+        {/* Sub-filter - appears when a category is selected */}
+        {selectedModelFilter !== 'all' && (
+          <Select value={selectedSubFilter} onValueChange={setSelectedSubFilter}>
+            <SelectTrigger variant="retro" className="w-[150px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent variant="retro">
+              {getSubFilterOptions(selectedModelFilter).map(opt => (
+                <SelectItem key={opt.value} variant="retro" value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
               {/* Scrollable content area with floating controls */}
         <div className="flex-1 min-h-0 overflow-y-auto relative">
@@ -495,7 +589,13 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                     </div>
                     
                     {/* Right side: Sample thumbnail */}
-                    <div className="flex-shrink-0 flex items-start">
+                    <div className="flex-shrink-0 flex items-start relative">
+                      {/* Model type badge - bottom right of thumbnail */}
+                      {lora.lora_type && (
+                        <span className="absolute bottom-0 right-0 z-10 px-1 py-0.5 text-[8px] font-medium bg-black/70 text-white rounded-tl rounded-br whitespace-nowrap">
+                          {lora.lora_type}
+                        </span>
+                      )}
                       {lora.main_generation ? (
                         (() => {
                           const mainSample = lora.sample_generations?.find(s => s.url === lora.main_generation);
@@ -585,7 +685,13 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
               );
             })
           ) : (
-            <p className="text-center text-muted-foreground py-8">No LoRA models match your search criteria.</p>
+            <div className="col-span-full flex items-center justify-center py-12">
+              <div className="flex flex-col items-center justify-center p-8 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 text-center max-w-sm">
+                <Search className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                <p className="text-base font-medium text-foreground mb-1">No LoRA models found</p>
+                <p className="text-sm text-muted-foreground">Try adjusting your search or filter criteria</p>
+              </div>
+            </div>
           )}
         </div>
 
@@ -1090,9 +1196,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                 <SelectItem variant="retro" value="Qwen Image">Qwen Image</SelectItem>
                                 <SelectItem variant="retro" value="Qwen Image Edit">Qwen Image Edit</SelectItem>
                                 <SelectItem variant="retro" value="Qwen Image Edit 2509">Qwen Image Edit 2509</SelectItem>
-                                <SelectItem variant="retro" value="Flux.dev">Flux.dev</SelectItem>
-                                <SelectItem variant="retro" value="SD 1.5">SD 1.5</SelectItem>
-                                <SelectItem variant="retro" value="SDXL">SDXL</SelectItem>
+                                <SelectItem variant="retro" value="Z-Image">Z-Image</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -1332,6 +1436,22 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   const [showMyLorasOnly, setShowMyLorasOnly] = useState(false);
   const [showAddedLorasOnly, setShowAddedLorasOnly] = useState(false);
   const [processedLorasLength, setProcessedLorasLength] = useState(0);
+
+  // Model filter state - initialized from prop mapped to broad category
+  const [selectedModelFilter, setSelectedModelFilter] = useState<ModelFilterCategory>(() => getFilterCategory(lora_type));
+  // Sub-filter for specific model type within category (default 'all')
+  const [selectedSubFilter, setSelectedSubFilter] = useState<string>('all');
+
+  // Reset model filter when prop changes (e.g., when opening from different context)
+  React.useEffect(() => {
+    setSelectedModelFilter(getFilterCategory(lora_type));
+    setSelectedSubFilter('all');
+  }, [lora_type]);
+
+  // Reset sub-filter when category changes
+  React.useEffect(() => {
+    setSelectedSubFilter('all');
+  }, [selectedModelFilter]);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(0);
@@ -1397,13 +1517,13 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
           <div className="flex-1 flex flex-col min-h-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 overflow-hidden">
               <TabsContent value="browse" className="flex-1 flex flex-col min-h-0">
-                <CommunityLorasTab 
-                    loras={loras} 
-                    onAddLora={onAddLora} 
+                <CommunityLorasTab
+                    loras={loras}
+                    onAddLora={onAddLora}
                     onRemoveLora={onRemoveLora}
                     onUpdateLoraStrength={onUpdateLoraStrength}
-                    selectedLoras={selectedLoras} 
-                    lora_type={lora_type}
+                    selectedLoras={selectedLoras}
+                    lora_type={selectedModelFilter}
                     myLorasResource={myLorasResource as any}
                     createResource={createResource as any}
                     updateResource={updateResource as any}
@@ -1416,6 +1536,10 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     setShowAddedLorasOnly={setShowAddedLorasOnly}
                     onProcessedLorasLengthChange={setProcessedLorasLength}
                     onPageChange={handlePageChange}
+                    selectedModelFilter={selectedModelFilter}
+                    setSelectedModelFilter={setSelectedModelFilter}
+                    selectedSubFilter={selectedSubFilter}
+                    setSelectedSubFilter={setSelectedSubFilter}
                 />
               </TabsContent>
               <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">

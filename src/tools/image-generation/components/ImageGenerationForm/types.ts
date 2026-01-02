@@ -2,6 +2,26 @@ export type GenerationMode = 'wan-local' | 'qwen-image';
 
 export type PromptMode = 'managed' | 'automated';
 
+// Generation source: whether to use a reference image or just text prompts
+export type GenerationSource = 'by-reference' | 'just-text';
+
+// Available models for "just text" mode
+export type TextToImageModel = 'qwen-image' | 'qwen-image-2512' | 'z-image';
+
+export const TEXT_TO_IMAGE_MODELS: { id: TextToImageModel; name: string; description: string; loraType: string }[] = [
+  { id: 'qwen-image', name: 'Qwen Image', description: 'Default Qwen model', loraType: 'Qwen Image' },
+  { id: 'qwen-image-2512', name: 'Qwen Image 2512', description: 'Higher resolution Qwen', loraType: 'Qwen Image 2512' },
+  { id: 'z-image', name: 'Z-Image', description: 'Z-Image model', loraType: 'Z-Image' },
+];
+
+// LoRA type for "by reference" mode (always Qwen Image)
+export const BY_REFERENCE_LORA_TYPE = 'Qwen Image';
+
+// Get the LoRA type for a given text-to-image model
+export function getLoraTypeForModel(model: TextToImageModel): string {
+  return TEXT_TO_IMAGE_MODELS.find(m => m.id === model)?.loraType ?? 'Qwen Image';
+}
+
 export interface MetadataLora {
   id: string;
   name: string;
