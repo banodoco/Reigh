@@ -673,7 +673,7 @@ const StyleReferenceSection: React.FC<{
   onSubjectDescriptionBlur,
   onInThisSceneChange,
   onInThisSceneStrengthChange,
-  referenceMode = 'custom',
+  referenceMode = 'style',
   onReferenceModeChange,
   styleBoostTerms = '',
   onStyleBoostTermsChange,

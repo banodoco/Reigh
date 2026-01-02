@@ -274,7 +274,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [lastSubjectDescriptionFromParent, setLastSubjectDescriptionFromParent] = useState<string>('');
   const [inThisScene, setInThisScene] = useState<boolean>(false);
   const [inThisSceneStrength, setInThisSceneStrength] = useState<number>(0.5);
-  const [referenceMode, setReferenceMode] = useState<ReferenceMode>('custom');
+  const [referenceMode, setReferenceMode] = useState<ReferenceMode>('style');
   const [styleBoostTerms, setStyleBoostTerms] = useState<string>('');
   const pendingReferenceModeUpdate = useRef<ReferenceMode | null>(null);
   // Generation source toggle: by-reference or just-text
@@ -635,7 +635,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const effectiveSubjectDescription = currentSubjectDescription.trim() || 'this character';
   const currentInThisScene = selectedReference?.inThisScene ?? projectImageSettings?.inThisScene ?? false;
   const currentInThisSceneStrength = selectedReference?.inThisSceneStrength ?? (selectedReference?.inThisScene ? 1.0 : 0);
-  const currentReferenceMode = (selectedReference?.referenceMode ?? 'custom') as ReferenceMode;
+  const currentReferenceMode = (selectedReference?.referenceMode ?? 'style') as ReferenceMode;
   const currentStyleBoostTerms = selectedReference?.styleBoostTerms ?? '';
   
   // Display image (use original if available, fallback to processed)
@@ -689,7 +689,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       lastSyncedReferenceId.current = selectedReference.id;
       
       // Sync all reference settings to local state
-      setReferenceMode(selectedReference.referenceMode || 'custom');
+      setReferenceMode(selectedReference.referenceMode || 'style');
       setStyleReferenceStrength(selectedReference.styleReferenceStrength ?? 1.0);
       setSubjectStrength(selectedReference.subjectStrength ?? 0.0);
       setSubjectDescription(selectedReference.subjectDescription ?? '');
