@@ -49,6 +49,7 @@ export default function HomePage() {
   
   // Assets & Animation State
   const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [posterLoaded, setPosterLoaded] = useState(false);
   
   // Tooltip State
   const [openTipOpen, setOpenTipOpen] = useState(false);
@@ -137,16 +138,24 @@ export default function HomePage() {
         setAssetsLoaded(true);
       }
     };
-    
+
     const img = new Image();
     img.src = '/brush-paintbrush-icon.webp';
     img.onload = markLoaded;
     img.onerror = markLoaded;
-    
+
     // Fallback: if image events don't fire within 2s, proceed anyway
     const fallbackTimer = setTimeout(markLoaded, 2000);
-    
+
     return () => clearTimeout(fallbackTimer);
+  }, []);
+
+  // Preload poster image separately - only show when fully loaded
+  useEffect(() => {
+    const posterImg = new Image();
+    posterImg.src = '/hero-background-poster.jpg';
+    posterImg.onload = () => setPosterLoaded(true);
+    // Don't set on error - just won't show poster if it fails
   }, []);
 
   // Redirect check
@@ -446,7 +455,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen overflow-hidden">
-      {/* Background Video with poster fallback */}
+      {/* Background Video with poster fallback - only show poster once loaded */}
       <video
         ref={videoRef}
         autoPlay
@@ -456,7 +465,7 @@ export default function HomePage() {
         // @ts-expect-error webkit-specific attribute for iOS
         webkit-playsinline="true"
         preload="auto"
-        poster="/hero-background-poster.jpg"
+        poster={posterLoaded ? "/hero-background-poster.jpg" : undefined}
         src={isMobile ? "/hero-background-mobile.mp4" : "/hero-background-interpolated-seamless-faststart.mp4"}
         className="fixed inset-0 w-full h-full object-cover"
         style={{ zIndex: 0 }}
