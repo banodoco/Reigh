@@ -61,6 +61,11 @@ interface PaneControlTabProps {
    * When false, mobile uses simplified open/close behavior without locking.
    */
   allowMobileLock?: boolean;
+  /**
+   * Optional custom handler for the main open button. When provided, this is called
+   * instead of openPane(). Useful for navigating to a page instead of opening the pane.
+   */
+  customOpenAction?: () => void;
 }
 
 // Helper component to wrap buttons in tooltips (desktop only)
@@ -86,16 +91,16 @@ const TooltipButton: React.FC<{
   );
 };
 
-const PaneControlTab: React.FC<PaneControlTabProps> = ({ 
-  side, 
-  isLocked, 
-  isOpen, 
-  toggleLock, 
-  openPane, 
-  paneDimension, 
-  bottomOffset = 0, 
-  handlePaneEnter, 
-  handlePaneLeave, 
+const PaneControlTab: React.FC<PaneControlTabProps> = ({
+  side,
+  isLocked,
+  isOpen,
+  toggleLock,
+  openPane,
+  paneDimension,
+  bottomOffset = 0,
+  handlePaneEnter,
+  handlePaneLeave,
   thirdButton,
   fourthButton,
   horizontalOffset = 0,
@@ -103,9 +108,14 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   customIcon,
   paneTooltip,
   allowMobileLock = false,
+  customOpenAction,
 }) => {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
+
+  // Use custom open action if provided, otherwise default to openPane
+  const handleOpen = customOpenAction ?? openPane;
+
   // On tablets, use desktop-like behavior with lock icons
   // On phones (small mobile), use simplified mobile behavior
   const useDesktopBehavior = !isMobile || isTablet;
@@ -377,7 +387,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onPointerUp={handleButtonClick(() => openPane())}
+                  onPointerUp={handleButtonClick(() => handleOpen())}
                   onClick={(e) => e.stopPropagation()}
                   className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
                   aria-label={paneTooltip || "Open pane"}
@@ -392,7 +402,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                onPointerUp={handleButtonClick(() => openPane())}
+                onPointerUp={handleButtonClick(() => handleOpen())}
                 onClick={(e) => e.stopPropagation()}
                 className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
                 aria-label={paneTooltip || "Open pane"}
@@ -450,7 +460,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         <Button
           variant="ghost"
           size="icon"
-          onPointerUp={handleButtonClick(() => openPane())}
+          onPointerUp={handleButtonClick(() => handleOpen())}
           onClick={(e) => e.stopPropagation()}
           className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
           aria-label={paneTooltip || "Open pane"}
@@ -716,7 +726,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                onPointerUp={handleButtonClick(() => openPane())}
+                onPointerUp={handleButtonClick(() => handleOpen())}
                 onClick={(e) => e.stopPropagation()}
                 className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
                 aria-label={paneTooltip || "Open pane"}
@@ -732,7 +742,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                onPointerUp={handleButtonClick(() => openPane())}
+                onPointerUp={handleButtonClick(() => handleOpen())}
                 onClick={(e) => e.stopPropagation()}
                 className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
                 aria-label={paneTooltip || "Open pane"}

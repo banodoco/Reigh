@@ -1187,17 +1187,23 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [updateProjectImageSettings]);
 
-  // Get current prompts - from shot settings if shot selected, otherwise local state
-  // Include 'saving' status to prevent flicker during save
-  // Also verify settings are for the current shot (entityId check) to prevent flash of wrong data
-  const prompts = useMemo(() => {
+  // Single source of truth for whether shot settings are ready
+  // Used by all shot-level field accessors to prevent flash of project values
+  const isShotSettingsReady = useMemo(() => {
+    if (!associatedShotId) return false; // No shot selected
     const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
-    if (associatedShotId && settingsForCurrentShot && 
-        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
-      return shotPromptSettings.settings.prompts || [];
+    return settingsForCurrentShot &&
+      (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving');
+  }, [associatedShotId, shotPromptSettings.entityId, shotPromptSettings.status]);
+
+  // Get current prompts - from shot settings if shot selected, otherwise local state
+  const prompts = useMemo(() => {
+    if (associatedShotId) {
+      // Return empty while loading to avoid flash of project prompts
+      return isShotSettingsReady ? (shotPromptSettings.settings.prompts || []) : [];
     }
     return noShotPrompts;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.prompts, shotPromptSettings.entityId, noShotPrompts]);
+  }, [associatedShotId, isShotSettingsReady, shotPromptSettings.settings.prompts, noShotPrompts]);
   
   // Helper to update prompts - routes to shot settings or local state
   const setPrompts = useCallback((newPrompts: PromptEntry[] | ((prev: PromptEntry[]) => PromptEntry[])) => {
@@ -1219,15 +1225,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectPrompts]);
 
   // Get current master prompt - from shot settings if shot selected, otherwise local state
-  // Include 'saving' status to prevent flicker during save
   const masterPromptText = useMemo(() => {
-    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
-    if (associatedShotId && settingsForCurrentShot &&
-        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
-      return shotPromptSettings.settings.masterPrompt || '';
+    if (associatedShotId) {
+      // Return empty while loading to avoid flash of project value
+      return isShotSettingsReady ? (shotPromptSettings.settings.masterPrompt || '') : '';
     }
     return noShotMasterPrompt;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, shotPromptSettings.entityId, noShotMasterPrompt]);
+  }, [associatedShotId, isShotSettingsReady, shotPromptSettings.settings.masterPrompt, noShotMasterPrompt]);
   
   // Helper to update master prompt - routes to shot settings or local state
   const setMasterPromptText: React.Dispatch<React.SetStateAction<string>> = useCallback((newTextOrUpdater) => {
@@ -1245,13 +1249,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Get current prompt mode - from shot settings if shot selected, otherwise local state
   const effectivePromptMode = useMemo<PromptMode>(() => {
-    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
-    if (associatedShotId && settingsForCurrentShot &&
-        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
-      return shotPromptSettings.settings.promptMode || 'automated';
+    if (associatedShotId) {
+      // Return default while loading to avoid flash of project value
+      return isShotSettingsReady ? (shotPromptSettings.settings.promptMode || 'automated') : 'automated';
     }
     return promptMode;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.promptMode, shotPromptSettings.entityId, promptMode]);
+  }, [associatedShotId, isShotSettingsReady, shotPromptSettings.settings.promptMode, promptMode]);
 
   // Helper to update prompt mode - routes to shot settings or local state
   const setEffectivePromptMode = useCallback((newMode: PromptMode) => {
@@ -1265,19 +1268,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Get current selected reference ID - from shot settings if shot selected, otherwise project settings
+  // Note: Unlike other fields, reference ID intentionally falls back to project value while loading
   const effectiveSelectedReferenceId = useMemo<string | null>(() => {
-    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
-    if (associatedShotId && settingsForCurrentShot &&
-        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
-      // Shot-level reference takes precedence
+    if (associatedShotId && isShotSettingsReady) {
+      // Shot-level reference takes precedence if explicitly set
       const shotRefId = shotPromptSettings.settings.selectedReferenceId;
       if (shotRefId !== undefined) {
         return shotRefId;
       }
     }
-    // Fall back to project-level per-shot mapping
+    // Fall back to project-level selection
     return selectedReferenceId;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.selectedReferenceId, shotPromptSettings.entityId, selectedReferenceId]);
+  }, [associatedShotId, isShotSettingsReady, shotPromptSettings.settings.selectedReferenceId, selectedReferenceId]);
 
   // Helper to update selected reference ID - routes to shot settings
   const setEffectiveSelectedReferenceId = useCallback((newRefId: string | null) => {
@@ -1293,18 +1295,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Get current before prompt text - from shot settings if shot selected, otherwise project state
   // Defaults to empty string for shots (not inherited from project)
   const currentBeforePromptText = useMemo(() => {
-    // If a shot is selected, use shot-level value (or empty while loading/if not set)
     if (associatedShotId) {
-      const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
-      const shotReady = settingsForCurrentShot &&
-          (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving');
       // Return empty while loading to avoid flash of project value
-      if (!shotReady) return '';
-      return shotPromptSettings.settings.beforeEachPromptText ?? '';
+      return isShotSettingsReady ? (shotPromptSettings.settings.beforeEachPromptText ?? '') : '';
     }
-    // No shot selected - use project-level value
     return beforeEachPromptText;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.beforeEachPromptText, shotPromptSettings.entityId, beforeEachPromptText]);
+  }, [associatedShotId, isShotSettingsReady, shotPromptSettings.settings.beforeEachPromptText, beforeEachPromptText]);
 
   // Helper to update before prompt text - routes to shot settings or project state
   const setCurrentBeforePromptText = useCallback((newText: string) => {
@@ -1320,18 +1316,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Get current after prompt text - from shot settings if shot selected, otherwise project state
   // Defaults to empty string for shots (not inherited from project)
   const currentAfterPromptText = useMemo(() => {
-    // If a shot is selected, use shot-level value (or empty while loading/if not set)
     if (associatedShotId) {
-      const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
-      const shotReady = settingsForCurrentShot &&
-          (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving');
       // Return empty while loading to avoid flash of project value
-      if (!shotReady) return '';
-      return shotPromptSettings.settings.afterEachPromptText ?? '';
+      return isShotSettingsReady ? (shotPromptSettings.settings.afterEachPromptText ?? '') : '';
     }
-    // No shot selected - use project-level value
     return afterEachPromptText;
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.afterEachPromptText, shotPromptSettings.entityId, afterEachPromptText]);
+  }, [associatedShotId, isShotSettingsReady, shotPromptSettings.settings.afterEachPromptText, afterEachPromptText]);
 
   // Helper to update after prompt text - routes to shot settings or project state
   const setCurrentAfterPromptText = useCallback((newText: string) => {
@@ -1346,9 +1336,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Save current shot settings to localStorage for inheritance by new shots
   // Note: prompts and before/after prompt text are NOT inherited, only masterPrompt and mode settings
+  // Uses status === 'ready' (not isShotSettingsReady) to only save on initial load, not during saves
   useEffect(() => {
-    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
-    if (associatedShotId && settingsForCurrentShot && shotPromptSettings.status === 'ready') {
+    if (isShotSettingsReady && shotPromptSettings.status === 'ready') {
       try {
         const settingsToSave = {
           masterPrompt: shotPromptSettings.settings.masterPrompt || '',
@@ -1359,7 +1349,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         // Ignore localStorage errors
       }
     }
-  }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, shotPromptSettings.settings.promptMode, shotPromptSettings.entityId, effectivePromptMode]);
+  }, [isShotSettingsReady, shotPromptSettings.status, shotPromptSettings.settings.masterPrompt, shotPromptSettings.settings.promptMode, effectivePromptMode]);
 
   // Sync local style strength with project settings
   // Legacy sync effects removed to prevent overwriting user input

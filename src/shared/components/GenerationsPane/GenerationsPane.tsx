@@ -7,7 +7,7 @@ import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages,
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye, Sparkles, ExternalLink, Search, X } from 'lucide-react';
+import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye, Sparkles, ExternalLink, Search, X, Images } from 'lucide-react';
 import { ImageGenerationModal } from '@/shared/components/ImageGenerationModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
@@ -409,14 +409,6 @@ const GenerationsPaneComponent: React.FC = () => {
           handlePaneLeave={handlePaneLeave}
           thirdButton={{
             onClick: () => {
-              setIsGenerationModalOpen(true);
-            },
-            ariaLabel: "Generate new image",
-            tooltip: "Generate new image",
-            content: <Sparkles className="h-4 w-4" />
-          }}
-          fourthButton={{
-            onClick: () => {
               setIsGenerationsPaneLocked(false);
               navigate('/tools/image-generation');
             },
@@ -424,9 +416,16 @@ const GenerationsPaneComponent: React.FC = () => {
             tooltip: "Go to Image Generation tool",
             content: <ExternalLink className="h-4 w-4" />
           }}
-          paneIcon="gallery"
-          paneTooltip="View generations gallery"
+          fourthButton={{
+            onClick: () => setIsGenerationModalOpen(true),
+            ariaLabel: "Generate new image",
+            tooltip: "Generate new image",
+            content: <Sparkles className="h-4 w-4" />
+          }}
+          customIcon={<Sparkles className="h-4 w-4" />}
+          paneTooltip="Generate new image"
           allowMobileLock={true}
+          customOpenAction={() => setIsGenerationModalOpen(true)}
         />
       )}
       <div
