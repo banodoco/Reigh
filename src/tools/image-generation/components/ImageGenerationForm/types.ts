@@ -148,6 +148,9 @@ export interface HydratedReferenceImage {
 }
 
 // Project-level settings for model and style reference
+// Note: Most no-shot settings (masterPrompt, promptMode, beforeEachPromptText, afterEachPromptText,
+// associatedShotId) are persisted via usePersistentToolState with toolId='image-generation'.
+// Only projectPrompts needs explicit persistence here since it's an array not mapped there.
 export interface ProjectImageSettings {
   selectedModel?: GenerationMode;
 
@@ -156,15 +159,9 @@ export interface ProjectImageSettings {
   // Model for just-text mode
   selectedTextModel?: TextToImageModel;
 
-  // Last selected shot ID (persisted for UX continuity)
-  lastSelectedShotId?: string | null;
-
-  // Project-level prompt settings (used when no shot is selected)
+  // Project-level prompts (used when no shot is selected)
+  // This is the only no-shot field here - others are in usePersistentToolState
   projectPrompts?: PromptEntry[];
-  projectMasterPrompt?: string;
-  projectPromptMode?: PromptMode;
-  projectBeforeEachPromptText?: string;
-  projectAfterEachPromptText?: string;
 
   // Multi-reference structure (shot-specific selection)
   selectedReferenceIdByShot?: Record<string, string | null>; // Map of shotId -> referenceId

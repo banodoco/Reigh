@@ -30,10 +30,28 @@ const [value, setValue] = usePersistentState('my-key', defaultValue);
 
 ### Settings Hooks (Database)
 
-For cross-device settings persistence, see **[settings_system.md](settings_system.md)**:
-- `useToolSettings` — Low-level DB access
-- `useAutoSaveSettings` — Self-contained per-shot/project settings ⭐
-- `usePersistentToolState` — Binds existing useState to DB
+All three hooks write to the same `tool_settings` table:
+
+```
+useAutoSaveSettings ──────┐
+                          ├──► useToolSettings ──► tool_settings table
+usePersistentToolState ───┘
+```
+
+| Hook | Best For | How It Works |
+|------|----------|--------------|
+| `useToolSettings` | Complex data, manual control | Direct DB read/write, you manage state |
+| `usePersistentToolState` | Simple state sync | Maps existing `useState` to DB automatically |
+| `useAutoSaveSettings` | Per-shot settings | Self-contained state + auto-save on change |
+
+**When to use which:**
+- **`usePersistentToolState`**: Simple values (strings, numbers, booleans) that map 1:1 to React state
+- **`useToolSettings` directly**: Complex structures (arrays of objects, nested data), or when you need manual save control
+- **`useAutoSaveSettings`**: Per-shot settings that should auto-save on every change
+
+⚠️ **Avoid multiple tool IDs for the same form.** Each tool ID creates a separate DB record. If you use both `usePersistentToolState` and direct `useToolSettings` calls, use the SAME tool ID or you'll have duplicate/conflicting storage.
+
+For full details, see **[settings_system.md](settings_system.md)**.
 
 ---
 
@@ -67,12 +85,15 @@ Full resolution details in [settings_system.md](settings_system.md).
 
 ## 💡 Quick Decision Guide
 
-| Scenario | Use |
-|----------|-----|
-| Device-only UI (collapsed panels) | `usePersistentState` |
-| Per-shot settings (prompts, configs) | `useAutoSaveSettings` → [settings_system.md](settings_system.md) |
-| Project-wide preferences | `usePersistentToolState` → [settings_system.md](settings_system.md) |
-| Media files | Supabase Storage |
+| Scenario | Use | Example |
+|----------|-----|---------|
+| Device-only UI | `usePersistentState` | Collapsed panels, active tabs |
+| Simple project settings | `usePersistentToolState` | `imagesPerPrompt`, `promptMode`, `selectedModel` |
+| Complex project data | `useToolSettings` directly | `references[]`, `selectedReferenceIdByShot{}` |
+| Per-shot auto-save | `useAutoSaveSettings` | Shot prompts, shot-specific configs |
+| Media files | Supabase Storage | Images, videos, LoRAs |
+
+**Key principle:** Don't duplicate storage. If `usePersistentToolState` handles a field, don't also persist it via direct `useToolSettings` calls.
 
 ---
 

@@ -1160,103 +1160,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [updateProjectImageSettings, markAsInteracted]);
 
-  // Persist lastSelectedShotId changes to project settings
-  const persistLastSelectedShot = useCallback(async (shotId: string | null) => {
-    try {
-      await updateProjectImageSettings('project', { lastSelectedShotId: shotId });
-    } catch (error) {
-      console.error('Failed to save lastSelectedShotId:', error);
-    }
-  }, [updateProjectImageSettings]);
-
-  // Initialize associatedShotId from project settings
-  const hasInitializedLastSelectedShot = useRef(false);
-  useEffect(() => {
-    if (isLoadingProjectSettings) return;
-    if (hasInitializedLastSelectedShot.current) return;
-    if (!projectImageSettings) return;
-
-    // Don't override if initialShotId is a specific shot (not null/undefined)
-    // null = "no shot" context, undefined = no prop passed - both should restore
-    if (initialShotId) {
-      hasInitializedLastSelectedShot.current = true;
-      return;
-    }
-
-    const savedShotId = projectImageSettings.lastSelectedShotId;
-    if (savedShotId && shots) {
-      const shotExists = shots.some(shot => shot.id === savedShotId);
-      if (shotExists && associatedShotId !== savedShotId) {
-        setAssociatedShotId(savedShotId);
-      }
-    }
-    hasInitializedLastSelectedShot.current = true;
-  }, [projectImageSettings, isLoadingProjectSettings, initialShotId, shots, associatedShotId]);
-
   // Initialize no-shot prompts from project settings
+  // Note: Other no-shot settings (masterPrompt, promptMode, beforeEachPromptText, etc.)
+  // are handled by usePersistentToolState which auto-syncs with the DB
   const hasInitializedProjectPrompts = useRef(false);
   useEffect(() => {
     if (isLoadingProjectSettings) return;
     if (hasInitializedProjectPrompts.current) return;
     if (!projectImageSettings) return;
 
-    // Initialize project-level prompts (used when no shot is selected)
+    // Only initialize projectPrompts - other fields are synced via usePersistentToolState
     if (projectImageSettings.projectPrompts?.length) {
       setNoShotPrompts(projectImageSettings.projectPrompts);
-    }
-    if (projectImageSettings.projectMasterPrompt) {
-      setNoShotMasterPrompt(projectImageSettings.projectMasterPrompt);
-    }
-    if (projectImageSettings.projectPromptMode) {
-      setPromptMode(projectImageSettings.projectPromptMode);
-    }
-    if (projectImageSettings.projectBeforeEachPromptText) {
-      setBeforeEachPromptText(projectImageSettings.projectBeforeEachPromptText);
-    }
-    if (projectImageSettings.projectAfterEachPromptText) {
-      setAfterEachPromptText(projectImageSettings.projectAfterEachPromptText);
     }
     hasInitializedProjectPrompts.current = true;
   }, [projectImageSettings, isLoadingProjectSettings]);
 
-  // Persist no-shot prompts to project settings (debounced)
+  // Persist no-shot prompts to project settings
+  // Note: This is the only field that needs explicit persistence since it's an array
+  // that isn't mapped in usePersistentToolState
   const persistProjectPrompts = useCallback(async (prompts: PromptEntry[]) => {
     try {
       await updateProjectImageSettings('project', { projectPrompts: prompts });
     } catch (error) {
       console.error('[ProjectPrompts] ❌ Failed to save projectPrompts:', error);
-    }
-  }, [updateProjectImageSettings]);
-
-  const persistProjectMasterPrompt = useCallback(async (masterPrompt: string) => {
-    try {
-      await updateProjectImageSettings('project', { projectMasterPrompt: masterPrompt });
-    } catch (error) {
-      console.error('[ProjectPrompts] ❌ Failed to save projectMasterPrompt:', error);
-    }
-  }, [updateProjectImageSettings]);
-
-  const persistProjectPromptMode = useCallback(async (mode: PromptMode) => {
-    try {
-      await updateProjectImageSettings('project', { projectPromptMode: mode });
-    } catch (error) {
-      console.error('[ProjectPrompts] ❌ Failed to save projectPromptMode:', error);
-    }
-  }, [updateProjectImageSettings]);
-
-  const persistProjectBeforePrompt = useCallback(async (text: string) => {
-    try {
-      await updateProjectImageSettings('project', { projectBeforeEachPromptText: text });
-    } catch (error) {
-      console.error('[ProjectPrompts] ❌ Failed to save projectBeforeEachPromptText:', error);
-    }
-  }, [updateProjectImageSettings]);
-
-  const persistProjectAfterPrompt = useCallback(async (text: string) => {
-    try {
-      await updateProjectImageSettings('project', { projectAfterEachPromptText: text });
-    } catch (error) {
-      console.error('[ProjectPrompts] ❌ Failed to save projectAfterEachPromptText:', error);
     }
   }, [updateProjectImageSettings]);
 
@@ -1307,20 +1234,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     if (associatedShotId) {
       const currentText = shotPromptSettings.settings.masterPrompt || '';
       const newText = typeof newTextOrUpdater === 'function' ? newTextOrUpdater(currentText) : newTextOrUpdater;
-      console.log('[ImageGenerationForm] setMasterPromptText for shot:', associatedShotId.substring(0, 8));
       shotPromptSettings.updateField('masterPrompt', newText);
       markAsInteracted();
     } else {
-      console.log('[ImageGenerationForm] setMasterPromptText for no-shot mode');
-      setNoShotMasterPrompt(prev => {
-        const newText = typeof newTextOrUpdater === 'function' ? newTextOrUpdater(prev) : newTextOrUpdater;
-        // Persist to project settings
-        persistProjectMasterPrompt(newText);
-        return newText;
-      });
+      // usePersistentToolState auto-syncs noShotMasterPrompt to DB
+      setNoShotMasterPrompt(newTextOrUpdater);
       markAsInteracted();
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectMasterPrompt]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
   
   // Get current prompt mode - from shot settings if shot selected, otherwise local state
   const effectivePromptMode = useMemo<PromptMode>(() => {
@@ -1335,15 +1256,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Helper to update prompt mode - routes to shot settings or local state
   const setEffectivePromptMode = useCallback((newMode: PromptMode) => {
     if (associatedShotId) {
-      console.log('[ImageGenerationForm] setPromptMode for shot:', associatedShotId.substring(0, 8), newMode);
       shotPromptSettings.updateField('promptMode', newMode);
       markAsInteracted();
     } else {
+      // usePersistentToolState auto-syncs promptMode to DB
       setPromptMode(newMode);
-      // Persist to project settings
-      persistProjectPromptMode(newMode);
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectPromptMode]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Get current selected reference ID - from shot settings if shot selected, otherwise project settings
   const effectiveSelectedReferenceId = useMemo<string | null>(() => {
@@ -1393,11 +1312,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       shotPromptSettings.updateField('beforeEachPromptText', newText);
       markAsInteracted();
     } else {
+      // usePersistentToolState auto-syncs beforeEachPromptText to DB
       setBeforeEachPromptText(newText);
-      // Persist to project settings
-      persistProjectBeforePrompt(newText);
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectBeforePrompt]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Get current after prompt text - from shot settings if shot selected, otherwise project state
   // Defaults to empty string for shots (not inherited from project)
@@ -1421,11 +1339,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       shotPromptSettings.updateField('afterEachPromptText', newText);
       markAsInteracted();
     } else {
+      // usePersistentToolState auto-syncs afterEachPromptText to DB
       setAfterEachPromptText(newText);
-      // Persist to project settings
-      persistProjectAfterPrompt(newText);
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectAfterPrompt]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Save current shot settings to localStorage for inheritance by new shots
   // Note: prompts and before/after prompt text are NOT inherited, only masterPrompt and mode settings
@@ -2971,10 +2888,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       valueWasNone: value === "none"
     });
 
+    // usePersistentToolState auto-syncs associatedShotId to DB
     setAssociatedShotId(newShotId);
-
-    // Persist the shot selection at project level
-    persistLastSelectedShot(newShotId);
 
     // Call the parent callback if provided
     if (onShotChange) {
