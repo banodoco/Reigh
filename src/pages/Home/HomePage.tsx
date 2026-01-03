@@ -153,9 +153,9 @@ export default function HomePage() {
   // Preload poster image separately - only show when fully loaded
   useEffect(() => {
     const posterImg = new Image();
-    posterImg.src = '/hero-background-poster.jpg';
+    // Set onload BEFORE src to avoid race condition with cached images
     posterImg.onload = () => setPosterLoaded(true);
-    // Don't set on error - just won't show poster if it fails
+    posterImg.src = '/hero-background-poster.jpg';
   }, []);
 
   // Redirect check
