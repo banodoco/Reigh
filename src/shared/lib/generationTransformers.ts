@@ -285,7 +285,8 @@ export function transformGeneration(
   if (item.shot_data && Object.keys(item.shot_data).length > 0) {
     for (const [shotId, frames] of Object.entries(item.shot_data)) {
       // shot_data should always be an array now, but handle legacy single-value format during migration
-      const frameArray = Array.isArray(frames) ? frames : (frames !== null && frames !== undefined ? [frames] : []);
+      // Also handle null/undefined values - the shot association still exists, just without a position
+      const frameArray = Array.isArray(frames) ? frames : (frames !== null && frames !== undefined ? [frames] : [null]);
       for (const frame of frameArray) {
         shotGenerations.push({
           shot_id: shotId,

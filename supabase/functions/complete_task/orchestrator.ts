@@ -249,14 +249,28 @@ async function markOrchestratorComplete(
     }
   }
 
+  // For travel_orchestrator with independent_segments, don't set output_location
+  // The orchestrator doesn't produce a single combined output - each segment is standalone
+  const independentSegments = orchestratorTask.params?.orchestrator_details?.independent_segments ??
+                              orchestratorTask.params?.independent_segments ?? true;
+  const isIndependentTravelOrchestrator = taskType === TASK_TYPES.TRAVEL_SEGMENT && independentSegments;
+
+  const updateData: Record<string, any> = {
+    status: "Complete",
+    generation_started_at: earliestStartTime || new Date().toISOString(),
+    generation_processed_at: new Date().toISOString()
+  };
+
+  // Only set output_location if NOT an independent travel orchestrator
+  if (!isIndependentTravelOrchestrator) {
+    updateData.output_location = publicUrl;
+  } else {
+    console.log(`[OrchestratorComplete] Skipping output_location for independent travel orchestrator ${orchestratorTaskId}`);
+  }
+
   const { error: updateOrchError } = await supabase
     .from("tasks")
-    .update({
-      status: "Complete",
-      output_location: publicUrl,
-      generation_started_at: earliestStartTime || new Date().toISOString(),
-      generation_processed_at: new Date().toISOString()
-    })
+    .update(updateData)
     .eq("id", orchestratorTaskId)
     .in("status", ["Queued", "In Progress"]);
 

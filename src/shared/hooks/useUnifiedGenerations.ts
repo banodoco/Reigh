@@ -130,8 +130,9 @@ async function fetchShotSpecificGenerations({
       name,
       shot_data${includeTaskData ? ',tasks' : ''}
     `, { count: 'exact' })
-    .eq('project_id', projectId);
-  
+    .eq('project_id', projectId)
+    .eq('is_child', false); // Exclude child generations - only show parents
+
   // Apply shot filter - check if generation is in this shot
   // shot_data format: { shot_id: [frame1, frame2, ...] } (array of timeline_frames)
   // Check that the key exists (generation is in this shot)
