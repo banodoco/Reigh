@@ -1,0 +1,705 @@
+# Default Shot + Product Tour Implementation Plan
+
+## Overview
+
+Create a "Getting Started" shot with sample generations for new users, plus a guided product tour that starts after the WelcomeBonusModal completes.
+
+---
+
+## Part 1: Default Shot with Sample Generations
+
+### Approach: Extend Existing `createDefaultShot` in ProjectContext
+
+The existing user creation flow already has a hook point:
+1. User authenticates → `create_user_record_if_not_exists()` RPC creates user record
+2. `fetchProjects()` runs on client → if no projects exist, creates "Default Project"
+3. **`createDefaultShot()`** is called to create "Default Shot" ← **This is where we add sample content**
+
+This happens immediately when a new user first loads the app, before WelcomeBonusModal even shows.
+
+### Implementation Steps
+
+#### 1.1 Store Sample Assets in Public Storage
+
+Create a public bucket with sample images/videos that all new users will reference:
+
+```
+Storage: sample-content/
+├── sample-image-1.webp  (landscape, scenic - first keyframe)
+├── sample-image-2.webp  (same scene, different angle - second keyframe)
+├── sample-video-1.mp4   (short travel video between the two images)
+```
+
+**Action:**
+1. Create `sample-content` bucket in Supabase storage (public read access)
+2. Upload 2 high-quality sample images and 1 sample video
+3. These assets are shared by ALL new users (reference only, not copied)
+
+#### 1.2 Create `createSampleGenerationsForNewUser` Helper
+
+**File:** `src/shared/contexts/ProjectContext.tsx` (alongside existing `createDefaultShot`)
+
+```typescript
+const SAMPLE_CONTENT_BASE = 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/sample-content';
+
+const createSampleGenerationsForNewUser = async (projectId: string, shotId: string): Promise<void> => {
+  try {
+    // Create sample image generations (pointing to shared public assets)
+    const sampleGenerations = [
+      {
+        project_id: projectId,
+        type: 'image',
+        location: `${SAMPLE_CONTENT_BASE}/sample-image-1.webp`,
+        params: {
+          prompt: 'A serene mountain landscape at golden hour, cinematic lighting',
+          model: 'flux-dev',
+          width: 1280,
+          height: 720,
+          is_sample: true, // Mark as sample for potential filtering
+        },
+      },
+      {
+        project_id: projectId,
+        type: 'image',
+        location: `${SAMPLE_CONTENT_BASE}/sample-image-2.webp`,
+        params: {
+          prompt: 'The same mountain vista, camera slowly pushing forward',
+          model: 'flux-dev',
+          width: 1280,
+          height: 720,
+          is_sample: true,
+        },
+      },
+      {
+        project_id: projectId,
+        type: 'video',
+        location: `${SAMPLE_CONTENT_BASE}/sample-video-1.mp4`,
+        params: {
+          prompt: 'Smooth camera movement through the mountain scene',
+          model: 'travel_between_images',
+          is_sample: true,
+        },
+      },
+    ];
+
+    const { data: generations, error: genError } = await supabase
+      .from('generations')
+      .insert(sampleGenerations)
+      .select('id');
+
+    if (genError) {
+      console.error('[ProjectContext] Failed to create sample generations:', genError);
+      return;
+    }
+
+    // Link image generations to shot with timeline positions
+    // Video is NOT on timeline (just associated with project)
+    const shotGenerationLinks = [
+      { shot_id: shotId, generation_id: generations[0].id, position: 0 },
+      { shot_id: shotId, generation_id: generations[1].id, position: 1 },
+    ];
+
+    const { error: linkError } = await supabase
+      .from('shot_generations')
+      .insert(shotGenerationLinks);
+
+    if (linkError) {
+      console.error('[ProjectContext] Failed to link generations to shot:', linkError);
+    }
+
+    console.log('[ProjectContext] Created sample generations for new user');
+  } catch (err) {
+    console.error('[ProjectContext] Exception creating sample generations:', err);
+  }
+};
+```
+
+#### 1.3 Update `createDefaultShot` to Call Sample Generation Helper
+
+Modify the existing `createDefaultShot` function to also create sample content:
+
+```typescript
+const createDefaultShot = async (projectId: string, initialSettings?: any, isFirstProject: boolean = false): Promise<void> => {
+  try {
+    const shotName = isFirstProject ? 'Getting Started' : 'Default Shot';
+
+    const { data: shot, error } = await supabase
+      .from('shots')
+      .insert({
+        name: shotName,
+        project_id: projectId,
+        settings: initialSettings || {},
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[ProjectContext] Failed to create default shot:', error);
+      return;
+    }
+
+    // For first-time users, add sample content to help them get started
+    if (isFirstProject && shot) {
+      await createSampleGenerationsForNewUser(projectId, shot.id);
+    }
+  } catch (err) {
+    console.error('[ProjectContext] Exception creating default shot:', err);
+  }
+};
+```
+
+#### 1.4 Update the `fetchProjects` Call Site
+
+In `fetchProjects`, pass `isFirstProject: true` when creating the first project:
+
+```typescript
+// Around line 528-530 in ProjectContext.tsx
+// Create default shot for the new project - mark as first project for sample content
+await createDefaultShot(newProject.id, undefined, true /* isFirstProject */);
+```
+
+#### 1.5 Navigate to Getting Started Shot After Welcome Modal
+
+The WelcomeBonusModal should navigate to the Getting Started shot when complete:
+
+```typescript
+// In Layout.tsx handleWelcomeClose
+const handleWelcomeClose = useCallback(async () => {
+  closeWelcomeModal();
+
+  // Find the Getting Started shot and navigate to it
+  if (selectedProjectId) {
+    const { data: shot } = await supabase
+      .from('shots')
+      .select('id')
+      .eq('project_id', selectedProjectId)
+      .eq('name', 'Getting Started')
+      .maybeSingle();
+
+    if (shot) {
+      navigate(`/video-travel?shot=${shot.id}`);
+    }
+  }
+
+  // Start product tour after brief delay
+  setTimeout(() => startTour(), 500);
+}, [closeWelcomeModal, selectedProjectId, navigate, startTour]);
+```
+
+---
+
+## Part 2: Product Tour with React Joyride
+
+### Installation
+
+```bash
+npm install react-joyride
+```
+
+### Implementation Steps
+
+#### 2.1 Create Tour State Management
+
+**File:** `src/shared/hooks/useProductTour.ts`
+
+```typescript
+import { useState, useCallback, useEffect } from 'react';
+import { useUserUIState } from './useUserUIState';
+import { usePanes } from '@/shared/contexts/PanesContext';
+
+interface TourState {
+  completed: boolean;
+  skipped: boolean;
+  currentStep: number;
+}
+
+export function useProductTour() {
+  const { value: tourState, update: saveTourState } = useUserUIState<TourState>(
+    'productTour',
+    { completed: false, skipped: false, currentStep: 0 }
+  );
+
+  const [isRunning, setIsRunning] = useState(false);
+  const { setIsGenerationsPaneOpen, setIsTasksPaneOpen } = usePanes();
+
+  const startTour = useCallback(() => {
+    if (!tourState?.completed && !tourState?.skipped) {
+      setIsRunning(true);
+    }
+  }, [tourState]);
+
+  const completeTour = useCallback(() => {
+    setIsRunning(false);
+    saveTourState({ completed: true, skipped: false, currentStep: 0 });
+  }, [saveTourState]);
+
+  const skipTour = useCallback(() => {
+    setIsRunning(false);
+    saveTourState({ completed: false, skipped: true, currentStep: 0 });
+  }, [saveTourState]);
+
+  return {
+    isRunning,
+    startTour,
+    completeTour,
+    skipTour,
+    tourState,
+    setIsGenerationsPaneOpen,
+    setIsTasksPaneOpen,
+  };
+}
+```
+
+#### 2.2 Create Tour Steps Configuration
+
+**File:** `src/shared/components/ProductTour/tourSteps.ts`
+
+The tour steps use the same color progression as WelcomeBonusModal for visual continuity:
+
+```typescript
+import { Step } from 'react-joyride';
+
+// Color progression matching WelcomeBonusModal (continues from step 8)
+export const tourStepColors = [
+  { bg: 'bg-cyan-100 dark:bg-cyan-900/20', icon: 'text-cyan-600 dark:text-cyan-400' },      // Step 9
+  { bg: 'bg-rose-100 dark:bg-rose-900/20', icon: 'text-rose-600 dark:text-rose-400' },      // Step 10
+  { bg: 'bg-emerald-100 dark:bg-emerald-900/20', icon: 'text-emerald-600 dark:text-emerald-400' }, // Step 11
+  { bg: 'bg-amber-100 dark:bg-amber-900/20', icon: 'text-amber-600 dark:text-amber-400' },  // Step 12
+  { bg: 'bg-violet-100 dark:bg-violet-900/20', icon: 'text-violet-600 dark:text-violet-400' }, // Step 13
+  { bg: 'bg-teal-100 dark:bg-teal-900/20', icon: 'text-teal-600 dark:text-teal-400' },      // Step 14
+];
+
+export const tourSteps: Step[] = [
+  // Step 1: Open Generations pane
+  {
+    target: '[data-tour="generations-pane-tab"]',
+    content: 'Click here to open the Generations pane and see your sample generations.',
+    title: 'Your Generations',
+    disableBeacon: true,
+    spotlightClicks: true,
+    placement: 'top',
+  },
+  // Step 2: Show sample generations in pane
+  {
+    target: '[data-tour="generations-pane"]',
+    content: 'These are sample generations we created for you. You can use these as keyframes for your videos, or generate new ones.',
+    title: 'Sample Generations',
+    placement: 'top',
+  },
+  // Step 3: Point to the Getting Started shot (already navigated there)
+  {
+    target: '[data-tour="shot-selector"]',
+    content: 'This is your Getting Started shot. Shots organize your keyframes into sequences.',
+    title: 'Your First Shot',
+    placement: 'bottom',
+  },
+  // Step 4: Scroll DOWN to timeline and explain it
+  {
+    target: '[data-tour="timeline"]',
+    content: 'The timeline shows your keyframes in sequence. Drag images here to add them, or reorder to change the video flow.',
+    title: 'The Timeline',
+    placement: 'top',  // Show tooltip above timeline
+    // Joyride will auto-scroll to this element
+  },
+  // Step 5: Scroll UP to video gallery to show outputs
+  {
+    target: '[data-tour="video-gallery"]',
+    content: 'Generated videos appear here. Each video "travels" between your keyframes on the timeline.',
+    title: 'Video Outputs',
+    placement: 'bottom',  // Show tooltip below the gallery
+    // Joyride will auto-scroll back up to this element
+  },
+  // Step 6: Open Tasks pane
+  {
+    target: '[data-tour="tasks-pane-tab"]',
+    content: 'Click here to see your task queue. All generation tasks appear here with their progress.',
+    title: 'Tasks Pane',
+    spotlightClicks: true,
+    placement: 'left',
+  },
+  // Step 7: Open Tools pane
+  {
+    target: '[data-tour="tools-pane-tab"]',
+    content: 'Different tools help you create images, videos, and more. Start with Image Generation to create your first keyframe!',
+    title: 'Available Tools',
+    spotlightClicks: true,
+    placement: 'right',
+  },
+  // Step 8: Final encouraging message (centered modal)
+  {
+    target: 'body',
+    content: "You're all set! Start by generating some images, add them to your timeline, then generate a video to bring them to life. Have fun creating!",
+    title: 'Ready to Create!',
+    placement: 'center',
+  },
+];
+```
+
+#### 2.3 Create ProductTour Component
+
+**File:** `src/shared/components/ProductTour/index.tsx`
+
+The component uses custom tooltip styling to match WelcomeBonusModal's aesthetic - circular colored icons, same typography, step dots, and retro buttons.
+
+```typescript
+import Joyride, { CallBackProps, STATUS, TooltipRenderProps } from 'react-joyride';
+import { tourSteps, tourStepColors } from './tourSteps';
+import { useProductTour } from '@/shared/hooks/useProductTour';
+import { usePanes } from '@/shared/contexts/PanesContext';
+import { Button } from '@/shared/components/ui/button';
+import { ChevronRight, ChevronLeft, Images, Layout, Film, ListTodo, Wrench, Sparkles, MousePointerClick, PartyPopper } from 'lucide-react';
+
+// Icons for each step (matching the step content)
+const stepIcons = [Images, Images, Layout, Film, Film, ListTodo, Wrench, PartyPopper];
+
+// Custom tooltip component matching WelcomeBonusModal aesthetic
+function CustomTooltip({
+  continuous,
+  index,
+  step,
+  backProps,
+  primaryProps,
+  skipProps,
+  tooltipProps,
+  isLastStep,
+  size,
+}: TooltipRenderProps) {
+  const colors = tourStepColors[index % tourStepColors.length];
+  const Icon = stepIcons[index] || Sparkles;
+  const totalSteps = size;
+
+  return (
+    <div
+      {...tooltipProps}
+      className="bg-background border border-border rounded-lg shadow-lg p-6 max-w-sm"
+    >
+      {/* Header with colored icon - matching WelcomeBonusModal */}
+      <div className="text-center space-y-4 mb-4">
+        <div className={`mx-auto w-12 h-12 ${colors.bg} rounded-full flex items-center justify-center`}>
+          <Icon className={`w-6 h-6 ${colors.icon}`} />
+        </div>
+        {step.title && (
+          <h3 className="text-xl font-bold text-center text-foreground">
+            {step.title}
+          </h3>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="text-center mb-6">
+        <p className="text-muted-foreground">{step.content}</p>
+      </div>
+
+      {/* Navigation buttons - matching WelcomeBonusModal button styles */}
+      <div className="flex flex-col space-y-2">
+        {continuous && (
+          <Button
+            {...primaryProps}
+            variant="retro"
+            size="retro-sm"
+            className="w-full"
+          >
+            {isLastStep ? 'Start Creating!' : 'Next'}
+            {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
+          </Button>
+        )}
+
+        <div className="flex justify-between items-center">
+          {index > 0 ? (
+            <button
+              {...backProps}
+              className="flex items-center space-x-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span>Back</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <button
+            {...skipProps}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Skip Tour
+          </button>
+        </div>
+      </div>
+
+      {/* Step indicators - matching WelcomeBonusModal dots */}
+      <div className="flex justify-center space-x-2 pt-4 border-t mt-4">
+        {Array.from({ length: totalSteps }).map((_, i) => (
+          <div
+            key={i}
+            className={`w-2 h-2 rounded-full transition-colors ${
+              i === index ? 'bg-primary' : 'bg-muted'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ProductTour() {
+  const { isRunning, completeTour, skipTour } = useProductTour();
+  const { setIsGenerationsPaneOpen, setIsTasksPaneOpen } = usePanes();
+
+  const handleCallback = (data: CallBackProps) => {
+    const { status, index, type } = data;
+
+    // Handle step-specific actions (open panes when needed)
+    if (type === 'step:before') {
+      // Before showing generations pane content, ensure it's visible
+      if (index === 1) {
+        setIsGenerationsPaneOpen(true);
+      }
+      // Before showing tasks pane step
+      if (index === 5) {
+        setIsTasksPaneOpen(true);
+      }
+    }
+
+    // Handle tour completion/skip
+    if (status === STATUS.FINISHED) {
+      completeTour();
+    } else if (status === STATUS.SKIPPED) {
+      skipTour();
+    }
+  };
+
+  return (
+    <Joyride
+      steps={tourSteps}
+      run={isRunning}
+      continuous
+      scrollToFirstStep
+      showSkipButton
+      showProgress
+      disableCloseOnEsc={false}
+      disableOverlayClose
+      spotlightClicks
+      callback={handleCallback}
+      tooltipComponent={CustomTooltip}
+      styles={{
+        options: {
+          zIndex: 10000,
+          arrowColor: 'var(--background)',
+        },
+        spotlight: {
+          borderRadius: 8,
+        },
+        overlay: {
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        },
+      }}
+      floaterProps={{
+        styles: {
+          floater: {
+            filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15))',
+          },
+        },
+      }}
+    />
+  );
+}
+```
+
+#### 2.4 Add data-tour Attributes to Target Elements
+
+**Files to modify:**
+
+| File | Element | Attribute |
+|------|---------|-----------|
+| `src/shared/components/PaneControlTabs.tsx` | Generations tab button | `data-tour="generations-pane-tab"` |
+| `src/shared/components/PaneControlTabs.tsx` | Tasks tab button | `data-tour="tasks-pane-tab"` |
+| `src/shared/components/PaneControlTabs.tsx` | Tools tab button | `data-tour="tools-pane-tab"` |
+| `src/shared/components/GenerationsPane/GenerationsPane.tsx` | Main container | `data-tour="generations-pane"` |
+| `src/tools/travel-between-images/components/Timeline.tsx` | Timeline container | `data-tour="timeline"` |
+| `src/tools/travel-between-images/components/VideoGallery/index.tsx` | Gallery container | `data-tour="video-gallery"` |
+| `src/tools/travel-between-images/components/SortableShotItem.tsx` | Shot items (conditional) | `data-tour={isFirst ? "shot-item-0" : undefined}` |
+
+#### 2.5 Integrate into Layout.tsx
+
+```typescript
+// In Layout.tsx
+import { ProductTour } from '@/shared/components/ProductTour';
+import { useProductTour } from '@/shared/hooks/useProductTour';
+
+function Layout() {
+  const { showWelcomeModal, closeWelcomeModal } = useWelcomeBonus();
+  const { startTour } = useProductTour();
+
+  const handleWelcomeClose = useCallback(() => {
+    closeWelcomeModal();
+    // Start tour after a brief delay to let modal animate out
+    setTimeout(() => startTour(), 500);
+  }, [closeWelcomeModal, startTour]);
+
+  return (
+    <>
+      {/* ... existing layout ... */}
+      <WelcomeBonusModal
+        isOpen={showWelcomeModal}
+        onClose={handleWelcomeClose}
+      />
+      <ProductTour />
+    </>
+  );
+}
+```
+
+---
+
+## Part 3: Database Changes
+
+### 3.1 Track Tour Completion in `onboarding` JSONB
+
+No migration needed - the `onboarding` JSONB column already exists. Will store:
+
+```json
+{
+  "productTour": {
+    "completed": true,
+    "skipped": false,
+    "completedAt": "2026-01-03T..."
+  }
+}
+```
+
+### 3.2 Track Getting Started Shot Creation
+
+Either:
+- Add `getting_started_created: boolean` to user record
+- Or check for shot existence each time (simpler, idempotent)
+
+---
+
+## Implementation Order (Master Checklist)
+
+### Phase 1: Sample Assets & Client-Side Creation
+- [ ] Create `sample-content` bucket in Supabase (public read access)
+- [ ] Upload sample images (2) and video (1) to bucket
+- [ ] Add `createSampleGenerationsForNewUser` helper to ProjectContext.tsx
+- [ ] Update `createDefaultShot` to accept `isFirstProject` param
+- [ ] Update `fetchProjects` to pass `isFirstProject: true` for first project
+- [ ] Test: New user signup creates "Getting Started" shot with sample content
+
+### Phase 2: Product Tour Core
+- [ ] `npm install react-joyride`
+- [ ] Create `useProductTour` hook
+- [ ] Create `tourSteps.ts` configuration
+- [ ] Create `ProductTour` component
+- [ ] Integrate into Layout.tsx
+
+### Phase 3: UI Target Attributes
+- [ ] Add `data-tour` to PaneControlTabs (3 tabs)
+- [ ] Add `data-tour` to GenerationsPane
+- [ ] Add `data-tour` to Timeline
+- [ ] Add `data-tour` to VideoGallery
+- [ ] Add `data-tour` to first shot item
+
+### Phase 4: Flow Integration
+- [ ] Update Layout.tsx `handleWelcomeClose` to navigate to Getting Started shot
+- [ ] Start product tour after WelcomeBonusModal closes
+- [ ] Ensure panes open at correct tour steps (programmatic control)
+- [ ] Test full flow: signup → modal → tour → ready
+
+### Phase 5: Polish
+- [ ] Style Joyride tooltips to match app theme (dark mode support)
+- [ ] Test on mobile (may need to disable or simplify tour)
+- [ ] Add "Restart Tour" option in Settings modal
+- [ ] Handle edge case: user closes modal early / skips tour
+
+---
+
+## Files to Create
+
+| Path | Purpose |
+|------|---------|
+| `src/shared/hooks/useProductTour.ts` | Tour state management |
+| `src/shared/components/ProductTour/index.tsx` | Main tour component |
+| `src/shared/components/ProductTour/tourSteps.ts` | Step definitions |
+
+## Files to Modify
+
+| Path | Change |
+|------|--------|
+| `src/shared/contexts/ProjectContext.tsx` | Add sample generation creation for first project |
+| `src/app/Layout.tsx` | Add ProductTour, handle tour start + navigation |
+| `src/shared/components/PaneControlTabs.tsx` | Add data-tour attributes |
+| `src/shared/components/GenerationsPane/GenerationsPane.tsx` | Add data-tour |
+| `src/tools/travel-between-images/components/Timeline.tsx` | Add data-tour |
+| `src/tools/travel-between-images/components/VideoGallery/index.tsx` | Add data-tour |
+| `src/tools/travel-between-images/components/SortableShotItem.tsx` | Add data-tour to first item |
+
+---
+
+## Seamless Transition & Scroll Behavior
+
+### Transition from WelcomeBonusModal
+
+The tour should feel like a **continuation** of the onboarding flow, not a separate experience:
+
+1. **No gap:** Tour starts immediately (500ms delay) after modal close animation completes
+2. **Visual continuity:** Custom tooltip uses same aesthetic:
+   - Circular colored icon header (continuing the color progression)
+   - Same typography (`text-2xl font-bold`, `text-muted-foreground`)
+   - Same button styles (`variant="retro"`, `size="retro-sm"`)
+   - Same step indicator dots
+   - Same back button styling
+3. **Step counter continues:** WelcomeBonusModal has 8 steps → tour feels like steps 9-16
+
+### Scroll Behavior
+
+React Joyride handles scrolling automatically via `scrollToFirstStep` and per-step targeting:
+
+1. **Step 4 (Timeline):** Page scrolls DOWN to bring timeline into view
+   - Timeline is typically below the fold on VideoTravelToolPage
+   - Tooltip appears above the timeline (`placement: 'top'`)
+
+2. **Step 5 (Video Gallery):** Page scrolls BACK UP to show video outputs
+   - Video gallery is at the top of the page
+   - Tooltip appears below the gallery (`placement: 'bottom'`)
+
+3. **Smooth scrolling:** Joyride uses `scrollIntoView` with smooth behavior by default
+
+### Flow Summary
+
+```
+WelcomeBonusModal (8 steps)
+├── Step 1: Welcome
+├── Step 2: Community
+├── Step 3: Generation Method
+├── Step 4: Promise/Credits
+├── Step 5: Credits Result
+├── Step 6: Theme
+├── Step 7: Privacy
+└── Step 8: "One more thing" → Close
+
+[500ms delay - modal animates out]
+
+Product Tour (8 steps, feels like continuation)
+├── Step 9: Click Generations pane tab
+├── Step 10: See sample generations
+├── Step 11: Your Getting Started shot
+├── Step 12: Timeline (scrolls down)
+├── Step 13: Video outputs (scrolls up)
+├── Step 14: Tasks pane
+├── Step 15: Tools pane
+└── Step 16: Ready to create!
+```
+
+---
+
+## Notes
+
+1. **Mobile:** React Joyride works on mobile but may need adjusted positioning. Consider showing simpler tour or skipping on very small screens.
+
+2. **Sample Assets:** Use high-quality, diverse samples that showcase what the tool can do. Consider using actual AI-generated content.
+
+3. **Idempotency:** The setup function should be safe to call multiple times (check for existing shot before creating).
+
+4. **Future Tours:** The `onboarding` JSONB field can track multiple feature tours as we add new capabilities.
+
+5. **Restart Tour:** Add a "Restart Tour" button in Settings modal that resets the `productTour.completed` state.

@@ -68,40 +68,28 @@ const TaskItemSkeleton: React.FC<TaskItemSkeletonProps> = ({
 };
 
 // Loading skeleton for the task list that shows varied task types
-const TaskListSkeleton: React.FC<{ activeFilter: FilterGroup }> = ({ activeFilter }) => {
-  // Different skeleton configurations based on filter type
-  const getSkeletonConfig = () => {
+const TaskListSkeleton: React.FC<{ activeFilter: FilterGroup; count?: number }> = ({ activeFilter, count }) => {
+  // Determine how many skeletons to show (cap at 4, default to 4 if unknown)
+  const skeletonCount = count !== undefined ? Math.min(count, 4) : 4;
+
+  // Get variant based on filter type
+  const getVariant = (): 'processing' | 'complete' | 'failed' => {
     switch (activeFilter) {
-      case 'Processing':
-        return [
-          { variant: 'processing' as const, showImages: true },
-          { variant: 'processing' as const, showPrompt: true },
-          { variant: 'processing' as const, showImages: true },
-          { variant: 'processing' as const, showPrompt: true },
-        ];
-      case 'Succeeded':
-        return [
-          { variant: 'complete' as const, showImages: true },
-          { variant: 'complete' as const, showPrompt: true },
-          { variant: 'complete' as const, showImages: true },
-          { variant: 'complete' as const, showPrompt: true },
-        ];
-      case 'Failed':
-        return [
-          { variant: 'failed' as const, showImages: true },
-          { variant: 'failed' as const, showPrompt: true },
-          { variant: 'failed' as const, showImages: true },
-        ];
-      default:
-        return [
-          { variant: 'processing' as const, showImages: true },
-          { variant: 'processing' as const, showPrompt: true },
-          { variant: 'processing' as const, showImages: true },
-        ];
+      case 'Processing': return 'processing';
+      case 'Succeeded': return 'complete';
+      case 'Failed': return 'failed';
+      default: return 'processing';
     }
   };
 
-  const skeletonItems = getSkeletonConfig();
+  const variant = getVariant();
+
+  // Generate skeleton items alternating between image and prompt styles
+  const skeletonItems = Array.from({ length: skeletonCount }, (_, i) => ({
+    variant,
+    showImages: i % 2 === 0,
+    showPrompt: i % 2 === 1,
+  }));
 
   return (
     <div className="space-y-1">
@@ -328,8 +316,14 @@ const TaskList: React.FC<TaskListProps> = ({
     }
   };
 
+  // For Processing filter, we know the exact count from statusCounts
+  // For Succeeded/Failed, the counts are only "recent" (past hour) but the list shows all history
+  // So we can only skip skeleton for Processing when we know count is 0
+  const knownEmptyProcessing = activeFilter === 'Processing' && statusCounts?.processing === 0;
+
   // Show skeleton during initial load OR during filter transitions
-  const showSkeleton = isLoading || isFilterTransitioning;
+  // BUT skip skeleton if we already know Processing is empty
+  const showSkeleton = (isLoading || isFilterTransitioning) && !knownEmptyProcessing;
 
   return (
     <div className="p-4 h-full flex flex-col text-zinc-200">
@@ -340,7 +334,7 @@ const TaskList: React.FC<TaskListProps> = ({
       )}
       
       {showSkeleton && (
-        <TaskListSkeleton activeFilter={activeFilter} />
+        <TaskListSkeleton activeFilter={activeFilter} count={activeFilter === 'Processing' ? statusCounts?.processing : undefined} />
       )}
       
       {!showSkeleton && filteredTasks.length === 0 && !summaryMessage && !(activeFilter === 'Processing' && incomingTasks.length > 0) && (
