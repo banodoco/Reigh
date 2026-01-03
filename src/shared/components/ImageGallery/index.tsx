@@ -335,8 +335,10 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     if (!paginationHook.paginatedImages) return [];
     return paginationHook.paginatedImages.map(img => {
       // Don't merge badge data while loading - prevents showing "0" badges
+      // Strip out any existing derivedCount to prevent flash of "0"
       if (isBadgeDataLoading) {
-        return img;
+        const { derivedCount, hasUnviewedVariants, unviewedVariantCount, ...imgWithoutBadges } = img as any;
+        return imgWithoutBadges;
       }
       const generationId = (img as any).generation_id || img.id;
       const badgeData = getBadgeData(generationId);

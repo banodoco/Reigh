@@ -53,7 +53,7 @@ export function useVariantBadges(
     return ['variant-badges', sortedIds.join(',')];
   }, [generationIds]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching } = useQuery({
     queryKey,
     queryFn: async (): Promise<DerivedCountsResult> => {
       if (generationIds.length === 0) {
@@ -65,6 +65,9 @@ export function useVariantBadges(
     staleTime: 30000, // Cache for 30 seconds
     gcTime: 60000, // Keep in cache for 1 minute
   });
+
+  // Consider loading if: query is loading, query is fetching, or data hasn't loaded yet
+  const isEffectivelyLoading = isLoading || isFetching || !data;
 
   const getBadgeData = useCallback((generationId: string): VariantBadgeData => {
     const derivedCount = data?.derivedCounts[generationId] || 0;
@@ -109,7 +112,7 @@ export function useVariantBadges(
   return {
     getBadgeData,
     markGenerationViewed,
-    isLoading,
+    isLoading: isEffectivelyLoading,
   };
 }
 
