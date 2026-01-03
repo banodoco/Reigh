@@ -15,6 +15,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -112,12 +113,18 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
         {...modal.props}
       >
         <DialogHeader className={modal.headerClass}>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <DialogTitle className="text-xl font-light">Generate Images</DialogTitle>
-            <Button variant="secondary" size="sm" onClick={handleNavigateToTool} className="gap-1 flex-shrink-0 mr-2">
-              <ExternalLink className="h-4 w-4" />
-              Open Tool
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={handleNavigateToTool} className="h-7 w-7">
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Open Tool</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </DialogHeader>
         

@@ -6,6 +6,7 @@ interface SectionHeaderProps {
   theme?: 'orange' | 'green' | 'blue' | 'purple';
   className?: string;
   htmlFor?: string;
+  rightContent?: React.ReactNode;
 }
 
 const themeStyles: Record<string, string> = {
@@ -20,18 +21,24 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   theme = 'blue',
   className = '',
   htmlFor,
+  rightContent,
 }) => {
   const themeClasses = themeStyles[theme];
   const [borderClass, bgClass] = themeClasses.split(' ');
-  
+
   return (
-    <Label 
-      htmlFor={htmlFor}
-      className={`text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 ${borderClass} pl-3 py-1 relative ${className}`}
-    >
-      {title}
-      <span className={`absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 ${bgClass} rounded-full`}></span>
-    </Label>
+    <div className="flex items-center gap-2">
+      <Label
+        htmlFor={htmlFor}
+        className={`text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 ${borderClass} pl-3 py-1 relative ${className}`}
+      >
+        {title}
+        <span className={`absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 ${bgClass} rounded-full`}></span>
+      </Label>
+      {rightContent && (
+        <span className="ml-12 text-sm text-muted-foreground">{rightContent}</span>
+      )}
+    </div>
   );
 };
 

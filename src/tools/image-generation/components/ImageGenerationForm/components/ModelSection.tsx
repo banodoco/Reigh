@@ -15,6 +15,8 @@ import { Resource } from "@/shared/hooks/useResources";
 import { ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
 import { LoraModel } from "@/shared/components/LoraSelectorModal";
 import { Slider } from "@/shared/components/ui/slider";
+import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
+import HoverScrubVideo from "@/shared/components/HoverScrubVideo";
 
 // Reusable LoRA Grid component (no pagination)
 interface LoraGridProps {
@@ -33,7 +35,7 @@ const LoraGrid: React.FC<LoraGridProps> = ({
   isGenerating,
 }) => {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
       <div className="flex items-center justify-between">
         <Label className="text-sm font-medium">LoRAs {selectedLoras.length > 0 && `(${selectedLoras.length})`}</Label>
         <Button
@@ -50,58 +52,75 @@ const LoraGrid: React.FC<LoraGridProps> = ({
 
       {selectedLoras.length > 0 ? (
         <div className="grid grid-cols-4 gap-2">
-          {selectedLoras.map((lora) => (
-            <div
-              key={lora.id}
-              className="relative group rounded-lg border bg-muted/30 overflow-hidden"
-            >
-              {/* Thumbnail */}
-              <div className="aspect-square relative">
-                {lora.previewImageUrl ? (
-                  <img
-                    src={lora.previewImageUrl}
-                    alt={lora.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <Images className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                )}
+          {selectedLoras.map((lora) => {
+            // Check if preview is a video based on file extension
+            const isVideo = lora.previewImageUrl &&
+              lora.previewImageUrl.match(/\.(mp4|webm|mov|avi)(\?|$)/i);
 
-                {/* Remove button overlay */}
-                <button
-                  type="button"
-                  onClick={() => onRemoveLora(lora.id)}
-                  disabled={isGenerating}
-                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
+            return (
+              <div
+                key={lora.id}
+                className="relative group rounded-lg border bg-muted/30 overflow-hidden"
+              >
+                {/* Thumbnail */}
+                <div className="aspect-square relative">
+                  {lora.previewImageUrl ? (
+                    isVideo ? (
+                      <HoverScrubVideo
+                        src={lora.previewImageUrl}
+                        className="w-full h-full object-cover"
+                        videoClassName="object-cover"
+                        autoplayOnHover
+                        loop
+                        muted
+                      />
+                    ) : (
+                      <img
+                        src={lora.previewImageUrl}
+                        alt={lora.name}
+                        className="w-full h-full object-cover"
+                      />
+                    )
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <Images className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  )}
 
-              {/* Name and strength */}
-              <div className="p-1.5 space-y-1">
-                <p className="text-[10px] font-medium truncate" title={lora.name}>
-                  {lora.name}
-                </p>
-                <div className="flex items-center gap-1">
-                  <Slider
-                    value={[lora.strength]}
-                    onValueChange={(value) => onUpdateLoraStrength(lora.id, value[0])}
-                    min={0}
-                    max={2}
-                    step={0.05}
+                  {/* Remove button overlay */}
+                  <button
+                    type="button"
+                    onClick={() => onRemoveLora(lora.id)}
                     disabled={isGenerating}
-                    className="flex-1"
-                  />
-                  <span className="text-[9px] text-muted-foreground w-6 text-right">
-                    {lora.strength.toFixed(1)}
-                  </span>
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+
+                {/* Name and strength */}
+                <div className="p-1.5 space-y-1">
+                  <p className="text-[10px] font-medium truncate" title={lora.name}>
+                    {lora.name}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Slider
+                      value={[lora.strength]}
+                      onValueChange={(value) => onUpdateLoraStrength(lora.id, value[0])}
+                      min={0}
+                      max={2}
+                      step={0.05}
+                      disabled={isGenerating}
+                      className="flex-1"
+                    />
+                    <span className="text-[9px] text-muted-foreground w-6 text-right">
+                      {lora.strength.toFixed(1)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <p className="text-sm text-muted-foreground italic">
@@ -166,7 +185,7 @@ interface ReferenceSelectorProps {
   referenceCount?: number; // Number of references from cache (for skeleton)
 }
 
-const REFS_PER_PAGE = 15; // 16 slots total, 1 for add button = 15 refs per page
+const REFS_PER_PAGE = 11; // 11 refs per page + 1 for add button
 
 const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   references,
@@ -717,10 +736,6 @@ const StyleReferenceSection: React.FC<{
 
   return (
   <div className="space-y-2">
-    <div className="space-y-1">
-      <SectionHeader title="Reference" theme="purple" />
-    </div>
-
     {/* New Multiple References UI - Two column layout when reference exists OR loading */}
     {showMultiReference && (referenceCount > 0 || references.length > 0) && (
       <div className="space-y-4">
@@ -1213,37 +1228,24 @@ export const ModelSection: React.FC<ModelSectionProps & {
 }) => {
   return (
     <div className="flex-1 space-y-4">
-      {/* Generation Source Toggle */}
-      {onGenerationSourceChange && (
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
-          <button
-            type="button"
-            onClick={() => onGenerationSourceChange('by-reference')}
-            className={cn(
-              "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
-              generationSource === 'by-reference'
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            disabled={isGenerating}
+      {/* Settings Header with generation source toggle */}
+      <div className="flex flex-row justify-between items-center">
+        <SectionHeader title="Settings" theme="purple" />
+        {onGenerationSourceChange && (
+          <SegmentedControl
+            value={generationSource}
+            onValueChange={(value) => onGenerationSourceChange(value as GenerationSource)}
+            size="sm"
           >
-            By reference
-          </button>
-          <button
-            type="button"
-            onClick={() => onGenerationSourceChange('just-text')}
-            className={cn(
-              "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
-              generationSource === 'just-text'
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            disabled={isGenerating}
-          >
-            Just text
-          </button>
-        </div>
-      )}
+            <SegmentedControlItem value="by-reference">
+              By reference
+            </SegmentedControlItem>
+            <SegmentedControlItem value="just-text">
+              Just text
+            </SegmentedControlItem>
+          </SegmentedControl>
+        )}
+      </div>
 
       {/* Conditional content based on generation source */}
       {generationSource === 'by-reference' ? (
