@@ -79,10 +79,10 @@ const SliderWithValue = ({
             {formatValue(value)}
           </div>
         ) : (
-          <div className={`flex items-center border border-border rounded ${numberInputClassName} h-10 bg-card dark:bg-gray-800 overflow-hidden`}>
+          <div className={`flex items-center border border-border rounded ${numberInputClassName} h-10 bg-card dark:bg-gray-800`}>
             <input
               type="number"
-              className="flex-1 h-full bg-transparent text-center px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none"
+              className="flex-1 min-w-0 h-full bg-transparent text-center px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none"
               value={inputValue}
               onChange={handleInputChange}
               step={step}
@@ -90,10 +90,10 @@ const SliderWithValue = ({
               max={max}
               disabled={disabled}
             />
-            <div className="flex flex-col h-full border-l border-border">
+            <div className="flex flex-col h-full border-l border-border shrink-0">
               <button
                 type="button"
-                className="flex-1 px-2 hover:bg-muted/50 active:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-1.5 flex items-center justify-center hover:bg-muted/50 active:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
                   const newVal = Math.min(max, value + step);
                   onChange(newVal);
@@ -105,7 +105,7 @@ const SliderWithValue = ({
               </button>
               <button
                 type="button"
-                className="flex-1 px-2 hover:bg-muted/50 active:bg-muted transition-colors border-t border-border disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-1.5 flex items-center justify-center hover:bg-muted/50 active:bg-muted transition-colors border-t border-border disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
                   const newVal = Math.max(min, value - step);
                   onChange(newVal);

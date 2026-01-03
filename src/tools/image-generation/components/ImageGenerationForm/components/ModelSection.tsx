@@ -14,7 +14,6 @@ import { HydratedReferenceImage, ReferenceMode, GenerationSource, TextToImageMod
 import { Resource } from "@/shared/hooks/useResources";
 import { ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
 import { LoraModel } from "@/shared/components/LoraSelectorModal";
-import { Slider } from "@/shared/components/ui/slider";
 import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
 import HoverScrubVideo from "@/shared/components/HoverScrubVideo";
 
@@ -51,7 +50,7 @@ const LoraGrid: React.FC<LoraGridProps> = ({
       </div>
 
       {selectedLoras.length > 0 ? (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           {selectedLoras.map((lora) => {
             // Check if preview is a video based on file extension
             const isVideo = lora.previewImageUrl &&
@@ -63,7 +62,7 @@ const LoraGrid: React.FC<LoraGridProps> = ({
                 className="relative group rounded-lg border bg-muted/30 overflow-hidden"
               >
                 {/* Thumbnail */}
-                <div className="aspect-square relative">
+                <div className="aspect-video relative">
                   {lora.previewImageUrl ? (
                     isVideo ? (
                       <HoverScrubVideo
@@ -99,24 +98,21 @@ const LoraGrid: React.FC<LoraGridProps> = ({
                 </div>
 
                 {/* Name and strength */}
-                <div className="p-1.5 space-y-1">
-                  <p className="text-[10px] font-medium truncate" title={lora.name}>
+                <div className="p-2 space-y-2">
+                  <p className="text-xs font-medium truncate" title={lora.name}>
                     {lora.name}
                   </p>
-                  <div className="flex items-center gap-1">
-                    <Slider
-                      value={[lora.strength]}
-                      onValueChange={(value) => onUpdateLoraStrength(lora.id, value[0])}
-                      min={0}
-                      max={2}
-                      step={0.05}
-                      disabled={isGenerating}
-                      className="flex-1"
-                    />
-                    <span className="text-[9px] text-muted-foreground w-6 text-right">
-                      {lora.strength.toFixed(1)}
-                    </span>
-                  </div>
+                  <SliderWithValue
+                    label="Strength"
+                    value={lora.strength}
+                    onChange={(value) => onUpdateLoraStrength(lora.id, value)}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    disabled={isGenerating}
+                    hideLabel
+                    numberInputClassName="w-14"
+                  />
                 </div>
               </div>
             );
