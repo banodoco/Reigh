@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef, useCallback, useMemo, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { LoraSelectorModal, LoraModel } from "@/shared/components/LoraSelectorModal";
 import { DisplayableMetadata } from "@/shared/components/ImageGallery";
 import { ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
@@ -94,6 +95,11 @@ interface ImageGenerationFormProps {
    * at the bottom of the scroll container (for modal contexts)
    */
   stickyFooter?: boolean;
+  /**
+   * When provided with stickyFooter, the footer will be portaled to this element
+   * (by ID) so it renders outside the scroll container
+   */
+  footerPortalId?: string;
   /**
    * Pre-select a specific shot when the form mounts. This takes precedence over
    * persisted settings on initial render only.
@@ -223,6 +229,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   justQueued = false,
   onShotChange,
   stickyFooter = false,
+  footerPortalId,
   initialShotId,
 }, ref) => {
   
@@ -3028,24 +3035,42 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           </div>
         )}
 
-        {/* Spacer to ensure content can scroll above sticky footer */}
-        {stickyFooter && <div className="h-4" />}
+        {/* Spacer to ensure content can scroll above sticky footer (only when not using portal) */}
+        {stickyFooter && !footerPortalId && <div className="h-4" />}
 
-        <div className={stickyFooter ? "sticky bottom-0 z-50 !mt-0 -mx-6 px-6 py-3 bg-background border-t border-zinc-700" : ""}>
-          <GenerateControls
-            imagesPerPrompt={imagesPerPrompt}
-            onChangeImagesPerPrompt={handleSliderChange(setImagesPerPrompt)}
-            actionablePromptsCount={actionablePromptsCount}
-            isGenerating={isGenerating || automatedSubmitButton.isSubmitting}
-            hasApiKey={hasApiKey}
-            justQueued={justQueued || automatedSubmitButton.isSuccess}
-            promptMode={effectivePromptMode}
-            onUseExistingPrompts={handleUseExistingPrompts}
-            onNewPromptsLikeExisting={handleNewPromptsLikeExisting}
-            promptMultiplier={promptMultiplier}
-            onChangePromptMultiplier={setPromptMultiplier}
-          />
-        </div>
+        {/* Footer: portaled when footerPortalId provided, sticky when stickyFooter without portal, inline otherwise */}
+        {(() => {
+          const footerContent = (
+            <div className={
+              stickyFooter
+                ? footerPortalId
+                  ? "px-6 py-3 bg-background border-t border-zinc-700" // Portaled footer
+                  : "sticky bottom-0 z-50 !mt-0 -mx-6 px-6 py-3 bg-background border-t border-zinc-700" // Sticky footer
+                : "border-t border-border pt-6 mt-2" // Inline footer (tool page)
+            }>
+              <GenerateControls
+                imagesPerPrompt={imagesPerPrompt}
+                onChangeImagesPerPrompt={handleSliderChange(setImagesPerPrompt)}
+                actionablePromptsCount={actionablePromptsCount}
+                isGenerating={isGenerating || automatedSubmitButton.isSubmitting}
+                hasApiKey={hasApiKey}
+                justQueued={justQueued || automatedSubmitButton.isSuccess}
+                promptMode={effectivePromptMode}
+                onUseExistingPrompts={handleUseExistingPrompts}
+                onNewPromptsLikeExisting={handleNewPromptsLikeExisting}
+                promptMultiplier={promptMultiplier}
+                onChangePromptMultiplier={setPromptMultiplier}
+              />
+            </div>
+          );
+
+          // Portal footer outside scroll container when footerPortalId is provided
+          if (stickyFooter && footerPortalId) {
+            const portalTarget = document.getElementById(footerPortalId);
+            return portalTarget ? createPortal(footerContent, portalTarget) : footerContent;
+          }
+          return footerContent;
+        })()}
       </form>
 
       <Suspense fallback={<div className="sr-only">Loading...</div>}>

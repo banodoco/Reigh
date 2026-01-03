@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, Suspense } from 'react';
+import React, { useState, useRef, useCallback, Suspense, useId } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
 }) => {
   const modal = useExtraLargeModal();
   const formRef = useRef<ImageGenerationFormHandles>(null);
+  const footerPortalId = useId();
   const { selectedProjectId } = useProject();
   const queryClient = useQueryClient();
   const { getApiKey } = useApiKeys();
@@ -110,12 +111,13 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
         }}
         onPointerDownOutside={() => onClose()}
         onInteractOutside={() => onClose()}
+        onOpenAutoFocus={(e) => e.preventDefault()}
         {...modal.props}
       >
         <DialogHeader className={modal.headerClass}>
           <div className="flex items-center gap-2">
             <DialogTitle className="text-xl font-light">Generate Images</DialogTitle>
-            <Tooltip>
+            <Tooltip delayDuration={500}>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" onClick={handleNavigateToTool} className="h-7 w-7">
                   <ExternalLink className="h-4 w-4" />
@@ -128,7 +130,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           </div>
         </DialogHeader>
         
-        <div className={`${modal.scrollClass} -mx-6 -mb-6 px-6 pb-6 flex-1 min-h-0`}>
+        <div className={`${modal.scrollClass} -mx-6 px-6 flex-1 min-h-0 pb-4`}>
           <Suspense fallback={
             <div className="flex flex-col h-full">
               <div className="space-y-6 py-4 flex-1">
@@ -154,7 +156,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                       <Skeleton className="h-10 w-full rounded-md" />
                     </div>
                   </div>
-                  
+
                   {/* Right Column - ModelSection */}
                   <div className="md:w-80 space-y-6">
                     {/* ModelSection skeleton */}
@@ -175,13 +177,6 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                   </div>
                 </div>
               </div>
-              
-              {/* Sticky GenerateControls skeleton */}
-              <div className="sticky bottom-0 z-50 -mx-6 px-6 py-3 bg-background border-t border-zinc-700">
-                <div className="flex justify-center">
-                  <Skeleton className="h-11 w-full max-w-md rounded-md" />
-                </div>
-              </div>
             </div>
           }>
             <ImageGenerationForm
@@ -193,10 +188,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               openaiApiKey={openaiApiKey}
               justQueued={justQueued}
               stickyFooter={true}
+              footerPortalId={footerPortalId}
               initialShotId={initialShotId}
             />
           </Suspense>
         </div>
+
+        {/* Footer portal target - outside scroll container so scrollbar appears behind it */}
+        <div id={footerPortalId} className="-mx-6 -mb-6" />
       </DialogContent>
     </Dialog>
   );
