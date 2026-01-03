@@ -358,50 +358,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Use cache fallback for selection too, so selection is stable during loading
   const selectedReferenceIdByShot = projectImageSettings?.selectedReferenceIdByShot ?? cachedProjectSettings?.selectedReferenceIdByShot ?? {};
   const selectedReferenceId = selectedReferenceIdByShot[effectiveShotId] ?? null;
-  
-  // [RefJumpDebug] Detailed logging to track selection source and changes
-  const prevSelectedRefId = useRef<string | null>(null);
-  const prevEffectiveShotId = useRef<string | null>(null);
-  useEffect(() => {
-    const fromProjectSettings = projectImageSettings?.selectedReferenceIdByShot?.[effectiveShotId];
-    const fromCache = cachedProjectSettings?.selectedReferenceIdByShot?.[effectiveShotId];
-    const source = fromProjectSettings !== undefined ? 'projectSettings' : (fromCache !== undefined ? 'cache' : 'default(null)');
-    const selectionChanged = prevSelectedRefId.current !== selectedReferenceId;
-    const shotChanged = prevEffectiveShotId.current !== effectiveShotId;
-    
-    if (selectionChanged || shotChanged) {
-      // Get stack trace to see what triggered this change
-      const stack = new Error().stack?.split('\n').slice(2, 6).map(s => s.trim()).join(' <- ');
-      console.log('[RefJumpDebug] 🔄 ' + (shotChanged ? 'SHOT CHANGED' : 'SELECTION CHANGED') + ':', {
-        shotChanged,
-        shotFrom: prevEffectiveShotId.current?.substring(0, 8) || 'null',
-        shotTo: effectiveShotId?.substring(0, 8),
-        associatedShotId: associatedShotId?.substring(0, 8) || 'null',
-        initialShotId: initialShotId?.substring(0, 8) || 'null/undefined',
-        selectionChanged,
-        selectionFrom: prevSelectedRefId.current?.substring(0, 8) || 'null',
-        selectionTo: selectedReferenceId?.substring(0, 8) || 'null',
-        source,
-        fromProjectSettings: fromProjectSettings?.substring(0, 8) || 'undefined',
-        fromCache: fromCache?.substring(0, 8) || 'undefined',
-        isLoadingProjectSettings,
-        hasProjectSettings: !!projectImageSettings,
-        hasCachedSettings: !!cachedProjectSettings,
-        timestamp: Date.now()
-      });
-      // Log the actual full IDs for easier debugging
-      if (selectionChanged) {
-        console.log('[RefJumpDebug] 📍 Selection IDs:', {
-          from: prevSelectedRefId.current,
-          to: selectedReferenceId,
-          allSelectionsForShots: Object.entries(selectedReferenceIdByShot).map(([k, v]) => `${k.substring(0,8)}:${v?.substring(0,8)}`).join(', ')
-        });
-      }
-      prevSelectedRefId.current = selectedReferenceId;
-      prevEffectiveShotId.current = effectiveShotId;
-    }
-  }, [selectedReferenceId, effectiveShotId, projectImageSettings, cachedProjectSettings, isLoadingProjectSettings, associatedShotId, initialShotId, selectedReferenceIdByShot]);
-  
+
   // Debug log for reference selection tracking
   useEffect(() => {
     console.log('[AddToRefDebug:Form] 📋 Reference selection state', {
@@ -479,14 +436,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     updateProjectImageSettings,
   ]);
 
-  // [RefJumpDebug] Compute displayed reference ID purely from current state.
+  // Compute displayed reference ID purely from current state.
   // Uses a ref to cache the first fallback per shot (prevents flickering as more refs hydrate).
   const fallbackCache = useRef<{ shotId: string; referenceId: string } | null>(null);
-  
+
   const displayedReferenceId = useMemo(() => {
     // If we have no hydrated references yet, nothing to display
     if (hydratedReferences.length === 0) return null;
-    
+
     // If the persisted selection exists in hydrated refs, use it
     if (selectedReferenceId && hydratedReferences.some(r => r.id === selectedReferenceId)) {
       // Clear any cached fallback since we have a real selection
@@ -495,7 +452,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
       return selectedReferenceId;
     }
-    
+
     // Need a fallback - check if we already cached one for this shot
     if (fallbackCache.current?.shotId === effectiveShotId) {
       // Verify the cached fallback still exists in hydrated refs
@@ -505,7 +462,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // Cached ref no longer valid, clear it
       fallbackCache.current = null;
     }
-    
+
     // Compute fallback: most recently created reference
     const sorted = [...hydratedReferences].sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -513,13 +470,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return dateB - dateA;
     });
     const fallbackId = sorted[0]?.id ?? null;
-    
+
     // Cache this fallback so it doesn't change as more refs hydrate
     if (fallbackId) {
       fallbackCache.current = { shotId: effectiveShotId, referenceId: fallbackId };
-      console.log('[RefJumpDebug] 📌 Cached fallback for shot', effectiveShotId, ':', fallbackId.substring(0, 8));
     }
-    
+
     return fallbackId;
   }, [hydratedReferences, selectedReferenceId, effectiveShotId]);
   
@@ -744,7 +700,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Initialize generationSource and selectedTextModel from project settings
   const hasInitializedGenerationSource = useRef(false);
   useEffect(() => {
-    if (!projectImageSettings || hasInitializedGenerationSource.current) return;
+    if (isLoadingProjectSettings) return;
+    if (hasInitializedGenerationSource.current) return;
+    if (!projectImageSettings) return;
 
     if (projectImageSettings.generationSource) {
       setGenerationSource(projectImageSettings.generationSource);
@@ -753,7 +711,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       setSelectedTextModel(projectImageSettings.selectedTextModel);
     }
     hasInitializedGenerationSource.current = true;
-  }, [projectImageSettings]);
+  }, [projectImageSettings, selectedProjectId, isLoadingProjectSettings]);
 
   // Auto-migrate base64 data to URL when detected
   useEffect(() => {
@@ -1181,18 +1139,126 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   );
 
   // Persist generationSource changes to project settings
-  const handleGenerationSourceChange = useCallback((source: GenerationSource) => {
+  const handleGenerationSourceChange = useCallback(async (source: GenerationSource) => {
     setGenerationSource(source);
     markAsInteracted();
-    updateProjectImageSettings('project', { generationSource: source });
+    try {
+      await updateProjectImageSettings('project', { generationSource: source });
+    } catch (error) {
+      console.error('[GenerationSourcePersist] Failed to save generationSource:', error);
+    }
   }, [updateProjectImageSettings, markAsInteracted]);
 
   // Persist selectedTextModel changes to project settings
-  const handleTextModelChange = useCallback((model: TextToImageModel) => {
+  const handleTextModelChange = useCallback(async (model: TextToImageModel) => {
     setSelectedTextModel(model);
     markAsInteracted();
-    updateProjectImageSettings('project', { selectedTextModel: model });
+    try {
+      await updateProjectImageSettings('project', { selectedTextModel: model });
+    } catch (error) {
+      console.error('[GenerationSourcePersist] Failed to save selectedTextModel:', error);
+    }
   }, [updateProjectImageSettings, markAsInteracted]);
+
+  // Persist lastSelectedShotId changes to project settings
+  const persistLastSelectedShot = useCallback(async (shotId: string | null) => {
+    try {
+      await updateProjectImageSettings('project', { lastSelectedShotId: shotId });
+    } catch (error) {
+      console.error('Failed to save lastSelectedShotId:', error);
+    }
+  }, [updateProjectImageSettings]);
+
+  // Initialize associatedShotId from project settings
+  const hasInitializedLastSelectedShot = useRef(false);
+  useEffect(() => {
+    if (isLoadingProjectSettings) return;
+    if (hasInitializedLastSelectedShot.current) return;
+    if (!projectImageSettings) return;
+
+    // Don't override if initialShotId is a specific shot (not null/undefined)
+    // null = "no shot" context, undefined = no prop passed - both should restore
+    if (initialShotId) {
+      hasInitializedLastSelectedShot.current = true;
+      return;
+    }
+
+    const savedShotId = projectImageSettings.lastSelectedShotId;
+    if (savedShotId && shots) {
+      const shotExists = shots.some(shot => shot.id === savedShotId);
+      if (shotExists && associatedShotId !== savedShotId) {
+        setAssociatedShotId(savedShotId);
+      }
+    }
+    hasInitializedLastSelectedShot.current = true;
+  }, [projectImageSettings, isLoadingProjectSettings, initialShotId, shots, associatedShotId]);
+
+  // Initialize no-shot prompts from project settings
+  const hasInitializedProjectPrompts = useRef(false);
+  useEffect(() => {
+    if (isLoadingProjectSettings) return;
+    if (hasInitializedProjectPrompts.current) return;
+    if (!projectImageSettings) return;
+
+    // Initialize project-level prompts (used when no shot is selected)
+    if (projectImageSettings.projectPrompts?.length) {
+      setNoShotPrompts(projectImageSettings.projectPrompts);
+    }
+    if (projectImageSettings.projectMasterPrompt) {
+      setNoShotMasterPrompt(projectImageSettings.projectMasterPrompt);
+    }
+    if (projectImageSettings.projectPromptMode) {
+      setPromptMode(projectImageSettings.projectPromptMode);
+    }
+    if (projectImageSettings.projectBeforeEachPromptText) {
+      setBeforeEachPromptText(projectImageSettings.projectBeforeEachPromptText);
+    }
+    if (projectImageSettings.projectAfterEachPromptText) {
+      setAfterEachPromptText(projectImageSettings.projectAfterEachPromptText);
+    }
+    hasInitializedProjectPrompts.current = true;
+  }, [projectImageSettings, isLoadingProjectSettings]);
+
+  // Persist no-shot prompts to project settings (debounced)
+  const persistProjectPrompts = useCallback(async (prompts: PromptEntry[]) => {
+    try {
+      await updateProjectImageSettings('project', { projectPrompts: prompts });
+    } catch (error) {
+      console.error('[ProjectPrompts] ❌ Failed to save projectPrompts:', error);
+    }
+  }, [updateProjectImageSettings]);
+
+  const persistProjectMasterPrompt = useCallback(async (masterPrompt: string) => {
+    try {
+      await updateProjectImageSettings('project', { projectMasterPrompt: masterPrompt });
+    } catch (error) {
+      console.error('[ProjectPrompts] ❌ Failed to save projectMasterPrompt:', error);
+    }
+  }, [updateProjectImageSettings]);
+
+  const persistProjectPromptMode = useCallback(async (mode: PromptMode) => {
+    try {
+      await updateProjectImageSettings('project', { projectPromptMode: mode });
+    } catch (error) {
+      console.error('[ProjectPrompts] ❌ Failed to save projectPromptMode:', error);
+    }
+  }, [updateProjectImageSettings]);
+
+  const persistProjectBeforePrompt = useCallback(async (text: string) => {
+    try {
+      await updateProjectImageSettings('project', { projectBeforeEachPromptText: text });
+    } catch (error) {
+      console.error('[ProjectPrompts] ❌ Failed to save projectBeforeEachPromptText:', error);
+    }
+  }, [updateProjectImageSettings]);
+
+  const persistProjectAfterPrompt = useCallback(async (text: string) => {
+    try {
+      await updateProjectImageSettings('project', { projectAfterEachPromptText: text });
+    } catch (error) {
+      console.error('[ProjectPrompts] ❌ Failed to save projectAfterEachPromptText:', error);
+    }
+  }, [updateProjectImageSettings]);
 
   // Get current prompts - from shot settings if shot selected, otherwise local state
   // Include 'saving' status to prevent flicker during save
@@ -1218,10 +1284,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.log('[ImageGenerationForm] setPrompts for no-shot mode');
       setNoShotPrompts(prev => {
         const updatedPrompts = typeof newPrompts === 'function' ? newPrompts(prev) : newPrompts;
+        // Persist to project settings
+        persistProjectPrompts(updatedPrompts);
         return updatedPrompts;
       });
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectPrompts]);
 
   // Get current master prompt - from shot settings if shot selected, otherwise local state
   // Include 'saving' status to prevent flicker during save
@@ -1246,11 +1314,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.log('[ImageGenerationForm] setMasterPromptText for no-shot mode');
       setNoShotMasterPrompt(prev => {
         const newText = typeof newTextOrUpdater === 'function' ? newTextOrUpdater(prev) : newTextOrUpdater;
+        // Persist to project settings
+        persistProjectMasterPrompt(newText);
         return newText;
       });
       markAsInteracted();
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectMasterPrompt]);
   
   // Get current prompt mode - from shot settings if shot selected, otherwise local state
   const effectivePromptMode = useMemo<PromptMode>(() => {
@@ -1270,8 +1340,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       markAsInteracted();
     } else {
       setPromptMode(newMode);
+      // Persist to project settings
+      persistProjectPromptMode(newMode);
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectPromptMode]);
 
   // Get current selected reference ID - from shot settings if shot selected, otherwise project settings
   const effectiveSelectedReferenceId = useMemo<string | null>(() => {
@@ -1300,13 +1372,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Get current before prompt text - from shot settings if shot selected, otherwise project state
-  // Defaults to empty string (not inherited from other shots)
+  // Defaults to empty string for shots (not inherited from project)
   const currentBeforePromptText = useMemo(() => {
-    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
-    if (associatedShotId && settingsForCurrentShot &&
-        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+    // If a shot is selected, use shot-level value (or empty while loading/if not set)
+    if (associatedShotId) {
+      const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+      const shotReady = settingsForCurrentShot &&
+          (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving');
+      // Return empty while loading to avoid flash of project value
+      if (!shotReady) return '';
       return shotPromptSettings.settings.beforeEachPromptText ?? '';
     }
+    // No shot selected - use project-level value
     return beforeEachPromptText;
   }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.beforeEachPromptText, shotPromptSettings.entityId, beforeEachPromptText]);
 
@@ -1317,17 +1394,24 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       markAsInteracted();
     } else {
       setBeforeEachPromptText(newText);
+      // Persist to project settings
+      persistProjectBeforePrompt(newText);
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectBeforePrompt]);
 
   // Get current after prompt text - from shot settings if shot selected, otherwise project state
-  // Defaults to empty string (not inherited from other shots)
+  // Defaults to empty string for shots (not inherited from project)
   const currentAfterPromptText = useMemo(() => {
-    const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
-    if (associatedShotId && settingsForCurrentShot &&
-        (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving')) {
+    // If a shot is selected, use shot-level value (or empty while loading/if not set)
+    if (associatedShotId) {
+      const settingsForCurrentShot = shotPromptSettings.entityId === associatedShotId;
+      const shotReady = settingsForCurrentShot &&
+          (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving');
+      // Return empty while loading to avoid flash of project value
+      if (!shotReady) return '';
       return shotPromptSettings.settings.afterEachPromptText ?? '';
     }
+    // No shot selected - use project-level value
     return afterEachPromptText;
   }, [associatedShotId, shotPromptSettings.status, shotPromptSettings.settings.afterEachPromptText, shotPromptSettings.entityId, afterEachPromptText]);
 
@@ -1338,8 +1422,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       markAsInteracted();
     } else {
       setAfterEachPromptText(newText);
+      // Persist to project settings
+      persistProjectAfterPrompt(newText);
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectAfterPrompt]);
 
   // Save current shot settings to localStorage for inheritance by new shots
   // Note: prompts and before/after prompt text are NOT inherited, only masterPrompt and mode settings
@@ -1438,46 +1524,19 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // If initialShotId is explicitly null, reset to None (opened from outside shot context)
   const hasAppliedInitialShotId = useRef(false);
   useEffect(() => {
-    console.log('[RefJumpDebug] 🎯 initialShotId effect check:', {
-      ready,
-      hasAppliedInitialShotId: hasAppliedInitialShotId.current,
-      hasShots: !!shots,
-      shotsCount: shots?.length,
-      initialShotId: initialShotId?.substring(0, 8) || String(initialShotId),
-      currentAssociatedShotId: associatedShotId?.substring(0, 8) || 'null',
-      willApply: ready && !hasAppliedInitialShotId.current && !!shots,
-      timestamp: Date.now()
-    });
-    
     // Only apply once, after hydration is complete
+    // Only override when initialShotId is a specific shot ID (truthy string)
+    // null or undefined = keep the persisted value from project settings
     if (ready && !hasAppliedInitialShotId.current && shots) {
       if (initialShotId) {
-        // initialShotId was provided - set to that shot if it exists
+        // initialShotId was provided as a specific shot - set to that shot if it exists
         const shotExists = shots.some(shot => shot.id === initialShotId);
-        if (shotExists) {
-          // Skip if already set to the correct value (persistence may have loaded it faster)
-          if (associatedShotId === initialShotId) {
-            console.log('[RefJumpDebug] ⏭️ Skipping initialShotId - already set to:', initialShotId.substring(0, 8));
-          } else {
-            console.log('[RefJumpDebug] ✅ Applying initialShotId:', initialShotId.substring(0, 8), 'from:', associatedShotId?.substring(0, 8) || 'null');
-            setAssociatedShotId(initialShotId);
-            markAsInteracted();
-          }
-        } else {
-          console.log('[RefJumpDebug] ⚠️ initialShotId not found in shots list:', initialShotId);
-        }
-      } else if (initialShotId === null) {
-        // initialShotId is explicitly null - reset to None (opened from outside shot context)
-        // Skip if already null
-        if (associatedShotId !== null) {
-          console.log('[RefJumpDebug] 🔄 initialShotId is null, resetting from:', associatedShotId?.substring(0, 8) || 'null', 'to None');
-          setAssociatedShotId(null);
+        if (shotExists && associatedShotId !== initialShotId) {
+          setAssociatedShotId(initialShotId);
           markAsInteracted();
-        } else {
-          console.log('[RefJumpDebug] ⏭️ Skipping initialShotId null - already None');
         }
       }
-      // If initialShotId is undefined, keep the persisted value
+      // If initialShotId is null/undefined, keep the persisted value from project settings
       hasAppliedInitialShotId.current = true;
     }
   }, [ready, initialShotId, shots, markAsInteracted, associatedShotId]);
@@ -2902,18 +2961,21 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       hasOnShotChangeCallback: !!onShotChange,
       timestamp: Date.now()
     });
-    
+
     markAsInteracted();
     const newShotId = value === "none" ? null : value;
-    
+
     console.log('[ShotChangeDebug] 📝 Setting new shot ID:', {
       newShotId,
       previousShotId: associatedShotId,
       valueWasNone: value === "none"
     });
-    
+
     setAssociatedShotId(newShotId);
-    
+
+    // Persist the shot selection at project level
+    persistLastSelectedShot(newShotId);
+
     // Call the parent callback if provided
     if (onShotChange) {
       console.log('[ShotChangeDebug] 📞 Calling parent onShotChange callback with:', newShotId);
@@ -2922,7 +2984,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } else {
       console.log('[ShotChangeDebug] ❌ No onShotChange callback provided');
     }
-    
+
     // Note: Prompts for the new shot will be loaded automatically via useAutoSaveSettings
     // and initialized if empty via the initialization effect
     markAsInteracted();

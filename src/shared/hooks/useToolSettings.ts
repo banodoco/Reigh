@@ -294,6 +294,7 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
         });
       }
 
+
       // Merge in priority order: defaults → user → project → shot
       const merged = deepMerge(
         {},
@@ -589,8 +590,11 @@ export function useToolSettings<T>(
   });
 
   // Extract settings and hasShotSettings from the query result
-  const settings = queryResult?.settings;
-  const hasShotSettings = queryResult?.hasShotSettings ?? false;
+  // Handle both formats: { settings: T, hasShotSettings } (new) and T directly (legacy cache)
+  const hasSettingsWrapper = queryResult && 'settings' in queryResult && 'hasShotSettings' in queryResult;
+  const settings = hasSettingsWrapper ? queryResult?.settings : queryResult;
+  const hasShotSettings = hasSettingsWrapper ? (queryResult?.hasShotSettings ?? false) : false;
+
 
   // Log errors for debugging (except expected cancellations)
   if (error && !error?.message?.includes('Request was cancelled')) {
@@ -656,14 +660,19 @@ export function useToolSettings<T>(
     },
     onSuccess: (fullMergedSettings) => {
       // Optimistically update the cache by merging with existing cache
-      // CRITICAL: We must merge, not replace, because the cache includes user/project defaults
-      // that aren't in fullMergedSettings (which only has shot-level settings)
-      queryClient.setQueryData<T>(
+      // CRITICAL: The cache stores { settings: T, hasShotSettings: boolean } shape
+      // Handle legacy format where settings are directly on the object (no wrapper)
+      queryClient.setQueryData(
         ['toolSettings', toolId, projectId, shotId],
-        (oldData) => {
-          if (!oldData) return fullMergedSettings as T;
-          // Merge the updated shot settings over the existing cache (which includes defaults)
-          return deepMerge({}, oldData, fullMergedSettings) as T;
+        (oldData: any) => {
+          // Check if old data has the new wrapper format
+          const hasWrapper = oldData && 'settings' in oldData && 'hasShotSettings' in oldData;
+          const oldSettings = hasWrapper ? (oldData?.settings ?? {}) : (oldData ?? {});
+          const mergedSettings = deepMerge({}, oldSettings, fullMergedSettings);
+          return {
+            settings: mergedSettings,
+            hasShotSettings: hasWrapper ? (oldData?.hasShotSettings ?? false) : false
+          };
         }
       );
     },

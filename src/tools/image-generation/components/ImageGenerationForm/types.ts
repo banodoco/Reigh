@@ -156,10 +156,20 @@ export interface ProjectImageSettings {
   // Model for just-text mode
   selectedTextModel?: TextToImageModel;
 
+  // Last selected shot ID (persisted for UX continuity)
+  lastSelectedShotId?: string | null;
+
+  // Project-level prompt settings (used when no shot is selected)
+  projectPrompts?: PromptEntry[];
+  projectMasterPrompt?: string;
+  projectPromptMode?: PromptMode;
+  projectBeforeEachPromptText?: string;
+  projectAfterEachPromptText?: string;
+
   // Multi-reference structure (shot-specific selection)
   selectedReferenceIdByShot?: Record<string, string | null>; // Map of shotId -> referenceId
   references?: ReferenceImage[]; // Array of references (project-wide)
-  
+
   // Legacy structures (deprecated, kept for migration)
   selectedReferenceId?: string | null; // Old project-wide selection (deprecated)
   styleReferenceImage?: string | null; // URL of processed style reference image (used for generation)

@@ -104,7 +104,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
               ))}
             </SelectContent>
           </Select>
-          {/* Jump to animate shot link - positioned at top right of Select dropdown */}
+          {/* Visit shot link - positioned at top right of Select dropdown */}
           {associatedShotId && shots && onJumpToShot && (() => {
             const selectedShot = shots.find(shot => shot.id === associatedShotId);
             return selectedShot ? (
@@ -114,7 +114,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
                 className="absolute top-0 right-[35px] text-xs font-light text-gray-500 hover:text-gray-700 hover:underline transition-colors duration-200 px-2 py-1 rounded-md hover:bg-gray-50 -translate-y-1/2"
                 style={{ top: '50%' }}
               >
-                Jump to animate →
+                Visit →
               </button>
             ) : null;
           })()}
