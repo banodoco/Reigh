@@ -150,7 +150,12 @@ export interface HydratedReferenceImage {
 // Project-level settings for model and style reference
 export interface ProjectImageSettings {
   selectedModel?: GenerationMode;
-  
+
+  // Generation source: by-reference or just-text
+  generationSource?: GenerationSource;
+  // Model for just-text mode
+  selectedTextModel?: TextToImageModel;
+
   // Multi-reference structure (shot-specific selection)
   selectedReferenceIdByShot?: Record<string, string | null>; // Map of shotId -> referenceId
   references?: ReferenceImage[]; // Array of references (project-wide)

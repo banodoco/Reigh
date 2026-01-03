@@ -740,7 +740,21 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       setModelOverride(undefined);
     }
   }, [projectImageSettings?.selectedModel]);
-  
+
+  // Initialize generationSource and selectedTextModel from project settings
+  const hasInitializedGenerationSource = useRef(false);
+  useEffect(() => {
+    if (!projectImageSettings || hasInitializedGenerationSource.current) return;
+
+    if (projectImageSettings.generationSource) {
+      setGenerationSource(projectImageSettings.generationSource);
+    }
+    if (projectImageSettings.selectedTextModel) {
+      setSelectedTextModel(projectImageSettings.selectedTextModel);
+    }
+    hasInitializedGenerationSource.current = true;
+  }, [projectImageSettings]);
+
   // Auto-migrate base64 data to URL when detected
   useEffect(() => {
     const migrateBase64ToUrl = async () => {
@@ -1165,6 +1179,20 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       hiresFixConfig: [hiresFixConfig, setHiresFixConfig],
     }
   );
+
+  // Persist generationSource changes to project settings
+  const handleGenerationSourceChange = useCallback((source: GenerationSource) => {
+    setGenerationSource(source);
+    markAsInteracted();
+    updateProjectImageSettings('project', { generationSource: source });
+  }, [updateProjectImageSettings, markAsInteracted]);
+
+  // Persist selectedTextModel changes to project settings
+  const handleTextModelChange = useCallback((model: TextToImageModel) => {
+    setSelectedTextModel(model);
+    markAsInteracted();
+    updateProjectImageSettings('project', { selectedTextModel: model });
+  }, [updateProjectImageSettings, markAsInteracted]);
 
   // Get current prompts - from shot settings if shot selected, otherwise local state
   // Include 'saving' status to prevent flicker during save
@@ -3010,10 +3038,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             referenceCount={referenceCount}
             // Generation source toggle props (cloud mode only)
             generationSource={generationSource}
-            onGenerationSourceChange={!isLocalGenerationEnabled ? setGenerationSource : undefined}
+            onGenerationSourceChange={!isLocalGenerationEnabled ? handleGenerationSourceChange : undefined}
             // Just-text mode props
             selectedTextModel={selectedTextModel}
-            onTextModelChange={setSelectedTextModel}
+            onTextModelChange={handleTextModelChange}
             selectedLoras={loraManager.selectedLoras}
             onOpenLoraModal={() => loraManager.setIsLoraModalOpen(true)}
             onRemoveLora={(loraId) => loraManager.setSelectedLoras(loraManager.selectedLoras.filter(l => l.id !== loraId))}
