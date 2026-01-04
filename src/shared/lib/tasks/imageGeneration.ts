@@ -125,6 +125,7 @@ export interface BatchImageGenerationTaskParams {
   hires_scale?: number; // Upscale factor (e.g., 2.0 = 2x resolution)
   hires_steps?: number; // Steps for hires/refinement pass
   hires_denoise?: number; // Denoising strength for hires pass (0-1)
+  lightning_lora_strength?: number; // Lightning LoRA strength (0-1, default 0.85)
   additional_loras?: Record<string, string>; // LoRA URL -> "pass1;pass2" strength string
 }
 
@@ -340,6 +341,7 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       ...(params.hires_scale !== undefined && { hires_scale: params.hires_scale }),
       ...(params.hires_steps !== undefined && { hires_steps: params.hires_steps }),
       ...(params.hires_denoise !== undefined && { hires_denoise: params.hires_denoise }),
+      ...(params.lightning_lora_strength !== undefined && { lightning_lora_strength: params.lightning_lora_strength }),
       // Per-phase LoRA strengths for hires fix (overrides additional_loras if provided)
       ...(params.additional_loras && Object.keys(params.additional_loras).length > 0 && {
         additional_loras: params.additional_loras
@@ -430,6 +432,7 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
           ...(params.hires_scale !== undefined && { hires_scale: params.hires_scale }),
           ...(params.hires_steps !== undefined && { hires_steps: params.hires_steps }),
           ...(params.hires_denoise !== undefined && { hires_denoise: params.hires_denoise }),
+          ...(params.lightning_lora_strength !== undefined && { lightning_lora_strength: params.lightning_lora_strength }),
           ...(params.additional_loras && { additional_loras: params.additional_loras }),
         } as ImageGenerationTaskParams;
       });
