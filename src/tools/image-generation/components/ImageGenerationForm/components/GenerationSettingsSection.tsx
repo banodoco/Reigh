@@ -166,6 +166,18 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
             disabled={disabled}
             numberInputClassName="w-20"
           />
+
+          {/* Lightning LoRA Strength */}
+          <SliderWithValue
+            label="Lightning LoRA Strength"
+            value={hiresFixConfig.lightningLoraStrength ?? 0.85}
+            onChange={(v) => updateField('lightningLoraStrength', v)}
+            min={0}
+            max={1.0}
+            step={0.01}
+            disabled={disabled}
+            numberInputClassName="w-20"
+          />
         </div>
 
         {/* Per-Phase LoRA Strengths */}
@@ -219,12 +231,6 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
               Set 0 to disable a LoRA for that pass. Values &gt;1 increase strength.
             </p>
           </div>
-        )}
-
-        {!hasLoras && (
-          <p className="text-xs text-muted-foreground">
-            Add LoRAs above to configure per-phase strengths.
-          </p>
         )}
       </div>
     </CollapsibleSection>

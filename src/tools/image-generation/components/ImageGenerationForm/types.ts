@@ -256,6 +256,8 @@ export interface HiresFixConfig {
   hiresDenoise: number;
   /** Per-LoRA phase strength overrides */
   phaseLoraStrengths: PhaseLoraStrength[];
+  /** Lightning LoRA strength (0-1, default 0.85) */
+  lightningLoraStrength: number;
 }
 
 /** Default hires fix configuration */
@@ -266,4 +268,5 @@ export const DEFAULT_HIRES_FIX_CONFIG: HiresFixConfig = {
   hiresSteps: 6,
   hiresDenoise: 0.5,
   phaseLoraStrengths: [],
+  lightningLoraStrength: 0.85,
 };
