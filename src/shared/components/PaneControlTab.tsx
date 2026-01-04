@@ -66,6 +66,10 @@ interface PaneControlTabProps {
    * instead of openPane(). Useful for navigating to a page instead of opening the pane.
    */
   customOpenAction?: () => void;
+  /**
+   * Optional data-tour attribute for product tour targeting.
+   */
+  dataTour?: string;
 }
 
 // Helper component to wrap buttons in tooltips (desktop only)
@@ -109,6 +113,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   paneTooltip,
   allowMobileLock = false,
   customOpenAction,
+  dataTour,
 }) => {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -252,6 +257,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
         return (
         <div
           data-pane-control
+          data-tour={dataTour}
           style={dynamicStyle}
           className={cn(
             `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
@@ -336,6 +342,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
       return (
         <div
           data-pane-control
+          data-tour={dataTour}
           style={dynamicStyle}
           className={cn(
             `fixed ${mobileZIndex} flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
@@ -448,6 +455,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
     return (
       <div
         data-pane-control
+        data-tour={dataTour}
         style={dynamicStyle}
         className={cn(
           `fixed ${mobileZIndex} flex flex-col items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
@@ -494,6 +502,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
       <TooltipProvider delayDuration={300}>
         <div
           data-pane-control
+          data-tour={dataTour}
           style={dynamicStyle}
           className={cn(
             `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
@@ -589,6 +598,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
       <TooltipProvider delayDuration={300}>
         <div
           data-pane-control
+          data-tour={dataTour}
           style={dynamicStyle}
           className={cn(
             `fixed ${PANE_CONFIG.zIndex.CONTROL_LOCKED} flex items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_ONLY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
@@ -684,6 +694,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
     <TooltipProvider delayDuration={300}>
       <div
         data-pane-control
+        data-tour={dataTour}
         style={dynamicStyle}
         className={cn(
           `fixed ${PANE_CONFIG.zIndex.CONTROL_UNLOCKED} flex items-center p-1 bg-zinc-800/80 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 ${PANE_CONFIG.transition.PROPERTIES.TRANSFORM_OPACITY} duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,

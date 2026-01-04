@@ -948,7 +948,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const currentVideo = lightboxIndex !== null ? sortedVideoOutputs[lightboxIndex] : null;
 
   return (
-    <div className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm">
+    <div className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm" data-tour="video-gallery">
       <div className="flex flex-col space-y-2 sm:space-y-3">
         <GalleryControls
           sortedVideoOutputs={displaySortedVideoOutputs}

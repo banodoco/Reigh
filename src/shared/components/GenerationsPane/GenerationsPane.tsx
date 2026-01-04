@@ -426,6 +426,7 @@ const GenerationsPaneComponent: React.FC = () => {
           paneTooltip="Generate new image"
           allowMobileLock={true}
           customOpenAction={() => setIsGenerationModalOpen(true)}
+          dataTour="generations-pane-tab"
         />
       )}
       <div

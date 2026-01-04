@@ -269,6 +269,7 @@ const ToolsPaneComponent: React.FC = () => {
           content: <currentTool.icon className="h-4 w-4" />,
           tooltip: `Current tool: ${currentTool.name}`
         } : undefined}
+        dataTour="tools-pane-tab"
       />
       <div
         className="pointer-events-none"

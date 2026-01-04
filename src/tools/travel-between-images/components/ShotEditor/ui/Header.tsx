@@ -153,7 +153,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
         </div>
         
         {/* Desktop shot name with navigation buttons - centered */}
-        <div ref={centerSectionRef} className="flex items-center justify-center">
+        <div ref={centerSectionRef} className="flex items-center justify-center" data-tour="shot-selector">
           {isEditingName ? (
             // Hide navigation buttons when editing - only show name editing controls
             <div className="flex items-center space-x-2">

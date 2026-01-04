@@ -797,6 +797,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         }}
         paneIcon="tasks"
         paneTooltip="View all tasks"
+        dataTour="tasks-pane-tab"
       />
       <div
         className="pointer-events-none"

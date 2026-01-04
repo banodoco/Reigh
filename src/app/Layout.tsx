@@ -19,6 +19,8 @@ import { WelcomeBonusModal } from '@/shared/components/WelcomeBonusModal';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { usePageVisibility } from '@/shared/hooks/usePageVisibility';
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { ProductTour } from '@/shared/components/ProductTour';
+import { useProductTour } from '@/shared/hooks/useProductTour';
 import '@/shared/lib/debugPolling';
 import { SocialIcons } from '@/shared/components/SocialIcons';
 import { AIInputModeProvider } from '@/shared/contexts/AIInputModeContext';
@@ -216,8 +218,9 @@ const Layout: React.FC = () => {
   const { showWelcomeModal, closeWelcomeModal } = useWelcomeBonus();
   const navigate = useNavigate();
   const { selectedProjectId } = useProject();
+  const { startTour } = useProductTour();
 
-  // Handle welcome modal close - navigate to Getting Started shot
+  // Handle welcome modal close - navigate to Getting Started shot, then start tour
   const handleWelcomeClose = useCallback(async () => {
     closeWelcomeModal();
 
@@ -234,15 +237,18 @@ const Layout: React.FC = () => {
         if (shot) {
           console.log('[Onboarding] Navigating to Getting Started shot:', shot.id);
           navigate(`/tools/travel-between-images?shot=${shot.id}`);
+
+          // Start product tour after brief delay to let the page load
+          setTimeout(() => {
+            console.log('[Onboarding] Starting product tour');
+            startTour();
+          }, 1000);
         }
       } catch (err) {
         console.error('[Onboarding] Failed to find Getting Started shot:', err);
       }
     }
-
-    // TODO: Start product tour after brief delay
-    // setTimeout(() => startTour(), 500);
-  }, [closeWelcomeModal, selectedProjectId, navigate]);
+  }, [closeWelcomeModal, selectedProjectId, navigate, startTour]);
 
   // Preload user settings to warm the cache for the welcome modal
   // This prevents loading delays when users reach the generation method step
@@ -379,6 +385,9 @@ const Layout: React.FC = () => {
           isOpen={showWelcomeModal}
           onClose={handleWelcomeClose}
         />
+
+        {/* Product Tour */}
+        <ProductTour />
       </div>
     </AIInputModeProvider>
   );

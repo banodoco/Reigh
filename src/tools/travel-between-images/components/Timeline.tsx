@@ -793,7 +793,7 @@ const Timeline: React.FC<TimelineProps> = ({
   }, [onImageUpload, onGenerationDrop]);
 
   return (
-    <div className="w-full overflow-x-hidden relative">
+    <div className="w-full overflow-x-hidden relative" data-tour="timeline">
       {/* Blur and overlay when no images */}
       {hasNoImages && (
         <>
