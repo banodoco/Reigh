@@ -446,8 +446,8 @@ Please be very specific with file paths, command syntax, and verification steps 
         ? `.\\venv\\Scripts\\Activate.ps1`
         : `venv\\Scripts\\activate.bat`;
         
-      return `git clone https://github.com/peteromallet/Headless-Wan2GP.git
-cd Headless-Wan2GP
+      return `git clone https://github.com/banodoco/Reigh-Worker.git
+cd Reigh-Worker
 python -m venv venv
 ${activateCmd}
 ${torchInstall}
@@ -458,8 +458,8 @@ python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not avai
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux command
-      return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
-cd Headless-Wan2GP && \\
+      return `git clone https://github.com/banodoco/Reigh-Worker && \\
+cd Reigh-Worker && \\
 sudo apt-get update && sudo apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
 source venv/bin/activate && \\
@@ -482,8 +482,8 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
     if (computerType === "windows") {
       // Shell-specific activation and directory check
       const cdCheck = windowsShell === "powershell"
-        ? `if (!(Test-Path worker.py)) { cd Headless-Wan2GP }`
-        : `if not exist worker.py cd Headless-Wan2GP`;
+        ? `if (!(Test-Path worker.py)) { cd Reigh-Worker }`
+        : `if not exist worker.py cd Reigh-Worker`;
       const activateCmd = windowsShell === "powershell" 
         ? `.\\venv\\Scripts\\Activate.ps1`
         : `venv\\Scripts\\activate.bat`;
@@ -494,7 +494,7 @@ ${activateCmd}
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux / Mac command - auto-cd if not in correct folder
-      return `[ ! -f "worker.py" ] && cd Headless-Wan2GP
+      return `[ ! -f "worker.py" ] && cd Reigh-Worker
 git pull && \\
 source venv/bin/activate && \\
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\

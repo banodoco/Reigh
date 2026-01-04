@@ -586,7 +586,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   <div className="flex items-center space-x-3">
                     <div style={getPopStyle(0.8, false)}>
                       <a
-                        href="http://github.com/peteromallet/reigh"
+                        href="https://github.com/banodoco/Reigh"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="block p-2 bg-transparent rounded-full border border-[#ecede3]/30 hover:border-[#ecede3]/60 transition-all duration-300 hover:bg-[#ecede3]/10 group"
