@@ -100,8 +100,28 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
     navigate('/tools/image-generation');
   }, [onClose, navigate]);
 
+  // Check if product tour is active (Joyride elements exist in DOM)
+  const isTourActive = useCallback(() => {
+    return !!document.querySelector('.react-joyride__overlay');
+  }, []);
+
+  // Handle open state changes
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      // During tour, only close via the closeGenerationModal event
+      if (isTourActive()) {
+        console.log('[ProductTour] Blocking modal close (tour active)');
+        return;
+      }
+      onClose();
+    }
+  }, [onClose, isTourActive]);
+
+  // During tour, make dialog non-modal so clicks can reach Joyride buttons
+  const tourActive = isTourActive();
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange} modal={!tourActive}>
       <DialogContent
         className={`${modal.className} gap-2 overflow-hidden flex flex-col`}
         style={{
@@ -109,8 +129,9 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           maxWidth: '900px',
           width: 'calc(100vw - 2rem)',
         }}
-        onPointerDownOutside={() => onClose()}
-        onInteractOutside={() => onClose()}
+        // During tour, don't handle outside interactions - let clicks pass through to Joyride
+        onPointerDownOutside={(e) => !isTourActive() && onClose()}
+        onInteractOutside={(e) => !isTourActive() && onClose()}
         onOpenAutoFocus={(e) => e.preventDefault()}
         {...modal.props}
       >

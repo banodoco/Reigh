@@ -61,6 +61,8 @@ import {
   TextToImageModel,
   getLoraTypeForModel,
   BY_REFERENCE_LORA_TYPE,
+  ReferenceApiParams,
+  DEFAULT_REFERENCE_PARAMS,
 } from "./types";
 
 // Lazy load modals to improve initial bundle size and performance
@@ -126,24 +128,20 @@ interface BuildBatchTaskParamsInput {
   prompts: PromptEntry[];
   imagesPerPrompt: number;
   shotId: string | null;
-  styleRef: string | null;
-  styleStrength: number;
-  subjectStrength: number;
-  subjectDescription: string;
-  inThisScene: boolean;
-  inThisSceneStrength: number;
-  referenceMode: string;
   beforePromptText: string;
   afterPromptText: string;
-  styleBoostTerms: string;
+  styleBoostTerms: string; // Appended to prompts, NOT sent to API
   isLocalGenerationEnabled: boolean;
   hiresFixConfig: HiresFixConfig;
   modelName: string; // Model name for task type mapping (e.g., 'qwen-image', 'qwen-image-2512', 'z-image')
+  // Reference params grouped together - snake_case to match API directly
+  referenceParams: ReferenceApiParams;
 }
 
 function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGenerationTaskParams {
-  const effectiveAfterText = input.styleBoostTerms.trim()
-    ? `${input.afterPromptText}${input.afterPromptText.trim() ? ', ' : ''}${input.styleBoostTerms.trim()}`
+  const styleBoostTerms = input.styleBoostTerms?.trim() ?? '';
+  const effectiveAfterText = styleBoostTerms
+    ? `${input.afterPromptText}${input.afterPromptText.trim() ? ', ' : ''}${styleBoostTerms}`
     : input.afterPromptText;
 
   return {
@@ -161,15 +159,16 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
     shot_id: input.shotId || undefined,
     model_name: input.modelName,
     steps: input.isLocalGenerationEnabled ? input.hiresFixConfig.base_steps : undefined,
-    ...(input.styleRef && {
-      style_reference_image: input.styleRef,
-      style_reference_strength: input.styleStrength,
-      subject_reference_image: input.styleRef,
-      subject_strength: input.subjectStrength,
-      subject_description: input.subjectDescription,
-      in_this_scene: input.inThisScene,
-      in_this_scene_strength: input.inThisSceneStrength,
-      reference_mode: input.referenceMode,
+    // Reference params - spread directly (already snake_case)
+    ...(input.referenceParams.style_reference_image && {
+      style_reference_image: input.referenceParams.style_reference_image,
+      style_reference_strength: input.referenceParams.style_reference_strength,
+      subject_reference_image: input.referenceParams.style_reference_image, // Same image for both
+      subject_strength: input.referenceParams.subject_strength,
+      subject_description: input.referenceParams.subject_description,
+      in_this_scene: input.referenceParams.in_this_scene,
+      in_this_scene_strength: input.referenceParams.in_this_scene_strength,
+      reference_mode: input.referenceParams.reference_mode,
     }),
     // Hires fix params - field names match API directly (no conversion needed)
     ...(input.isLocalGenerationEnabled && {
@@ -271,10 +270,24 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [steps, setSteps] = useState(12); // Default to 12 steps for local generation
   const [hiresFixConfigRaw, setHiresFixConfig] = useState<Partial<HiresFixConfig>>({});
   // Always merge with defaults to handle incomplete persisted data
-  const hiresFixConfig = useMemo<HiresFixConfig>(() => ({
-    ...DEFAULT_HIRES_FIX_CONFIG,
-    ...hiresFixConfigRaw,
-  }), [hiresFixConfigRaw]);
+  // Also migrate legacy camelCase field names to snake_case
+  const hiresFixConfig = useMemo<HiresFixConfig>(() => {
+    const raw = hiresFixConfigRaw as Record<string, unknown>;
+    // Migrate legacy camelCase fields if present
+    const migrated: Partial<HiresFixConfig> = {
+      ...hiresFixConfigRaw,
+      // Map old camelCase to new snake_case (prefer new names if both exist)
+      base_steps: (raw.base_steps as number) ?? (raw.baseSteps as number),
+      hires_scale: (raw.hires_scale as number) ?? (raw.hiresScale as number),
+      hires_steps: (raw.hires_steps as number) ?? (raw.hiresSteps as number),
+      hires_denoise: (raw.hires_denoise as number) ?? (raw.hiresDenoise as number),
+      lightning_lora_strength: (raw.lightning_lora_strength as number) ?? (raw.lightningLoraStrength as number),
+    };
+    return {
+      ...DEFAULT_HIRES_FIX_CONFIG,
+      ...migrated,
+    };
+  }, [hiresFixConfigRaw]);
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
@@ -2383,24 +2396,28 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return;
     }
 
+    const referenceParams: ReferenceApiParams = {
+      style_reference_image: styleReferenceImageGeneration ?? undefined,
+      style_reference_strength: currentStyleStrength,
+      subject_strength: currentSubjectStrength,
+      subject_description: effectiveSubjectDescription,
+      in_this_scene: currentInThisScene,
+      in_this_scene_strength: currentInThisSceneStrength,
+      reference_mode: referenceMode,
+    };
+
     const batchTaskParams = buildBatchTaskParams({
       projectId: selectedProjectId!,
       prompts: activePrompts,
       imagesPerPrompt,
       shotId: associatedShotId,
-      styleRef: styleReferenceImageGeneration,
-      styleStrength: currentStyleStrength,
-      subjectStrength: currentSubjectStrength,
-      subjectDescription: effectiveSubjectDescription,
-      inThisScene: currentInThisScene,
-      inThisSceneStrength: currentInThisSceneStrength,
-      referenceMode,
       beforePromptText: currentBeforePromptText,
       afterPromptText: currentAfterPromptText,
       styleBoostTerms: currentStyleBoostTerms,
       isLocalGenerationEnabled,
       hiresFixConfig,
       modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
+      referenceParams,
     });
 
     const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
@@ -2451,24 +2468,28 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     console.log('[ImageGenerationForm] Use Existing Prompts: Using', activePrompts.length, 'existing prompts');
 
+    const referenceParams: ReferenceApiParams = {
+      style_reference_image: styleReferenceImageGeneration ?? undefined,
+      style_reference_strength: currentStyleStrength,
+      subject_strength: currentSubjectStrength,
+      subject_description: effectiveSubjectDescription,
+      in_this_scene: currentInThisScene,
+      in_this_scene_strength: currentInThisSceneStrength,
+      reference_mode: referenceMode,
+    };
+
     const batchTaskParams = buildBatchTaskParams({
       projectId: selectedProjectId!,
       prompts: activePrompts,
       imagesPerPrompt: promptMultiplier,
       shotId: associatedShotId,
-      styleRef: styleReferenceImageGeneration,
-      styleStrength: currentStyleStrength,
-      subjectStrength: currentSubjectStrength,
-      subjectDescription: effectiveSubjectDescription,
-      inThisScene: currentInThisScene,
-      inThisSceneStrength: currentInThisSceneStrength,
-      referenceMode,
       beforePromptText: currentBeforePromptText,
       afterPromptText: currentAfterPromptText,
       styleBoostTerms: currentStyleBoostTerms,
       isLocalGenerationEnabled,
       hiresFixConfig,
       modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
+      referenceParams,
     });
 
     const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
@@ -2550,24 +2571,28 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       setPrompts(newPrompts);
 
       // Now generate images with these prompts
+      const referenceParams: ReferenceApiParams = {
+        style_reference_image: styleReferenceImageGeneration ?? undefined,
+        style_reference_strength: currentStyleStrength,
+        subject_strength: currentSubjectStrength,
+        subject_description: effectiveSubjectDescription,
+        in_this_scene: currentInThisScene,
+        in_this_scene_strength: currentInThisSceneStrength,
+        reference_mode: referenceMode,
+      };
+
       const batchTaskParams = buildBatchTaskParams({
         projectId: selectedProjectId!,
         prompts: newPrompts,
         imagesPerPrompt: promptMultiplier,
         shotId: associatedShotId,
-        styleRef: styleReferenceImageGeneration,
-        styleStrength: currentStyleStrength,
-        subjectStrength: currentSubjectStrength,
-        subjectDescription: effectiveSubjectDescription,
-        inThisScene: currentInThisScene,
-        inThisSceneStrength: currentInThisSceneStrength,
-        referenceMode,
         beforePromptText: currentBeforePromptText,
         afterPromptText: currentAfterPromptText,
         styleBoostTerms: currentStyleBoostTerms,
         isLocalGenerationEnabled,
         hiresFixConfig,
         modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
+        referenceParams,
       });
 
       const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
@@ -2697,24 +2722,28 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           setPrompts(newPrompts);
 
           // Build batch task parameters
+          const referenceParams: ReferenceApiParams = {
+            style_reference_image: capturedStyleRef ?? undefined,
+            style_reference_strength: capturedStyleStrength,
+            subject_strength: capturedSubjectStrength,
+            subject_description: capturedSubjectDescription,
+            in_this_scene: capturedInThisScene,
+            in_this_scene_strength: capturedInThisSceneStrength,
+            reference_mode: capturedReferenceMode,
+          };
+
           const batchTaskParams = buildBatchTaskParams({
             projectId: capturedProjectId,
             prompts: newPrompts,
             imagesPerPrompt: capturedPromptMultiplier,
             shotId: capturedAssociatedShotId,
-            styleRef: capturedStyleRef,
-            styleStrength: capturedStyleStrength,
-            subjectStrength: capturedSubjectStrength,
-            subjectDescription: capturedSubjectDescription,
-            inThisScene: capturedInThisScene,
-            inThisSceneStrength: capturedInThisSceneStrength,
-            referenceMode: capturedReferenceMode,
             beforePromptText: capturedBeforePromptText,
             afterPromptText: capturedAfterPromptText,
             styleBoostTerms: capturedStyleBoostTerms,
             isLocalGenerationEnabled: capturedIsLocalGenerationEnabled,
             hiresFixConfig: capturedHiresFixConfig,
             modelName: capturedModelName,
+            referenceParams,
           });
 
           const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
@@ -2764,24 +2793,28 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
 
     // Build task params using helper
+    const referenceParams: ReferenceApiParams = {
+      style_reference_image: styleReferenceImageGeneration ?? undefined,
+      style_reference_strength: currentStyleStrength,
+      subject_strength: currentSubjectStrength,
+      subject_description: effectiveSubjectDescription,
+      in_this_scene: currentInThisScene,
+      in_this_scene_strength: currentInThisSceneStrength,
+      reference_mode: referenceMode,
+    };
+
     const batchTaskParams = buildBatchTaskParams({
       projectId: selectedProjectId!,
       prompts: activePrompts,
       imagesPerPrompt,
       shotId: associatedShotId,
-      styleRef: styleReferenceImageGeneration,
-      styleStrength: currentStyleStrength,
-      subjectStrength: currentSubjectStrength,
-      subjectDescription: effectiveSubjectDescription,
-      inThisScene: currentInThisScene,
-      inThisSceneStrength: currentInThisSceneStrength,
-      referenceMode,
       beforePromptText: currentBeforePromptText,
       afterPromptText: currentAfterPromptText,
       styleBoostTerms: currentStyleBoostTerms,
       isLocalGenerationEnabled,
       hiresFixConfig,
       modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
+      referenceParams,
     });
 
     const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {

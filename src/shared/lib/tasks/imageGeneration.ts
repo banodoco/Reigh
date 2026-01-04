@@ -7,6 +7,49 @@ import {
   BaseTaskParams,
 } from '../taskCreation';
 
+// ============================================================================
+// API Parameter Types (single source of truth)
+// ============================================================================
+
+/** Reference mode for image generation */
+export type ReferenceMode = 'style' | 'subject' | 'style-character' | 'scene' | 'custom';
+
+/**
+ * Reference-related API parameters for image generation tasks.
+ * Uses snake_case to match API directly.
+ */
+export interface ReferenceApiParams {
+  style_reference_image?: string;
+  style_reference_strength: number;
+  subject_strength: number;
+  subject_description: string;
+  in_this_scene: boolean;
+  in_this_scene_strength: number;
+  reference_mode: ReferenceMode;
+}
+
+/** Default reference params */
+export const DEFAULT_REFERENCE_PARAMS: ReferenceApiParams = {
+  style_reference_strength: 1.0,
+  subject_strength: 0.0,
+  subject_description: '',
+  in_this_scene: false,
+  in_this_scene_strength: 0.0,
+  reference_mode: 'style',
+};
+
+/**
+ * Hires fix API parameters for image generation tasks.
+ * Uses snake_case to match API directly.
+ */
+export interface HiresFixApiParams {
+  hires_scale?: number;
+  hires_steps?: number;
+  hires_denoise?: number;
+  lightning_lora_strength?: number;
+  additional_loras?: Record<string, string>;
+}
+
 /**
  * Filter reference settings based on the selected reference mode.
  * This ensures only relevant settings are passed to the backend based on what mode is active.
@@ -74,33 +117,27 @@ function filterReferenceSettingsByMode(
 }
 
 /**
- * Parameters for creating an image generation task
- * Maps to the parameters expected by the single-image-generate edge function
+ * Parameters for creating an image generation task.
+ * Extends ReferenceApiParams and HiresFixApiParams for single source of truth.
  */
-export interface ImageGenerationTaskParams {
+export interface ImageGenerationTaskParams extends Partial<ReferenceApiParams>, Partial<HiresFixApiParams> {
   project_id: string;
   prompt: string;
   negative_prompt?: string;
-  resolution?: string; // e.g., "512x512" - will be resolved from project if not provided
+  resolution?: string;
   model_name?: string;
   seed?: number;
   loras?: Array<{ path: string; strength: number }>;
-  shot_id?: string; // Optional: associate generated image with a shot
-  style_reference_image?: string; // URL of uploaded style reference image for Qwen.Image model
-  style_reference_strength?: number; // Strength for style reference (0.1-2.0)
-  subject_reference_image?: string; // URL of uploaded subject reference image for Qwen.Image model
-  subject_strength?: number; // Strength for subject reference (0.0-2.0)
-  subject_description?: string; // Text description of the subject for Qwen.Image model
-  in_this_scene?: boolean; // Whether the subject is "in this scene"
-  in_this_scene_strength?: number; // Strength for "in this scene" LoRA (0.0-2.0)
-  steps?: number; // Number of inference steps
-  reference_mode?: 'style' | 'subject' | 'style-character' | 'scene' | 'custom'; // Reference mode to filter settings
+  shot_id?: string;
+  subject_reference_image?: string; // Can differ from style_reference_image
+  steps?: number;
 }
 
 /**
- * Parameters for creating multiple image generation tasks (batch generation)
+ * Parameters for creating multiple image generation tasks (batch generation).
+ * Extends ReferenceApiParams and HiresFixApiParams for single source of truth.
  */
-export interface BatchImageGenerationTaskParams {
+export interface BatchImageGenerationTaskParams extends Partial<ReferenceApiParams>, Partial<HiresFixApiParams> {
   project_id: string;
   prompts: Array<{
     id: string;
@@ -112,21 +149,8 @@ export interface BatchImageGenerationTaskParams {
   shot_id?: string;
   resolution?: string;
   model_name?: string;
-  style_reference_image?: string; // URL of uploaded style reference image for Qwen.Image model
-  style_reference_strength?: number; // Strength for style reference (0.1-2.0)
-  subject_reference_image?: string; // URL of uploaded subject reference image for Qwen.Image model
-  subject_strength?: number; // Strength for subject reference (0.0-2.0)
-  subject_description?: string; // Text description of the subject for Qwen.Image model
-  in_this_scene?: boolean; // Whether the subject is "in this scene"
-  in_this_scene_strength?: number; // Strength for "in this scene" LoRA (0.0-2.0)
-  steps?: number; // Number of inference steps
-  reference_mode?: 'style' | 'subject' | 'style-character' | 'scene' | 'custom'; // Reference mode to filter settings
-  // Two-pass hires fix settings
-  hires_scale?: number; // Upscale factor (e.g., 2.0 = 2x resolution)
-  hires_steps?: number; // Steps for hires/refinement pass
-  hires_denoise?: number; // Denoising strength for hires pass (0-1)
-  lightning_lora_strength?: number; // Lightning LoRA strength (0-1, default 0.85)
-  additional_loras?: Record<string, string>; // LoRA URL -> "pass1;pass2" strength string
+  subject_reference_image?: string; // Can differ from style_reference_image
+  steps?: number;
 }
 
 /**

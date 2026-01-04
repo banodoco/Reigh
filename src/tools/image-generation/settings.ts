@@ -16,6 +16,22 @@ export interface ActiveLora {
 
 export type PromptMode = 'managed' | 'automated';
 
+export interface HiresFixConfig {
+  enabled: boolean;
+  base_steps: number;
+  hires_scale: number;
+  hires_steps: number;
+  hires_denoise: number;
+  lightning_lora_strength: number;
+  phaseLoraStrengths: Array<{
+    loraId: string;
+    loraPath: string;
+    loraName: string;
+    pass1Strength: number;
+    pass2Strength: number;
+  }>;
+}
+
 export interface ImageGenerationSettings {
   prompts?: PromptEntry[];
   promptsByShot?: Record<string, PromptEntry[]>; // Prompts organized by shot ID
@@ -31,6 +47,7 @@ export interface ImageGenerationSettings {
   promptMode?: PromptMode;
   masterPromptByShot?: Record<string, string>; // Master prompt per shot ID
   masterPromptText?: string; // Legacy - kept for migration
+  hiresFixConfig?: HiresFixConfig; // Two-pass hires fix settings
 }
 
 export const defaultImageGenerationSettings: ImageGenerationSettings = {
@@ -45,7 +62,7 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   promptsByShot: {},
   // Note: beforeEachPromptText/afterEachPromptText are NOT persisted
   associatedShotId: null,
-  
+
   // Configuration fields (can inherit to new projects)
   imagesPerPrompt: 1,
   selectedLorasByMode: {
@@ -59,6 +76,15 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   promptMode: 'automated',
   masterPromptByShot: {},
   masterPromptText: '', // Legacy - kept for migration
+  hiresFixConfig: {
+    enabled: true,
+    base_steps: 8,
+    hires_scale: 1,
+    hires_steps: 6,
+    hires_denoise: 0.6,
+    lightning_lora_strength: 0.95,
+    phaseLoraStrengths: [],
+  },
 };
 
 export const imageGenerationSettings = {

@@ -86,11 +86,16 @@ const GenerationsPaneComponent: React.FC = () => {
   // Image generation modal state
   const [isGenerationModalOpen, setIsGenerationModalOpen] = useState(false);
 
-  // Listen for custom event from product tour to close modal
+  // Listen for custom events from product tour to open/close modal
   useEffect(() => {
+    const handleOpenModal = () => setIsGenerationModalOpen(true);
     const handleCloseModal = () => setIsGenerationModalOpen(false);
+    window.addEventListener('openGenerationModal', handleOpenModal);
     window.addEventListener('closeGenerationModal', handleCloseModal);
-    return () => window.removeEventListener('closeGenerationModal', handleCloseModal);
+    return () => {
+      window.removeEventListener('openGenerationModal', handleOpenModal);
+      window.removeEventListener('closeGenerationModal', handleCloseModal);
+    };
   }, []);
 
   // Use the generalized logic - data loading now enabled on all pages
@@ -692,9 +697,10 @@ const GenerationsPaneComponent: React.FC = () => {
                 )}
             </div>
         </div>
-        <div 
+        <div
           className="flex-grow px-1 sm:px-3 overflow-y-auto overscroll-contain flex flex-col"
           style={{ WebkitOverflowScrolling: 'touch' }}
+          data-tour="gallery-section"
         >
             {isLoading && (
                 <SkeletonGallery

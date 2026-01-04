@@ -11,34 +11,43 @@ export const tourStepColors = [
   { bg: 'bg-pink-100 dark:bg-pink-900/20', icon: 'text-pink-600 dark:text-pink-400' },
   { bg: 'bg-indigo-100 dark:bg-indigo-900/20', icon: 'text-indigo-600 dark:text-indigo-400' },
   { bg: 'bg-orange-100 dark:bg-orange-900/20', icon: 'text-orange-600 dark:text-orange-400' },
+  { bg: 'bg-sky-100 dark:bg-sky-900/20', icon: 'text-sky-600 dark:text-sky-400' },
 ];
 
 export const tourSteps: Step[] = [
   // Step 0: Lock button to open generations pane
   {
     target: '[data-tour="generations-lock"]',
-    content: 'Click the lock to open and pin your gallery. This is where all your generated images will appear.',
+    content: 'Click the lock to open and pin your gallery.',
     title: 'Open Your Gallery',
     disableBeacon: true,
     spotlightClicks: true,
     placement: 'top',
   },
-  // Step 1: Sparkles button to open generation modal
+  // Step 1: Gallery - show where images appear
+  {
+    target: '[data-tour="gallery-section"]',
+    content: 'All your generated images will appear here in your gallery.',
+    title: 'Your Image Gallery',
+    placement: 'left',
+    disableScrolling: true,
+  },
+  // Step 2: Sparkles button to open generation modal
   {
     target: '[data-tour="generations-sparkles"]',
-    content: 'Click here to open the image generation dialog and create your first keyframe!',
+    content: 'Click here to generate new images!',
     title: 'Generate Images',
     spotlightClicks: true,
     placement: 'top',
   },
-  // Step 2: High-level instructions (centered, shown when modal is open)
+  // Step 3: High-level instructions (centered, shown when modal is open)
   {
     target: 'body',
     content: 'Create images with AI, then arrange them on a timeline to generate videos that "travel" between your keyframes. Start by generating some images!',
     title: 'How It Works',
     placement: 'center',
   },
-  // Step 3: Click into first shot
+  // Step 4: Click into first shot
   {
     target: '[data-tour="first-shot"]',
     content: 'Click on this shot to open it and see the timeline, where you can arrange your keyframes.',
@@ -46,21 +55,21 @@ export const tourSteps: Step[] = [
     spotlightClicks: true,
     placement: 'bottom',
   },
-  // Step 4: First video output
+  // Step 5: First video output
   {
     target: '[data-tour="first-video-output"]',
     content: 'Generated videos appear here. Each video "travels" between your keyframes.',
     title: 'Video Outputs',
-    placement: 'bottom',
+    placement: 'right',
   },
-  // Step 5: Timeline explanation
+  // Step 6: Timeline explanation
   {
     target: '[data-tour="timeline"]',
     content: 'The timeline shows your keyframes in sequence. Drag images here to add them, or reorder to change the video flow.',
     title: 'The Timeline',
     placement: 'top',
   },
-  // Step 6: Tasks pane
+  // Step 7: Tasks pane
   {
     target: '[data-tour="tasks-pane-tab"]',
     content: 'Track your generation tasks here. See progress and manage your queue.',
@@ -68,7 +77,7 @@ export const tourSteps: Step[] = [
     spotlightClicks: true,
     placement: 'top',
   },
-  // Step 7: Tools pane
+  // Step 8: Tools pane
   {
     target: '[data-tour="tools-pane-tab"]',
     content: 'Different tools help you create images, videos, and more. Explore them to unlock more creative possibilities!',
@@ -76,7 +85,7 @@ export const tourSteps: Step[] = [
     spotlightClicks: true,
     placement: 'right',
   },
-  // Step 8: Final message (centered)
+  // Step 9: Final message (centered)
   {
     target: 'body',
     content: "You're all set! Generate some images, add them to your timeline, then create a video to bring them to life. Have fun!",

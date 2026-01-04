@@ -1,3 +1,6 @@
+// Import API types from shared (used in interfaces below, re-exported at bottom)
+import { ReferenceMode } from '@/shared/lib/tasks/imageGeneration';
+
 export type GenerationMode = 'wan-local' | 'qwen-image';
 
 export type PromptMode = 'managed' | 'automated';
@@ -99,8 +102,8 @@ export interface ImageGenShotSettings {
   afterEachPromptText?: string;
 }
 
-// Reference mode type
-export type ReferenceMode = 'style' | 'subject' | 'style-character' | 'scene' | 'custom';
+// Reference mode type - re-exported from shared at bottom of file
+// (kept here as comment to explain the type used in interfaces below)
 
 // Reference pointer stored in tool settings (lightweight)
 // Actual image data is stored in resources table, usage settings stored here
@@ -219,7 +222,40 @@ export type { ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
 export type { DisplayableMetadata } from "@/shared/components/ImageGallery";
 
 // ============================================================================
-// Hires Fix / Two-Pass Generation Settings
+// Re-export API types from shared (single source of truth)
+// ============================================================================
+export type { ReferenceApiParams, HiresFixApiParams, ReferenceMode } from '@/shared/lib/tasks/imageGeneration';
+export { DEFAULT_REFERENCE_PARAMS } from '@/shared/lib/tasks/imageGeneration';
+
+/**
+ * Helper to convert from HydratedReferenceImage to ReferenceApiParams.
+ * Use this when reading from hydrated reference to prepare task params.
+ */
+export function toReferenceApiParams(
+  hydrated: {
+    styleReferenceImage?: string;
+    styleReferenceStrength?: number;
+    subjectStrength?: number;
+    subjectDescription?: string;
+    inThisScene?: boolean;
+    inThisSceneStrength?: number;
+    referenceMode?: ReferenceMode;
+  },
+  defaults = DEFAULT_REFERENCE_PARAMS
+): ReferenceApiParams {
+  return {
+    style_reference_image: hydrated.styleReferenceImage,
+    style_reference_strength: hydrated.styleReferenceStrength ?? defaults.style_reference_strength,
+    subject_strength: hydrated.subjectStrength ?? defaults.subject_strength,
+    subject_description: hydrated.subjectDescription ?? defaults.subject_description,
+    in_this_scene: hydrated.inThisScene ?? defaults.in_this_scene,
+    in_this_scene_strength: hydrated.inThisSceneStrength ?? defaults.in_this_scene_strength,
+    reference_mode: hydrated.referenceMode ?? defaults.reference_mode,
+  };
+}
+
+// ============================================================================
+// Hires Fix / Two-Pass Generation Settings (UI config)
 // ============================================================================
 
 /**
@@ -265,10 +301,10 @@ export interface HiresFixConfig {
 /** Default hires fix configuration */
 export const DEFAULT_HIRES_FIX_CONFIG: HiresFixConfig = {
   enabled: true,
-  base_steps: 6,
-  hires_scale: 2.0,
+  base_steps: 8,
+  hires_scale: 1,
   hires_steps: 6,
-  hires_denoise: 0.5,
-  lightning_lora_strength: 0.85,
+  hires_denoise: 0.6,
+  lightning_lora_strength: 0.95,
   phaseLoraStrengths: [],
 };

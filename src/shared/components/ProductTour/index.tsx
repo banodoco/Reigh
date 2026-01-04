@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Lock,
+  Images,
   Sparkles,
   Lightbulb,
   Layout,
@@ -21,14 +22,15 @@ import {
 // Icons for each step (matching the step content)
 const stepIcons = [
   Lock,        // Step 0: Open gallery (lock button)
-  Sparkles,    // Step 1: Generate images
-  Lightbulb,   // Step 2: How it works
-  Layout,      // Step 3: First shot (click to open)
-  Film,        // Step 4: Video gallery
-  Layers,      // Step 5: Timeline
-  ListTodo,    // Step 6: Tasks pane
-  Wrench,      // Step 7: Tools pane
-  PartyPopper, // Step 8: Final step
+  Images,      // Step 1: Your image gallery
+  Sparkles,    // Step 2: Generate images
+  Lightbulb,   // Step 3: How it works
+  Layout,      // Step 4: First shot (click to open)
+  Film,        // Step 5: Video outputs
+  Layers,      // Step 6: Timeline
+  ListTodo,    // Step 7: Tasks pane
+  Wrench,      // Step 8: Tools pane
+  PartyPopper, // Step 9: Final step
 ];
 
 // Custom tooltip component matching WelcomeBonusModal aesthetic
@@ -50,7 +52,7 @@ function CustomTooltip({
   return (
     <div
       {...tooltipProps}
-      className="bg-background border border-border rounded-lg shadow-lg p-4 max-w-xs z-[10001]"
+      className="bg-background border border-border rounded-lg shadow-lg p-4 max-w-xs z-[100011]"
     >
       {/* Header with colored icon */}
       <div className="text-center space-y-2 mb-3">
@@ -117,9 +119,9 @@ function CustomTooltip({
 export function ProductTour() {
   const { isRunning, startTour, completeTour, skipTour, tourState } = useProductTour();
   const {
-    setIsGenerationsPaneOpen,
     setIsGenerationsPaneLocked,
-    setIsTasksPaneOpen
+    setIsTasksPaneOpen,
+    resetAllPaneLocks
   } = usePanes();
   const location = useLocation();
   const hasAutoStarted = useRef(false);
@@ -128,13 +130,34 @@ export function ProductTour() {
   const [stepIndex, setStepIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Reset step index when tour starts
+  // Track if we've done the initial setup for this tour run
+  const hasInitializedRef = useRef(false);
+
+  // Reset step index and close/unlock all panes when tour starts
   useEffect(() => {
-    if (isRunning) {
+    if (isRunning && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      console.log('[ProductTour] Tour starting - resetting all pane locks');
       setStepIndex(0);
       setIsPaused(false);
+      // Reset all pane locks (updates both local state and database immediately)
+      resetAllPaneLocks();
+      console.log('[ProductTour] Pane locks reset');
+    } else if (!isRunning) {
+      // Reset the flag when tour stops
+      hasInitializedRef.current = false;
     }
-  }, [isRunning]);
+  }, [isRunning, resetAllPaneLocks]);
+
+  // Helper to open generation modal via custom event
+  const openGenerationModal = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('openGenerationModal'));
+  }, []);
+
+  // Helper to close generation modal via custom event
+  const closeGenerationModal = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('closeGenerationModal'));
+  }, []);
 
   // Add click listeners to spotlightClicks targets to advance tour
   useEffect(() => {
@@ -151,34 +174,31 @@ export function ProductTour() {
 
       // Step 0: Lock button clicked - locks the generations pane
       if (stepIndex === 0) {
-        // Lock button click will lock the pane automatically
-        // Just wait for the pane to open
         setIsPaused(true);
         setTimeout(() => {
           setStepIndex(nextIndex);
           setIsPaused(false);
         }, 400);
       }
-      // Step 1: Sparkles button clicked - opens generation modal
-      else if (stepIndex === 1) {
-        // Modal will open naturally from the button click
-        // Wait for modal to appear
+      // Step 2: Sparkles button clicked - opens generation modal
+      else if (stepIndex === 2) {
+        // Modal opens naturally from the button click
         setIsPaused(true);
         setTimeout(() => {
           setStepIndex(nextIndex);
           setIsPaused(false);
         }, 400);
       }
-      // Step 3: First shot click - navigates to shot editor
-      else if (stepIndex === 3) {
+      // Step 4: First shot click - navigates to shot editor (needs longer delay for page to render)
+      else if (stepIndex === 4) {
         setIsPaused(true);
         setTimeout(() => {
           setStepIndex(nextIndex);
           setIsPaused(false);
-        }, 800);
+        }, 1500);
       }
-      // Step 6: Tasks pane tab clicked
-      else if (stepIndex === 6) {
+      // Step 7: Tasks pane tab clicked
+      else if (stepIndex === 7) {
         setIsTasksPaneOpen(true);
         setIsPaused(true);
         setTimeout(() => {
@@ -233,37 +253,44 @@ export function ProductTour() {
           setIsPaused(false);
         }, 400);
       }
-      // Step 1: Sparkles button - opens modal (handled by click)
+      // Step 1: Gallery view - just advance
       else if (index === 1 && action !== ACTIONS.PREV) {
-        // Modal should already be open from click
-        setIsPaused(true);
-        setTimeout(() => {
-          setStepIndex(nextIndex);
-          setIsPaused(false);
-        }, 400);
+        setStepIndex(nextIndex);
       }
-      // Step 2: Instructions - close modal and unlock pane when clicking Next
+      // Step 2: Sparkles button - open the modal when clicking Next
       else if (index === 2 && action !== ACTIONS.PREV) {
-        // Dispatch custom event to close the generation modal
-        window.dispatchEvent(new CustomEvent('closeGenerationModal'));
-        // Unlock the generations pane
-        setIsGenerationsPaneLocked(false);
+        openGenerationModal();
         setIsPaused(true);
         setTimeout(() => {
           setStepIndex(nextIndex);
           setIsPaused(false);
         }, 400);
       }
-      // Step 3: First shot click - page navigation
+      // Step 3: How It Works - close modal, unlock pane, AND advance
       else if (index === 3 && action !== ACTIONS.PREV) {
+        console.log('[ProductTour] Step 3: closing modal, unlocking pane, advancing to', nextIndex);
+        closeGenerationModal();
+        setIsGenerationsPaneLocked(false);
+        // Use longer delay to ensure modal closes before advancing
+        setIsPaused(true);
+        setTimeout(() => {
+          console.log('[ProductTour] Step 3: timeout fired, setting stepIndex to', nextIndex);
+          setStepIndex(nextIndex);
+          setTimeout(() => {
+            setIsPaused(false);
+          }, 100);
+        }, 500);
+      }
+      // Step 4: First shot click - page navigation (needs longer delay for shot editor to render)
+      else if (index === 4 && action !== ACTIONS.PREV) {
         setIsPaused(true);
         setTimeout(() => {
           setStepIndex(nextIndex);
           setIsPaused(false);
-        }, 800);
+        }, 1500);
       }
-      // Step 6: Tasks pane
-      else if (index === 6 && action !== ACTIONS.PREV) {
+      // Step 7: Tasks pane
+      else if (index === 7 && action !== ACTIONS.PREV) {
         setIsTasksPaneOpen(true);
         setIsPaused(true);
         setTimeout(() => {
@@ -283,7 +310,7 @@ export function ProductTour() {
     } else if (status === STATUS.SKIPPED) {
       skipTour();
     }
-  }, [completeTour, skipTour, setIsGenerationsPaneLocked, setIsTasksPaneOpen]);
+  }, [completeTour, skipTour, setIsGenerationsPaneLocked, setIsTasksPaneOpen, openGenerationModal, closeGenerationModal]);
 
   if (!isRunning) return null;
 
@@ -302,7 +329,7 @@ export function ProductTour() {
       tooltipComponent={CustomTooltip}
       styles={{
         options: {
-          zIndex: 10000,
+          zIndex: 100010,
           arrowColor: 'hsl(var(--background))',
         },
         spotlight: {

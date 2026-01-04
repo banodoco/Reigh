@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { CollapsibleSection } from '@/shared/components/ui/collapsible-section';
 import { Label } from '@/shared/components/ui/label';
 import { Input } from '@/shared/components/ui/input';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
-import { HiresFixConfig, PhaseLoraStrength, ActiveLora } from '../types';
+import { Button } from '@/shared/components/ui/button';
+import { RotateCcw } from 'lucide-react';
+import { HiresFixConfig, PhaseLoraStrength, ActiveLora, DEFAULT_HIRES_FIX_CONFIG } from '../types';
 
 interface GenerationSettingsSectionProps {
   /** Currently selected LoRAs from the main form */
@@ -109,6 +111,14 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
     }
   }, [hiresFixConfig, onHiresFixConfigChange]);
 
+  // Reset to defaults (preserving phaseLoraStrengths)
+  const handleResetDefaults = useCallback(() => {
+    onHiresFixConfigChange({
+      ...DEFAULT_HIRES_FIX_CONFIG,
+      phaseLoraStrengths: hiresFixConfig?.phaseLoraStrengths ?? [],
+    });
+  }, [hiresFixConfig?.phaseLoraStrengths, onHiresFixConfigChange]);
+
   // Don't render if hiresFixConfig is not available
   if (!hiresFixConfig) {
     return null;
@@ -117,6 +127,20 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
   return (
     <CollapsibleSection title="Generation settings">
       <div className="space-y-4">
+        {/* Header with reset button */}
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleResetDefaults}
+            disabled={disabled}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            <RotateCcw className="w-3 h-3 mr-1" />
+            Reset defaults
+          </Button>
+        </div>
+
         {/* Settings Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Base Steps */}

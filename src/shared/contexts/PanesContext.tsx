@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 import { PANE_CONFIG } from '@/shared/config/panes';
+import { updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PanesContextType {
   isGenerationsPaneLocked: boolean;
@@ -20,14 +22,17 @@ interface PanesContextType {
   setIsTasksPaneLocked: (isLocked: boolean) => void;
   tasksPaneWidth: number;
   setTasksPaneWidth: (width: number) => void;
-  
+
   // Active task tracking for highlighting
   activeTaskId: string | null;
   setActiveTaskId: (taskId: string | null) => void;
-  
+
   // Programmatic tasks pane control (desktop only)
   isTasksPaneOpen: boolean;
   setIsTasksPaneOpen: (isOpen: boolean) => void;
+
+  // Reset all pane locks (used by ProductTour)
+  resetAllPaneLocks: () => void;
 }
 
 const PanesContext = createContext<PanesContextType | undefined>(undefined);
@@ -181,6 +186,34 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [isMobile]);
 
+  // Reset all pane locks immediately (used by ProductTour)
+  // This updates local state, useUserUIState value, and database without debounce
+  const resetAllPaneLocks = useCallback(async () => {
+    const unlockedState = { shots: false, tasks: false, gens: false };
+
+    // Update local locks state immediately
+    setLocks(unlockedState);
+
+    // Update the useUserUIState local value (prevents sync effect from restoring old value)
+    savePaneLocks(unlockedState);
+
+    // Also save to database immediately (no debounce) for reliability
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await updateToolSettingsSupabase({
+          scope: 'user',
+          id: user.id,
+          toolId: 'ui',
+          patch: { paneLocks: unlockedState },
+        }, undefined, 'immediate');
+        console.log('[PanesContext] All pane locks reset in database');
+      }
+    } catch (error) {
+      console.error('[PanesContext] Error resetting pane locks in database:', error);
+    }
+  }, [savePaneLocks]);
+
   // Dimension setters
   const setGenerationsPaneHeight = useCallback((height: number) => {
     setGenerationsPaneHeightState(height);
@@ -215,6 +248,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setActiveTaskId,
       isTasksPaneOpen: isTasksPaneOpenState,
       setIsTasksPaneOpen,
+      resetAllPaneLocks,
     }),
     [
       locks.gens,
@@ -235,6 +269,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setActiveTaskId,
       isTasksPaneOpenState,
       setIsTasksPaneOpen,
+      resetAllPaneLocks,
     ]
   );
 

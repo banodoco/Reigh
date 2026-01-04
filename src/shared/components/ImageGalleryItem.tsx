@@ -91,6 +91,8 @@ interface ImageGalleryItemProps {
   onImageClick?: (image: GeneratedImageWithMetadata) => void;
   /** When true, videos are rendered as static thumbnail images instead of HoverScrubVideo for better performance */
   videosAsThumbnails?: boolean;
+  /** Optional data-tour attribute for product tour targeting */
+  dataTour?: string;
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -143,6 +145,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   enableSingleClick = false,
   onImageClick,
   videosAsThumbnails = false,
+  dataTour,
 }) => {
   // Local pending state to scope star button disabled to this item only
   const [isTogglingStar, setIsTogglingStar] = useState<boolean>(false);
@@ -864,13 +867,14 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
   const imageContent = (
-    <div 
+    <div
         className={`border rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 relative group bg-card ${
           isOptimisticallyDeleted ? 'opacity-50 scale-95 pointer-events-none' : ''
         } ${isDragging ? 'opacity-50 scale-75' : ''} ${!isMobile ? 'cursor-grab active:cursor-grabbing' : ''}`}
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        data-tour={dataTour}
         onClick={enableSingleClick || !isMobile ? (e) => {
           if (onImageClick) {
             e.stopPropagation();
