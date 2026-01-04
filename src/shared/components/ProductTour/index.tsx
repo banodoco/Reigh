@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import Joyride, { CallBackProps, STATUS, EVENTS, TooltipRenderProps } from 'react-joyride';
 import { tourSteps, tourStepColors } from './tourSteps';
 import { useProductTour } from '@/shared/hooks/useProductTour';
@@ -125,8 +126,26 @@ function CustomTooltip({
 }
 
 export function ProductTour() {
-  const { isRunning, completeTour, skipTour } = useProductTour();
+  const { isRunning, startTour, completeTour, skipTour, tourState } = useProductTour();
   const { setIsGenerationsPaneOpen, setIsTasksPaneOpen } = usePanes();
+  const location = useLocation();
+  const hasAutoStarted = useRef(false);
+
+  // Auto-start tour when user lands on shot editor and hasn't completed/skipped tour
+  useEffect(() => {
+    const isOnShotEditor = location.pathname === '/tools/travel-between-images';
+    const shouldShowTour = tourState && !tourState.completed && !tourState.skipped;
+
+    if (isOnShotEditor && shouldShowTour && !isRunning && !hasAutoStarted.current) {
+      hasAutoStarted.current = true;
+      // Brief delay to let the page fully render
+      const timer = setTimeout(() => {
+        console.log('[ProductTour] Auto-starting tour on shot editor');
+        startTour();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, tourState, isRunning, startTour]);
 
   const handleCallback = (data: CallBackProps) => {
     const { status, index, type, action } = data;
