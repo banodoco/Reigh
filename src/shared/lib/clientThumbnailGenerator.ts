@@ -109,64 +109,68 @@ export async function generateClientThumbnail(
   });
 }
 
+export interface UploadWithThumbnailOptions {
+  onProgress?: (progress: number) => void;
+  signal?: AbortSignal;
+}
+
 /**
  * Upload both original image and thumbnail to storage
  * @param originalFile - The original image file
  * @param thumbnailBlob - The generated thumbnail blob
- * @param userId - User ID for storage path organization
- * @param onProgress - Optional callback for upload progress (0-100)
+ * @param userId - User ID for storage path organization (kept for backwards compat, not used)
+ * @param onProgressOrOptions - Progress callback or options object
  * @returns Promise<{imageUrl: string, thumbnailUrl: string}>
  */
 export async function uploadImageWithThumbnail(
   originalFile: File,
   thumbnailBlob: Blob,
   userId: string,
-  onProgress?: (progress: number) => void
+  onProgressOrOptions?: ((progress: number) => void) | UploadWithThumbnailOptions
 ): Promise<{imageUrl: string, thumbnailUrl: string}> {
-  const { uploadImageToStorage } = await import('./imageUploader');
-  const { supabase } = await import('@/integrations/supabase/client');
-  const { storagePaths, generateThumbnailFilename, MEDIA_BUCKET } = await import('./storagePaths');
-  
+  // Handle both old signature and new options object
+  let options: UploadWithThumbnailOptions;
+  if (typeof onProgressOrOptions === 'function') {
+    options = { onProgress: onProgressOrOptions };
+  } else {
+    options = onProgressOrOptions || {};
+  }
+
+  const { onProgress, signal } = options;
+
+  const { uploadImageToStorage, uploadBlobToStorage } = await import('./imageUploader');
+
   // Upload original image using existing utility (with progress tracking)
   // Original image is ~90% of the work, thumbnail is ~10%
-  const imageUrl = await uploadImageToStorage(
-    originalFile,
-    3, // maxRetries
-    onProgress ? (progress) => {
+  const imageUrl = await uploadImageToStorage(originalFile, {
+    maxRetries: 3,
+    signal,
+    onProgress: onProgress ? (progress) => {
       // Map 0-100 to 0-90 for main image
       onProgress(Math.round(progress * 0.9));
     } : undefined
-  );
-  
-  // Upload thumbnail using centralized path utilities
-  const thumbnailFilename = generateThumbnailFilename();
-  const thumbnailPath = storagePaths.thumbnail(userId, thumbnailFilename);
-  
+  });
+
   // Report 90% progress before thumbnail upload
   onProgress?.(90);
-  
-  const { data: thumbnailUploadData, error: thumbnailUploadError } = await supabase.storage
-    .from(MEDIA_BUCKET)
-    .upload(thumbnailPath, thumbnailBlob, {
-      contentType: 'image/jpeg',
-      upsert: true
-    });
-  
-  // Report 100% progress after thumbnail upload
-  onProgress?.(100);
-  
-  if (thumbnailUploadError) {
-    console.error('Thumbnail upload error:', thumbnailUploadError);
+
+  // Upload thumbnail using centralized uploader (with retry/timeout support)
+  try {
+    const thumbnailUrl = await uploadBlobToStorage(
+      thumbnailBlob,
+      'thumbnail.jpg',
+      'image/jpeg',
+      { maxRetries: 2, signal, timeoutMs: 30000 } // Shorter timeout for small thumbnails
+    );
+
+    // Report 100% progress after thumbnail upload
+    onProgress?.(100);
+
+    return { imageUrl, thumbnailUrl };
+  } catch (thumbnailError) {
+    console.error('Thumbnail upload error:', thumbnailError);
     // Don't fail the main upload, use main image as thumbnail fallback
+    onProgress?.(100);
     return { imageUrl, thumbnailUrl: imageUrl };
   }
-  
-  // Get public URL for thumbnail
-  const { data: thumbnailUrlData } = supabase.storage
-    .from(MEDIA_BUCKET)
-    .getPublicUrl(thumbnailPath);
-  
-  const thumbnailUrl = thumbnailUrlData.publicUrl;
-  
-  return { imageUrl, thumbnailUrl };
 }

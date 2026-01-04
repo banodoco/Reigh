@@ -13,6 +13,8 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { storagePaths, getFileExtension, generateUniqueFilename, MEDIA_BUCKET } from '@/shared/lib/storagePaths';
+import { uploadVideoToStorage } from '@/shared/lib/videoUploader';
+import { uploadBlobToStorage } from '@/shared/lib/imageUploader';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { JoinClipsSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
@@ -1067,54 +1069,22 @@ const JoinClipsPage: React.FC = () => {
         durationPromise
       ]);
       
-      // Get userId for storage path
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) {
-        throw new Error('User not authenticated');
-      }
-      const userId = session.user.id;
-
-      // Generate storage paths using centralized utilities
-      const fileExt = getFileExtension(file.name, file.type, 'mp4');
-      const timestamp = Date.now();
-      const randomId = Math.random().toString(36).substring(7);
-      const fileName = storagePaths.upload(userId, `${timestamp}-${clipId}-${randomId}.${fileExt}`);
-      const posterFileName = storagePaths.thumbnail(userId, `${timestamp}-${clipId}-${randomId}-poster.jpg`);
-      const finalFrameFileName = storagePaths.thumbnail(userId, `${timestamp}-${clipId}-${randomId}-final.jpg`);
-      
-      // Upload video and both frames in parallel
-      const [videoUpload, posterUpload, finalFrameUpload] = await Promise.all([
-        supabase.storage.from(MEDIA_BUCKET).upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
+      // Upload video and both frames in parallel using centralized uploaders
+      // These now have timeout, retry, and stall detection built in
+      const [videoUrl, posterUrl, finalFrameUrl] = await Promise.all([
+        uploadVideoToStorage(file, selectedProjectId || '', clipId, {
+          maxRetries: 3,
+          timeoutMs: 300000, // 5 min for video
         }),
-        supabase.storage.from(MEDIA_BUCKET).upload(posterFileName, posterBlob, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: 'image/jpeg'
+        uploadBlobToStorage(posterBlob, 'poster.jpg', 'image/jpeg', {
+          maxRetries: 2,
+          timeoutMs: 30000, // 30s for small image
         }),
-        supabase.storage.from(MEDIA_BUCKET).upload(finalFrameFileName, finalFrameBlob, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: 'image/jpeg'
+        uploadBlobToStorage(finalFrameBlob, 'final-frame.jpg', 'image/jpeg', {
+          maxRetries: 2,
+          timeoutMs: 30000, // 30s for small image
         })
       ]);
-      
-      if (videoUpload.error) throw videoUpload.error;
-      if (posterUpload.error) throw posterUpload.error;
-      if (finalFrameUpload.error) throw finalFrameUpload.error;
-      
-      const { data: { publicUrl: videoUrl } } = supabase.storage
-        .from(MEDIA_BUCKET)
-        .getPublicUrl(fileName);
-        
-      const { data: { publicUrl: posterUrl } } = supabase.storage
-        .from(MEDIA_BUCKET)
-        .getPublicUrl(posterFileName);
-        
-      const { data: { publicUrl: finalFrameUrl } } = supabase.storage
-        .from(MEDIA_BUCKET)
-        .getPublicUrl(finalFrameFileName);
       
       // Create a generation record so the video appears in the gallery
       if (selectedProjectId) {
