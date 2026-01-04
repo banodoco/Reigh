@@ -138,6 +138,7 @@ interface BuildBatchTaskParamsInput {
   styleBoostTerms: string;
   isLocalGenerationEnabled: boolean;
   hiresFixConfig: HiresFixConfig;
+  modelName: string; // Model name for task type mapping (e.g., 'qwen-image', 'qwen-image-2512', 'z-image')
 }
 
 function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGenerationTaskParams {
@@ -158,7 +159,7 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
     imagesPerPrompt: input.imagesPerPrompt,
     loras: [],
     shot_id: input.shotId || undefined,
-    model_name: 'qwen-image',
+    model_name: input.modelName,
     steps: input.isLocalGenerationEnabled ? input.hiresFixConfig.baseSteps : undefined,
     ...(input.styleRef && {
       style_reference_image: input.styleRef,
@@ -2396,6 +2397,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       styleBoostTerms: currentStyleBoostTerms,
       isLocalGenerationEnabled,
       hiresFixConfig,
+      modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
     });
 
     const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
@@ -2410,8 +2412,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     onGenerate(legacyGenerationData);
   }, [
-    handleSavePromptsFromModal, 
-    selectedModel, 
+    handleSavePromptsFromModal,
+    selectedModel,
     styleReferenceImageGeneration,
     selectedProjectId,
     currentBeforePromptText,
@@ -2421,6 +2423,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     isLocalGenerationEnabled,
     steps,
     currentStyleStrength,
+    generationSource,
+    selectedTextModel,
     currentSubjectStrength,
     effectiveSubjectDescription,
     currentInThisScene,
@@ -2461,6 +2465,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       styleBoostTerms: currentStyleBoostTerms,
       isLocalGenerationEnabled,
       hiresFixConfig,
+      modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
     });
 
     const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
@@ -2490,6 +2495,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     currentSubjectStrength,
     effectiveSubjectDescription,
     currentInThisScene,
+    generationSource,
+    selectedTextModel,
     currentInThisSceneStrength,
     referenceMode,
     loraManager.selectedLoras,
@@ -2557,6 +2564,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         styleBoostTerms: currentStyleBoostTerms,
         isLocalGenerationEnabled,
         hiresFixConfig,
+        modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
       });
 
       const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
@@ -2580,6 +2588,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [
     prompts,
     styleReferenceImageGeneration,
+    generationSource,
+    selectedTextModel,
     selectedProjectId,
     imagesPerPrompt,
     currentBeforePromptText,
@@ -2640,6 +2650,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         : undefined;
       const capturedSelectedLoras = loraManager.selectedLoras;
       const capturedSelectedModel = selectedModel;
+      const capturedModelName = generationSource === 'just-text' ? selectedTextModel : 'qwen-image';
 
       // Trigger button state: submitting (1s) → success (2s) → idle
       automatedSubmitButton.trigger();
@@ -2700,6 +2711,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             styleBoostTerms: capturedStyleBoostTerms,
             isLocalGenerationEnabled: capturedIsLocalGenerationEnabled,
             hiresFixConfig: capturedHiresFixConfig,
+            modelName: capturedModelName,
           });
 
           const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
@@ -2766,6 +2778,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       styleBoostTerms: currentStyleBoostTerms,
       isLocalGenerationEnabled,
       hiresFixConfig,
+      modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
     });
 
     const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {

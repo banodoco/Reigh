@@ -260,9 +260,25 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       !!params.style_reference_image
     );
 
-    // 3. Determine task type based on model
-    const isQwenModel = params.model_name === 'qwen-image';
-    const taskType = isQwenModel ? "qwen_image_style" : "wan_2_2_t2i";
+    // 3. Determine task type based on model and whether there's a style reference
+    const taskType = (() => {
+      const modelName = params.model_name;
+      const hasStyleRef = !!params.style_reference_image;
+
+      switch (modelName) {
+        case 'qwen-image':
+          // Use qwen_image_style for by-reference mode, qwen_image for just-text
+          return hasStyleRef ? 'qwen_image_style' : 'qwen_image';
+        case 'qwen-image-2512':
+          return 'qwen_image_2512';
+        case 'z-image':
+          return 'z_image_turbo';
+        default:
+          // Fallback to wan_2_2_t2i for unknown models
+          return 'wan_2_2_t2i';
+      }
+    })();
+    const isQwenModel = params.model_name?.startsWith('qwen-image') || params.model_name === 'z-image';
     
     // 4. Generate task ID for orchestrator payload (stored in params, not as DB ID)
     const taskId = generateTaskId(taskType);

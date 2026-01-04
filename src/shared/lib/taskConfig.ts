@@ -137,19 +137,37 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
     description: 'Inpaint or extend images'
   },
 
-  // Qwen image generation (legacy task type name)
+  // Qwen image generation (text-only via fal.ai)
   qwen_image: {
-    isVisible: false, // Hidden - legacy task type, superseded by qwen_image_style
-    displayName: 'Qwen Image (Legacy)',
-    canCancel: true,
-    category: 'generation',
-    description: 'Generate images using Qwen model (legacy)'
-  },
-
-  // Qwen image style generation (current task type for Qwen model)
-  qwen_image_style: {
     isVisible: true,
     displayName: 'Qwen Image',
+    canCancel: true,
+    category: 'generation',
+    description: 'Generate images using Qwen model (text-only)'
+  },
+
+  // Qwen image 2512 (higher resolution text-only via fal.ai)
+  qwen_image_2512: {
+    isVisible: true,
+    displayName: 'Qwen Image 2512',
+    canCancel: true,
+    category: 'generation',
+    description: 'Generate high-resolution images using Qwen model (text-only)'
+  },
+
+  // Z Image Turbo (fast text-to-image via fal.ai)
+  z_image_turbo: {
+    isVisible: true,
+    displayName: 'Z Image Turbo',
+    canCancel: true,
+    category: 'generation',
+    description: 'Fast image generation using Z Image Turbo model'
+  },
+
+  // Qwen image style generation (with style reference)
+  qwen_image_style: {
+    isVisible: true,
+    displayName: 'Qwen w/ Reference',
     canCancel: true,
     category: 'generation',
     description: 'Generate images with style reference using Qwen model'

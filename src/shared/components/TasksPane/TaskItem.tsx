@@ -130,6 +130,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     const knownImageTaskTypes = [
       'image_inpaint',
       'qwen_image',
+      'qwen_image_2512',
+      'z_image_turbo',
       'qwen_image_edit',
       'image_generation',
       'magic_edit',
