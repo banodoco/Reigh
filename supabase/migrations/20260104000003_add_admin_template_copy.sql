@@ -1,7 +1,7 @@
--- Function to copy onboarding template content to a new user's project
--- Uses SECURITY DEFINER to bypass RLS and read from template project
+-- Add admin version of template copy that skips auth check (for service role only)
+-- This allows testing and manual population of template content
 
-CREATE OR REPLACE FUNCTION copy_onboarding_template(
+CREATE OR REPLACE FUNCTION copy_onboarding_template_admin(
   target_project_id UUID,
   target_shot_id UUID
 )
@@ -20,29 +20,23 @@ DECLARE
   new_gen_id UUID;
   template_shot RECORD;
 BEGIN
-  -- 1. Verify caller owns the target project
-  IF NOT EXISTS (
-    SELECT 1 FROM projects
-    WHERE id = target_project_id AND user_id = auth.uid()
-  ) THEN
-    RAISE EXCEPTION 'Not authorized: you do not own this project';
-  END IF;
+  -- Admin function - no auth check, only callable by service role
+  -- (RLS on the function itself restricts who can call it)
 
-  -- 2. Get template config
+  -- Get template config
   SELECT value INTO template_config
   FROM onboarding_config
   WHERE key = 'template';
 
   IF template_config IS NULL THEN
-    RAISE NOTICE 'No template config found, skipping onboarding content';
-    RETURN;
+    RAISE EXCEPTION 'No template config found';
   END IF;
 
   template_project_id := (template_config->>'project_id')::UUID;
   template_shot_id := (template_config->>'shot_id')::UUID;
   featured_video_id := (template_config->>'featured_video_id')::UUID;
 
-  -- 3. Copy starred images from template project to new user's gallery
+  -- Copy starred images from template project to new user's gallery
   FOR starred_gen IN
     SELECT type, location, thumbnail_url, params
     FROM generations
@@ -61,7 +55,7 @@ BEGIN
     );
   END LOOP;
 
-  -- 4. Copy template shot settings to new shot
+  -- Copy template shot settings to new shot
   SELECT settings, aspect_ratio INTO template_shot
   FROM shots
   WHERE id = template_shot_id;
@@ -73,7 +67,7 @@ BEGIN
     WHERE id = target_shot_id;
   END IF;
 
-  -- 5. Copy timeline images from template shot
+  -- Copy timeline images from template shot
   FOR shot_gen IN
     SELECT
       sg.timeline_frame,
@@ -89,7 +83,6 @@ BEGIN
       AND g.type != 'video'
     ORDER BY sg.timeline_frame
   LOOP
-    -- Create new generation record
     INSERT INTO generations (project_id, type, location, thumbnail_url, params)
     VALUES (
       target_project_id,
@@ -100,19 +93,17 @@ BEGIN
     )
     RETURNING id INTO new_gen_id;
 
-    -- Link to new shot with same position and metadata
     INSERT INTO shot_generations (shot_id, generation_id, timeline_frame, metadata)
     VALUES (target_shot_id, new_gen_id, shot_gen.timeline_frame, shot_gen.metadata);
   END LOOP;
 
-  -- 6. Copy featured video if specified
+  -- Copy featured video if specified
   IF featured_video_id IS NOT NULL THEN
     FOR shot_gen IN
       SELECT type, location, thumbnail_url, params
       FROM generations
       WHERE id = featured_video_id
     LOOP
-      -- Create new video generation record
       INSERT INTO generations (project_id, type, location, thumbnail_url, params)
       VALUES (
         target_project_id,
@@ -123,7 +114,6 @@ BEGIN
       )
       RETURNING id INTO new_gen_id;
 
-      -- Link video to shot (no timeline_frame for videos)
       INSERT INTO shot_generations (shot_id, generation_id)
       VALUES (target_shot_id, new_gen_id);
     END LOOP;
@@ -133,8 +123,7 @@ BEGIN
 END;
 $$;
 
--- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION copy_onboarding_template(UUID, UUID) TO authenticated;
+-- Only service role can call this function (no grant to authenticated)
+REVOKE ALL ON FUNCTION copy_onboarding_template_admin(UUID, UUID) FROM PUBLIC;
 
--- Add comment
-COMMENT ON FUNCTION copy_onboarding_template IS 'Copies onboarding template content (starred images, timeline, video) to a new user''s project. Uses SECURITY DEFINER to read from template project.';
+COMMENT ON FUNCTION copy_onboarding_template_admin IS 'Admin version of template copy - no auth check, for testing and manual population.';
