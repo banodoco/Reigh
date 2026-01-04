@@ -34,145 +34,22 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 /**
  * Copy template content to a new user's Getting Started shot.
- * Uses live data from template project/shot, so updates are automatic.
+ * Calls a SECURITY DEFINER database function that copies starred images,
+ * timeline content, and featured video from the template project.
  */
 const copyTemplateToNewUser = async (newProjectId: string, newShotId: string): Promise<void> => {
   try {
-    // 1. Get template config
-    const { data: config, error: configError } = await supabase
-      .from('onboarding_config')
-      .select('value')
-      .eq('key', 'template')
-      .single();
+    console.log('[Onboarding] Copying template content via RPC...');
 
-    if (configError || !config) {
-      console.log('[Onboarding] No template config found, skipping sample content');
+    const { error } = await supabase.rpc('copy_onboarding_template', {
+      target_project_id: newProjectId,
+      target_shot_id: newShotId,
+    });
+
+    if (error) {
+      // Not a fatal error - new users just won't have sample content
+      console.warn('[Onboarding] Template copy failed:', error.message);
       return;
-    }
-
-    const { project_id, shot_id, featured_video_id } = config.value as {
-      project_id: string;
-      shot_id: string;
-      featured_video_id?: string;
-    };
-
-    console.log('[Onboarding] Copying template content from:', { project_id, shot_id, featured_video_id });
-
-    // 2. Copy starred images from template project to new user's gallery
-    const { data: starredGens } = await supabase
-      .from('generations')
-      .select('type, location, thumbnail_url, params')
-      .eq('project_id', project_id)
-      .eq('is_starred', true)
-      .eq('type', 'image');
-
-    if (starredGens?.length) {
-      const starredInserts = starredGens.map(gen => ({
-        project_id: newProjectId,
-        type: gen.type,
-        location: gen.location,
-        thumbnail_url: gen.thumbnail_url,
-        params: { ...(gen.params as object || {}), is_sample: true },
-        is_starred: true, // Keep them starred for new user too
-      }));
-
-      await supabase.from('generations').insert(starredInserts);
-      console.log(`[Onboarding] Copied ${starredGens.length} starred images`);
-    }
-
-    // 3. Copy template shot settings to new shot
-    const { data: templateShot } = await supabase
-      .from('shots')
-      .select('settings, aspect_ratio')
-      .eq('id', shot_id)
-      .single();
-
-    if (templateShot) {
-      await supabase
-        .from('shots')
-        .update({
-          settings: templateShot.settings,
-          aspect_ratio: templateShot.aspect_ratio,
-        })
-        .eq('id', newShotId);
-      console.log('[Onboarding] Copied shot settings and aspect ratio');
-    }
-
-    // 4. Copy timeline images from template shot
-    const { data: shotGens } = await supabase
-      .from('shot_generations')
-      .select(`
-        timeline_frame,
-        metadata,
-        generations:generation_id (
-          type, location, thumbnail_url, params
-        )
-      `)
-      .eq('shot_id', shot_id)
-      .not('timeline_frame', 'is', null)
-      .order('timeline_frame');
-
-    if (shotGens?.length) {
-      for (const sg of shotGens) {
-        const gen = sg.generations as any;
-        if (!gen || gen.type === 'video') continue;
-
-        // Create new generation record (same URL, new project)
-        const { data: newGen } = await supabase
-          .from('generations')
-          .insert({
-            project_id: newProjectId,
-            type: gen.type,
-            location: gen.location,
-            thumbnail_url: gen.thumbnail_url,
-            params: { ...(gen.params as object || {}), is_sample: true },
-          })
-          .select('id')
-          .single();
-
-        if (newGen) {
-          // Link to new shot with same position and metadata
-          await supabase.from('shot_generations').insert({
-            shot_id: newShotId,
-            generation_id: newGen.id,
-            timeline_frame: sg.timeline_frame,
-            metadata: sg.metadata, // Preserves pair prompts etc.
-          });
-        }
-      }
-      console.log(`[Onboarding] Copied ${shotGens.length} timeline images`);
-    }
-
-    // 5. Copy featured video if specified
-    if (featured_video_id) {
-      const { data: videoGen } = await supabase
-        .from('generations')
-        .select('type, location, thumbnail_url, params')
-        .eq('id', featured_video_id)
-        .single();
-
-      if (videoGen) {
-        const { data: newVideo } = await supabase
-          .from('generations')
-          .insert({
-            project_id: newProjectId,
-            type: videoGen.type,
-            location: videoGen.location,
-            thumbnail_url: videoGen.thumbnail_url,
-            params: { ...(videoGen.params as object || {}), is_sample: true },
-          })
-          .select('id')
-          .single();
-
-        if (newVideo) {
-          // Link video to shot (no timeline_frame for videos)
-          await supabase.from('shot_generations').insert({
-            shot_id: newShotId,
-            generation_id: newVideo.id,
-          });
-          console.log('[Onboarding] Copied featured video');
-        }
-      }
     }
 
     console.log('[Onboarding] Template content copied successfully');
