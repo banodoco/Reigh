@@ -122,8 +122,8 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
           {/* Base Steps */}
           <SliderWithValue
             label="Base Steps"
-            value={hiresFixConfig.baseSteps ?? 4}
-            onChange={(v) => updateField('baseSteps', Math.round(v))}
+            value={hiresFixConfig.base_steps ?? 6}
+            onChange={(v) => updateField('base_steps', Math.round(v))}
             min={1}
             max={16}
             step={1}
@@ -134,8 +134,8 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
           {/* Hires Steps */}
           <SliderWithValue
             label="Hires Steps"
-            value={hiresFixConfig.hiresSteps ?? 4}
-            onChange={(v) => updateField('hiresSteps', Math.round(v))}
+            value={hiresFixConfig.hires_steps ?? 6}
+            onChange={(v) => updateField('hires_steps', Math.round(v))}
             min={1}
             max={16}
             step={1}
@@ -146,8 +146,8 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
           {/* Hires Scale Multiplier */}
           <SliderWithValue
             label="Hires Scale Multiplier"
-            value={hiresFixConfig.hiresScale ?? 2.0}
-            onChange={(v) => updateField('hiresScale', v)}
+            value={hiresFixConfig.hires_scale ?? 2.0}
+            onChange={(v) => updateField('hires_scale', v)}
             min={1.0}
             max={4.0}
             step={0.1}
@@ -158,8 +158,8 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
           {/* Denoise */}
           <SliderWithValue
             label="Denoise"
-            value={hiresFixConfig.hiresDenoise ?? 0.5}
-            onChange={(v) => updateField('hiresDenoise', v)}
+            value={hiresFixConfig.hires_denoise ?? 0.5}
+            onChange={(v) => updateField('hires_denoise', v)}
             min={0.1}
             max={1.0}
             step={0.05}
@@ -170,8 +170,8 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
           {/* Lightning LoRA Strength */}
           <SliderWithValue
             label="Lightning LoRA Strength"
-            value={hiresFixConfig.lightningLoraStrength ?? 0.85}
-            onChange={(v) => updateField('lightningLoraStrength', v)}
+            value={hiresFixConfig.lightning_lora_strength ?? 0.85}
+            onChange={(v) => updateField('lightning_lora_strength', v)}
             min={0}
             max={1.0}
             step={0.01}

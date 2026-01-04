@@ -1008,6 +1008,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     onShareCreated={handleShareCreated}
                     onViewSegments={handleViewSegments}
                     deleteTooltip="Delete video permanently"
+                    dataTour={index === 0 ? 'first-video-output' : undefined}
                   />
                 );
               })}

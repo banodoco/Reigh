@@ -160,7 +160,7 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
     loras: [],
     shot_id: input.shotId || undefined,
     model_name: input.modelName,
-    steps: input.isLocalGenerationEnabled ? input.hiresFixConfig.baseSteps : undefined,
+    steps: input.isLocalGenerationEnabled ? input.hiresFixConfig.base_steps : undefined,
     ...(input.styleRef && {
       style_reference_image: input.styleRef,
       style_reference_strength: input.styleStrength,
@@ -171,11 +171,13 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
       in_this_scene_strength: input.inThisSceneStrength,
       reference_mode: input.referenceMode,
     }),
+    // Hires fix params - field names match API directly (no conversion needed)
     ...(input.isLocalGenerationEnabled && {
-      hires_scale: input.hiresFixConfig.hiresScale,
-      hires_steps: input.hiresFixConfig.hiresSteps,
-      hires_denoise: input.hiresFixConfig.hiresDenoise,
-      lightning_lora_strength: input.hiresFixConfig.lightningLoraStrength,
+      hires_scale: input.hiresFixConfig.hires_scale,
+      hires_steps: input.hiresFixConfig.hires_steps,
+      hires_denoise: input.hiresFixConfig.hires_denoise,
+      lightning_lora_strength: input.hiresFixConfig.lightning_lora_strength,
+      // phaseLoraStrengths is UI structure, transform to API format
       additional_loras: Object.fromEntries(
         (input.hiresFixConfig.phaseLoraStrengths ?? []).map(lora => [
           lora.loraPath,

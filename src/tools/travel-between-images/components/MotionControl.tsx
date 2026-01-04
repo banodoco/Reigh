@@ -101,7 +101,7 @@ export interface MotionControlProps {
   
   // Loading state - prevents sync effects from running during initial load
   settingsLoading?: boolean;
-  
+
   // Restore defaults handler (for Advanced mode - respects I2V/VACE mode)
   onRestoreDefaults?: () => void;
 }

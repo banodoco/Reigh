@@ -271,7 +271,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
             </div>
             
             {/* Shot name with navigation buttons - tighter spacing */}
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1" data-tour="shot-selector">
               <Button 
                 variant="ghost" 
                 size="sm" 

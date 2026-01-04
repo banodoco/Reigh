@@ -33,6 +33,8 @@ interface SortableShotItemProps {
   initialPendingBaselineNonVideoCount?: number;
   // Callback when initial pending uploads are consumed
   onInitialPendingUploadsConsumed?: () => void;
+  // Data attribute for product tour
+  dataTour?: string;
 }
 
 const SortableShotItem: React.FC<SortableShotItemProps> = ({
@@ -50,6 +52,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   initialPendingUploads = 0,
   initialPendingBaselineNonVideoCount,
   onInitialPendingUploadsConsumed,
+  dataTour,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -511,6 +514,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
         isHighlighted={isHighlighted || isDropTarget}
         pendingUploads={pendingSkeletonCount}
         dropLoadingState={withPositionDropState}
+        dataTour={dataTour}
       />
       
       {/* "Without Position" drop zone - appears when dragging over the shot or during loading/success */}

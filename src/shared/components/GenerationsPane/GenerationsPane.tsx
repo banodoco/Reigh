@@ -86,6 +86,13 @@ const GenerationsPaneComponent: React.FC = () => {
   // Image generation modal state
   const [isGenerationModalOpen, setIsGenerationModalOpen] = useState(false);
 
+  // Listen for custom event from product tour to close modal
+  useEffect(() => {
+    const handleCloseModal = () => setIsGenerationModalOpen(false);
+    window.addEventListener('closeGenerationModal', handleCloseModal);
+    return () => window.removeEventListener('closeGenerationModal', handleCloseModal);
+  }, []);
+
   // Use the generalized logic - data loading now enabled on all pages
   const {
     shotsData,
@@ -427,6 +434,8 @@ const GenerationsPaneComponent: React.FC = () => {
           allowMobileLock={true}
           customOpenAction={() => setIsGenerationModalOpen(true)}
           dataTour="generations-pane-tab"
+          dataTourLock="generations-lock"
+          dataTourFourthButton="generations-sparkles"
         />
       )}
       <div

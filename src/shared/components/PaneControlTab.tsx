@@ -70,6 +70,14 @@ interface PaneControlTabProps {
    * Optional data-tour attribute for product tour targeting.
    */
   dataTour?: string;
+  /**
+   * Optional data-tour attribute for the lock button.
+   */
+  dataTourLock?: string;
+  /**
+   * Optional data-tour attribute for the fourth button.
+   */
+  dataTourFourthButton?: string;
 }
 
 // Helper component to wrap buttons in tooltips (desktop only)
@@ -114,6 +122,8 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   allowMobileLock = false,
   customOpenAction,
   dataTour,
+  dataTourLock,
+  dataTourFourthButton,
 }) => {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
@@ -538,6 +548,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
                   onClick={(e) => e.stopPropagation()}
                   className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
                   aria-label="Lock pane"
+                  data-tour={dataTourLock}
                 >
                   <LockIcon className="h-4 w-4" />
                 </Button>
@@ -551,6 +562,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
                     onClick={(e) => e.stopPropagation()}
                     className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
                     aria-label={fourthButton.ariaLabel}
+                    data-tour={dataTourFourthButton}
                   >
                     {fourthButton.content || <Square className="h-4 w-4" />}
                   </Button>
@@ -582,6 +594,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
                   onClick={(e) => e.stopPropagation()}
                   className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
                   aria-label="Lock pane"
+                  data-tour={dataTourLock}
                 >
                   <LockIcon className="h-4 w-4" />
                 </Button>
@@ -645,6 +658,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
                     onClick={(e) => e.stopPropagation()}
                     className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
                     aria-label={fourthButton.ariaLabel}
+                    data-tour={dataTourFourthButton}
                   >
                     {fourthButton.content || <Square className="h-4 w-4" />}
                   </Button>
@@ -729,6 +743,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
                 onClick={(e) => e.stopPropagation()}
                 className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
                 aria-label="Lock pane"
+                data-tour={dataTourLock}
               >
                 <LockIcon className="h-4 w-4" />
               </Button>
@@ -783,6 +798,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
                 onClick={(e) => e.stopPropagation()}
                 className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
                 aria-label="Lock pane"
+                data-tour={dataTourLock}
               >
                 <LockIcon className="h-4 w-4" />
               </Button>

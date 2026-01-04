@@ -65,6 +65,8 @@ interface VideoItemProps {
   hideActions?: boolean;
   /** Custom tooltip text for the delete button */
   deleteTooltip?: string;
+  /** Optional data-tour attribute for product tour targeting */
+  dataTour?: string;
 }
 
 export const VideoItem = React.memo<VideoItemProps>(({
@@ -90,7 +92,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
   onViewSegments,
   projectId,
   hideActions = false,
-  deleteTooltip
+  deleteTooltip,
+  dataTour
 }) => {
   // Get task mapping for this video to enable Apply Settings button
   const { data: taskMapping } = useTaskFromUnifiedCache(video.id || '');
@@ -956,7 +959,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   }
 
   return (
-    <div className="relative group" style={{ contain: 'layout style paint' }}>
+    <div className="relative group" style={{ contain: 'layout style paint' }} data-tour={dataTour}>
       <div
         className="bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative"
         style={aspectRatioStyle}

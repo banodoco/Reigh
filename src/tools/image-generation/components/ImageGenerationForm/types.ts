@@ -242,31 +242,33 @@ export interface PhaseLoraStrength {
 /**
  * Configuration for two-pass hires fix image generation.
  * When enabled, generates at base resolution then upscales with refinement.
+ *
+ * Uses snake_case to match API params directly - no conversion needed.
  */
 export interface HiresFixConfig {
-  /** Whether hires fix is enabled */
+  /** Whether hires fix is enabled (UI only) */
   enabled: boolean;
-  /** Number of inference steps for base pass (default 6) */
-  baseSteps: number;
+  /** Number of inference steps for base pass (maps to `steps` in API) */
+  base_steps: number;
   /** Upscale factor for hires pass (e.g., 2.0 = 2x resolution) */
-  hiresScale: number;
-  /** Number of steps for hires/refinement pass (default 6) */
-  hiresSteps: number;
-  /** Denoising strength for hires pass (0-1, default 0.5) */
-  hiresDenoise: number;
-  /** Per-LoRA phase strength overrides */
+  hires_scale: number;
+  /** Number of steps for hires/refinement pass */
+  hires_steps: number;
+  /** Denoising strength for hires pass (0-1) */
+  hires_denoise: number;
+  /** Lightning LoRA strength (0-1) */
+  lightning_lora_strength: number;
+  /** Per-LoRA phase strength overrides (UI structure, transforms to additional_loras) */
   phaseLoraStrengths: PhaseLoraStrength[];
-  /** Lightning LoRA strength (0-1, default 0.85) */
-  lightningLoraStrength: number;
 }
 
 /** Default hires fix configuration */
 export const DEFAULT_HIRES_FIX_CONFIG: HiresFixConfig = {
   enabled: true,
-  baseSteps: 6,
-  hiresScale: 2.0,
-  hiresSteps: 6,
-  hiresDenoise: 0.5,
+  base_steps: 6,
+  hires_scale: 2.0,
+  hires_steps: 6,
+  hires_denoise: 0.5,
+  lightning_lora_strength: 0.85,
   phaseLoraStrengths: [],
-  lightningLoraStrength: 0.85,
 };

@@ -803,6 +803,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                   setNewlyCreatedShotExpectedImages(0);
                   setNewlyCreatedShotBaselineNonVideoCount(0);
                 } : undefined}
+                dataTour={index === 0 ? 'first-shot' : undefined}
               />
             );
           })}

@@ -31,11 +31,12 @@ interface VideoShotDisplayProps {
   pendingUploads?: number; // Number of images currently being uploaded
   imagesOverlay?: React.ReactNode; // Optional overlay to render over the images area
   dropLoadingState?: 'idle' | 'loading' | 'success'; // Loading state for drops with position
+  dataTour?: string; // Data attribute for product tour
 }
 
 const SKIP_DELETE_CONFIRMATION_KEY = 'reigh-skip-delete-shot-confirmation';
 
-const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false, pendingUploads = 0, imagesOverlay, dropLoadingState = 'idle' }) => {
+const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false, pendingUploads = 0, imagesOverlay, dropLoadingState = 'idle', dataTour }) => {
   // Check if this is a temp shot (optimistic duplicate waiting for real ID)
   const isTempShot = shot.id.startsWith('temp-');
   
@@ -258,12 +259,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
 
   return (
     <>
-      <div 
-        key={shot.id} 
+      <div
+        key={shot.id}
         className={`click-ripple group p-4 border rounded-lg bg-card/50 dark:bg-card/70 dark:border-border transition-all duration-700 relative flex flex-col ${isRippleActive ? 'ripple-active' : ''} ${isHighlighted ? 'ring-4 ring-blue-500 ring-opacity-75 shadow-[0_0_30px_rgba(59,130,246,0.6)] scale-105 animate-pulse' : ''} ${isTempShot ? 'opacity-70 cursor-wait animate-pulse' : 'hover:bg-card/80 hover:shadow-wes-hover hover:border-primary/30 hover:scale-105 cursor-pointer'}`}
         style={rippleStyles}
         onPointerDown={isTempShot ? undefined : handleRippleTrigger}
         onClick={handleClick}
+        data-tour={dataTour}
       >
           <div className="flex justify-between items-start mb-3">
           {isEditingName ? (

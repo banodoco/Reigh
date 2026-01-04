@@ -173,7 +173,7 @@ export interface GenerateVideoParams {
   
   // LoRAs
   selectedLoras: Array<{ id: string; path: string; strength: number; name: string }>;
-  
+
   // Structure video
   structureVideoPath: string | null;
   structureVideoType: 'flow' | 'canny' | 'depth';
