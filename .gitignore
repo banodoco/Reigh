@@ -55,6 +55,11 @@ temp/
 /*.jpeg
 /*.webp
 
+# Archive files in root
+/*.zip
+/*.rar
+/*.7z
+
 # Python cache
 __pycache__/
 *.pyc
