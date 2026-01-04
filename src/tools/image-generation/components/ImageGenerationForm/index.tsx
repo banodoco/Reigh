@@ -175,6 +175,7 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
       hires_scale: input.hiresFixConfig.hiresScale,
       hires_steps: input.hiresFixConfig.hiresSteps,
       hires_denoise: input.hiresFixConfig.hiresDenoise,
+      lightning_lora_strength: input.hiresFixConfig.lightningLoraStrength,
       additional_loras: Object.fromEntries(
         (input.hiresFixConfig.phaseLoraStrengths ?? []).map(lora => [
           lora.loraPath,
