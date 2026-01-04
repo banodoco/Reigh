@@ -53,12 +53,12 @@ export const uploadImageToStorage = async (
     throw new Error('Upload cancelled');
   }
 
-  // Get current user ID for storage path organization
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user?.id) {
+  // Get current user ID for storage path organization (initial check)
+  const { data: { session: initialSession } } = await supabase.auth.getSession();
+  if (!initialSession?.user?.id) {
     throw new Error('User not authenticated');
   }
-  const userId = session.user.id;
+  const userId = initialSession.user.id;
 
   // Generate storage path using centralized utilities
   const fileExtension = getFileExtension(file.name, file.type);
@@ -77,6 +77,12 @@ export const uploadImageToStorage = async (
     // Check abort before each attempt
     if (signal?.aborted) {
       throw new Error('Upload cancelled');
+    }
+
+    // Refresh session token before each attempt (tokens can expire during retries)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error('Session expired - please sign in again');
     }
 
     try {
@@ -153,7 +159,8 @@ export const uploadImageToStorage = async (
           xhr.addEventListener('abort', () => {
             cleanup();
             signal?.removeEventListener('abort', abortHandler);
-            // Don't reject here - we reject in the abort handler with specific message
+            // Reject if not already rejected by timeout/stall/signal handlers
+            reject(new Error('Upload aborted'));
           });
 
           xhr.open('POST', bucketUrl);

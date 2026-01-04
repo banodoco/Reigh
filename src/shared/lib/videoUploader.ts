@@ -131,12 +131,12 @@ export const uploadVideoToStorage = async (
     throw new Error('Upload cancelled');
   }
 
-  // Get session for auth and user ID
-  const { data: session } = await supabase.auth.getSession();
-  if (!session?.session?.access_token || !session?.session?.user?.id) {
+  // Get session for auth and user ID (initial check)
+  const { data: initialSessionData } = await supabase.auth.getSession();
+  if (!initialSessionData?.session?.access_token || !initialSessionData?.session?.user?.id) {
     throw new Error('No active session');
   }
-  const userId = session.session.user.id;
+  const userId = initialSessionData.session.user.id;
 
   // Generate storage path using centralized utilities
   const fileExt = getFileExtension(file.name, file.type, 'mp4');
@@ -152,6 +152,12 @@ export const uploadVideoToStorage = async (
     // Check abort before each attempt
     if (signal?.aborted) {
       throw new Error('Upload cancelled');
+    }
+
+    // Refresh session token before each attempt (tokens can expire during retries)
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session?.access_token) {
+      throw new Error('Session expired - please sign in again');
     }
 
     try {
@@ -226,11 +232,12 @@ export const uploadVideoToStorage = async (
         xhr.addEventListener('abort', () => {
           cleanup();
           signal?.removeEventListener('abort', abortHandler);
-          // Don't reject here - we reject in specific handlers with message
+          // Reject if not already rejected by timeout/stall/signal handlers
+          reject(new Error('Upload aborted'));
         });
 
         xhr.open('POST', bucketUrl);
-        xhr.setRequestHeader('Authorization', `Bearer ${session.session!.access_token}`);
+        xhr.setRequestHeader('Authorization', `Bearer ${sessionData.session!.access_token}`);
         xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
         xhr.setRequestHeader('Cache-Control', '3600');
 
