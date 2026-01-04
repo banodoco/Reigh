@@ -6,120 +6,206 @@ Create a "Getting Started" shot with sample generations for new users, plus a gu
 
 ---
 
-## Part 1: Default Shot with Sample Generations
+## Part 1: Default Shot with Sample Generations (Dynamic Template)
 
-### Approach: Extend Existing `createDefaultShot` in ProjectContext
+### Approach: Dynamic Template from Existing Project
 
-The existing user creation flow already has a hook point:
-1. User authenticates → `create_user_record_if_not_exists()` RPC creates user record
-2. `fetchProjects()` runs on client → if no projects exist, creates "Default Project"
-3. **`createDefaultShot()`** is called to create "Default Shot" ← **This is where we add sample content**
+Instead of hardcoding sample assets, we use a **live template** from an existing project. This allows updating the onboarding content simply by editing the template project/shot.
 
-This happens immediately when a new user first loads the app, before WelcomeBonusModal even shows.
+**How it works:**
+1. Store template IDs in `onboarding_config` table (project, shot, video)
+2. When new user signs up → copy content from template to their "Getting Started" shot
+3. Update template anytime → new users automatically get latest version
+
+**What gets copied:**
+- **Starred images** from template project → New user's gallery
+- **Timeline images** from template shot → New user's Getting Started shot (with positions, metadata, settings)
+- **Featured video** → New user's shot
 
 ### Implementation Steps
 
-#### 1.1 Store Sample Assets in Public Storage
+#### 1.1 Create Config Table and Seed Template
 
-Create a public bucket with sample images/videos that all new users will reference:
+**Migration:** `supabase/migrations/YYYYMMDD_onboarding_config.sql`
 
+```sql
+-- Config table for onboarding template references
+CREATE TABLE IF NOT EXISTS onboarding_config (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Will be populated with actual IDs after selecting template content
+-- Example:
+-- INSERT INTO onboarding_config (key, value) VALUES (
+--   'template',
+--   '{
+--     "project_id": "uuid-of-template-project",
+--     "shot_id": "uuid-of-template-shot",
+--     "featured_video_id": "uuid-of-video-generation"
+--   }'
+-- );
 ```
-Storage: sample-content/
-├── sample-image-1.webp  (landscape, scenic - first keyframe)
-├── sample-image-2.webp  (same scene, different angle - second keyframe)
-├── sample-video-1.mp4   (short travel video between the two images)
-```
 
-**Action:**
-1. Create `sample-content` bucket in Supabase storage (public read access)
-2. Upload 2 high-quality sample images and 1 sample video
-3. These assets are shared by ALL new users (reference only, not copied)
-
-#### 1.2 Create `createSampleGenerationsForNewUser` Helper
+#### 1.2 Create `copyTemplateToNewUser` Helper
 
 **File:** `src/shared/contexts/ProjectContext.tsx` (alongside existing `createDefaultShot`)
 
 ```typescript
-const SAMPLE_CONTENT_BASE = 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/sample-content';
-
-const createSampleGenerationsForNewUser = async (projectId: string, shotId: string): Promise<void> => {
+/**
+ * Copy template content to a new user's Getting Started shot.
+ * Uses live data from template project/shot, so updates are automatic.
+ */
+const copyTemplateToNewUser = async (newProjectId: string, newShotId: string): Promise<void> => {
   try {
-    // Create sample image generations (pointing to shared public assets)
-    const sampleGenerations = [
-      {
-        project_id: projectId,
-        type: 'image',
-        location: `${SAMPLE_CONTENT_BASE}/sample-image-1.webp`,
-        params: {
-          prompt: 'A serene mountain landscape at golden hour, cinematic lighting',
-          model: 'flux-dev',
-          width: 1280,
-          height: 720,
-          is_sample: true, // Mark as sample for potential filtering
-        },
-      },
-      {
-        project_id: projectId,
-        type: 'image',
-        location: `${SAMPLE_CONTENT_BASE}/sample-image-2.webp`,
-        params: {
-          prompt: 'The same mountain vista, camera slowly pushing forward',
-          model: 'flux-dev',
-          width: 1280,
-          height: 720,
-          is_sample: true,
-        },
-      },
-      {
-        project_id: projectId,
-        type: 'video',
-        location: `${SAMPLE_CONTENT_BASE}/sample-video-1.mp4`,
-        params: {
-          prompt: 'Smooth camera movement through the mountain scene',
-          model: 'travel_between_images',
-          is_sample: true,
-        },
-      },
-    ];
+    // 1. Get template config
+    const { data: config, error: configError } = await supabase
+      .from('onboarding_config')
+      .select('value')
+      .eq('key', 'template')
+      .single();
 
-    const { data: generations, error: genError } = await supabase
-      .from('generations')
-      .insert(sampleGenerations)
-      .select('id');
-
-    if (genError) {
-      console.error('[ProjectContext] Failed to create sample generations:', genError);
+    if (configError || !config) {
+      console.log('[Onboarding] No template config found, skipping sample content');
       return;
     }
 
-    // Link image generations to shot with timeline positions
-    // Video is NOT on timeline (just associated with project)
-    const shotGenerationLinks = [
-      { shot_id: shotId, generation_id: generations[0].id, position: 0 },
-      { shot_id: shotId, generation_id: generations[1].id, position: 1 },
-    ];
+    const { project_id, shot_id, featured_video_id } = config.value;
 
-    const { error: linkError } = await supabase
-      .from('shot_generations')
-      .insert(shotGenerationLinks);
+    // 2. Copy starred images from template project to new user's gallery
+    const { data: starredGens } = await supabase
+      .from('generations')
+      .select('type, location, thumbnail_url, params')
+      .eq('project_id', project_id)
+      .eq('is_starred', true)
+      .eq('type', 'image');
 
-    if (linkError) {
-      console.error('[ProjectContext] Failed to link generations to shot:', linkError);
+    if (starredGens?.length) {
+      const starredInserts = starredGens.map(gen => ({
+        project_id: newProjectId,
+        type: gen.type,
+        location: gen.location,
+        thumbnail_url: gen.thumbnail_url,
+        params: { ...gen.params, is_sample: true },
+        is_starred: true, // Keep them starred for new user too
+      }));
+
+      await supabase.from('generations').insert(starredInserts);
+      console.log(`[Onboarding] Copied ${starredGens.length} starred images`);
     }
 
-    console.log('[ProjectContext] Created sample generations for new user');
+    // 3. Copy template shot settings to new shot
+    const { data: templateShot } = await supabase
+      .from('shots')
+      .select('settings, aspect_ratio')
+      .eq('id', shot_id)
+      .single();
+
+    if (templateShot) {
+      await supabase
+        .from('shots')
+        .update({
+          settings: templateShot.settings,
+          aspect_ratio: templateShot.aspect_ratio,
+        })
+        .eq('id', newShotId);
+    }
+
+    // 4. Copy timeline images from template shot
+    const { data: shotGens } = await supabase
+      .from('shot_generations')
+      .select(`
+        timeline_frame,
+        metadata,
+        generations:generation_id (
+          type, location, thumbnail_url, params
+        )
+      `)
+      .eq('shot_id', shot_id)
+      .not('timeline_frame', 'is', null)
+      .order('timeline_frame');
+
+    if (shotGens?.length) {
+      for (const sg of shotGens) {
+        const gen = sg.generations as any;
+        if (!gen || gen.type === 'video') continue;
+
+        // Create new generation record (same URL, new project)
+        const { data: newGen } = await supabase
+          .from('generations')
+          .insert({
+            project_id: newProjectId,
+            type: gen.type,
+            location: gen.location,
+            thumbnail_url: gen.thumbnail_url,
+            params: { ...gen.params, is_sample: true },
+          })
+          .select('id')
+          .single();
+
+        if (newGen) {
+          // Link to new shot with same position and metadata
+          await supabase.from('shot_generations').insert({
+            shot_id: newShotId,
+            generation_id: newGen.id,
+            timeline_frame: sg.timeline_frame,
+            metadata: sg.metadata, // Preserves pair prompts etc.
+          });
+        }
+      }
+      console.log(`[Onboarding] Copied ${shotGens.length} timeline images`);
+    }
+
+    // 5. Copy featured video if specified
+    if (featured_video_id) {
+      const { data: videoGen } = await supabase
+        .from('generations')
+        .select('type, location, thumbnail_url, params')
+        .eq('id', featured_video_id)
+        .single();
+
+      if (videoGen) {
+        const { data: newVideo } = await supabase
+          .from('generations')
+          .insert({
+            project_id: newProjectId,
+            type: videoGen.type,
+            location: videoGen.location,
+            thumbnail_url: videoGen.thumbnail_url,
+            params: { ...videoGen.params, is_sample: true },
+          })
+          .select('id')
+          .single();
+
+        if (newVideo) {
+          // Link video to shot (no timeline_frame for videos)
+          await supabase.from('shot_generations').insert({
+            shot_id: newShotId,
+            generation_id: newVideo.id,
+          });
+          console.log('[Onboarding] Copied featured video');
+        }
+      }
+    }
+
+    console.log('[Onboarding] Template content copied successfully');
   } catch (err) {
-    console.error('[ProjectContext] Exception creating sample generations:', err);
+    console.error('[Onboarding] Exception copying template:', err);
   }
 };
 ```
 
-#### 1.3 Update `createDefaultShot` to Call Sample Generation Helper
+#### 1.3 Update `createDefaultShot` to Call Template Copy
 
-Modify the existing `createDefaultShot` function to also create sample content:
+Modify the existing `createDefaultShot` function:
 
 ```typescript
-const createDefaultShot = async (projectId: string, initialSettings?: any, isFirstProject: boolean = false): Promise<void> => {
+const createDefaultShot = async (
+  projectId: string,
+  initialSettings?: any,
+  isFirstProject: boolean = false
+): Promise<void> => {
   try {
     const shotName = isFirstProject ? 'Getting Started' : 'Default Shot';
 
@@ -138,9 +224,9 @@ const createDefaultShot = async (projectId: string, initialSettings?: any, isFir
       return;
     }
 
-    // For first-time users, add sample content to help them get started
+    // For first-time users, copy template content
     if (isFirstProject && shot) {
-      await createSampleGenerationsForNewUser(projectId, shot.id);
+      await copyTemplateToNewUser(projectId, shot.id);
     }
   } catch (err) {
     console.error('[ProjectContext] Exception creating default shot:', err);
@@ -159,8 +245,6 @@ await createDefaultShot(newProject.id, undefined, true /* isFirstProject */);
 ```
 
 #### 1.5 Navigate to Getting Started Shot After Welcome Modal
-
-The WelcomeBonusModal should navigate to the Getting Started shot when complete:
 
 ```typescript
 // In Layout.tsx handleWelcomeClose
@@ -185,6 +269,45 @@ const handleWelcomeClose = useCallback(async () => {
   setTimeout(() => startTour(), 500);
 }, [closeWelcomeModal, selectedProjectId, navigate, startTour]);
 ```
+
+#### 1.6 Helper Script: Set Template IDs
+
+Once you've created the template content, run this to set the config:
+
+```sql
+-- Find your template project
+SELECT id, name FROM projects WHERE name ILIKE '%template%' OR name ILIKE '%onboarding%';
+
+-- Find starred images in template project
+SELECT id, location FROM generations
+WHERE project_id = 'YOUR_PROJECT_ID' AND is_starred = true AND type = 'image';
+
+-- Find template shot
+SELECT id, name FROM shots WHERE project_id = 'YOUR_PROJECT_ID';
+
+-- Find a good video to feature
+SELECT id, location FROM generations
+WHERE project_id = 'YOUR_PROJECT_ID' AND type = 'video' LIMIT 5;
+
+-- Set the template config
+INSERT INTO onboarding_config (key, value)
+VALUES ('template', '{
+  "project_id": "YOUR_PROJECT_ID",
+  "shot_id": "YOUR_SHOT_ID",
+  "featured_video_id": "YOUR_VIDEO_ID"
+}')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+```
+
+### Benefits of Dynamic Template
+
+| Benefit | Description |
+|---------|-------------|
+| **Easy updates** | Edit template project/shot in UI, new users get latest |
+| **No file duplication** | New records point to same storage URLs |
+| **Full fidelity** | Preserves timeline positions, pair prompts, shot settings |
+| **No deploys needed** | Change template content without code changes |
+| **Testable** | Create test user to verify onboarding experience |
 
 ---
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
-import { Outlet, useLocation, Navigate } from 'react-router-dom';
+import { Outlet, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { GlobalHeader } from '@/shared/components/GlobalHeader';
 import TasksPane from '@/shared/components/TasksPane/TasksPane';
 import ToolsPane from '@/shared/components/ToolsPane/ToolsPane';
@@ -18,6 +18,7 @@ import { useWelcomeBonus } from '@/shared/hooks/useWelcomeBonus';
 import { WelcomeBonusModal } from '@/shared/components/WelcomeBonusModal';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { usePageVisibility } from '@/shared/hooks/usePageVisibility';
+import { useProject } from '@/shared/contexts/ProjectContext';
 import '@/shared/lib/debugPolling';
 import { SocialIcons } from '@/shared/components/SocialIcons';
 import { AIInputModeProvider } from '@/shared/contexts/AIInputModeContext';
@@ -213,6 +214,35 @@ const Layout: React.FC = () => {
 
   // Check for welcome bonus when user is authenticated
   const { showWelcomeModal, closeWelcomeModal } = useWelcomeBonus();
+  const navigate = useNavigate();
+  const { selectedProjectId } = useProject();
+
+  // Handle welcome modal close - navigate to Getting Started shot
+  const handleWelcomeClose = useCallback(async () => {
+    closeWelcomeModal();
+
+    // Find the Getting Started shot and navigate to it
+    if (selectedProjectId) {
+      try {
+        const { data: shot } = await supabase
+          .from('shots')
+          .select('id')
+          .eq('project_id', selectedProjectId)
+          .eq('name', 'Getting Started')
+          .maybeSingle();
+
+        if (shot) {
+          console.log('[Onboarding] Navigating to Getting Started shot:', shot.id);
+          navigate(`/tools/travel-between-images?shot=${shot.id}`);
+        }
+      } catch (err) {
+        console.error('[Onboarding] Failed to find Getting Started shot:', err);
+      }
+    }
+
+    // TODO: Start product tour after brief delay
+    // setTimeout(() => startTour(), 500);
+  }, [closeWelcomeModal, selectedProjectId, navigate]);
 
   // Preload user settings to warm the cache for the welcome modal
   // This prevents loading delays when users reach the generation method step
@@ -347,7 +377,7 @@ const Layout: React.FC = () => {
         {/* Welcome Bonus Modal */}
         <WelcomeBonusModal
           isOpen={showWelcomeModal}
-          onClose={closeWelcomeModal}
+          onClose={handleWelcomeClose}
         />
       </div>
     </AIInputModeProvider>
