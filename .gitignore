@@ -45,10 +45,15 @@ temp/
 !tasks/*.md
 !CLAUDE.md
 
-# Stray video/media files in root (should be in public/)
+# Stray media files in root (should be in public/)
 /*.mp4
 /*.webm
 /*.mov
+/*.gif
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
 
 # Python cache
 __pycache__/
