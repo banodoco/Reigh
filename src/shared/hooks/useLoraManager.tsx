@@ -159,17 +159,32 @@ export const useLoraManager = (
 
     if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
       const loraName = loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"];
+
+      // Determine if this is a multi-stage LoRA (has high_noise_url OR low_noise_url)
+      const hasHighNoise = !!loraToAdd.high_noise_url;
+      const hasLowNoise = !!loraToAdd.low_noise_url;
+      const isMultiStage = hasHighNoise || hasLowNoise;
+
+      // For multi-stage LoRAs, use high_noise_url as the primary path (if available)
+      // For single-stage, use the Model Files URL
+      const primaryPath = isMultiStage
+        ? (loraToAdd.high_noise_url || loraToAdd.low_noise_url) // Prefer high, fallback to low
+        : (loraToAdd["Model Files"][0].url || loraToAdd["Model Files"][0].path);
+
       const newLora: ActiveLora = {
         id: loraToAdd["Model ID"],
         name: loraName,
-        path: loraToAdd["Model Files"][0].url || loraToAdd["Model Files"][0].path,
+        path: hasHighNoise ? loraToAdd.high_noise_url : primaryPath, // High noise URL or single URL
         strength: initialStrength || 1.0, // Use provided strength or default to 1.0
-        previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0 
-          ? loraToAdd.Images[0].url 
+        previewImageUrl: loraToAdd.Images && loraToAdd.Images.length > 0
+          ? loraToAdd.Images[0].url
           : undefined,
         trigger_word: loraToAdd.trigger_word,
+        // Multi-stage fields - store both even if one is undefined
+        lowNoisePath: hasLowNoise ? loraToAdd.low_noise_url : undefined,
+        isMultiStage,
       };
-      console.log(`[LoRA] Adding LoRA ${newLora.id} to selectedLoras with strength ${newLora.strength}`);
+      console.log(`[LoRA] Adding LoRA ${newLora.id} with strength ${newLora.strength}, isMultiStage: ${isMultiStage}, hasHighNoise: ${hasHighNoise}, hasLowNoise: ${hasLowNoise}`);
       setSelectedLoras(prev => [...prev, newLora]);
       if (isManualAction) {
         markAsUserSet();

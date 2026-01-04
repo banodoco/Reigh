@@ -22,33 +22,41 @@ const MOTION_LORA_URL = 'https://huggingface.co/peteromallet/random_junk/resolve
 /**
  * Build phase config for basic mode based on structure video presence, motion amount, and user LoRAs.
  * Uses DEFAULT_PHASE_CONFIG and DEFAULT_VACE_PHASE_CONFIG from settings.ts as the base configs.
- * 
+ *
+ * For multi-stage LoRAs (Wan 2.2 I2V):
+ * - High-noise LoRA (path) is applied to early phases (phase 0, 1 for 3-phase; phase 0 for 2-phase)
+ * - Low-noise LoRA (lowNoisePath) is applied to the final phase
+ *
  * @param hasStructureVideo - Whether to use VACE mode (true) or I2V mode (false)
  * @param amountOfMotion - 0-100 motion slider value
- * @param userLoras - User-selected LoRAs to add to every phase
+ * @param userLoras - User-selected LoRAs to add to phases (with optional multi-stage support)
  * @returns Object with model name and phase config
  */
 export function buildBasicModePhaseConfig(
   hasStructureVideo: boolean,
   amountOfMotion: number,
-  userLoras: Array<{ path: string; strength: number }>
+  userLoras: Array<{ path: string; strength: number; lowNoisePath?: string; isMultiStage?: boolean }>
 ): { model: string; phaseConfig: PhaseConfig } {
-  
+
   // Get base config from settings.ts (single source of truth)
   const baseConfig = hasStructureVideo ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
-  const model = hasStructureVideo 
-    ? 'wan_2_2_vace_lightning_baseline_2_2_2' 
+  const model = hasStructureVideo
+    ? 'wan_2_2_vace_lightning_baseline_2_2_2'
     : 'wan_2_2_i2v_lightning_baseline_2_2_2';
+
+  const totalPhases = baseConfig.phases.length;
 
   // DEEP CLONE: Create completely new phase config with new LoRA objects
   // This prevents shared references that cause strength changes to affect multiple phases
   const phaseConfig: PhaseConfig = {
     ...baseConfig,
     steps_per_phase: [...baseConfig.steps_per_phase], // Clone array
-    phases: baseConfig.phases.map(phase => {
+    phases: baseConfig.phases.map((phase, phaseIndex) => {
+      const isLastPhase = phaseIndex === totalPhases - 1;
+
       // Build additional LoRAs for THIS phase (new objects for each phase!)
       const additionalLoras: PhaseLoraConfig[] = [];
-      
+
       // Add motion LoRA if motion > 0 (strength scales with amount of motion)
       if (amountOfMotion > 0) {
         additionalLoras.push({
@@ -56,14 +64,43 @@ export function buildBasicModePhaseConfig(
           multiplier: (amountOfMotion / 100).toFixed(2)
         });
       }
-      
-      // Add all user-selected LoRAs (create NEW objects for each phase)
+
+      // Add user-selected LoRAs with multi-stage support
       userLoras.forEach(lora => {
-        if (lora.path) {
-          additionalLoras.push({
-            url: lora.path,
-            multiplier: lora.strength.toFixed(2)
-          });
+        const multiplier = lora.strength.toFixed(2);
+
+        if (lora.isMultiStage) {
+          // Multi-stage LoRA: route to correct phase based on available URLs
+          const hasHighNoise = !!lora.path; // High noise stored in path
+          const hasLowNoise = !!lora.lowNoisePath;
+
+          if (isLastPhase) {
+            // Final phase: use low_noise LoRA if available
+            if (hasLowNoise) {
+              additionalLoras.push({
+                url: lora.lowNoisePath!,
+                multiplier
+              });
+            }
+            // If only high_noise exists, don't apply anything to final phase
+          } else {
+            // Early phases: use high_noise LoRA if available
+            if (hasHighNoise) {
+              additionalLoras.push({
+                url: lora.path,
+                multiplier
+              });
+            }
+            // If only low_noise exists, don't apply anything to early phases
+          }
+        } else {
+          // Single-stage LoRA: apply to all phases (existing behavior)
+          if (lora.path) {
+            additionalLoras.push({
+              url: lora.path,
+              multiplier
+            });
+          }
         }
       });
 
@@ -761,10 +798,13 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     console.warn('[Generation] ⚠️ I2V mode selected but structure video exists. Structure video will NOT be used.');
   }
   
-  // Convert user LoRAs to the format needed for phase config
+  // Convert user LoRAs to the format needed for phase config (including multi-stage fields)
   const userLorasForPhaseConfig = (selectedLoras || []).map(l => ({
     path: l.path,
-    strength: parseFloat(l.strength?.toString() ?? '0') || 0.0
+    strength: parseFloat(l.strength?.toString() ?? '0') || 0.0,
+    // Multi-stage LoRA fields
+    lowNoisePath: (l as any).lowNoisePath,
+    isMultiStage: (l as any).isMultiStage,
   }));
   
   // Use advanced mode ONLY if:

@@ -13,6 +13,9 @@ export interface ActiveLora {
   strength: number;
   previewImageUrl?: string;
   trigger_word?: string;
+  // Multi-stage LoRA fields (for Wan 2.2 I2V)
+  lowNoisePath?: string;  // URL for low-noise (final) phase
+  isMultiStage?: boolean; // Quick check flag
 }
 
 interface ActiveLoRAsDisplayProps {

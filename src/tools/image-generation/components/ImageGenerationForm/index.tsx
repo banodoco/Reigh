@@ -3003,9 +3003,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             // Loading state - show placeholders while hydrating
             isLoadingReferenceData={isReferenceDataLoading}
             referenceCount={referenceCount}
-            // Generation source toggle props (cloud mode only)
+            // Generation source toggle props (both local and cloud modes)
             generationSource={generationSource}
-            onGenerationSourceChange={!isLocalGenerationEnabled ? handleGenerationSourceChange : undefined}
+            onGenerationSourceChange={handleGenerationSourceChange}
             // Just-text mode props
             selectedTextModel={selectedTextModel}
             onTextModelChange={handleTextModelChange}
