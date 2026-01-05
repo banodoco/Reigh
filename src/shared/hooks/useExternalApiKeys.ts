@@ -7,7 +7,7 @@ export type ExternalService = 'huggingface' | 'replicate' | 'civitai';
 interface ExternalApiKey {
   id: string;
   service: ExternalService;
-  key_value: string;
+  key_value?: string;  // Not fetched client-side (stored in Vault)
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -128,7 +128,7 @@ export function useExternalApiKey(service: ExternalService) {
 
   return {
     apiKey,
-    hasKey: !!apiKey?.key_value,
+    hasKey: !!apiKey,  // Record exists = key exists (actual value is in Vault)
     isLoading,
     error,
     refetch,
