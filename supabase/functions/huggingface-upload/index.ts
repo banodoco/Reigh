@@ -197,15 +197,13 @@ serve(async (req) => {
 
     console.log(`[HF-UPLOAD] Authenticated user: ${user.id}`);
 
-    // 2. Get user's HuggingFace token
-    const { data: apiKeyData, error: apiKeyError } = await supabaseClient
-      .from("external_api_keys")
-      .select("key_value, metadata")
-      .eq("user_id", user.id)
-      .eq("service", "huggingface")
-      .single();
+    // 2. Get user's HuggingFace token (decrypted from Vault)
+    const { data: apiKeyData, error: apiKeyError } = await supabaseAdmin.rpc(
+      "get_external_api_key_decrypted",
+      { p_user_id: user.id, p_service: "huggingface" }
+    );
 
-    if (apiKeyError || !apiKeyData) {
+    if (apiKeyError || !apiKeyData || apiKeyData.length === 0) {
       console.error("[HF-UPLOAD] HF token not found:", apiKeyError);
       return createResponse({
         error: "HuggingFace API key not found. Please set up your HuggingFace token first.",
@@ -213,8 +211,15 @@ serve(async (req) => {
       }, 400);
     }
 
-    const hfToken = apiKeyData.key_value;
-    console.log("[HF-UPLOAD] Retrieved HF token");
+    const hfToken = apiKeyData[0].key_value;
+    if (!hfToken) {
+      console.error("[HF-UPLOAD] HF token is empty");
+      return createResponse({
+        error: "HuggingFace API key is empty. Please re-enter your token.",
+        code: "HF_TOKEN_EMPTY"
+      }, 400);
+    }
+    console.log("[HF-UPLOAD] Retrieved HF token from Vault");
 
     // 3. Parse form data
     const formData = await req.formData();

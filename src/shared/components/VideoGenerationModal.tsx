@@ -323,8 +323,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
         <DialogContent
           className={modal.className}
           style={{ ...modal.style, maxWidth: '1000px' }}
-          onPointerDownOutside={() => onClose()}
-          onInteractOutside={() => onClose()}
+          onPointerDownOutside={() => !isLoraModalOpen && onClose()}
+          onInteractOutside={() => !isLoraModalOpen && onClose()}
           {...modal.props}
         >
           <DialogHeader className={modal.headerClass}>

@@ -39,7 +39,7 @@ async function fetchExternalApiKey(service: ExternalService): Promise<ExternalAp
 }
 
 /**
- * Save or update an external API key
+ * Save or update an external API key using Vault encryption
  */
 async function saveExternalApiKey(
   service: ExternalService,
@@ -49,39 +49,35 @@ async function saveExternalApiKey(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // Upsert: insert or update based on (user_id, service) unique constraint
-  const { data, error } = await supabase
-    .from('external_api_keys')
-    .upsert(
-      {
-        user_id: user.id,
-        service,
-        key_value: keyValue,
-        metadata: metadata || {},
-      },
-      {
-        onConflict: 'user_id,service',
-      }
-    )
-    .select()
-    .single();
+  // Call RPC to save encrypted in Vault
+  const { data, error } = await supabase.rpc('save_external_api_key', {
+    p_service: service,
+    p_key_value: keyValue,
+    p_metadata: metadata || {},
+  });
 
   if (error) throw error;
-  return data as ExternalApiKey;
+
+  // Refetch the record to get the full data
+  const { data: record, error: fetchError } = await supabase
+    .from('external_api_keys')
+    .select('id, service, metadata, created_at, updated_at')
+    .eq('user_id', user.id)
+    .eq('service', service)
+    .single();
+
+  if (fetchError) throw fetchError;
+  return record as ExternalApiKey;
 }
 
 /**
- * Delete an external API key
+ * Delete an external API key (also removes from Vault)
  */
 async function deleteExternalApiKey(service: ExternalService): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-
-  const { error } = await supabase
-    .from('external_api_keys')
-    .delete()
-    .eq('user_id', user.id)
-    .eq('service', service);
+  // Call RPC to delete from both external_api_keys and vault
+  const { error } = await supabase.rpc('delete_external_api_key', {
+    p_service: service,
+  });
 
   if (error) throw error;
 }
