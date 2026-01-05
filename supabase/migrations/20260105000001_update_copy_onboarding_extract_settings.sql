@@ -1,5 +1,6 @@
--- Function to copy onboarding template content to a new user's project
--- Uses SECURITY DEFINER to bypass RLS and read from template project
+-- Update copy_onboarding_template to extract settings from video params
+-- Instead of copying shot settings (which can be overwritten by UI),
+-- we extract settings from the video's full_orchestrator_payload
 
 CREATE OR REPLACE FUNCTION copy_onboarding_template(
   target_project_id UUID,
@@ -18,10 +19,8 @@ DECLARE
   starred_gen RECORD;
   shot_gen RECORD;
   new_gen_id UUID;
-  template_shot RECORD;
   video_params JSONB;
   orchestrator_payload JSONB;
-  extracted_settings JSONB;
   structure_video_settings JSONB;
   travel_settings JSONB;
 BEGIN
@@ -181,8 +180,5 @@ BEGIN
 END;
 $$;
 
--- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION copy_onboarding_template(UUID, UUID) TO authenticated;
-
--- Add comment
-COMMENT ON FUNCTION copy_onboarding_template IS 'Copies onboarding template content (starred images, timeline, video) to a new user''s project. Uses SECURITY DEFINER to read from template project.';
+-- Add updated comment
+COMMENT ON FUNCTION copy_onboarding_template IS 'Copies onboarding template content (starred images, timeline, video) to a new user''s project. Extracts settings from video params to ensure shot settings are properly initialized.';

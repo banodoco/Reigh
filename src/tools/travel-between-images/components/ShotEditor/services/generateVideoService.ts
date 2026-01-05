@@ -10,8 +10,14 @@ import {
   type VideoMotionApiParams,
   type VideoModelApiParams,
   type VideoPromptApiParams,
+  type PromptConfig,
+  type MotionConfig,
+  type ModelConfig,
   DEFAULT_VIDEO_STRUCTURE_PARAMS,
   DEFAULT_VIDEO_MOTION_PARAMS,
+  DEFAULT_PROMPT_CONFIG,
+  DEFAULT_MOTION_CONFIG,
+  DEFAULT_MODEL_CONFIG,
 } from '@/shared/lib/tasks/travelBetweenImages';
 import {
   type StructureVideoConfig,
@@ -30,9 +36,19 @@ export type {
   VideoMotionApiParams,
   VideoModelApiParams,
   VideoPromptApiParams,
+  PromptConfig,
+  MotionConfig,
+  ModelConfig,
   StructureVideoConfig,
 };
-export { DEFAULT_VIDEO_STRUCTURE_PARAMS, DEFAULT_VIDEO_MOTION_PARAMS, DEFAULT_STRUCTURE_VIDEO_CONFIG };
+export {
+  DEFAULT_VIDEO_STRUCTURE_PARAMS,
+  DEFAULT_VIDEO_MOTION_PARAMS,
+  DEFAULT_PROMPT_CONFIG,
+  DEFAULT_MOTION_CONFIG,
+  DEFAULT_MODEL_CONFIG,
+  DEFAULT_STRUCTURE_VIDEO_CONFIG,
+};
 
 // ============================================================================
 // PHASE CONFIG HELPERS FOR BASIC MODE
@@ -149,61 +165,32 @@ export interface GenerateVideoParams {
   projectId: string;
   selectedShotId: string;
   selectedShot: any; // Shot type
-  
+
   // Query management
   queryClient: QueryClient;
   onShotImagesUpdate?: () => void;
-  
+
   // Resolution/dimensions
   effectiveAspectRatio: string | null;
-  
+
   // Generation mode
   generationMode: 'timeline' | 'batch';
-  
-  // Prompts
-  batchVideoPrompt: string;
-  textBeforePrompts?: string;
-  textAfterPrompts?: string;
-  
-  // Video settings
+
+  // Grouped configs (snake_case matching API)
+  promptConfig: PromptConfig;
+  motionConfig: MotionConfig;
+  modelConfig: ModelConfig;
+  structureVideoConfig: StructureVideoConfig;
+
+  // Video settings (used for fallback computation, not direct API params)
   batchVideoFrames: number;
-  batchVideoSteps: number;
-  
-  // Model settings
-  steerableMotionSettings: {
-    seed: number;
-    debug?: boolean;
-    negative_prompt: string;
-    model_name: string;
-  };
-  getModelName: () => string;
-  
-  // UI state
-  randomSeed: boolean;
-  turboMode: boolean;
-  enhancePrompt: boolean;
-  
-  // Motion settings
-  amountOfMotion: number;
-  motionMode?: 'basic' | 'advanced';
-  
-  // Generation type mode (I2V vs VACE)
-  generationTypeMode?: 'i2v' | 'vace';
-  
-  // Advanced mode
-  advancedMode: boolean;
-  phaseConfig?: PhaseConfig;
-  selectedPhasePresetId?: string;
-  
+
   // LoRAs
   selectedLoras: Array<{ id: string; path: string; strength: number; name: string }>;
 
-  // Structure video config (grouped with snake_case matching API)
-  structureVideoConfig: StructureVideoConfig;
-  
   // Generation name
   variantNameParam: string;
-  
+
   // Cleanup function
   clearAllEnhancedPrompts: () => Promise<void>;
 }
@@ -223,9 +210,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   console.log('[BasePromptsDebug] Generation mode:', params.generationMode);
   console.log('[BasePromptsDebug] Shot ID:', params.selectedShotId?.substring(0, 8));
   console.log('[BasePromptsDebug] Batch video frames:', params.batchVideoFrames);
-  console.log('[BasePromptsDebug] Batch video prompt:', params.batchVideoPrompt);
+  console.log('[BasePromptsDebug] Batch video prompt:', params.promptConfig.base_prompt);
   console.log('[BasePromptsDebug] ========================================');
-  
+
   const {
     projectId,
     selectedShotId,
@@ -234,28 +221,43 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     onShotImagesUpdate,
     effectiveAspectRatio,
     generationMode,
-    batchVideoPrompt,
-    textBeforePrompts,
-    textAfterPrompts,
-    batchVideoFrames,
-    batchVideoSteps,
-    steerableMotionSettings,
-    getModelName,
-    randomSeed,
-    turboMode,
-    enhancePrompt,
-    amountOfMotion: rawAmountOfMotion,
-    motionMode,
-    generationTypeMode = 'i2v', // Default to I2V if not set
-    advancedMode,
-    phaseConfig,
-    selectedPhasePresetId,
-    selectedLoras,
+    promptConfig,
+    motionConfig,
+    modelConfig,
     structureVideoConfig,
+    batchVideoFrames,
+    selectedLoras,
     variantNameParam,
     clearAllEnhancedPrompts,
   } = params;
-  
+
+  // Destructure prompt config for convenience (snake_case matches API)
+  const {
+    base_prompt: batchVideoPrompt,
+    enhance_prompt: enhancePrompt,
+    text_before_prompts: textBeforePrompts,
+    text_after_prompts: textAfterPrompts,
+    default_negative_prompt: defaultNegativePrompt,
+  } = promptConfig;
+
+  // Destructure motion config
+  const {
+    amount_of_motion: rawAmountOfMotion,
+    motion_mode: motionMode,
+    advanced_mode: advancedMode,
+    phase_config: phaseConfig,
+    selected_phase_preset_id: selectedPhasePresetId,
+  } = motionConfig;
+
+  // Destructure model config
+  const {
+    seed,
+    random_seed: randomSeed,
+    turbo_mode: turboMode,
+    debug,
+    generation_type_mode: generationTypeMode,
+  } = modelConfig;
+
   // CRITICAL: Ensure amountOfMotion has a valid default value
   // JavaScript destructuring default only applies when property is absent, not when it's undefined
   const amountOfMotion = rawAmountOfMotion ?? 50;
@@ -603,7 +605,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     negativePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
       // Use pair-specific negative prompt if available, otherwise fall back to default
       const pairNegativePrompt = pairPrompts[index]?.negativePrompt;
-      const finalNegativePrompt = (pairNegativePrompt && pairNegativePrompt.trim()) ? pairNegativePrompt.trim() : steerableMotionSettings.negative_prompt;
+      const finalNegativePrompt = (pairNegativePrompt && pairNegativePrompt.trim()) ? pairNegativePrompt.trim() : defaultNegativePrompt;
       console.log(`[PairPrompts-GENERATION] 🚫 Pair ${index} negative:`, {
         hasPairNegativePrompt: !!pairNegativePrompt,
         pairNegativePromptRaw: pairNegativePrompt || '(none)',
@@ -611,7 +613,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         isCustom: pairNegativePrompt && pairNegativePrompt.trim() ? true : false
       });
       return finalNegativePrompt;
-    }) : [steerableMotionSettings.negative_prompt];
+    }) : [defaultNegativePrompt];
 
     // Build enhanced prompts array (empty strings for pairs without enhanced prompts)
     enhancedPromptsArray = frameGaps.length > 0 ? frameGaps.map((_, index) => {
@@ -752,14 +754,14 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         
         negativePrompts = numPairs > 0 ? Array.from({ length: numPairs }, (_, index) => {
           const pairNegativePrompt = pairPrompts[index]?.negativePrompt;
-          const finalNegativePrompt = (pairNegativePrompt && pairNegativePrompt.trim()) ? pairNegativePrompt.trim() : steerableMotionSettings.negative_prompt;
+          const finalNegativePrompt = (pairNegativePrompt && pairNegativePrompt.trim()) ? pairNegativePrompt.trim() : defaultNegativePrompt;
           
           console.log(`[BasePromptsDebug] 🚫 Pair ${index} negative:`);
           console.log(`[BasePromptsDebug]   hasPairNegativePrompt: ${!!pairNegativePrompt}`);
           console.log(`[BasePromptsDebug]   finalNegativePromptUsed: "${finalNegativePrompt?.substring(0, 30) || '(none)'}"`);
           
           return finalNegativePrompt;
-        }) : [steerableMotionSettings.negative_prompt];
+        }) : [defaultNegativePrompt];
         
         enhancedPromptsArray = numPairs > 0 ? Array.from({ length: numPairs }, (_, index) => {
           const enhancedPrompt = enhancedPrompts[index] || '';
@@ -787,7 +789,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       basePrompts = [''];
       segmentFrames = [batchVideoFrames];
       frameOverlap = [10];
-      negativePrompts = [steerableMotionSettings.negative_prompt];
+      negativePrompts = [defaultNegativePrompt];
     }
   }
 
@@ -995,9 +997,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     ...(hasValidEnhancedPrompts ? { enhanced_prompts: enhancedPromptsArray } : {}),
     model_name: actualModelName,
     model_type: modelType,
-    seed: steerableMotionSettings.seed,
+    seed: seed,
     // Steps are now always in phase_config.steps_per_phase - don't send separately
-    debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
+    debug: debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
     show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
     enhance_prompt: enhancePrompt,
     // Save UI state settings (dimension_source removed - now using aspect ratios only)

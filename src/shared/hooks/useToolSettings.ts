@@ -163,9 +163,9 @@ async function getUserWithTimeout(timeoutMs = 15000) {
 
 async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContext, signal?: AbortSignal): Promise<unknown> {
   try {
-    // Check if request was cancelled before starting - return undefined gracefully
+    // Check if request was cancelled before starting - throw to signal cancellation
     if (signal?.aborted) {
-      return undefined;
+      throw new Error('Request was cancelled');
     }
     
     // Single-flight dedupe key for concurrent identical requests
@@ -214,10 +214,10 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
         throw new Error('Authentication required');
       }
       
-      // Check again after auth call - return undefined instead of throwing
-      // This prevents noisy console errors when React Query cancels requests
+      // Check again after auth call - throw to signal cancellation
+      // React Query's retry logic won't retry cancelled requests
       if (signal?.aborted) {
-        return undefined;
+        throw new Error('Request was cancelled');
       }
 
       const dbQueryStart = Date.now();

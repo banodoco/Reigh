@@ -213,6 +213,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   
   // State for video browser modal
   const [showVideoBrowser, setShowVideoBrowser] = useState(false);
+
+  // Track when uploading a structure video to show loading state immediately
+  const [isUploadingStructureVideo, setIsUploadingStructureVideo] = useState(false);
   
   // Resource creation hook for video upload
   const createResource = useCreateResource();
@@ -955,7 +958,39 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               Reset
             </Button>
           </div>
-          
+
+          {/* Middle: Add Audio button - show when structure video exists but no audio */}
+          {structureVideoPath && !audioUrl && onAudioChange && !readOnly && (
+            <label className="pointer-events-auto cursor-pointer">
+              <input
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    const audio = new Audio();
+                    const tempUrl = URL.createObjectURL(file);
+                    audio.src = tempUrl;
+                    await new Promise<void>((resolve, reject) => {
+                      audio.addEventListener('loadedmetadata', () => resolve());
+                      audio.addEventListener('error', () => reject(new Error('Failed to load audio')));
+                    });
+                    const { uploadVideoToStorage } = await import('@/shared/lib/videoUploader');
+                    const uploadedUrl = await uploadVideoToStorage(file, projectId!, shotId);
+                    URL.revokeObjectURL(tempUrl);
+                    onAudioChange(uploadedUrl, { duration: audio.duration, name: file.name });
+                    e.target.value = '';
+                  } catch (error) {
+                    console.error('Error uploading audio:', error);
+                  }
+                }}
+              />
+              <span className="text-xs text-muted-foreground hover:text-foreground">Add Audio</span>
+            </label>
+          )}
+
           {/* Right side: Structure controls OR Upload button */}
           {structureVideoPath ? (
             <div className={`flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
@@ -1015,11 +1050,12 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
+                  setIsUploadingStructureVideo(true);
                   try {
                     const { extractVideoMetadata, uploadVideoToStorage } = await import('@/shared/lib/videoUploader');
                     const metadata = await extractVideoMetadata(file);
                     const videoUrl = await uploadVideoToStorage(file, projectId!, shotId);
-                    
+
                     // Create resource for reuse
                     const { data: { user } } = await supabase.auth.getUser();
                     const now = new Date().toISOString();
@@ -1033,11 +1069,13 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                       createdAt: now,
                     };
                     await createResource.mutateAsync({ type: 'structure-video', metadata: resourceMetadata });
-                    
+
                     onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
                     e.target.value = '';
                   } catch (error) {
                     console.error('Error uploading video:', error);
+                  } finally {
+                    setIsUploadingStructureVideo(false);
                   }
                 }}
                 className="hidden"
@@ -1072,16 +1110,17 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
             isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
           }`}
-          style={{ 
-            minHeight: "240px", 
-            paddingTop: structureVideoPath ? "4rem" : "1rem",  // Show padding if structure video exists (metadata can be null during extraction)
-            paddingBottom: "7.5rem" 
+          style={{
+            minHeight: "240px",
+            paddingTop: structureVideoPath ? "3rem" : "1rem",  // Show padding if structure video exists (metadata can be null during extraction)
+            paddingBottom: "7.5rem"
           }}
           onDragEnter={handleDragEnter}
           onDragOver={(e) => handleDragOver(e, containerRef)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, containerRef)}
         >
+
         {/* Structure video strip (show if exists) or uploader (only if not readOnly) */}
         {shotId && projectId && onStructureVideoChange && (
           structureVideoPath ? (
@@ -1115,6 +1154,21 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               frameSpacing={50} // Use default spacing as contextFrames is removed
               readOnly={readOnly}
             />
+          ) : isUploadingStructureVideo ? (
+            // Show loading placeholder while uploading
+            <div
+              className="relative h-28 mb-0"
+              style={{
+                width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
+                minWidth: '100%',
+              }}
+            >
+              <div className="absolute left-4 right-4 top-6 bottom-2 flex items-center justify-center bg-muted/50 dark:bg-muted-foreground/15 border border-border/30 rounded-sm">
+                <span className="text-xs text-muted-foreground font-medium">
+                  Uploading video...
+                </span>
+              </div>
+            </div>
           ) : !readOnly ? (
             // Only show uploader placeholder if NOT readOnly and no video exists
             <GuidanceVideoUploader
@@ -1137,7 +1191,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           ) : null
         )}
 
-        {/* Audio strip - below guidance video */}
+        {/* Audio strip - below guidance video (or Add Audio placeholder when no structure video) */}
         {onAudioChange && (
           audioUrl ? (
             <AudioStrip
@@ -1150,8 +1204,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               containerWidth={containerWidth}
               zoomLevel={zoomLevel}
               readOnly={readOnly}
+              compact={!!structureVideoPath}
             />
-          ) : !readOnly ? (
+          ) : !readOnly && !structureVideoPath ? (
+            // Only show Add Audio here when there's NO structure video
+            // (when there IS a structure video, Add Audio is shown above it)
             <label
               className="relative block h-8 mb-3 cursor-pointer"
               style={{

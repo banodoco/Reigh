@@ -233,6 +233,9 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
       const advancedMode = motionMode === 'advanced';
       const finalPhaseConfig = advancedMode ? (settings.phaseConfig || DEFAULT_PHASE_CONFIG) : basicPhaseConfig;
       
+      // Build merged steerable motion settings for extracting defaults
+      const mergedSteerableSettings = { ...DEFAULT_STEERABLE_MOTION_SETTINGS, ...(settings.steerableMotionSettings || {}) };
+
       const result = await generateVideo({
         projectId: selectedProjectId,
         selectedShotId: shot.id,
@@ -240,23 +243,28 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
         queryClient,
         effectiveAspectRatio,
         generationMode: 'batch',
-        batchVideoPrompt: settings.batchVideoPrompt || '',
-        textBeforePrompts: settings.textBeforePrompts,
-        textAfterPrompts: settings.textAfterPrompts,
-        batchVideoFrames: settings.batchVideoFrames || 61,
-        batchVideoSteps: settings.batchVideoSteps || 6,
-        steerableMotionSettings: { ...DEFAULT_STEERABLE_MOTION_SETTINGS, ...(settings.steerableMotionSettings || {}) },
-        getModelName,
-        randomSeed,
-        turboMode: settings.turboMode || false,
-        enhancePrompt: settings.enhancePrompt || false,
-        amountOfMotion: settings.amountOfMotion || 50,
-        motionMode,
-        generationTypeMode: settings.generationTypeMode || 'i2v',
-        advancedMode,
-        phaseConfig: finalPhaseConfig,
-        selectedPhasePresetId: settings.selectedPhasePresetId || undefined,
-        selectedLoras: selectedLoras.map(l => ({ id: l.id, path: l.path, strength: l.strength, name: l.name })),
+        // Grouped configs (snake_case matching API)
+        promptConfig: {
+          base_prompt: settings.batchVideoPrompt || '',
+          enhance_prompt: settings.enhancePrompt || false,
+          text_before_prompts: settings.textBeforePrompts,
+          text_after_prompts: settings.textAfterPrompts,
+          default_negative_prompt: mergedSteerableSettings.negative_prompt,
+        },
+        motionConfig: {
+          amount_of_motion: settings.amountOfMotion || 50,
+          motion_mode: motionMode,
+          advanced_mode: advancedMode,
+          phase_config: finalPhaseConfig,
+          selected_phase_preset_id: settings.selectedPhasePresetId,
+        },
+        modelConfig: {
+          seed: mergedSteerableSettings.seed,
+          random_seed: randomSeed,
+          turbo_mode: settings.turboMode || false,
+          debug: mergedSteerableSettings.debug || false,
+          generation_type_mode: settings.generationTypeMode || 'i2v',
+        },
         structureVideoConfig: {
           ...DEFAULT_STRUCTURE_VIDEO_CONFIG,
           structure_video_path: settings.structureVideo?.path || null,
@@ -264,6 +272,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
           structure_video_treatment: settings.structureVideo?.treatment || DEFAULT_STRUCTURE_VIDEO_CONFIG.structure_video_treatment,
           structure_video_motion_strength: settings.structureVideo?.motionStrength || DEFAULT_STRUCTURE_VIDEO_CONFIG.structure_video_motion_strength,
         },
+        batchVideoFrames: settings.batchVideoFrames || 61,
+        selectedLoras: selectedLoras.map(l => ({ id: l.id, path: l.path, strength: l.strength, name: l.name })),
         variantNameParam: '',
         clearAllEnhancedPrompts: async () => {},
       });
@@ -291,7 +301,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedProjectId, shot, positionedImages, selectedLoras, settings, queryClient, effectiveAspectRatio, getModelName, randomSeed, updateField, onClose]);
+  }, [selectedProjectId, shot, positionedImages, selectedLoras, settings, queryClient, effectiveAspectRatio, randomSeed, updateField, onClose]);
   
   const handleNavigateToShot = useCallback(() => {
     onClose();

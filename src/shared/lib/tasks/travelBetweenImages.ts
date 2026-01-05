@@ -107,6 +107,93 @@ export const DEFAULT_VIDEO_MOTION_PARAMS: Required<Pick<VideoMotionApiParams, 'a
 };
 
 /**
+ * UI-controlled prompt configuration for video generation.
+ * Uses snake_case to match API params directly - no conversion needed.
+ *
+ * Note: Array fields (base_prompts, negative_prompts, enhanced_prompts) are
+ * computed from database in generateVideoService, not passed from UI.
+ */
+export interface PromptConfig {
+  /** Default/base prompt used for all segments */
+  base_prompt: string;
+  /** Whether to enable AI prompt enhancement */
+  enhance_prompt: boolean;
+  /** Text prepended to all prompts (optional) */
+  text_before_prompts?: string;
+  /** Text appended to all prompts (optional) */
+  text_after_prompts?: string;
+  /** Default negative prompt (used as fallback for negative_prompts array) */
+  default_negative_prompt: string;
+}
+
+/**
+ * Default values for prompt config
+ */
+export const DEFAULT_PROMPT_CONFIG: PromptConfig = {
+  base_prompt: '',
+  enhance_prompt: false,
+  text_before_prompts: '',
+  text_after_prompts: '',
+  default_negative_prompt: '',
+};
+
+/**
+ * UI-controlled motion configuration for video generation.
+ * Uses snake_case to match API params directly - no conversion needed.
+ */
+export interface MotionConfig {
+  /** Amount of motion: 0-100 (divided by 100 before sending to API) */
+  amount_of_motion: number;
+  /** Motion control mode for UI */
+  motion_mode: 'basic' | 'presets' | 'advanced';
+  /** Whether using advanced phase configuration */
+  advanced_mode: boolean;
+  /** Advanced phase configuration for multi-phase generation */
+  phase_config?: PhaseConfig;
+  /** Selected phase preset ID for UI state restoration */
+  selected_phase_preset_id?: string;
+}
+
+/**
+ * Default values for motion config
+ */
+export const DEFAULT_MOTION_CONFIG: MotionConfig = {
+  amount_of_motion: 50,
+  motion_mode: 'basic',
+  advanced_mode: false,
+  phase_config: undefined,
+  selected_phase_preset_id: undefined,
+};
+
+/**
+ * UI-controlled model/generation configuration for video generation.
+ * Uses snake_case to match API params directly - no conversion needed.
+ */
+export interface ModelConfig {
+  /** Random seed for reproducibility */
+  seed: number;
+  /** Whether to use a random seed each generation */
+  random_seed: boolean;
+  /** Enable turbo/fast generation mode */
+  turbo_mode: boolean;
+  /** Enable debug output */
+  debug: boolean;
+  /** Generation type mode: i2v (image-to-video) or vace (video-guided) */
+  generation_type_mode: 'i2v' | 'vace';
+}
+
+/**
+ * Default values for model config
+ */
+export const DEFAULT_MODEL_CONFIG: ModelConfig = {
+  seed: 11111,
+  random_seed: true,
+  turbo_mode: false,
+  debug: false,
+  generation_type_mode: 'i2v',
+};
+
+/**
  * Interface for travel between images (steerable motion) task parameters.
  * Extends from shared API param interfaces for consistent typing.
  * This matches the original steerable-motion edge function request body.

@@ -22,6 +22,8 @@ interface AudioStripProps {
   containerWidth: number;
   zoomLevel: number;
   readOnly?: boolean;
+  // When true, reduces top margin (used when structure video is above)
+  compact?: boolean;
 }
 
 export const AudioStrip: React.FC<AudioStripProps> = ({
@@ -34,6 +36,7 @@ export const AudioStrip: React.FC<AudioStripProps> = ({
   containerWidth,
   zoomLevel,
   readOnly = false,
+  compact = false,
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -164,7 +167,7 @@ export const AudioStrip: React.FC<AudioStripProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative h-10 mt-9 mb-1 select-none"
+      className={`relative h-10 ${compact ? 'mt-0' : 'mt-9'} mb-1 select-none`}
       style={{
         width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
         minWidth: '100%',

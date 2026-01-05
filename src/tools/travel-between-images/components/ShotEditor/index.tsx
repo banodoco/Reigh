@@ -1222,30 +1222,36 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       onShotImagesUpdate,
       effectiveAspectRatio,
       generationMode,
-      batchVideoPrompt,
-      textBeforePrompts,
-      textAfterPrompts,
+      // Grouped configs (snake_case matching API)
+      promptConfig: {
+        base_prompt: batchVideoPrompt,
+        enhance_prompt: enhancePrompt,
+        text_before_prompts: textBeforePrompts,
+        text_after_prompts: textAfterPrompts,
+        default_negative_prompt: steerableMotionSettings.negative_prompt,
+      },
+      motionConfig: {
+        amount_of_motion: amountOfMotion,
+        motion_mode: motionMode || 'basic',
+        advanced_mode: advancedMode,
+        phase_config: phaseConfig,
+        selected_phase_preset_id: selectedPhasePresetId,
+      },
+      modelConfig: {
+        seed: steerableMotionSettings.seed,
+        random_seed: randomSeed,
+        turbo_mode: turboMode,
+        debug: steerableMotionSettings.debug || false,
+        generation_type_mode: generationTypeMode || 'i2v',
+      },
+      structureVideoConfig,
       batchVideoFrames,
-      // batchVideoContext, // Removed
-      batchVideoSteps,
-      steerableMotionSettings,
-      getModelName,
-      randomSeed,
-      turboMode,
-      enhancePrompt,
-      amountOfMotion,
-      motionMode,
-      generationTypeMode,
-      advancedMode,
-      phaseConfig,
-      selectedPhasePresetId,
       selectedLoras: loraManager.selectedLoras.map(lora => ({
         id: lora.id,
         path: lora.path,
         strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0,
         name: lora.name
       })),
-      structureVideoConfig, // Grouped config with snake_case API params
       variantNameParam,
       clearAllEnhancedPrompts,
     });
@@ -1269,25 +1275,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     onShotImagesUpdate,
     effectiveAspectRatio,
     generationMode,
+    // PromptConfig deps
     batchVideoPrompt,
     textBeforePrompts,
     textAfterPrompts,
-    batchVideoFrames,
-    // batchVideoContext, // Removed
-    batchVideoSteps,
-    steerableMotionSettings,
-    getModelName,
-    randomSeed,
-    turboMode,
     enhancePrompt,
+    steerableMotionSettings, // for negative_prompt, seed, debug
+    // MotionConfig deps
     amountOfMotion,
     motionMode,
-    generationTypeMode,
     advancedMode,
     phaseConfig,
     selectedPhasePresetId,
+    // ModelConfig deps
+    randomSeed,
+    turboMode,
+    generationTypeMode,
+    // Other deps
+    batchVideoFrames,
     loraManager.selectedLoras,
-    structureVideoConfig, // Grouped config replaces individual fields
+    structureVideoConfig,
     clearAllEnhancedPrompts,
   ]);
 

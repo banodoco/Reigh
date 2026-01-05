@@ -1155,6 +1155,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
       associatedShotId: [associatedShotId, setAssociatedShotId],
       promptMode: [promptMode, setPromptMode],
+      prompts: [noShotPrompts, setNoShotPrompts], // Persist no-shot prompts
       masterPrompt: [noShotMasterPrompt, setNoShotMasterPrompt], // Persist no-shot master prompt
       hiresFixConfig: [hiresFixConfig, setHiresFixConfig],
     }
@@ -1181,33 +1182,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.error('[GenerationSourcePersist] Failed to save selectedTextModel:', error);
     }
   }, [updateProjectImageSettings, markAsInteracted]);
-
-  // Initialize no-shot prompts from project settings
-  // Note: Other no-shot settings (masterPrompt, promptMode, beforeEachPromptText, etc.)
-  // are handled by usePersistentToolState which auto-syncs with the DB
-  const hasInitializedProjectPrompts = useRef(false);
-  useEffect(() => {
-    if (isLoadingProjectSettings) return;
-    if (hasInitializedProjectPrompts.current) return;
-    if (!projectImageSettings) return;
-
-    // Only initialize projectPrompts - other fields are synced via usePersistentToolState
-    if (projectImageSettings.projectPrompts?.length) {
-      setNoShotPrompts(projectImageSettings.projectPrompts);
-    }
-    hasInitializedProjectPrompts.current = true;
-  }, [projectImageSettings, isLoadingProjectSettings]);
-
-  // Persist no-shot prompts to project settings
-  // Note: This is the only field that needs explicit persistence since it's an array
-  // that isn't mapped in usePersistentToolState
-  const persistProjectPrompts = useCallback(async (prompts: PromptEntry[]) => {
-    try {
-      await updateProjectImageSettings('project', { projectPrompts: prompts });
-    } catch (error) {
-      console.error('[ProjectPrompts] ❌ Failed to save projectPrompts:', error);
-    }
-  }, [updateProjectImageSettings]);
 
   // Single source of truth for whether shot settings are ready
   // Used by all shot-level field accessors to prevent flash of project values
@@ -1237,14 +1211,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       markAsInteracted();
     } else {
       console.log('[ImageGenerationForm] setPrompts for no-shot mode');
+      // usePersistentToolState auto-syncs noShotPrompts to DB
       setNoShotPrompts(prev => {
-        const updatedPrompts = typeof newPrompts === 'function' ? newPrompts(prev) : newPrompts;
-        // Persist to project settings
-        persistProjectPrompts(updatedPrompts);
-        return updatedPrompts;
+        return typeof newPrompts === 'function' ? newPrompts(prev) : newPrompts;
       });
+      markAsInteracted();
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted, persistProjectPrompts]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
 
   // Get current master prompt - from shot settings if shot selected, otherwise local state
   const masterPromptText = useMemo(() => {

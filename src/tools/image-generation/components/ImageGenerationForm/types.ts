@@ -74,12 +74,15 @@ export interface PersistedFormSettings {
   /** Two-pass hires fix configuration for local generation */
   hiresFixConfig?: HiresFixConfig;
 
+  /** Prompts when no shot is selected (project-level fallback) */
+  prompts?: PromptEntry[];
+  /** Master prompt when no shot is selected (project-level fallback) */
+  masterPrompt?: string;
+
   // DEPRECATED: Legacy shot-specific storage (replaced by ImageGenShotSettings)
   // Kept for migration - will be removed after all users migrate
   promptsByShot?: Record<string, PromptEntry[]>;
   masterPromptByShot?: Record<string, string>;
-  /** Master prompt when no shot is selected (project-level fallback) */
-  masterPrompt?: string;
 }
 
 /**
@@ -151,9 +154,9 @@ export interface HydratedReferenceImage {
 }
 
 // Project-level settings for model and style reference
-// Note: Most no-shot settings (masterPrompt, promptMode, beforeEachPromptText, afterEachPromptText,
-// associatedShotId) are persisted via usePersistentToolState with toolId='image-generation'.
-// Only projectPrompts needs explicit persistence here since it's an array not mapped there.
+// Note: Prompt-related no-shot settings (prompts, masterPrompt, promptMode, beforeEachPromptText,
+// afterEachPromptText, associatedShotId) are persisted via usePersistentToolState with toolId='image-generation'.
+// This interface stores model selection and reference image settings in 'project-image-settings'.
 export interface ProjectImageSettings {
   selectedModel?: GenerationMode;
 
@@ -162,8 +165,8 @@ export interface ProjectImageSettings {
   // Model for just-text mode
   selectedTextModel?: TextToImageModel;
 
-  // Project-level prompts (used when no shot is selected)
-  // This is the only no-shot field here - others are in usePersistentToolState
+  // DEPRECATED: projectPrompts moved to 'image-generation' tool settings via usePersistentToolState
+  // Kept for migration - will be removed after all users migrate
   projectPrompts?: PromptEntry[];
 
   // Multi-reference structure (shot-specific selection)
