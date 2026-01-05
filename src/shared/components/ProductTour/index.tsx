@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Joyride, { CallBackProps, STATUS, EVENTS, ACTIONS, TooltipRenderProps } from 'react-joyride';
 import { tourSteps, tourStepColors } from './tourSteps';
 import { useProductTour } from '@/shared/hooks/useProductTour';
@@ -124,9 +124,7 @@ export function ProductTour() {
     setIsTasksPaneLocked,
     resetAllPaneLocks
   } = usePanes();
-  const location = useLocation();
   const navigate = useNavigate();
-  const hasAutoStarted = useRef(false);
 
   // Controlled step index for managing transitions
   const [stepIndex, setStepIndex] = useState(0);
@@ -218,26 +216,9 @@ export function ProductTour() {
     return () => target.removeEventListener('click', handleClick);
   }, [isRunning, isPaused, stepIndex, setIsTasksPaneLocked]);
 
-  // Auto-start tour when user lands on shot editor and hasn't completed/skipped tour
-  useEffect(() => {
-    const isOnShotEditor = location.pathname === '/tools/travel-between-images';
-    const shouldShowTour = tourState && !tourState.completed && !tourState.skipped;
-
-    console.log('[ProductTour] Check auto-start:', { isOnShotEditor, shouldShowTour, isRunning, hasAutoStarted: hasAutoStarted.current, tourState });
-
-    if (isOnShotEditor && shouldShowTour && !isRunning && !hasAutoStarted.current) {
-      // Brief delay to let the page fully render
-      const timer = setTimeout(() => {
-        // Double-check we haven't started yet (in case of race)
-        if (!hasAutoStarted.current) {
-          hasAutoStarted.current = true;
-          console.log('[ProductTour] Auto-starting tour on shot editor');
-          startTour();
-        }
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [location.pathname, tourState, isRunning, startTour]);
+  // NOTE: Auto-start is handled by Layout.tsx after WelcomeBonusModal closes
+  // This prevents the tour from starting on every visit to the shot editor
+  // The tour is explicitly started via startTour() after welcome modal closes
 
   const handleCallback = useCallback((data: CallBackProps) => {
     const { status, index, type, action } = data;

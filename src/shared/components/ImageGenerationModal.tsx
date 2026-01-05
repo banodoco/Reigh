@@ -47,6 +47,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   const openaiApiKey = getApiKey('openai_api_key');
 
   const handleGenerate = useCallback(async (taskParams: BatchImageGenerationTaskParams) => {
+    console.log('[ImageGenerationModal] handleGenerate called with:', {
+      hasTaskParams: !!taskParams,
+      promptCount: taskParams?.prompts?.length,
+      imagesPerPrompt: taskParams?.imagesPerPrompt,
+      modelName: taskParams?.model_name,
+      selectedProjectId,
+    });
+
     if (!selectedProjectId) {
       toast.error("No project selected. Please select a project before generating images.");
       return;
@@ -54,7 +62,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
 
     setIsGenerating(true);
     try {
-      console.log('[ImageGenerationModal] Creating batch image generation tasks');
+      console.log('[ImageGenerationModal] Creating batch image generation tasks with params:', taskParams);
       await createBatchImageGenerationTasks(taskParams);
 
       // Invalidate generations to ensure they refresh when tasks complete
