@@ -525,16 +525,15 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   };
 
-  const handleNewGenerate = async (formData: any): Promise<string[]> => {
+  const handleNewGenerate = async (taskParams: BatchImageGenerationTaskParams): Promise<string[]> => {
     const generateStartTime = Date.now();
     const generateId = `gen-${generateStartTime}-${Math.random().toString(36).slice(2, 6)}`;
 
     console.log(`[GenerationDiag:${generateId}] 🚀 GENERATION START:`, {
       selectedProjectId,
-      generationMode: formData.generationMode,
-      promptCount: formData.prompts?.length,
-      imagesPerPrompt: formData.imagesPerPrompt,
-      hasBatchTaskParams: !!formData.batchTaskParams,
+      modelName: taskParams.model_name,
+      promptCount: taskParams.prompts?.length,
+      imagesPerPrompt: taskParams.imagesPerPrompt,
       timestamp: generateStartTime
     });
 
@@ -543,28 +542,17 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       return [];
     }
 
-    const { generationMode, associatedShotId, batchTaskParams, ...restOfFormData } = formData;
-
     // Clear existing images but keep current page position
-    if (restOfFormData.prompts.length * restOfFormData.imagesPerPrompt > 0) {
+    if (taskParams.prompts.length * taskParams.imagesPerPrompt > 0) {
       setGeneratedImages([]);
-      // Don't reset page - let user stay where they are
     }
 
-    // Always use the unified task creation approach
     setLocalIsGenerating(true);
     let createdTaskIds: string[] = [];
     try {
-      // Use the batch params from the form (should always be present now)
-      if (batchTaskParams) {
-        console.log('[ImageGeneration] Using unified batch task creation for model:', generationMode);
-        const createdTasks = await createBatchImageGenerationTasks(batchTaskParams);
-        createdTaskIds = createdTasks.map((t: any) => t.id);
-      } else {
-        // This should not happen with the updated form, but provide a safety fallback
-        console.error('[ImageGeneration] Missing batchTaskParams - this indicates a form integration issue');
-        throw new Error('Missing batch task parameters');
-      }
+      console.log('[ImageGeneration] Using unified batch task creation for model:', taskParams.model_name);
+      const createdTasks = await createBatchImageGenerationTasks(taskParams);
+      createdTaskIds = createdTasks.map((t: any) => t.id);
 
       // Invalidate generations to ensure they refresh when tasks complete
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
@@ -572,7 +560,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       const generateDuration = Date.now() - generateStartTime;
       console.log(`[GenerationDiag:${generateId}] ✅ GENERATION COMPLETE:`, {
         duration: `${generateDuration}ms`,
-        tasksCreated: batchTaskParams?.prompts?.length * batchTaskParams?.imagesPerPrompt || 0,
+        tasksCreated: taskParams.prompts.length * taskParams.imagesPerPrompt,
         taskIds: createdTaskIds,
         timestamp: Date.now()
       });

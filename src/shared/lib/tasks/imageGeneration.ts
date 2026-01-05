@@ -224,17 +224,16 @@ function validateBatchImageGenerationParams(params: BatchImageGenerationTaskPara
 
 /**
  * Calculates the final resolution for image generation tasks
+ * Applies 1.5x scaling for supported image generation models (qwen-image, qwen-image-2512, z-image)
  * @param projectId - Project ID for resolution lookup
  * @param customResolution - Optional custom resolution override
- * @param modelName - Model name (affects scaling for Qwen)
- * @param hasStyleReference - Whether task has style reference (affects scaling for Qwen)
+ * @param modelName - Model name (determines if scaling is applied)
  * @returns Promise resolving to the final resolution string
  */
 export async function calculateTaskResolution(
   projectId: string,
   customResolution?: string,
-  modelName?: string,
-  hasStyleReference?: boolean
+  modelName?: string
 ): Promise<string> {
   // 1. If custom resolution is provided, use it as-is (assume it's already final)
   if (customResolution?.trim()) {
@@ -245,14 +244,14 @@ export async function calculateTaskResolution(
   // 2. Get base resolution from project
   const { resolution: baseResolution } = await resolveProjectResolution(projectId);
   
-  // 3. Apply Qwen scaling if needed
-  const isQwenModel = modelName === 'qwen-image';
-  if (isQwenModel && hasStyleReference) {
+  // 3. Apply 1.5x scaling for all image generation models (qwen-image, qwen-image-2512, z-image)
+  const isImageGenerationModel = modelName === 'qwen-image' || modelName === 'qwen-image-2512' || modelName === 'z-image';
+  if (isImageGenerationModel) {
     const [width, height] = baseResolution.split('x').map(Number);
     const scaledWidth = Math.round(width * 1.5);
     const scaledHeight = Math.round(height * 1.5);
     const scaledResolution = `${scaledWidth}x${scaledHeight}`;
-    console.log(`[calculateTaskResolution] Scaling Qwen resolution from ${baseResolution} to ${scaledResolution} for style reference`);
+    console.log(`[calculateTaskResolution] Scaling resolution from ${baseResolution} to ${scaledResolution} for ${modelName}`);
     return scaledResolution;
   }
   
@@ -286,8 +285,7 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
     const finalResolution = await calculateTaskResolution(
       params.project_id,
       params.resolution,
-      params.model_name,
-      !!params.style_reference_image
+      params.model_name
     );
 
     // 3. Determine task type based on model and whether there's a style reference
@@ -424,8 +422,7 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
     const finalResolution = await calculateTaskResolution(
       params.project_id,
       params.resolution,
-      params.model_name,
-      !!params.style_reference_image
+      params.model_name
     );
 
     // 3. Generate individual task parameters for each image

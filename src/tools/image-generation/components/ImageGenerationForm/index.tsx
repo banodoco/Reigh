@@ -78,7 +78,7 @@ const LazyPromptEditorModal = React.lazy(() =>
 );
 
 interface ImageGenerationFormProps {
-  onGenerate: (formData: any) => Promise<string[]> | string[] | void;
+  onGenerate: (params: BatchImageGenerationTaskParams) => Promise<string[]> | string[] | void;
   isGenerating?: boolean;
   hasApiKey?: boolean;
   apiKey?: string;
@@ -186,35 +186,6 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
         ])
       ),
     }),
-  };
-}
-
-// Helper to build legacy generation data wrapper
-function buildLegacyGenerationData(
-  batchTaskParams: BatchImageGenerationTaskParams,
-  extra: {
-    selectedLoras: ActiveLora[];
-    selectedModel: string;
-    associatedShotId: string | null;
-    styleRef: string | null;
-    styleStrength: number;
-    subjectStrength: number;
-    subjectDescription: string;
-  }
-) {
-  return {
-    prompts: batchTaskParams.prompts,
-    imagesPerPrompt: batchTaskParams.imagesPerPrompt,
-    loras: [],
-    fullSelectedLoras: extra.selectedLoras,
-    generationMode: extra.selectedModel,
-    associatedShotId: extra.associatedShotId,
-    styleReferenceImage: extra.selectedModel === 'qwen-image' ? extra.styleRef : null,
-    styleReferenceStrength: extra.selectedModel === 'qwen-image' ? extra.styleStrength : undefined,
-    subjectStrength: extra.selectedModel === 'qwen-image' ? extra.subjectStrength : undefined,
-    subjectDescription: extra.selectedModel === 'qwen-image' ? extra.subjectDescription : undefined,
-    selectedModel: extra.selectedModel,
-    batchTaskParams,
   };
 }
 
@@ -2357,31 +2328,24 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     setPrompts(sanitizedPrompts);
   };
-  
-  const handleGenerateAndQueue = useCallback((updatedPrompts: PromptEntry[]) => {
-    console.log('[ImageGenerationForm] Generate & Queue: Received', updatedPrompts.length, 'prompts, saving and queuing');
-    
-    // Save the prompts to state for future use
-    handleSavePromptsFromModal(updatedPrompts);
-    
-    // Close the modal
-    setIsPromptModalOpen(false);
-    setOpenPromptModalWithAIExpanded(false);
-    
-    // Generate immediately with the updated prompts (don't wait for state)
-    // This ensures we use the exact prompts the user just created
-    const activePrompts = updatedPrompts.filter(p => p.fullPrompt.trim() !== "");
-    
+
+  // Build BatchImageGenerationTaskParams from current form state
+  // This is the single source of truth for task param construction
+  const getTaskParams = useCallback((
+    promptsToUse: PromptEntry[],
+    options?: { imagesPerPromptOverride?: number }
+  ): BatchImageGenerationTaskParams | null => {
+    const activePrompts = promptsToUse.filter(p => p.fullPrompt.trim() !== "");
+
     if (activePrompts.length === 0) {
-      console.warn("[ImageGenerationForm] Generate & Queue: No active prompts. Generation aborted.");
       toast.error("Please enter at least one valid prompt.");
-      return;
+      return null;
     }
 
-    // Validate model-specific requirements (only require style reference for by-reference mode)
+    // Validate: require style reference for by-reference mode
     if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
       toast.error("Please upload a style reference image for by-reference mode.");
-      return;
+      return null;
     }
 
     // Only include reference params for by-reference mode
@@ -2395,10 +2359,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       reference_mode: referenceMode,
     } : {};
 
-    const batchTaskParams = buildBatchTaskParams({
+    return buildBatchTaskParams({
       projectId: selectedProjectId!,
       prompts: activePrompts,
-      imagesPerPrompt,
+      imagesPerPrompt: options?.imagesPerPromptOverride ?? imagesPerPrompt,
       shotId: associatedShotId,
       beforePromptText: currentBeforePromptText,
       afterPromptText: currentAfterPromptText,
@@ -2408,116 +2372,55 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
       referenceParams,
     });
-
-    const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
-      selectedLoras: loraManager.selectedLoras,
-      selectedModel,
-      associatedShotId,
-      styleRef: styleReferenceImageGeneration,
-      styleStrength: currentStyleStrength,
-      subjectStrength: currentSubjectStrength,
-      subjectDescription: effectiveSubjectDescription,
-    });
-
-    onGenerate(legacyGenerationData);
   }, [
-    handleSavePromptsFromModal,
-    selectedModel,
-    styleReferenceImageGeneration,
-    selectedProjectId,
-    currentBeforePromptText,
-    currentAfterPromptText,
-    imagesPerPrompt,
-    associatedShotId,
-    isLocalGenerationEnabled,
-    steps,
-    currentStyleStrength,
     generationSource,
-    selectedTextModel,
+    styleReferenceImageGeneration,
+    currentStyleStrength,
     currentSubjectStrength,
     effectiveSubjectDescription,
     currentInThisScene,
-    loraManager.selectedLoras,
-    onGenerate
+    currentInThisSceneStrength,
+    referenceMode,
+    selectedProjectId,
+    imagesPerPrompt,
+    associatedShotId,
+    currentBeforePromptText,
+    currentAfterPromptText,
+    currentStyleBoostTerms,
+    isLocalGenerationEnabled,
+    hiresFixConfig,
+    selectedTextModel,
   ]);
+
+  const handleGenerateAndQueue = useCallback((updatedPrompts: PromptEntry[]) => {
+    console.log('[ImageGenerationForm] Generate & Queue: Received', updatedPrompts.length, 'prompts, saving and queuing');
+
+    // Save the prompts to state for future use
+    handleSavePromptsFromModal(updatedPrompts);
+
+    // Close the modal
+    setIsPromptModalOpen(false);
+    setOpenPromptModalWithAIExpanded(false);
+
+    // Build task params (includes validation)
+    const taskParams = getTaskParams(updatedPrompts);
+    if (!taskParams) return;
+
+    onGenerate(taskParams);
+  }, [handleSavePromptsFromModal, getTaskParams, onGenerate]);
 
   // Handler for "Use Existing Prompts" button in automated mode
   // Uses the already-inputted prompts directly to generate images
   const handleUseExistingPrompts = useCallback(async () => {
-    const activePrompts = prompts.filter(p => p.fullPrompt.trim() !== "");
-    if (activePrompts.length === 0) {
-      toast.error("No prompts available. Please add prompts first.");
-      return;
-    }
+    console.log('[ImageGenerationForm] Use Existing Prompts: Using', prompts.length, 'existing prompts');
 
-    // Only require style reference for by-reference mode
-    if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
-      toast.error("Please upload a style reference image for by-reference mode.");
-      return;
-    }
+    // Build task params with promptMultiplier override (includes validation)
+    const taskParams = getTaskParams(prompts, { imagesPerPromptOverride: promptMultiplier });
+    if (!taskParams) return;
 
-    console.log('[ImageGenerationForm] Use Existing Prompts: Using', activePrompts.length, 'existing prompts');
-
-    // Only include reference params for by-reference mode
-    const referenceParams: ReferenceApiParams = generationSource === 'by-reference' ? {
-      style_reference_image: styleReferenceImageGeneration ?? undefined,
-      style_reference_strength: currentStyleStrength,
-      subject_strength: currentSubjectStrength,
-      subject_description: effectiveSubjectDescription,
-      in_this_scene: currentInThisScene,
-      in_this_scene_strength: currentInThisSceneStrength,
-      reference_mode: referenceMode,
-    } : {};
-
-    const batchTaskParams = buildBatchTaskParams({
-      projectId: selectedProjectId!,
-      prompts: activePrompts,
-      imagesPerPrompt: promptMultiplier,
-      shotId: associatedShotId,
-      beforePromptText: currentBeforePromptText,
-      afterPromptText: currentAfterPromptText,
-      styleBoostTerms: currentStyleBoostTerms,
-      isLocalGenerationEnabled,
-      hiresFixConfig,
-      modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
-      referenceParams,
-    });
-
-    const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
-      selectedLoras: loraManager.selectedLoras,
-      selectedModel,
-      associatedShotId,
-      styleRef: styleReferenceImageGeneration,
-      styleStrength: currentStyleStrength,
-      subjectStrength: currentSubjectStrength,
-      subjectDescription: effectiveSubjectDescription,
-    });
-
-    console.log('[ImageGenerationForm] Use Existing Prompts: Queuing', activePrompts.length, 'images');
-    onGenerate(legacyGenerationData);
-  }, [
-    prompts,
-    styleReferenceImageGeneration,
-    selectedProjectId,
-    currentBeforePromptText,
-    currentAfterPromptText,
-    currentStyleBoostTerms,
-    associatedShotId,
-    isLocalGenerationEnabled,
-    steps,
-    hiresFixConfig,
-    currentStyleStrength,
-    currentSubjectStrength,
-    effectiveSubjectDescription,
-    currentInThisScene,
-    generationSource,
-    selectedTextModel,
-    currentInThisSceneStrength,
-    referenceMode,
-    loraManager.selectedLoras,
-    selectedModel,
-    onGenerate
-  ]);
+    console.log('[ImageGenerationForm] Use Existing Prompts: Queuing', taskParams.prompts.length, 'images');
+    onGenerate(taskParams);
+  }, [prompts, promptMultiplier, getTaskParams, onGenerate]);
 
   // Handler for "New Prompts Like Existing" button in automated mode
   // Uses existing prompts as context to generate similar new prompts, then generates images
@@ -2528,7 +2431,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return;
     }
 
-    // Only require style reference for by-reference mode
+    // Validate early before AI call
     if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
       toast.error("Please upload a style reference image for by-reference mode.");
       return;
@@ -2562,44 +2465,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // Save generated prompts to state
       setPrompts(newPrompts);
 
-      // Now generate images with these prompts
-      // Only include reference params for by-reference mode
-      const referenceParams: ReferenceApiParams = generationSource === 'by-reference' ? {
-        style_reference_image: styleReferenceImageGeneration ?? undefined,
-        style_reference_strength: currentStyleStrength,
-        subject_strength: currentSubjectStrength,
-        subject_description: effectiveSubjectDescription,
-        in_this_scene: currentInThisScene,
-        in_this_scene_strength: currentInThisSceneStrength,
-        reference_mode: referenceMode,
-      } : {};
-
-      const batchTaskParams = buildBatchTaskParams({
-        projectId: selectedProjectId!,
-        prompts: newPrompts,
-        imagesPerPrompt: promptMultiplier,
-        shotId: associatedShotId,
-        beforePromptText: currentBeforePromptText,
-        afterPromptText: currentAfterPromptText,
-        styleBoostTerms: currentStyleBoostTerms,
-        isLocalGenerationEnabled,
-        hiresFixConfig,
-        modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
-        referenceParams,
-      });
-
-      const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
-        selectedLoras: loraManager.selectedLoras,
-        selectedModel,
-        associatedShotId,
-        styleRef: styleReferenceImageGeneration,
-        styleStrength: currentStyleStrength,
-        subjectStrength: currentSubjectStrength,
-        subjectDescription: effectiveSubjectDescription,
-      });
+      // Build task params with the new prompts (includes validation)
+      const taskParams = getTaskParams(newPrompts, { imagesPerPromptOverride: promptMultiplier });
+      if (!taskParams) return;
 
       console.log('[ImageGenerationForm] New Prompts Like Existing: Queuing', newPrompts.length, 'images');
-      onGenerate(legacyGenerationData);
+      onGenerate(taskParams);
     } catch (error) {
       console.error('[ImageGenerationForm] New Prompts Like Existing: Error generating prompts:', error);
       toast.error("Failed to generate prompts. Please try again.");
@@ -2610,32 +2481,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     prompts,
     styleReferenceImageGeneration,
     generationSource,
-    selectedTextModel,
-    selectedProjectId,
     imagesPerPrompt,
-    currentBeforePromptText,
-    currentAfterPromptText,
-    currentStyleBoostTerms,
-    associatedShotId,
-    isLocalGenerationEnabled,
-    steps,
-    hiresFixConfig,
-    currentStyleStrength,
-    currentSubjectStrength,
-    effectiveSubjectDescription,
-    currentInThisScene,
-    currentInThisSceneStrength,
-    referenceMode,
-    loraManager.selectedLoras,
-    selectedModel,
+    promptMultiplier,
+    getTaskParams,
     onGenerate,
     aiGeneratePrompts,
-    setPrompts
+    setPrompts,
   ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Handle automated mode: generate prompts first, then images
     if (effectivePromptMode === 'automated') {
       if (!masterPromptText.trim()) {
@@ -2643,13 +2499,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         return;
       }
 
-      // Only require style reference for by-reference mode
+      // Validate early before starting background operation
       if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
         toast.error("Please upload a style reference image for by-reference mode.");
         return;
       }
 
-      // Capture current values for the background operation
+      // Capture current values for the background operation (necessary because async runs in background)
       const capturedMasterPrompt = masterPromptText;
       const capturedImagesPerPrompt = imagesPerPrompt;
       const capturedPromptMultiplier = promptMultiplier;
@@ -2668,11 +2524,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const capturedStyleBoostTerms = currentStyleBoostTerms;
       const capturedIsLocalGenerationEnabled = isLocalGenerationEnabled;
       const capturedHiresFixConfig = hiresFixConfig;
-      const capturedSteps = isLocalGenerationEnabled
-        ? hiresFixConfig.baseSteps
-        : undefined;
-      const capturedSelectedLoras = loraManager.selectedLoras;
-      const capturedSelectedModel = selectedModel;
       const capturedModelName = generationSource === 'just-text' ? selectedTextModel : 'qwen-image';
 
       // Trigger button state: submitting (1s) → success (2s) → idle
@@ -2696,7 +2547,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           // Generate prompts using AI (this is the slow part - up to 20 seconds)
           const rawResults = await aiGeneratePrompts({
             overallPromptText: capturedMasterPrompt,
-            numberToGenerate: capturedImagesPerPrompt, // Slider value = number of prompts
+            numberToGenerate: capturedImagesPerPrompt,
             includeExistingContext: false,
             addSummaryForNewPrompts: true,
             replaceCurrentPrompts: true,
@@ -2716,8 +2567,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           // Save generated prompts to state (for user to see/edit later)
           setPrompts(newPrompts);
 
-          // Build batch task parameters
-          // Only include reference params for by-reference mode
+          // Build batch task params using captured values (can't use getTaskParams as it uses current state)
           const referenceParams: ReferenceApiParams = capturedGenerationSource === 'by-reference' ? {
             style_reference_image: capturedStyleRef ?? undefined,
             style_reference_strength: capturedStyleStrength,
@@ -2728,7 +2578,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             reference_mode: capturedReferenceMode,
           } : {};
 
-          const batchTaskParams = buildBatchTaskParams({
+          const taskParams = buildBatchTaskParams({
             projectId: capturedProjectId,
             prompts: newPrompts,
             imagesPerPrompt: capturedPromptMultiplier,
@@ -2742,18 +2592,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             referenceParams,
           });
 
-          const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
-            selectedLoras: capturedSelectedLoras,
-            selectedModel: capturedSelectedModel,
-            associatedShotId: capturedAssociatedShotId,
-            styleRef: capturedStyleRef,
-            styleStrength: capturedStyleStrength,
-            subjectStrength: capturedSubjectStrength,
-            subjectDescription: capturedSubjectDescription,
-          });
-
           console.log('[ImageGenerationForm] Automated mode: Queuing', newPrompts.length, 'images');
-          const taskIds = await onGenerate(legacyGenerationData);
+          const taskIds = await onGenerate(taskParams);
 
           // Wait for tasks to appear in UI before removing filler (up to 5s)
           if (taskIds && taskIds.length > 0) {
@@ -2773,58 +2613,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // Return immediately - don't block the UI
       return;
     }
-    
-    // Managed mode: use existing prompts
-    const activePrompts = prompts.filter(p => p.fullPrompt.trim() !== "");
-    if (activePrompts.length === 0) {
-        console.warn("[ImageGenerationForm] handleSubmit: No active prompts. Generation aborted.");
-        toast.error("Please enter at least one valid prompt.");
-        return;
-    }
 
-    // Validate model-specific requirements (only require style reference for by-reference mode)
-    if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
-        toast.error("Please upload a style reference image for by-reference mode.");
-        return;
-    }
+    // Managed mode: use getTaskParams (includes validation)
+    const taskParams = getTaskParams(prompts);
+    if (!taskParams) return;
 
-    // Build task params using helper
-    // Only include reference params for by-reference mode
-    const referenceParams: ReferenceApiParams = generationSource === 'by-reference' ? {
-      style_reference_image: styleReferenceImageGeneration ?? undefined,
-      style_reference_strength: currentStyleStrength,
-      subject_strength: currentSubjectStrength,
-      subject_description: effectiveSubjectDescription,
-      in_this_scene: currentInThisScene,
-      in_this_scene_strength: currentInThisSceneStrength,
-      reference_mode: referenceMode,
-    } : {};
-
-    const batchTaskParams = buildBatchTaskParams({
-      projectId: selectedProjectId!,
-      prompts: activePrompts,
-      imagesPerPrompt,
-      shotId: associatedShotId,
-      beforePromptText: currentBeforePromptText,
-      afterPromptText: currentAfterPromptText,
-      styleBoostTerms: currentStyleBoostTerms,
-      isLocalGenerationEnabled,
-      hiresFixConfig,
-      modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
-      referenceParams,
-    });
-
-    const legacyGenerationData = buildLegacyGenerationData(batchTaskParams, {
-      selectedLoras: loraManager.selectedLoras,
-      selectedModel,
-      associatedShotId,
-      styleRef: styleReferenceImageGeneration,
-      styleStrength: currentStyleStrength,
-      subjectStrength: currentSubjectStrength,
-      subjectDescription: effectiveSubjectDescription,
-    });
-
-    onGenerate(legacyGenerationData);
+    onGenerate(taskParams);
   };
 
   // Handle creating a new shot
