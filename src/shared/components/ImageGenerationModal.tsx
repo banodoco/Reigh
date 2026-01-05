@@ -133,11 +133,10 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
         />
       )}
       <DialogContent
-        className={`${modal.className} gap-2 overflow-hidden flex flex-col`}
+        className={modal.className}
         style={{
           ...modal.style,
           maxWidth: '900px',
-          width: 'calc(100vw - 2rem)',
         }}
         // During tour, don't handle outside interactions - let clicks pass through to Joyride
         onPointerDownOutside={(e) => !isTourActive() && onClose()}
