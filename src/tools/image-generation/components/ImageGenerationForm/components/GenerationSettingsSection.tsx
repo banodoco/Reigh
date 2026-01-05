@@ -1,7 +1,6 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
 import { CollapsibleSection } from '@/shared/components/ui/collapsible-section';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
-import { Button } from '@/shared/components/ui/button';
 import { RotateCcw } from 'lucide-react';
 import { HiresFixConfig, DEFAULT_HIRES_FIX_CONFIG, ResolutionMode } from '../types';
 import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
@@ -65,17 +64,24 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
   }
 
   const resetButton = (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={handleResetDefaults}
-      disabled={disabled}
-      className="text-xs text-muted-foreground hover:text-foreground h-7"
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={(e) => {
+        e.preventDefault();
+        if (!disabled) handleResetDefaults();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (!disabled) handleResetDefaults();
+        }
+      }}
+      className={`inline-flex items-center text-xs text-muted-foreground hover:text-foreground h-7 px-2 rounded cursor-pointer ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
     >
       <RotateCcw className="w-3 h-3 mr-1" />
       Reset
-    </Button>
+    </div>
   );
 
   // Calculate the resulting resolution based on current settings
