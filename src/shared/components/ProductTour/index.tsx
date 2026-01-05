@@ -53,7 +53,7 @@ function CustomTooltip({
   return (
     <div
       {...tooltipProps}
-      className="bg-background border border-border rounded-lg shadow-lg p-4 max-w-xs z-[100011]"
+      className="bg-background border border-border rounded-lg shadow-lg p-4 max-w-xs z-[100011] animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
     >
       {/* Header with colored icon */}
       <div className="text-center space-y-2 mb-3">
@@ -351,15 +351,18 @@ export function ProductTour() {
         },
         spotlight: {
           borderRadius: 8,
+          transition: 'opacity 0.3s ease, transform 0.3s ease',
         },
         overlay: {
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          transition: 'opacity 0.3s ease',
         },
       }}
       floaterProps={{
         styles: {
           floater: {
             filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15))',
+            transition: 'opacity 0.3s ease, transform 0.3s ease',
           },
         },
       }}

@@ -125,6 +125,13 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
       // Always non-modal so we can control closing behavior ourselves
       modal={false}
     >
+      {/* Custom overlay since modal={false} doesn't render the default one */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-[100002] bg-black/80 animate-in fade-in-0 duration-200"
+          onClick={() => !isTourActive() && onClose()}
+        />
+      )}
       <DialogContent
         className={`${modal.className} gap-2 overflow-hidden flex flex-col`}
         style={{
