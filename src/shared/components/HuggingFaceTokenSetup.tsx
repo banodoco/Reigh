@@ -3,7 +3,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { useHuggingFaceToken } from '@/shared/hooks/useExternalApiKeys';
-import { Loader2, CheckCircle2, XCircle, ExternalLink, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ExternalLink, Trash2, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
 interface HuggingFaceTokenSetupProps {
@@ -39,6 +39,7 @@ export const HuggingFaceTokenSetup: React.FC<HuggingFaceTokenSetupProps> = ({
   const [state, setState] = useState<SetupState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [verifiedUsername, setVerifiedUsername] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false); // Show update form when connected
 
   const handleVerify = async () => {
     if (!tokenInput.trim()) return;
@@ -69,6 +70,7 @@ export const HuggingFaceTokenSetup: React.FC<HuggingFaceTokenSetupProps> = ({
       setState('success');
       setTokenInput('');
       setVerifiedUsername(null);
+      setIsUpdating(false); // Close update form
       onSuccess?.();
     } else {
       setErrorMessage(result.error || 'Failed to save token');
@@ -91,7 +93,7 @@ export const HuggingFaceTokenSetup: React.FC<HuggingFaceTokenSetupProps> = ({
   }
 
   // Already connected state
-  if (hasToken && isVerified) {
+  if (hasToken && isVerified && !isUpdating) {
     return (
       <div className={cn('space-y-3', className)}>
         <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
@@ -109,8 +111,24 @@ export const HuggingFaceTokenSetup: React.FC<HuggingFaceTokenSetupProps> = ({
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => {
+              setIsUpdating(true);
+              setTokenInput('');
+              setState('idle');
+              setErrorMessage(null);
+              setVerifiedUsername(null);
+            }}
+            title="Update token"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleDelete}
             disabled={isDeleting}
+            title="Remove token"
             className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
           >
             {isDeleting ? (
@@ -124,14 +142,16 @@ export const HuggingFaceTokenSetup: React.FC<HuggingFaceTokenSetupProps> = ({
     );
   }
 
-  // Setup form
+  // Setup form (also used for updating)
   return (
     <div className={cn('space-y-4', className)}>
       {!compact && (
         <div className="space-y-1">
-          <h3 className="text-sm font-medium">Connect HuggingFace</h3>
+          <h3 className="text-sm font-medium">{isUpdating ? 'Update HuggingFace Token' : 'Connect HuggingFace'}</h3>
           <p className="text-xs text-muted-foreground">
-            To upload LoRAs directly, connect your HuggingFace account with a write-access token.
+            {isUpdating
+              ? 'Enter a new HuggingFace token to replace the existing one.'
+              : 'To upload LoRAs directly, connect your HuggingFace account with a write-access token.'}
           </p>
         </div>
       )}
@@ -232,8 +252,23 @@ export const HuggingFaceTokenSetup: React.FC<HuggingFaceTokenSetupProps> = ({
                 Saving...
               </>
             ) : (
-              'Save Token'
+              isUpdating ? 'Update Token' : 'Save Token'
             )}
+          </Button>
+        )}
+        {isUpdating && (
+          <Button
+            onClick={() => {
+              setIsUpdating(false);
+              setTokenInput('');
+              setState('idle');
+              setErrorMessage(null);
+              setVerifiedUsername(null);
+            }}
+            variant="ghost"
+            size="sm"
+          >
+            Cancel
           </Button>
         )}
       </div>

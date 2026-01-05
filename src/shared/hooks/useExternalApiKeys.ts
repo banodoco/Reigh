@@ -26,9 +26,10 @@ async function fetchExternalApiKey(service: ExternalService): Promise<ExternalAp
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  // Only select fields we need - don't fetch key_value to client (it's only used server-side)
   const { data, error } = await supabase
     .from('external_api_keys')
-    .select('*')
+    .select('id, service, metadata, created_at, updated_at')
     .eq('user_id', user.id)
     .eq('service', service)
     .maybeSingle();
