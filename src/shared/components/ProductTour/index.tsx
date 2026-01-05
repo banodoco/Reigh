@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Joyride, { CallBackProps, STATUS, EVENTS, ACTIONS, TooltipRenderProps } from 'react-joyride';
 import { tourSteps, tourStepColors } from './tourSteps';
 import { useProductTour } from '@/shared/hooks/useProductTour';
@@ -28,9 +28,10 @@ const stepIcons = [
   Layout,      // Step 4: First shot (click to open)
   Film,        // Step 5: Video outputs
   Layers,      // Step 6: Timeline
-  ListTodo,    // Step 7: Tasks pane
-  Wrench,      // Step 8: Tools pane
-  PartyPopper, // Step 9: Final step
+  Film,        // Step 7: Structure video
+  ListTodo,    // Step 8: Tasks pane
+  Wrench,      // Step 9: Tools pane
+  PartyPopper, // Step 10: Final step
 ];
 
 // Custom tooltip component matching WelcomeBonusModal aesthetic
@@ -120,10 +121,11 @@ export function ProductTour() {
   const { isRunning, startTour, completeTour, skipTour, tourState } = useProductTour();
   const {
     setIsGenerationsPaneLocked,
-    setIsTasksPaneOpen,
+    setIsTasksPaneLocked,
     resetAllPaneLocks
   } = usePanes();
   const location = useLocation();
+  const navigate = useNavigate();
   const hasAutoStarted = useRef(false);
 
   // Controlled step index for managing transitions
@@ -197,9 +199,9 @@ export function ProductTour() {
           setIsPaused(false);
         }, 1500);
       }
-      // Step 7: Tasks pane tab clicked
-      else if (stepIndex === 7) {
-        setIsTasksPaneOpen(true);
+      // Step 8: Tasks pane tab clicked - lock the tasks pane
+      else if (stepIndex === 8) {
+        setIsTasksPaneLocked(true);
         setIsPaused(true);
         setTimeout(() => {
           setStepIndex(nextIndex);
@@ -214,7 +216,7 @@ export function ProductTour() {
 
     target.addEventListener('click', handleClick);
     return () => target.removeEventListener('click', handleClick);
-  }, [isRunning, isPaused, stepIndex, setIsTasksPaneOpen]);
+  }, [isRunning, isPaused, stepIndex, setIsTasksPaneLocked]);
 
   // Auto-start tour when user lands on shot editor and hasn't completed/skipped tour
   useEffect(() => {
@@ -302,9 +304,9 @@ export function ProductTour() {
           setIsPaused(false);
         }, 1500);
       }
-      // Step 7: Tasks pane
-      else if (index === 7 && action !== ACTIONS.PREV) {
-        setIsTasksPaneOpen(true);
+      // Step 8: Tasks pane - lock the pane
+      else if (index === 8 && action !== ACTIONS.PREV) {
+        setIsTasksPaneLocked(true);
         setIsPaused(true);
         setTimeout(() => {
           setStepIndex(nextIndex);
@@ -320,10 +322,12 @@ export function ProductTour() {
     // Handle tour completion/skip
     if (status === STATUS.FINISHED) {
       completeTour();
+      // Navigate to main tool page (out of any shot)
+      navigate('/tools/travel-between-images');
     } else if (status === STATUS.SKIPPED) {
       skipTour();
     }
-  }, [completeTour, skipTour, setIsGenerationsPaneLocked, setIsTasksPaneOpen, openGenerationModal, closeGenerationModal]);
+  }, [completeTour, skipTour, setIsGenerationsPaneLocked, setIsTasksPaneLocked, openGenerationModal, closeGenerationModal, navigate]);
 
   if (!isRunning) return null;
 

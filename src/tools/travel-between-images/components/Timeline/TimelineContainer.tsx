@@ -907,7 +907,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         {/* Show when: there's a structure video OR when showing the uploader (no video, not readOnly) */}
         {shotId && projectId && onStructureVideoChange && (structureVideoPath || !readOnly) && (
         <div
-          className="absolute left-0 z-30 flex items-center justify-between pointer-events-none px-8"
+          className="absolute left-0 z-30 flex items-end justify-between pointer-events-none px-8"
           style={{ 
             width: "100%", 
             maxWidth: "100vw", 
@@ -959,8 +959,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             </Button>
           </div>
 
-          {/* Middle: Add Audio button - show when structure video exists but no audio */}
-          {structureVideoPath && !audioUrl && onAudioChange && !readOnly && (
+          {/* Middle: Add Audio button - show when structure video exists (or uploading) but no audio */}
+          {(structureVideoPath || isUploadingStructureVideo) && !audioUrl && onAudioChange && !readOnly && (
             <label className="pointer-events-auto cursor-pointer">
               <input
                 type="file"
@@ -1112,7 +1112,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           }`}
           style={{
             minHeight: "240px",
-            paddingTop: structureVideoPath ? "3rem" : "1rem",  // Show padding if structure video exists (metadata can be null during extraction)
+            paddingTop: structureVideoPath || isUploadingStructureVideo ? "3.5rem" : "1rem",  // Show padding if structure video exists or uploading
             paddingBottom: "7.5rem"
           }}
           onDragEnter={handleDragEnter}

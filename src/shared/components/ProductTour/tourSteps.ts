@@ -12,6 +12,7 @@ export const tourStepColors = [
   { bg: 'bg-indigo-100 dark:bg-indigo-900/20', icon: 'text-indigo-600 dark:text-indigo-400' },
   { bg: 'bg-orange-100 dark:bg-orange-900/20', icon: 'text-orange-600 dark:text-orange-400' },
   { bg: 'bg-sky-100 dark:bg-sky-900/20', icon: 'text-sky-600 dark:text-sky-400' },
+  { bg: 'bg-lime-100 dark:bg-lime-900/20', icon: 'text-lime-600 dark:text-lime-400' },
 ];
 
 export const tourSteps: Step[] = [
@@ -70,7 +71,14 @@ export const tourSteps: Step[] = [
     title: 'The Timeline',
     placement: 'top',
   },
-  // Step 7: Tasks pane
+  // Step 7: Structure video
+  {
+    target: '[data-tour="structure-video"]',
+    content: 'You can use a structure video to control the motion of your generated video.',
+    title: 'Structure Video',
+    placement: 'top',
+  },
+  // Step 8: Tasks pane
   {
     target: '[data-tour="tasks-pane-tab"]',
     content: 'Track your generation tasks here. See progress and manage your queue.',
@@ -78,15 +86,14 @@ export const tourSteps: Step[] = [
     spotlightClicks: true,
     placement: 'top',
   },
-  // Step 8: Tools pane
+  // Step 9: Tools pane
   {
     target: '[data-tour="tools-pane-tab"]',
-    content: 'Different tools help you create images, videos, and more. Explore them to unlock more creative possibilities!',
-    title: 'Available Tools',
-    spotlightClicks: true,
+    content: 'You can find more tools here to help you create images, videos, and more.',
+    title: 'More Tools',
     placement: 'right',
   },
-  // Step 9: Final message (centered)
+  // Step 10: Final message (centered)
   {
     target: 'body',
     content: "You're all set! Generate some images, add them to your timeline, then create a video to bring them to life. Have fun!",

@@ -737,7 +737,9 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       )}
 
       {/* Structure video strip - outer container always full width */}
-      <div className="relative h-28 mb-0"
+      <div
+        className="relative h-28 mb-0"
+        data-tour="structure-video"
         style={{
           width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
           minWidth: '100%',
