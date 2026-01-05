@@ -46,23 +46,16 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   const falApiKey = getApiKey('fal_api_key');
   const openaiApiKey = getApiKey('openai_api_key');
 
-  const handleGenerate = useCallback(async (formData: any) => {
+  const handleGenerate = useCallback(async (taskParams: BatchImageGenerationTaskParams) => {
     if (!selectedProjectId) {
       toast.error("No project selected. Please select a project before generating images.");
       return;
     }
 
-    const { batchTaskParams } = formData;
-
     setIsGenerating(true);
     try {
-      if (batchTaskParams) {
-        console.log('[ImageGenerationModal] Creating batch image generation tasks');
-        await createBatchImageGenerationTasks(batchTaskParams);
-      } else {
-        console.error('[ImageGenerationModal] Missing batchTaskParams');
-        throw new Error('Missing batch task parameters');
-      }
+      console.log('[ImageGenerationModal] Creating batch image generation tasks');
+      await createBatchImageGenerationTasks(taskParams);
 
       // Invalidate generations to ensure they refresh when tasks complete
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
