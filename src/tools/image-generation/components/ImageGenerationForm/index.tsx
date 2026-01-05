@@ -2871,18 +2871,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           />
         </div>
 
-        {/* Generation Settings (local generation only) */}
-        {isLocalGenerationEnabled && (
-          <div className="md:col-span-2 mt-2">
-            <GenerationSettingsSection
-              hiresFixConfig={hiresFixConfig}
-              onHiresFixConfigChange={setHiresFixConfig}
-              projectResolution={projectResolution}
-              projectAspectRatio={projectAspectRatio}
-              disabled={isGenerating || !hasApiKey}
-            />
-          </div>
-        )}
+        {/* Generation Settings (dimensions always, phase config for local only) */}
+        <div className="md:col-span-2 mt-2">
+          <GenerationSettingsSection
+            hiresFixConfig={hiresFixConfig}
+            onHiresFixConfigChange={setHiresFixConfig}
+            projectResolution={projectResolution}
+            projectAspectRatio={projectAspectRatio}
+            disabled={isGenerating || !hasApiKey}
+            isLocalGeneration={isLocalGenerationEnabled}
+          />
+        </div>
 
         {/* Spacer to ensure content can scroll above sticky footer (only when not using portal) */}
         {stickyFooter && !footerPortalId && <div className="h-4" />}

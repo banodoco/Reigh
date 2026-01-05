@@ -20,6 +20,8 @@ interface GenerationSettingsSectionProps {
   projectAspectRatio?: string;
   /** Whether inputs should be disabled */
   disabled?: boolean;
+  /** Whether local generation is enabled (shows Phase 1/2 settings) */
+  isLocalGeneration?: boolean;
 }
 
 /**
@@ -32,6 +34,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
   projectResolution,
   projectAspectRatio,
   disabled = false,
+  isLocalGeneration = false,
 }) => {
   // Update a single field
   const updateField = <K extends keyof HiresFixConfig>(
@@ -168,85 +171,90 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
           </div>
         </div>
 
-        {/* Phase 1: Base Generation */}
-        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide">Phase 1</span>
-            <span className="text-xs text-muted-foreground">Base Generation</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SliderWithValue
-              label="Steps"
-              value={hiresFixConfig.base_steps ?? 8}
-              onChange={(v) => updateField('base_steps', Math.round(v))}
-              min={1}
-              max={16}
-              step={1}
-              disabled={disabled}
-              numberInputClassName="w-20"
-            />
-            <SliderWithValue
-              label="Lightning LoRA"
-              value={hiresFixConfig.lightning_lora_strength_phase_1 ?? 0.9}
-              onChange={(v) => updateField('lightning_lora_strength_phase_1', v)}
-              min={0}
-              max={1.0}
-              step={0.01}
-              disabled={disabled}
-              numberInputClassName="w-20"
-            />
-          </div>
-        </div>
+        {/* Phase 1 & 2: Only shown for local generation */}
+        {isLocalGeneration && (
+          <>
+            {/* Phase 1: Base Generation */}
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide">Phase 1</span>
+                <span className="text-xs text-muted-foreground">Base Generation</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SliderWithValue
+                  label="Steps"
+                  value={hiresFixConfig.base_steps ?? 8}
+                  onChange={(v) => updateField('base_steps', Math.round(v))}
+                  min={1}
+                  max={16}
+                  step={1}
+                  disabled={disabled}
+                  numberInputClassName="w-20"
+                />
+                <SliderWithValue
+                  label="Lightning LoRA"
+                  value={hiresFixConfig.lightning_lora_strength_phase_1 ?? 0.9}
+                  onChange={(v) => updateField('lightning_lora_strength_phase_1', v)}
+                  min={0}
+                  max={1.0}
+                  step={0.01}
+                  disabled={disabled}
+                  numberInputClassName="w-20"
+                />
+              </div>
+            </div>
 
-        {/* Phase 2: Hires Refinement */}
-        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide">Phase 2</span>
-            <span className="text-xs text-muted-foreground">Hires Refinement</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SliderWithValue
-              label="Steps"
-              value={hiresFixConfig.hires_steps ?? 8}
-              onChange={(v) => updateField('hires_steps', Math.round(v))}
-              min={1}
-              max={16}
-              step={1}
-              disabled={disabled}
-              numberInputClassName="w-20"
-            />
-            <SliderWithValue
-              label="Upscale Factor"
-              value={hiresFixConfig.hires_scale ?? 1.1}
-              onChange={(v) => updateField('hires_scale', v)}
-              min={1.0}
-              max={4.0}
-              step={0.1}
-              disabled={disabled}
-              numberInputClassName="w-20"
-            />
-            <SliderWithValue
-              label="Denoise"
-              value={hiresFixConfig.hires_denoise ?? 0.55}
-              onChange={(v) => updateField('hires_denoise', v)}
-              min={0.1}
-              max={1.0}
-              step={0.05}
-              disabled={disabled}
-              numberInputClassName="w-20"
-            />
-            <SliderWithValue
-              label="Lightning LoRA"
-              value={hiresFixConfig.lightning_lora_strength_phase_2 ?? 0.5}
-              onChange={(v) => updateField('lightning_lora_strength_phase_2', v)}
-              min={0}
-              max={1.0}
-              step={0.01}
-              disabled={disabled}
-              numberInputClassName="w-20"
-            />
-          </div>
-        </div>
+            {/* Phase 2: Hires Refinement */}
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide">Phase 2</span>
+                <span className="text-xs text-muted-foreground">Hires Refinement</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SliderWithValue
+                  label="Steps"
+                  value={hiresFixConfig.hires_steps ?? 8}
+                  onChange={(v) => updateField('hires_steps', Math.round(v))}
+                  min={1}
+                  max={16}
+                  step={1}
+                  disabled={disabled}
+                  numberInputClassName="w-20"
+                />
+                <SliderWithValue
+                  label="Upscale Factor"
+                  value={hiresFixConfig.hires_scale ?? 1.1}
+                  onChange={(v) => updateField('hires_scale', v)}
+                  min={1.0}
+                  max={4.0}
+                  step={0.1}
+                  disabled={disabled}
+                  numberInputClassName="w-20"
+                />
+                <SliderWithValue
+                  label="Denoise"
+                  value={hiresFixConfig.hires_denoise ?? 0.55}
+                  onChange={(v) => updateField('hires_denoise', v)}
+                  min={0.1}
+                  max={1.0}
+                  step={0.05}
+                  disabled={disabled}
+                  numberInputClassName="w-20"
+                />
+                <SliderWithValue
+                  label="Lightning LoRA"
+                  value={hiresFixConfig.lightning_lora_strength_phase_2 ?? 0.5}
+                  onChange={(v) => updateField('lightning_lora_strength_phase_2', v)}
+                  min={0}
+                  max={1.0}
+                  step={0.01}
+                  disabled={disabled}
+                  numberInputClassName="w-20"
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </CollapsibleSection>
   );
