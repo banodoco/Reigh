@@ -303,14 +303,56 @@ export interface HiresFixConfig {
   phaseLoraStrengths: PhaseLoraStrength[];
 }
 
-/** Default hires fix configuration */
+/** Default hires fix configuration (used as fallback) */
 export const DEFAULT_HIRES_FIX_CONFIG: HiresFixConfig = {
   enabled: true,
   base_steps: 8,
-  hires_scale: 1,
-  hires_steps: 6,
-  hires_denoise: 0.6,
-  lightning_lora_strength_phase_1: 0.95,
-  lightning_lora_strength_phase_2: 0,
+  hires_scale: 1.1,
+  hires_steps: 8,
+  hires_denoise: 0.55,
+  lightning_lora_strength_phase_1: 0.9,
+  lightning_lora_strength_phase_2: 0.5,
   phaseLoraStrengths: [],
 };
+
+/** Model-specific hires fix defaults */
+export const MODEL_HIRES_FIX_DEFAULTS: Record<string, HiresFixConfig> = {
+  // Qwen Image - used for by-reference mode and just-text qwen-image
+  'qwen-image': {
+    enabled: true,
+    base_steps: 8,
+    hires_scale: 1.1,
+    hires_steps: 8,
+    hires_denoise: 0.55,
+    lightning_lora_strength_phase_1: 0.9,
+    lightning_lora_strength_phase_2: 0.5,
+    phaseLoraStrengths: [],
+  },
+  // Qwen Image 2512 - higher resolution variant
+  'qwen-image-2512': {
+    enabled: true,
+    base_steps: 10,
+    hires_scale: 1.0,
+    hires_steps: 8,
+    hires_denoise: 0.5,
+    lightning_lora_strength_phase_1: 0.85,
+    lightning_lora_strength_phase_2: 0.4,
+    phaseLoraStrengths: [],
+  },
+  // Z-Image model
+  'z-image': {
+    enabled: true,
+    base_steps: 12,
+    hires_scale: 1.2,
+    hires_steps: 10,
+    hires_denoise: 0.6,
+    lightning_lora_strength_phase_1: 0.8,
+    lightning_lora_strength_phase_2: 0.3,
+    phaseLoraStrengths: [],
+  },
+};
+
+/** Get the default hires fix config for a given model */
+export function getHiresFixDefaultsForModel(modelName: string): HiresFixConfig {
+  return MODEL_HIRES_FIX_DEFAULTS[modelName] ?? DEFAULT_HIRES_FIX_CONFIG;
+}

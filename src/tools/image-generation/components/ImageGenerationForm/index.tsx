@@ -60,6 +60,7 @@ import {
   GenerationSource,
   TextToImageModel,
   getLoraTypeForModel,
+  getHiresFixDefaultsForModel,
   BY_REFERENCE_LORA_TYPE,
   ReferenceApiParams,
   DEFAULT_REFERENCE_PARAMS,
@@ -1161,21 +1162,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   );
 
-  // Persist generationSource changes to project settings
+  // Persist generationSource changes to project settings and apply model-specific hires defaults
   const handleGenerationSourceChange = useCallback(async (source: GenerationSource) => {
     setGenerationSource(source);
     markAsInteracted();
+
+    // Apply model-specific hires fix defaults when switching modes
+    const modelName = source === 'by-reference' ? 'qwen-image' : selectedTextModel;
+    setHiresFixConfig(getHiresFixDefaultsForModel(modelName));
+
     try {
       await updateProjectImageSettings('project', { generationSource: source });
     } catch (error) {
       console.error('[GenerationSourcePersist] Failed to save generationSource:', error);
     }
-  }, [updateProjectImageSettings, markAsInteracted]);
+  }, [updateProjectImageSettings, markAsInteracted, selectedTextModel]);
 
-  // Persist selectedTextModel changes to project settings
+  // Persist selectedTextModel changes to project settings and apply model-specific hires defaults
   const handleTextModelChange = useCallback(async (model: TextToImageModel) => {
     setSelectedTextModel(model);
     markAsInteracted();
+
+    // Apply model-specific hires fix defaults when changing text model
+    setHiresFixConfig(getHiresFixDefaultsForModel(model));
+
     try {
       await updateProjectImageSettings('project', { selectedTextModel: model });
     } catch (error) {
@@ -2368,9 +2378,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return;
     }
 
-    // Validate model-specific requirements
-    if (selectedModel === 'qwen-image' && !styleReferenceImageGeneration) {
-      toast.error("Please upload a style reference image for Qwen.Image model.");
+    // Validate model-specific requirements (only require style reference for by-reference mode)
+    if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
+      toast.error("Please upload a style reference image for by-reference mode.");
       return;
     }
 
@@ -2439,8 +2449,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return;
     }
 
-    if (!styleReferenceImageGeneration) {
-      toast.error("Please upload a style reference image for Qwen.Image model.");
+    // Only require style reference for by-reference mode
+    if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
+      toast.error("Please upload a style reference image for by-reference mode.");
       return;
     }
 
@@ -2515,8 +2526,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return;
     }
 
-    if (!styleReferenceImageGeneration) {
-      toast.error("Please upload a style reference image for Qwen.Image model.");
+    // Only require style reference for by-reference mode
+    if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
+      toast.error("Please upload a style reference image for by-reference mode.");
       return;
     }
 
@@ -2628,8 +2640,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         return;
       }
 
-      if (!styleReferenceImageGeneration) {
-        toast.error("Please upload a style reference image for Qwen.Image model.");
+      // Only require style reference for by-reference mode
+      if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
+        toast.error("Please upload a style reference image for by-reference mode.");
         return;
       }
 
@@ -2764,9 +2777,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         return;
     }
 
-    // Validate model-specific requirements
-    if (selectedModel === 'qwen-image' && !styleReferenceImageGeneration) {
-        toast.error("Please upload a style reference image for Qwen.Image model.");
+    // Validate model-specific requirements (only require style reference for by-reference mode)
+    if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
+        toast.error("Please upload a style reference image for by-reference mode.");
         return;
     }
 
