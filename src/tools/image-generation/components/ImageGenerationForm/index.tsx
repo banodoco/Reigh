@@ -3049,7 +3049,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         {isLocalGenerationEnabled && (
           <div className="md:col-span-2 mt-2">
             <GenerationSettingsSection
-              selectedLoras={loraManager.selectedLoras}
               hiresFixConfig={hiresFixConfig}
               onHiresFixConfigChange={setHiresFixConfig}
               disabled={isGenerating || !hasApiKey}

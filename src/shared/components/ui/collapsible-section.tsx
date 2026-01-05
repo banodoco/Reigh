@@ -19,6 +19,8 @@ interface CollapsibleSectionProps {
   contentClassName?: string;
   /** Whether to use default open state (uncontrolled) */
   defaultOpen?: boolean;
+  /** Optional action element to show on the right side of the header when expanded */
+  headerAction?: React.ReactNode;
 }
 
 /**
@@ -33,14 +35,15 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   className,
   contentClassName,
   defaultOpen = false,
+  headerAction,
 }) => {
   // Internal state for uncontrolled mode
   const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
-  
+
   // Determine if we're in controlled mode
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
-  
+
   const handleOpenChange = (newOpen: boolean) => {
     if (!isControlled) {
       setInternalOpen(newOpen);
@@ -64,12 +67,19 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
           )}
         >
           <span className="text-xs font-medium">{title}</span>
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 transition-transform duration-200",
-              !isOpen && "-rotate-90"
+          <div className="flex items-center gap-1">
+            {isOpen && headerAction && (
+              <div onClick={(e) => e.stopPropagation()}>
+                {headerAction}
+              </div>
             )}
-          />
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 transition-transform duration-200",
+                !isOpen && "rotate-90"
+              )}
+            />
+          </div>
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>

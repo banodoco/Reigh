@@ -80,11 +80,11 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   hiresFixConfig: {
     enabled: true,
     base_steps: 8,
-    hires_scale: 1,
-    hires_steps: 6,
+    hires_scale: 1.3,
+    hires_steps: 8,
     hires_denoise: 0.6,
-    lightning_lora_strength_phase_1: 0.95,
-    lightning_lora_strength_phase_2: 0,
+    lightning_lora_strength_phase_1: 0.8,
+    lightning_lora_strength_phase_2: 0.2,
     phaseLoraStrengths: [],
   },
 };
