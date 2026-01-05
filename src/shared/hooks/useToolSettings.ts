@@ -551,15 +551,23 @@ export function useToolSettings<T>(
         });
         return result;
       } catch (err: any) {
-        // Don't log cancelled requests - they're expected during navigation/unmount
-        if (!err?.message?.includes('Request was cancelled')) {
-          console.log('[ShotNavPerf] ❌ useToolSettings queryFn FAILED', {
+        // For cancelled requests, return undefined to let React Query use cached/placeholder data
+        // This prevents "Uncaught (in promise)" errors and allows the UI to remain functional
+        if (err?.message?.includes('Request was cancelled') ||
+            err?.name === 'AbortError' ||
+            err?.message?.includes('signal is aborted')) {
+          console.log('[ShotNavPerf] ⏹️ useToolSettings request cancelled (returning undefined)', {
             toolId,
             shotId: shotId?.substring(0, 8) || 'none',
-            error: err.message,
-            timestamp: Date.now()
           });
+          return undefined;
         }
+        console.log('[ShotNavPerf] ❌ useToolSettings queryFn FAILED', {
+          toolId,
+          shotId: shotId?.substring(0, 8) || 'none',
+          error: err.message,
+          timestamp: Date.now()
+        });
         throw err;
       }
     },
