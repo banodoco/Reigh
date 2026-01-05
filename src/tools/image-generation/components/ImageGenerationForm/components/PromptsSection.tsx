@@ -102,7 +102,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
               Automated
             </SegmentedControlItem>
             <SegmentedControlItem value="managed">
-              Managed
+              Managed{prompts.length > 0 ? ` (${prompts.length})` : ''}
             </SegmentedControlItem>
           </SegmentedControl>
         </div>
