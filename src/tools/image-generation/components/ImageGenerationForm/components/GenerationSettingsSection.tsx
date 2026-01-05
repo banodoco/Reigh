@@ -191,11 +191,23 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
             numberInputClassName="w-20"
           />
 
-          {/* Lightning LoRA Strength */}
+          {/* Lightning LoRA Strength Phase 1 */}
           <SliderWithValue
-            label="Lightning LoRA Strength"
-            value={hiresFixConfig.lightning_lora_strength ?? 0.85}
-            onChange={(v) => updateField('lightning_lora_strength', v)}
+            label="Lightning LoRA Phase 1"
+            value={hiresFixConfig.lightning_lora_strength_phase_1 ?? 0.95}
+            onChange={(v) => updateField('lightning_lora_strength_phase_1', v)}
+            min={0}
+            max={1.0}
+            step={0.01}
+            disabled={disabled}
+            numberInputClassName="w-20"
+          />
+
+          {/* Lightning LoRA Strength Phase 2 */}
+          <SliderWithValue
+            label="Lightning LoRA Phase 2"
+            value={hiresFixConfig.lightning_lora_strength_phase_2 ?? 0}
+            onChange={(v) => updateField('lightning_lora_strength_phase_2', v)}
             min={0}
             max={1.0}
             step={0.01}

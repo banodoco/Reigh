@@ -1,70 +1,151 @@
-import { 
-  resolveProjectResolution, 
-  generateTaskId, 
-  generateRunId, 
-  createTask, 
-  expandArrayToCount, 
-  validateRequiredFields, 
-  TaskValidationError, 
-  safeParseJson 
+import {
+  resolveProjectResolution,
+  generateTaskId,
+  generateRunId,
+  createTask,
+  expandArrayToCount,
+  validateRequiredFields,
+  TaskValidationError,
+  safeParseJson
 } from "../taskCreation";
 import { PhaseConfig } from '@/tools/travel-between-images/settings';
 
+// ============================================================================
+// Video Generation API Param Interfaces (Single Source of Truth)
+// ============================================================================
+// These interfaces define the snake_case params sent to the backend.
+// UI code should re-export these types and use them when building task params.
+
 /**
- * Interface for travel between images (steerable motion) task parameters
- * This matches the original steerable-motion edge function request body
+ * Structure video parameters for VACE mode.
+ * Controls how a reference video guides the motion/structure of generation.
  */
-export interface TravelBetweenImagesTaskParams {
-  project_id: string;
-  shot_id?: string;
-  image_urls: string[];
-  image_generation_ids?: string[]; // Generation IDs corresponding to image_urls (for clickable images in SegmentCard)
-  base_prompts: string[];
-  base_prompt?: string; // Singular - the default/base prompt used for all segments
+export interface VideoStructureApiParams {
+  /** Path to structure video (S3/Storage URL) */
+  structure_video_path?: string | null;
+  /** How to handle frame count mismatches between structure video and generation */
+  structure_video_treatment?: 'adjust' | 'clip';
+  /** Motion strength: 0.0 = no motion, 1.0 = full motion, >1.0 = amplified */
+  structure_video_motion_strength?: number;
+  /** Type of structure extraction from video */
+  structure_video_type?: 'flow' | 'canny' | 'depth';
+}
+
+/**
+ * Motion control parameters for video generation.
+ * Controls the amount and type of motion in generated videos.
+ */
+export interface VideoMotionApiParams {
+  /** Amount of motion: 0.0 = static, 1.0 = maximum motion (UI slider is 0-100, divide by 100) */
+  amount_of_motion?: number;
+  /** Motion control mode for UI state */
+  motion_mode?: 'basic' | 'presets' | 'advanced';
+  /** Whether using advanced phase configuration */
+  advanced_mode?: boolean;
+  /** Advanced phase configuration for multi-phase generation */
+  phase_config?: PhaseConfig;
+  /** Selected phase preset ID for UI state restoration */
+  selected_phase_preset_id?: string | null;
+}
+
+/**
+ * Model and generation settings for video tasks.
+ */
+export interface VideoModelApiParams {
+  /** Model name/identifier */
+  model_name?: string;
+  /** Model type: i2v (image-to-video) or vace (video-guided) */
+  model_type?: 'i2v' | 'vace';
+  /** Random seed for reproducibility */
+  seed?: number;
+  /** Number of inference steps (when not using phase_config) */
+  steps?: number;
+  /** Whether to use a random seed */
+  random_seed?: boolean;
+  /** Enable turbo/fast generation mode */
+  turbo_mode?: boolean;
+  /** Enable debug output */
+  debug?: boolean;
+}
+
+/**
+ * Prompt-related parameters for video generation.
+ */
+export interface VideoPromptApiParams {
+  /** Default/base prompt used for all segments */
+  base_prompt?: string;
+  /** Per-segment prompts (overrides base_prompt when non-empty) */
+  base_prompts?: string[];
+  /** Negative prompts per segment */
   negative_prompts?: string[];
+  /** AI-enhanced prompts per segment */
   enhanced_prompts?: string[];
+  /** Whether to enable AI prompt enhancement */
+  enhance_prompt?: boolean;
+  /** Text prepended to all prompts */
+  text_before_prompts?: string;
+  /** Text appended to all prompts */
+  text_after_prompts?: string;
+}
+
+/**
+ * Default values for video structure API params
+ */
+export const DEFAULT_VIDEO_STRUCTURE_PARAMS: Required<Pick<VideoStructureApiParams, 'structure_video_treatment' | 'structure_video_motion_strength' | 'structure_video_type'>> = {
+  structure_video_treatment: 'adjust',
+  structure_video_motion_strength: 1.0,
+  structure_video_type: 'flow',
+};
+
+/**
+ * Default values for video motion API params
+ */
+export const DEFAULT_VIDEO_MOTION_PARAMS: Required<Pick<VideoMotionApiParams, 'amount_of_motion' | 'motion_mode' | 'advanced_mode'>> = {
+  amount_of_motion: 0.5,
+  motion_mode: 'basic',
+  advanced_mode: false,
+};
+
+/**
+ * Interface for travel between images (steerable motion) task parameters.
+ * Extends from shared API param interfaces for consistent typing.
+ * This matches the original steerable-motion edge function request body.
+ */
+export interface TravelBetweenImagesTaskParams extends
+  Partial<VideoStructureApiParams>,
+  Partial<VideoMotionApiParams>,
+  Partial<VideoModelApiParams>,
+  Partial<VideoPromptApiParams> {
+  // Required fields (override Partial<> for fields that must be present)
+  project_id: string;
+  image_urls: string[];
+  base_prompts: string[]; // Required - per-segment prompts
   segment_frames: number[];
   frame_overlap: number[];
+
+  // Optional task-specific fields (not in shared interfaces)
+  shot_id?: string;
+  /** Generation IDs corresponding to image_urls (for clickable images in SegmentCard) */
+  image_generation_ids?: string[];
   resolution?: string;
-  model_name?: string;
-  model_type?: string;
-  seed?: number;
-  debug?: boolean;
   params_json_str?: string;
-  steps?: number;
   main_output_dir_for_run?: string;
-  enhance_prompt?: boolean;
   openai_api_key?: string;
+  /** Legacy LoRA format - prefer phase_config.phases[].loras */
   loras?: Array<{ path: string; strength: number }>;
   show_input_images?: boolean;
   generation_mode?: 'batch' | 'timeline';
   dimension_source?: 'project' | 'firstImage' | 'custom';
-  // Additional parameters sent by ShotEditor
-  random_seed?: boolean;
-  turbo_mode?: boolean;
-  amount_of_motion?: number;
-  advanced_mode?: boolean;                           // Whether Advanced Mode is enabled
-  regenerate_anchors?: boolean;                      // Whether to regenerate anchor images (Advanced Mode only)
-  // Post-generation adjustments
-  after_first_post_generation_saturation?: number;   // Saturation adjustment (1.0 = no change)
-  after_first_post_generation_brightness?: number;   // Brightness adjustment (0 = no change)
-  // Structure video parameters (matches backend naming)
-  structure_video_path?: string | null;              // Path to structure video (S3/Storage URL)
-  structure_video_treatment?: 'adjust' | 'clip';     // How to handle frame mismatches
-  structure_video_motion_strength?: number;          // 0.0 = no motion, 1.0 = full motion, >1.0 = amplified
-  structure_video_type?: 'flow' | 'canny' | 'depth'; // Type of structure extraction: optical flow, canny edges, or depth map
-  // Variant naming
-  generation_name?: string;                          // Optional variant name for the generation
-  // Advanced phase configuration
-  phase_config?: PhaseConfig;
-  // Selected phase config preset ID (for UI state restoration)
-  selected_phase_preset_id?: string | null;
+  /** Whether to regenerate anchor images (Advanced Mode only) */
+  regenerate_anchors?: boolean;
+  /** Saturation adjustment (1.0 = no change) */
+  after_first_post_generation_saturation?: number;
+  /** Brightness adjustment (0 = no change) */
+  after_first_post_generation_brightness?: number;
+  /** Optional variant name for the generation */
+  generation_name?: string;
+  /** Whether segments are generated independently */
   independent_segments?: boolean;
-  // Text before/after prompts
-  text_before_prompts?: string;
-  text_after_prompts?: string;
-  // Motion control mode (basic/presets/advanced)
-  motion_mode?: 'basic' | 'presets' | 'advanced';
 }
 
 /**
@@ -230,12 +311,12 @@ function buildTravelBetweenImagesPayload(
     WARNING: orchestratorPayload.enhance_prompt === true ? '⚠️ enhance_prompt is TRUE - check if this is intentional' : '✅ enhance_prompt is false'
   });
 
-  // Add structure video parameters if provided
+  // Add structure video parameters if provided (use defaults from single source of truth)
   if (params.structure_video_path) {
     orchestratorPayload.structure_video_path = params.structure_video_path;
-    orchestratorPayload.structure_video_treatment = params.structure_video_treatment ?? 'adjust';
-    orchestratorPayload.structure_video_motion_strength = params.structure_video_motion_strength ?? 1.0;
-    orchestratorPayload.structure_video_type = params.structure_video_type ?? 'flow';
+    orchestratorPayload.structure_video_treatment = params.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment;
+    orchestratorPayload.structure_video_motion_strength = params.structure_video_motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength;
+    orchestratorPayload.structure_video_type = params.structure_video_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type;
   }
 
   // Attach additional_loras mapping if provided (matching original logic)

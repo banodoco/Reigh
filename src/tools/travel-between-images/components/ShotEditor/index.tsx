@@ -221,6 +221,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Structure video management (extracted to hook)
   const {
+    // New grouped config (preferred for generateVideo)
+    structureVideoConfig,
+    // Legacy individual accessors (for UI components that haven't migrated)
     structureVideoPath,
     structureVideoMetadata,
     structureVideoTreatment,
@@ -1242,10 +1245,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0,
         name: lora.name
       })),
-      structureVideoPath,
-      structureVideoType,
-      structureVideoTreatment,
-      structureVideoMotionStrength,
+      structureVideoConfig, // Grouped config with snake_case API params
       variantNameParam,
       clearAllEnhancedPrompts,
     });
@@ -1287,10 +1287,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     phaseConfig,
     selectedPhasePresetId,
     loraManager.selectedLoras,
-    structureVideoPath,
-    structureVideoType,
-    structureVideoTreatment,
-    structureVideoMotionStrength,
+    structureVideoConfig, // Grouped config replaces individual fields
     clearAllEnhancedPrompts,
   ]);
 

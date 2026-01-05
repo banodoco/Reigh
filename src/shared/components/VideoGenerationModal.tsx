@@ -21,7 +21,12 @@ import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '@/tools/travel-between-images
 import BatchSettingsForm from '@/tools/travel-between-images/components/BatchSettingsForm';
 import { MotionControl } from '@/tools/travel-between-images/components/MotionControl';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
-import { generateVideo, buildBasicModePhaseConfig } from '@/tools/travel-between-images/components/ShotEditor/services/generateVideoService';
+import {
+  generateVideo,
+  buildBasicModePhaseConfig,
+  type StructureVideoConfig,
+  DEFAULT_STRUCTURE_VIDEO_CONFIG,
+} from '@/tools/travel-between-images/components/ShotEditor/services/generateVideoService';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
@@ -252,10 +257,13 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
         phaseConfig: finalPhaseConfig,
         selectedPhasePresetId: settings.selectedPhasePresetId || undefined,
         selectedLoras: selectedLoras.map(l => ({ id: l.id, path: l.path, strength: l.strength, name: l.name })),
-        structureVideoPath: settings.structureVideo?.path || null,
-        structureVideoType: 'flow',
-        structureVideoTreatment: settings.structureVideo?.treatment || 'adjust',
-        structureVideoMotionStrength: settings.structureVideo?.motionStrength || 1.0,
+        structureVideoConfig: {
+          ...DEFAULT_STRUCTURE_VIDEO_CONFIG,
+          structure_video_path: settings.structureVideo?.path || null,
+          structure_video_type: settings.structureVideo?.structureType || DEFAULT_STRUCTURE_VIDEO_CONFIG.structure_video_type,
+          structure_video_treatment: settings.structureVideo?.treatment || DEFAULT_STRUCTURE_VIDEO_CONFIG.structure_video_treatment,
+          structure_video_motion_strength: settings.structureVideo?.motionStrength || DEFAULT_STRUCTURE_VIDEO_CONFIG.structure_video_motion_strength,
+        },
         variantNameParam: '',
         clearAllEnhancedPrompts: async () => {},
       });

@@ -105,23 +105,26 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
     return !!document.querySelector('.react-joyride__overlay');
   }, []);
 
-  // Handle open state changes
-  const handleOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      // During tour, only close via the closeGenerationModal event
-      if (isTourActive()) {
-        console.log('[ProductTour] Blocking modal close (tour active)');
-        return;
-      }
-      onClose();
-    }
-  }, [onClose, isTourActive]);
-
-  // During tour, make dialog non-modal so clicks can reach Joyride buttons
-  const tourActive = isTourActive();
-
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange} modal={!tourActive}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        // Check tour status fresh (not stale render-time value)
+        const tourActiveNow = isTourActive();
+        console.log('[ProductTour] Modal onOpenChange:', { open, tourActiveNow });
+
+        // During tour, the modal is controlled entirely by the isOpen prop
+        // (which is set by the closeGenerationModal event from ProductTour)
+        // So we ignore onOpenChange during the tour
+        if (!open && tourActiveNow) {
+          console.log('[ProductTour] Blocking modal close (tour active)');
+          return;
+        }
+        if (!open) onClose();
+      }}
+      // Always non-modal so we can control closing behavior ourselves
+      modal={false}
+    >
       <DialogContent
         className={`${modal.className} gap-2 overflow-hidden flex flex-col`}
         style={{

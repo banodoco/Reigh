@@ -271,18 +271,31 @@ export function ProductTour() {
         console.log('[ProductTour] Step 3: closing modal, unlocking pane, advancing to', nextIndex);
         closeGenerationModal();
         setIsGenerationsPaneLocked(false);
-        // Use longer delay to ensure modal closes before advancing
+        // Use longer delay to ensure modal fully closes and first-shot element is visible
         setIsPaused(true);
         setTimeout(() => {
-          console.log('[ProductTour] Step 3: timeout fired, setting stepIndex to', nextIndex);
-          setStepIndex(nextIndex);
-          setTimeout(() => {
-            setIsPaused(false);
-          }, 100);
-        }, 500);
+          // Wait for first-shot element to be available
+          const waitForTarget = () => {
+            const target = document.querySelector('[data-tour="first-shot"]');
+            if (target) {
+              console.log('[ProductTour] Step 3: first-shot found, advancing to', nextIndex);
+              setStepIndex(nextIndex);
+              setTimeout(() => setIsPaused(false), 100);
+            } else {
+              console.log('[ProductTour] Step 3: waiting for first-shot...');
+              setTimeout(waitForTarget, 100);
+            }
+          };
+          waitForTarget();
+        }, 800);
       }
       // Step 4: First shot click - page navigation (needs longer delay for shot editor to render)
       else if (index === 4 && action !== ACTIONS.PREV) {
+        // Programmatically click the first shot to navigate into it
+        const firstShot = document.querySelector('[data-tour="first-shot"]') as HTMLElement;
+        if (firstShot) {
+          firstShot.click();
+        }
         setIsPaused(true);
         setTimeout(() => {
           setStepIndex(nextIndex);

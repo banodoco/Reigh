@@ -22,7 +22,8 @@ export interface HiresFixConfig {
   hires_scale: number;
   hires_steps: number;
   hires_denoise: number;
-  lightning_lora_strength: number;
+  lightning_lora_strength_phase_1: number;
+  lightning_lora_strength_phase_2: number;
   phaseLoraStrengths: Array<{
     loraId: string;
     loraPath: string;
@@ -82,7 +83,8 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
     hires_scale: 1,
     hires_steps: 6,
     hires_denoise: 0.6,
-    lightning_lora_strength: 0.95,
+    lightning_lora_strength_phase_1: 0.95,
+    lightning_lora_strength_phase_2: 0,
     phaseLoraStrengths: [],
   },
 };

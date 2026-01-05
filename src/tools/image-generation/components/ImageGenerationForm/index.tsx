@@ -175,7 +175,8 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
       hires_scale: input.hiresFixConfig.hires_scale,
       hires_steps: input.hiresFixConfig.hires_steps,
       hires_denoise: input.hiresFixConfig.hires_denoise,
-      lightning_lora_strength: input.hiresFixConfig.lightning_lora_strength,
+      lightning_lora_strength_phase_1: input.hiresFixConfig.lightning_lora_strength_phase_1,
+      lightning_lora_strength_phase_2: input.hiresFixConfig.lightning_lora_strength_phase_2,
       // phaseLoraStrengths is UI structure, transform to API format
       additional_loras: Object.fromEntries(
         (input.hiresFixConfig.phaseLoraStrengths ?? []).map(lora => [
@@ -281,7 +282,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       hires_scale: (raw.hires_scale as number) ?? (raw.hiresScale as number),
       hires_steps: (raw.hires_steps as number) ?? (raw.hiresSteps as number),
       hires_denoise: (raw.hires_denoise as number) ?? (raw.hiresDenoise as number),
-      lightning_lora_strength: (raw.lightning_lora_strength as number) ?? (raw.lightningLoraStrength as number),
+      // Migrate from old single lightning_lora_strength to phase_1 (phase_2 defaults to 0)
+      lightning_lora_strength_phase_1: (raw.lightning_lora_strength_phase_1 as number)
+        ?? (raw.lightning_lora_strength as number)
+        ?? (raw.lightningLoraStrength as number),
+      lightning_lora_strength_phase_2: (raw.lightning_lora_strength_phase_2 as number),
     };
     return {
       ...DEFAULT_HIRES_FIX_CONFIG,

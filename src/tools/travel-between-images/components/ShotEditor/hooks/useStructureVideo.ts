@@ -1,28 +1,67 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
+import {
+  VideoStructureApiParams,
+  DEFAULT_VIDEO_STRUCTURE_PARAMS,
+} from '@/shared/lib/tasks/travelBetweenImages';
 
 export interface UseStructureVideoParams {
   projectId: string;
   shotId: string | undefined;
 }
 
+/**
+ * Structure video configuration with snake_case fields matching API params.
+ * Extends VideoStructureApiParams with UI-only fields (metadata, resource_id).
+ */
+export interface StructureVideoConfig extends VideoStructureApiParams {
+  /** Video metadata (frame count, duration, etc.) - UI only */
+  metadata?: VideoMetadata | null;
+  /** Resource ID for tracking which resource this video came from - UI only */
+  resource_id?: string | null;
+}
+
+/** Default structure video config */
+export const DEFAULT_STRUCTURE_VIDEO_CONFIG: StructureVideoConfig = {
+  structure_video_path: null,
+  structure_video_treatment: DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+  structure_video_motion_strength: DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
+  structure_video_type: DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+  metadata: null,
+  resource_id: null,
+};
+
 export interface UseStructureVideoReturn {
+  /** Grouped structure video config with snake_case API params */
+  structureVideoConfig: StructureVideoConfig;
+  /** Update the entire structure video config */
+  setStructureVideoConfig: (config: StructureVideoConfig) => void;
+  /** Loading state */
+  isLoading: boolean;
+
+  // Legacy individual accessors (deprecated - use structureVideoConfig instead)
+  /** @deprecated Use structureVideoConfig.structure_video_path */
   structureVideoPath: string | null;
+  /** @deprecated Use structureVideoConfig.metadata */
   structureVideoMetadata: VideoMetadata | null;
+  /** @deprecated Use structureVideoConfig.structure_video_treatment */
   structureVideoTreatment: 'adjust' | 'clip';
+  /** @deprecated Use structureVideoConfig.structure_video_motion_strength */
   structureVideoMotionStrength: number;
+  /** @deprecated Use structureVideoConfig.structure_video_type */
   structureVideoType: 'flow' | 'canny' | 'depth';
-  structureVideoResourceId: string | null; // Track the resource ID for reference
+  /** @deprecated Use structureVideoConfig.resource_id */
+  structureVideoResourceId: string | null;
+  /** @deprecated Use setStructureVideoConfig */
   handleStructureVideoChange: (
     videoPath: string | null,
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
     structureType: 'flow' | 'canny' | 'depth',
-    resourceId?: string // Optional resource ID
+    resourceId?: string
   ) => void;
-  isLoading: boolean;
 }
 
 /**
@@ -34,30 +73,33 @@ export function useStructureVideo({
   shotId,
 }: UseStructureVideoParams): UseStructureVideoReturn {
   // Structure video persistence using separate tool settings (per-shot basis)
-  const { 
-    settings: structureVideoSettings, 
+  // Supports both new snake_case format and legacy camelCase for migration
+  const {
+    settings: structureVideoSettings,
     update: updateStructureVideoSettings,
-    isLoading: isStructureVideoSettingsLoading 
+    isLoading: isStructureVideoSettingsLoading
   } = useToolSettings<{
+    // New snake_case format (preferred)
+    structure_video_path?: string | null;
+    structure_video_treatment?: 'adjust' | 'clip';
+    structure_video_motion_strength?: number;
+    structure_video_type?: 'flow' | 'canny' | 'depth';
+    resource_id?: string | null;
+    metadata?: VideoMetadata | null;
+    // Legacy camelCase format (for migration)
     path?: string;
-    metadata?: VideoMetadata;
     treatment?: 'adjust' | 'clip';
     motionStrength?: number;
     structureType?: 'flow' | 'canny' | 'depth';
-    resourceId?: string; // Track which resource this video came from
-  }>('travel-structure-video', { 
-    projectId, 
+    resourceId?: string;
+  }>('travel-structure-video', {
+    projectId,
     shotId: shotId,
-    enabled: !!shotId 
+    enabled: !!shotId
   });
 
-  // Structure video state
-  const [structureVideoPath, setStructureVideoPath] = useState<string | null>(null);
-  const [structureVideoMetadata, setStructureVideoMetadata] = useState<VideoMetadata | null>(null);
-  const [structureVideoTreatment, setStructureVideoTreatment] = useState<'adjust' | 'clip'>('adjust');
-  const [structureVideoMotionStrength, setStructureVideoMotionStrength] = useState<number>(1.0);
-  const [structureVideoType, setStructureVideoType] = useState<'flow' | 'canny' | 'depth'>('flow');
-  const [structureVideoResourceId, setStructureVideoResourceId] = useState<string | null>(null);
+  // Single state object for structure video config (snake_case)
+  const [config, setConfig] = useState<StructureVideoConfig>(DEFAULT_STRUCTURE_VIDEO_CONFIG);
   const [hasInitializedStructureVideo, setHasInitializedStructureVideo] = useState<string | null>(null);
 
   // Reset initialization state when shot changes
@@ -67,39 +109,89 @@ export function useStructureVideo({
     }
   }, [shotId, hasInitializedStructureVideo]);
 
-  // Load structure video from settings when shot loads
+  // Load structure video from settings when shot loads (with legacy migration)
   useEffect(() => {
     if (!hasInitializedStructureVideo && !isStructureVideoSettingsLoading && shotId) {
-      // Only check for path - metadata is optional and can be null
-      if (structureVideoSettings?.path) {
-        setStructureVideoPath(structureVideoSettings.path);
-        setStructureVideoMetadata(structureVideoSettings.metadata || null);
-        setStructureVideoTreatment(structureVideoSettings.treatment || 'adjust');
-        setStructureVideoMotionStrength(structureVideoSettings.motionStrength ?? 1.0);
-        setStructureVideoType(structureVideoSettings.structureType || 'flow');
-        setStructureVideoResourceId(structureVideoSettings.resourceId || null);
+      // Check for path in either new or legacy format
+      const videoPath = structureVideoSettings?.structure_video_path ?? structureVideoSettings?.path;
+
+      if (videoPath) {
+        // Migrate from legacy camelCase to snake_case
+        setConfig({
+          structure_video_path: videoPath,
+          structure_video_treatment: structureVideoSettings?.structure_video_treatment
+            ?? structureVideoSettings?.treatment
+            ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+          structure_video_motion_strength: structureVideoSettings?.structure_video_motion_strength
+            ?? structureVideoSettings?.motionStrength
+            ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
+          structure_video_type: structureVideoSettings?.structure_video_type
+            ?? structureVideoSettings?.structureType
+            ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+          metadata: structureVideoSettings?.metadata ?? null,
+          resource_id: structureVideoSettings?.resource_id ?? structureVideoSettings?.resourceId ?? null,
+        });
       } else {
         // No saved structure video - initialize with defaults
-        setStructureVideoPath(null);
-        setStructureVideoMetadata(null);
-        setStructureVideoTreatment('adjust');
-        setStructureVideoMotionStrength(1.0);
-        setStructureVideoType('flow');
-        setStructureVideoResourceId(null);
+        setConfig(DEFAULT_STRUCTURE_VIDEO_CONFIG);
       }
       setHasInitializedStructureVideo(shotId);
     }
   }, [structureVideoSettings, isStructureVideoSettingsLoading, shotId, hasInitializedStructureVideo]);
 
   // 🎯 PERF FIX: Use refs to avoid callback instability
-  const structureVideoTypeRef = useRef(structureVideoType);
-  structureVideoTypeRef.current = structureVideoType;
+  const configRef = useRef(config);
+  configRef.current = config;
   const updateStructureVideoSettingsRef = useRef(updateStructureVideoSettings);
   updateStructureVideoSettingsRef.current = updateStructureVideoSettings;
   const shotIdRef = useRef(shotId);
   shotIdRef.current = shotId;
 
-  // Handler for structure video changes with auto-save
+  // New unified setter for structure video config
+  const setStructureVideoConfig = useCallback((newConfig: StructureVideoConfig) => {
+    console.log('[useStructureVideo] setStructureVideoConfig called:', {
+      path: newConfig.structure_video_path ? newConfig.structure_video_path.substring(0, 50) + '...' : null,
+      hasMetadata: !!newConfig.metadata,
+      treatment: newConfig.structure_video_treatment,
+      motionStrength: newConfig.structure_video_motion_strength,
+      structureType: newConfig.structure_video_type,
+      resourceId: newConfig.resource_id?.substring(0, 8),
+    });
+
+    setConfig(newConfig);
+
+    // Save to database using new snake_case format
+    if (newConfig.structure_video_path) {
+      console.log('[useStructureVideo] 💾 SAVING structure video to database (snake_case format)');
+      updateStructureVideoSettingsRef.current('shot', {
+        structure_video_path: newConfig.structure_video_path,
+        structure_video_treatment: newConfig.structure_video_treatment,
+        structure_video_motion_strength: newConfig.structure_video_motion_strength,
+        structure_video_type: newConfig.structure_video_type,
+        metadata: newConfig.metadata ?? null,
+        resource_id: newConfig.resource_id ?? null,
+      });
+    } else {
+      // Clear structure video
+      console.log('[useStructureVideo] 🗑️  CLEARING structure video from database');
+      updateStructureVideoSettingsRef.current('shot', {
+        structure_video_path: null,
+        structure_video_treatment: null,
+        structure_video_motion_strength: null,
+        structure_video_type: null,
+        metadata: null,
+        resource_id: null,
+        // Also clear legacy fields
+        path: null,
+        treatment: null,
+        motionStrength: null,
+        structureType: null,
+        resourceId: null,
+      });
+    }
+  }, []);
+
+  // Legacy handler for backwards compatibility (wraps setStructureVideoConfig)
   const handleStructureVideoChange = useCallback((
     videoPath: string | null,
     metadata: VideoMetadata | null,
@@ -108,83 +200,31 @@ export function useStructureVideo({
     structureType: 'flow' | 'canny' | 'depth',
     resourceId?: string
   ) => {
-    console.log('[useStructureVideo] [DEBUG] handleStructureVideoChange called:', {
-      videoPath: videoPath ? videoPath.substring(0, 50) + '...' : null,
-      hasMetadata: !!metadata,
-      metadataDetails: metadata ? { totalFrames: metadata.total_frames, frameRate: metadata.frame_rate } : null,
-      treatment,
-      motionStrength,
-      structureType,
-      resourceId: resourceId?.substring(0, 8),
-      previousStructureType: structureVideoTypeRef.current // Use ref instead of state
+    console.log('[useStructureVideo] [LEGACY] handleStructureVideoChange called - converting to snake_case');
+    setStructureVideoConfig({
+      structure_video_path: videoPath,
+      structure_video_treatment: treatment,
+      structure_video_motion_strength: motionStrength,
+      structure_video_type: structureType,
+      metadata: metadata,
+      resource_id: resourceId ?? null,
     });
-    
-    console.error('[StructureVideoDebug] 🔄 Setting state values:', {
-      videoPath: videoPath ? videoPath.substring(0, 60) + '...' : null,
-      hasMetadata: !!metadata,
-      treatment,
-      motionStrength,
-      structureType,
-      resourceId: resourceId?.substring(0, 8)
-    });
-    
-    setStructureVideoPath(videoPath);
-    setStructureVideoMetadata(metadata); // Always update, even if null (important for clearing old metadata)
-    setStructureVideoTreatment(treatment);
-    setStructureVideoMotionStrength(motionStrength);
-    setStructureVideoType(structureType);
-    setStructureVideoResourceId(resourceId || null);
-    
-    console.error('[StructureVideoDebug] ✅ State setters called successfully');
-
-    // Save to database
-    if (videoPath) {
-      // Save structure video (metadata is optional - can be fetched later from path)
-      console.error('[useStructureVideo] 💾 SAVING structure video to database:', { 
-        path: videoPath,
-        pathPreview: videoPath.substring(0, 80) + '...',
-        hasMetadata: !!metadata,
-        treatment,
-        motionStrength,
-        structureType,
-        resourceId: resourceId?.substring(0, 8),
-        toolId: 'travel-structure-video',
-        scope: 'shot',
-        shotId: shotIdRef.current?.substring(0, 8)
-      });
-      updateStructureVideoSettingsRef.current('shot', {
-        path: videoPath,
-        metadata: metadata || null,
-        treatment,
-        motionStrength,
-        structureType,
-        resourceId: resourceId || null
-      });
-      console.error('[useStructureVideo] ✅ Structure video save requested');
-    } else {
-      // Clear structure video - explicitly set fields to null to ensure deletion
-      console.error('[useStructureVideo] 🗑️  CLEARING structure video from database');
-      updateStructureVideoSettingsRef.current('shot', {
-        path: null,
-        metadata: null,
-        treatment: null,
-        motionStrength: null,
-        structureType: null,
-        resourceId: null
-      });
-      console.error('[useStructureVideo] ✅ Structure video clear requested');
-    }
-  }, []); // 🎯 PERF FIX: All dependencies accessed via refs for stable callback
+  }, [setStructureVideoConfig]);
 
   return {
-    structureVideoPath,
-    structureVideoMetadata,
-    structureVideoTreatment,
-    structureVideoMotionStrength,
-    structureVideoType,
-    structureVideoResourceId,
-    handleStructureVideoChange,
+    // New grouped interface (preferred)
+    structureVideoConfig: config,
+    setStructureVideoConfig,
     isLoading: isStructureVideoSettingsLoading,
+
+    // Legacy individual accessors for backwards compatibility (use constants for defaults)
+    structureVideoPath: config.structure_video_path ?? null,
+    structureVideoMetadata: config.metadata ?? null,
+    structureVideoTreatment: config.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+    structureVideoMotionStrength: config.structure_video_motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
+    structureVideoType: config.structure_video_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+    structureVideoResourceId: config.resource_id ?? null,
+    handleStructureVideoChange,
   };
 }
 

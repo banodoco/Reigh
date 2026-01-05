@@ -46,7 +46,10 @@ export interface HiresFixApiParams {
   hires_scale?: number;
   hires_steps?: number;
   hires_denoise?: number;
-  lightning_lora_strength?: number;
+  /** Lightning LoRA strength for phase 1 (initial generation) */
+  lightning_lora_strength_phase_1?: number;
+  /** Lightning LoRA strength for phase 2 (hires/refinement pass) */
+  lightning_lora_strength_phase_2?: number;
   additional_loras?: Record<string, string>;
 }
 
@@ -269,6 +272,8 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
     hires_scale: params.hires_scale,
     hires_steps: params.hires_steps,
     hires_denoise: params.hires_denoise,
+    lightning_lora_strength_phase_1: params.lightning_lora_strength_phase_1,
+    lightning_lora_strength_phase_2: params.lightning_lora_strength_phase_2,
     additional_loras: params.additional_loras,
     steps: params.steps,
   });
@@ -365,7 +370,8 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       ...(params.hires_scale !== undefined && { hires_scale: params.hires_scale }),
       ...(params.hires_steps !== undefined && { hires_steps: params.hires_steps }),
       ...(params.hires_denoise !== undefined && { hires_denoise: params.hires_denoise }),
-      ...(params.lightning_lora_strength !== undefined && { lightning_lora_strength: params.lightning_lora_strength }),
+      ...(params.lightning_lora_strength_phase_1 !== undefined && { lightning_lora_strength_phase_1: params.lightning_lora_strength_phase_1 }),
+      ...(params.lightning_lora_strength_phase_2 !== undefined && { lightning_lora_strength_phase_2: params.lightning_lora_strength_phase_2 }),
       // Per-phase LoRA strengths for hires fix (overrides additional_loras if provided)
       ...(params.additional_loras && Object.keys(params.additional_loras).length > 0 && {
         additional_loras: params.additional_loras
@@ -404,6 +410,8 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
     hires_scale: params.hires_scale,
     hires_steps: params.hires_steps,
     hires_denoise: params.hires_denoise,
+    lightning_lora_strength_phase_1: params.lightning_lora_strength_phase_1,
+    lightning_lora_strength_phase_2: params.lightning_lora_strength_phase_2,
     additional_loras: params.additional_loras,
     steps: params.steps,
   });
@@ -456,7 +464,8 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
           ...(params.hires_scale !== undefined && { hires_scale: params.hires_scale }),
           ...(params.hires_steps !== undefined && { hires_steps: params.hires_steps }),
           ...(params.hires_denoise !== undefined && { hires_denoise: params.hires_denoise }),
-          ...(params.lightning_lora_strength !== undefined && { lightning_lora_strength: params.lightning_lora_strength }),
+          ...(params.lightning_lora_strength_phase_1 !== undefined && { lightning_lora_strength_phase_1: params.lightning_lora_strength_phase_1 }),
+          ...(params.lightning_lora_strength_phase_2 !== undefined && { lightning_lora_strength_phase_2: params.lightning_lora_strength_phase_2 }),
           ...(params.additional_loras && { additional_loras: params.additional_loras }),
         } as ImageGenerationTaskParams;
       });

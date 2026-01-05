@@ -3,12 +3,36 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 // NOTE: resolveImageUrl is no longer needed - location already contains the best version
-import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } from '@/shared/lib/tasks/travelBetweenImages';
+import {
+  createTravelBetweenImagesTask,
+  type TravelBetweenImagesTaskParams,
+  type VideoStructureApiParams,
+  type VideoMotionApiParams,
+  type VideoModelApiParams,
+  type VideoPromptApiParams,
+  DEFAULT_VIDEO_STRUCTURE_PARAMS,
+  DEFAULT_VIDEO_MOTION_PARAMS,
+} from '@/shared/lib/tasks/travelBetweenImages';
+import {
+  type StructureVideoConfig,
+  DEFAULT_STRUCTURE_VIDEO_CONFIG,
+} from '../hooks/useStructureVideo';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { DEFAULT_RESOLUTION } from '../utils/dimension-utils';
 import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../state/types';
 import { PhaseConfig, PhaseLoraConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '../../../settings';
 import { isVideoShotGenerations, type ShotGenerationsLike } from '@/shared/lib/typeGuards';
+
+// Re-export API types for UI code to use
+export type {
+  TravelBetweenImagesTaskParams,
+  VideoStructureApiParams,
+  VideoMotionApiParams,
+  VideoModelApiParams,
+  VideoPromptApiParams,
+  StructureVideoConfig,
+};
+export { DEFAULT_VIDEO_STRUCTURE_PARAMS, DEFAULT_VIDEO_MOTION_PARAMS, DEFAULT_STRUCTURE_VIDEO_CONFIG };
 
 // ============================================================================
 // PHASE CONFIG HELPERS FOR BASIC MODE
@@ -174,11 +198,8 @@ export interface GenerateVideoParams {
   // LoRAs
   selectedLoras: Array<{ id: string; path: string; strength: number; name: string }>;
 
-  // Structure video
-  structureVideoPath: string | null;
-  structureVideoType: 'flow' | 'canny' | 'depth';
-  structureVideoTreatment: 'adjust' | 'clip';
-  structureVideoMotionStrength: number;
+  // Structure video config (grouped with snake_case matching API)
+  structureVideoConfig: StructureVideoConfig;
   
   // Generation name
   variantNameParam: string;
@@ -230,10 +251,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     phaseConfig,
     selectedPhasePresetId,
     selectedLoras,
-    structureVideoPath,
-    structureVideoType,
-    structureVideoTreatment,
-    structureVideoMotionStrength,
+    structureVideoConfig,
     variantNameParam,
     clearAllEnhancedPrompts,
   } = params;
@@ -794,7 +812,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   const useVaceMode = generationTypeMode === 'vace';
   
   // Log warning if I2V mode is selected but structure video exists
-  if (generationTypeMode === 'i2v' && structureVideoPath) {
+  if (generationTypeMode === 'i2v' && structureVideoConfig.structure_video_path) {
     console.warn('[Generation] ⚠️ I2V mode selected but structure video exists. Structure video will NOT be used.');
   }
   
@@ -820,8 +838,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     generationTypeMode,
     useVaceMode,
     useAdvancedMode,
-    hasStructureVideo: !!structureVideoPath,
-    structureVideoWillBeUsed: useVaceMode && !!structureVideoPath,
+    hasStructureVideo: !!structureVideoConfig.structure_video_path,
+    structureVideoWillBeUsed: useVaceMode && !!structureVideoConfig.structure_video_path,
     amountOfMotion,
     rawAmountOfMotion,
     amountOfMotionDefaultApplied: rawAmountOfMotion == null
@@ -890,8 +908,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       modelType,
       generationTypeMode,
       useVaceMode,
-      hasStructureVideo: !!structureVideoPath,
-      structureVideoWillBeUsed: useVaceMode && !!structureVideoPath,
+      hasStructureVideo: !!structureVideoConfig.structure_video_path,
+      structureVideoWillBeUsed: useVaceMode && !!structureVideoConfig.structure_video_path,
       amountOfMotion,
       motionLoraApplied: amountOfMotion > 0,
       motionLoraStrength: amountOfMotion > 0 ? (amountOfMotion / 100).toFixed(2) : 'N/A',
@@ -1028,26 +1046,24 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     requestBody.resolution = resolution;
   }
 
-  // Add structure video params if available
-  console.log('[Generation] [DEBUG] Structure video state at generation time:', {
-    structureVideoPath,
-    structureVideoType,
-    structureVideoTreatment,
-    structureVideoMotionStrength,
-    willAddToRequest: !!structureVideoPath
+  // Add structure video params if available (spread from grouped config)
+  console.log('[Generation] [DEBUG] Structure video config at generation time:', {
+    ...structureVideoConfig,
+    willAddToRequest: !!structureVideoConfig.structure_video_path
   });
-  
-  if (structureVideoPath) {
-    console.log('[Generation] Adding structure video to task:', {
-      videoPath: structureVideoPath,
-      treatment: structureVideoTreatment,
-      motionStrength: structureVideoMotionStrength,
-      structureType: structureVideoType
+
+  if (structureVideoConfig.structure_video_path) {
+    console.log('[Generation] Adding structure video to task (spreading snake_case params):', {
+      structure_video_path: structureVideoConfig.structure_video_path,
+      structure_video_treatment: structureVideoConfig.structure_video_treatment,
+      structure_video_motion_strength: structureVideoConfig.structure_video_motion_strength,
+      structure_video_type: structureVideoConfig.structure_video_type,
     });
-    requestBody.structure_video_path = structureVideoPath;
-    requestBody.structure_video_treatment = structureVideoTreatment;
-    requestBody.structure_video_motion_strength = structureVideoMotionStrength;
-    requestBody.structure_video_type = structureVideoType;
+    // Spread structure video API params directly (already snake_case)
+    requestBody.structure_video_path = structureVideoConfig.structure_video_path;
+    requestBody.structure_video_treatment = structureVideoConfig.structure_video_treatment;
+    requestBody.structure_video_motion_strength = structureVideoConfig.structure_video_motion_strength;
+    requestBody.structure_video_type = structureVideoConfig.structure_video_type;
   }
   
   // Debug logging for enhance_prompt parameter and enhanced_prompts array

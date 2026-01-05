@@ -61,6 +61,7 @@ export const tourSteps: Step[] = [
     content: 'Generated videos appear here. Each video "travels" between your keyframes.',
     title: 'Video Outputs',
     placement: 'right',
+    disableScrolling: true,
   },
   // Step 6: Timeline explanation
   {

@@ -330,13 +330,206 @@ try {
 }
 ```
 
+## API Param Best Practices
+
+### Single Source of Truth for API Params
+
+When adding new task parameters, follow these principles to minimize duplication:
+
+#### 1. Define API param interfaces in `src/shared/lib/tasks/`
+
+Create snake_case interfaces that match what the backend expects:
+
+```typescript
+// src/shared/lib/tasks/travelBetweenImages.ts
+
+/** Structure video parameters for VACE mode */
+export interface VideoStructureApiParams {
+  structure_video_path?: string | null;
+  structure_video_treatment?: 'adjust' | 'clip';
+  structure_video_motion_strength?: number;
+  structure_video_type?: 'flow' | 'canny' | 'depth';
+}
+
+/** Default values */
+export const DEFAULT_VIDEO_STRUCTURE_PARAMS: VideoStructureApiParams = {
+  structure_video_treatment: 'adjust',
+  structure_video_motion_strength: 1.0,
+  structure_video_type: 'flow',
+};
+```
+
+#### 2. Use `extends Partial<>` for task interfaces
+
+Compose task param interfaces from shared API param types:
+
+```typescript
+export interface TravelBetweenImagesTaskParams extends
+  Partial<VideoStructureApiParams>,
+  Partial<VideoMotionApiParams>,
+  Partial<VideoModelApiParams> {
+  // Required fields
+  project_id: string;
+  image_urls: string[];
+  base_prompts: string[];
+  // ... task-specific fields only
+}
+```
+
+#### 3. Use snake_case in UI state for API-bound fields
+
+For config objects that map directly to API params, use snake_case to eliminate conversion:
+
+```typescript
+// useStructureVideo.ts
+export interface StructureVideoConfig extends VideoStructureApiParams {
+  metadata?: VideoMetadata | null;  // UI-only field
+  resource_id?: string | null;      // UI-only field
+}
+
+// In generateVideoService.ts - just spread, no conversion needed
+if (structureVideoConfig.structure_video_path) {
+  requestBody.structure_video_path = structureVideoConfig.structure_video_path;
+  requestBody.structure_video_treatment = structureVideoConfig.structure_video_treatment;
+  // ...
+}
+```
+
+#### 4. Adding a new API param (checklist)
+
+| Step | Location | Example |
+|------|----------|---------|
+| 1. Add to API interface | `src/shared/lib/tasks/*.ts` | Add `new_param?: number` to `VideoStructureApiParams` |
+| 2. Add default (if needed) | Same file | Add to `DEFAULT_VIDEO_STRUCTURE_PARAMS` |
+| 3. Add to UI config | Hook file (e.g., `useStructureVideo.ts`) | TypeScript will enforce via `extends` |
+| 4. Done | - | Param flows through automatically |
+
+### Naming Conventions
+
+| Context | Convention | Example |
+|---------|------------|---------|
+| API params (to backend) | snake_case | `structure_video_path` |
+| React props (UI-only) | camelCase | `onStructureVideoChange` |
+| Config objects (API-bound) | snake_case fields | `structureVideoConfig.structure_video_path` |
+| Hook return values | camelCase wrapper | `structureVideoConfig` (contains snake_case fields) |
+
+---
+
+## Full Task Lifecycle
+
+Understanding how a task flows from creation to completion:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            TASK CREATION (this doc)                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  UI Component                                                               │
+│       │                                                                     │
+│       ▼                                                                     │
+│  Task Helper (src/shared/lib/tasks/*.ts)                                   │
+│       │  - Validates params                                                 │
+│       │  - Builds payload                                                   │
+│       ▼                                                                     │
+│  createTask() (src/shared/lib/taskCreation.ts)                             │
+│       │                                                                     │
+│       ▼                                                                     │
+│  create-task Edge Function (supabase/functions/create-task/)               │
+│       │  - Authenticates (JWT/PAT)                                         │
+│       │  - Inserts into `tasks` table with status='Pending'                │
+│       ▼                                                                     │
+│  DB Trigger: on_task_created                                               │
+│       │  - Looks up task_type in `task_types` table                        │
+│       │  - Sets run_type ('gpu' or 'api')                                  │
+└───────┴─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    TASK EXECUTION (see task_worker_lifecycle.md)            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Worker polls for tasks matching its run_type                              │
+│       │                                                                     │
+│       ▼                                                                     │
+│  Worker claims task (status → 'Processing')                                │
+│       │                                                                     │
+│       ▼                                                                     │
+│  Worker executes (GPU inference / API call)                                │
+│       │                                                                     │
+│       ▼                                                                     │
+│  Worker calls complete-task Edge Function                                  │
+│       │  - Updates status → 'Complete' or 'Failed'                         │
+│       │  - Creates generation records                                       │
+│       │  - Triggers realtime updates                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Relationships
+
+| This Doc | Related Doc | Connection |
+|----------|-------------|------------|
+| `createTask()` | `task_worker_lifecycle.md` | Tasks created here are picked up by workers |
+| `task_type` param | `task_types` table | Must match a row in `task_types` for worker routing |
+| Task `params` | Worker code | Workers read `params` to know what to execute |
+
+### The `task_type` ↔ `task_types` Contract
+
+When you call `createTask({ task_type: 'travel_orchestrator', ... })`:
+1. The `task_type` string is stored in the `tasks.task_type` column
+2. A DB trigger looks up this string in `task_types.name`
+3. The `run_type` from `task_types` determines which worker pool picks it up
+4. If no matching `task_types` row exists, defaults to `run_type='gpu'`
+
+**Important:** Always ensure your `task_type` string has a corresponding row in `task_types`.
+
+---
+
+## Task Types Table
+
+The `task_types` table defines all available task types and their metadata:
+
+```sql
+CREATE TABLE task_types (
+  id uuid PRIMARY KEY,
+  name text NOT NULL UNIQUE,          -- e.g., 'single_image', 'travel_orchestrator'
+  run_type text NOT NULL DEFAULT 'gpu', -- 'gpu' | 'api'
+  category text NOT NULL,             -- 'generation', 'processing', 'orchestration', 'utility'
+  display_name text NOT NULL,
+  description text,
+  base_cost_per_second decimal(10,6), -- Cost calculation
+  cost_factors jsonb DEFAULT '{}',    -- Flexible cost factors
+  is_active boolean DEFAULT true
+);
+```
+
+### Key Fields
+
+| Field | Purpose |
+|-------|---------|
+| `name` | Matches `tasks.task_type` - must be consistent |
+| `run_type` | `'gpu'` for local/cloud GPU workers, `'api'` for external API calls |
+| `category` | Groups tasks in UI: `generation`, `processing`, `orchestration`, `utility` |
+| `base_cost_per_second` | Used for credit calculation |
+
+### Adding a New Task Type
+
+```sql
+INSERT INTO task_types (name, run_type, category, display_name, description, base_cost_per_second)
+VALUES ('new_task_type', 'gpu', 'generation', 'New Task', 'Description here', 0.001)
+ON CONFLICT (name) DO UPDATE SET
+  display_name = EXCLUDED.display_name,
+  description = EXCLUDED.description;
+```
+
+---
+
 ## Summary
 
 The unified task creation system provides a robust, maintainable, and performant approach to task management. The travel between images migration demonstrates the pattern for future migrations, with significant benefits in code organization, performance, and developer experience.
 
 Key principles:
 - **Client-side parameter processing** for performance
-- **Shared utilities** for consistency  
+- **Shared utilities** for consistency
 - **Dual authentication** for compatibility
 - **Preserve all functionality** during migration
 - **Clean up old systems** after successful migration
+- **Snake_case API params** to eliminate conversion overhead
+- **Grouped config objects** to reduce places params need updating

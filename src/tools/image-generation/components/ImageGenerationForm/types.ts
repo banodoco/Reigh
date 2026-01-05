@@ -292,8 +292,10 @@ export interface HiresFixConfig {
   hires_steps: number;
   /** Denoising strength for hires pass (0-1) */
   hires_denoise: number;
-  /** Lightning LoRA strength (0-1) */
-  lightning_lora_strength: number;
+  /** Lightning LoRA strength for phase 1 (initial generation, 0-1) */
+  lightning_lora_strength_phase_1: number;
+  /** Lightning LoRA strength for phase 2 (hires/refinement pass, 0-1) */
+  lightning_lora_strength_phase_2: number;
   /** Per-LoRA phase strength overrides (UI structure, transforms to additional_loras) */
   phaseLoraStrengths: PhaseLoraStrength[];
 }
@@ -305,6 +307,7 @@ export const DEFAULT_HIRES_FIX_CONFIG: HiresFixConfig = {
   hires_scale: 1,
   hires_steps: 6,
   hires_denoise: 0.6,
-  lightning_lora_strength: 0.95,
+  lightning_lora_strength_phase_1: 0.95,
+  lightning_lora_strength_phase_2: 0,
   phaseLoraStrengths: [],
 };
