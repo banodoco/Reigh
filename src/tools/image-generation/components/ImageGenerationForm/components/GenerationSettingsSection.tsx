@@ -66,7 +66,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
   );
 
   return (
-    <CollapsibleSection title="Generation settings" headerAction={resetButton}>
+    <CollapsibleSection title="Advanced generation settings" headerAction={resetButton}>
       <div className="space-y-4">
         {/* Phase 1: Base Generation */}
         <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
@@ -87,7 +87,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
             />
             <SliderWithValue
               label="Lightning LoRA"
-              value={hiresFixConfig.lightning_lora_strength_phase_1 ?? 0.8}
+              value={hiresFixConfig.lightning_lora_strength_phase_1 ?? 0.9}
               onChange={(v) => updateField('lightning_lora_strength_phase_1', v)}
               min={0}
               max={1.0}
@@ -117,7 +117,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
             />
             <SliderWithValue
               label="Scale Multiplier"
-              value={hiresFixConfig.hires_scale ?? 1.3}
+              value={hiresFixConfig.hires_scale ?? 1.1}
               onChange={(v) => updateField('hires_scale', v)}
               min={1.0}
               max={4.0}
@@ -127,7 +127,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
             />
             <SliderWithValue
               label="Denoise"
-              value={hiresFixConfig.hires_denoise ?? 0.6}
+              value={hiresFixConfig.hires_denoise ?? 0.55}
               onChange={(v) => updateField('hires_denoise', v)}
               min={0.1}
               max={1.0}
@@ -137,7 +137,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
             />
             <SliderWithValue
               label="Lightning LoRA"
-              value={hiresFixConfig.lightning_lora_strength_phase_2 ?? 0.2}
+              value={hiresFixConfig.lightning_lora_strength_phase_2 ?? 0.5}
               onChange={(v) => updateField('lightning_lora_strength_phase_2', v)}
               min={0}
               max={1.0}
