@@ -20,11 +20,15 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/shared/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
-import { Info, X, Pencil, Trash2, Search } from 'lucide-react';
+import { Info, X, Pencil, Trash2, Search, Upload, Link } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { Slider } from "@/shared/components/ui/slider";
 import { supabase } from '@/integrations/supabase/client';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { useHuggingFaceToken } from '@/shared/hooks/useExternalApiKeys';
+import { useHuggingFaceUpload, LoraFiles } from '@/shared/hooks/useHuggingFaceUpload';
+import HuggingFaceTokenSetup from '@/shared/components/HuggingFaceTokenSetup';
+import { Progress } from '@/shared/components/ui/progress';
 
 // Model filter categories - broad matching
 type ModelFilterCategory = 'all' | 'qwen' | 'wan' | 'z-image';
@@ -64,7 +68,12 @@ function getSubFilterOptions(category: ModelFilterCategory): { value: string; la
     case 'wan':
       return [
         { value: 'all', label: 'All' },
-        { value: 'Wan 2.1 14b', label: 'Wan 2.1 14b' },
+        { value: 'Wan 2.1 T2V 14B', label: 'Wan 2.1 T2V 14B' },
+        { value: 'Wan 2.1 I2V 14B', label: 'Wan 2.1 I2V 14B' },
+        { value: 'Wan 2.1 1.3B', label: 'Wan 2.1 1.3B' },
+        { value: 'Wan 2.2 T2V', label: 'Wan 2.2 T2V' },
+        { value: 'Wan 2.2 I2V', label: 'Wan 2.2 I2V' },
+        { value: 'Wan 2.1 14b', label: 'Wan 2.1 (Legacy)' },
       ];
     case 'z-image':
       return [
@@ -780,6 +789,15 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
         low_noise_url: '',
     });
 
+    // Upload mode: 'url' = paste HuggingFace URL, 'file' = upload file to HuggingFace
+    const [uploadMode, setUploadMode] = useState<'url' | 'file'>('url');
+    // LoRA files: supports single-stage (single) and multi-stage (highNoise + lowNoise)
+    const [loraFiles, setLoraFiles] = useState<LoraFiles>({});
+
+    // HuggingFace token and upload hooks
+    const { hasToken: hasHfToken, isLoading: isLoadingHfToken } = useHuggingFaceToken();
+    const { uploadToHuggingFace, uploadProgress, resetProgress, isUploading } = useHuggingFaceUpload();
+
     // Check if current base_model supports multi-stage URLs (Wan 2.2 I2V and T2V)
     const supportsMultiStage = addForm.base_model === 'Wan 2.2 I2V' || addForm.base_model === 'Wan 2.2 T2V';
 
@@ -958,9 +976,27 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
 
         // Samples are optional - users may not have any to upload
 
-        // Validate URLs based on whether this is a multi-stage model
-        if (isMultiStageModel) {
-            // For Wan 2.2 multi-stage, require at least one URL (high or low noise)
+        // Determine which mode we're in
+        const isSingleStageFileMode = uploadMode === 'file' && !isMultiStageModel && !isEditMode;
+        const isMultiStageFileMode = uploadMode === 'file' && isMultiStageModel && !isEditMode;
+        const isMultiStageUrlMode = (uploadMode === 'url' || isEditMode) && isMultiStageModel;
+        const isSingleStageUrlMode = (uploadMode === 'url' || isEditMode) && !isMultiStageModel;
+
+        // Validate based on mode
+        if (isSingleStageFileMode) {
+            // Single-stage file upload mode: require a file
+            if (!loraFiles.single) {
+                toast.error("Please select a LoRA file to upload");
+                return;
+            }
+        } else if (isMultiStageFileMode) {
+            // Multi-stage file upload mode: require at least one file
+            if (!loraFiles.highNoise && !loraFiles.lowNoise) {
+                toast.error("Please select at least one LoRA file (High Noise or Low Noise)");
+                return;
+            }
+        } else if (isMultiStageUrlMode) {
+            // For Wan 2.2 multi-stage URL mode, require at least one URL (high or low noise)
             const hasHighNoise = addForm.high_noise_url.trim().length > 0;
             const hasLowNoise = addForm.low_noise_url.trim().length > 0;
 
@@ -984,8 +1020,8 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     return;
                 }
             }
-        } else {
-            // For other models, require the single huggingface_url
+        } else if (isSingleStageUrlMode) {
+            // URL mode: require a valid HuggingFace URL
             const urlValidation = validateHuggingFaceUrl(addForm.huggingface_url);
             if (!urlValidation.isValid) {
                 toast.error(`Invalid HuggingFace URL: ${urlValidation.message}`);
@@ -994,6 +1030,66 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
         }
 
         setIsSubmitting(true);
+
+        // If file upload mode, upload to HuggingFace first
+        let finalHuggingfaceUrl = addForm.huggingface_url;
+        let finalHighNoiseUrl = addForm.high_noise_url;
+        let finalLowNoiseUrl = addForm.low_noise_url;
+
+        if (isSingleStageFileMode && loraFiles.single) {
+            // Single-stage file upload
+            const uploadResult = await uploadToHuggingFace(
+                loraFiles,
+                {
+                    name: addForm.name,
+                    description: addForm.description,
+                    baseModel: addForm.base_model,
+                    triggerWord: addForm.trigger_word,
+                    creatorName: addForm.created_by_is_you ? (userName || 'You') : addForm.created_by_username,
+                },
+                sampleFiles.filter(f => f.type.startsWith('video/')), // Only upload videos to HF
+                {
+                    isPrivate: !addForm.is_public,
+                }
+            );
+
+            if (!uploadResult.success) {
+                toast.error(`Failed to upload to HuggingFace: ${uploadResult.error}`);
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Use the returned URL
+            finalHuggingfaceUrl = uploadResult.loraUrl!;
+            toast.success(`Uploaded to HuggingFace: ${uploadResult.repoUrl}`);
+        } else if (isMultiStageFileMode && (loraFiles.highNoise || loraFiles.lowNoise)) {
+            // Multi-stage file upload
+            const uploadResult = await uploadToHuggingFace(
+                loraFiles,
+                {
+                    name: addForm.name,
+                    description: addForm.description,
+                    baseModel: addForm.base_model,
+                    triggerWord: addForm.trigger_word,
+                    creatorName: addForm.created_by_is_you ? (userName || 'You') : addForm.created_by_username,
+                },
+                sampleFiles.filter(f => f.type.startsWith('video/')), // Only upload videos to HF
+                {
+                    isPrivate: !addForm.is_public,
+                }
+            );
+
+            if (!uploadResult.success) {
+                toast.error(`Failed to upload to HuggingFace: ${uploadResult.error}`);
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Use the returned URLs
+            if (uploadResult.highNoiseUrl) finalHighNoiseUrl = uploadResult.highNoiseUrl;
+            if (uploadResult.lowNoiseUrl) finalLowNoiseUrl = uploadResult.lowNoiseUrl;
+            toast.success(`Uploaded to HuggingFace: ${uploadResult.repoUrl}`);
+        }
         
         try {
             // Upload sample generations
@@ -1040,15 +1136,15 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
 
             // Generate unique filename - or use existing if editing
             const existingFilenames = getExistingFilenames();
-            const uniqueFilename = isEditMode 
-                ? (editingLora?.metadata["Model ID"] || editingLora?.metadata.filename || generateUniqueFilename(addForm.name, addForm.base_model, addForm.huggingface_url, existingFilenames))
-                : generateUniqueFilename(addForm.name, addForm.base_model, addForm.huggingface_url, existingFilenames);
+            const uniqueFilename = isEditMode
+                ? (editingLora?.metadata["Model ID"] || editingLora?.metadata.filename || generateUniqueFilename(addForm.name, addForm.base_model, finalHuggingfaceUrl, existingFilenames))
+                : generateUniqueFilename(addForm.name, addForm.base_model, finalHuggingfaceUrl, existingFilenames);
 
             // Determine the primary URL for Model Files
             // For multi-stage models, use high_noise_url if available, else low_noise_url
             const primaryUrl = isMultiStageModel
-                ? (addForm.high_noise_url.trim() || addForm.low_noise_url.trim())
-                : addForm.huggingface_url;
+                ? (finalHighNoiseUrl.trim() || finalLowNoiseUrl.trim())
+                : finalHuggingfaceUrl;
 
             // Create/Update the LoRA model
             const loraMetadata: LoraModel = {
@@ -1066,7 +1162,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     is_you: addForm.created_by_is_you,
                     username: addForm.created_by_is_you ? undefined : addForm.created_by_username,
                 },
-                huggingface_url: isMultiStageModel ? undefined : addForm.huggingface_url, // Only set for single-stage
+                huggingface_url: isMultiStageModel ? undefined : finalHuggingfaceUrl, // Only set for single-stage
                 filename: uniqueFilename,
                 base_model: addForm.base_model,
                 sample_generations: finalSamples,
@@ -1074,9 +1170,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 is_public: addForm.is_public,
                 "Last Modified": new Date().toISOString(),
                 trigger_word: addForm.trigger_word,
-                // Multi-stage LoRA fields (only set provided URLs)
-                ...(isMultiStageModel && addForm.high_noise_url.trim() ? { high_noise_url: addForm.high_noise_url.trim() } : {}),
-                ...(isMultiStageModel && addForm.low_noise_url.trim() ? { low_noise_url: addForm.low_noise_url.trim() } : {}),
+                // Multi-stage LoRA fields (only set provided URLs - use final URLs which may come from file upload)
+                ...(isMultiStageModel && finalHighNoiseUrl.trim() ? { high_noise_url: finalHighNoiseUrl.trim() } : {}),
+                ...(isMultiStageModel && finalLowNoiseUrl.trim() ? { low_noise_url: finalLowNoiseUrl.trim() } : {}),
             };
 
             if (isEditMode && editingLora) {
@@ -1104,6 +1200,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 low_noise_url: '',
             });
             setLoraMode('multi'); // Default to multi for Wan 2.2
+            setUploadMode('url'); // Reset to URL mode
+            setLoraFiles({}); // Clear any selected files
+            resetProgress(); // Reset upload progress
             setSampleFiles([]);
             setDeletedExistingSampleUrls([]);
             setMainGenerationIndex(0);
@@ -1246,114 +1345,414 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         </div>
                     </div>
 
-                    {/* URL field(s) - conditional based on whether model is multi-stage */}
-                    {isMultiStageModel ? (
-                        // Multi-stage mode: Show two URL fields for high_noise and low_noise
-                        <div className="space-y-3">
-                            <div className="space-y-1">
-                                <TooltipProvider>
-                                    <div className="flex items-center gap-2">
-                                        <Label htmlFor="lora-high-noise-url">High Noise LoRA URL: *</Label>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                                                  <Info className="h-4 w-4" />
-                                                </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-md">
-                                                <div className="text-xs space-y-1">
-                                                    <p><strong>High Noise LoRA:</strong> Applied during early generation phases (high noise levels).</p>
-                                                    <p>This is typically the <code>high_noise_model.safetensors</code> file.</p>
-                                                </div>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </TooltipProvider>
-                                <Input
-                                    id="lora-high-noise-url"
-                                    placeholder="https://huggingface.co/.../high_noise_model.safetensors"
-                                    value={addForm.high_noise_url}
-                                    onChange={e => handleFormChange('high_noise_url', e.target.value)}
-                                    className={!validateHuggingFaceUrl(addForm.high_noise_url).isValid && addForm.high_noise_url ? 'border-red-500' : ''}
-                                />
-                                {!validateHuggingFaceUrl(addForm.high_noise_url).isValid && addForm.high_noise_url && (
-                                    <p className="text-xs text-red-600">
-                                        ⚠️ {validateHuggingFaceUrl(addForm.high_noise_url).message}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="space-y-1">
-                                <TooltipProvider>
-                                    <div className="flex items-center gap-2">
-                                        <Label htmlFor="lora-low-noise-url">Low Noise LoRA URL: *</Label>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                                                  <Info className="h-4 w-4" />
-                                                </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-md">
-                                                <div className="text-xs space-y-1">
-                                                    <p><strong>Low Noise LoRA:</strong> Applied during the final generation phase (low noise level).</p>
-                                                    <p>This is typically the <code>low_noise_model.safetensors</code> file.</p>
-                                                </div>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </TooltipProvider>
-                                <Input
-                                    id="lora-low-noise-url"
-                                    placeholder="https://huggingface.co/.../low_noise_model.safetensors"
-                                    value={addForm.low_noise_url}
-                                    onChange={e => handleFormChange('low_noise_url', e.target.value)}
-                                    className={!validateHuggingFaceUrl(addForm.low_noise_url).isValid && addForm.low_noise_url ? 'border-red-500' : ''}
-                                />
-                                {!validateHuggingFaceUrl(addForm.low_noise_url).isValid && addForm.low_noise_url && (
-                                    <p className="text-xs text-red-600">
-                                        ⚠️ {validateHuggingFaceUrl(addForm.low_noise_url).message}
-                                    </p>
-                                )}
+                    {/* Upload Mode Toggle - show for non-edit mode */}
+                    {!isEditMode && (
+                        <div className="space-y-2">
+                            <Label>How do you want to add this LoRA?</Label>
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant={uploadMode === 'url' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => {
+                                        setUploadMode('url');
+                                        setLoraFiles({});
+                                        resetProgress();
+                                    }}
+                                    className="flex items-center gap-2"
+                                >
+                                    <Link className="h-4 w-4" />
+                                    Paste URL
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant={uploadMode === 'file' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => {
+                                        setUploadMode('file');
+                                        handleFormChange('huggingface_url', '');
+                                        handleFormChange('high_noise_url', '');
+                                        handleFormChange('low_noise_url', '');
+                                    }}
+                                    className="flex items-center gap-2"
+                                >
+                                    <Upload className="h-4 w-4" />
+                                    Upload File
+                                </Button>
                             </div>
                         </div>
-                    ) : (
-                        // Single-stage mode: Show single URL field
-                        <div className="space-y-1">
-                            <TooltipProvider>
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="lora-url">HuggingFace Direct Download URL: *</Label>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                                              <Info className="h-4 w-4" />
-                                            </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-md">
-                                            <div className="text-xs space-y-1">
-                                                <p><strong>How to get the correct URL:</strong></p>
-                                                <ol className="list-decimal list-inside space-y-1 pl-2">
-                                                    <li>Go to the HuggingFace model page</li>
-                                                    <li>Click on "Files" tab</li>
-                                                    <li>Find the .safetensors file you want</li>
-                                                    <li>Right-click the download button (⬇️) and copy link</li>
-                                                    <li>The URL should contain "/resolve/" and end with the filename</li>
-                                                </ol>
-                                            </div>
-                                        </TooltipContent>
-                                    </Tooltip>
+                    )}
+
+                    {/* URL field(s) - conditional based on upload mode */}
+                    {uploadMode === 'url' || isEditMode ? (
+                        isMultiStageModel ? (
+                            // Multi-stage mode: Show two URL fields for high_noise and low_noise
+                            <div className="space-y-3">
+                                <div className="space-y-1">
+                                    <TooltipProvider>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="lora-high-noise-url">High Noise LoRA URL: *</Label>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                                                      <Info className="h-4 w-4" />
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent className="max-w-md">
+                                                    <div className="text-xs space-y-1">
+                                                        <p><strong>High Noise LoRA:</strong> Applied during early generation phases (high noise levels).</p>
+                                                        <p>This is typically the <code>high_noise_model.safetensors</code> file.</p>
+                                                    </div>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                    </TooltipProvider>
+                                    <Input
+                                        id="lora-high-noise-url"
+                                        placeholder="https://huggingface.co/.../high_noise_model.safetensors"
+                                        value={addForm.high_noise_url}
+                                        onChange={e => handleFormChange('high_noise_url', e.target.value)}
+                                        className={!validateHuggingFaceUrl(addForm.high_noise_url).isValid && addForm.high_noise_url ? 'border-red-500' : ''}
+                                    />
+                                    {!validateHuggingFaceUrl(addForm.high_noise_url).isValid && addForm.high_noise_url && (
+                                        <p className="text-xs text-red-600">
+                                            ⚠️ {validateHuggingFaceUrl(addForm.high_noise_url).message}
+                                        </p>
+                                    )}
                                 </div>
-                            </TooltipProvider>
-                            <Input
-                                id="lora-url"
-                                placeholder="https://huggingface.co/username/model/resolve/main/filename.safetensors"
-                                value={addForm.huggingface_url}
-                                onChange={e => handleFormChange('huggingface_url', e.target.value)}
-                                className={!validateHuggingFaceUrl(addForm.huggingface_url).isValid && addForm.huggingface_url ? 'border-red-500' : ''}
-                            />
-                            {!validateHuggingFaceUrl(addForm.huggingface_url).isValid && addForm.huggingface_url && (
-                                <p className="text-xs text-red-600">
-                                    ⚠️ {validateHuggingFaceUrl(addForm.huggingface_url).message}
-                                </p>
+
+                                <div className="space-y-1">
+                                    <TooltipProvider>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="lora-low-noise-url">Low Noise LoRA URL: *</Label>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                                                      <Info className="h-4 w-4" />
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent className="max-w-md">
+                                                    <div className="text-xs space-y-1">
+                                                        <p><strong>Low Noise LoRA:</strong> Applied during the final generation phase (low noise level).</p>
+                                                        <p>This is typically the <code>low_noise_model.safetensors</code> file.</p>
+                                                    </div>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </div>
+                                    </TooltipProvider>
+                                    <Input
+                                        id="lora-low-noise-url"
+                                        placeholder="https://huggingface.co/.../low_noise_model.safetensors"
+                                        value={addForm.low_noise_url}
+                                        onChange={e => handleFormChange('low_noise_url', e.target.value)}
+                                        className={!validateHuggingFaceUrl(addForm.low_noise_url).isValid && addForm.low_noise_url ? 'border-red-500' : ''}
+                                    />
+                                    {!validateHuggingFaceUrl(addForm.low_noise_url).isValid && addForm.low_noise_url && (
+                                        <p className="text-xs text-red-600">
+                                            ⚠️ {validateHuggingFaceUrl(addForm.low_noise_url).message}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            // Single-stage mode: Show single URL field
+                            <div className="space-y-1">
+                                <TooltipProvider>
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="lora-url">HuggingFace Direct Download URL: *</Label>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                                                  <Info className="h-4 w-4" />
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-md">
+                                                <div className="text-xs space-y-1">
+                                                    <p><strong>How to get the correct URL:</strong></p>
+                                                    <ol className="list-decimal list-inside space-y-1 pl-2">
+                                                        <li>Go to the HuggingFace model page</li>
+                                                        <li>Click on "Files" tab</li>
+                                                        <li>Find the .safetensors file you want</li>
+                                                        <li>Right-click the download button (⬇️) and copy link</li>
+                                                        <li>The URL should contain "/resolve/" and end with the filename</li>
+                                                    </ol>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                </TooltipProvider>
+                                <Input
+                                    id="lora-url"
+                                    placeholder="https://huggingface.co/username/model/resolve/main/filename.safetensors"
+                                    value={addForm.huggingface_url}
+                                    onChange={e => handleFormChange('huggingface_url', e.target.value)}
+                                    className={!validateHuggingFaceUrl(addForm.huggingface_url).isValid && addForm.huggingface_url ? 'border-red-500' : ''}
+                                />
+                                {!validateHuggingFaceUrl(addForm.huggingface_url).isValid && addForm.huggingface_url && (
+                                    <p className="text-xs text-red-600">
+                                        ⚠️ {validateHuggingFaceUrl(addForm.huggingface_url).message}
+                                    </p>
+                                )}
+                            </div>
+                        )
+                    ) : (
+                        // File upload mode
+                        <div className="space-y-3">
+                            {isLoadingHfToken ? (
+                                <div className="flex items-center justify-center py-4">
+                                    <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
+                                </div>
+                            ) : !hasHfToken ? (
+                                // Show HuggingFace token setup
+                                <div className="border rounded-lg p-4 bg-muted/30">
+                                    <HuggingFaceTokenSetup
+                                        onSuccess={() => {
+                                            // Token saved, the hasHfToken will update automatically
+                                        }}
+                                    />
+                                </div>
+                            ) : isMultiStageModel ? (
+                                // Multi-stage file upload: Two file inputs for high_noise and low_noise
+                                <div className="space-y-4">
+                                    {/* High Noise File */}
+                                    <div className="space-y-2">
+                                        <TooltipProvider>
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="lora-high-noise-file">High Noise LoRA File:</Label>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                                                          <Info className="h-4 w-4" />
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-md">
+                                                        <div className="text-xs space-y-1">
+                                                            <p><strong>High Noise LoRA:</strong> Applied during early generation phases (high noise levels).</p>
+                                                            <p>This is typically the <code>high_noise_model.safetensors</code> file.</p>
+                                                        </div>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </div>
+                                        </TooltipProvider>
+                                        <div
+                                            className={`relative border-2 border-dashed rounded-lg p-3 transition-colors ${
+                                                loraFiles.highNoise
+                                                    ? 'border-green-500 bg-green-50 dark:bg-green-950/30'
+                                                    : 'border-muted-foreground/30 hover:border-muted-foreground/50'
+                                            }`}
+                                        >
+                                            <input
+                                                id="lora-high-noise-file"
+                                                type="file"
+                                                accept=".safetensors"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        setLoraFiles(prev => ({ ...prev, highNoise: file }));
+                                                    }
+                                                }}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                            <div className="flex items-center gap-3 pointer-events-none">
+                                                <Upload className="h-6 w-6 text-muted-foreground flex-shrink-0" />
+                                                <div className="text-sm flex-1 min-w-0">
+                                                    {loraFiles.highNoise ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-medium text-green-700 dark:text-green-300 truncate">{loraFiles.highNoise.name}</span>
+                                                            <span className="text-xs text-muted-foreground flex-shrink-0">
+                                                                ({(loraFiles.highNoise.size / 1024 / 1024).toFixed(1)} MB)
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">Select high noise .safetensors file</span>
+                                                    )}
+                                                </div>
+                                                {loraFiles.highNoise && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setLoraFiles(prev => ({ ...prev, highNoise: undefined }));
+                                                        }}
+                                                        className="pointer-events-auto h-6 w-6 p-0"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Low Noise File */}
+                                    <div className="space-y-2">
+                                        <TooltipProvider>
+                                            <div className="flex items-center gap-2">
+                                                <Label htmlFor="lora-low-noise-file">Low Noise LoRA File:</Label>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                                                          <Info className="h-4 w-4" />
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-md">
+                                                        <div className="text-xs space-y-1">
+                                                            <p><strong>Low Noise LoRA:</strong> Applied during the final generation phase (low noise level).</p>
+                                                            <p>This is typically the <code>low_noise_model.safetensors</code> file.</p>
+                                                        </div>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </div>
+                                        </TooltipProvider>
+                                        <div
+                                            className={`relative border-2 border-dashed rounded-lg p-3 transition-colors ${
+                                                loraFiles.lowNoise
+                                                    ? 'border-green-500 bg-green-50 dark:bg-green-950/30'
+                                                    : 'border-muted-foreground/30 hover:border-muted-foreground/50'
+                                            }`}
+                                        >
+                                            <input
+                                                id="lora-low-noise-file"
+                                                type="file"
+                                                accept=".safetensors"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        setLoraFiles(prev => ({ ...prev, lowNoise: file }));
+                                                    }
+                                                }}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                            <div className="flex items-center gap-3 pointer-events-none">
+                                                <Upload className="h-6 w-6 text-muted-foreground flex-shrink-0" />
+                                                <div className="text-sm flex-1 min-w-0">
+                                                    {loraFiles.lowNoise ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-medium text-green-700 dark:text-green-300 truncate">{loraFiles.lowNoise.name}</span>
+                                                            <span className="text-xs text-muted-foreground flex-shrink-0">
+                                                                ({(loraFiles.lowNoise.size / 1024 / 1024).toFixed(1)} MB)
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">Select low noise .safetensors file</span>
+                                                    )}
+                                                </div>
+                                                {loraFiles.lowNoise && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setLoraFiles(prev => ({ ...prev, lowNoise: undefined }));
+                                                        }}
+                                                        className="pointer-events-auto h-6 w-6 p-0"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Upload progress */}
+                                    {uploadProgress.stage !== 'idle' && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2 text-sm">
+                                                {uploadProgress.stage === 'error' ? (
+                                                    <span className="text-red-600">{uploadProgress.message}</span>
+                                                ) : uploadProgress.stage === 'complete' ? (
+                                                    <span className="text-green-600">{uploadProgress.message}</span>
+                                                ) : (
+                                                    <span className="text-muted-foreground">{uploadProgress.message}</span>
+                                                )}
+                                            </div>
+                                            {uploadProgress.progress !== undefined && uploadProgress.stage !== 'error' && uploadProgress.stage !== 'complete' && (
+                                                <Progress value={uploadProgress.progress} className="h-2" />
+                                            )}
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">
+                                        At least one file is required. Files will be uploaded to your HuggingFace account.
+                                    </p>
+                                </div>
+                            ) : (
+                                // Single-stage file upload: One file input
+                                <div className="space-y-2">
+                                    <Label htmlFor="lora-file-input">LoRA File (.safetensors): *</Label>
+                                    <div className="flex flex-col gap-2">
+                                        <div
+                                            className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${
+                                                loraFiles.single
+                                                    ? 'border-green-500 bg-green-50 dark:bg-green-950/30'
+                                                    : 'border-muted-foreground/30 hover:border-muted-foreground/50'
+                                            }`}
+                                        >
+                                            <input
+                                                id="lora-file-input"
+                                                type="file"
+                                                accept=".safetensors"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        setLoraFiles({ single: file });
+                                                    }
+                                                }}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                            <div className="flex flex-col items-center gap-2 text-center pointer-events-none">
+                                                <Upload className="h-8 w-8 text-muted-foreground" />
+                                                <div className="text-sm">
+                                                    {loraFiles.single ? (
+                                                        <span className="font-medium text-green-700 dark:text-green-300">{loraFiles.single.name}</span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            Drop or click to select a <code>.safetensors</code> file
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {loraFiles.single && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {(loraFiles.single.size / 1024 / 1024).toFixed(1)} MB
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {loraFiles.single && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setLoraFiles({})}
+                                                className="self-start"
+                                            >
+                                                <X className="h-4 w-4 mr-1" />
+                                                Clear file
+                                            </Button>
+                                        )}
+                                    </div>
+                                    {/* Upload progress */}
+                                    {uploadProgress.stage !== 'idle' && (
+                                        <div className="space-y-2 mt-2">
+                                            <div className="flex items-center gap-2 text-sm">
+                                                {uploadProgress.stage === 'error' ? (
+                                                    <span className="text-red-600">{uploadProgress.message}</span>
+                                                ) : uploadProgress.stage === 'complete' ? (
+                                                    <span className="text-green-600">{uploadProgress.message}</span>
+                                                ) : (
+                                                    <span className="text-muted-foreground">{uploadProgress.message}</span>
+                                                )}
+                                            </div>
+                                            {uploadProgress.progress !== undefined && uploadProgress.stage !== 'error' && uploadProgress.stage !== 'complete' && (
+                                                <Progress value={uploadProgress.progress} className="h-2" />
+                                            )}
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">
+                                        Your file will be uploaded to your HuggingFace account. The LoRA will be stored in a new repository.
+                                    </p>
+                                </div>
                             )}
                         </div>
                     )}
@@ -1548,19 +1947,29 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         onClick={handleAddLoraFromForm}
                         disabled={
                             isSubmitting ||
+                            isUploading ||
                             !addForm.name.trim() ||
-                            (isMultiStageModel
-                                ? // For multi-stage: at least one valid URL required
-                                  !(
-                                    (addForm.high_noise_url.trim() && validateHuggingFaceUrl(addForm.high_noise_url).isValid) ||
-                                    (addForm.low_noise_url.trim() && validateHuggingFaceUrl(addForm.low_noise_url).isValid)
-                                  )
-                                : !validateHuggingFaceUrl(addForm.huggingface_url).isValid)
+                            // Validation depends on mode
+                            (uploadMode === 'file' && !isEditMode
+                                ? // File upload mode: require file(s) and HF token
+                                  !hasHfToken || (isMultiStageModel
+                                    ? !(loraFiles.highNoise || loraFiles.lowNoise) // Multi-stage: at least one file
+                                    : !loraFiles.single) // Single-stage: require single file
+                                : isMultiStageModel
+                                    ? // Multi-stage URL mode: at least one valid URL required
+                                      !(
+                                        (addForm.high_noise_url.trim() && validateHuggingFaceUrl(addForm.high_noise_url).isValid) ||
+                                        (addForm.low_noise_url.trim() && validateHuggingFaceUrl(addForm.low_noise_url).isValid)
+                                      )
+                                    : // Single-stage URL mode: valid URL required
+                                      !validateHuggingFaceUrl(addForm.huggingface_url).isValid)
                         }
                     >
-                        {isSubmitting 
-                            ? (isEditMode ? 'Saving Changes...' : 'Adding LoRA...') 
-                            : (isEditMode ? 'Save Changes' : 'Add LoRA')
+                        {isUploading
+                            ? 'Uploading to HuggingFace...'
+                            : isSubmitting
+                                ? (isEditMode ? 'Saving Changes...' : 'Adding LoRA...')
+                                : (isEditMode ? 'Save Changes' : (uploadMode === 'file' && !isEditMode ? 'Upload & Add LoRA' : 'Add LoRA'))
                         }
                     </Button>
                 </ItemCardFooter>
