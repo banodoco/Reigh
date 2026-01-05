@@ -133,7 +133,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
               {hiresFixConfig.resolution_mode === 'custom' ? (
                 <AspectRatioSelector
                   value={hiresFixConfig.custom_aspect_ratio ?? '16:9'}
-                  onChange={(ratio) => updateField('custom_aspect_ratio', ratio)}
+                  onValueChange={(ratio) => updateField('custom_aspect_ratio', ratio)}
                   disabled={disabled}
                 />
               ) : projectAspectRatio && (
