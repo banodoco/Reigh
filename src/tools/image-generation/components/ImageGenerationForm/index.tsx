@@ -1247,6 +1247,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Helper to update prompt mode - routes to shot settings or local state
   const setEffectivePromptMode = useCallback((newMode: PromptMode) => {
+    console.log('[ImageGenerationForm] setEffectivePromptMode called:', {
+      newMode,
+      associatedShotId,
+      shotSettingsStatus: shotPromptSettings.status,
+      currentEffectiveMode: effectivePromptMode,
+    });
     if (associatedShotId) {
       shotPromptSettings.updateField('promptMode', newMode);
       markAsInteracted();
@@ -1254,7 +1260,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // usePersistentToolState auto-syncs promptMode to DB
       setPromptMode(newMode);
     }
-  }, [associatedShotId, shotPromptSettings, markAsInteracted]);
+  }, [associatedShotId, shotPromptSettings, markAsInteracted, effectivePromptMode]);
 
   // Get current selected reference ID - from shot settings if shot selected, otherwise project settings
   // Note: Unlike other fields, reference ID intentionally falls back to project value while loading
@@ -2504,6 +2510,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    console.log('[ImageGenerationForm] handleSubmit called:', {
+      effectivePromptMode,
+      promptsCount: prompts.length,
+      actionablePromptsCount,
+      masterPromptText: masterPromptText?.substring(0, 50),
+      isGenerating,
+      hasApiKey,
+      selectedProjectId,
+    });
 
     // Handle automated mode: generate prompts first, then images
     if (effectivePromptMode === 'automated') {
