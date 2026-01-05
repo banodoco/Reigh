@@ -2384,7 +2384,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return;
     }
 
-    const referenceParams: ReferenceApiParams = {
+    // Only include reference params for by-reference mode
+    const referenceParams: ReferenceApiParams = generationSource === 'by-reference' ? {
       style_reference_image: styleReferenceImageGeneration ?? undefined,
       style_reference_strength: currentStyleStrength,
       subject_strength: currentSubjectStrength,
@@ -2392,7 +2393,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       in_this_scene: currentInThisScene,
       in_this_scene_strength: currentInThisSceneStrength,
       reference_mode: referenceMode,
-    };
+    } : {};
 
     const batchTaskParams = buildBatchTaskParams({
       projectId: selectedProjectId!,
@@ -2457,7 +2458,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     console.log('[ImageGenerationForm] Use Existing Prompts: Using', activePrompts.length, 'existing prompts');
 
-    const referenceParams: ReferenceApiParams = {
+    // Only include reference params for by-reference mode
+    const referenceParams: ReferenceApiParams = generationSource === 'by-reference' ? {
       style_reference_image: styleReferenceImageGeneration ?? undefined,
       style_reference_strength: currentStyleStrength,
       subject_strength: currentSubjectStrength,
@@ -2465,7 +2467,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       in_this_scene: currentInThisScene,
       in_this_scene_strength: currentInThisSceneStrength,
       reference_mode: referenceMode,
-    };
+    } : {};
 
     const batchTaskParams = buildBatchTaskParams({
       projectId: selectedProjectId!,
@@ -2561,7 +2563,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       setPrompts(newPrompts);
 
       // Now generate images with these prompts
-      const referenceParams: ReferenceApiParams = {
+      // Only include reference params for by-reference mode
+      const referenceParams: ReferenceApiParams = generationSource === 'by-reference' ? {
         style_reference_image: styleReferenceImageGeneration ?? undefined,
         style_reference_strength: currentStyleStrength,
         subject_strength: currentSubjectStrength,
@@ -2569,7 +2572,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         in_this_scene: currentInThisScene,
         in_this_scene_strength: currentInThisSceneStrength,
         reference_mode: referenceMode,
-      };
+      } : {};
 
       const batchTaskParams = buildBatchTaskParams({
         projectId: selectedProjectId!,
@@ -2652,6 +2655,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const capturedPromptMultiplier = promptMultiplier;
       const capturedProjectId = selectedProjectId!;
       const capturedAssociatedShotId = associatedShotId;
+      const capturedGenerationSource = generationSource;
       const capturedStyleRef = styleReferenceImageGeneration;
       const capturedStyleStrength = currentStyleStrength;
       const capturedSubjectStrength = currentSubjectStrength;
@@ -2713,7 +2717,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           setPrompts(newPrompts);
 
           // Build batch task parameters
-          const referenceParams: ReferenceApiParams = {
+          // Only include reference params for by-reference mode
+          const referenceParams: ReferenceApiParams = capturedGenerationSource === 'by-reference' ? {
             style_reference_image: capturedStyleRef ?? undefined,
             style_reference_strength: capturedStyleStrength,
             subject_strength: capturedSubjectStrength,
@@ -2721,7 +2726,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             in_this_scene: capturedInThisScene,
             in_this_scene_strength: capturedInThisSceneStrength,
             reference_mode: capturedReferenceMode,
-          };
+          } : {};
 
           const batchTaskParams = buildBatchTaskParams({
             projectId: capturedProjectId,
@@ -2784,7 +2789,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
 
     // Build task params using helper
-    const referenceParams: ReferenceApiParams = {
+    // Only include reference params for by-reference mode
+    const referenceParams: ReferenceApiParams = generationSource === 'by-reference' ? {
       style_reference_image: styleReferenceImageGeneration ?? undefined,
       style_reference_strength: currentStyleStrength,
       subject_strength: currentSubjectStrength,
@@ -2792,7 +2798,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       in_this_scene: currentInThisScene,
       in_this_scene_strength: currentInThisSceneStrength,
       reference_mode: referenceMode,
-    };
+    } : {};
 
     const batchTaskParams = buildBatchTaskParams({
       projectId: selectedProjectId!,
