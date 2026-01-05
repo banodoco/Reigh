@@ -278,6 +278,9 @@ export interface PhaseLoraStrength {
   pass2Strength: number;
 }
 
+/** Resolution mode for image generation */
+export type ResolutionMode = 'project' | 'custom';
+
 /**
  * Configuration for two-pass hires fix image generation.
  * When enabled, generates at base resolution then upscales with refinement.
@@ -287,6 +290,12 @@ export interface PhaseLoraStrength {
 export interface HiresFixConfig {
   /** Whether hires fix is enabled (UI only) */
   enabled: boolean;
+  /** Resolution mode: 'project' uses project dimensions, 'custom' allows selecting aspect ratio */
+  resolution_mode: ResolutionMode;
+  /** Custom aspect ratio when resolution_mode is 'custom' (e.g., "16:9") */
+  custom_aspect_ratio?: string;
+  /** Scale factor for initial resolution vs base resolution (1.0-2.5x) */
+  resolution_scale: number;
   /** Number of inference steps for base pass (maps to `steps` in API) */
   base_steps: number;
   /** Upscale factor for hires pass (e.g., 2.0 = 2x resolution) */
@@ -306,6 +315,8 @@ export interface HiresFixConfig {
 /** Default hires fix configuration (used as fallback) */
 export const DEFAULT_HIRES_FIX_CONFIG: HiresFixConfig = {
   enabled: true,
+  resolution_mode: 'project',
+  resolution_scale: 1.5,
   base_steps: 8,
   hires_scale: 1.1,
   hires_steps: 8,
@@ -320,6 +331,8 @@ export const MODEL_HIRES_FIX_DEFAULTS: Record<string, HiresFixConfig> = {
   // Qwen Image - used for by-reference mode and just-text qwen-image
   'qwen-image': {
     enabled: true,
+    resolution_mode: 'project',
+    resolution_scale: 1.5,
     base_steps: 8,
     hires_scale: 1.1,
     hires_steps: 8,
@@ -331,6 +344,8 @@ export const MODEL_HIRES_FIX_DEFAULTS: Record<string, HiresFixConfig> = {
   // Qwen Image 2512 - higher resolution variant
   'qwen-image-2512': {
     enabled: true,
+    resolution_mode: 'project',
+    resolution_scale: 1.5,
     base_steps: 10,
     hires_scale: 1.0,
     hires_steps: 8,
@@ -342,6 +357,8 @@ export const MODEL_HIRES_FIX_DEFAULTS: Record<string, HiresFixConfig> = {
   // Z-Image model
   'z-image': {
     enabled: true,
+    resolution_mode: 'project',
+    resolution_scale: 1.5,
     base_steps: 12,
     hires_scale: 1.2,
     hires_steps: 10,

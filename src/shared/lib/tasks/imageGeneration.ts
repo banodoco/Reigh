@@ -6,6 +6,7 @@ import {
   TaskValidationError,
   BaseTaskParams,
 } from '../taskCreation';
+import { ASPECT_RATIO_TO_RESOLUTION } from '../aspectRatios';
 
 // ============================================================================
 // API Parameter Types (single source of truth)
@@ -151,6 +152,12 @@ export interface BatchImageGenerationTaskParams extends Partial<ReferenceApiPara
   loras?: Array<{ path: string; strength: number }>;
   shot_id?: string;
   resolution?: string;
+  /** User-configurable resolution scale multiplier (1.0-2.5x). If not provided, defaults to 1.5. */
+  resolution_scale?: number;
+  /** Resolution mode: 'project' uses project dimensions, 'custom' uses custom_aspect_ratio */
+  resolution_mode?: 'project' | 'custom';
+  /** Custom aspect ratio when resolution_mode is 'custom' (e.g., "16:9") */
+  custom_aspect_ratio?: string;
   model_name?: string;
   subject_reference_image?: string; // Can differ from style_reference_image
   steps?: number;
@@ -223,38 +230,86 @@ function validateBatchImageGenerationParams(params: BatchImageGenerationTaskPara
 // Removed buildImageGenerationPayload function - now storing all data at top level to avoid duplication
 
 /**
+ * Options for calculateTaskResolution
+ */
+export interface CalculateTaskResolutionOptions {
+  /** Project ID for resolution lookup */
+  projectId: string;
+  /** Optional explicit resolution override (bypasses all calculations) */
+  customResolution?: string;
+  /** Model name (determines if scaling is applied) */
+  modelName?: string;
+  /** User-configurable resolution scale multiplier (1.0-2.5x). Defaults to 1.5 for image models. */
+  resolution_scale?: number;
+  /** Resolution mode: 'project' uses project dimensions, 'custom' uses custom_aspect_ratio */
+  resolution_mode?: 'project' | 'custom';
+  /** Custom aspect ratio when resolution_mode is 'custom' (e.g., "16:9") */
+  custom_aspect_ratio?: string;
+}
+
+/**
  * Calculates the final resolution for image generation tasks
- * Applies 1.5x scaling for supported image generation models (qwen-image, qwen-image-2512, z-image)
- * @param projectId - Project ID for resolution lookup
- * @param customResolution - Optional custom resolution override
- * @param modelName - Model name (determines if scaling is applied)
+ * Applies user-configurable scaling for supported image generation models
+ * @param options - Resolution calculation options
  * @returns Promise resolving to the final resolution string
+ */
+export async function calculateTaskResolution(
+  options: CalculateTaskResolutionOptions
+): Promise<string>;
+
+/**
+ * @deprecated Use the options object form instead
  */
 export async function calculateTaskResolution(
   projectId: string,
   customResolution?: string,
   modelName?: string
+): Promise<string>;
+
+export async function calculateTaskResolution(
+  projectIdOrOptions: string | CalculateTaskResolutionOptions,
+  customResolution?: string,
+  modelName?: string
 ): Promise<string> {
-  // 1. If custom resolution is provided, use it as-is (assume it's already final)
-  if (customResolution?.trim()) {
-    console.log(`[calculateTaskResolution] Using provided custom resolution: ${customResolution}`);
-    return customResolution.trim();
+  // Handle both old and new API
+  const options: CalculateTaskResolutionOptions = typeof projectIdOrOptions === 'string'
+    ? { projectId: projectIdOrOptions, customResolution, modelName }
+    : projectIdOrOptions;
+
+  const { projectId, resolution_scale, resolution_mode, custom_aspect_ratio } = options;
+
+  // 1. If explicit custom resolution is provided, use it as-is (assumes it's already final)
+  if (options.customResolution?.trim()) {
+    console.log(`[calculateTaskResolution] Using provided custom resolution: ${options.customResolution}`);
+    return options.customResolution.trim();
   }
-  
-  // 2. Get base resolution from project
-  const { resolution: baseResolution } = await resolveProjectResolution(projectId);
-  
-  // 3. Apply 1.5x scaling for all image generation models (qwen-image, qwen-image-2512, z-image)
-  const isImageGenerationModel = modelName === 'qwen-image' || modelName === 'qwen-image-2512' || modelName === 'z-image';
+
+  // 2. Determine base resolution
+  let baseResolution: string;
+
+  if (resolution_mode === 'custom' && custom_aspect_ratio) {
+    // Use custom aspect ratio
+    baseResolution = ASPECT_RATIO_TO_RESOLUTION[custom_aspect_ratio] ?? '902x508';
+    console.log(`[calculateTaskResolution] Using custom aspect ratio ${custom_aspect_ratio} → ${baseResolution}`);
+  } else {
+    // Use project resolution
+    const { resolution } = await resolveProjectResolution(projectId);
+    baseResolution = resolution;
+    console.log(`[calculateTaskResolution] Using project resolution: ${baseResolution}`);
+  }
+
+  // 3. Apply scaling for image generation models
+  const isImageGenerationModel = options.modelName === 'qwen-image' || options.modelName === 'qwen-image-2512' || options.modelName === 'z-image';
   if (isImageGenerationModel) {
+    const scale = resolution_scale ?? 1.5; // Default to 1.5 if not specified
     const [width, height] = baseResolution.split('x').map(Number);
-    const scaledWidth = Math.round(width * 1.5);
-    const scaledHeight = Math.round(height * 1.5);
+    const scaledWidth = Math.round(width * scale);
+    const scaledHeight = Math.round(height * scale);
     const scaledResolution = `${scaledWidth}x${scaledHeight}`;
-    console.log(`[calculateTaskResolution] Scaling resolution from ${baseResolution} to ${scaledResolution} for ${modelName}`);
+    console.log(`[calculateTaskResolution] Scaling resolution from ${baseResolution} (×${scale}) to ${scaledResolution} for ${options.modelName}`);
     return scaledResolution;
   }
-  
+
   return baseResolution;
 }
 
@@ -419,11 +474,14 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
     validateBatchImageGenerationParams(params);
 
     // 2. Calculate final resolution once for all tasks (handles Qwen scaling automatically)
-    const finalResolution = await calculateTaskResolution(
-      params.project_id,
-      params.resolution,
-      params.model_name
-    );
+    const finalResolution = await calculateTaskResolution({
+      projectId: params.project_id,
+      customResolution: params.resolution,
+      modelName: params.model_name,
+      resolution_scale: params.resolution_scale,
+      resolution_mode: params.resolution_mode,
+      custom_aspect_ratio: params.custom_aspect_ratio,
+    });
 
     // 3. Generate individual task parameters for each image
     const taskParams = params.prompts.flatMap((promptEntry, promptIdx) => {

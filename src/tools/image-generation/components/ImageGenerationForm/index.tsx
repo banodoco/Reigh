@@ -23,6 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useShotNavigation } from "@/shared/hooks/useShotNavigation";
 import { BatchImageGenerationTaskParams } from "@/shared/lib/tasks/imageGeneration";
 import { processStyleReferenceForAspectRatioString } from "@/shared/lib/styleReferenceProcessor";
+import { ASPECT_RATIO_TO_RESOLUTION } from "@/shared/lib/aspectRatios";
 import { resolveProjectResolution } from "@/shared/lib/taskCreation";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
 import { generateClientThumbnail } from "@/shared/lib/clientThumbnailGenerator";
@@ -178,6 +179,10 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
       hires_denoise: input.hiresFixConfig.hires_denoise,
       lightning_lora_strength_phase_1: input.hiresFixConfig.lightning_lora_strength_phase_1,
       lightning_lora_strength_phase_2: input.hiresFixConfig.lightning_lora_strength_phase_2,
+      // Resolution scaling params
+      resolution_scale: input.hiresFixConfig.resolution_scale,
+      resolution_mode: input.hiresFixConfig.resolution_mode,
+      custom_aspect_ratio: input.hiresFixConfig.custom_aspect_ratio,
       // phaseLoraStrengths is UI structure, transform to API format
       additional_loras: Object.fromEntries(
         (input.hiresFixConfig.phaseLoraStrengths ?? []).map(lora => [
@@ -288,9 +293,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Associated shot for image generation
   const [associatedShotId, setAssociatedShotId] = useState<string | null>(null);
   
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
   const { addIncomingTask, removeIncomingTask } = useIncomingTasks();
+
+  // Derive project aspect ratio and resolution for GenerationSettingsSection
+  const { projectAspectRatio, projectResolution } = useMemo(() => {
+    const currentProject = projects.find(p => p.id === selectedProjectId);
+    const aspectRatio = currentProject?.aspectRatio ?? '16:9';
+    const resolution = ASPECT_RATIO_TO_RESOLUTION[aspectRatio] ?? '902x508';
+    return { projectAspectRatio: aspectRatio, projectResolution: resolution };
+  }, [projects, selectedProjectId]);
   
   // Access user's generation settings to detect local generation
   const {
@@ -2864,6 +2877,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             <GenerationSettingsSection
               hiresFixConfig={hiresFixConfig}
               onHiresFixConfigChange={setHiresFixConfig}
+              projectResolution={projectResolution}
+              projectAspectRatio={projectAspectRatio}
               disabled={isGenerating || !hasApiKey}
             />
           </div>
