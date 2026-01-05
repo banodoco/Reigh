@@ -172,17 +172,17 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
       in_this_scene_strength: input.referenceParams.in_this_scene_strength,
       reference_mode: input.referenceParams.reference_mode,
     }),
-    // Hires fix params - field names match API directly (no conversion needed)
+    // Resolution scaling params - always sent regardless of local generation mode
+    resolution_scale: input.hiresFixConfig.resolution_scale,
+    resolution_mode: input.hiresFixConfig.resolution_mode,
+    custom_aspect_ratio: input.hiresFixConfig.custom_aspect_ratio,
+    // Hires fix params - only for local generation
     ...(input.isLocalGenerationEnabled && {
       hires_scale: input.hiresFixConfig.hires_scale,
       hires_steps: input.hiresFixConfig.hires_steps,
       hires_denoise: input.hiresFixConfig.hires_denoise,
       lightning_lora_strength_phase_1: input.hiresFixConfig.lightning_lora_strength_phase_1,
       lightning_lora_strength_phase_2: input.hiresFixConfig.lightning_lora_strength_phase_2,
-      // Resolution scaling params
-      resolution_scale: input.hiresFixConfig.resolution_scale,
-      resolution_mode: input.hiresFixConfig.resolution_mode,
-      custom_aspect_ratio: input.hiresFixConfig.custom_aspect_ratio,
       // phaseLoraStrengths is UI structure, transform to API format
       additional_loras: Object.fromEntries(
         (input.hiresFixConfig.phaseLoraStrengths ?? []).map(lora => [
