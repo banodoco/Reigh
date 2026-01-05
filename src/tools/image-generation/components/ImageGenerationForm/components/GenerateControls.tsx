@@ -82,6 +82,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
 
       <Button
         type="submit"
+        form="image-generation-form"
         className="w-full max-w-md transition-none disabled:opacity-100 disabled:saturate-100 disabled:brightness-100"
         variant={justQueued ? "success" : "retro"}
         size="retro-default"

@@ -2772,7 +2772,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form id="image-generation-form" onSubmit={handleSubmit} className="space-y-6">
         {/* Main Content Layout */}
         <div className="flex gap-6 flex-col md:flex-row pb-4">
           {/* Left Column - Prompts and Shot Selector */}
