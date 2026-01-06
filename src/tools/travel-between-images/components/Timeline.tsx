@@ -165,6 +165,9 @@ export interface TimelineProps {
   onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
+  // Single image endpoint for setting video duration when there's only one image
+  singleImageEndFrame?: number;
+  onSingleImageEndFrameChange?: (endFrame: number) => void;
 }
 
 /**
@@ -220,7 +223,10 @@ const Timeline: React.FC<TimelineProps> = ({
   onShotChange,
   onAddToShot,
   onAddToShotWithoutPosition,
-  onCreateShot
+  onCreateShot,
+  // Single image duration props
+  singleImageEndFrame,
+  onSingleImageEndFrameChange,
 }) => {
   // [RefactorMetrics] Track render count for baseline measurements
   useRenderCount('Timeline');
@@ -896,6 +902,8 @@ const Timeline: React.FC<TimelineProps> = ({
         readOnly={readOnly}
         isUploadingImage={isUploadingImage}
         uploadProgress={uploadProgress}
+        singleImageEndFrame={singleImageEndFrame}
+        onSingleImageEndFrameChange={onSingleImageEndFrameChange}
       />
 
       {/* Lightbox */}

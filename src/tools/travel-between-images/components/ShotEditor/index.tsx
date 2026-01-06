@@ -1555,6 +1555,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onAddToShotWithoutPosition={handleAddToShotWithoutPosition}
             onCreateShot={handleCreateShot}
             onDragStateChange={handleDragStateChange}
+            // Single image duration - updates batchVideoFrames when endpoint is dragged
+            onSingleImageDurationChange={onBatchVideoFramesChange}
           />
         </div>
 

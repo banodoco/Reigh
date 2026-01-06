@@ -12,6 +12,7 @@ import TimelineRuler from './TimelineRuler';
 import DropIndicator from './DropIndicator';
 import PairRegion from './PairRegion';
 import TimelineItem from './TimelineItem';
+import SingleImageEndpoint, { SINGLE_IMAGE_ENDPOINT_ID } from './SingleImageEndpoint';
 import { GuidanceVideoStrip } from './GuidanceVideoStrip';
 import { GuidanceVideoUploader } from './GuidanceVideoUploader';
 import { AudioStrip } from './AudioStrip';
@@ -147,6 +148,9 @@ interface TimelineContainerProps {
   // Upload progress tracking
   isUploadingImage?: boolean;
   uploadProgress?: number;
+  // Single image endpoint for setting video duration
+  singleImageEndFrame?: number;
+  onSingleImageEndFrameChange?: (endFrame: number) => void;
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
@@ -186,7 +190,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   audioUrl,
   audioMetadata,
   onAudioChange,
-  hasNoImages = false
+  hasNoImages = false,
+  singleImageEndFrame,
+  onSingleImageEndFrameChange,
 }) => {
   // [ZoomDebug] Track component mounts to detect unwanted remounts
   const mountCountRef = useRef(0);
@@ -442,6 +448,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // Handle reset button click
   const handleReset = () => {
     onResetFrames(resetGap);
+    // Also update the single image endpoint if present
+    // When there's 1 image, the endpoint should be at resetGap frames from the image (which is at 0)
+    if (images.length === 1 && onSingleImageEndFrameChange) {
+      onSingleImageEndFrameChange(resetGap);
+    }
   };
   
   // Refs
@@ -464,34 +475,31 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // Only show tap-to-move on tablets (not phones or desktop)
   const enableTapToMove = isTablet && !readOnly;
 
+  // Track dimensions at drag start to prevent view jumping when reducing duration
+  const dragStartDimensionsRef = useRef<{ fullMin: number; fullMax: number; fullRange: number } | null>(null);
+  const isEndpointDraggingRef = useRef(false);
+
   // Calculate coordinate system using proper timeline dimensions
   // Include pending frames (drop, duplicate, external add) so the ruler updates immediately
-  const { fullMin, fullMax, fullRange } = getTimelineDimensions(
+  // Also include single image endpoint if present
+  const rawDimensions = getTimelineDimensions(
     framePositions,
-    [pendingDropFrame, pendingDuplicateFrame, pendingExternalAddFrame]
-  );
-  
-  // [PendingDebug] Log when pending frames affect timeline dimensions
-  if (pendingDropFrame !== null || pendingDuplicateFrame !== null || pendingExternalAddFrame !== null) {
-    console.log('[PendingDebug] 📏 Timeline dimensions with pending frames:', {
+    [
       pendingDropFrame,
       pendingDuplicateFrame,
       pendingExternalAddFrame,
-      fullMin,
-      fullMax,
-      fullRange,
-      framePositionsCount: framePositions.size,
-      timestamp: Date.now()
-    });
-  }
-
+      // Include endpoint for single-image case so timeline extends to show it
+      images.length === 1 && singleImageEndFrame !== undefined ? singleImageEndFrame : null
+    ]
+  );
+  
   // Get actual container dimensions for calculations
   const containerRect = containerRef.current?.getBoundingClientRect() || null;
   const baseContainerWidth = containerRef.current?.clientWidth || 1000;
   // Adjust container width for zoom level to match video strip calculations
   const containerWidth = baseContainerWidth;
 
-  // Drag hook
+  // Drag hook - uses raw dimensions for internal calculations
   const {
     dragState,
     dragOffset,
@@ -507,12 +515,58 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     setFramePositions,
     images,
     onImageReorder,
-    fullMin,
-    fullMax,
-    fullRange,
+    fullMin: rawDimensions.fullMin,
+    fullMax: rawDimensions.fullMax,
+    fullRange: rawDimensions.fullRange,
     containerRect,
     setIsDragInProgress,
   });
+
+  // Set/clear frozen dimensions when image drag starts/ends
+  // (Endpoint drags set this manually in their mouse handlers)
+  useEffect(() => {
+    if (dragState.isDragging && dragState.activeId && !dragStartDimensionsRef.current) {
+      // Image drag just started - capture current dimensions
+      dragStartDimensionsRef.current = {
+        fullMin: rawDimensions.fullMin,
+        fullMax: rawDimensions.fullMax,
+        fullRange: rawDimensions.fullRange,
+      };
+    } else if (!dragState.isDragging && !isEndpointDraggingRef.current && dragStartDimensionsRef.current) {
+      // Drag ended - clear frozen dimensions
+      dragStartDimensionsRef.current = null;
+    }
+  }, [dragState.isDragging, dragState.activeId, rawDimensions.fullMin, rawDimensions.fullMax, rawDimensions.fullRange]);
+
+  // Calculate frozen dimensions for rendering
+  // During drag, prevent the coordinate system from shrinking (only allow expansion)
+  // This prevents the view from jumping when reducing duration
+  const isDraggingAnything = dragState.isDragging || isEndpointDraggingRef.current;
+
+  let fullMin = rawDimensions.fullMin;
+  let fullMax = rawDimensions.fullMax;
+  let fullRange = rawDimensions.fullRange;
+
+  if (isDraggingAnything && dragStartDimensionsRef.current) {
+    // Use the larger of current or drag-start dimensions to prevent shrinking
+    fullMax = Math.max(rawDimensions.fullMax, dragStartDimensionsRef.current.fullMax);
+    fullMin = Math.min(rawDimensions.fullMin, dragStartDimensionsRef.current.fullMin);
+    fullRange = fullMax - fullMin;
+  }
+
+  // [PendingDebug] Log when pending frames affect timeline dimensions
+  if (pendingDropFrame !== null || pendingDuplicateFrame !== null || pendingExternalAddFrame !== null) {
+    console.log('[PendingDebug] 📏 Timeline dimensions with pending frames:', {
+      pendingDropFrame,
+      pendingDuplicateFrame,
+      pendingExternalAddFrame,
+      fullMin,
+      fullMax,
+      fullRange,
+      framePositionsCount: framePositions.size,
+      timestamp: Date.now()
+    });
+  }
 
   // Tap-to-move hook (for tablets only)
   // Uses the same position conflict logic as desktop drag
@@ -1452,25 +1506,83 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             );
           })}
 
-          {/* Single item vertical marker - ensures visual consistency when there's only one item */}
-          {images.length === 1 && currentPositions.size > 0 && (() => {
+          {/* Single image endpoint - draggable handle to set video duration when there's only one image */}
+          {images.length === 1 && currentPositions.size > 0 && onSingleImageEndFrameChange && (() => {
             const entry = [...currentPositions.entries()][0];
             if (!entry) return null;
-            
-            const [id, framePos] = entry;
-            // Use same calculation as getPixel
-            const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
-            const pixelPos = TIMELINE_PADDING_OFFSET + ((framePos - fullMin) / fullRange) * effectiveWidth;
-            const leftPercent = (pixelPos / containerWidth) * 100;
-            
-            // Use blue-300 to match the border of the first pair (PairRegion color scheme 0)
+
+            const [id, imageFrame] = entry;
+            // Default end frame to 49 frames from image (approximately 2 seconds at 24fps)
+            // Use provided singleImageEndFrame or calculate default
+            const defaultEndFrame = imageFrame + 49;
+            const effectiveEndFrame = singleImageEndFrame ?? defaultEndFrame;
+            const gapToImage = effectiveEndFrame - imageFrame;
+
+            // Check if endpoint is being dragged
+            const isEndpointDragging = dragState.isDragging && dragState.activeId === SINGLE_IMAGE_ENDPOINT_ID;
+
             return (
-              <div
-                className="absolute top-0 bottom-0 w-[2px] bg-blue-300 pointer-events-none z-5"
-                style={{
-                  left: `${leftPercent}%`,
-                  transform: 'translateX(-50%)',
+              <SingleImageEndpoint
+                framePosition={effectiveEndFrame}
+                imageFramePosition={imageFrame}
+                isDragging={isEndpointDragging}
+                dragOffset={isEndpointDragging ? dragOffset : null}
+                onMouseDown={readOnly ? undefined : (e, endpointId) => {
+                  // Custom drag handler for the endpoint
+                  // We'll track mouse movement and update the endpoint position
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  // Store dimensions at drag start to prevent view jumping when reducing
+                  dragStartDimensionsRef.current = { fullMin, fullMax, fullRange };
+                  isEndpointDraggingRef.current = true;
+
+                  const handleMouseMove = (moveEvent: MouseEvent) => {
+                    if (!containerRef.current) return;
+
+                    // Use the frozen dimensions during drag
+                    const frozenFullMin = dragStartDimensionsRef.current?.fullMin ?? fullMin;
+                    const frozenFullMax = dragStartDimensionsRef.current?.fullMax ?? fullMax;
+                    const frozenFullRange = dragStartDimensionsRef.current?.fullRange ?? fullRange;
+
+                    const containerRect = containerRef.current.getBoundingClientRect();
+                    const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+                    const relativeX = moveEvent.clientX - containerRect.left - TIMELINE_PADDING_OFFSET;
+
+                    // Calculate frame from pixel position using frozen dimensions
+                    let newFrame = frozenFullMin + (relativeX / effectiveWidth) * frozenFullRange;
+
+                    // Constrain: minimum 5 frames from image, maximum 81 frames
+                    const minFrame = imageFrame + 5;
+                    const maxFrame = imageFrame + 81;
+                    newFrame = Math.max(minFrame, Math.min(Math.round(newFrame), maxFrame));
+
+                    // Quantize to 4N+1 format (5, 9, 13, 17, 21, 25, ...)
+                    const gap = newFrame - imageFrame;
+                    const quantizedGap = Math.max(5, Math.round((gap - 1) / 4) * 4 + 1);
+                    const quantizedFrame = imageFrame + quantizedGap;
+
+                    onSingleImageEndFrameChange(Math.min(quantizedFrame, maxFrame));
+                  };
+
+                  const handleMouseUp = () => {
+                    // Clear the frozen dimensions on drag end
+                    dragStartDimensionsRef.current = null;
+                    isEndpointDraggingRef.current = false;
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                  };
+
+                  document.addEventListener('mousemove', handleMouseMove);
+                  document.addEventListener('mouseup', handleMouseUp);
                 }}
+                timelineWidth={containerWidth}
+                fullMinFrames={fullMin}
+                fullRange={fullRange}
+                currentDragFrame={isEndpointDragging ? currentDragFrame : null}
+                gapToImage={gapToImage}
+                maxAllowedGap={maxAllowedGap}
+                readOnly={readOnly}
               />
             );
           })()}

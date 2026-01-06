@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { GenerationRow } from "@/types/shots";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/card";
 import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
@@ -124,6 +124,8 @@ interface ShotImagesEditorProps {
   onCreateShot?: (name: string) => Promise<string>;
   /** Callback to notify parent of drag state changes - used to suppress query refetches during drag */
   onDragStateChange?: (isDragging: boolean) => void;
+  /** Callback when single-image duration changes (for single-image video generation) */
+  onSingleImageDurationChange?: (durationFrames: number) => void;
 }
 
 // Force TypeScript to re-evaluate this interface
@@ -185,10 +187,36 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onAddToShotWithoutPosition,
   onCreateShot,
   onDragStateChange,
+  onSingleImageDurationChange,
 }) => {
   // Track local drag state to suppress hook reloads during drag operations
   // This is forwarded via onDragStateChange but we also need it locally for useEnhancedShotPositions
   const [isDragInProgress, setIsDragInProgress] = useState(false);
+
+  // Single image endpoint state - stores the end frame for single-image duration control
+  // Initialized to batchVideoFrames when there's 1 image
+  const [singleImageEndFrame, setSingleImageEndFrame] = useState<number | undefined>(undefined);
+
+  // Handle single image end frame changes - notify parent which updates batchVideoFrames
+  const handleSingleImageEndFrameChange = useCallback((endFrame: number) => {
+    setSingleImageEndFrame(endFrame);
+    // The endFrame represents frames from 0 (where the single image typically sits)
+    // So endFrame IS the duration in frames
+    if (onSingleImageDurationChange) {
+      onSingleImageDurationChange(endFrame);
+    }
+  }, [onSingleImageDurationChange]);
+
+  // Initialize single image endpoint when switching to single-image mode
+  // Use batchVideoFrames as the default duration
+  useEffect(() => {
+    // This runs when image count or batchVideoFrames changes
+    // We only want to initialize if singleImageEndFrame is currently undefined
+    if (singleImageEndFrame === undefined) {
+      // Initialize with batchVideoFrames (image is typically at frame 0)
+      setSingleImageEndFrame(batchVideoFrames);
+    }
+  }, [batchVideoFrames]); // Only re-run when batchVideoFrames changes, not when singleImageEndFrame does
 
   // Wrapper to track drag state locally AND forward to parent
   const handleDragStateChange = useCallback((isDragging: boolean) => {
@@ -1010,6 +1038,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   const shotId = await onCreateShot(shotName);
                   return { shotId, shotName };
                 } : undefined}
+                // Single image duration endpoint
+                singleImageEndFrame={singleImageEndFrame}
+                onSingleImageEndFrameChange={handleSingleImageEndFrameChange}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}
