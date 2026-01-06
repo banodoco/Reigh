@@ -1596,7 +1596,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Handle style reference image upload
   const handleStyleReferenceUpload = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
-    
+
+    // GUARD: Don't add references while settings are loading
+    // If we proceed with stale/empty cache, we could overwrite existing references
+    if (isLoadingProjectSettings) {
+      console.warn('[RefSettings] ⚠️ Cannot upload reference while settings are loading');
+      toast.error('Please wait for settings to load');
+      return;
+    }
+
     const file = files[0];
     if (!file.type.startsWith('image/')) {
       // Silently ignore invalid file types (no toasts for style reference flows)
@@ -1746,31 +1754,39 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           const prevResources = prev || [];
           return [...prevResources, resource];
         });
-        
+
         // Update settings cache to select the new reference
+        // IMPORTANT: Use functional update with prev to avoid race conditions when
+        // multiple references are added quickly (each callback would otherwise use stale closure values)
         queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-          const next = { 
-            ...(prev || {}), 
-            references: [...referencePointers, newPointer],
+          const currentReferences = prev?.references || [];
+          const currentSelections = prev?.selectedReferenceIdByShot || {};
+
+          const next = {
+            ...(prev || {}),
+            references: [...currentReferences, newPointer],
             selectedReferenceIdByShot: {
-              ...selectedReferenceIdByShot,
+              ...currentSelections,
               [effectiveShotId]: newPointer.id
             }
           };
-          console.log('[RefSettings] ⚡ Applied optimistic cache update for new reference', { next });
+          console.log('[RefSettings] ⚡ Applied optimistic cache update for new reference', {
+            prevReferencesLength: currentReferences.length,
+            nextReferencesLength: next.references.length
+          });
           return next;
         });
       } catch (e) {
         console.warn('[RefSettings] Failed to set optimistic cache data', e);
       }
-      
+
+      // Read from cache after optimistic update to get current state (avoids race conditions)
+      const currentData = queryClient.getQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined]) as any;
+
       // Add the new pointer and select it for the current shot
       await updateProjectImageSettings('project', {
-        references: [...referencePointers, newPointer],
-        selectedReferenceIdByShot: {
-          ...selectedReferenceIdByShot,
-          [effectiveShotId]: newPointer.id
-        }
+        references: currentData?.references || [],
+        selectedReferenceIdByShot: currentData?.selectedReferenceIdByShot || {}
       });
       
       // Don't invalidate immediately - let optimistic updates do their job
@@ -1795,10 +1811,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } finally {
       setIsUploadingStyleReference(false);
     }
-  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, selectedProjectId, hydratedReferences, queryClient, createStyleReference, referencePointers]);
+  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, selectedProjectId, hydratedReferences, queryClient, createStyleReference, referencePointers, isLoadingProjectSettings]);
 
   // Handle selecting an existing resource from the browser (no upload needed)
   const handleResourceSelect = useCallback(async (resource: Resource) => {
+    // GUARD: Don't add references while settings are loading
+    // If we proceed with stale/empty cache, we could overwrite existing references
+    if (isLoadingProjectSettings) {
+      console.warn('[RefBrowser] ⚠️ Cannot add reference while settings are loading');
+      toast.error('Please wait for settings to load');
+      return;
+    }
+
     try {
       // Check if we already have this resource linked
       const existingPointer = referencePointers.find(ptr => ptr.resourceId === resource.id);
@@ -1922,7 +1946,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.error('[RefBrowser] ❌ Failed to link resource:', error);
       toast.error('Failed to add reference');
     }
-  }, [effectiveShotId, updateProjectImageSettings, queryClient, selectedProjectId, markAsInteracted, referencePointers, selectedReferenceIdByShot, referenceMode, styleReferenceStrength, subjectStrength, inThisScene, inThisSceneStrength]);
+  }, [effectiveShotId, updateProjectImageSettings, queryClient, selectedProjectId, markAsInteracted, referencePointers, selectedReferenceIdByShot, referenceMode, styleReferenceStrength, subjectStrength, inThisScene, inThisSceneStrength, isLoadingProjectSettings]);
 
   // Handle selecting a reference for the current shot
   const handleSelectReference = useCallback(async (referenceId: string) => {
