@@ -2234,8 +2234,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       updates.inThisScene = false;
       updates.inThisSceneStrength = 0;
     } else if (mode === 'subject') {
-      updates.styleReferenceStrength = 1.1;
-      updates.subjectStrength = 0.4;
+      // Different defaults for local vs cloud generation
+      if (isLocalGenerationEnabled) {
+        updates.styleReferenceStrength = 0.70;
+        updates.subjectStrength = 1.10;
+      } else {
+        updates.styleReferenceStrength = 1.1;
+        updates.subjectStrength = 0.4;
+      }
       updates.inThisScene = false;
       updates.inThisSceneStrength = 0;
     } else if (mode === 'scene') {
@@ -2284,7 +2290,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     // Single batched update to avoid race conditions
     console.log('[RefModeDebug] Calling handleUpdateReference with:', { referenceId: selectedReferenceId, updates });
     await handleUpdateReference(selectedReferenceId, updates);
-  }, [selectedReferenceId, handleUpdateReference, styleReferenceStrength, subjectStrength]);
+  }, [selectedReferenceId, handleUpdateReference, styleReferenceStrength, subjectStrength, isLocalGenerationEnabled]);
 
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {
     markAsInteracted();

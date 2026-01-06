@@ -214,6 +214,20 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     }
   }, [settingsLoading]);
 
+  // SYNC FIX: When no preset is selected (custom config), ensure we're in advanced mode
+  // This fixes the inconsistent state where "Custom" shows highlighted but we're in basic mode
+  useEffect(() => {
+    // Skip if settings are still loading
+    if (settingsLoading) return;
+
+    // If no preset is selected AND we're in basic mode, switch to advanced
+    // This is an inconsistent state that can occur when loading saved settings
+    if (!selectedPhasePresetId && motionMode === 'basic' && phaseConfig?.phases?.length) {
+      console.log('[MotionControl] SYNC FIX: Custom config detected in basic mode, switching to advanced');
+      onMotionModeChange('advanced');
+    }
+  }, [settingsLoading, selectedPhasePresetId, motionMode, phaseConfig?.phases?.length, onMotionModeChange]);
+
   // Auto-select the built-in default preset when:
   // 1. Initial mount with no preset selected AND user is in basic mode
   // 2. Structure video changes (switch to appropriate default) - only in basic mode
