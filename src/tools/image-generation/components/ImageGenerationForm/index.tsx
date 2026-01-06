@@ -2245,10 +2245,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       updates.inThisScene = false;
       updates.inThisSceneStrength = 0;
     } else if (mode === 'scene') {
-      updates.styleReferenceStrength = 1.1;
-      updates.subjectStrength = 0;
+      // Different defaults for local vs cloud generation
+      if (isLocalGenerationEnabled) {
+        updates.styleReferenceStrength = 0.60;
+        updates.subjectStrength = 0;
+        updates.inThisSceneStrength = 1.20;
+      } else {
+        updates.styleReferenceStrength = 1.1;
+        updates.subjectStrength = 0;
+        updates.inThisSceneStrength = 0.4;
+      }
       updates.inThisScene = true;
-      updates.inThisSceneStrength = 0.4;
     } else if (mode === 'custom') {
       // Ensure we have valid starting values if coming from a mode with low strength (like scene)
       const currentTotal = styleReferenceStrength + subjectStrength;
