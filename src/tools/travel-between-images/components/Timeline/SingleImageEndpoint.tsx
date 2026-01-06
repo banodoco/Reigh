@@ -167,25 +167,6 @@ const SingleImageEndpoint: React.FC<SingleImageEndpointProps> = ({
           <GripVertical className="h-4 w-4 text-white" />
         </div>
 
-        {/* Drag feedback (shown on hover or drag) */}
-        {(isHovered || isDragging) && (
-          <div
-            className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap
-              px-2 py-1 rounded text-xs font-medium shadow-md z-20
-              ${isOverMaxGap
-                ? 'bg-red-500 text-white'
-                : 'bg-card dark:bg-gray-800 text-foreground border border-border'
-              }
-            `}
-            style={{
-              top: '-32px',
-            }}
-          >
-            {framesToSeconds(displayGap)}
-            {isOverMaxGap && ' (max!)'}
-          </div>
-        )}
-
         {/* "End" label below the handle */}
         <div
           className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap
