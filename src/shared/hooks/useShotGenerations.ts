@@ -339,13 +339,17 @@ export const useTimelineShotGenerations = (
 // ============================================================================
 
 /**
- * Selector: Timeline images (positioned, non-video)
- * 
+ * Selector: Timeline images (positioned, non-video, with valid location)
+ *
  * Returns images that should appear on the timeline:
  * - Has valid timeline_frame (not null, >= 0)
  * - Is not a video generation
+ * - Has valid location (not null, not placeholder)
  * - Sorted by timeline_frame ascending
- * 
+ *
+ * CRITICAL: Location filtering ensures UI counts match task creation counts
+ * (see generateVideoService.ts for the same filtering logic)
+ *
  * @param shotId - The shot ID to get timeline images for
  * @returns Query result with filtered GenerationRow[] data
  */
@@ -353,18 +357,21 @@ export const useTimelineImages = (
   shotId: string | null
 ): UseQueryResult<GenerationRow[]> => {
   const baseQuery = useAllShotGenerations(shotId);
-  
+
   const filtered = React.useMemo(() => {
     if (!baseQuery.data) return undefined;
-    
+
     const result = baseQuery.data
-      .filter(g => 
-        g.timeline_frame != null && 
-        g.timeline_frame >= 0 && 
-        !g.type?.includes('video')
-      )
+      .filter(g => {
+        const location = g.imageUrl || g.location;
+        const hasValidLocation = location && location !== '/placeholder.svg';
+        return g.timeline_frame != null &&
+               g.timeline_frame >= 0 &&
+               !g.type?.includes('video') &&
+               hasValidLocation;
+      })
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
-    
+
     // [SelectorDebug] THE GOD LOG - See exactly what's inside the data
     if (baseQuery.data.length > 0) {
       console.log('[SelectorDebug] RAW DATA SAMPLE (First Item):', {
@@ -372,15 +379,18 @@ export const useTimelineImages = (
         id: baseQuery.data[0]?.id,
         timeline_frame: baseQuery.data[0]?.timeline_frame,
         type: baseQuery.data[0]?.type,
+        location: baseQuery.data[0]?.imageUrl || baseQuery.data[0]?.location,
         keys: Object.keys(baseQuery.data[0]),
         isFilteredOut: result.length === 0 || !result.some(r => r.id === baseQuery.data[0].id)
       });
     }
 
     // [SelectorDebug] Log filtering results with WHY items were filtered
-    const filtered = baseQuery.data.filter(g => 
-      g.timeline_frame == null || g.timeline_frame < 0 || g.type?.includes('video')
-    );
+    const filteredOut = baseQuery.data.filter(g => {
+      const location = g.imageUrl || g.location;
+      const hasValidLocation = location && location !== '/placeholder.svg';
+      return g.timeline_frame == null || g.timeline_frame < 0 || g.type?.includes('video') || !hasValidLocation;
+    });
     console.log('[SelectorDebug] useTimelineImages filtered:', {
       shotId: shotId?.substring(0, 8),
       inputCount: baseQuery.data.length,
@@ -388,29 +398,31 @@ export const useTimelineImages = (
       outputIds: result.slice(0, 5).map(r => r.id?.substring(0, 8)),
       frames: result.slice(0, 5).map(r => r.timeline_frame),
       // Show WHY items were filtered out
-      filteredOutCount: filtered.length,
-      filteredOutReasons: filtered.slice(0, 5).map(g => ({
+      filteredOutCount: filteredOut.length,
+      filteredOutReasons: filteredOut.slice(0, 5).map(g => ({
         id: g.id?.substring(0, 8),
         timeline_frame: g.timeline_frame,
         isNull: g.timeline_frame == null,
         isNegative: g.timeline_frame != null && g.timeline_frame < 0,
         isVideo: g.type?.includes('video'),
+        hasNoLocation: !(g.imageUrl || g.location) || (g.imageUrl || g.location) === '/placeholder.svg',
       })),
     });
-    
+
     return result;
   }, [baseQuery.data, shotId]);
-  
+
   return { ...baseQuery, data: filtered } as UseQueryResult<GenerationRow[]>;
 };
 
 /**
- * Selector: Unpositioned images (no timeline_frame, non-video)
- * 
+ * Selector: Unpositioned images (no timeline_frame, non-video, with valid location)
+ *
  * Returns images that are in the shot but not positioned on timeline:
  * - Has null timeline_frame
  * - Is not a video generation
- * 
+ * - Has valid location (not null, not placeholder)
+ *
  * @param shotId - The shot ID to get unpositioned images for
  * @returns Query result with filtered GenerationRow[] data
  */
@@ -418,16 +430,19 @@ export const useUnpositionedImages = (
   shotId: string | null
 ): UseQueryResult<GenerationRow[]> => {
   const baseQuery = useAllShotGenerations(shotId);
-  
+
   const filtered = React.useMemo(() => {
     if (!baseQuery.data) return undefined;
-    
-    return baseQuery.data.filter(g => 
-      g.timeline_frame == null && 
-      !g.type?.includes('video')
-    );
+
+    return baseQuery.data.filter(g => {
+      const location = g.imageUrl || g.location;
+      const hasValidLocation = location && location !== '/placeholder.svg';
+      return g.timeline_frame == null &&
+             !g.type?.includes('video') &&
+             hasValidLocation;
+    });
   }, [baseQuery.data]);
-  
+
   return { ...baseQuery, data: filtered } as UseQueryResult<GenerationRow[]>;
 };
 

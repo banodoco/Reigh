@@ -110,10 +110,15 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       if (fetchError) throw fetchError;
 
       // Convert database data to ShotGeneration format and set state
-      // CRITICAL: Filter out videos at the source level to prevent them from appearing anywhere
+      // CRITICAL: Filter out videos AND items without valid locations at the source level
+      // This ensures UI counts match task creation counts (see generateVideoService.ts)
       // Uses canonical isVideoShotGeneration from typeGuards
       const shotGenerationsData = (data || [])
-        .filter(sg => sg.generation && !isVideoShotGeneration(sg as ShotGenerationLike))
+        .filter(sg => {
+          const gen = sg.generation as any;
+          const hasValidLocation = gen?.location && gen.location !== '/placeholder.svg';
+          return sg.generation && !isVideoShotGeneration(sg as ShotGenerationLike) && hasValidLocation;
+        })
         .map(sg => ({
           id: sg.id,
           shot_id: sg.shot_id,
