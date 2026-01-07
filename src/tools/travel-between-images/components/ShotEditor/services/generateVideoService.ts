@@ -466,19 +466,25 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         })));
         
         // Build sorted positions from timeline_frame data
-        // CRITICAL: Filter out videos to match absoluteImageUrls filtering
-        // MUST match the UI filtering logic exactly (only filter videos, NOT timeline_frame)
+        // CRITICAL: Filter to match absoluteImageUrls filtering EXACTLY
+        // Must filter by: has generations join, not video, valid timeline_frame, AND valid location
+        // This ensures sortedPositions.length matches absoluteImageUrls.length
         // Uses canonical isVideoShotGenerations from typeGuards
-        const filteredShotGenerations = shotGenerationsData.filter(sg => 
-          sg.generations && !isVideoShotGenerations(sg as ShotGenerationsLike)
-        );
+        const filteredShotGenerations = shotGenerationsData.filter(sg => {
+          const gen = sg.generations as any;
+          const hasValidLocation = gen?.location && gen.location !== '/placeholder.svg';
+          return sg.generations &&
+                 !isVideoShotGenerations(sg as ShotGenerationsLike) &&
+                 hasValidLocation;
+        });
 
-        console.log('[BasePromptsDebug] After filtering out videos:', filteredShotGenerations.length);
+        console.log('[BasePromptsDebug] After filtering out videos and invalid locations:', filteredShotGenerations.length);
         console.log('[BasePromptsDebug] Filtered records:', filteredShotGenerations.map((sg, i) => ({
           index: i,
           id: sg.id?.substring(0, 8),
           timeline_frame: sg.timeline_frame,
-          has_metadata: !!sg.metadata
+          has_metadata: !!sg.metadata,
+          location: (sg.generations as any)?.location?.substring(0, 30)
         })));
 
         // Build sorted positions ONLY from items with valid timeline_frame
@@ -672,18 +678,24 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       } else if (shotGenerationsData) {
         console.log('[BasePromptsDebug] ✅ Query returned data');
         console.log('[BasePromptsDebug] Total records from DB:', shotGenerationsData.length);
-        
-        // Filter to get only images (same logic as timeline mode)
+
+        // Filter to get only images with valid locations (same logic as timeline mode)
+        // CRITICAL: Must match absoluteImageUrls filtering to ensure array lengths match
         // Uses canonical isVideoShotGenerations from typeGuards
-        const filteredShotGenerations = shotGenerationsData.filter(sg => 
-          sg.generations && !isVideoShotGenerations(sg as ShotGenerationsLike)
-        );
-        
-        console.log('[BasePromptsDebug] After filtering out videos:', filteredShotGenerations.length);
+        const filteredShotGenerations = shotGenerationsData.filter(sg => {
+          const gen = sg.generations as any;
+          const hasValidLocation = gen?.location && gen.location !== '/placeholder.svg';
+          return sg.generations &&
+                 !isVideoShotGenerations(sg as ShotGenerationsLike) &&
+                 hasValidLocation;
+        });
+
+        console.log('[BasePromptsDebug] After filtering out videos and invalid locations:', filteredShotGenerations.length);
         console.log('[BasePromptsDebug] Filtered records:', filteredShotGenerations.map((sg, i) => ({
           index: i,
           id: sg.id?.substring(0, 8),
-          has_metadata: !!sg.metadata
+          has_metadata: !!sg.metadata,
+          location: (sg.generations as any)?.location?.substring(0, 30)
         })));
         
         // BATCH MODE: Extract pair prompts for ALL pairs (not just first)
