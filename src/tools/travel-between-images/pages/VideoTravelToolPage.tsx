@@ -308,6 +308,7 @@ const VideoTravelToolPage: React.FC = () => {
     handleBlurSave,
     handleEnhancePromptChange,
     handleTurboModeChange,
+    handleSmoothContinuationsChange,
     handleAmountOfMotionChange,
     handleMotionModeChange,
     handleGenerationTypeModeChange,
@@ -559,6 +560,7 @@ const VideoTravelToolPage: React.FC = () => {
     advancedMode = false,
     motionMode = 'basic',
     generationTypeMode = 'i2v', // I2V by default, switches to VACE when structure video is added
+    smoothContinuations = false, // SVI for smoother transitions
     phaseConfig,
     selectedPhasePresetId,
     pairConfigs = [],
@@ -1714,6 +1716,8 @@ const VideoTravelToolPage: React.FC = () => {
               onEnhancePromptChange={handleEnhancePromptChange}
               turboMode={turboMode}
               onTurboModeChange={handleTurboModeChange}
+              smoothContinuations={smoothContinuations}
+              onSmoothContinuationsChange={handleSmoothContinuationsChange}
               amountOfMotion={amountOfMotion}
               onAmountOfMotionChange={handleAmountOfMotionChange}
               motionMode={motionMode}

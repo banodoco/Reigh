@@ -2,9 +2,10 @@ import { log } from "@/shared/lib/logger";
 import { quantizeGap, isValidFrameCount } from "./time-utils";
 
 // Calculate max gap based on context frames
-// Formula: max_segments = 81 - (context_frames * 2)
-export const calculateMaxGap = (contextFrames: number = 0): number => {
-  return Math.max(1, 81 - (contextFrames * 2));
+// Formula: max_segments = baseMax - (context_frames * 2)
+// baseMax is 77 when smooth continuations is enabled, 81 otherwise
+export const calculateMaxGap = (contextFrames: number = 0, baseMax: number = 81): number => {
+  return Math.max(1, baseMax - (contextFrames * 2));
 };
 
 // Minimum gap between frames (4N+1 format, starting at 5)

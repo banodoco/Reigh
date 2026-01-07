@@ -56,6 +56,9 @@ interface BatchSettingsFormProps {
   // Turbo mode props
   turboMode: boolean;
   onTurboModeChange: (value: boolean) => void;
+
+  // Smooth continuations - affects max frame count
+  smoothContinuations?: boolean;
   
   // Image count for conditional UI
   imageCount?: number;
@@ -122,6 +125,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onRandomSeedChange,
   turboMode,
   onTurboModeChange,
+  smoothContinuations,
   imageCount = 0,
   amountOfMotion,
   onAmountOfMotionChange,
@@ -464,7 +468,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               <Slider
                 id="batchVideoFrames"
                 min={9}
-                max={81} 
+                max={smoothContinuations ? 77 : 81}
                 step={4}
                 value={[quantizeFrameCount(batchVideoFrames, 9)]}
                 onValueChange={(value) => onBatchVideoFramesChange(quantizeFrameCount(value[0], 9))}

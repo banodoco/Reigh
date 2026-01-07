@@ -55,6 +55,7 @@ export interface VideoTravelSettingsHandlers {
   // Generation settings
   handleEnhancePromptChange: (enhance: boolean) => void;
   handleTurboModeChange: (turbo: boolean) => void;
+  handleSmoothContinuationsChange: (smooth: boolean) => void;
   
   // Motion settings
   handleAmountOfMotionChange: (motion: number) => void;
@@ -171,6 +172,18 @@ export const useVideoTravelSettingsHandlers = ({
       });
     } else {
       shotSettingsRef.current.updateField('turboMode', turbo);
+    }
+  }, [shotSettingsRef]);
+
+  const handleSmoothContinuationsChange = useCallback((smooth: boolean) => {
+    shotSettingsRef.current.updateField('smoothContinuations', smooth);
+
+    // When enabling smooth continuations, clamp batchVideoFrames to 77 if it exceeds the new limit
+    if (smooth) {
+      const currentFrames = shotSettingsRef.current.settings?.batchVideoFrames;
+      if (currentFrames && currentFrames > 77) {
+        shotSettingsRef.current.updateField('batchVideoFrames', 77);
+      }
     }
   }, [shotSettingsRef]);
 
@@ -454,6 +467,7 @@ export const useVideoTravelSettingsHandlers = ({
     handleBlurSave,
     handleEnhancePromptChange,
     handleTurboModeChange,
+    handleSmoothContinuationsChange,
     handleAmountOfMotionChange,
     handleMotionModeChange,
     handleGenerationTypeModeChange,

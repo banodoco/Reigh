@@ -99,6 +99,10 @@ export interface SegmentRegenerateControlsProps {
   showHeader?: boolean;
   /** Custom header title (default: "Regenerate Video") */
   headerTitle?: string;
+  /** Predecessor video URL for smooth continuations (SVI) - only for segments after the first */
+  predecessorVideoUrl?: string;
+  /** Whether to show the smooth continuations toggle (only shown when predecessorVideoUrl is available) */
+  showSmoothContinuation?: boolean;
 }
 
 export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps> = ({
@@ -122,6 +126,8 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   buttonLabel = 'Regenerate Segment',
   showHeader = false,
   headerTitle = 'Regenerate Video',
+  predecessorVideoUrl,
+  showSmoothContinuation = false,
 }) => {
   const { toast } = useToast();
 
@@ -243,6 +249,11 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     { makePrimaryVariant: [makePrimaryVariant, setMakePrimaryVariant] },
     { scope: 'project', enabled: !!projectId }
   );
+
+  // Smooth continuations (SVI) - for smoother transitions between segments
+  // Only available when predecessorVideoUrl is provided (segments after the first)
+  // Defaults to true when a predecessor video is available
+  const [smoothContinuations, setSmoothContinuations] = useState(true);
 
   // LoRA state - derived from params.additional_loras
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>(() => {
@@ -417,6 +428,9 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         selected_phase_preset_id: selectedPhasePresetId,
         loras: lorasForTask,
         make_primary_variant: makePrimaryVariant,
+        // Smooth continuations (SVI) params
+        use_svi: smoothContinuations && !!predecessorVideoUrl,
+        svi_predecessor_video_url: smoothContinuations ? predecessorVideoUrl : undefined,
       });
 
       setRegenerateSuccess(true);
@@ -451,6 +465,8 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     randomSeed,
     makePrimaryVariant,
     projectResolution,
+    smoothContinuations,
+    predecessorVideoUrl,
     toast
   ]);
 
@@ -762,6 +778,25 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
           />
         </CollapsibleContent>
       </Collapsible>
+
+      {/* Smooth Continuations Toggle - only shown for segments after the first */}
+      {showSmoothContinuation && predecessorVideoUrl && (
+        <div className="flex items-center space-x-2 p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+          <Switch
+            id="smooth-continuations"
+            checked={smoothContinuations}
+            onCheckedChange={setSmoothContinuations}
+          />
+          <div className="flex-1">
+            <Label htmlFor="smooth-continuations" className="font-medium cursor-pointer">
+              Smooth Continuations
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Use previous segment for smoother transition
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Make Primary Variant Toggle */}
       <div className="flex items-center justify-between py-2">

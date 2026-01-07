@@ -151,6 +151,8 @@ interface TimelineContainerProps {
   // Single image endpoint for setting video duration
   singleImageEndFrame?: number;
   onSingleImageEndFrameChange?: (endFrame: number) => void;
+  // Maximum frame limit for timeline gaps (77 with smooth continuations, 81 otherwise)
+  maxFrameLimit?: number;
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
@@ -193,6 +195,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   hasNoImages = false,
   singleImageEndFrame,
   onSingleImageEndFrameChange,
+  maxFrameLimit = 81,
 }) => {
   // [ZoomDebug] Track component mounts to detect unwanted remounts
   const mountCountRef = useRef(0);
@@ -1552,9 +1555,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                     // Calculate frame from pixel position using frozen dimensions
                     let newFrame = frozenFullMin + (relativeX / effectiveWidth) * frozenFullRange;
 
-                    // Constrain: minimum 5 frames from image, maximum 81 frames
+                    // Constrain: minimum 5 frames from image, maximum based on maxFrameLimit (77 for smooth continuations, 81 otherwise)
                     const minFrame = imageFrame + 5;
-                    const maxFrame = imageFrame + 81;
+                    const maxFrame = imageFrame + maxFrameLimit;
                     newFrame = Math.max(minFrame, Math.min(Math.round(newFrame), maxFrame));
 
                     // Quantize to 4N+1 format (5, 9, 13, 17, 21, 25, ...)

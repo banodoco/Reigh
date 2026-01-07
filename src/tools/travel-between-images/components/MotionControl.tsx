@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Label } from '@/shared/components/ui/label';
 import { Button } from '@/shared/components/ui/button';
+import { Switch } from '@/shared/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { Info, Library, Pencil, Settings, X } from 'lucide-react';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '../settings';
@@ -98,12 +99,16 @@ export interface MotionControlProps {
   
   // Turbo mode affects availability
   turboMode?: boolean;
-  
+
   // Loading state - prevents sync effects from running during initial load
   settingsLoading?: boolean;
 
   // Restore defaults handler (for Advanced mode - respects I2V/VACE mode)
   onRestoreDefaults?: () => void;
+
+  // Smooth continuations (SVI) - for smoother transitions between segments
+  smoothContinuations?: boolean;
+  onSmoothContinuationsChange?: (value: boolean) => void;
 }
 
 export const MotionControl: React.FC<MotionControlProps> = ({
@@ -132,6 +137,8 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   turboMode,
   settingsLoading,
   onRestoreDefaults,
+  smoothContinuations,
+  onSmoothContinuationsChange,
 }) => {
   // Derive advancedMode from motionMode - single source of truth
   const advancedMode = motionMode === 'advanced';
@@ -459,6 +466,31 @@ export const MotionControl: React.FC<MotionControlProps> = ({
                 onRemovePreset={onPhasePresetRemove}
               />
             )}
+          </div>
+
+          {/* Smooth Continuations Toggle */}
+          <div className="flex items-center space-x-2 p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+            <Switch
+              id="smooth-continuations"
+              checked={smoothContinuations || false}
+              onCheckedChange={(checked) => onSmoothContinuationsChange?.(checked)}
+            />
+            <div className="flex-1 flex items-center gap-2">
+              <Label htmlFor="smooth-continuations" className="font-medium">
+                Smooth Continuations
+              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                    <Info className="h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Enable smoother transitions between video segments.<br />
+                  Max duration is reduced to 77 frames when enabled.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
           {/* LoRA Controls */}

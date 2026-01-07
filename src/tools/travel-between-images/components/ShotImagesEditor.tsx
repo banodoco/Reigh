@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { GenerationRow } from "@/types/shots";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/card";
 import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
@@ -126,6 +126,10 @@ interface ShotImagesEditorProps {
   onDragStateChange?: (isDragging: boolean) => void;
   /** Callback when single-image duration changes (for single-image video generation) */
   onSingleImageDurationChange?: (durationFrames: number) => void;
+  /** Maximum frame limit for timeline gaps (77 when smoothContinuations enabled, 81 otherwise) */
+  maxFrameLimit?: number;
+  /** Whether smooth continuations is enabled - used to compact timeline gaps when toggled */
+  smoothContinuations?: boolean;
 }
 
 // Force TypeScript to re-evaluate this interface
@@ -188,6 +192,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onCreateShot,
   onDragStateChange,
   onSingleImageDurationChange,
+  maxFrameLimit = 81,
+  smoothContinuations = false,
 }) => {
   // Track local drag state to suppress hook reloads during drag operations
   // This is forwarded via onDragStateChange but we also need it locally for useEnhancedShotPositions
@@ -628,6 +634,69 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     hasEverHadDataRef.current = memoizedShotGenerations.length > 0;
   }, [selectedShotId]);
 
+  // Track previous smoothContinuations value to detect when it's enabled
+  const prevSmoothContinuationsRef = useRef(smoothContinuations);
+
+  // Effect: Compact timeline gaps when smooth continuations is enabled
+  // This reduces any gaps > 77 frames down to 77
+  useEffect(() => {
+    const wasEnabled = !prevSmoothContinuationsRef.current && smoothContinuations;
+    prevSmoothContinuationsRef.current = smoothContinuations;
+
+    if (!wasEnabled || readOnly) return;
+
+    // Get positioned images sorted by frame
+    const positionedImages = images
+      .filter((img: any) => img.timeline_frame != null && img.timeline_frame !== -1)
+      .sort((a: any, b: any) => a.timeline_frame - b.timeline_frame);
+
+    if (positionedImages.length < 2) return;
+
+    // Find gaps > maxFrameLimit and calculate shifts needed
+    const updates: Array<{ id: string; newFrame: number }> = [];
+    let cumulativeShift = 0;
+
+    // Always start from frame 0 for gap calculation
+    let prevFrame = 0;
+
+    for (const img of positionedImages) {
+      const currentFrame = (img as any).timeline_frame;
+      const gap = currentFrame - prevFrame;
+
+      if (gap > maxFrameLimit) {
+        // This gap is too large, need to shift this and all subsequent images
+        const excess = gap - maxFrameLimit;
+        cumulativeShift += excess;
+      }
+
+      if (cumulativeShift > 0) {
+        const newFrame = currentFrame - cumulativeShift;
+        updates.push({ id: (img as any).id, newFrame });
+      }
+
+      prevFrame = currentFrame - cumulativeShift; // Use the new position for next gap calculation
+    }
+
+    // Apply updates if any
+    if (updates.length > 0) {
+      console.log('[SmoothContinuations] Compacting timeline gaps:', {
+        updatesCount: updates.length,
+        maxFrameLimit,
+        updates: updates.map(u => ({ id: u.id.substring(0, 8), newFrame: u.newFrame }))
+      });
+
+      // Update each frame position
+      // Use Promise.all to batch the updates
+      Promise.all(
+        updates.map(({ id, newFrame }) => updateTimelineFrame(id, newFrame))
+      ).then(() => {
+        console.log('[SmoothContinuations] Timeline gaps compacted successfully');
+      }).catch((err) => {
+        console.error('[SmoothContinuations] Error compacting timeline gaps:', err);
+      });
+    }
+  }, [smoothContinuations, images, maxFrameLimit, updateTimelineFrame, readOnly]);
+
   // Note: Pair prompts cleanup is handled automatically by the database
   // when shot_generations are deleted, since prompts are stored in their metadata
 
@@ -1041,6 +1110,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // Single image duration endpoint
                 singleImageEndFrame={singleImageEndFrame}
                 onSingleImageEndFrameChange={handleSingleImageEndFrameChange}
+                // Frame limit (77 with smooth continuations, 81 otherwise)
+                maxFrameLimit={maxFrameLimit}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}

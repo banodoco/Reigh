@@ -97,6 +97,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onEnhancePromptChange,
   turboMode,
   onTurboModeChange,
+  smoothContinuations,
+  onSmoothContinuationsChange,
   amountOfMotion,
   onAmountOfMotionChange,
   motionMode = 'basic',
@@ -1243,6 +1245,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         turbo_mode: turboMode,
         debug: steerableMotionSettings.debug || false,
         generation_type_mode: generationTypeMode || 'i2v',
+        use_svi: smoothContinuations || false,
       },
       structureVideoConfig,
       batchVideoFrames,
@@ -1557,6 +1560,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onDragStateChange={handleDragStateChange}
             // Single image duration - updates batchVideoFrames when endpoint is dragged
             onSingleImageDurationChange={onBatchVideoFramesChange}
+            // Frame limit (77 with smooth continuations, 81 otherwise)
+            maxFrameLimit={smoothContinuations ? 77 : 81}
+            // Pass smoothContinuations to trigger timeline gap compaction when enabled
+            smoothContinuations={smoothContinuations}
           />
         </div>
 
@@ -1602,6 +1609,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onRandomSeedChange={handleRandomSeedChange}
                             turboMode={turboMode}
                             onTurboModeChange={onTurboModeChange}
+                            smoothContinuations={smoothContinuations}
                             amountOfMotion={amountOfMotion}
                             onAmountOfMotionChange={onAmountOfMotionChange}
                             imageCount={simpleFilteredImages.length}
@@ -1654,6 +1662,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             turboMode={turboMode}
                             settingsLoading={settingsLoading}
                             onRestoreDefaults={onRestoreDefaults}
+                            smoothContinuations={smoothContinuations}
+                            onSmoothContinuationsChange={onSmoothContinuationsChange}
                         />
                     </div>
                 </div>

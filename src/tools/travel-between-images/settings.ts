@@ -130,6 +130,7 @@ export interface VideoTravelSettings {
   textBeforePrompts?: string; // Text to prepend to all prompts
   textAfterPrompts?: string; // Text to append to all prompts
   generationTypeMode?: 'i2v' | 'vace'; // Generation type: I2V (image-to-video) or VACE (structure video guided)
+  smoothContinuations?: boolean; // Enable SVI (smooth video interpolation) for smoother transitions
   // selectedMode removed - now hardcoded to use specific model
   pairConfigs?: Array<{
     id: string;
@@ -190,5 +191,6 @@ export const videoTravelSettings = {
     customWidth: undefined,
     customHeight: undefined,
     generationTypeMode: 'i2v' as const, // Default to I2V (image-to-video) mode
+    smoothContinuations: true, // SVI enabled by default for smoother transitions
   },
 }; 

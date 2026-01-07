@@ -168,6 +168,8 @@ export interface TimelineProps {
   // Single image endpoint for setting video duration when there's only one image
   singleImageEndFrame?: number;
   onSingleImageEndFrameChange?: (endFrame: number) => void;
+  // Maximum frame limit for timeline gaps (77 with smooth continuations, 81 otherwise)
+  maxFrameLimit?: number;
 }
 
 /**
@@ -227,6 +229,8 @@ const Timeline: React.FC<TimelineProps> = ({
   // Single image duration props
   singleImageEndFrame,
   onSingleImageEndFrameChange,
+  // Frame limit
+  maxFrameLimit = 81,
 }) => {
   // [RefactorMetrics] Track render count for baseline measurements
   useRenderCount('Timeline');
@@ -904,6 +908,7 @@ const Timeline: React.FC<TimelineProps> = ({
         uploadProgress={uploadProgress}
         singleImageEndFrame={singleImageEndFrame}
         onSingleImageEndFrameChange={onSingleImageEndFrameChange}
+        maxFrameLimit={maxFrameLimit}
       />
 
       {/* Lightbox */}

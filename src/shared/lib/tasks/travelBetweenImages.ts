@@ -180,6 +180,8 @@ export interface ModelConfig {
   debug: boolean;
   /** Generation type mode: i2v (image-to-video) or vace (video-guided) */
   generation_type_mode: 'i2v' | 'vace';
+  /** Enable smooth video interpolation (SVI) for smoother transitions */
+  use_svi?: boolean;
 }
 
 /**
@@ -191,6 +193,7 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   turbo_mode: false,
   debug: false,
   generation_type_mode: 'i2v',
+  use_svi: false,
 };
 
 /**
@@ -233,6 +236,8 @@ export interface TravelBetweenImagesTaskParams extends
   generation_name?: string;
   /** Whether segments are generated independently */
   independent_segments?: boolean;
+  /** Enable smooth video interpolation (SVI) for smoother transitions */
+  use_svi?: boolean;
 }
 
 /**

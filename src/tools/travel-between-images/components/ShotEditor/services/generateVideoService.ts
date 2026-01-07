@@ -256,6 +256,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     turbo_mode: turboMode,
     debug,
     generation_type_mode: generationTypeMode,
+    use_svi: useSvi,
   } = modelConfig;
 
   // CRITICAL: Ensure amountOfMotion has a valid default value
@@ -1024,6 +1025,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     ...(textAfterPrompts ? { text_after_prompts: textAfterPrompts } : {}),
     // Always set independent segments to true
     independent_segments: true,
+    // Smooth video interpolation (SVI) for smoother transitions
+    ...(useSvi ? { use_svi: true } : {}),
   };
 
   // Debug log the exact request body being sent

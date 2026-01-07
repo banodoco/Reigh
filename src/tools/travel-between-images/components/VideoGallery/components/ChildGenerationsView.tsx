@@ -1538,7 +1538,14 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {segmentSlots.map((slot) => {
+                            {segmentSlots.map((slot, slotArrayIndex) => {
+                                // Get the predecessor video URL for smooth continuations
+                                // Look at the previous slot in the array
+                                const prevSlot = slotArrayIndex > 0 ? segmentSlots[slotArrayIndex - 1] : null;
+                                const predecessorVideoUrl = prevSlot?.type === 'child' && prevSlot.child.location
+                                    ? getDisplayUrl(prevSlot.child.location)
+                                    : undefined;
+
                                 if (slot.type === 'child') {
                                     // Check if child has a location (video output) - if not, show as processing
                                     const hasOutput = !!slot.child.location;
@@ -1580,6 +1587,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 onEndImageUpload={(file) => handleSegmentImageUpload(slot.child.id, 'end', file)}
                                                 isUploadingStartImage={uploadingSegmentImage?.childId === slot.child.id && uploadingSegmentImage?.position === 'start'}
                                                 isUploadingEndImage={uploadingSegmentImage?.childId === slot.child.id && uploadingSegmentImage?.position === 'end'}
+                                                predecessorVideoUrl={predecessorVideoUrl}
                                             />
                                         );
                                     } else {
@@ -1872,10 +1880,12 @@ interface SegmentCardProps {
     onEndImageUpload?: (file: File) => Promise<void>;
     isUploadingStartImage?: boolean;
     isUploadingEndImage?: boolean;
+    // Smooth continuations - URL of predecessor segment video
+    predecessorVideoUrl?: string;
 }
 
 // Memoized to prevent re-renders when parent state changes (e.g., lightbox index)
-const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, onStartImageUpload, onEndImageUpload, isUploadingStartImage, isUploadingEndImage }) => {
+const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, onStartImageUpload, onEndImageUpload, isUploadingStartImage, isUploadingEndImage, predecessorVideoUrl }) => {
     const isMobile = useIsMobile();
 
     // Fetch variants to get the most recent one's params
@@ -2085,6 +2095,8 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                     isUploadingStartImage={isUploadingStartImage}
                     isUploadingEndImage={isUploadingEndImage}
                     buttonLabel="Regenerate Segment"
+                    predecessorVideoUrl={predecessorVideoUrl}
+                    showSmoothContinuation={index > 0 && !!predecessorVideoUrl}
                 />
             </CardContent>
         </Card>

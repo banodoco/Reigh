@@ -52,6 +52,10 @@ export interface IndividualTravelSegmentParams {
 
   // Whether the new variant should be set as primary (default: true for backward compatibility)
   make_primary_variant?: boolean;
+
+  // Smooth continuations (SVI) - for smoother transitions between segments
+  use_svi?: boolean;
+  svi_predecessor_video_url?: string;
 }
 
 // Maximum frames allowed per segment (81-frame limit)
@@ -206,7 +210,17 @@ function buildIndividualTravelSegmentParams(
     // Add parent_generation_id for variant creation
     parent_generation_id: params.parent_generation_id,
   };
-  
+
+  // Add SVI (smooth continuations) params if enabled
+  if (params.use_svi && params.svi_predecessor_video_url) {
+    orchestratorDetails.use_svi = true;
+    orchestratorDetails.svi_predecessor_video_url = params.svi_predecessor_video_url;
+    console.log('[IndividualTravelSegment] SVI enabled:', {
+      use_svi: true,
+      svi_predecessor_video_url: params.svi_predecessor_video_url?.substring(0, 50) + '...',
+    });
+  }
+
   if (phaseConfig) {
     orchestratorDetails.phase_config = phaseConfig;
   }
@@ -291,6 +305,12 @@ function buildIndividualTravelSegmentParams(
 
   // Add make_primary_variant flag (defaults to true for backward compatibility)
   taskParams.make_primary_variant = params.make_primary_variant ?? true;
+
+  // Add SVI (smooth continuations) params at top level if enabled
+  if (params.use_svi && params.svi_predecessor_video_url) {
+    taskParams.use_svi = true;
+    taskParams.svi_predecessor_video_url = params.svi_predecessor_video_url;
+  }
 
   // Build individual_segment_params - all UI overrides in one place
   // GPU worker should check these first before falling back to top-level values

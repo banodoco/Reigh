@@ -127,6 +127,8 @@ export interface ShotEditorProps {
   onEnhancePromptChange?: (enhance: boolean) => void;
   turboMode?: boolean;
   onTurboModeChange?: (turbo: boolean) => void;
+  smoothContinuations?: boolean;
+  onSmoothContinuationsChange?: (smooth: boolean) => void;
   amountOfMotion?: number;
   onAmountOfMotionChange?: (motion: number) => void;
   // Motion mode
