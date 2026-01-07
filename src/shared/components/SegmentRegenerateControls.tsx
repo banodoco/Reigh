@@ -252,8 +252,11 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
   // Smooth continuations (SVI) - for smoother transitions between segments
   // Only available when predecessorVideoUrl is provided (segments after the first)
-  // Defaults to true when a predecessor video is available
-  const [smoothContinuations, setSmoothContinuations] = useState(true);
+  // Defaults to previous value if available, otherwise true
+  const [smoothContinuations, setSmoothContinuations] = useState(() => {
+    const orchestrator = params.orchestrator_details || {};
+    return params.use_svi ?? orchestrator.use_svi ?? true;
+  });
 
   // LoRA state - derived from params.additional_loras
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>(() => {
@@ -507,7 +510,22 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       {/* Input Images with Frames Slider in between */}
       {(startImageUrl || endImageUrl || onStartImageUpload || onEndImageUpload) && (
         <div className="@container">
-          <div className="grid grid-cols-2 gap-2 @[280px]:grid-cols-3">
+          <div className="flex gap-2">
+          {/* Smooth Continuations Toggle - compact, left of first image */}
+          {showSmoothContinuation && predecessorVideoUrl && (
+            <div className="flex flex-col items-center justify-center shrink-0 w-10">
+              <span className="text-[8px] text-muted-foreground mb-0.5 leading-tight text-center">
+                continue from previous
+              </span>
+              <Switch
+                id="smooth-continuations-compact"
+                checked={smoothContinuations}
+                onCheckedChange={setSmoothContinuations}
+                className="scale-75"
+              />
+            </div>
+          )}
+          <div className="flex-1 grid grid-cols-2 gap-2 @[280px]:grid-cols-3">
           {/* Start Image - 1/3 width on wide, 1/2 on narrow */}
           <div className="relative aspect-video">
             {startImageUrl ? (
@@ -636,6 +654,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                 <span className="text-[10px] text-muted-foreground">End</span>
               </button>
             ) : null}
+          </div>
           </div>
           </div>
         </div>
@@ -778,25 +797,6 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
           />
         </CollapsibleContent>
       </Collapsible>
-
-      {/* Smooth Continuations Toggle - only shown for segments after the first */}
-      {showSmoothContinuation && predecessorVideoUrl && (
-        <div className="flex items-center space-x-2 p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
-          <Switch
-            id="smooth-continuations"
-            checked={smoothContinuations}
-            onCheckedChange={setSmoothContinuations}
-          />
-          <div className="flex-1">
-            <Label htmlFor="smooth-continuations" className="font-medium cursor-pointer">
-              Smooth Continuations
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Use previous segment for smoother transition
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Make Primary Variant Toggle */}
       <div className="flex items-center justify-between py-2">
