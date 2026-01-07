@@ -16,7 +16,8 @@
 
 import { useCallback, useRef, MutableRefObject } from 'react';
 import { Shot } from '@/types/shots';
-import { VideoTravelSettings, PhaseConfig } from '../settings';
+import { VideoTravelSettings, PhaseConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '../settings';
+import { BUILTIN_DEFAULT_I2V_ID, BUILTIN_DEFAULT_VACE_ID } from '../components/MotionControl';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
 import { buildBasicModePhaseConfig } from '../components/ShotEditor/services/generateVideoService';
 import { UseShotSettingsReturn } from './useShotSettings';
@@ -273,11 +274,35 @@ export const useVideoTravelSettingsHandlers = ({
         });
       }
     } else {
-      // Basic mode - disable advanced mode but keep selected preset
-      shotSettingsRef.current.updateFields({
-        motionMode: mode,
-        advancedMode: false
-      });
+      // Basic mode - disable advanced mode
+      // If no preset is selected, auto-select the default preset to avoid
+      // the inconsistent state of "custom config in basic mode"
+      const currentSettings = shotSettingsRef.current.settings;
+      const hasPresetSelected = !!currentSettings?.selectedPhasePresetId;
+
+      if (!hasPresetSelected) {
+        // Auto-select default preset based on generation type mode
+        const isVaceMode = currentSettings?.generationTypeMode === 'vace';
+        const defaultPresetId = isVaceMode ? BUILTIN_DEFAULT_VACE_ID : BUILTIN_DEFAULT_I2V_ID;
+        const defaultConfig = isVaceMode ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
+
+        console.log('[MotionMode] Switching to basic with no preset - auto-selecting default:', {
+          isVaceMode,
+          presetId: defaultPresetId
+        });
+
+        shotSettingsRef.current.updateFields({
+          motionMode: mode,
+          advancedMode: false,
+          selectedPhasePresetId: defaultPresetId,
+          phaseConfig: defaultConfig
+        });
+      } else {
+        shotSettingsRef.current.updateFields({
+          motionMode: mode,
+          advancedMode: false
+        });
+      }
     }
   }, [currentShotId, shotSettingsRef]);
 

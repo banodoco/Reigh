@@ -347,6 +347,11 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
       });
     }
 
+    // Filter out items without any media to display
+    filtered = filtered.filter(lora =>
+      lora.main_generation || (lora.Images && lora.Images.length > 0)
+    );
+
     const sorted = [...filtered];
     switch (sortOption) {
       case 'downloads':
