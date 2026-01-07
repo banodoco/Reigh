@@ -391,6 +391,8 @@ function buildTravelBetweenImagesPayload(
     ...(params.text_after_prompts ? { text_after_prompts: params.text_after_prompts } : {}),
     // Motion control mode
     ...(params.motion_mode ? { motion_mode: params.motion_mode } : {}),
+    // Smooth video interpolation (SVI) for smoother transitions
+    ...(params.use_svi ? { use_svi: true } : {}),
   };
 
   // Log the enhance_prompt value that will be sent to orchestrator
