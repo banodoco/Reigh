@@ -258,6 +258,16 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     return params.use_svi ?? orchestrator.use_svi ?? true;
   });
 
+  // Max frames is 77 when smooth continuations is enabled, otherwise 81
+  const maxFrames = (smoothContinuations && predecessorVideoUrl) ? 77 : 81;
+
+  // Clamp num_frames when smooth continuations is enabled and current value exceeds max
+  useEffect(() => {
+    if (smoothContinuations && predecessorVideoUrl && params.num_frames > 77) {
+      setParams((prev: any) => ({ ...prev, num_frames: 77 }));
+    }
+  }, [smoothContinuations, predecessorVideoUrl, params.num_frames]);
+
   // LoRA state - derived from params.additional_loras
   const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>(() => {
     const lorasObj = params.additional_loras || params.orchestrator_details?.additional_loras || {};
@@ -594,7 +604,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
               value={[quantizeFrameCount(params.num_frames || 9, 9)]}
               onValueChange={([value]) => handleChange('num_frames', quantizeFrameCount(value, 9))}
               min={9}
-              max={81}
+              max={maxFrames}
               step={4}
               className="w-full"
             />
