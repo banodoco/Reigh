@@ -493,8 +493,6 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
         orchestrator_details: orchestratorPayload,
         // Also store at top level for direct access by worker (not just in orchestrator_details)
         ...(params.generation_name ? { generation_name: params.generation_name } : {}),
-        // SVI must be at top level for worker to read it
-        use_svi: params.use_svi ?? false,
       }
     });
 

@@ -570,6 +570,15 @@ const VideoTravelToolPage: React.FC = () => {
     textAfterPrompts = '',
     selectedLoras = [], // LoRAs now synced with all other settings
   } = shotSettings.settings || {};
+
+  // [SmoothContinuationsDebug] Log the value to trace where it comes from
+  console.log('[SmoothContinuationsDebug] Value from settings:', {
+    smoothContinuations,
+    rawFromSettings: shotSettings.settings?.smoothContinuations,
+    shotId: shotSettings.shotId?.substring(0, 8),
+    settingsStatus: shotSettings.status,
+    timestamp: Date.now()
+  });
   
   // CRITICAL: Ensure amountOfMotion has a valid default (destructuring default doesn't apply when value is explicitly undefined)
   const amountOfMotion = rawAmountOfMotion ?? 50;

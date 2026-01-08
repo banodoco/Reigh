@@ -306,12 +306,6 @@ function buildIndividualTravelSegmentParams(
   // Add make_primary_variant flag (defaults to true for backward compatibility)
   taskParams.make_primary_variant = params.make_primary_variant ?? true;
 
-  // Add SVI (smooth continuations) params at top level if enabled
-  if (params.use_svi && params.svi_predecessor_video_url) {
-    taskParams.use_svi = true;
-    taskParams.svi_predecessor_video_url = params.svi_predecessor_video_url;
-  }
-
   // Build individual_segment_params - all UI overrides in one place
   // GPU worker should check these first before falling back to top-level values
   const individualSegmentParams: Record<string, unknown> = {

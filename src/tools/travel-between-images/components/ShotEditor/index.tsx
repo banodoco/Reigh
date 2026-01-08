@@ -1247,6 +1247,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         generation_type_mode: generationTypeMode || 'i2v',
         use_svi: smoothContinuations || false,
       },
+      // [SmoothContinuationsDebug] Log what we're sending
+      ...(console.log('[SmoothContinuationsDebug] ShotEditor sending to generateVideo:', {
+        smoothContinuations,
+        use_svi: smoothContinuations || false,
+        selectedShotId: selectedShotId?.substring(0, 8),
+        timestamp: Date.now()
+      }), {}),
       structureVideoConfig,
       batchVideoFrames,
       selectedLoras: loraManager.selectedLoras.map(lora => ({
@@ -1294,6 +1301,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     randomSeed,
     turboMode,
     generationTypeMode,
+    smoothContinuations,
     // Other deps
     batchVideoFrames,
     loraManager.selectedLoras,

@@ -5,6 +5,7 @@ export { characterAnimateSettings } from './character-animate/settings';
 export { joinClipsSettings } from './join-clips/settings';
 export { editImagesSettings } from './edit-images/settings';
 export { editVideoSettings } from './edit-video/settings';
+export { trainingDataHelperSettings } from './training-data-helper/settings';
 export { userPreferencesSettings } from '../shared/settings/userPreferences';
 
 // Tool manifest for UI discovery and automatic registration
@@ -14,9 +15,10 @@ import { characterAnimateSettings } from './character-animate/settings';
 import { joinClipsSettings } from './join-clips/settings';
 import { editImagesSettings } from './edit-images/settings';
 import { editVideoSettings } from './edit-video/settings';
+import { trainingDataHelperSettings } from './training-data-helper/settings';
 import { userPreferencesSettings } from '../shared/settings/userPreferences';
 import { AppEnv, LOCAL_ENVS, type AppEnvValue } from '../types/env';
-import { Paintbrush, Video, Edit, Users, Link2, Film } from 'lucide-react';
+import { Paintbrush, Video, Edit, Users, Link2, Film, Database } from 'lucide-react';
 
 export const toolsManifest = [
   videoTravelSettings,
@@ -25,6 +27,7 @@ export const toolsManifest = [
   joinClipsSettings,
   editImagesSettings,
   editVideoSettings,
+  trainingDataHelperSettings,
   userPreferencesSettings,
 ] as const;
 

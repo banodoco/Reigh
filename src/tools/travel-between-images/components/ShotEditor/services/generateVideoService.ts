@@ -259,6 +259,13 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     use_svi: useSvi,
   } = modelConfig;
 
+  // [SmoothContinuationsDebug] Log what value we received
+  console.log('[SmoothContinuationsDebug] generateVideoService received:', {
+    useSvi,
+    modelConfig_use_svi: modelConfig.use_svi,
+    timestamp: Date.now()
+  });
+
   // CRITICAL: Ensure amountOfMotion has a valid default value
   // JavaScript destructuring default only applies when property is absent, not when it's undefined
   const amountOfMotion = rawAmountOfMotion ?? 50;

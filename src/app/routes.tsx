@@ -19,6 +19,7 @@ import JoinClipsPage from '@/tools/join-clips/pages/JoinClipsPage';
 import EditVideoPage from '@/tools/edit-video/pages/EditVideoPage';
 // Keep other heavy tools lazy-loaded to preserve bundle size
 const EditImagesPage = lazy(() => import('@/tools/edit-images/pages/EditImagesPage'));
+const TrainingDataHelperPage = lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
 import NotFoundPage from '@/pages/NotFoundPage';
 import ShotsPage from "@/pages/ShotsPage";
 import GenerationsPage from "@/pages/GenerationsPage"; // Import the new GenerationsPage
@@ -128,6 +129,14 @@ const router = createBrowserRouter([
       {
         path: '/tools/edit-video',
         element: <EditVideoPage />, // No Suspense wrapper needed – component is loaded synchronously
+      },
+      {
+        path: '/tools/training-data-helper',
+        element: (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <TrainingDataHelperPage />
+          </Suspense>
+        ),
       },
       {
         path: '/shots',
