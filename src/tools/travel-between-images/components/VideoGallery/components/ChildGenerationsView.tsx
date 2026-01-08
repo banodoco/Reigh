@@ -84,7 +84,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     // State for segment input image uploads: { childId: 'start' | 'end' }
     const [uploadingSegmentImage, setUploadingSegmentImage] = useState<{ childId: string; position: 'start' | 'end' } | null>(null);
     const isMobile = useIsMobile();
-    const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth } = usePanes();
+    const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth, isGenerationsPaneLocked } = usePanes();
     
     // Get current project's aspect ratio for resolution calculation (similar to VideoTravelToolPage)
     const { projects } = useProject();
@@ -1413,8 +1413,9 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             {/* Header - sticky with full-width background that respects panes */}
             {/* On mobile, GlobalHeader is NOT sticky (scrolls away), so we use top-0 */}
             {/* On desktop (md+), GlobalHeader is sticky at h-24 (96px), so we use top-24 */}
-            <div 
-                className="sticky top-0 md:top-24 z-30 bg-background/95 backdrop-blur-sm border-b border-border/50"
+            {/* EXCEPT when GenerationsPane is locked - then GlobalHeader is relative, so use top-0 */}
+            <div
+                className={`sticky z-30 bg-background/95 backdrop-blur-sm border-b border-border/50 ${isGenerationsPaneLocked ? 'top-0' : 'top-0 md:top-24'}`}
                 style={{
                     // Extend background to edges using negative margins, accounting for panes
                     marginLeft: `calc(-50vw + 50% + ${isShotsPaneLocked ? shotsPaneWidth / 2 : 0}px)`,
