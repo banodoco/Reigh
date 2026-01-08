@@ -12,16 +12,18 @@ import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/stat
 const DEFAULT_SETTINGS: VideoTravelSettings = {
   videoControlMode: 'batch',
   batchVideoPrompt: '',
-  batchVideoFrames: 60,
+  batchVideoFrames: 61, // Must be 4N+1 format for Wan model compatibility (61 = 4*15+1)
   batchVideoSteps: 6,
   steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
   enhancePrompt: false,
   turboMode: false,
+  smoothContinuations: true, // SVI enabled by default for smoother transitions
   amountOfMotion: 50,
   motionMode: 'basic',
   advancedMode: false,
   phaseConfig: undefined,
   generationMode: 'timeline',
+  generationTypeMode: 'i2v', // Default to I2V (image-to-video) mode
   pairConfigs: [],
   selectedLoras: [],
 };

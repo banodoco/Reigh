@@ -391,8 +391,8 @@ function buildTravelBetweenImagesPayload(
     ...(params.text_after_prompts ? { text_after_prompts: params.text_after_prompts } : {}),
     // Motion control mode
     ...(params.motion_mode ? { motion_mode: params.motion_mode } : {}),
-    // Smooth video interpolation (SVI) for smoother transitions
-    ...(params.use_svi ? { use_svi: true } : {}),
+    // Smooth video interpolation (SVI) for smoother transitions - always explicit
+    use_svi: params.use_svi ?? false,
   };
 
   // Log the enhance_prompt value that will be sent to orchestrator
@@ -491,8 +491,10 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
       params: {
         tool_type: 'travel-between-images', // Override tool_type for proper generation tagging
         orchestrator_details: orchestratorPayload,
-        // Also store at top level for direct access (redundant but useful for consistency)
+        // Also store at top level for direct access by worker (not just in orchestrator_details)
         ...(params.generation_name ? { generation_name: params.generation_name } : {}),
+        // SVI must be at top level for worker to read it
+        use_svi: params.use_svi ?? false,
       }
     });
 

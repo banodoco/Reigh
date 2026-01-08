@@ -450,9 +450,20 @@ export async function createGenerationFromTask(
   taskId: string,
   taskData: any,
   publicUrl: string,
-  thumbnailUrl: string | null | undefined
+  thumbnailUrl: string | null | undefined,
+  logger?: any
 ): Promise<any> {
   console.log(`[GenMigration] Starting generation creation for task ${taskId}`);
+  logger?.debug("Starting generation creation", {
+    task_id: taskId,
+    task_type: taskData.task_type,
+    tool_type: taskData.tool_type,
+    content_type: taskData.content_type,
+    has_orchestrator_task_id: !!taskData.params?.orchestrator_task_id,
+    has_parent_generation_id: !!taskData.params?.parent_generation_id,
+    has_child_generation_id: !!taskData.params?.child_generation_id,
+    has_based_on: !!extractBasedOn(taskData.params),
+  });
 
   try {
     // Check if generation already exists
@@ -460,6 +471,11 @@ export async function createGenerationFromTask(
     if (existingGeneration) {
       console.log(`[GenMigration] Generation already exists for task ${taskId}: ${existingGeneration.id}`);
       console.log(`[GenMigration] Creating new variant and making it primary`);
+      logger?.info("Existing generation found - creating regenerated variant", {
+        task_id: taskId,
+        existing_generation_id: existingGeneration.id,
+        action: "create_regenerated_variant"
+      });
 
       const variantParams = {
         ...taskData.params,
@@ -500,6 +516,11 @@ export async function createGenerationFromTask(
     if (taskData.task_type === TASK_TYPES.INDIVIDUAL_TRAVEL_SEGMENT && taskData.params?.child_generation_id) {
       const childGenId = taskData.params.child_generation_id;
       console.log(`[GenMigration] individual_travel_segment - creating variant for child generation ${childGenId}`);
+      logger?.info("SPECIAL CASE 1a: individual_travel_segment with child_generation_id", {
+        task_id: taskId,
+        child_generation_id: childGenId,
+        action: "create_variant_on_existing_child"
+      });
 
       const { data: childGen, error: fetchError } = await supabase
         .from('generations')
@@ -536,10 +557,16 @@ export async function createGenerationFromTask(
 
     if (taskData.task_type === TASK_TYPES.INDIVIDUAL_TRAVEL_SEGMENT && !taskData.params?.child_generation_id) {
       const parentGenId = taskData.params?.parent_generation_id ||
-                          taskData.params?.orchestrator_details?.parent_generation_id;
+                          taskData.params?.orchestrator_details?.parent_generation_id ||
+                          taskData.params?.full_orchestrator_payload?.parent_generation_id;
 
       if (parentGenId) {
         console.log(`[GenMigration] individual_travel_segment (new child) - will create child generation under parent ${parentGenId}`);
+        logger?.info("SPECIAL CASE 1b: individual_travel_segment creating new child", {
+          task_id: taskId,
+          parent_generation_id: parentGenId,
+          action: "create_new_child_generation"
+        });
 
         // Get the segment_index for child_order
         const segmentIndex = taskData.params?.segment_index;
@@ -552,17 +579,37 @@ export async function createGenerationFromTask(
       }
     }
 
-    // SPECIAL CASE 2: travel_stitch with parent_generation_id
-    const travelStitchParentId = taskData.task_type === TASK_TYPES.TRAVEL_STITCH 
-      ? (taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id)
-      : null;
-    
-    if (travelStitchParentId) {
-      const result = await createVariantOnParent(
-        supabase, travelStitchParentId, publicUrl, thumbnailUrl || null, taskData, taskId,
-        VARIANT_TYPES.TRAVEL_STITCH, { tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, created_from: 'travel_stitch_completion' }
-      );
-      if (result) return result;
+    // SPECIAL CASE 2: travel_stitch - create variant on parent generation
+    if (taskData.task_type === TASK_TYPES.TRAVEL_STITCH) {
+      // Get orchestrator task ID to find the parent generation
+      const orchTaskId = taskData.params?.orchestrator_task_id_ref ||
+                         taskData.params?.orchestrator_task_id ||
+                         taskData.params?.full_orchestrator_payload?.orchestrator_task_id;
+
+      if (orchTaskId) {
+        console.log(`[GenMigration] travel_stitch - getting parent generation for orchestrator ${orchTaskId}`);
+        // Use same function that segments use to get/create parent generation
+        const parentGen = await getOrCreateParentGeneration(supabase, orchTaskId, taskData.project_id, taskData.params);
+
+        if (parentGen?.id) {
+          console.log(`[GenMigration] travel_stitch task ${taskId} - creating variant on parent generation ${parentGen.id}`);
+          logger?.info("SPECIAL CASE 2: travel_stitch creating variant on parent", {
+            task_id: taskId,
+            parent_generation_id: parentGen.id,
+            orchestrator_task_id: orchTaskId,
+            action: "create_variant_on_parent"
+          });
+          const result = await createVariantOnParent(
+            supabase, parentGen.id, publicUrl, thumbnailUrl || null, taskData, taskId,
+            VARIANT_TYPES.TRAVEL_STITCH, { tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, created_from: 'travel_stitch_completion' }
+          );
+          if (result) return result;
+        } else {
+          console.log(`[GenMigration] travel_stitch task ${taskId} - could not find/create parent generation`);
+        }
+      } else {
+        console.log(`[GenMigration] travel_stitch task ${taskId} - no orchestrator_task_id found`);
+      }
     }
 
     // ===== SUB-TASK (SEGMENT) HANDLING =====
@@ -573,6 +620,11 @@ export async function createGenerationFromTask(
 
     if (orchestratorTaskId) {
       console.log(`[GenMigration] Task ${taskId} is a sub-task of orchestrator ${orchestratorTaskId}`);
+      logger?.info("Sub-task detected - orchestrator handling", {
+        task_id: taskId,
+        orchestrator_task_id: orchestratorTaskId,
+        segment_index: taskData.params?.segment_index
+      });
 
       const parentGen = await getOrCreateParentGeneration(supabase, orchestratorTaskId, taskData.project_id, taskData.params);
       if (parentGen) {
@@ -589,9 +641,15 @@ export async function createGenerationFromTask(
           // The segment output IS the final output - create variant on parent instead of child
           if (taskData.task_type === TASK_TYPES.JOIN_CLIPS_SEGMENT) {
             const isSingleJoin = taskData.params?.is_first_join === true && taskData.params?.is_last_join === true;
-            
+
             if (isSingleJoin && parentGenerationId) {
               console.log(`[JoinClipsSingleJoin] Detected single-join scenario (join_index: ${taskData.params?.join_index}) - creating variant for parent generation ${parentGenerationId}`);
+              logger?.info("Single-join scenario - creating variant on parent", {
+                task_id: taskId,
+                parent_generation_id: parentGenerationId,
+                join_index: taskData.params?.join_index,
+                action: "create_variant_on_parent_single_join"
+              });
               
               // Determine tool_type from orchestrator params (could be 'join-clips' or 'edit-video')
               const toolType = taskData.params?.full_orchestrator_payload?.tool_type ||
@@ -638,6 +696,12 @@ export async function createGenerationFromTask(
             const numSegments = orchDetails.num_new_segments_to_generate;
             if (numSegments === 1 && parentGenerationId) {
               console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent (no child generation)`);
+              logger?.info("Single-segment orchestrator - creating variant on parent", {
+                task_id: taskId,
+                parent_generation_id: parentGenerationId,
+                num_segments: numSegments,
+                action: "create_variant_on_parent_single_segment"
+              });
               
               const singleSegmentResult = await createVariantOnParent(
                 supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
@@ -712,6 +776,17 @@ export async function createGenerationFromTask(
     const finalIsChild = !!individualSegmentParentId || isChild;
     const finalChildOrder = individualSegmentChildOrder ?? childOrder;
 
+    logger?.info("Creating standard generation record", {
+      task_id: taskId,
+      is_child: finalIsChild,
+      parent_generation_id: finalParentGenerationId,
+      child_order: finalChildOrder,
+      based_on: basedOnGenerationId,
+      shot_id: shotId,
+      generation_type: generationType,
+      action: finalIsChild ? "create_child_generation" : "create_standalone_generation"
+    });
+
     const generationRecord = {
       id: newGenerationId,
       tasks: [taskId],
@@ -730,6 +805,13 @@ export async function createGenerationFromTask(
 
     const newGeneration = await insertGeneration(supabase, generationRecord);
     console.log(`[GenMigration] Created generation ${newGeneration.id} for task ${taskId}`);
+    logger?.info("Generation record created successfully", {
+      task_id: taskId,
+      generation_id: newGeneration.id,
+      is_child: finalIsChild,
+      parent_generation_id: finalParentGenerationId,
+      child_order: finalChildOrder
+    });
 
     // NOTE: Child generations (travel segments) are tracked via parent_generation_id and is_child fields.
     // They should NOT also be created as variants on the parent - that causes them to appear
@@ -749,6 +831,10 @@ export async function createGenerationFromTask(
 
   } catch (error) {
     console.error(`[GenMigration] Error creating generation for task ${taskId}:`, error);
+    logger?.error("Error creating generation", {
+      task_id: taskId,
+      error: error instanceof Error ? error.message : String(error)
+    });
     throw error;
   }
 }

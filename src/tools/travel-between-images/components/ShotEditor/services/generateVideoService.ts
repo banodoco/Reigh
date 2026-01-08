@@ -1037,8 +1037,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     ...(textAfterPrompts ? { text_after_prompts: textAfterPrompts } : {}),
     // Always set independent segments to true
     independent_segments: true,
-    // Smooth video interpolation (SVI) for smoother transitions
-    ...(useSvi ? { use_svi: true } : {}),
+    // Smooth video interpolation (SVI) for smoother transitions - always send explicitly
+    use_svi: useSvi ?? false,
   };
 
   // Debug log the exact request body being sent

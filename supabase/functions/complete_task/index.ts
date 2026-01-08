@@ -280,7 +280,7 @@ export async function completeTaskHandler(req: Request, deps: CompleteTaskDeps =
     const CREATE_GENERATION_IN_EDGE = Deno.env.get("CREATE_GENERATION_IN_EDGE") !== "false";
     if (CREATE_GENERATION_IN_EDGE) {
       try {
-        await handleGenerationCreation(supabaseAdmin, taskContext, publicUrl, thumbnailUrl);
+        await handleGenerationCreation(supabaseAdmin, taskContext, publicUrl, thumbnailUrl, logger);
       } catch (genErr: any) {
         const msg = genErr?.message || String(genErr);
         logger.error("Generation creation failed", { error: msg });
@@ -370,10 +370,16 @@ async function handleGenerationCreation(
   supabase: any,
   taskContext: TaskContext,
   publicUrl: string,
-  thumbnailUrl: string | null
+  thumbnailUrl: string | null,
+  logger?: any
 ): Promise<void> {
   const taskId = taskContext.id;
-  console.log(`[GenMigration] Checking if task ${taskId} should create generation...`);
+  logger?.debug("Checking if task should create generation", {
+    task_type: taskContext.task_type,
+    category: taskContext.category,
+    tool_type: taskContext.tool_type,
+    content_type: taskContext.content_type
+  });
   console.log(`[GenMigration] Task ${taskId}: category=${taskContext.category}, tool_type=${taskContext.tool_type}, content_type=${taskContext.content_type}`);
 
   // Build combined task data object expected by generation functions
@@ -412,7 +418,7 @@ async function handleGenerationCreation(
     }
 
     try {
-      await createGenerationFromTask(supabase, taskId, combinedTaskData, publicUrl, thumbnailUrl);
+      await createGenerationFromTask(supabase, taskId, combinedTaskData, publicUrl, thumbnailUrl, logger);
     } catch (genError: any) {
       console.error(`[GenMigration] Error creating generation for task ${taskId}:`, genError);
       // Preserve atomic semantics: bubble up so the main handler can fail the request
