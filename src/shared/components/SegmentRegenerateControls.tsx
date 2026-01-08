@@ -520,22 +520,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       {/* Input Images with Frames Slider in between */}
       {(startImageUrl || endImageUrl || onStartImageUpload || onEndImageUpload) && (
         <div className="@container">
-          <div className="flex gap-2">
-          {/* Smooth Continuations Toggle - compact, left of first image */}
-          {showSmoothContinuation && predecessorVideoUrl && (
-            <div className="flex flex-col items-center justify-center shrink-0 w-10">
-              <span className="text-[8px] text-muted-foreground mb-0.5 leading-tight text-center">
-                continue from previous
-              </span>
-              <Switch
-                id="smooth-continuations-compact"
-                checked={smoothContinuations}
-                onCheckedChange={setSmoothContinuations}
-                className="scale-75"
-              />
-            </div>
-          )}
-          <div className="flex-1 grid grid-cols-2 gap-2 @[280px]:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 @[280px]:grid-cols-3">
           {/* Start Image - 1/3 width on wide, 1/2 on narrow */}
           <div className="relative aspect-video">
             {startImageUrl ? (
@@ -593,21 +578,37 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
           </div>
 
           {/* Frames Slider - 1/3 width on wide, full width on narrow (spans 2 cols, shown last) */}
-          <div className="order-last col-span-2 @[280px]:order-none @[280px]:col-span-1 flex flex-col justify-center space-y-1">
-            <div className="flex flex-col items-center text-center">
-              <Label className="text-xs font-medium">Frames</Label>
-              <span className="text-xs text-muted-foreground">
-                {params.num_frames || 0} ({framesToSeconds(params.num_frames || 0)})
-              </span>
+          <div className="order-last col-span-2 @[280px]:order-none @[280px]:col-span-1 flex items-center gap-2">
+            {/* Smooth Continuations Toggle - compact, left of frames */}
+            {showSmoothContinuation && predecessorVideoUrl && (
+              <div className="flex flex-col items-center justify-center shrink-0 w-10">
+                <span className="text-[8px] text-muted-foreground mb-0.5 leading-tight text-center">
+                  continue from previous
+                </span>
+                <Switch
+                  id="smooth-continuations-compact"
+                  checked={smoothContinuations}
+                  onCheckedChange={setSmoothContinuations}
+                  className="scale-75"
+                />
+              </div>
+            )}
+            <div className="flex-1 flex flex-col justify-center space-y-1">
+              <div className="flex flex-col items-center text-center">
+                <Label className="text-xs font-medium">Frames</Label>
+                <span className="text-xs text-muted-foreground">
+                  {params.num_frames || 0} ({framesToSeconds(params.num_frames || 0)})
+                </span>
+              </div>
+              <Slider
+                value={[quantizeFrameCount(params.num_frames || 9, 9)]}
+                onValueChange={([value]) => handleChange('num_frames', quantizeFrameCount(value, 9))}
+                min={9}
+                max={maxFrames}
+                step={4}
+                className="w-full"
+              />
             </div>
-            <Slider
-              value={[quantizeFrameCount(params.num_frames || 9, 9)]}
-              onValueChange={([value]) => handleChange('num_frames', quantizeFrameCount(value, 9))}
-              min={9}
-              max={maxFrames}
-              step={4}
-              className="w-full"
-            />
           </div>
 
           {/* End Image - 1/3 width on wide, 1/2 on narrow */}
@@ -664,7 +665,6 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                 <span className="text-[10px] text-muted-foreground">End</span>
               </button>
             ) : null}
-          </div>
           </div>
           </div>
         </div>
