@@ -191,6 +191,6 @@ export const videoTravelSettings = {
     customWidth: undefined,
     customHeight: undefined,
     generationTypeMode: 'i2v' as const, // Default to I2V (image-to-video) mode
-    smoothContinuations: true, // SVI enabled by default for smoother transitions
+    smoothContinuations: false, // SVI disabled for now
   },
 }; 

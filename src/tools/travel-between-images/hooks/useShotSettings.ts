@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS: VideoTravelSettings = {
   steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
   enhancePrompt: false,
   turboMode: false,
-  smoothContinuations: true, // SVI enabled by default for smoother transitions
+  smoothContinuations: false, // SVI disabled for now
   amountOfMotion: 50,
   motionMode: 'basic',
   advancedMode: false,
