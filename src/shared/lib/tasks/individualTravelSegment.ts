@@ -211,13 +211,23 @@ function buildIndividualTravelSegmentParams(
     parent_generation_id: params.parent_generation_id,
   };
 
-  // Add SVI (smooth continuations) params if enabled
+  // Handle SVI (smooth continuations) - ALWAYS explicitly set the value
+  // This is needed because the original orchestrator_details is spread above and may have use_svi: true
   if (params.use_svi && params.svi_predecessor_video_url) {
     orchestratorDetails.use_svi = true;
     orchestratorDetails.svi_predecessor_video_url = params.svi_predecessor_video_url;
     console.log('[IndividualTravelSegment] SVI enabled:', {
       use_svi: true,
       svi_predecessor_video_url: params.svi_predecessor_video_url?.substring(0, 50) + '...',
+    });
+  } else {
+    // Explicitly disable SVI - override any inherited value from original orchestrator_details
+    orchestratorDetails.use_svi = false;
+    delete orchestratorDetails.svi_predecessor_video_url;
+    console.log('[IndividualTravelSegment] SVI disabled:', {
+      use_svi: false,
+      params_use_svi: params.use_svi,
+      params_has_predecessor_url: !!params.svi_predecessor_video_url,
     });
   }
 

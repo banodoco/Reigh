@@ -255,7 +255,15 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   // Defaults to previous value if available, otherwise true
   const [smoothContinuations, setSmoothContinuations] = useState(() => {
     const orchestrator = params.orchestrator_details || {};
-    return params.use_svi ?? orchestrator.use_svi ?? true;
+    const initialValue = params.use_svi ?? orchestrator.use_svi ?? true;
+    console.log('[SegmentRegenerateControls] [SVI] Initializing smoothContinuations:', {
+      initialValue,
+      params_use_svi: params.use_svi,
+      orchestrator_use_svi: orchestrator.use_svi,
+      hasPredecessorUrl: !!predecessorVideoUrl,
+      segmentIndex,
+    });
+    return initialValue;
   });
 
   // Max frames is 77 when smooth continuations is enabled, otherwise 81
@@ -417,6 +425,17 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
       const uiBasePrompt = params.base_prompt || params.prompt || '';
       const uiNegativePrompt = params.negative_prompt || '';
+
+      // [SVI Debug] Log exactly what SVI values we're sending
+      const sviUseValue = smoothContinuations && !!predecessorVideoUrl;
+      const sviPredecessorValue = smoothContinuations ? predecessorVideoUrl : undefined;
+      console.log('[SegmentRegenerateControls] [SVI] Creating task with:', {
+        smoothContinuations_state: smoothContinuations,
+        predecessorVideoUrl_exists: !!predecessorVideoUrl,
+        use_svi_being_sent: sviUseValue,
+        svi_predecessor_url_being_sent: !!sviPredecessorValue,
+        segmentIndex,
+      });
 
       await createIndividualTravelSegmentTask({
         project_id: projectId,

@@ -1063,8 +1063,16 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   console.log('[BasePromptsDebug]   segment_frames:', requestBody.segment_frames);
   console.log('[BasePromptsDebug]   phase_config phases:', requestBody.phase_config?.num_phases);
 
-  // NOTE: LoRAs are now ALWAYS in phase_config (for both basic and advanced mode)
-  // No separate loras array needed - unified backend processing
+  // LoRAs are in phase_config for GPU worker processing.
+  // Also send as separate loras array so they become additional_loras in orchestrator_details.
+  // This allows segment regeneration to preserve user-selected LoRAs.
+  if (selectedLoras && selectedLoras.length > 0) {
+    requestBody.loras = selectedLoras.map(l => ({
+      path: l.path,
+      strength: parseFloat(l.strength?.toString() ?? '1') || 1.0,
+    }));
+    console.log('[Generation] Adding user-selected LoRAs to additional_loras:', requestBody.loras);
+  }
 
   if (resolution) {
     requestBody.resolution = resolution;
