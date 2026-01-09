@@ -177,7 +177,7 @@ export const useVariants = ({
     },
     onSuccess: async (variantId) => {
       console.log('[useVariants] Successfully set primary variant:', variantId.substring(0, 8));
-      
+
       // Invalidate caches using centralized function
       if (generationId) {
         await invalidateVariantChange(queryClient, {
@@ -185,7 +185,73 @@ export const useVariants = ({
           reason: 'set-primary-variant',
         });
       }
-      
+
+      // SINGLE-SEGMENT PROPAGATION: If this is a child of a single-segment parent,
+      // also create a variant on the parent so the main generation updates
+      try {
+        // Get the promoted variant's location and thumbnail
+        const { data: promotedVariant } = await supabase
+          .from('generation_variants')
+          .select('location, thumbnail_url, params')
+          .eq('id', variantId)
+          .single();
+
+        if (!promotedVariant || !generationId) return;
+
+        // Check if this generation is a child with a parent
+        const { data: generation } = await supabase
+          .from('generations')
+          .select('is_child, parent_generation_id')
+          .eq('id', generationId)
+          .single();
+
+        if (!generation?.is_child || !generation?.parent_generation_id) return;
+
+        // Count how many children the parent has
+        const { count: childCount } = await supabase
+          .from('generations')
+          .select('id', { count: 'exact', head: true })
+          .eq('parent_generation_id', generation.parent_generation_id)
+          .eq('is_child', true);
+
+        // Only propagate for single-segment parents
+        if (childCount !== 1) {
+          console.log('[useVariants] Parent has multiple children, skipping propagation');
+          return;
+        }
+
+        console.log('[useVariants] Single-segment child - propagating to parent:', generation.parent_generation_id.substring(0, 8));
+
+        // Create a new variant on the parent with the promoted video
+        const { error: insertError } = await supabase
+          .from('generation_variants')
+          .insert({
+            generation_id: generation.parent_generation_id,
+            location: promotedVariant.location,
+            thumbnail_url: promotedVariant.thumbnail_url,
+            is_primary: true, // DB trigger will unset old primary
+            variant_type: 'travel_segment',
+            params: {
+              ...promotedVariant.params,
+              propagated_from_child: generationId,
+              propagated_from_variant: variantId,
+            },
+          });
+
+        if (insertError) {
+          console.error('[useVariants] Failed to propagate to parent:', insertError);
+        } else {
+          console.log('[useVariants] Successfully propagated to parent');
+          // Invalidate parent's variant cache
+          await invalidateVariantChange(queryClient, {
+            generationId: generation.parent_generation_id,
+            reason: 'single-segment-propagation',
+          });
+        }
+      } catch (err) {
+        console.error('[useVariants] Error in single-segment propagation:', err);
+        // Don't throw - this is a nice-to-have, not critical
+      }
     },
     onError: (error) => {
       console.error('[useVariants] Failed to set primary variant:', error);
