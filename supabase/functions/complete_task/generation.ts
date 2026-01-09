@@ -689,33 +689,30 @@ export async function createGenerationFromTask(
           if (orchDetails && !isNaN(childOrder)) {
             console.log(`[GenMigration] Extracting specific params for child segment ${childOrder}`);
 
-          // SPECIAL CASE: For travel orchestrators with only 1 segment, the segment IS the final output
-          // We create a variant on parent (like travel_stitch would) and RETURN EARLY
-          // No child generation needed - the single segment output becomes the parent's primary content
+          // SPECIAL CASE: For travel orchestrators with only 1 segment, create variant on parent
+          // AND also create a child generation for consistency with multi-segment behavior
           if (childOrder === 0) {
             const numSegments = orchDetails.num_new_segments_to_generate;
             if (numSegments === 1 && parentGenerationId) {
-              console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent (no child generation)`);
-              logger?.info("Single-segment orchestrator - creating variant on parent", {
+              console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent AND child generation`);
+              logger?.info("Single-segment orchestrator - creating variant on parent and child", {
                 task_id: taskId,
                 parent_generation_id: parentGenerationId,
                 num_segments: numSegments,
-                action: "create_variant_on_parent_single_segment"
+                action: "create_variant_on_parent_and_child_single_segment"
               });
-              
-              const singleSegmentResult = await createVariantOnParent(
+
+              // Create variant on parent so the main generation shows the video
+              await createVariantOnParent(
                 supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
                 VARIANT_TYPES.TRAVEL_SEGMENT, { tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true }
               );
-              
+
               // Mark orchestrator task as having created a generation
               await supabase.from('tasks').update({ generation_created: true }).eq('id', orchestratorTaskId);
-              
-              // Return early - single segment output IS the final output, no child needed
-              if (singleSegmentResult) {
-                console.log(`[TravelSingleSegment] Successfully created variant, returning parent generation`);
-                return singleSegmentResult;
-              }
+
+              // Continue to also create child generation below (don't return early)
+              console.log(`[TravelSingleSegment] Variant created, continuing to create child generation`);
             }
           }
 
