@@ -174,7 +174,12 @@ export async function applyInheritedSettings(
   if (mainSettings || uiSettings) {
     const defaultsToApply = {
       ...(mainSettings || {}),
-      _uiSettings: uiSettings || {}
+      _uiSettings: uiSettings || {},
+      // Always start with empty prompt fields for new shots (don't inherit)
+      batchVideoPrompt: '',
+      textBeforePrompts: '',
+      textAfterPrompts: '',
+      pairConfigs: [],
     };
     const storageKey = STORAGE_KEYS.APPLY_PROJECT_DEFAULTS(newShotId);
     sessionStorage.setItem(storageKey, JSON.stringify(defaultsToApply));

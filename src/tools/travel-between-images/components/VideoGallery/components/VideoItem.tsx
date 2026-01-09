@@ -132,9 +132,9 @@ export const VideoItem = React.memo<VideoItemProps>(({
     }
   }, [existingShareSlug]);
 
-  // Fetch child generations when video has no location but might have segments
+  // Fetch child generations for parent videos (to show "View X Segments" CTA)
   useEffect(() => {
-    const shouldCheckForChildren = !video.parent_generation_id && !video.location && video.id;
+    const shouldCheckForChildren = !video.parent_generation_id && video.id;
     
     if (shouldCheckForChildren) {
       setIsLoadingChildren(true);
@@ -1158,6 +1158,44 @@ export const VideoItem = React.memo<VideoItemProps>(({
             <TimeStamp createdAt={video.created_at} showOnHover={!isMobile} />
           </div>
         </div>
+
+        {/* View Segments CTAs - Shows on videos that have output but also have segments */}
+        {/* Uses pointer-events-none on container so video remains scrubable */}
+        {!showCollage && video.location && childGenerations.length > 0 && onViewSegments && !video.parent_generation_id && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-15 pointer-events-none">
+            <button
+              className="pointer-events-auto bg-black/70 backdrop-blur-md text-white px-2 py-1 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium flex items-center gap-1 md:gap-2 shadow-lg border border-white/10 transform transition-transform hover:scale-105 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (onViewSegments) onViewSegments(video);
+              }}
+              onTouchEnd={isMobile ? (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (onViewSegments) onViewSegments(video);
+              } : undefined}
+            >
+              <Layers className="w-3 h-3 md:w-4 md:h-4" />
+              View {childGenerations.length} Segments
+            </button>
+            <button
+              className="pointer-events-auto bg-black/40 text-white/80 px-2 py-1 rounded text-[10px] md:text-xs font-normal flex items-center gap-1 transition-colors hover:bg-black/60 hover:text-white cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onLightboxOpen(originalIndex);
+              }}
+              onTouchEnd={isMobile ? (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onLightboxOpen(originalIndex);
+              } : undefined}
+            >
+              View final video
+            </button>
+          </div>
+        )}
 
         {/* Bottom Overlay - View Segments Button & Variant Name */}
         <div className="absolute bottom-0 left-0 right-0 pb-2 pl-3 pr-3 pt-6 flex justify-between items-end bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none">

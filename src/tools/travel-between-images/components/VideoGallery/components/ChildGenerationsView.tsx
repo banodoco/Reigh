@@ -1186,30 +1186,67 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
     // Handler to clear only the output URL from the parent generation (not delete the generation itself)
     const handleClearParentOutput = useCallback(async () => {
-        if (!parentGenerationId) return;
-        
+        console.log('[ClearParentOutput] Called with parentGenerationId:', parentGenerationId);
+        if (!parentGenerationId) {
+            console.log('[ClearParentOutput] No parentGenerationId, returning early');
+            return;
+        }
+
         try {
-            const { error } = await supabase
+            // First, get the primary_variant_id so we can clear the variant too
+            // (The sync triggers use COALESCE which prevents null from being set via generation update)
+            const { data: genData } = await supabase
                 .from('generations')
-                .update({ 
-                    location: null,
-                    thumbnail_url: null 
-                })
-                .eq('id', parentGenerationId);
-            
-            if (error) throw error;
-            
+                .select('primary_variant_id')
+                .eq('id', parentGenerationId)
+                .single();
+
+            console.log('[ClearParentOutput] Generation data:', genData);
+
+            // Delete the primary variant (location column has NOT NULL constraint)
+            // The handle_variant_deletion trigger will either:
+            // - Promote the next variant to primary, OR
+            // - Clear the generation's location/thumbnail if no variants remain
+            if (genData?.primary_variant_id) {
+                console.log('[ClearParentOutput] Deleting primary variant:', genData.primary_variant_id);
+                const { error: variantError } = await supabase
+                    .from('generation_variants')
+                    .delete()
+                    .eq('id', genData.primary_variant_id);
+
+                if (variantError) {
+                    console.error('[ClearParentOutput] Error deleting variant:', variantError);
+                    throw variantError;
+                }
+                console.log('[ClearParentOutput] Variant deleted successfully');
+            } else {
+                // No variant - clear the generation directly
+                console.log('[ClearParentOutput] No primary variant, clearing generation directly...');
+                const { error } = await supabase
+                    .from('generations')
+                    .update({
+                        location: null,
+                        thumbnail_url: null
+                    })
+                    .eq('id', parentGenerationId);
+
+                if (error) throw error;
+            }
+
             toast({
                 title: "Output cleared",
                 description: "Final video output has been removed. You can regenerate it.",
             });
-            
+
             // Invalidate queries using centralized helper
             invalidateGenerationUpdate(queryClient, {
                 generationId: parentGenerationId,
                 projectId: projectId || undefined,
                 reason: 'clear-parent-output',
             });
+
+            // Refetch to update the UI
+            refetch();
         } catch (error) {
             console.error('[ChildGenerationsView] Error clearing parent output:', error);
             toast({
@@ -1218,7 +1255,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 variant: "destructive",
             });
         }
-    }, [parentGenerationId, queryClient, toast, projectId]);
+    }, [parentGenerationId, queryClient, toast, projectId, refetch]);
 
     // Handler for opening external generation (for "Based On" navigation in lightboxes)
     const handleOpenExternalGeneration = useCallback(async (

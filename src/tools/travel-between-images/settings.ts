@@ -164,8 +164,7 @@ export const videoTravelSettings = {
   scope: ['shot'], // Video travel settings are per-shot
   defaults: {
     // Content fields - explicit empty defaults
-    // Note: batchVideoPrompt, textBeforePrompts, textAfterPrompts DO inherit to new shots
-    // (via shotSettingsInheritance.ts), but start empty for new projects
+    // These do NOT inherit to new shots (cleared in shotSettingsInheritance.ts)
     batchVideoPrompt: '',
     pairConfigs: [],
     shotImageIds: [],
