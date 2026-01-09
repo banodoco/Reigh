@@ -778,6 +778,49 @@ export function useUpdateGenerationName() {
   });
 }
 
+/**
+ * Update generation params using direct Supabase call.
+ * Used for persisting user overrides on segment regeneration controls.
+ */
+export function useUpdateGenerationParams() {
+  return useMutation({
+    mutationFn: async ({ id, params }: { id: string; params: Record<string, any> }) => {
+      console.log('[GenerationUpdate] Updating generation params', {
+        id: id.substring(0, 8),
+        paramsKeys: Object.keys(params),
+        timestamp: Date.now()
+      });
+
+      const { data, error } = await supabase
+        .from('generations')
+        .update({ params })
+        .eq('id', id)
+        .select('id');
+
+      if (error) {
+        console.error('[GenerationUpdate] Failed to update params', { id, error: error.message });
+        throw new Error(`Failed to update generation params: ${error.message}`);
+      }
+
+      console.log('[GenerationUpdate] Successfully updated params', {
+        id: id.substring(0, 8),
+        timestamp: Date.now()
+      });
+
+      return data;
+    },
+    onSuccess: () => {
+      // Don't invalidate queries - the local state in the component is the source of truth
+      // while editing. Refetching could cause race conditions where user input is lost
+      // if they continue typing after a save completes.
+    },
+    onError: (error: Error) => {
+      console.error('Error updating generation params:', error);
+      // Don't show toast for params updates - they're auto-saved in background
+    },
+  });
+}
+
 // NOTE: useGetTaskIdForGeneration moved to generationTaskBridge.ts for centralization
 
 export function useCreateGeneration() {

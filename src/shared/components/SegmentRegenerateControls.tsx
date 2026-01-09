@@ -15,7 +15,7 @@ import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
-import { ChevronDown, ChevronUp, Loader2, Check, RotateCcw, Upload } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronLeft, Loader2, Check, RotateCcw, Upload } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
@@ -103,6 +103,8 @@ export interface SegmentRegenerateControlsProps {
   predecessorVideoUrl?: string;
   /** Whether to show the smooth continuations toggle (only shown when predecessorVideoUrl is available) */
   showSmoothContinuation?: boolean;
+  /** Callback when user overrides change - for persisting to database */
+  onOverridesChange?: (overrides: Record<string, any> | null) => void;
 }
 
 export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps> = ({
@@ -128,6 +130,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   headerTitle = 'Regenerate Video',
   predecessorVideoUrl,
   showSmoothContinuation = false,
+  onOverridesChange,
 }) => {
   const { toast } = useToast();
 
@@ -157,9 +160,59 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     }
   }, [onEndImageUpload]);
 
-  // Use shared normalization utility
-  const [params, setParams] = useState<any>(() => getNormalizedParams(initialParams, { segmentIndex }));
+  // Track user overrides - these persist across variant switches
+  const [userOverrides, setUserOverrides] = useState<Record<string, any>>(
+    () => initialParams.user_overrides || {}
+  );
+
+  // Use shared normalization utility, then apply user overrides on top
+  const [params, setParams] = useState<any>(() => {
+    const normalized = getNormalizedParams(initialParams, { segmentIndex });
+    const overrides = initialParams.user_overrides || {};
+    return { ...normalized, ...overrides };
+  });
   const [isDirty, setIsDirty] = useState(false);
+
+  // Debounce timer ref for saving overrides
+  const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced save function
+  const debouncedSaveOverrides = useCallback((overrides: Record<string, any>) => {
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    // Schedule save after 1 second of no changes
+    saveTimeoutRef.current = setTimeout(() => {
+      onOverridesChange?.(Object.keys(overrides).length > 0 ? overrides : null);
+    }, 1000);
+  }, [onOverridesChange]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Helper to update a field and track it as a user override
+  const updateOverride = useCallback((field: string, value: any) => {
+    setUserOverrides(prev => {
+      const updated = { ...prev, [field]: value };
+      debouncedSaveOverrides(updated);
+      return updated;
+    });
+    setParams((prev: any) => ({ ...prev, [field]: value }));
+    setIsDirty(true);
+  }, [debouncedSaveOverrides]);
+
+  // Helper to clear an override (sets to empty, not back to default)
+  const clearOverride = useCallback((field: string) => {
+    const emptyValue = field === 'additional_loras' ? {} : '';
+    updateOverride(field, emptyValue);
+  }, [updateOverride]);
 
   // [ResolutionDebug] Log what resolution this component received on mount
   console.log('[SegmentRegenerateControls] [ResolutionDebug] Component received props:', {
@@ -288,76 +341,158 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     });
   });
 
-  // Handle field changes
+  // Handle field changes (legacy - use updateOverride for new code)
   const handleChange = useCallback((field: string, value: any) => {
     setParams((prev: any) => ({ ...prev, [field]: value }));
     setIsDirty(true);
   }, []);
 
-  // Motion control handlers
+  // Motion control handlers - also save as overrides for persistence
   const handleMotionModeChange = useCallback((mode: 'basic' | 'advanced') => {
     setMotionMode(mode);
-    setIsDirty(true);
+    updateOverride('motion_mode', mode);
     if (mode === 'advanced' && !phaseConfig) {
-      setPhaseConfig(builtinPreset.metadata.phaseConfig);
+      const defaultConfig = builtinPreset.metadata.phaseConfig;
+      setPhaseConfig(defaultConfig);
+      updateOverride('phase_config', defaultConfig);
     }
-  }, [phaseConfig, builtinPreset]);
+  }, [phaseConfig, builtinPreset, updateOverride]);
 
   const handleAmountOfMotionChange = useCallback((value: number) => {
     setAmountOfMotion(value);
-    setIsDirty(true);
-  }, []);
+    updateOverride('amount_of_motion', value);
+  }, [updateOverride]);
 
   const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
     setPhaseConfig(config);
-    setIsDirty(true);
-  }, []);
+    updateOverride('phase_config', config);
+  }, [updateOverride]);
 
   const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig) => {
     setSelectedPhasePresetId(presetId);
     setPhaseConfig(config);
+    // Save both as overrides
+    setUserOverrides(prev => {
+      const updated = { ...prev, selected_phase_preset_id: presetId, phase_config: config };
+      debouncedSaveOverrides(updated);
+      return updated;
+    });
     setIsDirty(true);
-  }, []);
+  }, [debouncedSaveOverrides]);
 
   const handlePhasePresetRemove = useCallback(() => {
     setSelectedPhasePresetId(null);
-    setIsDirty(true);
-  }, []);
+    updateOverride('selected_phase_preset_id', null);
+  }, [updateOverride]);
 
   const handleRandomSeedChange = useCallback((value: boolean) => {
     setRandomSeed(value);
-    setIsDirty(true);
-  }, []);
+    updateOverride('random_seed', value);
+  }, [updateOverride]);
 
-  // LoRA handlers
+  // LoRA handlers - save as overrides for persistence
   const handleAddLoraClick = useCallback(() => {
     setIsLoraModalOpen(true);
   }, []);
 
-  const handleRemoveLora = useCallback((loraId: string) => {
-    setSelectedLoras(prev => prev.filter(l => l.id !== loraId));
-    setIsDirty(true);
+  // Helper to convert selectedLoras to override format
+  const lorasToOverrideFormat = useCallback((loras: ActiveLora[]) => {
+    const loraObj: Record<string, number> = {};
+    loras.forEach(l => {
+      loraObj[l.path || l.id] = l.strength;
+    });
+    return loraObj;
   }, []);
 
+  const handleRemoveLora = useCallback((loraId: string) => {
+    setSelectedLoras(prev => {
+      const updated = prev.filter(l => l.id !== loraId);
+      updateOverride('additional_loras', lorasToOverrideFormat(updated));
+      return updated;
+    });
+  }, [updateOverride, lorasToOverrideFormat]);
+
   const handleLoraStrengthChange = useCallback((loraId: string, strength: number) => {
-    setSelectedLoras(prev => prev.map(l => l.id === loraId ? { ...l, strength } : l));
-    setIsDirty(true);
-  }, []);
+    setSelectedLoras(prev => {
+      const updated = prev.map(l => l.id === loraId ? { ...l, strength } : l);
+      updateOverride('additional_loras', lorasToOverrideFormat(updated));
+      return updated;
+    });
+  }, [updateOverride, lorasToOverrideFormat]);
 
   const handleLoraSelect = useCallback((lora: LoraModel) => {
     setSelectedLoras(prev => {
       if (prev.some(l => l.id === lora.id || l.path === lora.path)) {
         return prev;
       }
-      return [...prev, {
+      const updated = [...prev, {
         id: lora.id || lora.path,
         name: lora.name,
         path: lora.path,
         strength: lora.default_strength || 1.0,
       }];
+      updateOverride('additional_loras', lorasToOverrideFormat(updated));
+      return updated;
     });
-    setIsDirty(true);
-  }, []);
+  }, [updateOverride, lorasToOverrideFormat]);
+
+  // Reset to defaults - clears all user overrides and restores variant/default settings
+  const handleResetToDefaults = useCallback(() => {
+    // Get normalized params WITHOUT user overrides (this is the "default" state)
+    const paramsWithoutOverrides = { ...initialParams };
+    delete paramsWithoutOverrides.user_overrides;
+    const normalized = getNormalizedParams(paramsWithoutOverrides, { segmentIndex });
+
+    // Reset params state
+    setParams(normalized);
+    setUserOverrides({});
+    setIsDirty(false);
+
+    // Reset motion control state to defaults from normalized params
+    const orchestrator = normalized.orchestrator_details || {};
+
+    // Motion mode
+    if (orchestrator.advanced_mode || normalized.advanced_mode) {
+      setMotionMode('advanced');
+    } else {
+      const savedMotionMode = orchestrator.motion_mode || normalized.motion_mode;
+      setMotionMode(savedMotionMode === 'advanced' ? 'advanced' : 'basic');
+    }
+
+    // Amount of motion
+    const rawMotion = normalized.amount_of_motion ?? orchestrator.amount_of_motion ?? 0.5;
+    setAmountOfMotion(Math.round(rawMotion * 100));
+
+    // Phase config
+    setPhaseConfig(orchestrator.phase_config || normalized.phase_config || undefined);
+    setSelectedPhasePresetId(orchestrator.selected_phase_preset_id || normalized.selected_phase_preset_id || null);
+
+    // Random seed
+    const savedRandomSeed = orchestrator.random_seed ?? normalized.random_seed;
+    setRandomSeed(savedRandomSeed !== undefined ? savedRandomSeed : true);
+
+    // LoRAs
+    const lorasObj = normalized.additional_loras || orchestrator.additional_loras || {};
+    const restoredLoras: ActiveLora[] = Object.entries(lorasObj).map(([url, strength]) => {
+      const filename = url.split('/').pop()?.replace('.safetensors', '') || url;
+      return {
+        id: url,
+        name: filename,
+        path: url,
+        strength: typeof strength === 'number' ? strength : 1.0,
+      };
+    });
+    setSelectedLoras(restoredLoras);
+
+    // Clear the pending save timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+
+    // Save the cleared overrides to DB immediately
+    onOverridesChange?.(null);
+  }, [initialParams, segmentIndex, onOverridesChange]);
 
   // Handle segment regeneration
   const handleRegenerateSegment = useCallback(async () => {
@@ -504,10 +639,46 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     toast
   ]);
 
-  // Update local state when params prop changes
+  // Update local state when params prop changes, preserving user overrides
   useEffect(() => {
-    setParams(getNormalizedParams(initialParams, { segmentIndex }));
+    const normalized = getNormalizedParams(initialParams, { segmentIndex });
+    const overrides = initialParams.user_overrides || {};
+
+    // Apply user overrides on top of normalized defaults
+    setParams({ ...normalized, ...overrides });
+    setUserOverrides(overrides);
     setIsDirty(false);
+
+    // Also restore motion control state from overrides if present
+    if (overrides.motion_mode !== undefined) {
+      setMotionMode(overrides.motion_mode);
+    }
+    if (overrides.amount_of_motion !== undefined) {
+      setAmountOfMotion(overrides.amount_of_motion);
+    }
+    if (overrides.phase_config !== undefined) {
+      setPhaseConfig(overrides.phase_config);
+    }
+    if (overrides.selected_phase_preset_id !== undefined) {
+      setSelectedPhasePresetId(overrides.selected_phase_preset_id);
+    }
+    if (overrides.random_seed !== undefined) {
+      setRandomSeed(overrides.random_seed);
+    }
+    // Restore LoRAs from overrides if present
+    if (overrides.additional_loras !== undefined) {
+      const lorasObj = overrides.additional_loras;
+      const restored: ActiveLora[] = Object.entries(lorasObj).map(([url, strength]) => {
+        const filename = url.split('/').pop()?.replace('.safetensors', '') || url;
+        return {
+          id: url,
+          name: filename,
+          path: url,
+          strength: typeof strength === 'number' ? strength : 1.0,
+        };
+      });
+      setSelectedLoras(restored);
+    }
   }, [initialParams, segmentIndex]);
 
   return (
@@ -655,7 +826,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
               </div>
               <Slider
                 value={[quantizeFrameCount(params.num_frames || 9, 9)]}
-                onValueChange={([value]) => handleChange('num_frames', quantizeFrameCount(value, 9))}
+                onValueChange={([value]) => updateOverride('num_frames', quantizeFrameCount(value, 9))}
                 min={9}
                 max={maxFrames}
                 step={4}
@@ -736,29 +907,25 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         <Textarea
           value={params.base_prompt || params.prompt || ''}
           onChange={(e) => {
-            setParams((prev: any) => ({
-              ...prev,
-              base_prompt: e.target.value,
-              prompt: e.target.value
-            }));
-            setIsDirty(true);
+            const newValue = e.target.value;
+            // Update both base_prompt and prompt for compatibility
+            updateOverride('base_prompt', newValue);
+            setParams((prev: any) => ({ ...prev, prompt: newValue }));
           }}
           className="h-20 text-sm resize-none"
           placeholder="Describe this segment..."
           clearable
           onClear={() => {
-            setParams((prev: any) => ({ ...prev, base_prompt: '', prompt: '' }));
-            setIsDirty(true);
+            // Clear sets to empty (not back to default)
+            clearOverride('base_prompt');
+            setParams((prev: any) => ({ ...prev, prompt: '' }));
           }}
           voiceInput
           voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
           onVoiceResult={(result) => {
-            setParams((prev: any) => ({
-              ...prev,
-              base_prompt: result.prompt || result.transcription,
-              prompt: result.prompt || result.transcription
-            }));
-            setIsDirty(true);
+            const newValue = result.prompt || result.transcription;
+            updateOverride('base_prompt', newValue);
+            setParams((prev: any) => ({ ...prev, prompt: newValue }));
           }}
         />
       </div>
@@ -769,31 +936,32 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-between h-9 text-xs font-medium"
+            className={`w-full justify-between h-9 text-xs font-medium ${
+              showAdvanced
+                ? 'bg-muted text-foreground hover:bg-muted rounded-b-none'
+                : 'bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary'
+            }`}
           >
             <span>Advanced Settings</span>
-            {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            <ChevronLeft className={`w-3 h-3 transition-transform ${showAdvanced ? '-rotate-90' : ''}`} />
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4 pt-3">
-          {/* Generation Settings Section */}
-          <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Generation Settings:</Label>
-
+        <CollapsibleContent className="-mx-4">
+          <div className="space-y-3 p-3 bg-muted/30 border-y border-border/50">
             {/* Negative Prompt */}
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Negative Prompt:</Label>
               <Textarea
                 value={params.negative_prompt || ''}
-                onChange={(e) => handleChange('negative_prompt', e.target.value)}
+                onChange={(e) => updateOverride('negative_prompt', e.target.value)}
                 className="h-16 text-xs resize-none"
                 placeholder="Things to avoid..."
                 clearable
-                onClear={() => handleChange('negative_prompt', '')}
+                onClear={() => clearOverride('negative_prompt')}
                 voiceInput
                 voiceContext="This is a negative prompt - things to AVOID in video generation. List unwanted qualities as a comma-separated list."
                 onVoiceResult={(result) => {
-                  handleChange('negative_prompt', result.prompt || result.transcription);
+                  updateOverride('negative_prompt', result.prompt || result.transcription);
                 }}
               />
             </div>
@@ -821,41 +989,41 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                 {params.seed_to_use || params.orchestrator_details?.seed_base || 'Random'}
               </span>
             </div>
-          </div>
 
-          {/* Motion Settings */}
-          <MotionPresetSelector
-            builtinPreset={builtinPreset}
-            featuredPresetIds={[]}
-            generationTypeMode={generationMode}
-            selectedPhasePresetId={selectedPhasePresetId}
-            phaseConfig={phaseConfig ?? builtinPreset.metadata.phaseConfig}
-            motionMode={motionMode}
-            onPresetSelect={handlePhasePresetSelect}
-            onPresetRemove={handlePhasePresetRemove}
-            onModeChange={handleMotionModeChange}
-            onPhaseConfigChange={handlePhaseConfigChange}
-            availableLoras={availableLoras}
-            randomSeed={randomSeed}
-            onRandomSeedChange={handleRandomSeedChange}
-            queryKeyPrefix={queryKeyPrefix}
-            renderBasicModeContent={() => (
-              <div className="space-y-3">
-                <ActiveLoRAsDisplay
-                  selectedLoras={selectedLoras}
-                  onRemoveLora={handleRemoveLora}
-                  onLoraStrengthChange={handleLoraStrengthChange}
-                  availableLoras={availableLoras}
-                />
-                <button
-                  onClick={handleAddLoraClick}
-                  className="w-full text-sm text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 rounded-lg py-2 transition-colors"
-                >
-                  Add or manage LoRAs
-                </button>
-              </div>
-            )}
-          />
+            {/* Motion Settings */}
+            <MotionPresetSelector
+              builtinPreset={builtinPreset}
+              featuredPresetIds={[]}
+              generationTypeMode={generationMode}
+              selectedPhasePresetId={selectedPhasePresetId}
+              phaseConfig={phaseConfig ?? builtinPreset.metadata.phaseConfig}
+              motionMode={motionMode}
+              onPresetSelect={handlePhasePresetSelect}
+              onPresetRemove={handlePhasePresetRemove}
+              onModeChange={handleMotionModeChange}
+              onPhaseConfigChange={handlePhaseConfigChange}
+              availableLoras={availableLoras}
+              randomSeed={randomSeed}
+              onRandomSeedChange={handleRandomSeedChange}
+              queryKeyPrefix={queryKeyPrefix}
+              renderBasicModeContent={() => (
+                <div className="space-y-3">
+                  <ActiveLoRAsDisplay
+                    selectedLoras={selectedLoras}
+                    onRemoveLora={handleRemoveLora}
+                    onLoraStrengthChange={handleLoraStrengthChange}
+                    availableLoras={availableLoras}
+                  />
+                  <button
+                    onClick={handleAddLoraClick}
+                    className="w-full text-sm text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 rounded-lg py-2 transition-colors"
+                  >
+                    Add or manage LoRAs
+                  </button>
+                </div>
+              )}
+            />
+          </div>
 
           {/* LoRA Selector Modal */}
           <LoraSelectorModal
@@ -905,6 +1073,15 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
           </>
         )}
       </Button>
+
+      {/* Reset to variant defaults */}
+      <button
+        type="button"
+        onClick={handleResetToDefaults}
+        className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        Reset to variant defaults
+      </button>
 
       {/* Warning if missing images */}
       {(!startImageUrl || !endImageUrl) && (

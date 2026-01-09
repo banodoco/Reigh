@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration, useUpdateGenerationParams } from '@/shared/hooks/useGenerations';
 import { GenerationRow } from '@/types/shots';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Separator } from '@/shared/components/ui/separator';
@@ -1926,6 +1926,9 @@ interface SegmentCardProps {
 const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, projectId, parentGenerationId, onLightboxOpen, onLightboxOpenWithTrim, onMobileTap, onUpdate, onDelete, isDeleting, availableLoras, onImageLightboxOpen, projectResolution, aspectRatio, onStartImageUpload, onEndImageUpload, isUploadingStartImage, isUploadingEndImage, predecessorVideoUrl }) => {
     const isMobile = useIsMobile();
 
+    // Mutation hook for saving user overrides to the generation params
+    const updateParams = useUpdateGenerationParams();
+
     // Fetch variants to get the most recent one's params
     // Variants are sorted by created_at descending, so variants[0] is most recent
     const { variants } = useVariants({ generationId: child.id });
@@ -1933,7 +1936,28 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
     // Use the most recent variant's params for the regeneration form
     // This ensures the form shows settings from the latest regeneration attempt
     const mostRecentVariant = variants[0];
-    const childParams = mostRecentVariant?.params || child.params || {};
+    const baseParams = mostRecentVariant?.params || child.params || {};
+
+    // Always preserve user_overrides from the generation (not variant)
+    // This ensures user edits persist across variant switches
+    const childParams = useMemo(() => ({
+        ...baseParams,
+        user_overrides: (child.params as any)?.user_overrides,
+    }), [baseParams, (child.params as any)?.user_overrides]);
+
+    // Callback to save user overrides when they change
+    const handleOverridesChange = useCallback((overrides: Record<string, any> | null) => {
+        if (!child.id) return;
+
+        const currentParams = child.params || {};
+        updateParams.mutate({
+            id: child.id,
+            params: {
+                ...currentParams,
+                user_overrides: overrides,
+            }
+        });
+    }, [child.id, child.params, updateParams]);
 
     // Calculate aspect ratio style for video container based on project/shot dimensions
     const aspectRatioStyle = useMemo(() => {
@@ -2135,6 +2159,7 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                     buttonLabel="Regenerate Segment"
                     predecessorVideoUrl={predecessorVideoUrl}
                     showSmoothContinuation={index > 0 && !!predecessorVideoUrl}
+                    onOverridesChange={handleOverridesChange}
                 />
             </CardContent>
         </Card>
