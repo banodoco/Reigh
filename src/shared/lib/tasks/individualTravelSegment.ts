@@ -56,6 +56,8 @@ export interface IndividualTravelSegmentParams {
   // Smooth continuations (SVI) - for smoother transitions between segments
   use_svi?: boolean;
   svi_predecessor_video_url?: string;
+  svi_strength_1?: number;
+  svi_strength_2?: number;
 }
 
 // Maximum frames allowed per segment (81-frame limit)
@@ -120,15 +122,21 @@ function buildIndividualTravelSegmentParams(
   }
 
   // Build additional_loras from params.loras or original
+  // If params.loras is explicitly provided (even as empty array), use it - user may have removed all LoRAs
+  // Only fall back to original if params.loras is undefined
   const additionalLoras: Record<string, number> = {};
-  if (params.loras && params.loras.length > 0) {
+  if (params.loras !== undefined) {
+    // User explicitly provided loras (could be empty array to clear them)
     params.loras.forEach(lora => {
       additionalLoras[lora.path] = lora.strength;
     });
+    console.log('[IndividualTravelSegment] Using provided loras:', params.loras.length > 0 ? params.loras : '(none - cleared by user)');
   } else if (orig.additional_loras) {
     Object.assign(additionalLoras, orig.additional_loras);
+    console.log('[IndividualTravelSegment] Using original additional_loras');
   } else if (orchDetails.additional_loras) {
     Object.assign(additionalLoras, orchDetails.additional_loras);
+    console.log('[IndividualTravelSegment] Using orchestrator_details additional_loras');
   }
 
   // Determine phase_config
@@ -216,14 +224,20 @@ function buildIndividualTravelSegmentParams(
   if (params.use_svi && params.svi_predecessor_video_url) {
     orchestratorDetails.use_svi = true;
     orchestratorDetails.svi_predecessor_video_url = params.svi_predecessor_video_url;
+    orchestratorDetails.svi_strength_1 = params.svi_strength_1 ?? 1.0;
+    orchestratorDetails.svi_strength_2 = params.svi_strength_2 ?? 0.5;
     console.log('[IndividualTravelSegment] SVI enabled:', {
       use_svi: true,
+      svi_strength_1: orchestratorDetails.svi_strength_1,
+      svi_strength_2: orchestratorDetails.svi_strength_2,
       svi_predecessor_video_url: params.svi_predecessor_video_url?.substring(0, 50) + '...',
     });
   } else {
     // Explicitly disable SVI - override any inherited value from original orchestrator_details
     orchestratorDetails.use_svi = false;
     delete orchestratorDetails.svi_predecessor_video_url;
+    delete orchestratorDetails.svi_strength_1;
+    delete orchestratorDetails.svi_strength_2;
     console.log('[IndividualTravelSegment] SVI disabled:', {
       use_svi: false,
       params_use_svi: params.use_svi,

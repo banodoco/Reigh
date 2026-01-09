@@ -250,20 +250,18 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     { scope: 'project', enabled: !!projectId }
   );
 
-  // Smooth continuations (SVI) - for smoother transitions between segments
-  // Only available when predecessorVideoUrl is provided (segments after the first)
-  // Defaults to previous value if available, otherwise true
-  const [smoothContinuations, setSmoothContinuations] = useState(() => {
+  // Smooth continuations (SVI) - DISABLED for now
+  // TODO: Re-enable when SVI is ready for production
+  const [smoothContinuations, setSmoothContinuations] = useState(false);
+
+  // SVI strength values - control how much the previous segment influences the current one
+  const [sviStrength1, setSviStrength1] = useState(() => {
     const orchestrator = params.orchestrator_details || {};
-    const initialValue = params.use_svi ?? orchestrator.use_svi ?? true;
-    console.log('[SegmentRegenerateControls] [SVI] Initializing smoothContinuations:', {
-      initialValue,
-      params_use_svi: params.use_svi,
-      orchestrator_use_svi: orchestrator.use_svi,
-      hasPredecessorUrl: !!predecessorVideoUrl,
-      segmentIndex,
-    });
-    return initialValue;
+    return params.svi_strength_1 ?? orchestrator.svi_strength_1 ?? 1.0;
+  });
+  const [sviStrength2, setSviStrength2] = useState(() => {
+    const orchestrator = params.orchestrator_details || {};
+    return params.svi_strength_2 ?? orchestrator.svi_strength_2 ?? 0.5;
   });
 
   // Max frames is 77 when smooth continuations is enabled, otherwise 81
@@ -463,6 +461,8 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         // Smooth continuations (SVI) params
         use_svi: smoothContinuations && !!predecessorVideoUrl,
         svi_predecessor_video_url: smoothContinuations ? predecessorVideoUrl : undefined,
+        svi_strength_1: smoothContinuations ? sviStrength1 : undefined,
+        svi_strength_2: smoothContinuations ? sviStrength2 : undefined,
       });
 
       setRegenerateSuccess(true);
@@ -498,6 +498,8 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     makePrimaryVariant,
     projectResolution,
     smoothContinuations,
+    sviStrength1,
+    sviStrength2,
     predecessorVideoUrl,
     toast
   ]);
@@ -562,13 +564,20 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                 <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">Start</span>
                 {/* Upload button overlay - shows on hover */}
                 {onStartImageUpload && (
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => {
                       e.stopPropagation();
-                      startImageInputRef.current?.click();
+                      if (!isUploadingStartImage) startImageInputRef.current?.click();
                     }}
-                    disabled={isUploadingStartImage}
-                    className="absolute top-1 right-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all opacity-0 group-hover:opacity-100"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                        if (!isUploadingStartImage) startImageInputRef.current?.click();
+                      }
+                    }}
+                    className={`absolute top-1 right-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all opacity-0 group-hover:opacity-100 cursor-pointer ${isUploadingStartImage ? 'pointer-events-none' : ''}`}
                     title="Replace start image"
                   >
                     {isUploadingStartImage ? (
@@ -576,7 +585,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                     ) : (
                       <Upload className="h-3 w-3" />
                     )}
-                  </button>
+                  </div>
                 )}
               </button>
             ) : onStartImageUpload ? (
@@ -598,10 +607,10 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
           {/* Frames Slider - 1/3 width on wide, full width on narrow (spans 2 cols, shown last) */}
           <div className="order-last col-span-2 @[280px]:order-none @[280px]:col-span-1 flex items-center gap-2">
-            {/* Smooth Continuations Toggle - compact, left of frames */}
+            {/* Smooth Continuations Toggle + Strength - DISABLED for now
             {showSmoothContinuation && predecessorVideoUrl && (
-              <div className="flex flex-col items-center justify-center shrink-0 w-10">
-                <span className="text-[8px] text-muted-foreground mb-0.5 leading-tight text-center">
+              <div className="flex flex-col items-center justify-center shrink-0 gap-0.5">
+                <span className="text-[8px] text-muted-foreground leading-tight text-center">
                   continue from previous
                 </span>
                 <Switch
@@ -610,8 +619,33 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                   onCheckedChange={setSmoothContinuations}
                   className="scale-75"
                 />
+                {smoothContinuations && (
+                  <div className="flex gap-1">
+                    <input
+                      type="number"
+                      value={sviStrength1}
+                      onChange={(e) => setSviStrength1(parseFloat(e.target.value) || 1.0)}
+                      step={0.1}
+                      min={0}
+                      max={2}
+                      className="w-10 h-5 text-[10px] text-center bg-background border border-border rounded px-0.5"
+                      title="SVI strength 1"
+                    />
+                    <input
+                      type="number"
+                      value={sviStrength2}
+                      onChange={(e) => setSviStrength2(parseFloat(e.target.value) || 0.5)}
+                      step={0.1}
+                      min={0}
+                      max={2}
+                      className="w-10 h-5 text-[10px] text-center bg-background border border-border rounded px-0.5"
+                      title="SVI strength 2"
+                    />
+                  </div>
+                )}
               </div>
             )}
+            */}
             <div className="flex-1 flex flex-col justify-center space-y-1">
               <div className="flex flex-col items-center text-center">
                 <Label className="text-xs font-medium">Frames</Label>
@@ -652,13 +686,20 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                 <span className="absolute bottom-0.5 right-0.5 text-[10px] bg-black/60 text-white px-1 rounded">End</span>
                 {/* Upload button overlay - shows on hover, positioned on left to avoid "End" label */}
                 {onEndImageUpload && (
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => {
                       e.stopPropagation();
-                      endImageInputRef.current?.click();
+                      if (!isUploadingEndImage) endImageInputRef.current?.click();
                     }}
-                    disabled={isUploadingEndImage}
-                    className="absolute top-1 left-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all opacity-0 group-hover:opacity-100"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                        if (!isUploadingEndImage) endImageInputRef.current?.click();
+                      }
+                    }}
+                    className={`absolute top-1 left-1 h-6 w-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all opacity-0 group-hover:opacity-100 cursor-pointer ${isUploadingEndImage ? 'pointer-events-none' : ''}`}
                     title="Replace end image"
                   >
                     {isUploadingEndImage ? (
@@ -666,7 +707,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                     ) : (
                       <Upload className="h-3 w-3" />
                     )}
-                  </button>
+                  </div>
                 )}
               </button>
             ) : onEndImageUpload ? (

@@ -450,12 +450,12 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       return;
     }
 
-    // Don't overwrite if user has pending edits (debounce hasn't fired yet)
-    // BUT only if we've loaded at least once - for new entities, we must load first
+    // Don't overwrite if user has pending edits for THIS entity (debounce hasn't fired yet)
     // This prevents React Query refetches from "unwriting" user input
-    const hasLoadedOnce = loadedSettingsRef.current !== null;
-    if (hasLoadedOnce && pendingSettingsRef.current && pendingEntityIdRef.current === entityId) {
-      console.log('[useAutoSaveSettings] ⏳ Skipping DB load - user has pending edits');
+    // IMPORTANT: We now protect pending edits even on first load - losing user's typing
+    // is worse than the theoretical risk of saving defaults over DB values
+    if (pendingSettingsRef.current && pendingEntityIdRef.current === entityId) {
+      console.log('[useAutoSaveSettings] ⏳ Skipping DB load - user has pending edits for this entity');
       // Still transition to ready and schedule save for pending edits
       if (status !== 'ready') {
         setStatus('ready');
@@ -492,42 +492,16 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       return;
     }
 
-    // Check if user typed during loading (before we had loaded once)
-    const pendingEdits = pendingSettingsRef.current;
-    const hasPendingForThisEntity = pendingEdits && pendingEntityIdRef.current === entityId;
+    // No pending edits for this entity - safe to apply DB settings
+    console.log('[useAutoSaveSettings] 📥 Loaded from DB:', {
+      toolId,
+      entityId: entityId.substring(0, 8),
+    });
 
-    if (hasPendingForThisEntity) {
-      // IMPORTANT: We intentionally do NOT merge pending edits with DB settings.
-      //
-      // The pendingEdits contains the FULL settings object (including defaults for
-      // unchanged fields), not just the changed fields. Merging would overwrite
-      // real DB values with defaults, causing data loss.
-      //
-      // Instead, we prioritize DB settings and clear pending refs. If user made an
-      // edit during loading, they'll see the DB values and can re-apply their change.
-      // This is safer than risking overwriting all saved settings with defaults.
-      console.log('[useAutoSaveSettings] 📥 Loaded from DB (discarding pending edits to prevent data loss):', {
-        toolId,
-        entityId: entityId.substring(0, 8),
-      });
-
-      setSettings(clonedSettings);
-      loadedSettingsRef.current = JSON.parse(JSON.stringify(clonedSettings));
-      pendingSettingsRef.current = null;
-      pendingEntityIdRef.current = null;
-      setStatus('ready');
-      setError(null);
-    } else {
-      console.log('[useAutoSaveSettings] 📥 Loaded from DB:', {
-        toolId,
-        entityId: entityId.substring(0, 8),
-      });
-
-      setSettings(clonedSettings);
-      loadedSettingsRef.current = JSON.parse(JSON.stringify(clonedSettings));
-      setStatus('ready');
-      setError(null);
-    }
+    setSettings(clonedSettings);
+    loadedSettingsRef.current = JSON.parse(JSON.stringify(clonedSettings));
+    setStatus('ready');
+    setError(null);
   }, [entityId, isLoading, dbSettings, defaults, enabled, status, toolId, debounceMs]);
 
   // Memoize return value to prevent object recreation on every render

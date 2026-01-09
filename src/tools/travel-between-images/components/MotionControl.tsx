@@ -468,7 +468,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
             )}
           </div>
 
-          {/* Smooth Continuations Toggle */}
+          {/* Smooth Continuations Toggle - DISABLED for now
           <div className="flex items-center space-x-2 p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
             <Switch
               id="smooth-continuations"
@@ -492,6 +492,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
               </Tooltip>
             </div>
           </div>
+          */}
 
           {/* LoRA Controls */}
           <div className="space-y-4 pt-4 border-t">

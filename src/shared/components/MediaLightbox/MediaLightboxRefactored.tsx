@@ -25,6 +25,9 @@ import {
   Plus,
   Scissors,
   RefreshCw,
+  Star,
+  Check,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -279,6 +282,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Basic state - only UI state remains here
   const [isSelectOpen, setIsSelectOpen] = useState(false);
+  const [isMakingMainVariant, setIsMakingMainVariant] = useState(false);
   const [replaceImages, setReplaceImages] = useState(true);
   const [previewImageDimensions, setPreviewImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const previousPreviewDataRef = useRef<GenerationRow | null>(null);
@@ -485,6 +489,29 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Reset handled ref when media changes (new item opened)
   React.useEffect(() => {
     handledInitialVariantRef.current = null;
+  }, [media.id]);
+
+  // Track which variant has been marked as viewed for this media to avoid duplicate marks
+  const markedViewedVariantRef = React.useRef<string | null>(null);
+
+  // Mark the initial/active variant as viewed when the lightbox opens
+  // This handles the case where the primary variant is auto-selected without explicit setActiveVariantId call
+  React.useEffect(() => {
+    if (activeVariant && activeVariant.id && markedViewedVariantRef.current !== activeVariant.id) {
+      const generationId = media.generation_id || media.id;
+      console.log('[VariantViewed] Marking initial variant as viewed:', {
+        variantId: activeVariant.id.substring(0, 8),
+        isPrimary: activeVariant.is_primary,
+        generationId: generationId.substring(0, 8),
+      });
+      markViewed({ variantId: activeVariant.id, generationId });
+      markedViewedVariantRef.current = activeVariant.id;
+    }
+  }, [activeVariant, media.generation_id, media.id, markViewed]);
+
+  // Reset marked-viewed ref when media changes (new item opened)
+  React.useEffect(() => {
+    markedViewedVariantRef.current = null;
   }, [media.id]);
 
   // Compute isViewingNonPrimaryVariant early for edit hooks
@@ -1186,6 +1213,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [shotAspectRatioData, shotId, isLoadingShotAspectRatio, isVideo]);
 
   // Create regenerate form for video edit panel
+  // IMPORTANT: Use PRIMARY variant's params for regeneration, not the active variant's
+  // This ensures regeneration respects the "main" variant's settings (e.g., LoRAs)
   const regenerateForm = useMemo(() => {
     if (!isVideo || !adjustedTaskDetailsData?.task?.params) {
       console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (not video or no params)', {
@@ -1195,7 +1224,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       return null;
     }
 
-    const taskParams = adjustedTaskDetailsData.task.params as Record<string, any>;
+    // Prefer primary variant's params if it has task data (source_task_id or orchestrator_details)
+    // This ensures regeneration uses the "main" variant's settings, not whatever variant is being viewed
+    const primaryParams = primaryVariant?.params as Record<string, any> | undefined;
+    const primaryHasTaskData = primaryParams && (
+      primaryParams.source_task_id ||
+      primaryParams.orchestrator_details ||
+      primaryParams.additional_loras
+    );
+
+    const taskParams = primaryHasTaskData
+      ? primaryParams
+      : adjustedTaskDetailsData.task.params as Record<string, any>;
+
+    console.log('[MediaLightbox] [RegenerateParams] Using params from:', {
+      source: primaryHasTaskData ? 'primaryVariant' : 'adjustedTaskDetailsData',
+      primaryVariantId: primaryVariant?.id?.substring(0, 8),
+      primaryHasTaskData,
+      hasAdditionalLoras: !!(taskParams.additional_loras || taskParams.orchestrator_details?.additional_loras),
+    });
     const orchestratorDetails = taskParams.orchestrator_details || {};
 
     // Use shared utility to extract segment images (handles explicit URLs and array formats)
@@ -1271,7 +1318,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         projectResolution={effectiveRegenerateResolution}
       />
     );
-  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media]);
+  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant]);
 
   // Handle entering video edit mode (unified) - defaults to trim sub-mode
   const handleEnterVideoEditMode = useCallback(() => {
@@ -1584,38 +1631,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       canMakeMainVariantFromVariant,
       activeVariantId: activeVariant?.id?.substring(0, 8),
     });
-    
-    // Case 2: We're viewing a non-primary variant - just set it as primary
-    if (canMakeMainVariantFromVariant && activeVariant) {
-      console.log('[VariantClickDebug] Setting existing variant as primary:', activeVariant.id.substring(0, 8));
-      try {
+
+    setIsMakingMainVariant(true);
+    try {
+      // Case 2: We're viewing a non-primary variant - just set it as primary
+      if (canMakeMainVariantFromVariant && activeVariant) {
+        console.log('[VariantClickDebug] Setting existing variant as primary:', activeVariant.id.substring(0, 8));
         await setPrimaryVariant(activeVariant.id);
         console.log('[VariantClickDebug] Successfully set variant as primary');
         // Refetch variants to update UI
         refetchVariants();
-      } catch (error) {
-        console.error('[VariantClickDebug] Failed to set variant as primary:', error);
+        return;
       }
-      return;
-    }
-    
-    // Case 1: We're viewing a child generation - create variant on parent
-    if (!sourceGenerationData || !media.location) {
-      console.log('[VariantClickDebug] handleMakeMainVariant bailing - missing data:', {
-        hasSourceGenerationData: !!sourceGenerationData,
-        hasMediaLocation: !!media.location,
+
+      // Case 1: We're viewing a child generation - create variant on parent
+      if (!sourceGenerationData || !media.location) {
+        console.log('[VariantClickDebug] handleMakeMainVariant bailing - missing data:', {
+          hasSourceGenerationData: !!sourceGenerationData,
+          hasMediaLocation: !!media.location,
+        });
+        return;
+      }
+
+      const parentGenId = sourceGenerationData.id;
+      console.log('[VariantClickDebug] Creating variant on parent generation', {
+        parentId: parentGenId.substring(0, 8),
+        currentId: media.id.substring(0, 8),
+        currentLocation: media.location.substring(0, 50)
       });
-      return;
-    }
-    
-    const parentGenId = sourceGenerationData.id;
-    console.log('[VariantClickDebug] Creating variant on parent generation', {
-      parentId: parentGenId.substring(0, 8),
-      currentId: media.id.substring(0, 8),
-      currentLocation: media.location.substring(0, 50)
-    });
-    
-    try {
       // 1. Create a new variant on the parent generation with current media's location
       const { data: insertedVariant, error: insertError } = await supabase
         .from('generation_variants')
@@ -1668,7 +1711,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       onClose();
     } catch (error) {
       console.error('[VariantClickDebug] handleMakeMainVariant failed:', error);
-      throw error;
+    } finally {
+      setIsMakingMainVariant(false);
     }
   }, [
     sourceGenerationData,
@@ -2298,8 +2342,47 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     );
                   })()}
 
-                    {/* Top Left Controls - Edit button */}
-                    <TopLeftControls {...buttonGroupProps.topLeft} />
+                    {/* Top Left Controls Container - stacked vertically */}
+                    <div className="absolute top-4 left-4 z-[70] flex flex-col gap-2 items-start">
+                      {/* Main Variant Badge/Button - shows first */}
+                      {!readOnly && activeVariant && variants && (variants.length > 1 || !activeVariant.is_primary) && (
+                        <>
+                          {activeVariant.is_primary ? (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
+                              <Check className="w-4 h-4" />
+                              <span>Main variant</span>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleMakeMainVariant}
+                              disabled={isMakingMainVariant || !canMakeMainVariant}
+                              className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
+                            >
+                              {isMakingMainVariant ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                              ) : (
+                                <Star className="w-4 h-4 mr-1.5" />
+                              )}
+                              Make main
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      {/* Edit button - below main variant when both show */}
+                      {!buttonGroupProps.topLeft.isVideo && !buttonGroupProps.topLeft.readOnly && !buttonGroupProps.topLeft.isSpecialEditMode && buttonGroupProps.topLeft.selectedProjectId && buttonGroupProps.topLeft.isCloudMode && buttonGroupProps.topLeft.handleEnterMagicEditMode && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={buttonGroupProps.topLeft.handleEnterMagicEditMode}
+                          className="bg-black/50 hover:bg-black/70 text-white"
+                          title="Edit image"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
 
                     {/* Floating Tool Controls - Tablet (landscape with sidebar) */}
                     {isSpecialEditMode && shouldShowSidePanel && (
@@ -2570,6 +2653,33 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       containerClassName="w-full h-full"
                       debugContext="Mobile Stacked"
                     />
+                    )}
+
+                    {/* Top Left - Main Variant Badge/Button (Mobile Stacked) */}
+                    {!readOnly && activeVariant && variants && (variants.length > 1 || !activeVariant.is_primary) && (
+                      <div className="absolute top-4 left-4 z-[70]">
+                        {activeVariant.is_primary ? (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
+                            <Check className="w-4 h-4" />
+                            <span>Main variant</span>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleMakeMainVariant}
+                            disabled={isMakingMainVariant || !canMakeMainVariant}
+                            className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
+                          >
+                            {isMakingMainVariant ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                            ) : (
+                              <Star className="w-4 h-4 mr-1.5" />
+                            )}
+                            Make main
+                          </Button>
+                        )}
+                      </div>
                     )}
 
                     {/* Floating Tool Controls - Mobile (portrait, no sidebar) */}
@@ -2874,6 +2984,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     debugContext="Regular Centered"
                   />
                 )}
+
+                  {/* Top Left - Main Variant Badge/Button */}
+                  {/* Show when: not readOnly, have variants loaded, and either multiple variants OR viewing non-primary */}
+                  {!readOnly && activeVariant && variants && (variants.length > 1 || !activeVariant.is_primary) && (
+                    <div className="absolute top-4 left-4 z-[70]">
+                      {activeVariant.is_primary ? (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
+                          <Check className="w-4 h-4" />
+                          <span>Main variant</span>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleMakeMainVariant}
+                          disabled={isMakingMainVariant || !canMakeMainVariant}
+                          className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
+                        >
+                          {isMakingMainVariant ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                          ) : (
+                            <Star className="w-4 h-4 mr-1.5" />
+                          )}
+                          Make main
+                        </Button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Bottom Left Controls - Mode Entry Buttons */}
                   {!readOnly && (

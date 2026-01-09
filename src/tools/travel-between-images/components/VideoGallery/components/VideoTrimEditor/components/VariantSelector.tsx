@@ -382,12 +382,15 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                 className={cn(
                   'relative flex flex-col items-center p-0.5 rounded transition-all w-full touch-manipulation',
                   'hover:bg-muted/80',
-                  isActive 
-                    ? 'ring-2 ring-primary bg-primary/10' 
+                  // Primary (main) variant gets green ring
+                  isPrimary && !isActive && 'ring-2 ring-green-500 bg-green-500/10',
+                  // Active variant gets orange ring (takes precedence over green)
+                  isActive
+                    ? 'ring-2 ring-orange-500 bg-orange-500/10'
                     : 'opacity-70 hover:opacity-100',
-                  // Add relationship highlighting
-                  isParent && !isActive && 'ring-1 ring-blue-500/50',
-                  isChild && !isActive && 'ring-1 ring-purple-500/50'
+                  // Add relationship highlighting (only when not active or primary)
+                  isParent && !isActive && !isPrimary && 'ring-1 ring-blue-500/50',
+                  isChild && !isActive && !isPrimary && 'ring-1 ring-purple-500/50'
                 )}
               >
                 {/* Thumbnail */}
