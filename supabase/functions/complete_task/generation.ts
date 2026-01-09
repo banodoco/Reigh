@@ -544,6 +544,42 @@ export async function createGenerationFromTask(
 
         console.log(`[GenMigration] Successfully created variant for child generation ${childGenId}`);
 
+        // SINGLE-SEGMENT PROPAGATION: If this child is the only child of its parent,
+        // also create a variant on the parent so the main generation updates automatically
+        if (makePrimary && childGen.parent_generation_id && childGen.is_child) {
+          const { count: siblingCount } = await supabase
+            .from('generations')
+            .select('id', { count: 'exact', head: true })
+            .eq('parent_generation_id', childGen.parent_generation_id)
+            .eq('is_child', true);
+
+          if (siblingCount === 1) {
+            console.log(`[GenMigration] Single-segment child - also creating variant on parent ${childGen.parent_generation_id}`);
+            logger?.info("Single-segment propagation to parent", {
+              task_id: taskId,
+              child_generation_id: childGenId,
+              parent_generation_id: childGen.parent_generation_id,
+              action: "propagate_to_parent"
+            });
+
+            await createVariant(
+              supabase,
+              childGen.parent_generation_id,
+              publicUrl,
+              thumbnailUrl || null,
+              {
+                ...variantParams,
+                propagated_from_child: childGenId,
+                created_from: 'single_segment_propagation',
+              },
+              true, // is_primary
+              VARIANT_TYPES.TRAVEL_SEGMENT,
+              null
+            );
+            console.log(`[GenMigration] Successfully propagated to parent generation`);
+          }
+        }
+
         await supabase.from('tasks').update({ generation_created: true }).eq('id', taskId);
         return childGen;
       }
