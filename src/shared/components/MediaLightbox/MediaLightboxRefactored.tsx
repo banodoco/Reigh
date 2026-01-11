@@ -779,6 +779,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [publicLorasData]);
 
   // Img2Img mode hook - uses persisted settings for strength and enablePromptExpansion
+  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
+  console.log('[EDIT_DEBUG] 🖼️ MediaLightbox BEFORE useImg2ImgMode:');
+  console.log('[EDIT_DEBUG] 🖼️ persistedImg2imgStrength:', persistedImg2imgStrength);
+  console.log('[EDIT_DEBUG] 🖼️ persistedImg2imgEnablePromptExpansion:', persistedImg2imgEnablePromptExpansion);
+  console.log('[EDIT_DEBUG] 🖼️ editSettingsPersistence.isLoading:', editSettingsPersistence.isLoading);
+  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
+
   const img2imgHook = useImg2ImgMode({
     media,
     selectedProjectId,
@@ -792,6 +799,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setImg2imgStrength: setPersistedImg2imgStrength,
     enablePromptExpansion: persistedImg2imgEnablePromptExpansion,
     setEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
+    // Prompt is shared with other edit modes, persisted per-generation
+    img2imgPrompt: persistedPrompt,
+    setImg2imgPrompt: setPersistedPrompt,
+    // Number of generations (shared with other edit modes)
+    numGenerations: persistedNumGenerations,
   });
   const {
     img2imgPrompt,
@@ -805,6 +817,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleGenerateImg2Img,
     loraManager: img2imgLoraManager,
   } = img2imgHook;
+
+  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
+  console.log('[EDIT_DEBUG] 🖼️ MediaLightbox AFTER useImg2ImgMode:');
+  console.log('[EDIT_DEBUG] 🖼️ img2imgStrength:', img2imgStrength);
+  console.log('[EDIT_DEBUG] 🖼️ enablePromptExpansion:', enablePromptExpansion);
+  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
 
   // Layout mode hook
   const layoutHook = useLayoutMode({

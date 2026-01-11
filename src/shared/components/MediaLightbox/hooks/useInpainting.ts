@@ -385,7 +385,7 @@ export const useInpainting = ({
           setInpaintStrokes(loadedInpaintStrokes);
           setAnnotationStrokes(loadedAnnotationStrokes);
           setInpaintPrompt(parsed.prompt || '');
-          setInpaintNumGenerations(parsed.numGenerations || 4);
+          setInpaintNumGenerations(parsed.numGenerations || 1);
           setBrushSize(parsed.brushSize || 20);
           
           hydratedMediaIdsRef.current.add(storageKey);
@@ -512,7 +512,7 @@ export const useInpainting = ({
           setInpaintStrokes(loadedInpaintStrokes);
           setAnnotationStrokes(loadedAnnotationStrokes);
           setInpaintPrompt(parsed.prompt || '');
-          setInpaintNumGenerations(parsed.numGenerations || 4);
+          setInpaintNumGenerations(parsed.numGenerations || 1);
           setBrushSize(parsed.brushSize || 20);
           
           hydratedMediaIdsRef.current.add(storageKey);

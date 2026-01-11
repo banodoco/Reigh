@@ -19,6 +19,7 @@ import { SectionHeader } from '@/tools/image-generation/components/ImageGenerati
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Video } from 'lucide-react';
 import { isVideoGeneration, isPositioned, isVideoAny } from '@/shared/lib/typeGuards';
+import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -624,6 +625,35 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     return result;
   }, [getImagesForMode, generationMode, selectedShotId]);
 
+  // Extract generation IDs for variant badge fetching
+  // Use generation_id since these are shot_generations entries
+  const generationIds = React.useMemo(() => 
+    images.map((img: any) => img.generation_id || img.id).filter(Boolean) as string[],
+    [images]
+  );
+
+  // Lazy-load variant badge data (derivedCount, hasUnviewedVariants, unviewedVariantCount)
+  // This allows images to display immediately while badge data loads in background
+  const { getBadgeData, isLoading: isBadgeDataLoading } = useVariantBadges(generationIds);
+
+  // Merge badge data with images for variant count and NEW badge display
+  const imagesWithBadges = React.useMemo(() => {
+    // Don't merge badge data while loading - prevents showing "0" badges
+    if (isBadgeDataLoading) {
+      return images;
+    }
+    return images.map((img: any) => {
+      const generationId = img.generation_id || img.id;
+      const badgeData = getBadgeData(generationId);
+      return {
+        ...img,
+        derivedCount: badgeData.derivedCount,
+        hasUnviewedVariants: badgeData.hasUnviewedVariants,
+        unviewedVariantCount: badgeData.unviewedVariantCount,
+      };
+    });
+  }, [images, getBadgeData, isBadgeDataLoading]);
+
   // Memoize shotGenerations to prevent reference changes
   const memoizedShotGenerations = React.useMemo(() => {
     return shotGenerations;
@@ -1018,7 +1048,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 shotGenerations={preloadedImages ? undefined : memoizedShotGenerations}
                 updateTimelineFrame={updateTimelineFrame}
                 allGenerations={preloadedImages}
-                images={images}
+                images={imagesWithBadges}
                 onTimelineChange={async () => {
                   await loadPositions({ silent: true });
                 }}
@@ -1149,7 +1179,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 </div>
                 
                 <ShotImageManager
-                  images={images}
+                  images={imagesWithBadges}
                   onImageDelete={handleDelete}
                   onBatchImageDelete={onBatchImageDelete}
                   onImageDuplicate={onImageDuplicate}

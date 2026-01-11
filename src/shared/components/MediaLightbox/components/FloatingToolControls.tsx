@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/shared/lib/utils';
 import { BrushStroke } from '../types';
-import { Type, Paintbrush, Pencil, Move } from 'lucide-react';
+import { Type, Paintbrush, Pencil, Move, Wand2 } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import {
   BrushSizeSlider,
@@ -53,7 +53,7 @@ export interface FloatingToolControlsProps {
  * Floating Tool Controls Component
  * 
  * Displays mode selection toggle and mode-specific canvas controls.
- * Now includes mode toggle (Text/Inpaint/Annotate) at the top.
+ * Includes mode toggle (Text/Inpaint/Annotate/Reposition/Img2Img) at the top.
  * Used on both tablet (landscape, with sidebar) and mobile (portrait, no sidebar).
  */
 export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
@@ -84,8 +84,8 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
   const isTablet = variant === 'tablet';
   const isMobile = useIsMobile();
   
-  // Variant-specific styling
-  const containerWidth = isTablet ? 'w-40' : 'w-32';
+  // Variant-specific styling - widened for 5 mode buttons
+  const containerWidth = isTablet ? 'w-48' : 'w-40';
   const leftPosition = isTablet ? 'left-4' : 'left-2';
   const topBottomPosition = isTablet 
     ? (panelPosition === 'top' ? 'top-4' : 'bottom-4')
@@ -107,11 +107,11 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
         "bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 border border-border shadow-xl",
         containerWidth
       )}>
-        {/* Mode Toggle - Text | Inpaint | Annotate | Reposition */}
-        {/* Mobile: 2x2 grid, Tablet: 4 in a row */}
+        {/* Mode Toggle - Text | Inpaint | Annotate | Reposition | Img2Img */}
+        {/* Mobile: 3+2 grid, Tablet: 5 in a row */}
         <div className={cn(
           "bg-muted rounded-md p-1",
-          isMobile ? "grid grid-cols-2 gap-0.5" : "flex items-center gap-0.5"
+          isMobile ? "grid grid-cols-3 gap-0.5" : "flex items-center gap-0.5"
         )}>
           <button
             onClick={() => onSetEditMode('text')}
@@ -160,6 +160,18 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
             title="Reposition mode - move, scale, rotate to fill edges with AI"
           >
             <Move className={iconSize} />
+          </button>
+          <button
+            onClick={() => onSetEditMode('img2img')}
+            className={cn(
+              "flex-1 flex items-center justify-center p-2 rounded transition-all",
+              editMode === 'img2img'
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            )}
+            title="Img2Img mode - transform entire image with prompt"
+          >
+            <Wand2 className={iconSize} />
           </button>
         </div>
         

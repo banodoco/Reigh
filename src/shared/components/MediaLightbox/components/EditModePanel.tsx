@@ -275,14 +275,14 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               setEditMode('text');
             }}
             className={cn(
-              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
               editMode === 'text'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
-            <Type className={toggleIconSize} />
-            {!isMobile && "Text"}
+            <Type className={`${toggleIconSize} flex-shrink-0`} />
+            {!isMobile && <span className="truncate">Text</span>}
           </button>
           <button
             onClick={() => {
@@ -290,14 +290,14 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               setEditMode('inpaint');
             }}
             className={cn(
-              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
               editMode === 'inpaint'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
-            <Paintbrush className={toggleIconSize} />
-            {!isMobile && "Inpaint"}
+            <Paintbrush className={`${toggleIconSize} flex-shrink-0`} />
+            {!isMobile && <span className="truncate">Inpaint</span>}
           </button>
           <button
             onClick={() => {
@@ -305,14 +305,14 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               setEditMode('annotate');
             }}
             className={cn(
-              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
               editMode === 'annotate'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
-            <Pencil className={toggleIconSize} />
-            {!isMobile && "Annotate"}
+            <Pencil className={`${toggleIconSize} flex-shrink-0`} />
+            {!isMobile && <span className="truncate">Annotate</span>}
           </button>
           <button
             onClick={() => {
@@ -320,15 +320,15 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               setEditMode('reposition');
             }}
             className={cn(
-              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
               editMode === 'reposition'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
             title="Move, scale, or rotate the image to fill edges with AI"
           >
-            <Move className={toggleIconSize} />
-            {!isMobile && "Reposition"}
+            <Move className={`${toggleIconSize} flex-shrink-0`} />
+            {!isMobile && <span className="truncate">Reposition</span>}
           </button>
           <button
             onClick={() => {
@@ -336,15 +336,15 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               setEditMode('img2img');
             }}
             className={cn(
-              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
               editMode === 'img2img'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
             title="Transform the entire image with a prompt and strength control"
           >
-            <Wand2 className={toggleIconSize} />
-            {!isMobile && "Img2Img"}
+            <Wand2 className={`${toggleIconSize} flex-shrink-0`} />
+            {!isMobile && <span className="truncate">Img2Img</span>}
           </button>
         </div>
         </div>
@@ -425,7 +425,16 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             {/* Strength Slider */}
             <div>
               <div className="flex items-center justify-between">
-                <label className={`${labelSize} font-medium`}>Strength:</label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className={`${labelSize} font-medium cursor-help`}>Strength:</label>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[200px]">
+                    <p className="text-xs">
+                      Lower = closer to original, Higher = more transformed
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
                 <span className={`${sliderTextSize} text-muted-foreground`}>{img2imgStrength.toFixed(2)}</span>
               </div>
               <input
@@ -437,9 +446,6 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 onChange={(e) => setImg2imgStrength(parseFloat(e.target.value))}
                 className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
-              <p className={`${sliderTextSize} text-muted-foreground mt-1`}>
-                Lower = closer to original, Higher = more transformed
-              </p>
             </div>
             
             {/* LoRA Selector */}
@@ -474,100 +480,105 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           </div>
         )}
         
-        {/* LoRA & Number of Generations - Hidden for img2img mode */}
+        {/* LoRA Selector - Hidden for img2img mode (has its own LoRA selector) */}
         {editMode !== 'img2img' && (
-        <div className={`flex ${isMobile ? 'flex-col gap-3' : 'gap-4'}`}>
-          {/* LoRA Selector */}
-          <div className={cn(isMobile ? "" : "flex-1")}>
-            <div className="flex items-center gap-3">
-              <label className={`${labelSize} font-medium whitespace-nowrap`}>LoRA:</label>
-              <div className="flex items-center gap-1 flex-1">
-                <Select value={loraMode} onValueChange={setLoraMode}>
-                  <SelectTrigger variant="retro" className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent variant="retro" className="z-[100001]">
-                    <SelectItem variant="retro" value="none">None</SelectItem>
-                    <SelectItem variant="retro" value="in-scene">InScene</SelectItem>
-                    <SelectItem variant="retro" value="next-scene">Next Scene</SelectItem>
-                    <SelectItem variant="retro" value="custom">Custom</SelectItem>
-                  </SelectContent>
-                </Select>
-                {loraMode !== 'none' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearLora}
-                    className={cn(
-                      "h-9 w-9 p-0 hover:bg-muted shrink-0",
-                      isMobile && "h-8 w-8"
-                    )}
-                    title="Clear LoRA selection"
-                  >
-                    <XCircle className={cn("h-4 w-4 text-muted-foreground", isMobile && "h-3.5 w-3.5")} />
-                  </Button>
-                )}
-              </div>
+        <div>
+          <div className="flex items-center gap-3">
+            <label className={`${labelSize} font-medium whitespace-nowrap`}>LoRA:</label>
+            <div className="flex items-center gap-1 flex-1">
+              <Select value={loraMode} onValueChange={setLoraMode}>
+                <SelectTrigger variant="retro" className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent variant="retro" className="z-[100001]">
+                  <SelectItem variant="retro" value="none">None</SelectItem>
+                  <SelectItem variant="retro" value="in-scene">InScene</SelectItem>
+                  <SelectItem variant="retro" value="next-scene">Next Scene</SelectItem>
+                  <SelectItem variant="retro" value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+              {loraMode !== 'none' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearLora}
+                  className={cn(
+                    "h-9 w-9 p-0 hover:bg-muted shrink-0",
+                    isMobile && "h-8 w-8"
+                  )}
+                  title="Clear LoRA selection"
+                >
+                  <XCircle className={cn("h-4 w-4 text-muted-foreground", isMobile && "h-3.5 w-3.5")} />
+                </Button>
+              )}
             </div>
-            
-            {/* Custom URL Input - Show when Custom is selected */}
-            {loraMode === 'custom' && (
-              <input
-                type="text"
-                value={customLoraUrl}
-                onChange={(e) => setCustomLoraUrl(e.target.value)}
-                placeholder="https://huggingface.co/.../lora.safetensors"
-                className={cn(
-                  "w-full mt-2 bg-background border border-input rounded-md px-3 py-2 text-sm",
-                  "focus:outline-none focus:ring-2 focus:ring-ring"
-                )}
-              />
-            )}
           </div>
-
-          {/* Number of Generations Slider */}
-          <div className={cn(isMobile ? "" : "flex-1")}>
-            <div className="flex items-center justify-between">
-              <label className={`${labelSize} font-medium`}>{isMobile ? 'Generations:' : 'Number of Generations:'}</label>
-              <span className={`${sliderTextSize} text-muted-foreground`}>{inpaintNumGenerations}</span>
-            </div>
+          
+          {/* Custom URL Input - Show when Custom is selected */}
+          {loraMode === 'custom' && (
             <input
-              type="range"
-              min={1}
-              max={16}
-              value={inpaintNumGenerations}
-              onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
-              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+              type="text"
+              value={customLoraUrl}
+              onChange={(e) => setCustomLoraUrl(e.target.value)}
+              placeholder="https://huggingface.co/.../lora.safetensors"
+              className={cn(
+                "w-full mt-2 bg-background border border-input rounded-md px-3 py-2 text-sm",
+                "focus:outline-none focus:ring-2 focus:ring-ring"
+              )}
             />
-          </div>
+          )}
         </div>
         )}
         
-        {/* Create as Variant toggle */}
+        {/* Number of Generations + Create as Variant - shown for all image edit modes */}
         {onCreateAsGenerationChange && (
-          <div className="flex items-center justify-between py-2 px-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-2 cursor-help">
-                  <Layers className={cn(iconSize, "text-muted-foreground")} />
-                  <Label htmlFor="create-as-variant" className={cn(labelSize, "font-medium cursor-pointer")}>
-                    Create as variant
-                  </Label>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[250px]">
-                <p className="text-xs">
-                  <strong>On:</strong> Result appears as a variant of this image in the variant selector.
-                  <br />
-                  <strong>Off:</strong> Result appears as its own image in the gallery.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-            <Switch
-              id="create-as-variant"
-              checked={!createAsGeneration}
-              onCheckedChange={(checked) => onCreateAsGenerationChange(!checked)}
-            />
+          <div className={cn(
+            "flex items-center gap-4 py-2 px-1",
+            isMobile && "flex-col gap-3 items-stretch"
+          )}>
+            {/* Number of Generations - takes at least 50% width */}
+            <div className={cn("flex items-center gap-2 flex-1 min-w-[50%]", isMobile && "justify-between")}>
+              <label className={`${labelSize} font-medium whitespace-nowrap`}>
+                {isMobile ? 'Generations:' : 'Generations:'}
+              </label>
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  type="range"
+                  min={1}
+                  max={16}
+                  value={inpaintNumGenerations}
+                  onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
+                  className="h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary flex-1"
+                />
+                <span className={`${sliderTextSize} text-muted-foreground w-5 text-center`}>{inpaintNumGenerations}</span>
+              </div>
+            </div>
+            
+            {/* Create as Variant toggle */}
+            <div className={cn("flex items-center gap-2", isMobile ? "justify-between" : "ml-auto")}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 cursor-help">
+                    <Layers className={cn(iconSize, "text-muted-foreground")} />
+                    <Label htmlFor="create-as-variant" className={cn(labelSize, "font-medium cursor-pointer whitespace-nowrap")}>
+                      {isMobile ? 'Variant' : 'Create as variant'}
+                    </Label>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[250px]">
+                  <p className="text-xs">
+                    <strong>On:</strong> Result appears as a variant of this image in the variant selector.
+                    <br />
+                    <strong>Off:</strong> Result appears as its own image in the gallery.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+              <Switch
+                id="create-as-variant"
+                checked={!createAsGeneration}
+                onCheckedChange={(checked) => onCreateAsGenerationChange(!checked)}
+              />
+            </div>
           </div>
         )}
         

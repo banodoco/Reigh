@@ -23,7 +23,7 @@ export const DEFAULT_EDIT_SETTINGS: GenerationEditSettings = {
   editMode: 'text',
   loraMode: 'in-scene',
   customLoraUrl: '',
-  numGenerations: 4,
+  numGenerations: 1,
   prompt: '',
   // Img2Img defaults
   img2imgStrength: 0.6,
@@ -86,8 +86,8 @@ export function useGenerationEditSettings({
   // Load settings from database
   const loadSettings = useCallback(async (genId: string): Promise<GenerationEditSettings | null> => {
     try {
-      console.log('[EditSettingsPersist] 📥 LOAD: Fetching from generations.params.ui.editSettings');
-      console.log('[EditSettingsPersist] 📥 LOAD: generationId:', genId.substring(0, 8));
+      console.log('[EDIT_DEBUG] 📥 LOAD: Fetching from generations.params.ui.editSettings');
+      console.log('[EDIT_DEBUG] 📥 LOAD: generationId:', genId.substring(0, 8));
       
       const { data, error } = await supabase
         .from('generations')
@@ -96,28 +96,28 @@ export function useGenerationEditSettings({
         .single();
       
       if (error) {
-        console.warn('[EditSettingsPersist] ❌ LOAD FAILED:', error.message);
+        console.warn('[EDIT_DEBUG] ❌ LOAD FAILED:', error.message);
         return null;
       }
       
       const savedSettings = (data?.params as any)?.ui?.editSettings;
       if (savedSettings) {
-        console.log('[EditSettingsPersist] ✅ LOAD SUCCESS: Found persisted settings');
-        console.log('[EditSettingsPersist] ✅ LOAD: editMode:', savedSettings.editMode);
-        console.log('[EditSettingsPersist] ✅ LOAD: loraMode:', savedSettings.loraMode);
-        console.log('[EditSettingsPersist] ✅ LOAD: customLoraUrl:', savedSettings.customLoraUrl || '(empty)');
-        console.log('[EditSettingsPersist] ✅ LOAD: numGenerations:', savedSettings.numGenerations);
-        console.log('[EditSettingsPersist] ✅ LOAD: prompt:', savedSettings.prompt ? `"${savedSettings.prompt.substring(0, 50)}..."` : '(empty)');
+        console.log('[EDIT_DEBUG] ✅ LOAD SUCCESS: Found persisted settings');
+        console.log('[EDIT_DEBUG] ✅ LOAD: editMode:', savedSettings.editMode);
+        console.log('[EDIT_DEBUG] ✅ LOAD: loraMode:', savedSettings.loraMode);
+        console.log('[EDIT_DEBUG] ✅ LOAD: customLoraUrl:', savedSettings.customLoraUrl || '(empty)');
+        console.log('[EDIT_DEBUG] ✅ LOAD: numGenerations:', savedSettings.numGenerations);
+        console.log('[EDIT_DEBUG] ✅ LOAD: prompt:', savedSettings.prompt ? `"${savedSettings.prompt.substring(0, 50)}..."` : '(empty)');
         return {
           ...DEFAULT_EDIT_SETTINGS,
           ...savedSettings,
         };
       }
       
-      console.log('[EditSettingsPersist] ⚠️ LOAD: No persisted settings found for this generation');
+      console.log('[EDIT_DEBUG] ⚠️ LOAD: No persisted settings found for this generation');
       return null;
     } catch (err) {
-      console.warn('[EditSettingsPersist] ❌ LOAD ERROR:', err);
+      console.warn('[EDIT_DEBUG] ❌ LOAD ERROR:', err);
       return null;
     }
   }, []);
@@ -125,13 +125,15 @@ export function useGenerationEditSettings({
   // Save settings to database (debounced)
   const saveSettings = useCallback(async (genId: string, newSettings: GenerationEditSettings) => {
     try {
-      console.log('[EditSettingsPersist] 💾 SAVE: Persisting to generations.params.ui.editSettings');
-      console.log('[EditSettingsPersist] 💾 SAVE: generationId:', genId.substring(0, 8));
-      console.log('[EditSettingsPersist] 💾 SAVE: editMode:', newSettings.editMode);
-      console.log('[EditSettingsPersist] 💾 SAVE: loraMode:', newSettings.loraMode);
-      console.log('[EditSettingsPersist] 💾 SAVE: customLoraUrl:', newSettings.customLoraUrl || '(empty)');
-      console.log('[EditSettingsPersist] 💾 SAVE: numGenerations:', newSettings.numGenerations);
-      console.log('[EditSettingsPersist] 💾 SAVE: prompt:', newSettings.prompt ? `"${newSettings.prompt.substring(0, 50)}..."` : '(empty)');
+      console.log('[EDIT_DEBUG] 💾 SAVE: Persisting to generations.params.ui.editSettings');
+      console.log('[EDIT_DEBUG] 💾 SAVE: generationId:', genId.substring(0, 8));
+      console.log('[EDIT_DEBUG] 💾 SAVE: editMode:', newSettings.editMode);
+      console.log('[EDIT_DEBUG] 💾 SAVE: loraMode:', newSettings.loraMode);
+      console.log('[EDIT_DEBUG] 💾 SAVE: customLoraUrl:', newSettings.customLoraUrl || '(empty)');
+      console.log('[EDIT_DEBUG] 💾 SAVE: numGenerations:', newSettings.numGenerations);
+      console.log('[EDIT_DEBUG] 💾 SAVE: prompt:', newSettings.prompt ? `"${newSettings.prompt.substring(0, 50)}..."` : '(empty)');
+      console.log('[EDIT_DEBUG] 💾 SAVE: img2imgStrength:', newSettings.img2imgStrength);
+      console.log('[EDIT_DEBUG] 💾 SAVE: img2imgEnablePromptExpansion:', newSettings.img2imgEnablePromptExpansion);
       
       // Fetch current params to merge
       const { data: current, error: fetchError } = await supabase
@@ -141,7 +143,7 @@ export function useGenerationEditSettings({
         .single();
       
       if (fetchError) {
-        console.warn('[EditSettingsPersist] ❌ SAVE: Failed to fetch current params:', fetchError.message);
+        console.warn('[EDIT_DEBUG] ❌ SAVE: Failed to fetch current params:', fetchError.message);
         return;
       }
       
@@ -163,9 +165,9 @@ export function useGenerationEditSettings({
         .eq('id', genId);
       
       if (updateError) {
-        console.warn('[EditSettingsPersist] ❌ SAVE FAILED:', updateError.message);
+        console.warn('[EDIT_DEBUG] ❌ SAVE FAILED:', updateError.message);
       } else {
-        console.log('[EditSettingsPersist] ✅ SAVE SUCCESS: Settings persisted to database');
+        console.log('[EDIT_DEBUG] ✅ SAVE SUCCESS: Settings persisted to database');
         
         // Invalidate generation queries
         queryClient.invalidateQueries({ 
@@ -173,7 +175,7 @@ export function useGenerationEditSettings({
         });
       }
     } catch (err) {
-      console.warn('[EditSettingsPersist] ❌ SAVE ERROR:', err);
+      console.warn('[EDIT_DEBUG] ❌ SAVE ERROR:', err);
     }
   }, [queryClient]);
   
@@ -201,9 +203,9 @@ export function useGenerationEditSettings({
     
     // Detect generation change
     if (currentGenerationIdRef.current !== generationId) {
-      console.log('[EditSettingsPersist] 🔄 Generation changed - will load settings');
-      console.log('[EditSettingsPersist] 🔄 from:', currentGenerationIdRef.current?.substring(0, 8) || 'none');
-      console.log('[EditSettingsPersist] 🔄 to:', generationId.substring(0, 8));
+      console.log('[EDIT_DEBUG] 🔄 Generation changed - will load settings');
+      console.log('[EDIT_DEBUG] 🔄 from:', currentGenerationIdRef.current?.substring(0, 8) || 'none');
+      console.log('[EDIT_DEBUG] 🔄 to:', generationId.substring(0, 8));
       
       currentGenerationIdRef.current = generationId;
       isInitializedRef.current = false;
@@ -230,9 +232,9 @@ export function useGenerationEditSettings({
       } else {
         // No persisted settings - check if we have pending "last used" to apply
         if (pendingInitFromLastUsedRef.current) {
-          console.log('[EditSettingsPersist] 🔄 INIT: Applying pending "last used" settings (no persisted settings found)');
-          console.log('[EditSettingsPersist] 🔄 INIT: lastUsed.editMode:', pendingInitFromLastUsedRef.current.editMode);
-          console.log('[EditSettingsPersist] 🔄 INIT: lastUsed.loraMode:', pendingInitFromLastUsedRef.current.loraMode);
+          console.log('[EDIT_DEBUG] 🔄 INIT: Applying pending "last used" settings (no persisted settings found)');
+          console.log('[EDIT_DEBUG] 🔄 INIT: lastUsed.editMode:', pendingInitFromLastUsedRef.current.editMode);
+          console.log('[EDIT_DEBUG] 🔄 INIT: lastUsed.loraMode:', pendingInitFromLastUsedRef.current.loraMode);
           setSettings({
             ...DEFAULT_EDIT_SETTINGS,
             ...pendingInitFromLastUsedRef.current,
@@ -240,7 +242,7 @@ export function useGenerationEditSettings({
           });
           pendingInitFromLastUsedRef.current = null;
         } else {
-          console.log('[EditSettingsPersist] 🔄 INIT: Using defaults (no persisted or lastUsed settings)');
+          console.log('[EDIT_DEBUG] 🔄 INIT: Using defaults (no persisted or lastUsed settings)');
           setSettings(DEFAULT_EDIT_SETTINGS);
         }
         setHasPersistedSettings(false);
@@ -338,20 +340,20 @@ export function useGenerationEditSettings({
     if (isLoading) {
       // Store for later application after load completes
       pendingInitFromLastUsedRef.current = lastUsed;
-      console.log('[EditSettingsPersist] ⏳ INIT: Queued "last used" settings for after load completes');
+      console.log('[EDIT_DEBUG] ⏳ INIT: Queued "last used" settings for after load completes');
     } else if (!hasPersistedSettings) {
       // Apply immediately if we're loaded and have no persisted settings
-      console.log('[EditSettingsPersist] 🔄 INIT: Applying "last used" settings immediately');
-      console.log('[EditSettingsPersist] 🔄 INIT: lastUsed.editMode:', lastUsed.editMode);
-      console.log('[EditSettingsPersist] 🔄 INIT: lastUsed.loraMode:', lastUsed.loraMode);
-      console.log('[EditSettingsPersist] 🔄 INIT: lastUsed.numGenerations:', lastUsed.numGenerations);
+      console.log('[EDIT_DEBUG] 🔄 INIT: Applying "last used" settings immediately');
+      console.log('[EDIT_DEBUG] 🔄 INIT: lastUsed.editMode:', lastUsed.editMode);
+      console.log('[EDIT_DEBUG] 🔄 INIT: lastUsed.loraMode:', lastUsed.loraMode);
+      console.log('[EDIT_DEBUG] 🔄 INIT: lastUsed.numGenerations:', lastUsed.numGenerations);
       setSettings(prev => ({
         ...prev,
         ...lastUsed,
         prompt: '', // Never inherit prompt
       }));
     } else {
-      console.log('[EditSettingsPersist] ⏭️ INIT: Skipping "last used" - generation has persisted settings');
+      console.log('[EDIT_DEBUG] ⏭️ INIT: Skipping "last used" - generation has persisted settings');
     }
   }, [isLoading, hasPersistedSettings]);
   

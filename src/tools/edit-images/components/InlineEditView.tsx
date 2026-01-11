@@ -97,6 +97,10 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     img2imgEnablePromptExpansion: persistedImg2imgEnablePromptExpansion,
     setImg2imgStrength: setPersistedImg2imgStrength,
     setImg2imgEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
+    prompt: persistedPrompt,
+    setPrompt: setPersistedPrompt,
+    numGenerations,
+    setNumGenerations,
   } = editSettingsPersistence;
   const {
     activeVariant,
@@ -228,6 +232,14 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
   }, [publicLorasData]);
 
   // Img2Img mode hook - uses persisted settings
+  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
+  console.log('[EDIT_DEBUG] 🎨 InlineEditView BEFORE useImg2ImgMode:');
+  console.log('[EDIT_DEBUG] 🎨 persistedImg2imgStrength:', persistedImg2imgStrength);
+  console.log('[EDIT_DEBUG] 🎨 persistedImg2imgEnablePromptExpansion:', persistedImg2imgEnablePromptExpansion);
+  console.log('[EDIT_DEBUG] 🎨 editSettingsPersistence.isLoading:', editSettingsPersistence.isLoading);
+  console.log('[EDIT_DEBUG] 🎨 editSettingsPersistence.hasPersistedSettings:', editSettingsPersistence.hasPersistedSettings);
+  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
+  
   const img2imgHook = useImg2ImgMode({
     media,
     selectedProjectId,
@@ -241,6 +253,11 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     setImg2imgStrength: setPersistedImg2imgStrength,
     enablePromptExpansion: persistedImg2imgEnablePromptExpansion,
     setEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
+    // Prompt is shared with other edit modes, persisted per-generation
+    img2imgPrompt: persistedPrompt,
+    setImg2imgPrompt: setPersistedPrompt,
+    // Number of generations (shared with other edit modes)
+    numGenerations,
   });
   const {
     img2imgPrompt,
@@ -254,6 +271,38 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     handleGenerateImg2Img,
     loraManager: img2imgLoraManager,
   } = img2imgHook;
+
+  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
+  console.log('[EDIT_DEBUG] 🎨 InlineEditView AFTER useImg2ImgMode:');
+  console.log('[EDIT_DEBUG] 🎨 img2imgStrength:', img2imgStrength);
+  console.log('[EDIT_DEBUG] 🎨 enablePromptExpansion:', enablePromptExpansion);
+  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
+
+  // Track if we've synced numGenerations from persistence
+  const hasInitializedNumGenerationsRef = useRef(false);
+
+  // Sync numGenerations: persistence → useInpainting (on initial load)
+  useEffect(() => {
+    if (!editSettingsPersistence.isReady || hasInitializedNumGenerationsRef.current) return;
+    
+    // Only sync on first load if values differ
+    if (numGenerations !== inpaintNumGenerations) {
+      console.log('[EDIT_DEBUG] 🔄 SYNC: numGenerations persistence → inpainting:', numGenerations);
+      setInpaintNumGenerations(numGenerations);
+    }
+    hasInitializedNumGenerationsRef.current = true;
+  }, [editSettingsPersistence.isReady, numGenerations, inpaintNumGenerations, setInpaintNumGenerations]);
+
+  // Sync numGenerations: useInpainting → persistence (on change)
+  useEffect(() => {
+    if (!hasInitializedNumGenerationsRef.current || !editSettingsPersistence.isReady) return;
+    
+    // Sync UI changes back to persistence
+    if (inpaintNumGenerations !== numGenerations) {
+      console.log('[EDIT_DEBUG] 🔄 SYNC: numGenerations inpainting → persistence:', inpaintNumGenerations);
+      setNumGenerations(inpaintNumGenerations);
+    }
+  }, [inpaintNumGenerations, numGenerations, setNumGenerations, editSettingsPersistence.isReady]);
 
   const { sourceGenerationData } = useSourceGeneration({
     media,
@@ -682,8 +731,6 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
                   setImg2imgPrompt={setImg2imgPrompt}
                   img2imgStrength={img2imgStrength}
                   setImg2imgStrength={setImg2imgStrength}
-                  img2imgNumGenerations={img2imgNumGenerations}
-                  setImg2imgNumGenerations={setImg2imgNumGenerations}
                   enablePromptExpansion={enablePromptExpansion}
                   setEnablePromptExpansion={setEnablePromptExpansion}
                   img2imgLoraManager={img2imgLoraManager}

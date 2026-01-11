@@ -20,7 +20,7 @@ export const DEFAULT_LAST_USED: LastUsedEditSettings = {
   editMode: 'text',
   loraMode: 'in-scene',
   customLoraUrl: '',
-  numGenerations: 4,
+  numGenerations: 1,
   // Img2Img defaults
   img2imgStrength: 0.6,
   img2imgEnablePromptExpansion: false,
@@ -80,10 +80,10 @@ export function useLastUsedEditSettings({
       const projectStored = localStorage.getItem(STORAGE_KEY_PROJECT(projectId));
       if (projectStored) {
         const parsed = JSON.parse(projectStored);
-        console.log('[EditSettingsPersist] 📥 LAST-USED LOAD: From project localStorage');
-        console.log('[EditSettingsPersist] 📥 LAST-USED LOAD: projectId:', projectId.substring(0, 8));
-        console.log('[EditSettingsPersist] 📥 LAST-USED LOAD: editMode:', parsed.editMode);
-        console.log('[EditSettingsPersist] 📥 LAST-USED LOAD: loraMode:', parsed.loraMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: From project localStorage');
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: projectId:', projectId.substring(0, 8));
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: editMode:', parsed.editMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: loraMode:', parsed.loraMode);
         return { ...DEFAULT_LAST_USED, ...parsed };
       }
       
@@ -91,15 +91,15 @@ export function useLastUsedEditSettings({
       const globalStored = localStorage.getItem(STORAGE_KEY_GLOBAL);
       if (globalStored) {
         const parsed = JSON.parse(globalStored);
-        console.log('[EditSettingsPersist] 📥 LAST-USED LOAD: From GLOBAL localStorage (new project fallback)');
-        console.log('[EditSettingsPersist] 📥 LAST-USED LOAD: editMode:', parsed.editMode);
-        console.log('[EditSettingsPersist] 📥 LAST-USED LOAD: loraMode:', parsed.loraMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: From GLOBAL localStorage (new project fallback)');
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: editMode:', parsed.editMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: loraMode:', parsed.loraMode);
         return { ...DEFAULT_LAST_USED, ...parsed };
       }
       
-      console.log('[EditSettingsPersist] ⚠️ LAST-USED LOAD: No localStorage found, using defaults');
+      console.log('[EDIT_DEBUG] ⚠️ LAST-USED LOAD: No localStorage found, using defaults');
     } catch (e) {
-      console.warn('[EditSettingsPersist] ❌ LAST-USED LOAD: Failed to read localStorage:', e);
+      console.warn('[EDIT_DEBUG] ❌ LAST-USED LOAD: Failed to read localStorage:', e);
     }
     
     return DEFAULT_LAST_USED;
@@ -111,9 +111,9 @@ export function useLastUsedEditSettings({
   // Reset on project change
   useEffect(() => {
     if (projectId !== lastProjectIdRef.current) {
-      console.log('[EditSettingsPersist] 🔄 LAST-USED: Project changed');
-      console.log('[EditSettingsPersist] 🔄 LAST-USED: from:', lastProjectIdRef.current?.substring(0, 8) || 'none');
-      console.log('[EditSettingsPersist] 🔄 LAST-USED: to:', projectId?.substring(0, 8) || 'none');
+      console.log('[EDIT_DEBUG] 🔄 LAST-USED: Project changed');
+      console.log('[EDIT_DEBUG] 🔄 LAST-USED: from:', lastProjectIdRef.current?.substring(0, 8) || 'none');
+      console.log('[EDIT_DEBUG] 🔄 LAST-USED: to:', projectId?.substring(0, 8) || 'none');
       lastProjectIdRef.current = projectId;
       hasSyncedFromDbRef.current = false;
       currentValueRef.current = getLocalStorageValue();
@@ -129,16 +129,16 @@ export function useLastUsedEditSettings({
       const merged = { ...currentValueRef.current, ...dbSettings };
       currentValueRef.current = merged;
       
-      console.log('[EditSettingsPersist] 🔄 LAST-USED SYNC: Synced from DB to localStorage');
-      console.log('[EditSettingsPersist] 🔄 LAST-USED SYNC: editMode:', merged.editMode);
-      console.log('[EditSettingsPersist] 🔄 LAST-USED SYNC: loraMode:', merged.loraMode);
+      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: Synced from DB to localStorage');
+      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: editMode:', merged.editMode);
+      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: loraMode:', merged.loraMode);
       
       // Update localStorage with DB values
       try {
         localStorage.setItem(STORAGE_KEY_PROJECT(projectId), JSON.stringify(merged));
         localStorage.setItem(STORAGE_KEY_GLOBAL, JSON.stringify(merged));
       } catch (e) {
-        console.warn('[EditSettingsPersist] ❌ LAST-USED SYNC: Failed to sync to localStorage:', e);
+        console.warn('[EDIT_DEBUG] ❌ LAST-USED SYNC: Failed to sync to localStorage:', e);
       }
     }
   }, [isDbLoading, dbSettings, projectId]);
@@ -160,22 +160,22 @@ export function useLastUsedEditSettings({
 
     currentValueRef.current = merged;
     
-    console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: Updating "last used" settings');
-    console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: editMode:', merged.editMode);
-    console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: loraMode:', merged.loraMode);
-    console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: numGenerations:', merged.numGenerations);
-    console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: customLoraUrl:', merged.customLoraUrl || '(empty)');
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: Updating "last used" settings');
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: editMode:', merged.editMode);
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: loraMode:', merged.loraMode);
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: numGenerations:', merged.numGenerations);
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: customLoraUrl:', merged.customLoraUrl || '(empty)');
     
     // 1. Update localStorage (instant for next time)
     try {
       if (projectId) {
         localStorage.setItem(STORAGE_KEY_PROJECT(projectId), JSON.stringify(merged));
-        console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: Saved to project localStorage');
+        console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: Saved to project localStorage');
       }
       localStorage.setItem(STORAGE_KEY_GLOBAL, JSON.stringify(merged));
-      console.log('[EditSettingsPersist] 💾 LAST-USED SAVE: Saved to global localStorage');
+      console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: Saved to global localStorage');
     } catch (e) {
-      console.warn('[EditSettingsPersist] ❌ LAST-USED SAVE: Failed to save to localStorage:', e);
+      console.warn('[EDIT_DEBUG] ❌ LAST-USED SAVE: Failed to save to localStorage:', e);
     }
     
     // 2. Update database (cross-device sync)
@@ -184,7 +184,7 @@ export function useLastUsedEditSettings({
     void updateDbSettings('user', merged).catch((err) => {
       // IMPORTANT: swallow to avoid "Uncaught (in promise)" spam.
       // useToolSettings already handles user-facing errors/toasts and backs off on network exhaustion.
-      console.warn('[EditSettingsPersist] ❌ LAST-USED SAVE: DB save failed', {
+      console.warn('[EDIT_DEBUG] ❌ LAST-USED SAVE: DB save failed', {
         message: err?.message,
       });
     });

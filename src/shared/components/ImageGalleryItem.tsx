@@ -1025,7 +1025,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       <>
           {/* Shot Name Badge / Variant Name for Videos - Top Left */}
           {isVideoContent && ((image as any).name || (image.shot_id && simplifiedShotOptions.length > 0) || (image.derivedCount && image.derivedCount > 0)) && (
-          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 z-20">
               {/* Variant Name */}
               {(image as any).name && (
                 <div className="bg-black/50 text-white text-xs sm:text-sm px-2 py-0.5 rounded-md mb-1 font-medium backdrop-blur-sm">
@@ -1461,7 +1461,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               <div className="flex flex-row items-center gap-1.5">
                 {/* "X new" badge + Variant Count - positioned to the left of Info button */}
                 {!isVideoContent && image.derivedCount && image.derivedCount > 1 && (
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1">
                     {image.hasUnviewedVariants && image.unviewedVariantCount && image.unviewedVariantCount > 0 && (
                       <TooltipProvider>
                         <Tooltip>

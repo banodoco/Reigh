@@ -17,6 +17,11 @@ export interface UseImg2ImgModeProps {
   setImg2imgStrength: (strength: number) => void;
   enablePromptExpansion: boolean;
   setEnablePromptExpansion: (enabled: boolean) => void;
+  // Prompt is persisted per-generation (shared with other edit modes)
+  img2imgPrompt: string;
+  setImg2imgPrompt: (prompt: string) => void;
+  // Number of generations (shared with other edit modes)
+  numGenerations: number;
 }
 
 export interface UseImg2ImgModeReturn {
@@ -43,8 +48,8 @@ export interface UseImg2ImgModeReturn {
  * Hook for managing Img2Img mode state and generation
  * Uses Z Image Turbo I2I task type with full LoRA selector support
  * 
- * Strength and enablePromptExpansion are persisted via editSettingsPersistence
- * Prompt is local state (never inherited between generations)
+ * Strength, enablePromptExpansion, and prompt are persisted via editSettingsPersistence
+ * Prompt is persisted per-generation (shared with other edit modes, never inherited)
  */
 export const useImg2ImgMode = ({
   media,
@@ -59,9 +64,22 @@ export const useImg2ImgMode = ({
   setImg2imgStrength,
   enablePromptExpansion,
   setEnablePromptExpansion,
+  // Prompt is persisted per-generation
+  img2imgPrompt,
+  setImg2imgPrompt,
+  // Number of generations (shared)
+  numGenerations,
 }: UseImg2ImgModeProps): UseImg2ImgModeReturn => {
+  
+  console.log('[EDIT_DEBUG] ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
+  console.log('[EDIT_DEBUG] 🖼️ useImg2ImgMode HOOK CALLED');
+  console.log('[EDIT_DEBUG] 🖼️ mediaId:', media?.id?.substring(0, 8) || 'null');
+  console.log('[EDIT_DEBUG] 🖼️ PERSISTED img2imgStrength:', img2imgStrength);
+  console.log('[EDIT_DEBUG] 🖼️ PERSISTED enablePromptExpansion:', enablePromptExpansion);
+  console.log('[EDIT_DEBUG] 🖼️ PERSISTED img2imgPrompt:', img2imgPrompt ? `"${img2imgPrompt.substring(0, 30)}..."` : '(empty)');
+  console.log('[EDIT_DEBUG] 🖼️ availableLoras count:', availableLoras.length);
+  console.log('[EDIT_DEBUG] ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
   // Local state (not persisted)
-  const [img2imgPrompt, setImg2imgPrompt] = useState('');
   const [isGeneratingImg2Img, setIsGeneratingImg2Img] = useState(false);
   const [img2imgGenerateSuccess, setImg2imgGenerateSuccess] = useState(false);
 
@@ -114,20 +132,21 @@ export const useImg2ImgMode = ({
         prompt: img2imgPrompt,
         strength: img2imgStrength,
         enablePromptExpansion,
+        numGenerations,
         loraCount: loras.length,
       });
 
       // Get actual generation ID (handle shot_generations case)
       const actualGenerationId = (media as any).generation_id || media.id;
 
-      // Create single task (numImages defaults to 1)
+      // Create tasks based on numGenerations
       await createBatchZImageTurboI2ITasks({
         project_id: selectedProjectId,
         image_url: sourceUrlForTasks,
         prompt: img2imgPrompt.trim() || undefined,
         strength: img2imgStrength,
         enable_prompt_expansion: enablePromptExpansion,
-        numImages: 1,
+        numImages: numGenerations,
         loras: loras.length > 0 ? loras : undefined,
         based_on: actualGenerationId,
         create_as_generation: createAsGeneration,
@@ -159,6 +178,7 @@ export const useImg2ImgMode = ({
     img2imgPrompt,
     img2imgStrength,
     enablePromptExpansion,
+    numGenerations,
     loraManager.selectedLoras,
     createAsGeneration,
     toolTypeOverride,
