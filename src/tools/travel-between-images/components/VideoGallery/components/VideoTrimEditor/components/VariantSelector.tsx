@@ -393,11 +393,11 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                   isChild && !isActive && !isPrimary && 'ring-1 ring-purple-500/50'
                 )}
               >
-                {/* Thumbnail */}
+                {/* Thumbnail - use thumbnail_url if available, otherwise fall back to location (works for images) */}
                 <div className="relative w-full aspect-video rounded overflow-hidden bg-muted">
-                  {variant.thumbnail_url ? (
+                  {(variant.thumbnail_url || variant.location) ? (
                     <img
-                      src={variant.thumbnail_url}
+                      src={variant.thumbnail_url || variant.location}
                       alt={label}
                       className="w-full h-full object-cover pointer-events-none"
                     />
