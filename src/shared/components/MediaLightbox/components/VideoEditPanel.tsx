@@ -9,8 +9,9 @@
 
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { Film, X, Scissors, RefreshCw, RotateCcw } from 'lucide-react';
+import { X, Scissors, RefreshCw, RotateCcw } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 
 // Import video editing components
 import {
@@ -39,8 +40,11 @@ export interface VideoEditPanelProps {
   /** Handler to switch to regenerate mode */
   onEnterRegenerateMode: () => void;
 
-  /** Handler to exit video edit mode */
+  /** Handler to close the lightbox entirely */
   onClose: () => void;
+
+  /** Handler to exit video edit mode (switch to info view) */
+  onExitVideoEditMode: () => void;
 
   // Trim mode props
   trimState: TrimState;
@@ -80,6 +84,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   onEnterReplaceMode,
   onEnterRegenerateMode,
   onClose,
+  onExitVideoEditMode,
   // Trim props
   trimState,
   onStartTrimChange,
@@ -116,20 +121,32 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header with close button */}
+      {/* Header with Info/Edit toggle and close button */}
       <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Film className="w-5 h-5 text-primary" />
           <h2 className={cn("font-light", isMobile ? "text-base" : "text-lg")}>Edit Video</h2>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-8 w-8 p-0 hover:bg-muted"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-3">
+          <SegmentedControl
+            value="edit"
+            onValueChange={(value) => {
+              if (value === 'info') {
+                onExitVideoEditMode();
+              }
+            }}
+          >
+            <SegmentedControlItem value="info">Info</SegmentedControlItem>
+            <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
+          </SegmentedControl>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="h-8 w-8 p-0 hover:bg-muted"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Sub-mode selector: Trim | Replace | Regenerate */}
@@ -197,6 +214,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
             videoUrl={videoUrl}
             currentTime={trimCurrentTime}
             videoRef={trimVideoRef}
+            hideHeader
           />
         )}
         {videoEditSubMode === 'replace' && (
@@ -250,6 +268,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
             generateSuccess={videoEditing.generateSuccess}
             isGenerateDisabled={!videoEditing.isValid}
             validationErrors={videoEditing.validationErrors}
+            hideHeader
           />
         )}
         {videoEditSubMode === 'regenerate' && regenerateForm}

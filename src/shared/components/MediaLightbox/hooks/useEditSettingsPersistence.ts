@@ -158,6 +158,9 @@ export function useEditSettingsPersistence({
       customLoraUrl: lastUsedSettings.lastUsed.customLoraUrl,
       numGenerations: lastUsedSettings.lastUsed.numGenerations,
       prompt: '', // Never inherit prompt
+      // Img2Img settings from lastUsed
+      img2imgStrength: lastUsedSettings.lastUsed.img2imgStrength,
+      img2imgEnablePromptExpansion: lastUsedSettings.lastUsed.img2imgEnablePromptExpansion,
     };
   }, [
     generationSettings.isLoading,
@@ -198,6 +201,19 @@ export function useEditSettingsPersistence({
     generationSettings.setPrompt(prompt);
   }, [generationSettings]);
   
+  // Img2Img setters (save to both generation and "last used")
+  const setImg2imgStrength = useCallback((strength: number) => {
+    console.log('[EditSettingsPersist] 🔧 SET: img2imgStrength →', strength);
+    generationSettings.setImg2imgStrength(strength);
+    lastUsedSettings.updateLastUsed({ img2imgStrength: strength });
+  }, [generationSettings, lastUsedSettings]);
+  
+  const setImg2imgEnablePromptExpansion = useCallback((enabled: boolean) => {
+    console.log('[EditSettingsPersist] 🔧 SET: img2imgEnablePromptExpansion →', enabled);
+    generationSettings.setImg2imgEnablePromptExpansion(enabled);
+    lastUsedSettings.updateLastUsed({ img2imgEnablePromptExpansion: enabled });
+  }, [generationSettings, lastUsedSettings]);
+  
   // Computed LoRAs based on mode (replaces useEditModeLoRAs logic)
   const editModeLoRAs = useMemo(() => {
     const { loraMode, customLoraUrl } = effectiveSettings;
@@ -230,6 +246,9 @@ export function useEditSettingsPersistence({
     customLoraUrl: effectiveSettings.customLoraUrl,
     numGenerations: effectiveSettings.numGenerations,
     prompt: effectiveSettings.prompt,
+    // Img2Img values
+    img2imgStrength: effectiveSettings.img2imgStrength,
+    img2imgEnablePromptExpansion: effectiveSettings.img2imgEnablePromptExpansion,
     
     // Setters
     setEditMode,
@@ -237,6 +256,9 @@ export function useEditSettingsPersistence({
     setCustomLoraUrl,
     setNumGenerations,
     setPrompt,
+    // Img2Img setters
+    setImg2imgStrength,
+    setImg2imgEnablePromptExpansion,
     
     // Computed
     editModeLoRAs,

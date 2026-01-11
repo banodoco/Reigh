@@ -51,7 +51,7 @@ interface ApplySettingsContext {
     metadata: any,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth'
+    structureType: 'uni3c' | 'flow' | 'canny' | 'depth'
   ) => void;
   
   // Current values

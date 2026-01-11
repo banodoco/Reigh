@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, Suspense } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -6,7 +6,8 @@ import { Switch } from '@/shared/components/ui/switch';
 import { Label } from '@/shared/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
-import { CheckCircle, Loader2, Move, Paintbrush, Pencil, Save, Sparkles, Type, X, XCircle, Layers } from 'lucide-react';
+import { CheckCircle, Loader2, Move, Paintbrush, Pencil, Save, Sparkles, Type, X, XCircle, Layers, Wand2, Plus } from 'lucide-react';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { GenerationRow } from '@/types/shots';
@@ -14,6 +15,9 @@ import type { LoraMode } from '../hooks';
 import type { SourceVariantData } from '../hooks/useSourceGeneration';
 import { VariantSelector } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/components/VariantSelector';
 import type { GenerationVariant } from '@/shared/hooks/useVariants';
+import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
+import { LoraSelectorModal, LoraModel } from '@/shared/components/LoraSelectorModal';
+import type { UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 
 export interface EditModePanelProps {
   // Source generation
@@ -28,8 +32,8 @@ export interface EditModePanelProps {
   canMakeMainVariant?: boolean;
   
   // Edit mode state
-  editMode: 'text' | 'inpaint' | 'annotate' | 'reposition';
-  setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition') => void;
+  editMode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
+  setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img') => void;
   setIsInpaintMode: (value: boolean) => void;
   
   // Prompt state
@@ -94,6 +98,20 @@ export interface EditModePanelProps {
   // Create as generation toggle
   createAsGeneration?: boolean;
   onCreateAsGenerationChange?: (value: boolean) => void;
+  
+  // Img2Img mode props
+  img2imgPrompt?: string;
+  setImg2imgPrompt?: (prompt: string) => void;
+  img2imgStrength?: number;
+  setImg2imgStrength?: (strength: number) => void;
+  enablePromptExpansion?: boolean;
+  setEnablePromptExpansion?: (enabled: boolean) => void;
+  isGeneratingImg2Img?: boolean;
+  img2imgGenerateSuccess?: boolean;
+  handleGenerateImg2Img?: () => void;
+  // LoRA manager for img2img (uses shared LoRA selector)
+  img2imgLoraManager?: UseLoraManagerReturn;
+  availableLoras?: LoraModel[];
 }
 
 /**
@@ -153,6 +171,18 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   hideInfoEditToggle = false,
   createAsGeneration = false,
   onCreateAsGenerationChange,
+  // Img2Img props
+  img2imgPrompt = '',
+  setImg2imgPrompt,
+  img2imgStrength = 0.6,
+  setImg2imgStrength,
+  enablePromptExpansion = false,
+  setEnablePromptExpansion,
+  isGeneratingImg2Img = false,
+  img2imgGenerateSuccess = false,
+  handleGenerateImg2Img,
+  img2imgLoraManager,
+  availableLoras = [],
 }) => {
   const isMobile = variant === 'mobile';
   
@@ -198,26 +228,12 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
 
   return (
     <div className="w-full">
-      {/* Top bar with Based On (left) and Info/Edit Toggle + Close (right) - Sticky */}
+      {/* Top bar with Edit Image title (left) and Info/Edit Toggle + Close (right) - Sticky */}
       <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
-        {/* Based On display - Show source image this was derived from */}
-        {sourceGenerationData && onOpenExternalGeneration ? (
-          <SourceGenerationDisplay
-            sourceGeneration={sourceGenerationData}
-            onNavigate={onOpenExternalGeneration}
-            variant="compact"
-            currentShotId={currentShotId}
-            allShots={allShots}
-            currentMediaId={currentMediaId}
-            isCurrentMediaPositioned={isCurrentMediaPositioned}
-            onReplaceInShot={onReplaceInShot}
-            sourcePrimaryVariant={sourcePrimaryVariant}
-            onMakeMainVariant={onMakeMainVariant}
-            canMakeMainVariant={canMakeMainVariant}
-          />
-        ) : (
-          <div></div>
-        )}
+        {/* Left side - Edit Image title */}
+        <div className="flex items-center gap-2">
+          <h2 className={cn("font-light", isMobile ? "text-base" : "text-lg")}>Edit Image</h2>
+        </div>
         
         {/* Info | Edit Toggle and Close Button */}
         <div className="flex items-center gap-3">
@@ -230,12 +246,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               }
             }}
           >
-            <SegmentedControlItem value="info">
-              Info
-            </SegmentedControlItem>
-            <SegmentedControlItem value="edit" disabled>
-              Edit
-            </SegmentedControlItem>
+            <SegmentedControlItem value="info">Info</SegmentedControlItem>
+            <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
           </SegmentedControl>
           )}
           
@@ -255,75 +267,90 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
       
       <div className={`${padding} ${spacing}`}>
       <div className={isMobile ? 'mb-2' : 'mb-4'}>
-        <h2 className={`${headerSize} font-light mb-3`}>Edit Image</h2>
-        
-        {/* Four-way toggle: Text | Inpaint | Annotate | Reposition - 2x2 grid on narrow screens */}
-        <div className="grid grid-cols-2 gap-1 border border-border rounded-lg overflow-hidden bg-muted/30">
-            <button
-              onClick={() => {
-                setIsInpaintMode(true);
-                setEditMode('text');
-              }}
-              className={cn(
-                `flex items-center justify-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
-                editMode === 'text'
-                  ? "bg-background text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              )}
-            >
-              <Type className={toggleIconSize} />
-              Text
-            </button>
-            <button
-              onClick={() => {
-                setIsInpaintMode(true);
-                setEditMode('inpaint');
-              }}
-              className={cn(
-                `flex items-center justify-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
-                editMode === 'inpaint'
-                  ? "bg-background text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              )}
-            >
-              <Paintbrush className={toggleIconSize} />
-              Inpaint
-            </button>
-            <button
-              onClick={() => {
-                setIsInpaintMode(true);
-                setEditMode('annotate');
-              }}
-              className={cn(
-                `flex items-center justify-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
-                editMode === 'annotate'
-                  ? "bg-background text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              )}
-            >
-              <Pencil className={toggleIconSize} />
-              Annotate
-            </button>
-            <button
-              onClick={() => {
-                setIsInpaintMode(true);
-                setEditMode('reposition');
-              }}
-              className={cn(
-                `flex items-center justify-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
-                editMode === 'reposition'
-                  ? "bg-background text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              )}
-              title="Move, scale, or rotate the image to fill edges with AI"
-            >
-              <Move className={toggleIconSize} />
-              Reposition
-            </button>
-          </div>
+        {/* Five-way toggle: Text | Inpaint | Annotate | Reposition | Img2Img - single row */}
+        <div className="flex gap-1 border border-border rounded-lg overflow-hidden bg-muted/30 p-1">
+          <button
+            onClick={() => {
+              setIsInpaintMode(true);
+              setEditMode('text');
+            }}
+            className={cn(
+              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              editMode === 'text'
+                ? "bg-background text-foreground font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+          >
+            <Type className={toggleIconSize} />
+            {!isMobile && "Text"}
+          </button>
+          <button
+            onClick={() => {
+              setIsInpaintMode(true);
+              setEditMode('inpaint');
+            }}
+            className={cn(
+              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              editMode === 'inpaint'
+                ? "bg-background text-foreground font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+          >
+            <Paintbrush className={toggleIconSize} />
+            {!isMobile && "Inpaint"}
+          </button>
+          <button
+            onClick={() => {
+              setIsInpaintMode(true);
+              setEditMode('annotate');
+            }}
+            className={cn(
+              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              editMode === 'annotate'
+                ? "bg-background text-foreground font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+          >
+            <Pencil className={toggleIconSize} />
+            {!isMobile && "Annotate"}
+          </button>
+          <button
+            onClick={() => {
+              setIsInpaintMode(true);
+              setEditMode('reposition');
+            }}
+            className={cn(
+              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              editMode === 'reposition'
+                ? "bg-background text-foreground font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+            title="Move, scale, or rotate the image to fill edges with AI"
+          >
+            <Move className={toggleIconSize} />
+            {!isMobile && "Reposition"}
+          </button>
+          <button
+            onClick={() => {
+              setIsInpaintMode(true);
+              setEditMode('img2img');
+            }}
+            className={cn(
+              `flex-1 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded`,
+              editMode === 'img2img'
+                ? "bg-background text-foreground font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+            title="Transform the entire image with a prompt and strength control"
+          >
+            <Wand2 className={toggleIconSize} />
+            {!isMobile && "Img2Img"}
+          </button>
+        </div>
         </div>
         
-        {/* Prompt Field */}
+        {/* Prompt Field - Hidden for img2img mode (has its own prompt field) */}
+        {editMode !== 'img2img' && (
         <div className={generationsSpacing}>
           <label className={`${labelSize} font-medium`}>Prompt:</label>
           <Textarea
@@ -349,8 +376,106 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             }}
           />
         </div>
+        )}
         
-        {/* LoRA & Number of Generations */}
+        {/* Img2Img Mode Controls */}
+        {editMode === 'img2img' && setImg2imgPrompt && setImg2imgStrength && setEnablePromptExpansion && (
+          <div className={spacing}>
+            {/* Prompt (optional for img2img) with Enable Prompt Expansion on the right */}
+            <div className={generationsSpacing}>
+              <div className="flex items-center justify-between mb-1">
+                <label className={`${labelSize} font-medium`}>Prompt (optional):</label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 cursor-pointer">
+                      <Checkbox
+                        id="enable-prompt-expansion"
+                        checked={enablePromptExpansion}
+                        onCheckedChange={(checked) => setEnablePromptExpansion(!!checked)}
+                        className="h-3.5 w-3.5"
+                      />
+                      <Label htmlFor="enable-prompt-expansion" className={cn("text-xs text-muted-foreground cursor-pointer")}>
+                        Expand
+                      </Label>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[250px]">
+                    <p className="text-xs">
+                      AI will automatically expand and enhance your prompt for better results.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Textarea
+                value={img2imgPrompt}
+                onChange={(e) => setImg2imgPrompt(e.target.value)}
+                placeholder={isMobile ? "Describe the desired output..." : "Optional: describe what the transformed image should look like..."}
+                className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
+                rows={textareaRows}
+                clearable
+                onClear={() => setImg2imgPrompt('')}
+                voiceInput
+                voiceContext="This is an image-to-image prompt. Describe the desired style or transformation for the image. Be specific about the visual result you want."
+                onVoiceResult={(result) => {
+                  setImg2imgPrompt(result.prompt || result.transcription);
+                }}
+              />
+            </div>
+            
+            {/* Strength Slider */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label className={`${labelSize} font-medium`}>Strength:</label>
+                <span className={`${sliderTextSize} text-muted-foreground`}>{img2imgStrength.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={img2imgStrength}
+                onChange={(e) => setImg2imgStrength(parseFloat(e.target.value))}
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+              />
+              <p className={`${sliderTextSize} text-muted-foreground mt-1`}>
+                Lower = closer to original, Higher = more transformed
+              </p>
+            </div>
+            
+            {/* LoRA Selector */}
+            {img2imgLoraManager && (
+              <div className={generationsSpacing}>
+                <div className="flex items-center justify-between mb-2">
+                  <label className={`${labelSize} font-medium`}>LoRAs (optional):</label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => img2imgLoraManager.setIsLoraModalOpen(true)}
+                    className="h-7 px-2 text-xs"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add LoRA
+                  </Button>
+                </div>
+                
+                {/* Display selected LoRAs */}
+                {img2imgLoraManager.selectedLoras.length > 0 && (
+                  <ActiveLoRAsDisplay
+                    selectedLoras={img2imgLoraManager.selectedLoras}
+                    onRemoveLora={img2imgLoraManager.handleRemoveLora}
+                    onLoraStrengthChange={img2imgLoraManager.handleLoraStrengthChange}
+                    isGenerating={isGeneratingImg2Img}
+                    availableLoras={availableLoras}
+                    className="mt-2"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* LoRA & Number of Generations - Hidden for img2img mode */}
+        {editMode !== 'img2img' && (
         <div className={`flex ${isMobile ? 'flex-col gap-3' : 'gap-4'}`}>
           {/* LoRA Selector */}
           <div className={cn(isMobile ? "" : "flex-1")}>
@@ -416,6 +541,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             />
           </div>
         </div>
+        )}
         
         {/* Create as Variant toggle */}
         {onCreateAsGenerationChange && (
@@ -518,6 +644,35 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               )}
             </Button>
           </div>
+        ) : editMode === 'img2img' && handleGenerateImg2Img ? (
+          /* Img2Img Generate Button */
+          <Button
+            variant="default"
+            size={buttonSize}
+            onClick={handleGenerateImg2Img}
+            disabled={isGeneratingImg2Img || img2imgGenerateSuccess}
+            className={cn(
+              "w-full",
+              img2imgGenerateSuccess && "bg-green-600 hover:bg-green-600"
+            )}
+          >
+            {isGeneratingImg2Img ? (
+              <>
+                <Loader2 className={`${iconSize} mr-2 animate-spin`} />
+                Generating...
+              </>
+            ) : img2imgGenerateSuccess ? (
+              <>
+                <CheckCircle className={`${iconSize} mr-2`} />
+                Submitted, results will appear below
+              </>
+            ) : (
+              <>
+                <Wand2 className={`${iconSize} mr-2`} />
+                Transform Image
+              </>
+            )}
+          </Button>
         ) : (
           /* Generate Button - For other modes */
           <Button
@@ -584,6 +739,30 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         </div>
       )}
       </div>
+
+      {/* Img2Img LoRA Selector Modal */}
+      {img2imgLoraManager && (
+        <Suspense fallback={null}>
+          <LoraSelectorModal
+            isOpen={img2imgLoraManager.isLoraModalOpen}
+            onClose={() => img2imgLoraManager.setIsLoraModalOpen(false)}
+            loras={availableLoras}
+            onAddLora={img2imgLoraManager.handleAddLora}
+            onRemoveLora={img2imgLoraManager.handleRemoveLora}
+            onUpdateLoraStrength={img2imgLoraManager.handleLoraStrengthChange}
+            selectedLoras={img2imgLoraManager.selectedLoras.map(lora => {
+              const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
+              return {
+                ...fullLora,
+                "Model ID": lora.id,
+                Name: lora.name,
+                strength: lora.strength,
+              } as LoraModel & { strength: number };
+            })}
+            lora_type="z-image"
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

@@ -287,35 +287,24 @@ export const useVideoTravelSettingsHandlers = ({
         });
       }
     } else {
-      // Basic mode - disable advanced mode
-      // If no preset is selected, auto-select the default preset to avoid
-      // the inconsistent state of "custom config in basic mode"
+      // Basic mode - disable advanced mode and reset to defaults
+      // Always reset to default config when switching from Advanced to Basic
       const currentSettings = shotSettingsRef.current.settings;
-      const hasPresetSelected = !!currentSettings?.selectedPhasePresetId;
+      const isVaceMode = currentSettings?.generationTypeMode === 'vace';
+      const defaultPresetId = isVaceMode ? BUILTIN_DEFAULT_VACE_ID : BUILTIN_DEFAULT_I2V_ID;
+      const defaultConfig = isVaceMode ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
 
-      if (!hasPresetSelected) {
-        // Auto-select default preset based on generation type mode
-        const isVaceMode = currentSettings?.generationTypeMode === 'vace';
-        const defaultPresetId = isVaceMode ? BUILTIN_DEFAULT_VACE_ID : BUILTIN_DEFAULT_I2V_ID;
-        const defaultConfig = isVaceMode ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
+      console.log('[MotionMode] Switching to basic mode - resetting to defaults:', {
+        isVaceMode,
+        presetId: defaultPresetId
+      });
 
-        console.log('[MotionMode] Switching to basic with no preset - auto-selecting default:', {
-          isVaceMode,
-          presetId: defaultPresetId
-        });
-
-        shotSettingsRef.current.updateFields({
-          motionMode: mode,
-          advancedMode: false,
-          selectedPhasePresetId: defaultPresetId,
-          phaseConfig: defaultConfig
-        });
-      } else {
-        shotSettingsRef.current.updateFields({
-          motionMode: mode,
-          advancedMode: false
-        });
-      }
+      shotSettingsRef.current.updateFields({
+        motionMode: mode,
+        advancedMode: false,
+        selectedPhasePresetId: defaultPresetId,
+        phaseConfig: defaultConfig
+      });
     }
   }, [currentShotId, shotSettingsRef]);
 
@@ -325,7 +314,22 @@ export const useVideoTravelSettingsHandlers = ({
       to: mode
     });
     
-    shotSettingsRef.current.updateField('generationTypeMode', mode);
+    // Update generation type mode AND the preset ID to match
+    // This keeps things consistent (preset ID should match the mode's default)
+    const currentSettings = shotSettingsRef.current.settings;
+    const isBasicMode = currentSettings?.motionMode === 'basic' || !currentSettings?.motionMode;
+    
+    if (isBasicMode) {
+      // In basic mode: update mode, preset ID, and rebuild phase config
+      const defaultPresetId = mode === 'vace' ? BUILTIN_DEFAULT_VACE_ID : BUILTIN_DEFAULT_I2V_ID;
+      shotSettingsRef.current.updateFields({
+        generationTypeMode: mode,
+        selectedPhasePresetId: defaultPresetId
+      });
+    } else {
+      // In advanced mode: just update the mode (user has custom config)
+      shotSettingsRef.current.updateField('generationTypeMode', mode);
+    }
     
     // Always rebuild phase config when mode changes (force: true bypasses Basic mode check)
     // because I2V vs VACE fundamentally changes the phase structure (2 vs 3 phases)
@@ -420,10 +424,21 @@ export const useVideoTravelSettingsHandlers = ({
 
   // Handler for restoring defaults in Advanced mode - respects current I2V/VACE mode
   const handleRestoreDefaults = useCallback(() => {
-    console.log('[RestoreDefaults] Restoring phase config from basic mode settings');
+    const currentSettings = shotSettingsRef.current.settings;
+    const isVaceMode = currentSettings?.generationTypeMode === 'vace';
+    const defaultPresetId = isVaceMode ? BUILTIN_DEFAULT_VACE_ID : BUILTIN_DEFAULT_I2V_ID;
+    
+    console.log('[RestoreDefaults] Restoring phase config from basic mode settings:', {
+      isVaceMode,
+      presetId: defaultPresetId
+    });
+    
+    // Update preset ID to match the restored config
+    shotSettingsRef.current.updateField('selectedPhasePresetId', defaultPresetId);
+    
     // Force rebuild regardless of current mode (user explicitly clicked "Restore Defaults")
     rebuildPhaseConfig({ force: true });
-  }, [rebuildPhaseConfig]);
+  }, [shotSettingsRef, rebuildPhaseConfig]);
 
   // =============================================================================
   // GENERATION MODE (batch vs timeline)

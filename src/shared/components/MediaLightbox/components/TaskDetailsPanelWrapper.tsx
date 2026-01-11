@@ -88,6 +88,7 @@ export const TaskDetailsPanelWrapper: React.FC<TaskDetailsPanelWrapperProps> = (
       onEditingGenerationNameChange={onEditingGenerationNameChange}
       showUserImage={false}
       derivedSection={null}
+      hideHeader={true}
     />
   );
 };

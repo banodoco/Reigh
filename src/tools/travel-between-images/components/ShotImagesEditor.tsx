@@ -98,15 +98,19 @@ interface ShotImagesEditorProps {
   structureVideoMetadata?: VideoMetadata | null;
   structureVideoTreatment?: 'adjust' | 'clip';
   structureVideoMotionStrength?: number;
-  structureVideoType?: 'flow' | 'canny' | 'depth';
+  structureVideoType?: 'uni3c' | 'flow' | 'canny' | 'depth';
+  /** Uni3C end percent (only used when structureVideoType is 'uni3c') */
+  uni3cEndPercent?: number;
   onStructureVideoChange?: (
     videoPath: string | null,
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth',
+    structureType: 'uni3c' | 'flow' | 'canny' | 'depth',
     resourceId?: string
   ) => void;
+  /** Callback for changing uni3c end percent */
+  onUni3cEndPercentChange?: (value: number) => void;
   /** Audio strip props */
   audioUrl?: string | null;
   audioMetadata?: { duration: number; name?: string } | null;
@@ -178,7 +182,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   structureVideoTreatment: propStructureVideoTreatment = 'adjust',
   structureVideoMotionStrength: propStructureVideoMotionStrength = 1.0,
   structureVideoType: propStructureVideoType = 'flow',
+  uni3cEndPercent: propUni3cEndPercent = 0.1,
   onStructureVideoChange: propOnStructureVideoChange,
+  onUni3cEndPercentChange: propOnUni3cEndPercentChange,
   // Audio strip props
   audioUrl: propAudioUrl,
   audioMetadata: propAudioMetadata,
@@ -1089,6 +1095,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 structureVideoMotionStrength={propStructureVideoMotionStrength}
                 structureVideoType={propStructureVideoType}
                 onStructureVideoChange={propOnStructureVideoChange}
+                uni3cEndPercent={propUni3cEndPercent}
+                onUni3cEndPercentChange={propOnUni3cEndPercentChange}
                 // Audio strip props
                 audioUrl={propAudioUrl}
                 audioMetadata={propAudioMetadata}
@@ -1364,6 +1372,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           type
                         );
                       }}
+                      uni3cEndPercent={propUni3cEndPercent}
+                      onUni3cEndPercentChange={propOnUni3cEndPercentChange}
                       readOnly={readOnly}
                     />
                   </>

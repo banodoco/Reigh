@@ -58,7 +58,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         projectResolution={projectResolution}
         queryKeyPrefix="lightbox-segment-presets"
         buttonLabel="Regenerate Video"
-        showHeader={true}
+        showHeader={false}
       />
     </div>
   );

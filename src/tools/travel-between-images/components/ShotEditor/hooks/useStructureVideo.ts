@@ -28,6 +28,7 @@ export const DEFAULT_STRUCTURE_VIDEO_CONFIG: StructureVideoConfig = {
   structure_video_treatment: DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
   structure_video_motion_strength: DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
   structure_video_type: DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+  uni3c_end_percent: 0.1, // Default 10%
   metadata: null,
   resource_id: null,
 };
@@ -50,7 +51,7 @@ export interface UseStructureVideoReturn {
   /** @deprecated Use structureVideoConfig.structure_video_motion_strength */
   structureVideoMotionStrength: number;
   /** @deprecated Use structureVideoConfig.structure_video_type */
-  structureVideoType: 'flow' | 'canny' | 'depth';
+  structureVideoType: 'uni3c' | 'flow' | 'canny' | 'depth';
   /** @deprecated Use structureVideoConfig.resource_id */
   structureVideoResourceId: string | null;
   /** @deprecated Use setStructureVideoConfig */
@@ -59,7 +60,7 @@ export interface UseStructureVideoReturn {
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth',
+    structureType: 'uni3c' | 'flow' | 'canny' | 'depth',
     resourceId?: string
   ) => void;
 }
@@ -83,14 +84,15 @@ export function useStructureVideo({
     structure_video_path?: string | null;
     structure_video_treatment?: 'adjust' | 'clip';
     structure_video_motion_strength?: number;
-    structure_video_type?: 'flow' | 'canny' | 'depth';
+    structure_video_type?: 'uni3c' | 'flow' | 'canny' | 'depth';
+    uni3c_end_percent?: number; // Only used when structure_video_type is 'uni3c'
     resource_id?: string | null;
     metadata?: VideoMetadata | null;
     // Legacy camelCase format (for migration)
     path?: string;
     treatment?: 'adjust' | 'clip';
     motionStrength?: number;
-    structureType?: 'flow' | 'canny' | 'depth';
+    structureType?: 'uni3c' | 'flow' | 'canny' | 'depth';
     resourceId?: string;
   }>('travel-structure-video', {
     projectId,
@@ -128,6 +130,7 @@ export function useStructureVideo({
           structure_video_type: structureVideoSettings?.structure_video_type
             ?? structureVideoSettings?.structureType
             ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+          uni3c_end_percent: structureVideoSettings?.uni3c_end_percent ?? 0.1, // Default 10%
           metadata: structureVideoSettings?.metadata ?? null,
           resource_id: structureVideoSettings?.resource_id ?? structureVideoSettings?.resourceId ?? null,
         });
@@ -155,6 +158,7 @@ export function useStructureVideo({
       treatment: newConfig.structure_video_treatment,
       motionStrength: newConfig.structure_video_motion_strength,
       structureType: newConfig.structure_video_type,
+      uni3cEndPercent: newConfig.uni3c_end_percent,
       resourceId: newConfig.resource_id?.substring(0, 8),
     });
 
@@ -168,6 +172,7 @@ export function useStructureVideo({
         structure_video_treatment: newConfig.structure_video_treatment,
         structure_video_motion_strength: newConfig.structure_video_motion_strength,
         structure_video_type: newConfig.structure_video_type,
+        uni3c_end_percent: newConfig.uni3c_end_percent ?? 0.1,
         metadata: newConfig.metadata ?? null,
         resource_id: newConfig.resource_id ?? null,
       });
@@ -179,6 +184,7 @@ export function useStructureVideo({
         structure_video_treatment: null,
         structure_video_motion_strength: null,
         structure_video_type: null,
+        uni3c_end_percent: null,
         metadata: null,
         resource_id: null,
         // Also clear legacy fields
@@ -197,7 +203,7 @@ export function useStructureVideo({
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth',
+    structureType: 'uni3c' | 'flow' | 'canny' | 'depth',
     resourceId?: string
   ) => {
     console.log('[useStructureVideo] [LEGACY] handleStructureVideoChange called - converting to snake_case');

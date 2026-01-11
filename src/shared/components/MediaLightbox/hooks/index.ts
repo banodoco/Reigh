@@ -71,3 +71,9 @@ export type {
 } from './useSwipeNavigation';
 
 export { useButtonGroupProps } from './useButtonGroupProps';
+
+export { useImg2ImgMode } from './useImg2ImgMode';
+export type {
+  UseImg2ImgModeProps,
+  UseImg2ImgModeReturn,
+} from './useImg2ImgMode';

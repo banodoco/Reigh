@@ -219,6 +219,9 @@ export interface VideoPortionEditorProps {
     
     // Close
     onClose?: () => void;
+    
+    // Hide header when embedded in parent panel
+    hideHeader?: boolean;
 }
 
 export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
@@ -257,6 +260,7 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
     isGenerateDisabled = false,
     validationErrors = [],
     onClose,
+    hideHeader = false,
 }) => {
     const enhancePromptValue = enhancePrompt ?? true;
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -299,13 +303,15 @@ export const VideoPortionEditor: React.FC<VideoPortionEditorProps> = ({
         <TooltipProvider>
         <div className="w-full">
             <div className="p-4 space-y-4">
-            {/* Header */}
+            {/* Header - hidden when embedded in parent panel */}
+            {!hideHeader && (
             <div className="flex items-center gap-2">
                 <h3 className="text-lg font-medium flex items-center gap-2">
                     <Wand2 className="w-5 h-5 text-primary" />
                     {selections.length > 1 ? 'Replace Portions' : 'Replace Portion'}
                 </h3>
             </div>
+            )}
             
             {/* Per-Segment Settings - Show first! */}
             {selections.length > 0 && onUpdateSelectionSettings && (

@@ -137,15 +137,18 @@ export interface TimelineProps {
   structureVideoMetadata?: import("@/shared/lib/videoUploader").VideoMetadata | null;
   structureVideoTreatment?: 'adjust' | 'clip';
   structureVideoMotionStrength?: number;
-  structureVideoType?: 'flow' | 'canny' | 'depth';
+  structureVideoType?: 'uni3c' | 'flow' | 'canny' | 'depth';
   onStructureVideoChange?: (
     videoPath: string | null,
     metadata: import("@/shared/lib/videoUploader").VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth',
+    structureType: 'uni3c' | 'flow' | 'canny' | 'depth',
     resourceId?: string
   ) => void;
+  /** Uni3C end percent (only used when structureVideoType is 'uni3c') */
+  uni3cEndPercent?: number;
+  onUni3cEndPercentChange?: (value: number) => void;
   // Audio strip props
   audioUrl?: string | null;
   audioMetadata?: { duration: number; name?: string } | null;
@@ -212,6 +215,8 @@ const Timeline: React.FC<TimelineProps> = ({
   structureVideoMotionStrength,
   structureVideoType,
   onStructureVideoChange,
+  uni3cEndPercent,
+  onUni3cEndPercentChange,
   // Audio strip props
   audioUrl,
   audioMetadata,
@@ -899,6 +904,8 @@ const Timeline: React.FC<TimelineProps> = ({
         structureVideoMotionStrength={structureVideoMotionStrength}
         structureVideoType={structureVideoType}
         onStructureVideoChange={onStructureVideoChange}
+        uni3cEndPercent={uni3cEndPercent}
+        onUni3cEndPercentChange={onUni3cEndPercentChange}
         audioUrl={audioUrl}
         audioMetadata={audioMetadata}
         onAudioChange={onAudioChange}

@@ -11,6 +11,9 @@ export interface LastUsedEditSettings {
   loraMode: LoraMode;
   customLoraUrl: string;
   numGenerations: number;
+  // Img2Img specific
+  img2imgStrength: number;
+  img2imgEnablePromptExpansion: boolean;
 }
 
 export const DEFAULT_LAST_USED: LastUsedEditSettings = {
@@ -18,6 +21,9 @@ export const DEFAULT_LAST_USED: LastUsedEditSettings = {
   loraMode: 'in-scene',
   customLoraUrl: '',
   numGenerations: 4,
+  // Img2Img defaults
+  img2imgStrength: 0.6,
+  img2imgEnablePromptExpansion: false,
 };
 
 // localStorage keys for instant access (no loading delay)

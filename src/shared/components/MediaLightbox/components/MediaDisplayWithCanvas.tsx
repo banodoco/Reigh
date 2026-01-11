@@ -11,7 +11,7 @@ interface MediaDisplayWithCanvasProps {
   isFlippedHorizontally: boolean;
   isSaving: boolean;
   isInpaintMode: boolean;
-  editMode?: 'text' | 'inpaint' | 'annotate' | 'reposition';
+  editMode?: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
   
   // Reposition mode transform style
   repositionTransformStyle?: React.CSSProperties;

@@ -26,6 +26,8 @@ import { getNetworkStatusManager } from '@/shared/lib/NetworkStatusManager';
 import { perfMonitor } from '@/shared/utils/mobilePerformanceMonitor';
 // [RefactorMetrics] Temporary component for baseline measurements - remove after refactor
 import { RefactorMetricsCollector } from '@/shared/components/debug/RefactorMetricsCollector';
+// Initialize task type config cache early
+import { TaskTypeConfigInitializer } from '@/shared/components/TaskTypeConfigInitializer';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -255,6 +257,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <TaskTypeConfigInitializer />
       <ProjectProvider>
         <SimpleRealtimeProvider>
           <ShotsProvider>

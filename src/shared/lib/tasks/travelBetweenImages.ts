@@ -27,8 +27,10 @@ export interface VideoStructureApiParams {
   structure_video_treatment?: 'adjust' | 'clip';
   /** Motion strength: 0.0 = no motion, 1.0 = full motion, >1.0 = amplified */
   structure_video_motion_strength?: number;
-  /** Type of structure extraction from video */
-  structure_video_type?: 'flow' | 'canny' | 'depth';
+  /** Type of structure extraction from video: uni3c (raw), optical flow, canny, or depth */
+  structure_video_type?: 'uni3c' | 'flow' | 'canny' | 'depth';
+  /** Uni3C end percent (0-1, only used when structure_video_type is 'uni3c') */
+  uni3c_end_percent?: number;
 }
 
 /**
@@ -238,6 +240,10 @@ export interface TravelBetweenImagesTaskParams extends
   independent_segments?: boolean;
   /** Enable smooth video interpolation (SVI) for smoother transitions */
   use_svi?: boolean;
+  /** Uni3C start percent (0-1, used when structure_video_type is 'raw'/uni3c) */
+  uni3c_start_percent?: number;
+  /** Uni3C end percent (0-1, used when structure_video_type is 'raw'/uni3c) */
+  uni3c_end_percent?: number;
 }
 
 /**
@@ -411,6 +417,16 @@ function buildTravelBetweenImagesPayload(
     orchestratorPayload.structure_video_treatment = params.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment;
     orchestratorPayload.structure_video_motion_strength = params.structure_video_motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength;
     orchestratorPayload.structure_video_type = params.structure_video_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type;
+    
+    // Add uni3c parameters if structure_video_type is 'raw' (uni3c mode)
+    if (params.structure_video_type === 'raw' || params.uni3c_start_percent !== undefined || params.uni3c_end_percent !== undefined) {
+      orchestratorPayload.uni3c_start_percent = params.uni3c_start_percent ?? 0;
+      orchestratorPayload.uni3c_end_percent = params.uni3c_end_percent ?? 0.1;
+      console.log("[createTravelBetweenImagesTask] Uni3C mode - adding uni3c parameters:", {
+        uni3c_start_percent: orchestratorPayload.uni3c_start_percent,
+        uni3c_end_percent: orchestratorPayload.uni3c_end_percent
+      });
+    }
   }
 
   // Attach additional_loras mapping if provided (matching original logic)

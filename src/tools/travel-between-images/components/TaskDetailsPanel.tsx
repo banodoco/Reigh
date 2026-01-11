@@ -35,6 +35,8 @@ interface TaskDetailsPanelProps {
   onEditingGenerationNameChange?: (editing: boolean) => void;
   // Control whether to show user-provided source images
   showUserImage?: boolean;
+  // Hide the header (title is shown in parent component)
+  hideHeader?: boolean;
 }
 
 const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
@@ -53,7 +55,8 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   onGenerationNameChange,
   isEditingGenerationName,
   onEditingGenerationNameChange,
-  showUserImage = true
+  showUserImage = true,
+  hideHeader = false
 }) => {
   const isMobile = useIsMobile();
   const [showDetailedParams, setShowDetailedParams] = useState(false);
@@ -129,27 +132,29 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
-      <div className="flex-shrink-0 p-4 border-b">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-light">Generation Task Details</h3>
-          {taskId && (
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(taskId);
-                setIdCopied(true);
-                setTimeout(() => setIdCopied(false), 2000);
-              }}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                idCopied
-                  ? "text-green-400"
-                  : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
-              }`}
-            >
-              {idCopied ? 'copied' : 'id'}
-            </button>
-          )}
+      {!hideHeader && (
+        <div className="flex-shrink-0 p-4 border-b">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-light">Generation Task Details</h3>
+            {taskId && (
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(taskId);
+                  setIdCopied(true);
+                  setTimeout(() => setIdCopied(false), 2000);
+                }}
+                className={`px-2 py-1 text-xs rounded transition-colors ${
+                  idCopied
+                    ? "text-green-400"
+                    : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                }`}
+              >
+                {idCopied ? 'copied' : 'id'}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
       
       <ScrollArea className="flex-1 p-4 overflow-y-auto">
         <div className="space-y-6">

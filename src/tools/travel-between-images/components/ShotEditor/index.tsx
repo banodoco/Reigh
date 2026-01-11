@@ -225,6 +225,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const {
     // New grouped config (preferred for generateVideo)
     structureVideoConfig,
+    setStructureVideoConfig,
     // Legacy individual accessors (for UI components that haven't migrated)
     structureVideoPath,
     structureVideoMetadata,
@@ -238,6 +239,44 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     shotId: selectedShot?.id,
   });
 
+  // Handler for changing uni3c end percent
+  const handleUni3cEndPercentChange = useCallback((value: number) => {
+    setStructureVideoConfig({
+      ...structureVideoConfig,
+      uni3c_end_percent: value,
+    });
+  }, [structureVideoConfig, setStructureVideoConfig]);
+
+  // Wrapper for structure video change that also auto-switches generation type mode
+  const handleStructureVideoChangeWithModeSwitch = useCallback((
+    videoPath: string | null,
+    metadata: import("@/shared/lib/videoUploader").VideoMetadata | null,
+    treatment: 'adjust' | 'clip',
+    motionStrength: number,
+    structureType: 'uni3c' | 'flow' | 'canny' | 'depth',
+    resourceId?: string
+  ) => {
+    // Call the original handler
+    handleStructureVideoChange(videoPath, metadata, treatment, motionStrength, structureType, resourceId);
+    
+    // Auto-switch generation type mode based on structure type
+    if (onGenerationTypeModeChange && videoPath) {
+      if (structureType === 'uni3c') {
+        // Uni3C uses I2V mode
+        if (generationTypeMode !== 'i2v') {
+          console.log('[GenerationTypeMode] Auto-switching to I2V because uni3c structure type was selected');
+          onGenerationTypeModeChange('i2v');
+        }
+      } else {
+        // flow, canny, depth use VACE mode
+        if (generationTypeMode !== 'vace') {
+          console.log('[GenerationTypeMode] Auto-switching to VACE because VACE structure type was selected:', structureType);
+          onGenerationTypeModeChange('vace');
+        }
+      }
+    }
+  }, [handleStructureVideoChange, onGenerationTypeModeChange, generationTypeMode]);
+
   // Audio management (extracted to hook)
   const {
     audioUrl,
@@ -250,7 +289,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   });
 
   // Auto-switch generationTypeMode when structure video is added/removed
-  // When structure video is added, switch to VACE; when removed, switch to I2V
+  // When structure video is added: switch to VACE (unless uni3c selected) or I2V (if uni3c)
+  // When removed: switch to I2V
   const prevStructureVideoPath = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     // Skip if handler is not available
@@ -265,16 +305,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     const wasAdded = !prevStructureVideoPath.current && structureVideoPath;
     const wasRemoved = prevStructureVideoPath.current && !structureVideoPath;
     
-    if (wasAdded && generationTypeMode !== 'vace') {
-      console.log('[GenerationTypeMode] Auto-switching to VACE because structure video was added');
-      onGenerationTypeModeChange('vace');
+    if (wasAdded) {
+      // When adding structure video, switch to appropriate mode based on structure type
+      const targetMode = structureVideoType === 'uni3c' ? 'i2v' : 'vace';
+      if (generationTypeMode !== targetMode) {
+        console.log(`[GenerationTypeMode] Auto-switching to ${targetMode.toUpperCase()} because structure video was added (type: ${structureVideoType})`);
+        onGenerationTypeModeChange(targetMode);
+      }
     } else if (wasRemoved && generationTypeMode !== 'i2v') {
       console.log('[GenerationTypeMode] Auto-switching to I2V because structure video was removed');
       onGenerationTypeModeChange('i2v');
     }
     
     prevStructureVideoPath.current = structureVideoPath;
-  }, [structureVideoPath, generationTypeMode, onGenerationTypeModeChange]);
+  }, [structureVideoPath, structureVideoType, generationTypeMode, onGenerationTypeModeChange]);
 
   // PERFORMANCE OPTIMIZATION: Prefetch adjacent shots for faster navigation
   React.useEffect(() => {
@@ -1264,6 +1308,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       })),
       variantNameParam,
       clearAllEnhancedPrompts,
+      // Uni3C end percent (from structure video config)
+      uni3cEndPercent: structureVideoConfig.uni3c_end_percent,
     });
 
     // Handle the result
@@ -1554,7 +1600,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             structureVideoTreatment={structureVideoTreatment}
             structureVideoMotionStrength={structureVideoMotionStrength}
             structureVideoType={structureVideoType}
-            onStructureVideoChange={handleStructureVideoChange}
+            onStructureVideoChange={handleStructureVideoChangeWithModeSwitch}
+            uni3cEndPercent={structureVideoConfig.uni3c_end_percent}
+            onUni3cEndPercentChange={handleUni3cEndPercentChange}
             // Audio strip props
             audioUrl={audioUrl}
             audioMetadata={audioMetadata}
@@ -1651,6 +1699,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             generationTypeMode={generationTypeMode}
                             onGenerationTypeModeChange={onGenerationTypeModeChange}
                             hasStructureVideo={!!structureVideoPath}
+                            structureType={structureVideoType}
                             selectedLoras={loraManager.selectedLoras}
                             availableLoras={availableLoras}
                             onAddLoraClick={() => loraManager.setIsLoraModalOpen(true)}

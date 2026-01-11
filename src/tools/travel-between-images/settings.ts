@@ -156,6 +156,7 @@ export interface VideoTravelSettings {
     };
     treatment: 'adjust' | 'clip';
     motionStrength: number;
+    structureType?: 'uni3c' | 'flow' | 'canny' | 'depth';
   };
 }
 

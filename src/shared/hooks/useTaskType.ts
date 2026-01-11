@@ -8,6 +8,8 @@ export interface TaskTypeInfo {
   tool_type: string | null;
   display_name: string;
   category: string;
+  is_visible: boolean;
+  supports_progress: boolean;
 }
 
 /**
@@ -21,7 +23,7 @@ export const useTaskType = (taskType: string) => {
     queryFn: async (): Promise<TaskTypeInfo | null> => {
       const { data, error } = await supabase
         .from('task_types')
-        .select('id, name, content_type, tool_type, display_name, category')
+        .select('id, name, content_type, tool_type, display_name, category, is_visible, supports_progress')
         .eq('name', taskType)
         .maybeSingle();
 
@@ -51,7 +53,7 @@ export const useTaskTypes = (taskTypes: string[]) => {
 
       const { data, error } = await supabase
         .from('task_types')
-        .select('id, name, content_type, tool_type, display_name, category')
+        .select('id, name, content_type, tool_type, display_name, category, is_visible, supports_progress')
         .in('name', taskTypes);
 
       if (error) {
@@ -68,5 +70,73 @@ export const useTaskTypes = (taskTypes: string[]) => {
     enabled: taskTypes.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+  });
+};
+
+// =============================================================================
+// GLOBAL TASK TYPE CONFIG CACHE
+// =============================================================================
+
+// Global cache for synchronous access (populated by useAllTaskTypesConfig hook)
+let _taskTypeConfigCache: Record<string, TaskTypeInfo> = {};
+let _cacheInitialized = false;
+
+/**
+ * Get the global task type config cache
+ * Used by taskConfig.ts for synchronous access
+ */
+export function getTaskTypeConfigCache(): Record<string, TaskTypeInfo> {
+  return _taskTypeConfigCache;
+}
+
+/**
+ * Check if the cache has been initialized
+ */
+export function isTaskTypeConfigCacheInitialized(): boolean {
+  return _cacheInitialized;
+}
+
+/**
+ * Fetch all task types config directly (for initialization)
+ * This is called once on app load to populate the cache
+ */
+export async function fetchAllTaskTypesConfig(): Promise<Record<string, TaskTypeInfo>> {
+  const { data, error } = await supabase
+    .from('task_types')
+    .select('id, name, content_type, tool_type, display_name, category, is_visible, supports_progress')
+    .eq('is_active', true);
+
+  if (error) {
+    console.warn('[TaskTypeConfig] Failed to fetch task types config:', error);
+    return {};
+  }
+
+  const configMap = (data || []).reduce((acc, taskType) => {
+    acc[taskType.name] = taskType;
+    return acc;
+  }, {} as Record<string, TaskTypeInfo>);
+
+  // Update the global cache
+  _taskTypeConfigCache = configMap;
+  _cacheInitialized = true;
+  
+  console.log('[TaskTypeConfig] Loaded', Object.keys(configMap).length, 'task types into cache');
+  
+  return configMap;
+}
+
+/**
+ * Hook to fetch and cache ALL task type configs
+ * Should be called once near the app root to initialize the cache
+ * @returns Query result with all task type configurations
+ */
+export const useAllTaskTypesConfig = () => {
+  return useQuery({
+    queryKey: ['task-types-config', 'all'],
+    queryFn: fetchAllTaskTypesConfig,
+    staleTime: 10 * 60 * 1000, // 10 minutes - task types config rarely changes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 };

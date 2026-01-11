@@ -56,7 +56,7 @@ export interface ExtractedSettings {
   structureVideoPath?: string | null;
   structureVideoTreatment?: 'adjust' | 'clip';
   structureVideoMotionStrength?: number;
-  structureVideoType?: 'flow' | 'canny' | 'depth';
+  structureVideoType?: 'uni3c' | 'flow' | 'canny' | 'depth';
 }
 
 export interface ApplyResult {
@@ -95,7 +95,7 @@ export interface ApplyContext {
     metadata: any | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth'
+    structureType: 'uni3c' | 'flow' | 'canny' | 'depth'
   ) => void;
   
   // LoRAs

@@ -62,6 +62,7 @@ export interface MotionControlProps {
   generationTypeMode?: 'i2v' | 'vace';
   onGenerationTypeModeChange?: (mode: 'i2v' | 'vace') => void;
   hasStructureVideo?: boolean; // Whether a structure video is currently set
+  structureType?: 'uni3c' | 'flow' | 'canny' | 'depth'; // Type of structure video guidance
   
   // LoRA management (for Basic mode - LoRAs are added to phaseConfig)
   selectedLoras: ActiveLora[];
@@ -117,6 +118,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   generationTypeMode = 'i2v',
   onGenerationTypeModeChange,
   hasStructureVideo = false,
+  structureType,
   selectedLoras,
   availableLoras,
   onAddLoraClick,
@@ -146,20 +148,22 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   // State for preset modal
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   
-  // Track previous structure video state for auto-switching presets
+  // Track previous state for auto-switching presets
   const prevHasStructureVideoRef = useRef<boolean | undefined>(undefined);
+  const prevGenerationTypeModeRef = useRef<'i2v' | 'vace' | undefined>(undefined);
 
   // Custom mode = no preset selected (selectedPhasePresetId is null/undefined)
   const isCustomConfig = !selectedPhasePresetId;
 
   // Get the built-in default preset for the current mode (I2V vs VACE)
+  // Use generationTypeMode instead of hasStructureVideo because Uni3C has structure video but uses I2V
   const builtinDefaultPreset = useMemo(() => {
-    return hasStructureVideo ? BUILTIN_VACE_PRESET : BUILTIN_I2V_PRESET;
-  }, [hasStructureVideo]);
+    return generationTypeMode === 'vace' ? BUILTIN_VACE_PRESET : BUILTIN_I2V_PRESET;
+  }, [generationTypeMode]);
 
   const builtinDefaultId = useMemo(() => {
-    return hasStructureVideo ? BUILTIN_DEFAULT_VACE_ID : BUILTIN_DEFAULT_I2V_ID;
-  }, [hasStructureVideo]);
+    return generationTypeMode === 'vace' ? BUILTIN_DEFAULT_VACE_ID : BUILTIN_DEFAULT_I2V_ID;
+  }, [generationTypeMode]);
 
   // Fetch additional featured presets from database (optional)
   const { data: additionalPresets } = useQuery({
@@ -223,7 +227,8 @@ export const MotionControl: React.FC<MotionControlProps> = ({
 
   // Auto-select the built-in default preset when:
   // 1. Initial mount with no preset selected AND user is in basic mode
-  // 2. Structure video changes (switch to appropriate default) - only in basic mode
+  // 2. Generation type mode changes (I2V vs VACE) - only in basic mode
+  // Note: We track generationTypeMode instead of hasStructureVideo because Uni3C has structure video but uses I2V
   useEffect(() => {
     console.log('[VTDebug] 🔍 Auto-select effect running:', {
       settingsLoading,
@@ -232,8 +237,8 @@ export const MotionControl: React.FC<MotionControlProps> = ({
       phaseConfigPhases: phaseConfig?.phases?.length,
       selectedPhasePresetId,
       hasAutoSelected: hasAutoSelectedRef.current,
-      hasStructureVideo,
-      prevHasStructureVideo: prevHasStructureVideoRef.current,
+      generationTypeMode,
+      prevGenerationTypeMode: prevGenerationTypeModeRef.current,
       timestamp: Date.now()
     });
     
@@ -249,6 +254,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     if (motionMode === 'advanced') {
       console.log('[VTDebug] ⏭️ Auto-select skipped - user is in advanced mode');
       prevHasStructureVideoRef.current = hasStructureVideo;
+      prevGenerationTypeModeRef.current = generationTypeMode;
       return;
     }
     
@@ -256,29 +262,36 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     // This prevents overwriting user's config when remounting
     if (phaseConfig && phaseConfig.phases && phaseConfig.phases.length > 0) {
       // Only auto-select if no preset is selected (user may have deselected preset but kept config)
-      // But still allow structure video change to trigger preset switch
-      const structureVideoChanged = prevHasStructureVideoRef.current !== undefined && 
-                                     prevHasStructureVideoRef.current !== hasStructureVideo;
+      // But still allow generation type mode change to trigger preset switch
+      const modeChanged = prevGenerationTypeModeRef.current !== undefined && 
+                          prevGenerationTypeModeRef.current !== generationTypeMode;
       
-      if (!structureVideoChanged) {
+      if (!modeChanged) {
         console.log('[VTDebug] ⏭️ Auto-select skipped - phaseConfig already exists');
         prevHasStructureVideoRef.current = hasStructureVideo;
+        prevGenerationTypeModeRef.current = generationTypeMode;
         return;
       }
     }
     
-    const structureVideoChanged = prevHasStructureVideoRef.current !== undefined && 
-                                   prevHasStructureVideoRef.current !== hasStructureVideo;
+    const modeChanged = prevGenerationTypeModeRef.current !== undefined && 
+                        prevGenerationTypeModeRef.current !== generationTypeMode;
     
-    // When structure video changes, select appropriate default (only in basic mode)
-    if (structureVideoChanged) {
-      console.log('[MotionControl] Structure video changed - switching to appropriate default preset');
+    // When generation type mode changes, select appropriate default (only in basic mode)
+    // This handles switching between I2V and VACE (including Uni3C which uses I2V with structure video)
+    if (modeChanged) {
+      console.log('[MotionControl] Generation type mode changed - switching to appropriate default preset:', {
+        from: prevGenerationTypeModeRef.current,
+        to: generationTypeMode,
+        newPresetId: builtinDefaultPreset.id
+      });
       onPhasePresetSelect(
         builtinDefaultPreset.id, 
         builtinDefaultPreset.metadata.phaseConfig, 
         builtinDefaultPreset.metadata
       );
       prevHasStructureVideoRef.current = hasStructureVideo;
+      prevGenerationTypeModeRef.current = generationTypeMode;
       return;
     }
     
@@ -303,7 +316,8 @@ export const MotionControl: React.FC<MotionControlProps> = ({
     }
     
     prevHasStructureVideoRef.current = hasStructureVideo;
-  }, [hasStructureVideo, builtinDefaultId, builtinDefaultPreset, selectedPhasePresetId, onPhasePresetSelect, settingsLoading, motionMode, phaseConfig]);
+    prevGenerationTypeModeRef.current = generationTypeMode;
+  }, [generationTypeMode, hasStructureVideo, builtinDefaultId, builtinDefaultPreset, selectedPhasePresetId, onPhasePresetSelect, settingsLoading, motionMode, phaseConfig]);
 
   // Handle mode change with validation
   // Parent keeps motionMode and advancedMode in sync, so we just call onMotionModeChange
@@ -468,31 +482,32 @@ export const MotionControl: React.FC<MotionControlProps> = ({
             )}
           </div>
 
-          {/* Smooth Continuations Toggle - DISABLED for now
-          <div className="flex items-center space-x-2 p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
-            <Switch
-              id="smooth-continuations"
-              checked={smoothContinuations || false}
-              onCheckedChange={(checked) => onSmoothContinuationsChange?.(checked)}
-            />
-            <div className="flex-1 flex items-center gap-2">
-              <Label htmlFor="smooth-continuations" className="font-medium">
-                Smooth Continuations
-              </Label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                    <Info className="h-4 w-4" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Enable smoother transitions between video segments.<br />
-                  Max duration is reduced to 77 frames when enabled.</p>
-                </TooltipContent>
-              </Tooltip>
+          {/* Smooth Continuations Toggle - Only shown for VACE mode */}
+          {generationTypeMode === 'vace' && (
+            <div className="flex items-center space-x-2 p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+              <Switch
+                id="smooth-continuations"
+                checked={smoothContinuations || false}
+                onCheckedChange={(checked) => onSmoothContinuationsChange?.(checked)}
+              />
+              <div className="flex-1 flex items-center gap-2">
+                <Label htmlFor="smooth-continuations" className="font-medium">
+                  Smooth Continuations
+                </Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Enable smoother transitions between video segments.<br />
+                    Max duration is reduced to 77 frames when enabled.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
-          </div>
-          */}
+          )}
 
           {/* LoRA Controls */}
           <div className="space-y-4 pt-4 border-t">
@@ -534,6 +549,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
               generationTypeMode={generationTypeMode}
               onGenerationTypeModeChange={onGenerationTypeModeChange}
               hasStructureVideo={hasStructureVideo}
+              structureType={structureType}
               onRestoreDefaults={onRestoreDefaults}
             />
           ) : (

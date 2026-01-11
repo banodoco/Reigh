@@ -92,6 +92,19 @@ export interface ControlsPanelProps extends ModeProps {
   createAsGeneration: EditModePanelProps['createAsGeneration'];
   onCreateAsGenerationChange: EditModePanelProps['onCreateAsGenerationChange'];
 
+  // Img2Img mode props
+  img2imgPrompt?: EditModePanelProps['img2imgPrompt'];
+  setImg2imgPrompt?: EditModePanelProps['setImg2imgPrompt'];
+  img2imgStrength?: EditModePanelProps['img2imgStrength'];
+  setImg2imgStrength?: EditModePanelProps['setImg2imgStrength'];
+  enablePromptExpansion?: EditModePanelProps['enablePromptExpansion'];
+  setEnablePromptExpansion?: EditModePanelProps['setEnablePromptExpansion'];
+  isGeneratingImg2Img?: EditModePanelProps['isGeneratingImg2Img'];
+  img2imgGenerateSuccess?: EditModePanelProps['img2imgGenerateSuccess'];
+  handleGenerateImg2Img?: EditModePanelProps['handleGenerateImg2Img'];
+  img2imgLoraManager?: EditModePanelProps['img2imgLoraManager'];
+  availableLoras?: EditModePanelProps['availableLoras'];
+
   // InfoPanel props
   isVideo: InfoPanelProps['isVideo'];
   showImageEditTools: InfoPanelProps['showImageEditTools'];
@@ -193,6 +206,18 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     saveAsVariantSuccess,
     createAsGeneration,
     onCreateAsGenerationChange,
+    // Img2Img props
+    img2imgPrompt,
+    setImg2imgPrompt,
+    img2imgStrength,
+    setImg2imgStrength,
+    enablePromptExpansion,
+    setEnablePromptExpansion,
+    isGeneratingImg2Img,
+    img2imgGenerateSuccess,
+    handleGenerateImg2Img,
+    img2imgLoraManager,
+    availableLoras,
     // InfoPanel props
     isVideo,
     showImageEditTools,
@@ -237,7 +262,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         onEnterTrimMode={onEnterTrimMode}
         onEnterReplaceMode={onEnterReplaceMode}
         onEnterRegenerateMode={onEnterRegenerateMode}
-        onClose={onExitVideoEditMode}
+        onClose={onClose}
+        onExitVideoEditMode={onExitVideoEditMode}
         // Trim props
         trimState={trimState}
         onStartTrimChange={onStartTrimChange}
@@ -322,6 +348,18 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         variant={variant}
         createAsGeneration={createAsGeneration}
         onCreateAsGenerationChange={onCreateAsGenerationChange}
+        // Img2Img props
+        img2imgPrompt={img2imgPrompt}
+        setImg2imgPrompt={setImg2imgPrompt}
+        img2imgStrength={img2imgStrength}
+        setImg2imgStrength={setImg2imgStrength}
+        enablePromptExpansion={enablePromptExpansion}
+        setEnablePromptExpansion={setEnablePromptExpansion}
+        isGeneratingImg2Img={isGeneratingImg2Img}
+        img2imgGenerateSuccess={img2imgGenerateSuccess}
+        handleGenerateImg2Img={handleGenerateImg2Img}
+        img2imgLoraManager={img2imgLoraManager}
+        availableLoras={availableLoras}
       />
     );
   }

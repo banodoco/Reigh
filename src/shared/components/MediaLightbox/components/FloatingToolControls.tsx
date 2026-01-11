@@ -15,8 +15,8 @@ import type { ImageTransform } from '../hooks/useRepositionMode';
 
 export interface FloatingToolControlsProps {
   variant: 'tablet' | 'mobile';
-  editMode: 'text' | 'inpaint' | 'annotate' | 'reposition';
-  onSetEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition') => void;
+  editMode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
+  onSetEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img') => void;
   
   // Inpaint props
   brushSize: number;

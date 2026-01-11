@@ -1,9 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { isVideoAny } from '@/shared/lib/typeGuards';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { useListPublicResources } from '@/shared/hooks/useResources';
+import type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 import {
   useUpscale,
@@ -13,7 +15,9 @@ import {
   useMagicEditMode,
   useGenerationLineage,
   useStarToggle,
-  useRepositionMode
+  useRepositionMode,
+  useImg2ImgMode,
+  useEditSettingsPersistence,
 } from '@/shared/components/MediaLightbox/hooks';
 
 import {
@@ -82,6 +86,18 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
 
   // Variants hook - moved early so activeVariantId is available for other hooks
   const actualGenerationId = (media as any).generation_id || media.id;
+
+  // Edit settings persistence - for img2img strength and enablePromptExpansion
+  const editSettingsPersistence = useEditSettingsPersistence({
+    generationId: actualGenerationId,
+    projectId: selectedProjectId,
+  });
+  const {
+    img2imgStrength: persistedImg2imgStrength,
+    img2imgEnablePromptExpansion: persistedImg2imgEnablePromptExpansion,
+    setImg2imgStrength: setPersistedImg2imgStrength,
+    setImg2imgEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
+  } = editSettingsPersistence;
   const {
     activeVariant,
     setActiveVariantId,
@@ -204,6 +220,40 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     handleSaveAsVariant,
     getTransformStyle,
   } = repositionHook;
+
+  // Fetch available LoRAs for img2img mode
+  const { data: publicLorasData } = useListPublicResources('lora');
+  const availableLoras: LoraModel[] = useMemo(() => {
+    return (Array.isArray(publicLorasData) ? publicLorasData.map(resource => resource.metadata) : []) || [];
+  }, [publicLorasData]);
+
+  // Img2Img mode hook - uses persisted settings
+  const img2imgHook = useImg2ImgMode({
+    media,
+    selectedProjectId,
+    isVideo,
+    sourceUrlForTasks,
+    toolTypeOverride: 'edit-images',
+    createAsGeneration,
+    availableLoras,
+    // Pass persisted values
+    img2imgStrength: persistedImg2imgStrength,
+    setImg2imgStrength: setPersistedImg2imgStrength,
+    enablePromptExpansion: persistedImg2imgEnablePromptExpansion,
+    setEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
+  });
+  const {
+    img2imgPrompt,
+    img2imgStrength,
+    enablePromptExpansion,
+    isGeneratingImg2Img,
+    img2imgGenerateSuccess,
+    setImg2imgPrompt,
+    setImg2imgStrength,
+    setEnablePromptExpansion,
+    handleGenerateImg2Img,
+    loraManager: img2imgLoraManager,
+  } = img2imgHook;
 
   const { sourceGenerationData } = useSourceGeneration({
     media,
@@ -359,7 +409,6 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
                    editMode={editMode}
                    setEditMode={setEditMode}
                    setIsInpaintMode={setIsInpaintMode}
-                   showTextModeHint={showTextModeHint}
                    inpaintPrompt={inpaintPrompt}
                    setInpaintPrompt={setInpaintPrompt}
                    inpaintNumGenerations={inpaintNumGenerations}
@@ -393,6 +442,18 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
                    hideInfoEditToggle={true}
                    createAsGeneration={createAsGeneration}
                    onCreateAsGenerationChange={setCreateAsGeneration}
+                   // Img2Img props
+                   img2imgPrompt={img2imgPrompt}
+                   setImg2imgPrompt={setImg2imgPrompt}
+                   img2imgStrength={img2imgStrength}
+                   setImg2imgStrength={setImg2imgStrength}
+                   enablePromptExpansion={enablePromptExpansion}
+                   setEnablePromptExpansion={setEnablePromptExpansion}
+                   img2imgLoraManager={img2imgLoraManager}
+                   availableLoras={availableLoras}
+                   isGeneratingImg2Img={isGeneratingImg2Img}
+                   img2imgGenerateSuccess={img2imgGenerateSuccess}
+                   handleGenerateImg2Img={handleGenerateImg2Img}
                  />
                ) : (
                  <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-4">
@@ -583,7 +644,6 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
                   editMode={editMode}
                   setEditMode={setEditMode}
                   setIsInpaintMode={setIsInpaintMode}
-                  showTextModeHint={showTextModeHint}
                   inpaintPrompt={inpaintPrompt}
                   setInpaintPrompt={setInpaintPrompt}
                   inpaintNumGenerations={inpaintNumGenerations}
@@ -617,6 +677,20 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
                   hideInfoEditToggle={true}
                   createAsGeneration={createAsGeneration}
                   onCreateAsGenerationChange={setCreateAsGeneration}
+                  // Img2Img props
+                  img2imgPrompt={img2imgPrompt}
+                  setImg2imgPrompt={setImg2imgPrompt}
+                  img2imgStrength={img2imgStrength}
+                  setImg2imgStrength={setImg2imgStrength}
+                  img2imgNumGenerations={img2imgNumGenerations}
+                  setImg2imgNumGenerations={setImg2imgNumGenerations}
+                  enablePromptExpansion={enablePromptExpansion}
+                  setEnablePromptExpansion={setEnablePromptExpansion}
+                  img2imgLoraManager={img2imgLoraManager}
+                  availableLoras={availableLoras}
+                  isGeneratingImg2Img={isGeneratingImg2Img}
+                  img2imgGenerateSuccess={img2imgGenerateSuccess}
+                  handleGenerateImg2Img={handleGenerateImg2Img}
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-4">

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 
-export type EditMode = 'text' | 'inpaint' | 'annotate';
+export type EditMode = 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
 export type LoraMode = 'none' | 'in-scene' | 'next-scene' | 'custom';
 
 /**
@@ -14,6 +14,9 @@ export interface GenerationEditSettings {
   customLoraUrl: string;
   numGenerations: number;
   prompt: string;
+  // Img2Img specific settings
+  img2imgStrength: number;
+  img2imgEnablePromptExpansion: boolean;
 }
 
 export const DEFAULT_EDIT_SETTINGS: GenerationEditSettings = {
@@ -22,6 +25,9 @@ export const DEFAULT_EDIT_SETTINGS: GenerationEditSettings = {
   customLoraUrl: '',
   numGenerations: 4,
   prompt: '',
+  // Img2Img defaults
+  img2imgStrength: 0.6,
+  img2imgEnablePromptExpansion: false,
 };
 
 export interface UseGenerationEditSettingsReturn {
@@ -34,6 +40,9 @@ export interface UseGenerationEditSettingsReturn {
   setCustomLoraUrl: (url: string) => void;
   setNumGenerations: (num: number) => void;
   setPrompt: (prompt: string) => void;
+  // Img2Img setters
+  setImg2imgStrength: (strength: number) => void;
+  setImg2imgEnablePromptExpansion: (enabled: boolean) => void;
   
   // Bulk update
   updateSettings: (updates: Partial<GenerationEditSettings>) => void;
@@ -298,6 +307,23 @@ export function useGenerationEditSettings({
     });
   }, [triggerSave]);
   
+  // Img2Img setters
+  const setImg2imgStrength = useCallback((strength: number) => {
+    setSettings(prev => {
+      const updated = { ...prev, img2imgStrength: strength };
+      triggerSave(updated);
+      return updated;
+    });
+  }, [triggerSave]);
+  
+  const setImg2imgEnablePromptExpansion = useCallback((enabled: boolean) => {
+    setSettings(prev => {
+      const updated = { ...prev, img2imgEnablePromptExpansion: enabled };
+      triggerSave(updated);
+      return updated;
+    });
+  }, [triggerSave]);
+  
   // Bulk update
   const updateSettings = useCallback((updates: Partial<GenerationEditSettings>) => {
     setSettings(prev => {
@@ -336,6 +362,8 @@ export function useGenerationEditSettings({
     setCustomLoraUrl,
     setNumGenerations,
     setPrompt,
+    setImg2imgStrength,
+    setImg2imgEnablePromptExpansion,
     updateSettings,
     isLoading,
     hasPersistedSettings,

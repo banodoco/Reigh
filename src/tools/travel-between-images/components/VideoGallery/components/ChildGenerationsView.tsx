@@ -1952,6 +1952,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                 .filter(c => c.location)
                                 .map(c => ({
                                     url: getDisplayUrl(c.location!),
+                                    thumbUrl: (c as any).thumbUrl || (c as any).thumbnail_url || c.location,
                                     index: (c as any).child_order ?? sortedSegments.indexOf(c),
                                 }))
                                 .sort((a, b) => a.index - b.index);
@@ -2026,8 +2027,9 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                             type="button"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                // Close preview dialog and open lightbox for this segment
+                                                // Close preview dialog and open lightbox for this segment in trim/edit mode
                                                 setIsPreviewTogetherOpen(false);
+                                                setOpenInTrimMode(true);
                                                 // Use the child_order from the current video to find the slot index
                                                 setLightboxIndex(currentVideo.index);
                                             }}
@@ -2057,6 +2059,11 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 >
                                                     {previewIsPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
                                                 </button>
+                                                
+                                                {/* Time display */}
+                                                <span className="text-white text-sm tabular-nums min-w-[85px]">
+                                                    {Math.floor(previewCurrentTime / 60)}:{Math.floor(previewCurrentTime % 60).toString().padStart(2, '0')} / {Math.floor(previewDuration / 60)}:{Math.floor(previewDuration % 60).toString().padStart(2, '0')}
+                                                </span>
                                                 
                                                 <div className="flex-1 relative h-4 flex items-center">
                                                     {/* Track background */}
@@ -2097,23 +2104,31 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                         </div>
                                     </div>
                                     
-                                    {/* Segment number indicators */}
+                                    {/* Segment thumbnail indicators */}
                                     <div className="flex items-center justify-center gap-2">
-                                        {videosWithLocation.map((_, idx) => (
+                                        {videosWithLocation.map((video, idx) => (
                                             <button
                                                 key={idx}
                                                 type="button"
-                                                className={`transition-all duration-200 rounded-full flex items-center justify-center ${
+                                                className={`relative transition-all duration-200 rounded-lg overflow-hidden ${
                                                     idx === safeIndex
-                                                        ? 'w-10 h-10 bg-primary text-primary-foreground font-medium text-sm'
-                                                        : 'w-8 h-8 bg-muted-foreground/30 hover:bg-muted-foreground/50 text-muted-foreground font-medium text-xs'
+                                                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                                                        : 'opacity-60 hover:opacity-100'
                                                 }`}
+                                                style={{ width: 64, height: 36 }}
                                                 onClick={() => {
                                                     setCurrentPreviewIndex(idx);
                                                 }}
                                                 aria-label={`Go to segment ${idx + 1}`}
                                             >
-                                                {idx + 1}
+                                                <img
+                                                    src={getDisplayUrl(video.thumbUrl)}
+                                                    alt={`Segment ${idx + 1}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <span className="absolute bottom-0.5 right-1 text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                                                    {idx + 1}
+                                                </span>
                                             </button>
                                         ))}
                                     </div>

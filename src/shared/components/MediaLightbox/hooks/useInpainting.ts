@@ -46,7 +46,7 @@ export interface UseInpaintingReturn {
   isDrawing: boolean;
   currentStroke: Array<{ x: number; y: number }>;
   isAnnotateMode: boolean;
-  editMode: 'text' | 'inpaint' | 'annotate' | 'reposition';
+  editMode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
   annotationMode: 'rectangle' | null;
   selectedShapeId: string | null;
   showTextModeHint: boolean;
@@ -56,7 +56,7 @@ export interface UseInpaintingReturn {
   setBrushSize: (size: number) => void;
   setIsEraseMode: (isErasing: boolean) => void;
   setIsAnnotateMode: (isAnnotate: boolean | ((prev: boolean) => boolean)) => void;
-  setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition' | ((prev: 'text' | 'inpaint' | 'annotate' | 'reposition') => 'text' | 'inpaint' | 'annotate' | 'reposition')) => void;
+  setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img' | ((prev: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img') => 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img')) => void;
   setAnnotationMode: (mode: 'rectangle' | null | ((prev: 'rectangle' | null) => 'rectangle' | null)) => void;
   handleEnterInpaintMode: () => void;
   handlePointerDown: (e: React.PointerEvent<HTMLCanvasElement>) => void;
@@ -110,7 +110,7 @@ export const useInpainting = ({
   
   // Per-media state storage (persists across media switches)
   const mediaStateRef = useRef<Map<string, {
-    editMode: 'text' | 'inpaint' | 'annotate' | 'reposition';
+    editMode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
     annotationMode: 'rectangle' | null;
   }>>(new Map());
 
@@ -146,10 +146,10 @@ export const useInpainting = ({
   const hintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track last used edit mode globally (for inheritance when visiting new media)
-  const lastUsedEditModeRef = useRef<'text' | 'inpaint' | 'annotate' | 'reposition'>('text');
+  const lastUsedEditModeRef = useRef<'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img'>('text');
   
   // Helper: Load edit mode from database
-  const loadEditModeFromDB = useCallback(async (generationId: string): Promise<'text' | 'inpaint' | 'annotate' | 'reposition' | null> => {
+  const loadEditModeFromDB = useCallback(async (generationId: string): Promise<'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img' | null> => {
     try {
       const { data, error } = await supabase
         .from('generations')
@@ -163,9 +163,9 @@ export const useInpainting = ({
       }
       
       const savedMode = (data?.params as any)?.ui?.editMode;
-      if (savedMode && ['text', 'inpaint', 'annotate', 'reposition'].includes(savedMode)) {
+      if (savedMode && ['text', 'inpaint', 'annotate', 'reposition', 'img2img'].includes(savedMode)) {
         console.log('[EditMode] ✅ Loaded from DB:', { generationId: generationId.substring(0, 8), mode: savedMode });
-        return savedMode as 'text' | 'inpaint' | 'annotate' | 'reposition';
+        return savedMode as 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
       }
       
       return null;
@@ -176,7 +176,7 @@ export const useInpainting = ({
   }, []);
   
   // Helper: Save edit mode to database
-  const saveEditModeToDB = useCallback(async (generationId: string, mode: 'text' | 'inpaint' | 'annotate' | 'reposition') => {
+  const saveEditModeToDB = useCallback(async (generationId: string, mode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img') => {
     try {
       // First, fetch current params to merge
       const { data: current, error: fetchError } = await supabase
@@ -226,7 +226,7 @@ export const useInpainting = ({
   const [inpaintGenerateSuccess, setInpaintGenerateSuccess] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<Array<{ x: number; y: number }>>([]);
-  const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate' | 'reposition'>('text');
+  const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img'>('text');
   const [annotationMode, setAnnotationModeInternal] = useState<'rectangle' | null>(null);
   
   // Debug state for production
@@ -259,13 +259,13 @@ export const useInpainting = ({
   const lastClickPositionRef = useRef<{ x: number; y: number } | null>(null); // Default to adjust
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const selectedShapeRef = useRef<BrushStroke | null>(null);
-  const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate' | 'reposition'>('text');
+  const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img'>('text');
   const prevMediaIdRef = useRef(media.id); // Track media ID changes
-  const prevModeForSelectionRef = useRef<'text' | 'inpaint' | 'annotate' | 'reposition'>(editMode); // Track mode changes for selection
+  const prevModeForSelectionRef = useRef<'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img'>(editMode); // Track mode changes for selection
   const prevCanvasSizeRef = useRef<{ width: number; height: number } | null>(null); // Track canvas size for scaling
 
   // Wrapper setters that persist to mediaStateRef and database
-  const setEditMode = useCallback((value: 'text' | 'inpaint' | 'annotate' | 'reposition' | ((prev: 'text' | 'inpaint' | 'annotate' | 'reposition') => 'text' | 'inpaint' | 'annotate' | 'reposition')) => {
+  const setEditMode = useCallback((value: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img' | ((prev: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img') => 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img')) => {
     setEditModeInternal(prev => {
       const newValue = typeof value === 'function' ? value(prev) : value;
       const currentState = mediaStateRef.current.get(media.id) || { editMode: 'text', annotationMode: null };

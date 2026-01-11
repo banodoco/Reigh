@@ -7,7 +7,7 @@
  * Follows the same pattern as EditModePanel and VideoEditPanel with variant prop.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 import { X } from 'lucide-react';
@@ -105,6 +105,10 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
 }) => {
   const isMobile = variant === 'mobile';
   const hasVariants = variants && variants.length >= 1;
+  const [idCopied, setIdCopied] = useState(false);
+  
+  // Get task ID for copy functionality
+  const taskId = taskDetailsData?.taskId;
 
   // Responsive styles
   const variantsMaxHeight = isMobile ? 'max-h-[120px]' : 'max-h-[200px]';
@@ -157,20 +161,38 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
       "flex-shrink-0 flex items-center justify-between border-b border-border p-4 bg-background",
       isMobile && "sticky top-0 z-[80]"
     )}>
-      {/* Left side - variant count on mobile, empty on desktop */}
-      {isMobile && hasVariants ? (
-        <button
-          onClick={() => variantsSectionRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
-        >
-          <span>{variants.length} variants</span>
-          <svg className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
-        </button>
-      ) : (
-        <div></div>
-      )}
+      {/* Left side - title + copy id + optional variant link */}
+      <div className="flex items-center gap-2">
+        <h2 className={cn("font-light", isMobile ? "text-base" : "text-lg")}>Generation Task Details</h2>
+        {taskId && (
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(taskId);
+              setIdCopied(true);
+              setTimeout(() => setIdCopied(false), 2000);
+            }}
+            className={`px-2 py-1 text-xs rounded transition-colors ${
+              idCopied
+                ? "text-green-400"
+                : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+            }`}
+          >
+            {idCopied ? 'copied' : 'id'}
+          </button>
+        )}
+        {/* Variant quick-link for mobile */}
+        {isMobile && hasVariants && (
+          <button
+            onClick={() => variantsSectionRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className="flex items-center gap-1 ml-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
+          >
+            <span>({variants.length})</span>
+            <svg className="w-2.5 h-2.5 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </button>
+        )}
+      </div>
 
       {/* Right side - toggles and close button */}
       <div className="flex items-center gap-3">

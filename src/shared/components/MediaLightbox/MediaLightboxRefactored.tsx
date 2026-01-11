@@ -36,6 +36,8 @@ import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
+import { useListPublicResources } from '@/shared/hooks/useResources';
+import type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 // Import all extracted hooks
 import {
@@ -56,6 +58,7 @@ import {
   useRepositionMode,
   useSwipeNavigation,
   useButtonGroupProps,
+  useImg2ImgMode,
 } from './hooks';
 
 // Import all extracted components
@@ -416,6 +419,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setEditMode: setPersistedEditMode,
     setNumGenerations: setPersistedNumGenerations,
     setPrompt: setPersistedPrompt,
+    // Img2Img persisted values
+    img2imgStrength: persistedImg2imgStrength,
+    img2imgEnablePromptExpansion: persistedImg2imgEnablePromptExpansion,
+    setImg2imgStrength: setPersistedImg2imgStrength,
+    setImg2imgEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
     isLoading: isLoadingEditSettings,
     isReady: isEditSettingsReady,
     hasPersistedSettings,
@@ -763,6 +771,40 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleSaveAsVariant,
     getTransformStyle,
   } = repositionHook;
+
+  // Fetch available LoRAs for img2img mode
+  const { data: publicLorasData } = useListPublicResources('lora');
+  const availableLoras: LoraModel[] = useMemo(() => {
+    return (Array.isArray(publicLorasData) ? publicLorasData.map(resource => resource.metadata) : []) || [];
+  }, [publicLorasData]);
+
+  // Img2Img mode hook - uses persisted settings for strength and enablePromptExpansion
+  const img2imgHook = useImg2ImgMode({
+    media,
+    selectedProjectId,
+    isVideo,
+    sourceUrlForTasks,
+    toolTypeOverride,
+    createAsGeneration,
+    availableLoras,
+    // Pass persisted values
+    img2imgStrength: persistedImg2imgStrength,
+    setImg2imgStrength: setPersistedImg2imgStrength,
+    enablePromptExpansion: persistedImg2imgEnablePromptExpansion,
+    setEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
+  });
+  const {
+    img2imgPrompt,
+    img2imgStrength,
+    enablePromptExpansion,
+    isGeneratingImg2Img,
+    img2imgGenerateSuccess,
+    setImg2imgPrompt,
+    setImg2imgStrength,
+    setEnablePromptExpansion,
+    handleGenerateImg2Img,
+    loraManager: img2imgLoraManager,
+  } = img2imgHook;
 
   // Layout mode hook
   const layoutHook = useLayoutMode({
@@ -2526,6 +2568,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     saveAsVariantSuccess={saveAsVariantSuccess}
                     createAsGeneration={createAsGeneration}
                     onCreateAsGenerationChange={setCreateAsGeneration}
+                    // Img2Img props
+                    img2imgPrompt={img2imgPrompt}
+                    setImg2imgPrompt={setImg2imgPrompt}
+                    img2imgStrength={img2imgStrength}
+                    setImg2imgStrength={setImg2imgStrength}
+                    enablePromptExpansion={enablePromptExpansion}
+                    setEnablePromptExpansion={setEnablePromptExpansion}
+                    isGeneratingImg2Img={isGeneratingImg2Img}
+                    img2imgGenerateSuccess={img2imgGenerateSuccess}
+                    handleGenerateImg2Img={handleGenerateImg2Img}
+                    img2imgLoraManager={img2imgLoraManager}
+                    availableLoras={availableLoras}
                     // InfoPanel props
                     isVideo={isVideo}
                     showImageEditTools={showImageEditTools}
@@ -2838,6 +2892,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     saveAsVariantSuccess={saveAsVariantSuccess}
                     createAsGeneration={createAsGeneration}
                     onCreateAsGenerationChange={setCreateAsGeneration}
+                    // Img2Img props
+                    img2imgPrompt={img2imgPrompt}
+                    setImg2imgPrompt={setImg2imgPrompt}
+                    img2imgStrength={img2imgStrength}
+                    setImg2imgStrength={setImg2imgStrength}
+                    enablePromptExpansion={enablePromptExpansion}
+                    setEnablePromptExpansion={setEnablePromptExpansion}
+                    isGeneratingImg2Img={isGeneratingImg2Img}
+                    img2imgGenerateSuccess={img2imgGenerateSuccess}
+                    handleGenerateImg2Img={handleGenerateImg2Img}
+                    img2imgLoraManager={img2imgLoraManager}
+                    availableLoras={availableLoras}
                     // InfoPanel props
                     isVideo={isVideo}
                     showImageEditTools={showImageEditTools}

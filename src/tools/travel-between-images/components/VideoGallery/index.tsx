@@ -685,22 +685,34 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   }, []);
 
   // Base lightbox navigation (without derived mode) - skips items without output URLs
+  // Handles page boundaries: advances to next/previous page when at edges
   const baseGoNext = useCallback(() => {
     if (lightboxIndex === null) return;
     
     const length = displaySortedVideoOutputs.length;
     if (length === 0) return;
     
-    // Find the next item with an output URL
-    for (let i = 1; i <= length; i++) {
-      const nextIndex = (lightboxIndex + i) % length;
-      if (hasOutputUrl(displaySortedVideoOutputs[nextIndex])) {
+    // Check if we're at the last item on the page
+    const isAtLastItem = lightboxIndex >= length - 1;
+    const hasMorePages = currentPage < totalPages;
+    
+    if (isAtLastItem && hasMorePages) {
+      // Advance to next page and open first item
+      setCurrentPage(currentPage + 1);
+      setLightboxIndex(0);
+      return;
+    }
+    
+    // Find the next item with an output URL on current page
+    for (let i = 1; i < length; i++) {
+      const nextIndex = lightboxIndex + i;
+      if (nextIndex < length && hasOutputUrl(displaySortedVideoOutputs[nextIndex])) {
         setLightboxIndex(nextIndex);
         return;
       }
     }
     // No valid items found, stay at current
-  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl]);
+  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl, currentPage, totalPages]);
 
   const baseGoPrev = useCallback(() => {
     if (lightboxIndex === null) return;
@@ -708,47 +720,66 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     const length = displaySortedVideoOutputs.length;
     if (length === 0) return;
     
-    // Find the previous item with an output URL
-    for (let i = 1; i <= length; i++) {
-      const prevIndex = (lightboxIndex - i + length) % length;
-      if (hasOutputUrl(displaySortedVideoOutputs[prevIndex])) {
+    // Check if we're at the first item on the page
+    const isAtFirstItem = lightboxIndex <= 0;
+    const hasPreviousPages = currentPage > 1;
+    
+    if (isAtFirstItem && hasPreviousPages) {
+      // Go to previous page and open last item
+      setCurrentPage(currentPage - 1);
+      // Set to last item (itemsPerPage - 1) - the actual last index will be set after data loads
+      setLightboxIndex(itemsPerPage - 1);
+      return;
+    }
+    
+    // Find the previous item with an output URL on current page
+    for (let i = 1; i < length; i++) {
+      const prevIndex = lightboxIndex - i;
+      if (prevIndex >= 0 && hasOutputUrl(displaySortedVideoOutputs[prevIndex])) {
         setLightboxIndex(prevIndex);
         return;
       }
     }
     // No valid items found, stay at current
-  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl]);
+  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl, currentPage, itemsPerPage]);
 
   // Check if there are valid items (with output URLs) in each direction
+  // Now also considers pagination - can navigate if there are more pages
   const hasValidNext = useMemo(() => {
     if (lightboxIndex === null) return false;
     const length = displaySortedVideoOutputs.length;
+    
+    // Can go next if there are more pages
+    if (currentPage < totalPages) return true;
+    
     if (length <= 1) return false;
     
-    // Check if any item other than the current one has a valid output URL
-    for (let i = 1; i < length; i++) {
-      const nextIndex = (lightboxIndex + i) % length;
-      if (hasOutputUrl(displaySortedVideoOutputs[nextIndex])) {
+    // Check if any item after current one has a valid output URL
+    for (let i = lightboxIndex + 1; i < length; i++) {
+      if (hasOutputUrl(displaySortedVideoOutputs[i])) {
         return true;
       }
     }
     return false;
-  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl]);
+  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl, currentPage, totalPages]);
 
   const hasValidPrevious = useMemo(() => {
     if (lightboxIndex === null) return false;
     const length = displaySortedVideoOutputs.length;
+    
+    // Can go previous if there are previous pages
+    if (currentPage > 1) return true;
+    
     if (length <= 1) return false;
     
-    // Check if any item other than the current one has a valid output URL
-    for (let i = 1; i < length; i++) {
-      const prevIndex = (lightboxIndex - i + length) % length;
-      if (hasOutputUrl(displaySortedVideoOutputs[prevIndex])) {
+    // Check if any item before current one has a valid output URL
+    for (let i = lightboxIndex - 1; i >= 0; i--) {
+      if (hasOutputUrl(displaySortedVideoOutputs[i])) {
         return true;
       }
     }
     return false;
-  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl]);
+  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl, currentPage]);
 
   // Add derived navigation mode support (navigates only through "Based on this" items when active)
   const { wrappedGoNext: handleNext, wrappedGoPrev: handlePrevious, hasNext: derivedHasNext, hasPrevious: derivedHasPrevious } = useDerivedNavigation({
@@ -760,6 +791,13 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     goPrev: baseGoPrev,
     logPrefix: '[VideoGallery:DerivedNav]'
   });
+
+  // Combine derived navigation and pagination-aware navigation:
+  // - In derived mode (derivedNavContext exists): use derivedHasNext/derivedHasPrevious
+  // - In normal mode: use hasValidNext/hasValidPrevious (which accounts for pagination)
+  const isInDerivedMode = !!externalGens.derivedNavContext;
+  const effectiveHasNext = isInDerivedMode ? derivedHasNext : hasValidNext;
+  const effectiveHasPrevious = isInDerivedMode ? derivedHasPrevious : hasValidPrevious;
 
   // Lightbox close handler - clear external generations
   const handleCloseLightbox = useCallback(() => {
@@ -866,6 +904,23 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   useEffect(() => {
     setCurrentPage(1);
   }, [showStarredOnly]);
+
+  // Clamp lightbox index to valid range when data changes (e.g., after page navigation)
+  // This handles edge cases where lightbox index might be out of bounds temporarily
+  useEffect(() => {
+    if (lightboxIndex !== null && displaySortedVideoOutputs.length > 0) {
+      if (lightboxIndex >= displaySortedVideoOutputs.length) {
+        // Clamp to last valid index
+        const lastValidIndex = displaySortedVideoOutputs.length - 1;
+        console.log('[VideoGallery:LightboxNav] Clamping lightbox index', {
+          oldIndex: lightboxIndex,
+          newIndex: lastValidIndex,
+          displayLength: displaySortedVideoOutputs.length
+        });
+        setLightboxIndex(lastValidIndex);
+      }
+    }
+  }, [lightboxIndex, displaySortedVideoOutputs.length]);
 
   // Log video loading strategy for this page (throttled to avoid spam)
   const hasLoggedStrategyRef = useRef(false);
@@ -1027,7 +1082,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       </div>
 
       {/* Lightbox */}
-      {lightboxIndex !== null && (
+      {lightboxIndex !== null && displaySortedVideoOutputs[lightboxIndex] && (
         <MediaLightbox
           media={(() => {
             const media = displaySortedVideoOutputs[lightboxIndex];
@@ -1046,8 +1101,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           showNavigation={true}
           showImageEditTools={false}
           showDownload={true}
-          hasNext={derivedHasNext && hasValidNext}
-          hasPrevious={derivedHasPrevious && hasValidPrevious}
+          hasNext={effectiveHasNext}
+          hasPrevious={effectiveHasPrevious}
           starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred ?? false}
           shotId={shotId || undefined}
           showTaskDetails={true}

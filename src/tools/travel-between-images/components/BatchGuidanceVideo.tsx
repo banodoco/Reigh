@@ -18,11 +18,14 @@ interface BatchGuidanceVideoProps {
   videoMetadata: VideoMetadata | null;
   treatment: 'adjust' | 'clip';
   motionStrength: number;
-  structureType?: 'flow' | 'canny' | 'depth';
+  structureType?: 'uni3c' | 'flow' | 'canny' | 'depth';
   onVideoUploaded: (videoUrl: string | null, metadata: VideoMetadata | null, resourceId?: string) => void;
   onTreatmentChange: (treatment: 'adjust' | 'clip') => void;
   onMotionStrengthChange: (strength: number) => void;
-  onStructureTypeChange?: (type: 'flow' | 'canny' | 'depth') => void;
+  onStructureTypeChange?: (type: 'uni3c' | 'flow' | 'canny' | 'depth') => void;
+  /** Uni3C end percent (only shown when structureType is 'uni3c') */
+  uni3cEndPercent?: number;
+  onUni3cEndPercentChange?: (value: number) => void;
   imageCount?: number; // Number of images in the batch
   timelineFramePositions?: number[]; // Actual frame positions from timeline
   readOnly?: boolean;
@@ -40,6 +43,8 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   onTreatmentChange,
   onMotionStrengthChange,
   onStructureTypeChange,
+  uni3cEndPercent = 0.1,
+  onUni3cEndPercentChange,
   imageCount = 0,
   timelineFramePositions = [],
   readOnly = false,
@@ -508,51 +513,83 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                 <Label className="text-sm">What type of guidance would you like to use?</Label>
                 <Select
                   value={structureType}
-                  onValueChange={(type: 'flow' | 'canny' | 'depth') => {
+                  onValueChange={(type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
                     onStructureTypeChange(type);
                   }}
                   disabled={readOnly}
                 >
                   <SelectTrigger variant="retro" size="sm" className="h-9 w-full text-sm">
                     <SelectValue>
-                      {structureType === 'flow' ? 'Optical flow' : structureType === 'canny' ? 'Canny' : 'Depth'}
+                      {structureType === 'uni3c' ? 'Uni3C (I2V)' : 
+                       structureType === 'flow' ? 'Optical flow (VACE)' : 
+                       structureType === 'canny' ? 'Canny (VACE)' : 'Depth (VACE)'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent variant="retro">
+                    <SelectItem variant="retro" value="uni3c">
+                      <span className="text-sm">Uni3C (I2V)</span>
+                    </SelectItem>
                     <SelectItem variant="retro" value="flow">
-                      <span className="text-sm">Optical flow</span>
+                      <span className="text-sm">Optical flow (VACE)</span>
                     </SelectItem>
                     <SelectItem variant="retro" value="canny">
-                      <span className="text-sm">Canny</span>
+                      <span className="text-sm">Canny (VACE)</span>
                     </SelectItem>
                     <SelectItem variant="retro" value="depth">
-                      <span className="text-sm">Depth</span>
+                      <span className="text-sm">Depth (VACE)</span>
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             )}
 
-            {/* Motion strength */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Strength of motion guidance:</Label>
-                <span className="text-sm font-medium">{motionStrength.toFixed(1)}x</span>
+            {/* Motion strength and End Percent (when uni3c) */}
+            <div className="space-y-4">
+              {/* Strength slider */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Strength:</Label>
+                  <span className="text-sm font-medium">{motionStrength.toFixed(1)}x</span>
+                </div>
+                <Slider
+                  value={[motionStrength]}
+                  onValueChange={([value]) => onMotionStrengthChange(value)}
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  className="w-full"
+                  disabled={readOnly}
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>0x</span>
+                  <span>1x</span>
+                  <span>2x</span>
+                </div>
               </div>
-              <Slider
-                value={[motionStrength]}
-                onValueChange={([value]) => onMotionStrengthChange(value)}
-                min={0}
-                max={2}
-                step={0.1}
-                className="w-full"
-                disabled={readOnly}
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0x (No motion)</span>
-                <span>1x (Original)</span>
-                <span>2x (Strong)</span>
-              </div>
+
+              {/* Uni3C End Percent - shown below strength when uni3c is selected */}
+              {structureType === 'uni3c' && onUni3cEndPercentChange && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">End Percent:</Label>
+                    <span className="text-sm font-medium">{(uni3cEndPercent * 100).toFixed(0)}%</span>
+                  </div>
+                  <Slider
+                    value={[uni3cEndPercent]}
+                    onValueChange={([value]) => onUni3cEndPercentChange(value)}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    className="w-full"
+                    disabled={readOnly}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0%</span>
+                    <span>50%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

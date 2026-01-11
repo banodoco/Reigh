@@ -40,6 +40,7 @@ interface PhaseConfigVerticalProps {
   generationTypeMode?: 'i2v' | 'vace';
   onGenerationTypeModeChange?: (mode: 'i2v' | 'vace') => void;
   hasStructureVideo?: boolean;
+  structureType?: 'uni3c' | 'flow' | 'canny' | 'depth'; // Type of structure video guidance
   amountOfMotion?: number;
   onRestoreDefaults?: () => void; // Custom handler for restoring defaults based on current mode
 }
@@ -58,6 +59,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
   generationTypeMode = 'i2v',
   onGenerationTypeModeChange,
   hasStructureVideo = false,
+  structureType,
   amountOfMotion = 50,
   onRestoreDefaults,
 }) => {
@@ -216,11 +218,11 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
             </SegmentedControlItem>
           </SegmentedControl>
           
-          {/* Warning when I2V mode is selected but structure video exists */}
-          {generationTypeMode === 'i2v' && hasStructureVideo && (
+          {/* Warning when I2V mode is selected but structure video exists (except for Uni3C which uses I2V with structure video) */}
+          {generationTypeMode === 'i2v' && hasStructureVideo && structureType !== 'uni3c' && (
             <div className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-              <span>Structure video is set but won't be used in I2V mode. Switch to VACE to use it.</span>
+              <span>Structure video is set but won't be used in I2V mode. Switch to VACE to use it, or select Uni3C.</span>
             </div>
           )}
         </div>

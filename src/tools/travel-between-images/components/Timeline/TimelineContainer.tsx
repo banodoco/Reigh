@@ -125,15 +125,18 @@ interface TimelineContainerProps {
   structureVideoMetadata?: VideoMetadata | null;
   structureVideoTreatment?: 'adjust' | 'clip';
   structureVideoMotionStrength?: number;
-  structureVideoType?: 'flow' | 'canny' | 'depth';
+  structureVideoType?: 'uni3c' | 'flow' | 'canny' | 'depth';
   onStructureVideoChange?: (
     videoPath: string | null,
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'flow' | 'canny' | 'depth',
+    structureType: 'uni3c' | 'flow' | 'canny' | 'depth',
     resourceId?: string
   ) => void;
+  /** Uni3C end percent (only used when structureVideoType is 'uni3c') */
+  uni3cEndPercent?: number;
+  onUni3cEndPercentChange?: (value: number) => void;
   // Audio strip props
   audioUrl?: string | null;
   audioMetadata?: { duration: number; name?: string } | null;
@@ -189,6 +192,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   structureVideoMotionStrength = 1.0,
   structureVideoType = 'flow',
   onStructureVideoChange,
+  uni3cEndPercent = 0.1,
+  onUni3cEndPercentChange,
   audioUrl,
   audioMetadata,
   onAudioChange,
@@ -1052,23 +1057,30 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           {structureVideoPath ? (
             <div className={`flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
               {/* Structure type selector */}
-              <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
+              <Select value={structureVideoType} onValueChange={(type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
                 onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
               }}>
-                <SelectTrigger variant="retro" size="sm" className="h-7 w-[100px] px-2 py-0 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                <SelectTrigger variant="retro" size="sm" className="h-7 w-[130px] px-2 py-0 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
                   <SelectValue>
-                    <span className="text-xs">{structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}</span>
+                    <span className="text-xs">
+                      {structureVideoType === 'uni3c' ? 'Uni3C (I2V)' : 
+                       structureVideoType === 'flow' ? 'Optical flow (VACE)' : 
+                       structureVideoType === 'canny' ? 'Canny (VACE)' : 'Depth (VACE)'}
+                    </span>
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent variant="retro">
+                  <SelectItem variant="retro" value="uni3c">
+                    <span className="text-xs">Uni3C (I2V)</span>
+                  </SelectItem>
                   <SelectItem variant="retro" value="flow">
-                    <span className="text-xs">Optical flow</span>
+                    <span className="text-xs">Optical flow (VACE)</span>
                   </SelectItem>
                   <SelectItem variant="retro" value="canny">
-                    <span className="text-xs">Canny</span>
+                    <span className="text-xs">Canny (VACE)</span>
                   </SelectItem>
                   <SelectItem variant="retro" value="depth">
-                    <span className="text-xs">Depth</span>
+                    <span className="text-xs">Depth (VACE)</span>
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -1096,6 +1108,26 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                   className="h-4"
                 />
               </div>
+
+              {/* End Percent - only shown for Uni3C */}
+              {structureVideoType === 'uni3c' && onUni3cEndPercentChange && (
+                <>
+                  <span className="text-xs text-muted-foreground">End:</span>
+                  <span className="text-xs font-medium">
+                    {(uni3cEndPercent * 100).toFixed(0)}%
+                  </span>
+                  <div className="w-20">
+                    <Slider
+                      value={[uni3cEndPercent]}
+                      onValueChange={([value]) => onUni3cEndPercentChange(value)}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      className="h-4"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             /* Add guidance video controls - styled like zoom controls, on the right */

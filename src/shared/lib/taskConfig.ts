@@ -1,7 +1,12 @@
 /**
  * Centralized task configuration system
- * Manages task visibility, display names, and other task-specific behaviors
+ * 
+ * This module provides synchronous access to task type configuration.
+ * Configuration is loaded from the database (task_types table) and cached globally.
+ * Hardcoded fallbacks exist for backwards compatibility and offline scenarios.
  */
+
+import { getTaskTypeConfigCache, isTaskTypeConfigCacheInitialized, type TaskTypeInfo } from '@/shared/hooks/useTaskType';
 
 export interface TaskTypeConfig {
   /** Whether this task type should be visible in the UI */
@@ -19,210 +24,80 @@ export interface TaskTypeConfig {
 }
 
 /**
- * Task type configuration registry
- * Add new task types here with their specific configurations
+ * HARDCODED FALLBACK: Task type configuration registry
+ * Used when database cache is not yet initialized or as fallback for unknown types
+ * 
+ * NOTE: The source of truth is the task_types database table.
+ * This is a fallback for backwards compatibility.
  */
-export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
-  // Travel orchestration tasks
-  travel_orchestrator: {
-    isVisible: true,
-    displayName: 'Travel Between Images',
-    supportsProgress: true,
-    canCancel: true,
-    category: 'orchestration',
-    description: 'Main orchestrator for travel generation workflows'
-  },
+const HARDCODED_TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
+  // Visible orchestration tasks
+  travel_orchestrator: { isVisible: true, displayName: 'Travel Between Images', supportsProgress: true, category: 'orchestration' },
+  join_clips_orchestrator: { isVisible: true, displayName: 'Join Clips', supportsProgress: true, category: 'orchestration' },
+  edit_video_orchestrator: { isVisible: true, displayName: 'Edit Video', supportsProgress: true, category: 'orchestration' },
   
-  // Hidden travel subtasks
-  travel_segment: {
-    isVisible: false,
-    canCancel: true,
-    category: 'processing',
-    description: 'Individual video segment generation (part of travel workflow)'
-  },
+  // Visible generation tasks
+  animate_character: { isVisible: true, displayName: 'Animate Character', category: 'generation' },
+  individual_travel_segment: { isVisible: true, displayName: 'Travel Segment', category: 'generation' },
+  image_inpaint: { isVisible: true, displayName: 'Image Inpaint', category: 'generation' },
+  qwen_image: { isVisible: true, displayName: 'Qwen Image', category: 'generation' },
+  qwen_image_2512: { isVisible: true, displayName: 'Qwen Image 2512', category: 'generation' },
+  z_image_turbo: { isVisible: true, displayName: 'Z Image Turbo', category: 'generation' },
+  z_image_turbo_i2i: { isVisible: true, displayName: 'Z Image Img2Img', category: 'generation' },
+  qwen_image_style: { isVisible: true, displayName: 'Qwen w/ Reference', category: 'generation' },
+  qwen_image_edit: { isVisible: true, displayName: 'Qwen Image Edit', category: 'generation' },
   
-  travel_stitch: {
-    isVisible: false,
-    canCancel: true,
-    category: 'processing', 
-    description: 'Video stitching task (part of travel workflow)'
-  },
-
-  // Image generation tasks (hidden - legacy)
-  single_image: {
-    isVisible: false,
-    displayName: 'Image Generation',
-    canCancel: true,
-    category: 'generation',
-    description: 'Single image generation task'
-  },
-
-  // Edit travel tasks (hidden - legacy)
-  edit_travel_kontext: {
-    isVisible: false,
-    displayName: 'Edit Travel (Kontext)',
-    canCancel: true,
-    category: 'generation',
-    description: 'Edit travel using Kontext model'
-  },
-
-  edit_travel_flux: {
-    isVisible: false,
-    displayName: 'Edit Travel (Flux)',
-    canCancel: true,
-    category: 'generation',
-    description: 'Edit travel using Flux model'
-  },
-
-  // Character animation tasks
-  animate_character: {
-    isVisible: true,
-    displayName: 'Animate Character',
-    canCancel: true,
-    category: 'generation',
-    description: 'Animate or replace characters in videos'
-  },
-
-  // Video joining tasks
-  join_clips_orchestrator: {
-    isVisible: true,
-    displayName: 'Join Clips',
-    supportsProgress: true,
-    canCancel: true,
-    category: 'orchestration',
-    description: 'Main orchestrator for join clips workflows with multiple videos'
-  },
-
-  // Hidden join clips subtasks
-  join_clips_segment: {
-    isVisible: false,
-    canCancel: true,
-    category: 'processing',
-    description: 'Individual join segment generation (part of join clips workflow)'
-  },
-
-  // Individual segment regeneration (visible - standalone task)
-  individual_travel_segment: {
-    isVisible: true,
-    displayName: 'Travel Segment',
-    canCancel: true,
-    category: 'generation',
-    description: 'Standalone segment regeneration from segment details view'
-  },
-
-  // Video editing/regeneration tasks
-  edit_video_orchestrator: {
-    isVisible: true,
-    displayName: 'Edit Video',
-    supportsProgress: true,
-    canCancel: true,
-    category: 'orchestration',
-    description: 'Regenerate selected portions of a video'
-  },
-
-  // Hidden edit video subtasks
-  edit_video_segment: {
-    isVisible: false,
-    canCancel: true,
-    category: 'processing',
-    description: 'Individual portion regeneration (part of edit video workflow)'
-  },
-
-  // Image inpainting task
-  image_inpaint: {
-    isVisible: true,
-    displayName: 'Image Inpaint',
-    canCancel: true,
-    category: 'generation',
-    description: 'Inpaint or extend images'
-  },
-
-  // Qwen image generation (text-only via fal.ai)
-  qwen_image: {
-    isVisible: true,
-    displayName: 'Qwen Image',
-    canCancel: true,
-    category: 'generation',
-    description: 'Generate images using Qwen model (text-only)'
-  },
-
-  // Qwen image 2512 (higher resolution text-only via fal.ai)
-  qwen_image_2512: {
-    isVisible: true,
-    displayName: 'Qwen Image 2512',
-    canCancel: true,
-    category: 'generation',
-    description: 'Generate high-resolution images using Qwen model (text-only)'
-  },
-
-  // Z Image Turbo (fast text-to-image via fal.ai)
-  z_image_turbo: {
-    isVisible: true,
-    displayName: 'Z Image Turbo',
-    canCancel: true,
-    category: 'generation',
-    description: 'Fast image generation using Z Image Turbo model'
-  },
-
-  // Qwen image style generation (with style reference)
-  qwen_image_style: {
-    isVisible: true,
-    displayName: 'Qwen w/ Reference',
-    canCancel: true,
-    category: 'generation',
-    description: 'Generate images with style reference using Qwen model'
-  },
-
-  // Wan 2.2 text-to-image generation (current task type for non-Qwen models)
-  wan_2_2_t2i: {
-    isVisible: false, // Hidden from filter - uses same UI as Qwen Image
-    displayName: 'Image Generation',
-    canCancel: true,
-    category: 'generation',
-    description: 'Generate images using text-to-image models'
-  },
-
-  // Qwen image editing
-  qwen_image_edit: {
-    isVisible: true,
-    displayName: 'Qwen Image Edit',
-    canCancel: true,
-    category: 'generation',
-    description: 'Edit images using Qwen model'
-  },
-
-  // Internal/utility tasks that should be hidden
-  extract_frame: {
-    isVisible: false,
-    category: 'utility',
-    description: 'Extract frames from video'
-  },
-
-  generate_openpose: {
-    isVisible: false,
-    category: 'utility',
-    description: 'Generate OpenPose skeleton'
-  },
-
-  rife_interpolate_images: {
-    isVisible: false,
-    category: 'utility',
-    description: 'RIFE frame interpolation'
-  },
-
-  wgp: {
-    isVisible: false,
-    category: 'utility',
-    description: 'Workflow graph processing'
-  },
+  // Hidden processing/utility tasks
+  travel_segment: { isVisible: false, category: 'processing' },
+  travel_stitch: { isVisible: false, category: 'processing' },
+  single_image: { isVisible: false, category: 'generation' },
+  edit_travel_kontext: { isVisible: false, category: 'generation' },
+  edit_travel_flux: { isVisible: false, category: 'generation' },
+  join_clips_segment: { isVisible: false, category: 'processing' },
+  edit_video_segment: { isVisible: false, category: 'processing' },
+  wan_2_2_t2i: { isVisible: false, category: 'generation' },
+  extract_frame: { isVisible: false, category: 'utility' },
+  generate_openpose: { isVisible: false, category: 'utility' },
+  rife_interpolate_images: { isVisible: false, category: 'utility' },
+  wgp: { isVisible: false, category: 'utility' },
 };
 
 /**
+ * Convert database TaskTypeInfo to TaskTypeConfig format
+ */
+function dbConfigToTaskConfig(dbConfig: TaskTypeInfo): TaskTypeConfig {
+  return {
+    isVisible: dbConfig.is_visible ?? false,
+    displayName: dbConfig.display_name,
+    supportsProgress: dbConfig.supports_progress ?? false,
+    canCancel: true, // Default all tasks to cancellable
+    category: dbConfig.category as TaskTypeConfig['category'],
+  };
+}
+
+/**
  * Get configuration for a specific task type
+ * Checks the database cache first, falls back to hardcoded defaults
  */
 export function getTaskConfig(taskType: string): TaskTypeConfig {
-  return TASK_TYPE_CONFIG[taskType] || {
-    isVisible: false, // Default to hidden for unknown task types (they may be internal/utility tasks)
+  // Check database cache first (populated by useAllTaskTypesConfig hook)
+  if (isTaskTypeConfigCacheInitialized()) {
+    const cache = getTaskTypeConfigCache();
+    const dbConfig = cache[taskType];
+    if (dbConfig) {
+      return dbConfigToTaskConfig(dbConfig);
+    }
+  }
+  
+  // Fall back to hardcoded config
+  const hardcodedConfig = HARDCODED_TASK_TYPE_CONFIG[taskType];
+  if (hardcodedConfig) {
+    return hardcodedConfig;
+  }
+  
+  // Default for completely unknown task types
+  return {
+    isVisible: false, // Default to hidden for unknown types
     canCancel: true,
     category: 'utility'
   };
@@ -259,20 +134,38 @@ export function canCancelTask(taskType: string): boolean {
 
 /**
  * Get all visible task types
+ * Uses database cache if available, falls back to hardcoded list
  */
 export function getVisibleTaskTypes(): string[] {
-  return Object.entries(TASK_TYPE_CONFIG)
+  if (isTaskTypeConfigCacheInitialized()) {
+    const cache = getTaskTypeConfigCache();
+    return Object.entries(cache)
+      .filter(([_, config]) => config.is_visible)
+      .map(([taskType]) => taskType);
+  }
+  
+  // Fall back to hardcoded
+  return Object.entries(HARDCODED_TASK_TYPE_CONFIG)
     .filter(([_, config]) => config.isVisible)
-    .map(([taskType, _]) => taskType);
+    .map(([taskType]) => taskType);
 }
 
 /**
  * Get all hidden task types
+ * Uses database cache if available, falls back to hardcoded list
  */
 export function getHiddenTaskTypes(): string[] {
-  return Object.entries(TASK_TYPE_CONFIG)
+  if (isTaskTypeConfigCacheInitialized()) {
+    const cache = getTaskTypeConfigCache();
+    return Object.entries(cache)
+      .filter(([_, config]) => !config.is_visible)
+      .map(([taskType]) => taskType);
+  }
+  
+  // Fall back to hardcoded
+  return Object.entries(HARDCODED_TASK_TYPE_CONFIG)
     .filter(([_, config]) => !config.isVisible)
-    .map(([taskType, _]) => taskType);
+    .map(([taskType]) => taskType);
 }
 
 /**
@@ -280,4 +173,7 @@ export function getHiddenTaskTypes(): string[] {
  */
 export function filterVisibleTasks<T extends { taskType: string }>(tasks: T[]): T[] {
   return tasks.filter(task => isTaskVisible(task.taskType));
-} 
+}
+
+// Re-export for backwards compatibility
+export { HARDCODED_TASK_TYPE_CONFIG as TASK_TYPE_CONFIG };

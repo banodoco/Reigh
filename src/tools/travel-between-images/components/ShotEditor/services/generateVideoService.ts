@@ -67,22 +67,39 @@ const MOTION_LORA_URL = 'https://huggingface.co/peteromallet/random_junk/resolve
  * - High-noise LoRA (path) is applied to early phases (phase 0, 1 for 3-phase; phase 0 for 2-phase)
  * - Low-noise LoRA (lowNoisePath) is applied to the final phase
  *
- * @param hasStructureVideo - Whether to use VACE mode (true) or I2V mode (false)
+ * @param hasStructureVideo - Whether a structure video is set
  * @param amountOfMotion - 0-100 motion slider value
  * @param userLoras - User-selected LoRAs to add to phases (with optional multi-stage support)
+ * @param structureType - Structure type determines mode: 'uni3c' uses I2V model, others use VACE model
  * @returns Object with model name and phase config
  */
 export function buildBasicModePhaseConfig(
   hasStructureVideo: boolean,
   amountOfMotion: number,
-  userLoras: Array<{ path: string; strength: number; lowNoisePath?: string; isMultiStage?: boolean }>
+  userLoras: Array<{ path: string; strength: number; lowNoisePath?: string; isMultiStage?: boolean }>,
+  structureType?: 'uni3c' | 'flow' | 'canny' | 'depth'
 ): { model: string; phaseConfig: PhaseConfig } {
 
+  // Check if using uni3c mode (I2V with guidance video)
+  const isUni3c = structureType === 'uni3c' && hasStructureVideo;
+
   // Get base config from settings.ts (single source of truth)
-  const baseConfig = hasStructureVideo ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
-  const model = hasStructureVideo
-    ? 'wan_2_2_vace_lightning_baseline_2_2_2'
-    : 'wan_2_2_i2v_lightning_baseline_2_2_2';
+  // Uni3C mode: uses I2V config (same as standard I2V)
+  // VACE mode: use DEFAULT_VACE_PHASE_CONFIG
+  // Standard I2V mode: use DEFAULT_PHASE_CONFIG
+  const baseConfig = (hasStructureVideo && !isUni3c)
+    ? DEFAULT_VACE_PHASE_CONFIG 
+    : DEFAULT_PHASE_CONFIG;
+  
+  // Model selection:
+  // Uni3C mode: use I2V model (wan_2_2_i2v_lightning_baseline_2_2_2)
+  // VACE mode: use VACE model
+  // Standard I2V mode: use I2V model
+  const model = isUni3c
+    ? 'wan_2_2_i2v_lightning_baseline_2_2_2'
+    : (hasStructureVideo
+      ? 'wan_2_2_vace_lightning_baseline_2_2_2'
+      : 'wan_2_2_i2v_lightning_baseline_2_2_2');
 
   const totalPhases = baseConfig.phases.length;
 
@@ -193,6 +210,9 @@ export interface GenerateVideoParams {
 
   // Cleanup function
   clearAllEnhancedPrompts: () => Promise<void>;
+
+  // Uni3C settings (only used when structure_video_type is 'uni3c')
+  uni3cEndPercent?: number;
 }
 
 export interface GenerateVideoResult {
@@ -263,6 +283,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   console.log('[SmoothContinuationsDebug] generateVideoService received:', {
     useSvi,
     modelConfig_use_svi: modelConfig.use_svi,
+    generationTypeMode,
     timestamp: Date.now()
   });
 
@@ -824,18 +845,31 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   // Note: generationTypeMode determines whether to use I2V or VACE mode.
   // If set to 'i2v' but structure video exists, the structure video will NOT be processed.
   // The UI should show a warning in this case, but we respect the user's choice.
+  //
+  // NEW: structure_video_type can now be 'uni3c' which uses I2V mode with a guidance video
+  // - uni3c: Uses I2V model with raw structure video processing (uni3c_start_percent=0, uni3c_end_percent configurable)
+  // - flow/canny/depth: Uses VACE model with respective structure video processing
   
   let actualModelName: string;
   let effectivePhaseConfig: PhaseConfig;
   let modelType: 'i2v' | 'vace';
   
+  // Check if using uni3c mode (I2V with guidance video)
+  const isUni3cMode = structureVideoConfig.structure_video_type === 'uni3c' && structureVideoConfig.structure_video_path;
+  
   // Determine if we're using VACE mode based on generationTypeMode setting
   // Even if structure video exists, if user explicitly chose I2V mode, we use I2V
-  const useVaceMode = generationTypeMode === 'vace';
+  // ALSO: If uni3c mode is selected, use I2V (not VACE)
+  const useVaceMode = generationTypeMode === 'vace' && !isUni3cMode;
   
-  // Log warning if I2V mode is selected but structure video exists
-  if (generationTypeMode === 'i2v' && structureVideoConfig.structure_video_path) {
+  // Log warning if I2V mode is selected but structure video exists (not applicable for uni3c)
+  if (generationTypeMode === 'i2v' && structureVideoConfig.structure_video_path && !isUni3cMode) {
     console.warn('[Generation] ⚠️ I2V mode selected but structure video exists. Structure video will NOT be used.');
+  }
+  
+  // Log uni3c mode
+  if (isUni3cMode) {
+    console.log('[Generation] 🔵 Using Uni3C mode - I2V model with guidance video');
   }
   
   // Convert user LoRAs to the format needed for phase config (including multi-stage fields)
@@ -859,9 +893,10 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     motionMode,
     generationTypeMode,
     useVaceMode,
+    isUni3cMode,
     useAdvancedMode,
     hasStructureVideo: !!structureVideoConfig.structure_video_path,
-    structureVideoWillBeUsed: useVaceMode && !!structureVideoConfig.structure_video_path,
+    structureVideoWillBeUsed: (useVaceMode || isUni3cMode) && !!structureVideoConfig.structure_video_path,
     amountOfMotion,
     rawAmountOfMotion,
     amountOfMotionDefaultApplied: rawAmountOfMotion == null
@@ -915,23 +950,28 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // BASIC MODE: Build phase config automatically based on generationTypeMode + Amount of Motion
     console.log('[Generation] Using BASIC MODE - building phase config from Amount of Motion');
     
+    // Pass structure type for uni3c mode detection
     const basicConfig = buildBasicModePhaseConfig(
-      useVaceMode, // Use generationTypeMode instead of structureVideoPath presence
+      useVaceMode || isUni3cMode, // Has structure video for both VACE and Uni3C modes
       amountOfMotion,
-      userLorasForPhaseConfig
+      userLorasForPhaseConfig,
+      structureVideoConfig.structure_video_type // Pass structure type for uni3c detection
     );
     
     actualModelName = basicConfig.model;
     effectivePhaseConfig = basicConfig.phaseConfig;
-    modelType = useVaceMode ? 'vace' : 'i2v';
+    // Uni3C mode uses I2V model type, VACE mode uses VACE
+    modelType = isUni3cMode ? 'i2v' : (useVaceMode ? 'vace' : 'i2v');
     
     console.log('[Generation] Basic Mode - built phase config:', {
       model: actualModelName,
       modelType,
       generationTypeMode,
       useVaceMode,
+      isUni3cMode,
+      structureVideoType: structureVideoConfig.structure_video_type,
       hasStructureVideo: !!structureVideoConfig.structure_video_path,
-      structureVideoWillBeUsed: useVaceMode && !!structureVideoConfig.structure_video_path,
+      structureVideoWillBeUsed: (useVaceMode || isUni3cMode) && !!structureVideoConfig.structure_video_path,
       amountOfMotion,
       motionLoraApplied: amountOfMotion > 0,
       motionLoraStrength: amountOfMotion > 0 ? (amountOfMotion / 100).toFixed(2) : 'N/A',
@@ -1042,11 +1082,25 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // Text before/after prompts
     ...(textBeforePrompts ? { text_before_prompts: textBeforePrompts } : {}),
     ...(textAfterPrompts ? { text_after_prompts: textAfterPrompts } : {}),
-    // Always set independent segments to true
-    independent_segments: true,
+    // Smooth Continuations in VACE mode: disable independent segments, set frame overlap, and enable chain_segments
+    // Otherwise: independent segments enabled (default behavior)
+    independent_segments: !(useVaceMode && useSvi),
+    chain_segments: useVaceMode && useSvi,
+    ...(useVaceMode && useSvi ? { frame_overlap_expanded: 4 } : {}),
     // Smooth video interpolation (SVI) for smoother transitions - always send explicitly
     use_svi: useSvi ?? false,
   };
+
+  // Log Smooth Continuations params
+  if (useSvi) {
+    console.log('[SmoothContinuationsDebug] Task params:', {
+      useVaceMode,
+      useSvi,
+      independent_segments: requestBody.independent_segments,
+      chain_segments: requestBody.chain_segments,
+      frame_overlap_expanded: requestBody.frame_overlap_expanded,
+    });
+  }
 
   // Debug log the exact request body being sent
   console.log('[BasePromptsDebug] 📤 REQUEST BODY BEING SENT TO BACKEND:');
@@ -1081,21 +1135,41 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   // Add structure video params if available (spread from grouped config)
   console.log('[Generation] [DEBUG] Structure video config at generation time:', {
     ...structureVideoConfig,
-    willAddToRequest: !!structureVideoConfig.structure_video_path
+    willAddToRequest: !!structureVideoConfig.structure_video_path,
+    isUni3cMode
   });
 
   if (structureVideoConfig.structure_video_path) {
+    // For uni3c mode, send 'raw' as structure_type instead of 'uni3c'
+    // The backend expects 'raw' for uni3c processing
+    const effectiveStructureType = structureVideoConfig.structure_video_type === 'uni3c' 
+      ? 'raw' 
+      : structureVideoConfig.structure_video_type;
+    
     console.log('[Generation] Adding structure video to task (spreading snake_case params):', {
       structure_video_path: structureVideoConfig.structure_video_path,
       structure_video_treatment: structureVideoConfig.structure_video_treatment,
       structure_video_motion_strength: structureVideoConfig.structure_video_motion_strength,
       structure_video_type: structureVideoConfig.structure_video_type,
+      effectiveStructureType,
+      isUni3cMode
     });
     // Spread structure video API params directly (already snake_case)
     requestBody.structure_video_path = structureVideoConfig.structure_video_path;
     requestBody.structure_video_treatment = structureVideoConfig.structure_video_treatment;
     requestBody.structure_video_motion_strength = structureVideoConfig.structure_video_motion_strength;
-    requestBody.structure_video_type = structureVideoConfig.structure_video_type;
+    // Send the effective structure type ('raw' for uni3c, otherwise the original value)
+    requestBody.structure_video_type = effectiveStructureType;
+    
+    // For uni3c mode, also send uni3c_start_percent and uni3c_end_percent
+    if (isUni3cMode) {
+      requestBody.uni3c_start_percent = 0;
+      requestBody.uni3c_end_percent = params.uni3cEndPercent ?? 0.1;
+      console.log('[Generation] 🔵 Uni3C mode params:', {
+        uni3c_start_percent: requestBody.uni3c_start_percent,
+        uni3c_end_percent: requestBody.uni3c_end_percent
+      });
+    }
   }
   
   // Debug logging for enhance_prompt parameter and enhanced_prompts array
