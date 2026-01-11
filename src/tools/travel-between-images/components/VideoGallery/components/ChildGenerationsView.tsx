@@ -6,7 +6,7 @@ import { Separator } from '@/shared/components/ui/separator';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
-import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2, Upload, Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -39,6 +39,7 @@ import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
 import { useVariants } from '@/shared/hooks/useVariants';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 
 // TypeScript declaration for global mobile video preload map
 declare global {
@@ -83,6 +84,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const deleteGeneration = useDeleteGeneration();
     // State for segment input image uploads: { childId: 'start' | 'end' }
     const [uploadingSegmentImage, setUploadingSegmentImage] = useState<{ childId: string; position: 'start' | 'end' } | null>(null);
+    // State for preview together modal
+    const [isPreviewTogetherOpen, setIsPreviewTogetherOpen] = useState(false);
+    const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
+    const previewVideoRef = React.useRef<HTMLVideoElement>(null);
     const isMobile = useIsMobile();
     const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth, isGenerationsPaneLocked } = usePanes();
     
@@ -1327,6 +1332,21 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         });
     };
 
+    // Effect to handle video playback when preview index changes
+    React.useEffect(() => {
+        if (isPreviewTogetherOpen && previewVideoRef.current) {
+            previewVideoRef.current.load();
+            previewVideoRef.current.play().catch(() => {});
+        }
+    }, [currentPreviewIndex, isPreviewTogetherOpen]);
+
+    // Reset preview index when dialog closes
+    React.useEffect(() => {
+        if (!isPreviewTogetherOpen) {
+            setCurrentPreviewIndex(0);
+        }
+    }, [isPreviewTogetherOpen]);
+
     const handleConfirmJoin = async () => {
         if (!projectId || sortedSegments.length < 2) return;
 
@@ -1556,7 +1576,23 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
             <div className="max-w-7xl mx-auto px-4 pt-5 pb-6">
                 <div className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm">
-                    <h2 className="text-lg sm:text-xl font-light tracking-tight text-foreground mb-6">Segments</h2>
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-lg sm:text-xl font-light tracking-tight text-foreground">Segments</h2>
+                        {sortedSegments.length > 0 && sortedSegments.some(c => c.location) && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    setCurrentPreviewIndex(0);
+                                    setIsPreviewTogetherOpen(true);
+                                }}
+                                className="gap-2"
+                            >
+                                <Play className="w-4 h-4" />
+                                Preview together
+                            </Button>
+                        )}
+                    </div>
                     
                     {isLoading ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1895,6 +1931,107 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     />
                 );
             })()}
+
+            {/* Preview Together Dialog */}
+            <Dialog open={isPreviewTogetherOpen} onOpenChange={setIsPreviewTogetherOpen}>
+                <DialogContent className="max-w-4xl w-full p-0 gap-0">
+                    <DialogHeader className="px-6 pt-6 pb-4">
+                        <DialogTitle>Preview Segments Together</DialogTitle>
+                    </DialogHeader>
+                    <div className="px-6 pb-6">
+                        {(() => {
+                            // Get videos from sortedSegments that have locations
+                            const videosWithLocation = sortedSegments
+                                .filter(c => c.location)
+                                .map(c => ({
+                                    url: getDisplayUrl(c.location!),
+                                    index: (c as any).child_order ?? sortedSegments.indexOf(c),
+                                }))
+                                .sort((a, b) => a.index - b.index);
+
+                            if (videosWithLocation.length === 0) {
+                                return (
+                                    <div className="flex items-center justify-center py-12 text-muted-foreground">
+                                        No videos available to preview
+                                    </div>
+                                );
+                            }
+
+                            // Ensure index is within bounds
+                            const safeIndex = Math.min(currentPreviewIndex, videosWithLocation.length - 1);
+                            const currentVideo = videosWithLocation[safeIndex];
+                            // Calculate aspect ratio style
+                            const aspectRatioStyle = (() => {
+                                if (!effectiveAspectRatio) {
+                                    return { aspectRatio: '16/9' };
+                                }
+                                const [width, height] = effectiveAspectRatio.split(':').map(Number);
+                                if (width && height) {
+                                    return { aspectRatio: `${width}/${height}` };
+                                }
+                                return { aspectRatio: '16/9' };
+                            })();
+
+                            return (
+                                <div className="space-y-4">
+                                    <div className="relative bg-black rounded-lg overflow-hidden" style={aspectRatioStyle}>
+                                        <video
+                                            ref={previewVideoRef}
+                                            src={currentVideo?.url}
+                                            className="w-full h-full object-contain"
+                                            controls
+                                            autoPlay
+                                            playsInline
+                                            onEnded={() => {
+                                                // When current video ends, play next one
+                                                const nextIndex = safeIndex + 1;
+                                                if (nextIndex < videosWithLocation.length) {
+                                                    setCurrentPreviewIndex(nextIndex);
+                                                } else {
+                                                    // Last video ended, close dialog
+                                                    setIsPreviewTogetherOpen(false);
+                                                }
+                                            }}
+                                            key={currentVideo.url}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                        <span>
+                                            Segment {safeIndex + 1} of {videosWithLocation.length}
+                                        </span>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (safeIndex > 0) {
+                                                        setCurrentPreviewIndex(safeIndex - 1);
+                                                    }
+                                                }}
+                                                disabled={safeIndex === 0}
+                                            >
+                                                Previous
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (safeIndex < videosWithLocation.length - 1) {
+                                                        setCurrentPreviewIndex(safeIndex + 1);
+                                                    }
+                                                }}
+                                                disabled={safeIndex === videosWithLocation.length - 1}
+                                            >
+                                                Next
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
