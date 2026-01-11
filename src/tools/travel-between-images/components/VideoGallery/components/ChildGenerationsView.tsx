@@ -6,7 +6,7 @@ import { Separator } from '@/shared/components/ui/separator';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
-import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2, Upload, Play } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2, Upload, Play, Pause, Maximize2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -88,6 +88,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [isPreviewTogetherOpen, setIsPreviewTogetherOpen] = useState(false);
     const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
     const previewVideoRef = React.useRef<HTMLVideoElement>(null);
+    // Custom video control state
+    const [previewIsPlaying, setPreviewIsPlaying] = useState(true);
+    const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
+    const [previewDuration, setPreviewDuration] = useState(0);
     const isMobile = useIsMobile();
     const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth, isGenerationsPaneLocked } = usePanes();
     
@@ -1340,10 +1344,13 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         }
     }, [currentPreviewIndex, isPreviewTogetherOpen]);
 
-    // Reset preview index when dialog closes
+    // Reset preview state when dialog closes
     React.useEffect(() => {
         if (!isPreviewTogetherOpen) {
             setCurrentPreviewIndex(0);
+            setPreviewCurrentTime(0);
+            setPreviewDuration(0);
+            setPreviewIsPlaying(true);
         }
     }, [isPreviewTogetherOpen]);
 
@@ -1935,10 +1942,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             {/* Preview Together Dialog */}
             <Dialog open={isPreviewTogetherOpen} onOpenChange={setIsPreviewTogetherOpen}>
                 <DialogContent className="max-w-4xl w-full p-0 gap-0">
-                    <DialogHeader className="px-6 pt-6 pb-4">
-                        <DialogTitle>Preview Segments Together</DialogTitle>
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>Preview Segments</DialogTitle>
                     </DialogHeader>
-                    <div className="px-6 pb-6">
+                    <div className="p-4">
                         {(() => {
                             // Get videos from sortedSegments that have locations
                             const videosWithLocation = sortedSegments
@@ -1978,53 +1985,137 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                         <video
                                             ref={previewVideoRef}
                                             src={currentVideo?.url}
-                                            className="w-full h-full object-contain"
-                                            controls
+                                            className="w-full h-full object-contain cursor-pointer"
                                             autoPlay
                                             playsInline
-                                            onEnded={() => {
-                                                // When current video ends, play next one
-                                                const nextIndex = safeIndex + 1;
-                                                if (nextIndex < videosWithLocation.length) {
-                                                    setCurrentPreviewIndex(nextIndex);
-                                                } else {
-                                                    // Last video ended, close dialog
-                                                    setIsPreviewTogetherOpen(false);
+                                            onClick={() => {
+                                                const video = previewVideoRef.current;
+                                                if (video) {
+                                                    if (video.paused) {
+                                                        video.play();
+                                                    } else {
+                                                        video.pause();
+                                                    }
                                                 }
+                                            }}
+                                            onPlay={() => setPreviewIsPlaying(true)}
+                                            onPause={() => setPreviewIsPlaying(false)}
+                                            onTimeUpdate={() => {
+                                                const video = previewVideoRef.current;
+                                                if (video) {
+                                                    setPreviewCurrentTime(video.currentTime);
+                                                }
+                                            }}
+                                            onLoadedMetadata={() => {
+                                                const video = previewVideoRef.current;
+                                                if (video) {
+                                                    setPreviewDuration(video.duration);
+                                                    setPreviewCurrentTime(0);
+                                                }
+                                            }}
+                                            onEnded={() => {
+                                                // When current video ends, play next one (loop back to start after last)
+                                                const nextIndex = (safeIndex + 1) % videosWithLocation.length;
+                                                setCurrentPreviewIndex(nextIndex);
                                             }}
                                             key={currentVideo.url}
                                         />
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                                        <span>
-                                            Segment {safeIndex + 1} of {videosWithLocation.length}
-                                        </span>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    if (safeIndex > 0) {
-                                                        setCurrentPreviewIndex(safeIndex - 1);
-                                                    }
-                                                }}
-                                                disabled={safeIndex === 0}
-                                            >
-                                                Previous
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    if (safeIndex < videosWithLocation.length - 1) {
-                                                        setCurrentPreviewIndex(safeIndex + 1);
-                                                    }
-                                                }}
-                                                disabled={safeIndex === videosWithLocation.length - 1}
-                                            >
-                                                Next
-                                            </Button>
+                                        
+                                        {/* Open in lightbox button - top left */}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                // Close preview dialog and open lightbox for this segment
+                                                setIsPreviewTogetherOpen(false);
+                                                // Use the child_order from the current video to find the slot index
+                                                setLightboxIndex(currentVideo.index);
+                                            }}
+                                            className="absolute top-3 left-3 px-3 py-2 rounded-lg bg-black/50 backdrop-blur-sm text-white text-sm font-medium flex items-center gap-2 hover:bg-black/70 transition-colors"
+                                        >
+                                            <Maximize2 className="w-4 h-4" />
+                                            Open Segment
+                                        </button>
+                                        
+                                        {/* Controls overlay on video */}
+                                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-8">
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const video = previewVideoRef.current;
+                                                        if (video) {
+                                                            if (video.paused) {
+                                                                video.play();
+                                                            } else {
+                                                                video.pause();
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition-colors"
+                                                >
+                                                    {previewIsPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+                                                </button>
+                                                
+                                                <div className="flex-1 relative h-4 flex items-center">
+                                                    {/* Track background */}
+                                                    <div className="absolute inset-x-0 h-1.5 bg-white/30 rounded-full" />
+                                                    {/* Track fill */}
+                                                    <div 
+                                                        className="absolute left-0 h-1.5 bg-white rounded-full"
+                                                        style={{ width: `${(previewCurrentTime / (previewDuration || 1)) * 100}%` }}
+                                                    />
+                                                    {/* Thumb */}
+                                                    <div 
+                                                        className="absolute w-3 h-3 bg-white rounded-full shadow-md cursor-pointer"
+                                                        style={{ 
+                                                            left: `calc(${(previewCurrentTime / (previewDuration || 1)) * 100}% - 6px)`,
+                                                        }}
+                                                    />
+                                                    {/* Invisible range input for interaction */}
+                                                    <input
+                                                        type="range"
+                                                        min={0}
+                                                        max={previewDuration || 100}
+                                                        step={0.1}
+                                                        value={previewCurrentTime}
+                                                        onChange={(e) => {
+                                                            e.stopPropagation();
+                                                            const video = previewVideoRef.current;
+                                                            if (video) {
+                                                                const newTime = parseFloat(e.target.value);
+                                                                video.currentTime = newTime;
+                                                                setPreviewCurrentTime(newTime);
+                                                            }
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
+                                    </div>
+                                    
+                                    {/* Segment number indicators */}
+                                    <div className="flex items-center justify-center gap-2">
+                                        {videosWithLocation.map((_, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                className={`transition-all duration-200 rounded-full flex items-center justify-center ${
+                                                    idx === safeIndex
+                                                        ? 'w-10 h-10 bg-primary text-primary-foreground font-medium text-sm'
+                                                        : 'w-8 h-8 bg-muted-foreground/30 hover:bg-muted-foreground/50 text-muted-foreground font-medium text-xs'
+                                                }`}
+                                                onClick={() => {
+                                                    setCurrentPreviewIndex(idx);
+                                                }}
+                                                aria-label={`Go to segment ${idx + 1}`}
+                                            >
+                                                {idx + 1}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             );
