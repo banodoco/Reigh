@@ -1457,40 +1457,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 </Button>
               )}
               
-              {/* Variant Count + NEW badge + Info Button Row (for non-video content) */}
+              {/* Info Button + Variant Count + NEW badge Row (for non-video content) */}
               <div className="flex flex-row items-center gap-1.5">
-                {/* "X new" badge + Variant Count - positioned to the left of Info button */}
-                {!isVideoContent && image.derivedCount && image.derivedCount > 1 && (
-                  <div className="flex items-center gap-1">
-                    {image.hasUnviewedVariants && image.unviewedVariantCount && image.unviewedVariantCount > 0 && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="bg-yellow-500 text-black text-[8px] font-bold px-1 py-0.5 rounded cursor-help">
-                              {image.unviewedVariantCount} new
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="left">
-                            <p>{image.unviewedVariantCount} unviewed variant{image.unviewedVariantCount !== 1 ? 's' : ''}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="bg-black/50 text-white text-[10px] font-medium px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help">
-                            {image.derivedCount}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="left">
-                          <p>{image.derivedCount} variant{image.derivedCount !== 1 ? 's' : ''}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                )}
-
                 {/* Info tooltip (shown on hover) */}
               {image.metadata && (
                 isMobile ? (
@@ -1579,6 +1547,38 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   </Tooltip>
                 )
               )}
+
+                {/* "X new" badge + Variant Count - positioned to the right of Info button */}
+                {!isVideoContent && image.derivedCount && image.derivedCount > 1 && (
+                  <div className="flex items-center gap-1">
+                    {image.hasUnviewedVariants && image.unviewedVariantCount && image.unviewedVariantCount > 0 && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="bg-yellow-500 text-black text-[8px] font-bold px-1 py-0.5 rounded cursor-help">
+                              {image.unviewedVariantCount} new
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">
+                            <p>{image.unviewedVariantCount} unviewed variant{image.unviewedVariantCount !== 1 ? 's' : ''}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="bg-black/50 text-white text-[10px] font-medium px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help">
+                            {image.derivedCount}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <p>{image.derivedCount} variant{image.derivedCount !== 1 ? 's' : ''}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
               </div>
 
               {/* Share Button - Below Info */}

@@ -278,31 +278,79 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
   console.log('[EDIT_DEBUG] 🎨 enablePromptExpansion:', enablePromptExpansion);
   console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
 
-  // Track if we've synced numGenerations from persistence
-  const hasInitializedNumGenerationsRef = useRef(false);
+  // Track if we've synced from persistence
+  const hasInitializedFromPersistenceRef = useRef(false);
+  // Track the last known good prompt to prevent race conditions
+  const lastUserPromptRef = useRef<string>('');
+  // Debounce timer for prompt sync
+  const promptSyncTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync numGenerations: persistence → useInpainting (on initial load)
+  // Sync persistence → useInpainting (on initial load)
   useEffect(() => {
-    if (!editSettingsPersistence.isReady || hasInitializedNumGenerationsRef.current) return;
+    if (!editSettingsPersistence.isReady || hasInitializedFromPersistenceRef.current) return;
     
-    // Only sync on first load if values differ
+    console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: Initializing from persistence');
+    console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: hasPersistedSettings:', editSettingsPersistence.hasPersistedSettings);
+    console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: persistedPrompt:', persistedPrompt ? `"${persistedPrompt.substring(0, 30)}..."` : '(empty)');
+    console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: numGenerations:', numGenerations);
+    
+    // Sync numGenerations
     if (numGenerations !== inpaintNumGenerations) {
-      console.log('[EDIT_DEBUG] 🔄 SYNC: numGenerations persistence → inpainting:', numGenerations);
+      console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: Setting numGenerations from', inpaintNumGenerations, 'to', numGenerations);
       setInpaintNumGenerations(numGenerations);
     }
-    hasInitializedNumGenerationsRef.current = true;
-  }, [editSettingsPersistence.isReady, numGenerations, inpaintNumGenerations, setInpaintNumGenerations]);
+    
+    // Sync prompt (only if has persisted settings - otherwise leave empty to avoid resetting user input)
+    if (editSettingsPersistence.hasPersistedSettings && persistedPrompt && persistedPrompt !== inpaintPrompt) {
+      console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: Setting prompt from persistence');
+      setInpaintPrompt(persistedPrompt);
+      lastUserPromptRef.current = persistedPrompt;
+    }
+    
+    hasInitializedFromPersistenceRef.current = true;
+  }, [editSettingsPersistence.isReady, editSettingsPersistence.hasPersistedSettings, numGenerations, inpaintNumGenerations, setInpaintNumGenerations, persistedPrompt, inpaintPrompt, setInpaintPrompt]);
 
   // Sync numGenerations: useInpainting → persistence (on change)
   useEffect(() => {
-    if (!hasInitializedNumGenerationsRef.current || !editSettingsPersistence.isReady) return;
+    if (!hasInitializedFromPersistenceRef.current || !editSettingsPersistence.isReady) return;
     
-    // Sync UI changes back to persistence
     if (inpaintNumGenerations !== numGenerations) {
-      console.log('[EDIT_DEBUG] 🔄 SYNC: numGenerations inpainting → persistence:', inpaintNumGenerations);
+      console.log('[EDIT_DEBUG] 🔄 SYNC FROM UI: numGenerations changed to:', inpaintNumGenerations);
       setNumGenerations(inpaintNumGenerations);
     }
   }, [inpaintNumGenerations, numGenerations, setNumGenerations, editSettingsPersistence.isReady]);
+
+  // Sync prompt: useInpainting → persistence (on change, with debounce to prevent race conditions)
+  useEffect(() => {
+    if (!hasInitializedFromPersistenceRef.current || !editSettingsPersistence.isReady) return;
+    
+    // If inpaintPrompt is reset to empty but we had a user prompt, it's likely a race condition - ignore
+    if (inpaintPrompt === '' && lastUserPromptRef.current !== '' && persistedPrompt !== '') {
+      console.log('[EDIT_DEBUG] 🔄 SYNC FROM UI: Ignoring empty prompt reset (race condition protection)');
+      // Restore the prompt from persistence after a short delay
+      if (promptSyncTimerRef.current) clearTimeout(promptSyncTimerRef.current);
+      promptSyncTimerRef.current = setTimeout(() => {
+        if (persistedPrompt) {
+          console.log('[EDIT_DEBUG] 🔄 SYNC: Restoring prompt from persistence after race condition');
+          setInpaintPrompt(persistedPrompt);
+        }
+      }, 100);
+      return;
+    }
+    
+    if (inpaintPrompt !== persistedPrompt) {
+      console.log('[EDIT_DEBUG] 🔄 SYNC FROM UI: prompt changed to:', inpaintPrompt ? `"${inpaintPrompt.substring(0, 30)}..."` : '(empty)');
+      setPersistedPrompt(inpaintPrompt);
+      lastUserPromptRef.current = inpaintPrompt;
+    }
+  }, [inpaintPrompt, persistedPrompt, setPersistedPrompt, setInpaintPrompt, editSettingsPersistence.isReady]);
+  
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (promptSyncTimerRef.current) clearTimeout(promptSyncTimerRef.current);
+    };
+  }, []);
 
   const { sourceGenerationData } = useSourceGeneration({
     media,
