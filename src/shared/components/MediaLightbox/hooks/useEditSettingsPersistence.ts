@@ -165,12 +165,15 @@ export function useEditSettingsPersistence({
     }
     
     // No persisted settings - use lastUsed values (with empty prompt)
+    // BUT: preserve any prompt that user has typed (it's in generationSettings.settings.prompt)
+    // even if hasPersistedSettings is false (debounced save hasn't completed yet)
     return {
       editMode: lastUsedSettings.lastUsed.editMode,
       loraMode: lastUsedSettings.lastUsed.loraMode,
       customLoraUrl: lastUsedSettings.lastUsed.customLoraUrl,
       numGenerations: lastUsedSettings.lastUsed.numGenerations,
-      prompt: '', // Never inherit prompt
+      // Use current typed prompt if any, otherwise empty (never inherit from lastUsed)
+      prompt: generationSettings.settings.prompt || '',
       // Img2Img settings from lastUsed
       img2imgStrength: lastUsedSettings.lastUsed.img2imgStrength,
       img2imgEnablePromptExpansion: lastUsedSettings.lastUsed.img2imgEnablePromptExpansion,
