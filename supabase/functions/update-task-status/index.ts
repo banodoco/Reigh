@@ -31,6 +31,157 @@ declare const Deno: any;
  */
 
 /**
+ * Trigger cost calculation for an orchestrator task.
+ * Used when an orchestrator is cancelled to bill for completed work.
+ */
+async function triggerOrchestratorBilling(
+  supabaseUrl: string,
+  serviceKey: string,
+  orchestratorTaskId: string,
+  logger: SystemLogger
+): Promise<void> {
+  try {
+    logger.info("Triggering billing for cancelled orchestrator", { 
+      orchestrator_task_id: orchestratorTaskId 
+    });
+    
+    const costResp = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${serviceKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ task_id: orchestratorTaskId })
+    });
+
+    if (costResp.ok) {
+      const costData = await costResp.json();
+      if (costData.skipped) {
+        logger.debug("Cost calculation skipped", { reason: costData.reason });
+      } else if (typeof costData.cost === 'number') {
+        logger.info("Cost calculated for cancelled orchestrator", { 
+          cost: costData.cost,
+          duration_seconds: costData.duration_seconds
+        });
+      }
+    } else {
+      const errTxt = await costResp.text();
+      logger.error("Cost calculation failed", { error: errTxt });
+    }
+  } catch (err: any) {
+    logger.error("Error triggering billing", { error: err?.message });
+  }
+}
+
+/**
+ * Handles billing for cancelled orchestrator tasks.
+ * When an orchestrator is cancelled, we should still bill for any completed segments.
+ */
+async function handleOrchestratorCancellationBilling(
+  supabaseAdmin: any,
+  supabaseUrl: string,
+  serviceKey: string,
+  logger: SystemLogger,
+  cancelledTaskId: string,
+  cancelledTaskData: any
+): Promise<void> {
+  try {
+    // Check if this is an orchestrator task (has orchestrator_details but no orchestrator reference to another task)
+    if (!cancelledTaskData.params) {
+      return;
+    }
+    
+    const params = typeof cancelledTaskData.params === 'string' 
+      ? JSON.parse(cancelledTaskData.params) 
+      : cancelledTaskData.params;
+    
+    // Check if this task references another orchestrator (meaning it's a child, not an orchestrator)
+    const orchestratorRef = params.orchestrator_task_id_ref || 
+                            params.orchestrator_details?.orchestrator_task_id ||
+                            params.originalParams?.orchestrator_details?.orchestrator_task_id ||
+                            params.orchestrator_task_id;
+    
+    // Validate if orchestratorRef is a UUID (child tasks have UUID refs, orchestrators have human-readable IDs)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isChildTask = orchestratorRef && uuidRegex.test(orchestratorRef) && orchestratorRef !== cancelledTaskId;
+    
+    if (isChildTask) {
+      // This is a child task - billing will be handled by the orchestrator
+      logger.debug("Cancelled task is a child, skipping billing", { 
+        task_id: cancelledTaskId,
+        orchestrator_ref: orchestratorRef 
+      });
+      return;
+    }
+    
+    // Check if this task has orchestrator_details (indicating it IS an orchestrator)
+    if (!params.orchestrator_details) {
+      logger.debug("Cancelled task is not an orchestrator, skipping billing", { 
+        task_id: cancelledTaskId 
+      });
+      return;
+    }
+    
+    logger.info("Cancelled task is an orchestrator, checking for completed work", { 
+      task_id: cancelledTaskId 
+    });
+    
+    // Check if there are any completed child segments
+    // Query for segments that reference this orchestrator
+    const { data: completedSegments, error: segmentsError } = await supabaseAdmin
+      .from('tasks')
+      .select('id, generation_started_at, generation_processed_at')
+      .or(`params->>orchestrator_task_id_ref.eq.${cancelledTaskId},params->orchestrator_details->>orchestrator_task_id.eq.${cancelledTaskId},params->originalParams->orchestrator_details->>orchestrator_task_id.eq.${cancelledTaskId},params->>orchestrator_task_id.eq.${cancelledTaskId}`)
+      .eq('status', 'Complete');
+    
+    if (segmentsError) {
+      logger.error("Error checking for completed segments", { error: segmentsError.message });
+      return;
+    }
+    
+    if (!completedSegments || completedSegments.length === 0) {
+      logger.info("No completed segments found, no billing needed", { 
+        task_id: cancelledTaskId 
+      });
+      return;
+    }
+    
+    logger.info("Found completed segments for cancelled orchestrator", { 
+      task_id: cancelledTaskId,
+      completed_segment_count: completedSegments.length
+    });
+    
+    // Set timestamps on the orchestrator so cost calculation can work
+    // Use the earliest start time from segments and current time as processed time
+    let earliestStartTime: string | null = null;
+    for (const segment of completedSegments) {
+      if (segment.generation_started_at) {
+        if (!earliestStartTime || segment.generation_started_at < earliestStartTime) {
+          earliestStartTime = segment.generation_started_at;
+        }
+      }
+    }
+    
+    if (earliestStartTime) {
+      // Update orchestrator with timestamps so cost calculation can proceed
+      await supabaseAdmin
+        .from('tasks')
+        .update({
+          generation_started_at: earliestStartTime,
+          generation_processed_at: new Date().toISOString()
+        })
+        .eq('id', cancelledTaskId);
+    }
+    
+    // Trigger cost calculation for the orchestrator
+    await triggerOrchestratorBilling(supabaseUrl, serviceKey, cancelledTaskId, logger);
+    
+  } catch (error: any) {
+    logger.error("Error in orchestrator cancellation billing", { error: error?.message });
+  }
+}
+
+/**
  * Handles cascading task failures/cancellations for orchestrated tasks.
  * When a task fails or is cancelled, this function:
  * 1. Finds the orchestrator task (if the failed task references one)
@@ -436,6 +587,18 @@ serve(async (req) => {
     // Handle cascading failures/cancellations for orchestrated tasks
     if (status === "Failed" || status === "Cancelled") {
       await handleCascadingTaskFailure(supabaseAdmin, logger, task_id, status, updateResult.data);
+      
+      // Bill for completed work when orchestrator is cancelled
+      if (status === "Cancelled") {
+        await handleOrchestratorCancellationBilling(
+          supabaseAdmin, 
+          supabaseUrl, 
+          serviceKey, 
+          logger, 
+          task_id, 
+          updateResult.data
+        );
+      }
     }
     
     await logger.flush();
