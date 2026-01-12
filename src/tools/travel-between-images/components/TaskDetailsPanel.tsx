@@ -169,8 +169,18 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
               // Legacy fallback for tasks before content_type was added
               // Uses centralized isVideoTaskType utility
               const isLegacyVideoTask = isVideoTaskType(task.taskType) || inputImages.length > 0;
+              
+              // Image edit tasks should also use SharedTaskDetails
+              const isImageEditTask = [
+                'z_image_turbo_i2i',
+                'image_inpaint',
+                'qwen_image_edit',
+                'magic_edit',
+                'kontext_image_edit',
+                'flux_image_edit',
+              ].includes(task.taskType);
 
-              const shouldShowVideoDetails = isVideoTask || isLegacyVideoTask;
+              const shouldShowVideoDetails = isVideoTask || isLegacyVideoTask || isImageEditTask;
               
               if (shouldShowVideoDetails) {
                 return (

@@ -274,21 +274,6 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   const isFirstSegment = (parsedParams as any)?.is_first_segment;
   const isLastSegment = (parsedParams as any)?.is_last_segment;
 
-  // Image edit task detection (for showing key params like Img2Img strength)
-  const isImageEditTask = useMemo(() => {
-    const t = task?.taskType;
-    if (!t) return false;
-    return [
-      'z_image_turbo_i2i',
-      'z_image_turbo',
-      'image_inpaint',
-      'qwen_image_edit',
-      'magic_edit',
-      'kontext_image_edit',
-      'flux_image_edit',
-    ].includes(t);
-  }, [task?.taskType]);
-
   return (
     <div className={`p-3 bg-muted/30 rounded-lg border ${showPhaseContentInRightColumn ? 'w-full' : variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'} ${showPhaseContentInRightColumn ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3'}`}>
       {/* Main Content Column */}
@@ -1079,37 +1064,13 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         
         {/* Technical Settings */}
         <div className="space-y-3">
-          {/* Image Edit Task Details (key parameters) */}
-          {isImageEditTask && (
-            <div className="space-y-2 pb-2 border-b border-muted-foreground/20">
-              <p className={`${config.textSize} font-medium text-muted-foreground`}>Edit Settings</p>
-              {/* Img2Img: denoising strength */}
-              {task?.taskType === 'z_image_turbo_i2i' && typeof (parsedParams as any)?.strength === 'number' && (
-                <div className="space-y-1">
-                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Denoising Strength</p>
-                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-                    {(parsedParams as any).strength.toFixed(2)}
-                  </p>
-                </div>
-              )}
-              {/* Img2Img: prompt expansion */}
-              {task?.taskType === 'z_image_turbo_i2i' && (parsedParams as any)?.enable_prompt_expansion !== undefined && (
-                <div className="space-y-1">
-                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt Expansion</p>
-                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-                    {(parsedParams as any).enable_prompt_expansion ? 'On' : 'Off'}
-                  </p>
-                </div>
-              )}
-              {/* Inpaint: mask */}
-              {task?.taskType === 'image_inpaint' && (
-                <div className="space-y-1">
-                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Mask</p>
-                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-                    {typeof (parsedParams as any)?.mask_url === 'string' && (parsedParams as any).mask_url ? 'Provided' : 'N/A'}
-                  </p>
-                </div>
-              )}
+          {/* Img2Img: denoising strength - key parameter */}
+          {task?.taskType === 'z_image_turbo_i2i' && typeof (parsedParams as any)?.strength === 'number' && (
+            <div className="space-y-1">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Strength</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                {(parsedParams as any).strength.toFixed(2)}
+              </p>
             </div>
           )}
 
