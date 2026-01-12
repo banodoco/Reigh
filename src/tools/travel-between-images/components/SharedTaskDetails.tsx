@@ -262,8 +262,18 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
     setVideoLoadedStates(prev => ({ ...prev, [index]: loaded }));
   };
 
+  // Check if this is an image edit task (shows simplified UI)
+  const isImageEditTask = [
+    'z_image_turbo_i2i',
+    'image_inpaint',
+    'qwen_image_edit',
+    'magic_edit',
+    'kontext_image_edit',
+    'flux_image_edit',
+  ].includes(task?.taskType || '');
+
   // Check if this is a video travel task (not character animate or join clips)
-  const isVideoTravelTask = !isCharacterAnimateTask && !isJoinClipsTask;
+  const isVideoTravelTask = !isCharacterAnimateTask && !isJoinClipsTask && !isImageEditTask;
 
   // Check if we should show Advanced Phase Settings and LoRAs in right column
   const showPhaseContentInRightColumn = isVideoTravelTask && phaseConfig?.phases;
@@ -674,8 +684,49 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         </>
       )}
 
-      {/* Guidance Images Section (for non-character-animate and non-join-clips tasks) */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && effectiveInputImages.length > 0 && (
+      {/* Image Edit Task Details - simplified view */}
+      {isImageEditTask && (
+        <div className="space-y-3">
+          {/* Input Image */}
+          {effectiveInputImages.length > 0 && (
+            <div className="space-y-2">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>
+                Input Image
+              </p>
+              <div className="relative group" style={{ width: '120px' }}>
+                <img 
+                  src={effectiveInputImages[0]} 
+                  alt="Input image" 
+                  className="w-full object-cover rounded border shadow-sm"
+                />
+              </div>
+            </div>
+          )}
+          
+          {/* Prompt (if provided) */}
+          {(parsedParams as any)?.prompt && (
+            <div className="space-y-1">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+                {(parsedParams as any).prompt}
+              </p>
+            </div>
+          )}
+          
+          {/* Img2Img Strength */}
+          {task?.taskType === 'z_image_turbo_i2i' && typeof (parsedParams as any)?.strength === 'number' && (
+            <div className="space-y-1">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Strength</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                {(parsedParams as any).strength.toFixed(2)}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Guidance Images Section (for non-character-animate and non-join-clips and non-image-edit tasks) */}
+      {!isCharacterAnimateTask && !isJoinClipsTask && !isImageEditTask && effectiveInputImages.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center">
             <div className="flex items-center space-x-2">
@@ -714,7 +765,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       )}
 
       {/* Advanced Phase Settings - Only show here when NOT in right column layout */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && phaseConfig?.phases && !showPhaseContentInRightColumn && (
+      {!isCharacterAnimateTask && !isJoinClipsTask && !isImageEditTask && phaseConfig?.phases && !showPhaseContentInRightColumn && (
         <div className="pt-3 border-t border-muted-foreground/20">
           <div className="space-y-2">
             <p className={`${config.textSize} font-medium text-muted-foreground mb-2`}>Advanced Phase Settings</p>
@@ -763,7 +814,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       )}
 
       {/* Video Guidance Section (for non-character-animate and non-join-clips tasks) */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && (() => {
+      {!isCharacterAnimateTask && !isJoinClipsTask && !isImageEditTask && (() => {
         // Check for video guidance data in multiple locations
         // Priority: orchestratorDetails > orchestratorPayload > task.params
         const videoPath = orchestratorDetails?.structure_video_path || 
@@ -869,7 +920,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       })()}
 
       {/* Style Reference Image Section (for non-character-animate and non-join-clips tasks) */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && (() => {
+      {!isCharacterAnimateTask && !isJoinClipsTask && !isImageEditTask && (() => {
         // Check multiple possible locations for style reference data
         const styleImage = task?.params?.style_reference_image || 
                           orchestratorDetails?.style_reference_image;
@@ -932,7 +983,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       })()}
       
       {/* Prompts and Technical Settings (for non-character-animate and non-join-clips tasks) */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && (
+      {!isCharacterAnimateTask && !isJoinClipsTask && !isImageEditTask && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Prompts Section */}
         <div className="space-y-3">
@@ -1136,7 +1187,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       )}
 
       {/* LoRAs Section (for non-character-animate and non-join-clips tasks) - Only show here when NOT in right column */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && !showPhaseContentInRightColumn && (() => {
+      {!isCharacterAnimateTask && !isJoinClipsTask && !isImageEditTask && !showPhaseContentInRightColumn && (() => {
         // Check if we have phase_config with phases
         const hasPhaseConfig = phasesWithLoras.length > 0;
         
