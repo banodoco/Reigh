@@ -176,7 +176,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   setImg2imgPrompt,
   img2imgStrength = 0.6,
   setImg2imgStrength,
-  enablePromptExpansion = false,
+  enablePromptExpansion = false, // Hidden UI, always false
   setEnablePromptExpansion,
   isGeneratingImg2Img = false,
   img2imgGenerateSuccess = false,
@@ -209,34 +209,46 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   };
   
   // Responsive styles
-  const padding = isMobile ? 'p-4' : 'p-6';
-  const spacing = isMobile ? 'space-y-3' : 'space-y-4';
+  const padding = isMobile ? 'p-3' : 'p-6';
+  const spacing = isMobile ? 'space-y-2' : 'space-y-4';
   const headerSize = isMobile ? 'text-lg' : 'text-2xl';
-  const labelSize = isMobile ? 'text-xs' : 'text-sm';
-  const textareaMinHeight = isMobile ? 'min-h-[60px]' : 'min-h-[100px]';
-  const textareaRows = isMobile ? 3 : 4;
+  const labelSize = isMobile ? 'text-[10px] uppercase tracking-wide text-muted-foreground' : 'text-sm';
+  const textareaMinHeight = isMobile ? 'min-h-[50px]' : 'min-h-[100px]';
+  const textareaRows = isMobile ? 2 : 4;
   const textareaPadding = isMobile ? 'px-2 py-1.5' : 'px-3 py-2';
-  const textareaTextSize = isMobile ? 'text-base' : 'text-sm';
+  const textareaTextSize = isMobile ? 'text-sm' : 'text-sm';
   const buttonSize = isMobile ? 'sm' : 'default';
   const iconSize = isMobile ? 'h-3 w-3' : 'h-4 w-4';
-  const togglePadding = isMobile ? 'px-2 py-1.5' : 'px-3 py-1.5';
-  const toggleTextSize = isMobile ? 'text-xs' : 'text-sm';
+  const togglePadding = isMobile ? 'px-1.5 py-1' : 'px-3 py-1.5';
+  const toggleTextSize = isMobile ? 'text-[10px]' : 'text-sm';
   const toggleIconSize = isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5';
   const closeButtonSize = isMobile ? 'text-xs px-2 py-1' : 'text-sm px-3 py-1';
-  const generationsSpacing = isMobile ? 'space-y-1' : 'space-y-2';
+  const generationsSpacing = isMobile ? 'space-y-0.5' : 'space-y-2';
   const sliderTextSize = isMobile ? 'text-xs' : 'text-sm';
+  
+  // Section label component for mobile
+  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+    isMobile ? (
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-1">
+        {children}
+      </div>
+    ) : null
+  );
 
   return (
     <div className="w-full">
       {/* Top bar with Edit Image title (left) and Info/Edit Toggle + Close (right) - Sticky */}
-      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
+      <div className={cn(
+        "flex items-center justify-between border-b border-border sticky top-0 z-[80] bg-background",
+        isMobile ? "px-3 py-2" : "p-4"
+      )}>
         {/* Left side - Edit Image title */}
         <div className="flex items-center gap-2">
-          <h2 className={cn("font-light", isMobile ? "text-base" : "text-lg")}>Edit Image</h2>
+          <h2 className={cn("font-light", isMobile ? "text-sm" : "text-lg")}>Edit</h2>
         </div>
         
         {/* Info | Edit Toggle and Close Button */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {!hideInfoEditToggle && (
           <SegmentedControl
             value="edit"
@@ -258,31 +270,38 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               e.stopPropagation();
               onClose();
             }}
-            className="h-8 w-8 p-0 hover:bg-muted"
+            className={cn("p-0 hover:bg-muted", isMobile ? "h-7 w-7" : "h-8 w-8")}
           >
-            <X className="h-4 w-4" />
+            <X className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
           </Button>
         </div>
       </div>
       
       <div className={`${padding} ${spacing}`}>
-      <div className={isMobile ? 'mb-2' : 'mb-4'}>
+      {/* Edit Mode Section */}
+      <div className={isMobile ? 'mb-1' : 'mb-4'}>
+        <SectionLabel>Edit Mode</SectionLabel>
         {/* Five-way toggle: Text | Inpaint | Annotate | Reposition | Img2Img - single row */}
-        <div className="flex gap-1 border border-border rounded-lg overflow-hidden bg-muted/30 p-1">
+        <div className={cn(
+          "flex gap-0.5 border border-border rounded-lg overflow-hidden bg-muted/30",
+          isMobile ? "p-0.5" : "p-1 gap-1"
+        )}>
           <button
             onClick={() => {
               setIsInpaintMode(true);
               setEditMode('text');
             }}
             className={cn(
-              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              isMobile && "gap-0.5",
+              !isMobile && "flex-row gap-1",
               editMode === 'text'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
             <Type className={`${toggleIconSize} flex-shrink-0`} />
-            {!isMobile && <span className="truncate">Text</span>}
+            <span className={cn("truncate", isMobile && "leading-tight")}>Text</span>
           </button>
           <button
             onClick={() => {
@@ -290,14 +309,16 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               setEditMode('inpaint');
             }}
             className={cn(
-              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              isMobile && "gap-0.5",
+              !isMobile && "flex-row gap-1",
               editMode === 'inpaint'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
             <Paintbrush className={`${toggleIconSize} flex-shrink-0`} />
-            {!isMobile && <span className="truncate">Inpaint</span>}
+            <span className={cn("truncate", isMobile && "leading-tight")}>Paint</span>
           </button>
           <button
             onClick={() => {
@@ -305,14 +326,16 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               setEditMode('annotate');
             }}
             className={cn(
-              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              isMobile && "gap-0.5",
+              !isMobile && "flex-row gap-1",
               editMode === 'annotate'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
             <Pencil className={`${toggleIconSize} flex-shrink-0`} />
-            {!isMobile && <span className="truncate">Annotate</span>}
+            <span className={cn("truncate", isMobile && "leading-tight")}>{isMobile ? 'Draw' : 'Annotate'}</span>
           </button>
           <button
             onClick={() => {
@@ -320,7 +343,9 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               setEditMode('reposition');
             }}
             className={cn(
-              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              isMobile && "gap-0.5",
+              !isMobile && "flex-row gap-1",
               editMode === 'reposition'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -328,7 +353,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             title="Move, scale, or rotate the image to fill edges with AI"
           >
             <Move className={`${toggleIconSize} flex-shrink-0`} />
-            {!isMobile && <span className="truncate">Reposition</span>}
+            <span className={cn("truncate", isMobile && "leading-tight")}>Move</span>
           </button>
           <button
             onClick={() => {
@@ -336,7 +361,9 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               setEditMode('img2img');
             }}
             className={cn(
-              `flex-1 min-w-0 flex items-center justify-center gap-1 ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+              isMobile && "gap-0.5",
+              !isMobile && "flex-row gap-1",
               editMode === 'img2img'
                 ? "bg-background text-foreground font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -344,26 +371,27 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             title="Transform the entire image with a prompt and strength control"
           >
             <Wand2 className={`${toggleIconSize} flex-shrink-0`} />
-            {!isMobile && <span className="truncate">Img2Img</span>}
+            <span className={cn("truncate", isMobile && "leading-tight")}>Img2Img</span>
           </button>
         </div>
-        </div>
+      </div>
         
         {/* Prompt Field - Hidden for img2img mode (has its own prompt field) */}
         {editMode !== 'img2img' && (
         <div className={generationsSpacing}>
-          <label className={`${labelSize} font-medium`}>Prompt:</label>
+          <SectionLabel>Prompt</SectionLabel>
+          {!isMobile && <label className={`${labelSize} font-medium`}>Prompt:</label>}
           <Textarea
             value={inpaintPrompt}
             onChange={(e) => setInpaintPrompt(e.target.value)}
             placeholder={
               editMode === 'text' 
-                ? (isMobile ? "Describe the text edit..." : "Describe the text-based edit to make...")
+                ? (isMobile ? "Describe changes..." : "Describe the text-based edit to make...")
                 : editMode === 'annotate'
-                  ? (isMobile ? "Describe what to generate..." : "Describe what to generate in the annotated regions...")
+                  ? (isMobile ? "What to generate..." : "Describe what to generate in the annotated regions...")
                   : editMode === 'reposition'
-                    ? (isMobile ? "Optional: describe how to fill edges..." : "Optional: describe how to fill the exposed edges (default: match existing content)")
-                    : (isMobile ? "Describe what to generate..." : "Describe what to generate in the masked area...")
+                    ? (isMobile ? "How to fill edges (optional)..." : "Optional: describe how to fill the exposed edges (default: match existing content)")
+                    : (isMobile ? "What to generate..." : "Describe what to generate in the masked area...")
             }
             className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
             rows={textareaRows}
@@ -381,35 +409,14 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         {/* Img2Img Mode Controls */}
         {editMode === 'img2img' && setImg2imgPrompt && setImg2imgStrength && setEnablePromptExpansion && (
           <div className={spacing}>
-            {/* Prompt (optional for img2img) with Enable Prompt Expansion on the right */}
+            {/* Prompt (optional for img2img) */}
             <div className={generationsSpacing}>
-              <div className="flex items-center justify-between mb-1">
-                <label className={`${labelSize} font-medium`}>Prompt (optional):</label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1.5 cursor-pointer">
-                      <Checkbox
-                        id="enable-prompt-expansion"
-                        checked={enablePromptExpansion}
-                        onCheckedChange={(checked) => setEnablePromptExpansion(!!checked)}
-                        className="h-3.5 w-3.5"
-                      />
-                      <Label htmlFor="enable-prompt-expansion" className={cn("text-xs text-muted-foreground cursor-pointer")}>
-                        Expand
-                      </Label>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[250px]">
-                    <p className="text-xs">
-                      AI will automatically expand and enhance your prompt for better results.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
+              <SectionLabel>Prompt</SectionLabel>
+              {!isMobile && <label className={`${labelSize} font-medium`}>Prompt (optional):</label>}
               <Textarea
                 value={img2imgPrompt}
                 onChange={(e) => setImg2imgPrompt(e.target.value)}
-                placeholder={isMobile ? "Describe the desired output..." : "Optional: describe what the transformed image should look like..."}
+                placeholder={isMobile ? "Describe image..." : "Optional: describe what the transformed image should look like..."}
                 className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
                 rows={textareaRows}
                 clearable
@@ -424,42 +431,50 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             
             {/* Strength Slider */}
             <div>
+              <SectionLabel>Strength</SectionLabel>
               <div className="flex items-center justify-between">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <label className={`${labelSize} font-medium cursor-help`}>Strength:</label>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[200px]">
-                    <p className="text-xs">
-                      Lower = closer to original, Higher = more transformed
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-                <span className={`${sliderTextSize} text-muted-foreground`}>{img2imgStrength.toFixed(2)}</span>
+                {!isMobile && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <label className={`${labelSize} font-medium cursor-help mr-4`}>Strength:</label>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <p className="text-xs">
+                        Lower = closer to original, Higher = more transformed
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                <div className={cn("flex items-center gap-2 flex-1", isMobile && "w-full")}>
+                  <span className={cn(sliderTextSize, "text-muted-foreground", isMobile && "text-[10px]")}>Keep</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={img2imgStrength}
+                    onChange={(e) => setImg2imgStrength(parseFloat(e.target.value))}
+                    className="flex-1 h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+                  <span className={cn(sliderTextSize, "text-muted-foreground", isMobile && "text-[10px]")}>Change</span>
+                  <span className={cn(sliderTextSize, "text-foreground font-medium w-8 text-right", isMobile && "text-xs")}>{Math.round(img2imgStrength * 100)}%</span>
+                </div>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={img2imgStrength}
-                onChange={(e) => setImg2imgStrength(parseFloat(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-              />
             </div>
             
             {/* LoRA Selector */}
             {img2imgLoraManager && (
               <div className={generationsSpacing}>
-                <div className="flex items-center justify-between mb-2">
-                  <label className={`${labelSize} font-medium`}>LoRAs (optional):</label>
+                <SectionLabel>Style LoRAs</SectionLabel>
+                <div className={cn("flex items-center justify-between", isMobile ? "mb-1" : "mb-2")}>
+                  {!isMobile && <label className={`${labelSize} font-medium`}>LoRAs (optional):</label>}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => img2imgLoraManager.setIsLoraModalOpen(true)}
-                    className="h-7 px-2 text-xs"
+                    className={cn("h-7 px-2 text-xs", isMobile && "h-6 text-[10px]")}
                   >
-                    <Plus className="h-3 w-3 mr-1" />
+                    <Plus className={cn("mr-1", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
                     Add LoRA
                   </Button>
                 </div>
@@ -472,7 +487,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                     onLoraStrengthChange={img2imgLoraManager.handleLoraStrengthChange}
                     isGenerating={isGeneratingImg2Img}
                     availableLoras={availableLoras}
-                    className="mt-2"
+                    className={isMobile ? "mt-1" : "mt-2"}
                   />
                 )}
               </div>
@@ -483,11 +498,12 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         {/* LoRA Selector - Hidden for img2img mode (has its own LoRA selector) */}
         {editMode !== 'img2img' && (
         <div>
-          <div className="flex items-center gap-3">
-            <label className={`${labelSize} font-medium whitespace-nowrap`}>LoRA:</label>
+          <SectionLabel>Style LoRA</SectionLabel>
+          <div className="flex items-center gap-2">
+            {!isMobile && <label className={`text-sm font-medium whitespace-nowrap`}>LoRA:</label>}
             <div className="flex items-center gap-1 flex-1">
               <Select value={loraMode} onValueChange={setLoraMode}>
-                <SelectTrigger variant="retro" className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
+                <SelectTrigger variant="retro" className={cn("flex-1", isMobile ? "h-7 text-xs" : "h-10")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent variant="retro" className="z-[100001]">
@@ -504,11 +520,11 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                   onClick={handleClearLora}
                   className={cn(
                     "h-9 w-9 p-0 hover:bg-muted shrink-0",
-                    isMobile && "h-8 w-8"
+                    isMobile && "h-7 w-7"
                   )}
                   title="Clear LoRA selection"
                 >
-                  <XCircle className={cn("h-4 w-4 text-muted-foreground", isMobile && "h-3.5 w-3.5")} />
+                  <XCircle className={cn("h-4 w-4 text-muted-foreground", isMobile && "h-3 w-3")} />
                 </Button>
               )}
             </div>
@@ -522,8 +538,9 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               onChange={(e) => setCustomLoraUrl(e.target.value)}
               placeholder="https://huggingface.co/.../lora.safetensors"
               className={cn(
-                "w-full mt-2 bg-background border border-input rounded-md px-3 py-2 text-sm",
-                "focus:outline-none focus:ring-2 focus:ring-ring"
+                "w-full mt-1.5 bg-background border border-input rounded-md text-sm",
+                "focus:outline-none focus:ring-2 focus:ring-ring",
+                isMobile ? "px-2 py-1.5 text-xs" : "px-3 py-2"
               )}
             />
           )}
@@ -533,41 +550,54 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         {/* Number of Generations + Create as Variant - shown for all image edit modes */}
         {onCreateAsGenerationChange && (
           <div className={cn(
-            "flex items-center gap-4 py-2 px-1",
-            isMobile && "flex-col gap-3 items-stretch"
+            "py-1.5 px-1 rounded-md flex items-center gap-2 overflow-hidden",
+            isMobile && "bg-muted/30"
           )}>
-            {/* Number of Generations - takes at least 50% width */}
-            <div className={cn("flex items-center gap-2 flex-1 min-w-[50%]", isMobile && "justify-between")}>
-              <label className={`${labelSize} font-medium whitespace-nowrap`}>
-                {isMobile ? 'Generations:' : 'Generations:'}
+            <SectionLabel>Options</SectionLabel>
+            {/* Number of Generations */}
+            <div className={cn("flex items-center gap-2 min-w-0", isMobile ? "flex-1" : "flex-shrink")}>
+              <label className={cn(
+                "font-medium whitespace-nowrap flex-shrink-0",
+                isMobile ? "text-[10px] text-muted-foreground" : "text-sm"
+              )}>
+                {isMobile ? '#' : 'Generations:'}
               </label>
-              <div className="flex items-center gap-2 flex-1">
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
                 <input
                   type="range"
                   min={1}
                   max={16}
                   value={inpaintNumGenerations}
                   onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
-                  className="h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary flex-1"
+                  className={cn(
+                    "bg-muted rounded-lg appearance-none cursor-pointer accent-primary min-w-[60px] w-full",
+                    isMobile ? "h-1.5 flex-1" : "h-2 max-w-[120px]"
+                  )}
                 />
-                <span className={`${sliderTextSize} text-muted-foreground w-5 text-center`}>{inpaintNumGenerations}</span>
+                <span className={cn(
+                  "text-foreground font-medium text-center flex-shrink-0",
+                  isMobile ? "text-xs w-4" : "text-sm w-5"
+                )}>{inpaintNumGenerations}</span>
               </div>
             </div>
             
             {/* Create as Variant toggle */}
-            <div className={cn("flex items-center gap-2", isMobile ? "justify-between" : "ml-auto")}>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 cursor-help">
-                    <Layers className={cn(iconSize, "text-muted-foreground")} />
-                    <Label htmlFor="create-as-variant" className={cn(labelSize, "font-medium cursor-pointer whitespace-nowrap")}>
-                      {isMobile ? 'Variant' : 'Create as variant'}
+                  <div className="flex items-center gap-1 cursor-help">
+                    <Layers className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-muted-foreground")} />
+                    <Label htmlFor="create-as-variant" className={cn(
+                      "font-medium cursor-pointer whitespace-nowrap",
+                      isMobile ? "text-[10px] text-muted-foreground" : "text-sm"
+                    )}>
+                      {isMobile ? 'Variant' : 'Variant'}
                     </Label>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-[250px]">
                   <p className="text-xs">
-                    <strong>On:</strong> Result appears as a variant of this image in the variant selector.
+                    <strong>On:</strong> Result appears as a variant of this image.
                     <br />
                     <strong>Off:</strong> Result appears as its own image in the gallery.
                   </p>
@@ -577,6 +607,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 id="create-as-variant"
                 checked={!createAsGeneration}
                 onCheckedChange={(checked) => onCreateAsGenerationChange(!checked)}
+                className={cn(isMobile && "scale-90")}
               />
             </div>
           </div>
@@ -584,7 +615,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         
         {/* Reposition Mode Buttons - Two options: Save or Generate with AI */}
         {editMode === 'reposition' ? (
-          <div className={`flex gap-2 ${isMobile ? 'flex-col' : ''}`}>
+          <div className={cn("flex gap-2", isMobile && "flex-row")}>
             {/* Save as Variant Button */}
             <Button
               variant="secondary"
@@ -598,24 +629,25 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 repositionGenerateSuccess
               }
               className={cn(
-                isMobile ? "w-full" : "flex-1",
+                "flex-1",
+                isMobile && "h-9 text-xs",
                 saveAsVariantSuccess && "bg-green-600 hover:bg-green-600 text-white"
               )}
             >
               {isSavingAsVariant ? (
                 <>
-                  <Loader2 className={`${iconSize} mr-2 animate-spin`} />
-                  Saving...
+                  <Loader2 className={`${iconSize} mr-1 animate-spin`} />
+                  {isMobile ? '...' : 'Saving...'}
                 </>
               ) : saveAsVariantSuccess ? (
                 <>
-                  <CheckCircle className={`${iconSize} mr-2`} />
-                  Saved!
+                  <CheckCircle className={`${iconSize} mr-1`} />
+                  {isMobile ? '✓' : 'Saved!'}
                 </>
               ) : (
                 <>
-                  <Save className={`${iconSize} mr-2`} />
-                  {isMobile ? 'Save' : 'Save as Variant'}
+                  <Save className={`${iconSize} mr-1`} />
+                  Save
                 </>
               )}
             </Button>
@@ -633,24 +665,25 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 saveAsVariantSuccess
               }
               className={cn(
-                isMobile ? "w-full" : "flex-1",
+                "flex-1",
+                isMobile && "h-9 text-xs",
                 repositionGenerateSuccess && "bg-green-600 hover:bg-green-600"
               )}
             >
               {isGeneratingReposition ? (
                 <>
-                  <Loader2 className={`${iconSize} mr-2 animate-spin`} />
-                  Generating...
+                  <Loader2 className={`${iconSize} mr-1 animate-spin`} />
+                  {isMobile ? '...' : 'Generating...'}
                 </>
               ) : repositionGenerateSuccess ? (
                 <>
-                  <CheckCircle className={`${iconSize} mr-2`} />
-                  Success!
+                  <CheckCircle className={`${iconSize} mr-1`} />
+                  {isMobile ? '✓' : 'Success!'}
                 </>
               ) : (
                 <>
-                  <Move className={`${iconSize} mr-2`} />
-                  {isMobile ? 'Fill with AI' : 'Fill edges with AI'}
+                  <Move className={`${iconSize} mr-1`} />
+                  {isMobile ? 'Fill AI' : 'Fill edges with AI'}
                 </>
               )}
             </Button>
@@ -664,23 +697,24 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             disabled={isGeneratingImg2Img || img2imgGenerateSuccess}
             className={cn(
               "w-full",
+              isMobile && "h-9 text-xs",
               img2imgGenerateSuccess && "bg-green-600 hover:bg-green-600"
             )}
           >
             {isGeneratingImg2Img ? (
               <>
-                <Loader2 className={`${iconSize} mr-2 animate-spin`} />
-                Generating...
+                <Loader2 className={`${iconSize} mr-1.5 animate-spin`} />
+                {isMobile ? 'Creating...' : 'Generating...'}
               </>
             ) : img2imgGenerateSuccess ? (
               <>
-                <CheckCircle className={`${iconSize} mr-2`} />
-                Submitted, results will appear below
+                <CheckCircle className={`${iconSize} mr-1.5`} />
+                {isMobile ? 'Submitted ✓' : 'Submitted, results will appear below'}
               </>
             ) : (
               <>
-                <Wand2 className={`${iconSize} mr-2`} />
-                Transform Image
+                <Wand2 className={`${iconSize} mr-1.5`} />
+                {isMobile ? 'Transform' : 'Transform Image'}
               </>
             )}
           </Button>
@@ -705,33 +739,34 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             }
             className={cn(
               "w-full",
+              isMobile && "h-9 text-xs",
               (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
             )}
           >
             {(isGeneratingInpaint || isCreatingMagicEditTasks) ? (
               <>
-                <Loader2 className={`${iconSize} mr-2 animate-spin`} />
-                Generating...
+                <Loader2 className={`${iconSize} mr-1.5 animate-spin`} />
+                {isMobile ? 'Creating...' : 'Generating...'}
               </>
             ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
               <>
-                <CheckCircle className={`${iconSize} mr-2`} />
-                {editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below'}
+                <CheckCircle className={`${iconSize} mr-1.5`} />
+                {isMobile ? 'Submitted ✓' : (editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below')}
               </>
             ) : editMode === 'inpaint' ? (
               <>
-                <Paintbrush className={`${iconSize} mr-2`} />
-                Generate inpainted image
+                <Paintbrush className={`${iconSize} mr-1.5`} />
+                {isMobile ? 'Generate' : 'Generate inpainted image'}
               </>
             ) : editMode === 'annotate' ? (
               <>
-                <Pencil className={`${iconSize} mr-2`} />
-                Generate based on annotations
+                <Pencil className={`${iconSize} mr-1.5`} />
+                {isMobile ? 'Generate' : 'Generate based on annotations'}
               </>
             ) : (
               <>
-                <Sparkles className={`${iconSize} mr-2`} />
-                Generate text edit
+                <Sparkles className={`${iconSize} mr-1.5`} />
+                {isMobile ? 'Generate' : 'Generate text edit'}
               </>
             )}
           </Button>
@@ -739,7 +774,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
       
       {/* Variants Section */}
       {variants && variants.length >= 1 && onVariantSelect && (
-        <div className="border-t border-border pt-4 mt-4">
+        <div className={cn("border-t border-border", isMobile ? "pt-2 mt-2" : "pt-4 mt-4")}>
+          <SectionLabel>Variants</SectionLabel>
           <VariantSelector
             variants={variants}
             activeVariantId={activeVariantId || null}
