@@ -166,23 +166,28 @@ export function useEditSettingsPersistence({
       return generationSettings.settings;
     }
     
-    // No persisted settings - use lastUsed values (with empty prompts)
-    // BUT: preserve any prompt that user has typed (it's in generationSettings.settings.prompt)
-    // even if hasPersistedSettings is false (debounced save hasn't completed yet)
-    return {
-      editMode: lastUsedSettings.lastUsed.editMode,
-      loraMode: lastUsedSettings.lastUsed.loraMode,
-      customLoraUrl: lastUsedSettings.lastUsed.customLoraUrl,
-      numGenerations: lastUsedSettings.lastUsed.numGenerations,
-      // Use current typed prompt if any, otherwise empty (never inherit from lastUsed)
-      prompt: generationSettings.settings.prompt || '',
-      // Use current typed img2imgPrompt if any, otherwise empty (never inherit from lastUsed)
-      img2imgPrompt: generationSettings.settings.img2imgPrompt || '',
-      // Img2Img settings from lastUsed
-      img2imgStrength: lastUsedSettings.lastUsed.img2imgStrength,
-      img2imgEnablePromptExpansion: lastUsedSettings.lastUsed.img2imgEnablePromptExpansion,
-    };
+    // No persisted settings yet.
+    // Before the coordinator finishes initialization, we use lastUsed as defaults.
+    // After initialization, always prefer the live generationSettings state so controls
+    // (like the Img2Img strength slider) never feel "locked" while the debounced save runs.
+    if (!isReady) {
+      return {
+        editMode: lastUsedSettings.lastUsed.editMode,
+        loraMode: lastUsedSettings.lastUsed.loraMode,
+        customLoraUrl: lastUsedSettings.lastUsed.customLoraUrl,
+        numGenerations: lastUsedSettings.lastUsed.numGenerations,
+        prompt: generationSettings.settings.prompt || '',
+        img2imgPrompt: generationSettings.settings.img2imgPrompt || '',
+        img2imgStrength: lastUsedSettings.lastUsed.img2imgStrength,
+        img2imgEnablePromptExpansion: lastUsedSettings.lastUsed.img2imgEnablePromptExpansion,
+      };
+    }
+
+    // Initialized: use the live per-generation state (it already has lastUsed applied,
+    // with prompts intentionally blank).
+    return generationSettings.settings;
   }, [
+    isReady,
     generationSettings.isLoading,
     generationSettings.hasPersistedSettings,
     generationSettings.settings,

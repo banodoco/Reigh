@@ -425,7 +425,7 @@ Please be very specific with file paths, command syntax, and verification steps 
     }
   };
 
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndjenlzcXp4bHdkbmRneGl0cnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MDI4NjgsImV4cCI6MjA2NzA3ODg2OH0.r-4RyHZiDibUjgdgDDM2Vo6x3YpgIO5-BTwfkB2qyYA";
+  // NOTE: Do not hardcode Supabase project secrets (URL / anon key) in the client.
 
   const getInstallationCommand = () => {
     // Use the actual token from database or freshly generated one
@@ -455,7 +455,7 @@ python -m pip install --no-cache-dir -r Wan2GP/requirements.txt
 python -m pip install --no-cache-dir -r requirements.txt
 echo Checking CUDA availability...
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))"
-python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
+python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux command
       return `git clone https://github.com/banodoco/Reigh-Worker && \\
@@ -467,9 +467,7 @@ ${torchInstall} && \\
 python -m pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 python -m pip install --no-cache-dir -r requirements.txt && \\
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))" && \\
-python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
-  --supabase-anon-key ${SUPABASE_ANON_KEY} \\
-  --supabase-access-token ${token}${debugFlag}${profileFlag}`;
+python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     }
   };
 
@@ -491,15 +489,13 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
       return `${cdCheck}
 git pull
 ${activateCmd}
-python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
+python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux / Mac command - auto-cd if not in correct folder
       return `[ ! -f "worker.py" ] && cd Reigh-Worker
 git pull && \\
 source venv/bin/activate && \\
-python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
-  --supabase-anon-key ${SUPABASE_ANON_KEY} \\
-  --supabase-access-token ${token}${debugFlag}${profileFlag}`;
+python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     }
   };
 
