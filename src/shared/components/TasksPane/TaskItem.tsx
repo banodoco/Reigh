@@ -27,6 +27,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
+import { isImageEditTaskType } from '@/tools/travel-between-images/components/TaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useTaskType } from '@/shared/hooks/useTaskType';
@@ -1390,7 +1391,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
             className="relative cursor-pointer hover:bg-background/90 transition-colors rounded-lg group"
             onClick={handleTooltipClick}
           >
-            {(taskInfo.isVideoTask || taskInfo.isImageTask) ? (
+            {(taskInfo.isVideoTask || isImageEditTaskType(task.taskType)) ? (
               <SharedTaskDetails
                 task={task}
                 inputImages={taskInfo.isVideoTask ? travelData.imageUrls : []}

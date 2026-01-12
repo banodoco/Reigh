@@ -36,6 +36,7 @@ import { useTaskType } from "@/shared/hooks/useTaskType";
 import { useGetTask } from "@/shared/hooks/useTasks";
 import { useShareGeneration } from "@/shared/hooks/useShareGeneration";
 import { deriveInputImages } from "./ImageGallery/utils";
+import { isImageEditTaskType } from "@/tools/travel-between-images/components/TaskDetails";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -182,7 +183,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isVideoTask = taskTypeInfo?.content_type === 'video' || 
     (!taskTypeInfo && (image.metadata as any)?.tool_type === 'travel-between-images');
   const isImageTask = taskTypeInfo?.content_type === 'image';
-  const shouldShowTaskDetails = (!!taskData) && (isVideoTask || isImageTask);
+  const isImageEditTask = isImageEditTaskType(taskType || undefined);
+  const shouldShowTaskDetails = (!!taskData) && (isVideoTask || isImageEditTask);
 
   // Share functionality
   const { handleShare, isCreatingShare, shareCopied, shareSlug } = useShareGeneration(image.id, taskId);
