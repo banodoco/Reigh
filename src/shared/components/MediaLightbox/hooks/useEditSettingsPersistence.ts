@@ -25,6 +25,7 @@ export interface UseEditSettingsPersistenceReturn {
   numGenerations: number;
   prompt: string;
   // Img2Img values
+  img2imgPrompt: string;
   img2imgStrength: number;
   img2imgEnablePromptExpansion: boolean;
   
@@ -35,6 +36,7 @@ export interface UseEditSettingsPersistenceReturn {
   setNumGenerations: (num: number) => void;
   setPrompt: (prompt: string) => void;
   // Img2Img setters
+  setImg2imgPrompt: (prompt: string) => void;
   setImg2imgStrength: (strength: number) => void;
   setImg2imgEnablePromptExpansion: (enabled: boolean) => void;
   
@@ -164,7 +166,7 @@ export function useEditSettingsPersistence({
       return generationSettings.settings;
     }
     
-    // No persisted settings - use lastUsed values (with empty prompt)
+    // No persisted settings - use lastUsed values (with empty prompts)
     // BUT: preserve any prompt that user has typed (it's in generationSettings.settings.prompt)
     // even if hasPersistedSettings is false (debounced save hasn't completed yet)
     return {
@@ -174,6 +176,8 @@ export function useEditSettingsPersistence({
       numGenerations: lastUsedSettings.lastUsed.numGenerations,
       // Use current typed prompt if any, otherwise empty (never inherit from lastUsed)
       prompt: generationSettings.settings.prompt || '',
+      // Use current typed img2imgPrompt if any, otherwise empty (never inherit from lastUsed)
+      img2imgPrompt: generationSettings.settings.img2imgPrompt || '',
       // Img2Img settings from lastUsed
       img2imgStrength: lastUsedSettings.lastUsed.img2imgStrength,
       img2imgEnablePromptExpansion: lastUsedSettings.lastUsed.img2imgEnablePromptExpansion,
@@ -217,6 +221,12 @@ export function useEditSettingsPersistence({
     generationSettings.setPrompt(prompt);
   }, [generationSettings]);
   
+  // Img2Img prompt only saves to generation (never to "last used")
+  const setImg2imgPrompt = useCallback((prompt: string) => {
+    console.log('[EDIT_DEBUG] 🔧 SET: img2imgPrompt →', prompt ? `"${prompt.substring(0, 30)}..."` : '(empty)');
+    generationSettings.setImg2imgPrompt(prompt);
+  }, [generationSettings]);
+
   // Img2Img setters (save to both generation and "last used")
   const setImg2imgStrength = useCallback((strength: number) => {
     console.log('[EDIT_DEBUG] 🔧 SET: img2imgStrength →', strength);
@@ -265,6 +275,7 @@ export function useEditSettingsPersistence({
   console.log('[EDIT_DEBUG] 📊 loraMode:', effectiveSettings.loraMode);
   console.log('[EDIT_DEBUG] 📊 numGenerations:', effectiveSettings.numGenerations);
   console.log('[EDIT_DEBUG] 📊 prompt:', effectiveSettings.prompt ? `"${effectiveSettings.prompt.substring(0, 30)}..."` : '(empty)');
+  console.log('[EDIT_DEBUG] 📊 img2imgPrompt:', effectiveSettings.img2imgPrompt ? `"${effectiveSettings.img2imgPrompt.substring(0, 30)}..."` : '(empty)');
   console.log('[EDIT_DEBUG] 📊 img2imgStrength:', effectiveSettings.img2imgStrength);
   console.log('[EDIT_DEBUG] 📊 img2imgEnablePromptExpansion:', effectiveSettings.img2imgEnablePromptExpansion);
   console.log('[EDIT_DEBUG] ───────────────────────────────────────────────────────────────');
@@ -277,6 +288,7 @@ export function useEditSettingsPersistence({
     numGenerations: effectiveSettings.numGenerations,
     prompt: effectiveSettings.prompt,
     // Img2Img values
+    img2imgPrompt: effectiveSettings.img2imgPrompt,
     img2imgStrength: effectiveSettings.img2imgStrength,
     img2imgEnablePromptExpansion: effectiveSettings.img2imgEnablePromptExpansion,
     
@@ -287,6 +299,7 @@ export function useEditSettingsPersistence({
     setNumGenerations,
     setPrompt,
     // Img2Img setters
+    setImg2imgPrompt,
     setImg2imgStrength,
     setImg2imgEnablePromptExpansion,
     

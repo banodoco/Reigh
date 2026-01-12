@@ -15,6 +15,7 @@ export interface GenerationEditSettings {
   numGenerations: number;
   prompt: string;
   // Img2Img specific settings
+  img2imgPrompt: string;
   img2imgStrength: number;
   img2imgEnablePromptExpansion: boolean;
 }
@@ -26,6 +27,7 @@ export const DEFAULT_EDIT_SETTINGS: GenerationEditSettings = {
   numGenerations: 1,
   prompt: '',
   // Img2Img defaults
+  img2imgPrompt: '',
   img2imgStrength: 0.6,
   img2imgEnablePromptExpansion: false,
 };
@@ -41,6 +43,7 @@ export interface UseGenerationEditSettingsReturn {
   setNumGenerations: (num: number) => void;
   setPrompt: (prompt: string) => void;
   // Img2Img setters
+  setImg2imgPrompt: (prompt: string) => void;
   setImg2imgStrength: (strength: number) => void;
   setImg2imgEnablePromptExpansion: (enabled: boolean) => void;
   
@@ -52,7 +55,7 @@ export interface UseGenerationEditSettingsReturn {
   hasPersistedSettings: boolean;
   
   // For initialization from "last used"
-  initializeFromLastUsed: (lastUsed: Omit<GenerationEditSettings, 'prompt'>) => void;
+  initializeFromLastUsed: (lastUsed: Omit<GenerationEditSettings, 'prompt' | 'img2imgPrompt'>) => void;
 }
 
 interface UseGenerationEditSettingsProps {
@@ -81,7 +84,7 @@ export function useGenerationEditSettings({
   const currentGenerationIdRef = useRef<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitializedRef = useRef(false);
-  const pendingInitFromLastUsedRef = useRef<Omit<GenerationEditSettings, 'prompt'> | null>(null);
+  const pendingInitFromLastUsedRef = useRef<Omit<GenerationEditSettings, 'prompt' | 'img2imgPrompt'> | null>(null);
   
   // Load settings from database
   const loadSettings = useCallback(async (genId: string): Promise<GenerationEditSettings | null> => {
@@ -108,6 +111,7 @@ export function useGenerationEditSettings({
         console.log('[EDIT_DEBUG] ✅ LOAD: customLoraUrl:', savedSettings.customLoraUrl || '(empty)');
         console.log('[EDIT_DEBUG] ✅ LOAD: numGenerations:', savedSettings.numGenerations);
         console.log('[EDIT_DEBUG] ✅ LOAD: prompt:', savedSettings.prompt ? `"${savedSettings.prompt.substring(0, 50)}..."` : '(empty)');
+        console.log('[EDIT_DEBUG] ✅ LOAD: img2imgPrompt:', savedSettings.img2imgPrompt ? `"${savedSettings.img2imgPrompt.substring(0, 50)}..."` : '(empty)');
         return {
           ...DEFAULT_EDIT_SETTINGS,
           ...savedSettings,
@@ -132,6 +136,7 @@ export function useGenerationEditSettings({
       console.log('[EDIT_DEBUG] 💾 SAVE: customLoraUrl:', newSettings.customLoraUrl || '(empty)');
       console.log('[EDIT_DEBUG] 💾 SAVE: numGenerations:', newSettings.numGenerations);
       console.log('[EDIT_DEBUG] 💾 SAVE: prompt:', newSettings.prompt ? `"${newSettings.prompt.substring(0, 50)}..."` : '(empty)');
+      console.log('[EDIT_DEBUG] 💾 SAVE: img2imgPrompt:', newSettings.img2imgPrompt ? `"${newSettings.img2imgPrompt.substring(0, 50)}..."` : '(empty)');
       console.log('[EDIT_DEBUG] 💾 SAVE: img2imgStrength:', newSettings.img2imgStrength);
       console.log('[EDIT_DEBUG] 💾 SAVE: img2imgEnablePromptExpansion:', newSettings.img2imgEnablePromptExpansion);
       
@@ -239,6 +244,7 @@ export function useGenerationEditSettings({
             ...DEFAULT_EDIT_SETTINGS,
             ...pendingInitFromLastUsedRef.current,
             prompt: '', // Never inherit prompt
+            img2imgPrompt: '', // Never inherit img2img prompt
           });
           pendingInitFromLastUsedRef.current = null;
         } else {
@@ -310,6 +316,14 @@ export function useGenerationEditSettings({
   }, [triggerSave]);
   
   // Img2Img setters
+  const setImg2imgPrompt = useCallback((prompt: string) => {
+    setSettings(prev => {
+      const updated = { ...prev, img2imgPrompt: prompt };
+      triggerSave(updated);
+      return updated;
+    });
+  }, [triggerSave]);
+
   const setImg2imgStrength = useCallback((strength: number) => {
     setSettings(prev => {
       const updated = { ...prev, img2imgStrength: strength };
@@ -336,7 +350,7 @@ export function useGenerationEditSettings({
   }, [triggerSave]);
   
   // Initialize from "last used" - called when generation has no persisted settings
-  const initializeFromLastUsed = useCallback((lastUsed: Omit<GenerationEditSettings, 'prompt'>) => {
+  const initializeFromLastUsed = useCallback((lastUsed: Omit<GenerationEditSettings, 'prompt' | 'img2imgPrompt'>) => {
     if (isLoading) {
       // Store for later application after load completes
       pendingInitFromLastUsedRef.current = lastUsed;
@@ -351,6 +365,7 @@ export function useGenerationEditSettings({
         ...prev,
         ...lastUsed,
         prompt: '', // Never inherit prompt
+        img2imgPrompt: '', // Never inherit img2img prompt
       }));
     } else {
       console.log('[EDIT_DEBUG] ⏭️ INIT: Skipping "last used" - generation has persisted settings');
@@ -364,6 +379,7 @@ export function useGenerationEditSettings({
     setCustomLoraUrl,
     setNumGenerations,
     setPrompt,
+    setImg2imgPrompt,
     setImg2imgStrength,
     setImg2imgEnablePromptExpansion,
     updateSettings,

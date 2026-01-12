@@ -95,8 +95,10 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
   const {
     img2imgStrength: persistedImg2imgStrength,
     img2imgEnablePromptExpansion: persistedImg2imgEnablePromptExpansion,
+    img2imgPrompt: persistedImg2imgPrompt,
     setImg2imgStrength: setPersistedImg2imgStrength,
     setImg2imgEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
+    setImg2imgPrompt: setPersistedImg2imgPrompt,
     prompt: persistedPrompt,
     setPrompt: setPersistedPrompt,
     numGenerations,
@@ -253,9 +255,9 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     setImg2imgStrength: setPersistedImg2imgStrength,
     enablePromptExpansion: persistedImg2imgEnablePromptExpansion,
     setEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
-    // Prompt is shared with other edit modes, persisted per-generation
-    img2imgPrompt: persistedPrompt,
-    setImg2imgPrompt: setPersistedPrompt,
+    // Img2Img prompt is persisted separately to avoid cross-mode races
+    img2imgPrompt: persistedImg2imgPrompt,
+    setImg2imgPrompt: setPersistedImg2imgPrompt,
     // Number of generations (shared with other edit modes)
     numGenerations,
   });

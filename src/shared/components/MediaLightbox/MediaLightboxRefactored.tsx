@@ -421,8 +421,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setPrompt: setPersistedPrompt,
     // Img2Img persisted values
     img2imgStrength: persistedImg2imgStrength,
+    img2imgPrompt: persistedImg2imgPrompt,
     img2imgEnablePromptExpansion: persistedImg2imgEnablePromptExpansion,
     setImg2imgStrength: setPersistedImg2imgStrength,
+    setImg2imgPrompt: setPersistedImg2imgPrompt,
     setImg2imgEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
     isLoading: isLoadingEditSettings,
     isReady: isEditSettingsReady,
@@ -799,9 +801,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setImg2imgStrength: setPersistedImg2imgStrength,
     enablePromptExpansion: persistedImg2imgEnablePromptExpansion,
     setEnablePromptExpansion: setPersistedImg2imgEnablePromptExpansion,
-    // Prompt is shared with other edit modes, persisted per-generation
-    img2imgPrompt: persistedPrompt,
-    setImg2imgPrompt: setPersistedPrompt,
+    // Img2Img prompt is persisted separately to avoid cross-mode races
+    img2imgPrompt: persistedImg2imgPrompt,
+    setImg2imgPrompt: setPersistedImg2imgPrompt,
     // Number of generations (shared with other edit modes)
     numGenerations: persistedNumGenerations,
   });
