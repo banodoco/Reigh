@@ -33,7 +33,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
 import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
 import { useSubmitButtonState } from '@/shared/hooks/useSubmitButtonState';
-import { waitForTasksInCache } from '@/shared/lib/waitForTasks';
 import { useHydratedReferences } from '../../hooks/useHydratedReferences';
 
 // Import extracted components
@@ -2659,14 +2658,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           });
 
           console.log('[ImageGenerationForm] Automated mode: Queuing', newPrompts.length, 'images');
-          const taskIds = await onGenerate(taskParams);
+          await onGenerate(taskParams);
 
-          // Wait for tasks to appear in UI before removing filler (up to 5s)
-          if (taskIds && taskIds.length > 0) {
-            console.log('[ImageGenerationForm] Waiting for tasks to appear in UI:', taskIds.length, 'tasks');
-            await waitForTasksInCache(queryClient, capturedProjectId, taskIds, { timeout: 5000 });
-          }
-
+          // Note: We immediately remove the incoming task filler after onGenerate completes.
+          // Real tasks will appear via realtime subscriptions. Previously we used waitForTasksInCache
+          // to wait for tasks to appear in cache before removing the filler, but this caused
+          // both the filler AND real tasks to show simultaneously (duplicate visibility).
         } catch (error) {
           console.error('[ImageGenerationForm] Automated mode: Error generating prompts:', error);
           toast.error("Failed to generate prompts. Please try again.");

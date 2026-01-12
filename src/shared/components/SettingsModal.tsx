@@ -460,7 +460,7 @@ python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
       // Linux command
       return `git clone --depth 1 https://github.com/banodoco/Reigh-Worker && \\
 cd Reigh-Worker && \\
-sudo apt-get update && sudo apt-get install -y python3.10-venv ffmpeg && \\
+sudo apt-get update && sudo apt-get install -y python3.10-venv python3.10-dev ffmpeg && \\
 python3.10 -m venv venv && \\
 source venv/bin/activate && \\
 ${torchInstall} && \\
