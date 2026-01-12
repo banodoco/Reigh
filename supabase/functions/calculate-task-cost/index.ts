@@ -147,10 +147,17 @@ serve(async (req) => {
                             task.params?.orchestrator_details?.orchestrator_task_id ||
                             task.params?.originalParams?.orchestrator_details?.orchestrator_task_id ||
                             task.params?.orchestrator_task_id;
+    
+    // Validate that orchestratorRef is a valid UUID
+    // Some orchestrator tasks store human-readable IDs (e.g., "sm_travel_orchestrator_26011210_c627ca")
+    // in their own params, which should NOT be treated as a sub-task reference
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isValidOrchestratorRef = orchestratorRef && uuidRegex.test(orchestratorRef);
+    
     // IMPORTANT: Don't skip if the task references ITSELF as the orchestrator!
     // This happens for orchestrator tasks (like join_clips_orchestrator) that store their own
     // task ID in params.orchestrator_details.orchestrator_task_id for sub-tasks to reference.
-    if (orchestratorRef && orchestratorRef !== task.id) {
+    if (isValidOrchestratorRef && orchestratorRef !== task.id) {
       logger.info("Skipping cost calculation (sub-task)", { 
         orchestrator_task_id: orchestratorRef 
       });

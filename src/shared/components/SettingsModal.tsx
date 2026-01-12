@@ -445,27 +445,29 @@ Please be very specific with file paths, command syntax, and verification steps 
       const activateCmd = windowsShell === "powershell" 
         ? `.\\venv\\Scripts\\Activate.ps1`
         : `venv\\Scripts\\activate.bat`;
-        
+      
+      // Install torch LAST to ensure CUDA version doesn't get overwritten by requirements
       return `git clone --depth 1 https://github.com/banodoco/Reigh-Worker.git
 cd Reigh-Worker
 python -m venv venv
 ${activateCmd}
-${torchInstall}
 python -m pip install --no-cache-dir -r Wan2GP/requirements.txt
 python -m pip install --no-cache-dir -r requirements.txt
+${torchInstall}
 echo Checking CUDA availability...
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))"
 python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux command
+      // Install torch LAST to ensure CUDA version doesn't get overwritten by requirements
       return `git clone --depth 1 https://github.com/banodoco/Reigh-Worker && \\
 cd Reigh-Worker && \\
 sudo apt-get update && sudo apt-get install -y python3.10-venv python3.10-dev ffmpeg && \\
 python3.10 -m venv venv && \\
 source venv/bin/activate && \\
-${torchInstall} && \\
 python -m pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 python -m pip install --no-cache-dir -r requirements.txt && \\
+${torchInstall} && \\
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))" && \\
 python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     }
