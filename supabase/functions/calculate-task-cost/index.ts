@@ -215,6 +215,39 @@ serve(async (req) => {
       durationSeconds = Math.max(1, Math.ceil((endTime.getTime() - startTime.getTime()) / 1000));
     }
 
+    // Idempotency: avoid double-billing if this function is called multiple times for the same task.
+    // The credits ledger is intended to be immutable, so we should skip if a spend entry already exists.
+    const { data: existingSpendEntries, error: existingSpendError } = await supabaseAdmin
+      .from('credits_ledger')
+      .select('id, amount, created_at')
+      .eq('task_id', task.id)
+      .eq('type', 'spend')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (existingSpendError) {
+      logger.error("Failed to check existing credit ledger entries", { error: existingSpendError.message });
+      await logger.flush();
+      return jsonResponse({ error: 'Failed to check existing cost records' }, 500);
+    }
+
+    if (existingSpendEntries && existingSpendEntries.length > 0) {
+      const existing = existingSpendEntries[0];
+      logger.info("Cost already recorded - skipping", {
+        ledger_id: existing.id,
+        existing_amount: existing.amount
+      });
+      await logger.flush();
+      return jsonResponse({
+        success: true,
+        skipped: true,
+        reason: 'Cost already recorded for this task',
+        task_id: task.id,
+        ledger_id: existing.id,
+        existing_amount: existing.amount
+      });
+    }
+
     // Get task type configuration
     const { data: taskType, error: taskTypeError } = await supabaseAdmin
       .from('task_types')

@@ -17,7 +17,7 @@ declare const Deno: any;
  * Headers: Authorization: Bearer <JWT or PAT>
  * Body: {
  *   "task_id": "uuid-string",
- *   "status": "In Progress" | "Failed" | "Complete",
+ *   "status": "In Progress" | "Failed" | "Complete" | "Cancelled",
  *   "output_location": "optional-string"
  * }
  * 
@@ -388,7 +388,7 @@ serve(async (req) => {
   }
 
   // Validate status values
-  const validStatuses = ["Queued", "In Progress", "Complete", "Failed"];
+  const validStatuses = ["Queued", "In Progress", "Complete", "Failed", "Cancelled"];
   if (!validStatuses.includes(status)) {
     logger.error("Invalid status value", { status, valid_statuses: validStatuses });
     await logger.flush();
@@ -442,7 +442,7 @@ serve(async (req) => {
       }
 
       callerId = data.user_id;
-      logger.debug("Authenticated via PAT", { user_id: callerId });
+      logger.debug("Authenticated via PAT", { user_id: data.user_id });
     } catch (e: any) {
       logger.error("Error querying user_api_token", { error: e?.message });
       await logger.flush();
@@ -451,7 +451,7 @@ serve(async (req) => {
   }
 
   try {
-    // SAFETY CHECK: Prevent overwriting Complete tasks with Failed status
+    // SAFETY CHECK: Prevent overwriting Complete tasks with terminal statuses
     const { data: currentTask, error: currentTaskError } = await supabaseAdmin
       .from("tasks")
       .select("status")
@@ -464,9 +464,9 @@ serve(async (req) => {
       return new Response(`Failed to check current task status: ${currentTaskError.message}`, { status: 500 });
     }
 
-    // Don't overwrite Complete tasks with Failed status
-    if (currentTask?.status === "Complete" && status === "Failed") {
-      logger.warn("Refusing to mark completed task as Failed", { 
+    // Don't overwrite Complete tasks with terminal statuses
+    if (currentTask?.status === "Complete" && (status === "Failed" || status === "Cancelled")) {
+      logger.warn("Refusing to update completed task to a terminal status", { 
         task_id, 
         current_status: currentTask.status 
       });
@@ -476,7 +476,7 @@ serve(async (req) => {
         task_id: task_id,
         current_status: currentTask.status,
         requested_status: status,
-        message: "Cannot mark completed task as failed"
+        message: "Cannot update a completed task to Failed/Cancelled"
       }), {
         status: 400,
         headers: { "Content-Type": "application/json" }
@@ -541,7 +541,7 @@ serve(async (req) => {
         .eq("user_id", callerId);
 
       if (!userProjects || userProjects.length === 0) {
-        logger.error("User has no projects", { user_id: callerId });
+        logger.error("User has no projects", { user_id: callerId ?? undefined });
         await logger.flush();
         return new Response("User has no projects", { status: 403 });
       }
