@@ -446,7 +446,7 @@ Please be very specific with file paths, command syntax, and verification steps 
         ? `.\\venv\\Scripts\\Activate.ps1`
         : `venv\\Scripts\\activate.bat`;
         
-      return `git clone https://github.com/banodoco/Reigh-Worker.git
+      return `git clone --depth 1 https://github.com/banodoco/Reigh-Worker.git
 cd Reigh-Worker
 python -m venv venv
 ${activateCmd}
@@ -458,7 +458,7 @@ python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not avai
 python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux command
-      return `git clone https://github.com/banodoco/Reigh-Worker && \\
+      return `git clone --depth 1 https://github.com/banodoco/Reigh-Worker && \\
 cd Reigh-Worker && \\
 sudo apt-get update && sudo apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
