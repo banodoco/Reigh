@@ -26,6 +26,7 @@ export interface UseEditSettingsPersistenceReturn {
   prompt: string;
   // Img2Img values
   img2imgPrompt: string;
+  img2imgPromptHasBeenSet: boolean;
   img2imgStrength: number;
   img2imgEnablePromptExpansion: boolean;
   
@@ -178,6 +179,7 @@ export function useEditSettingsPersistence({
         numGenerations: lastUsedSettings.lastUsed.numGenerations,
         prompt: generationSettings.settings.prompt || '',
         img2imgPrompt: generationSettings.settings.img2imgPrompt || '',
+        img2imgPromptHasBeenSet: generationSettings.settings.img2imgPromptHasBeenSet || false,
         img2imgStrength: lastUsedSettings.lastUsed.img2imgStrength,
         img2imgEnablePromptExpansion: lastUsedSettings.lastUsed.img2imgEnablePromptExpansion,
       };
@@ -281,6 +283,7 @@ export function useEditSettingsPersistence({
   console.log('[EDIT_DEBUG] 📊 numGenerations:', effectiveSettings.numGenerations);
   console.log('[EDIT_DEBUG] 📊 prompt:', effectiveSettings.prompt ? `"${effectiveSettings.prompt.substring(0, 30)}..."` : '(empty)');
   console.log('[EDIT_DEBUG] 📊 img2imgPrompt:', effectiveSettings.img2imgPrompt ? `"${effectiveSettings.img2imgPrompt.substring(0, 30)}..."` : '(empty)');
+  console.log('[EDIT_DEBUG] 📊 img2imgPromptHasBeenSet:', effectiveSettings.img2imgPromptHasBeenSet);
   console.log('[EDIT_DEBUG] 📊 img2imgStrength:', effectiveSettings.img2imgStrength);
   console.log('[EDIT_DEBUG] 📊 img2imgEnablePromptExpansion:', effectiveSettings.img2imgEnablePromptExpansion);
   console.log('[EDIT_DEBUG] ───────────────────────────────────────────────────────────────');
@@ -294,6 +297,7 @@ export function useEditSettingsPersistence({
     prompt: effectiveSettings.prompt,
     // Img2Img values
     img2imgPrompt: effectiveSettings.img2imgPrompt,
+    img2imgPromptHasBeenSet: effectiveSettings.img2imgPromptHasBeenSet,
     img2imgStrength: effectiveSettings.img2imgStrength,
     img2imgEnablePromptExpansion: effectiveSettings.img2imgEnablePromptExpansion,
     

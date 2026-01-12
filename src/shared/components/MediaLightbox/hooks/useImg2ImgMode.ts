@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { GenerationRow } from '@/types/shots';
 import { createBatchZImageTurboI2ITasks, ZImageLoraConfig } from '@/shared/lib/tasks/zImageTurboI2I';
@@ -20,6 +20,7 @@ export interface UseImg2ImgModeProps {
   // Prompt is persisted per-generation (shared with other edit modes)
   img2imgPrompt: string;
   setImg2imgPrompt: (prompt: string) => void;
+  img2imgPromptHasBeenSet: boolean;
   // Number of generations (shared with other edit modes)
   numGenerations: number;
 }
@@ -67,6 +68,7 @@ export const useImg2ImgMode = ({
   // Prompt is persisted per-generation
   img2imgPrompt,
   setImg2imgPrompt,
+  img2imgPromptHasBeenSet,
   // Number of generations (shared)
   numGenerations,
 }: UseImg2ImgModeProps): UseImg2ImgModeReturn => {
@@ -82,6 +84,26 @@ export const useImg2ImgMode = ({
   // Local state (not persisted)
   const [isGeneratingImg2Img, setIsGeneratingImg2Img] = useState(false);
   const [img2imgGenerateSuccess, setImg2imgGenerateSuccess] = useState(false);
+
+  // Derive the base generation prompt from the generation params (best-effort)
+  const baseGenerationPrompt = useMemo(() => {
+    const p = (media as any)?.params;
+    const raw =
+      (typeof p?.base_prompt === 'string' && p.base_prompt) ||
+      (typeof p?.prompt === 'string' && p.prompt) ||
+      '';
+    return raw.trim();
+  }, [media]);
+
+  // Default Img2Img prompt to the prompt that generated the base image (one-time per generation)
+  useEffect(() => {
+    if (img2imgPromptHasBeenSet) return;
+    if (img2imgPrompt && img2imgPrompt.trim().length > 0) return;
+    if (!baseGenerationPrompt) return;
+
+    console.log('[EDIT_DEBUG] 🖼️ Img2Img: defaulting prompt from base generation prompt');
+    setImg2imgPrompt(baseGenerationPrompt);
+  }, [img2imgPromptHasBeenSet, img2imgPrompt, baseGenerationPrompt, setImg2imgPrompt]);
 
   // Use the shared LoRA manager hook
   const loraManager = useLoraManager(availableLoras, {
