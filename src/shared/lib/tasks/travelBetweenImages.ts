@@ -397,8 +397,9 @@ function buildTravelBetweenImagesPayload(
     ...(params.text_after_prompts ? { text_after_prompts: params.text_after_prompts } : {}),
     // Motion control mode
     ...(params.motion_mode ? { motion_mode: params.motion_mode } : {}),
-    // Smooth video interpolation (SVI) for smoother transitions - always explicit
-    use_svi: params.use_svi ?? false,
+    // HARDCODED: SVI (smooth continuations) feature has been removed from UX
+    // Always set to false regardless of any params passed
+    use_svi: false,
   };
 
   // Log the enhance_prompt value that will be sent to orchestrator

@@ -219,31 +219,12 @@ function buildIndividualTravelSegmentParams(
     parent_generation_id: params.parent_generation_id,
   };
 
-  // Handle SVI (smooth continuations) - ALWAYS explicitly set the value
-  // This is needed because the original orchestrator_details is spread above and may have use_svi: true
-  if (params.use_svi && params.svi_predecessor_video_url) {
-    orchestratorDetails.use_svi = true;
-    orchestratorDetails.svi_predecessor_video_url = params.svi_predecessor_video_url;
-    orchestratorDetails.svi_strength_1 = params.svi_strength_1 ?? 1.0;
-    orchestratorDetails.svi_strength_2 = params.svi_strength_2 ?? 0.5;
-    console.log('[IndividualTravelSegment] SVI enabled:', {
-      use_svi: true,
-      svi_strength_1: orchestratorDetails.svi_strength_1,
-      svi_strength_2: orchestratorDetails.svi_strength_2,
-      svi_predecessor_video_url: params.svi_predecessor_video_url?.substring(0, 50) + '...',
-    });
-  } else {
-    // Explicitly disable SVI - override any inherited value from original orchestrator_details
-    orchestratorDetails.use_svi = false;
-    delete orchestratorDetails.svi_predecessor_video_url;
-    delete orchestratorDetails.svi_strength_1;
-    delete orchestratorDetails.svi_strength_2;
-    console.log('[IndividualTravelSegment] SVI disabled:', {
-      use_svi: false,
-      params_use_svi: params.use_svi,
-      params_has_predecessor_url: !!params.svi_predecessor_video_url,
-    });
-  }
+  // HARDCODED: SVI (smooth continuations) feature has been removed from UX
+  // Always disable SVI - override any inherited value from original orchestrator_details
+  orchestratorDetails.use_svi = false;
+  delete orchestratorDetails.svi_predecessor_video_url;
+  delete orchestratorDetails.svi_strength_1;
+  delete orchestratorDetails.svi_strength_2;
 
   if (phaseConfig) {
     orchestratorDetails.phase_config = phaseConfig;

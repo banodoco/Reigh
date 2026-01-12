@@ -1289,15 +1289,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         turbo_mode: turboMode,
         debug: steerableMotionSettings.debug || false,
         generation_type_mode: generationTypeMode || 'i2v',
-        use_svi: smoothContinuations || false,
+        // HARDCODED: SVI (smooth continuations) feature has been removed from UX
+        // Always set to false regardless of persisted shot settings
+        use_svi: false,
       },
-      // [SmoothContinuationsDebug] Log what we're sending
-      ...(console.log('[SmoothContinuationsDebug] ShotEditor sending to generateVideo:', {
-        smoothContinuations,
-        use_svi: smoothContinuations || false,
-        selectedShotId: selectedShotId?.substring(0, 8),
-        timestamp: Date.now()
-      }), {}),
       structureVideoConfig,
       batchVideoFrames,
       selectedLoras: loraManager.selectedLoras.map(lora => ({

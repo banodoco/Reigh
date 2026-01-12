@@ -276,16 +276,13 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     turbo_mode: turboMode,
     debug,
     generation_type_mode: generationTypeMode,
-    use_svi: useSvi,
+    // HARDCODED: SVI (smooth continuations) feature has been removed from UX
+    // Ignore any persisted value and always use false
+    use_svi: _ignoredUseSvi,
   } = modelConfig;
-
-  // [SmoothContinuationsDebug] Log what value we received
-  console.log('[SmoothContinuationsDebug] generateVideoService received:', {
-    useSvi,
-    modelConfig_use_svi: modelConfig.use_svi,
-    generationTypeMode,
-    timestamp: Date.now()
-  });
+  
+  // SVI is always disabled - feature removed from UX
+  const useSvi = false;
 
   // CRITICAL: Ensure amountOfMotion has a valid default value
   // JavaScript destructuring default only applies when property is absent, not when it's undefined

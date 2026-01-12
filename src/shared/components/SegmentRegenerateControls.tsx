@@ -559,17 +559,6 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       const uiBasePrompt = params.base_prompt || params.prompt || '';
       const uiNegativePrompt = params.negative_prompt || '';
 
-      // [SVI Debug] Log exactly what SVI values we're sending
-      const sviUseValue = smoothContinuations && !!predecessorVideoUrl;
-      const sviPredecessorValue = smoothContinuations ? predecessorVideoUrl : undefined;
-      console.log('[SegmentRegenerateControls] [SVI] Creating task with:', {
-        smoothContinuations_state: smoothContinuations,
-        predecessorVideoUrl_exists: !!predecessorVideoUrl,
-        use_svi_being_sent: sviUseValue,
-        svi_predecessor_url_being_sent: !!sviPredecessorValue,
-        segmentIndex,
-      });
-
       await createIndividualTravelSegmentTask({
         project_id: projectId,
         parent_generation_id: generationId,
@@ -593,11 +582,12 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         selected_phase_preset_id: selectedPhasePresetId,
         loras: lorasForTask,
         make_primary_variant: makePrimaryVariant,
-        // Smooth continuations (SVI) params
-        use_svi: smoothContinuations && !!predecessorVideoUrl,
-        svi_predecessor_video_url: smoothContinuations ? predecessorVideoUrl : undefined,
-        svi_strength_1: smoothContinuations ? sviStrength1 : undefined,
-        svi_strength_2: smoothContinuations ? sviStrength2 : undefined,
+        // HARDCODED: SVI (smooth continuations) feature has been removed from UX
+        // Always disable regardless of any persisted settings
+        use_svi: false,
+        svi_predecessor_video_url: undefined,
+        svi_strength_1: undefined,
+        svi_strength_2: undefined,
       });
 
       setRegenerateSuccess(true);
