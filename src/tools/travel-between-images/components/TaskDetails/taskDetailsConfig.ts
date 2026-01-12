@@ -107,10 +107,16 @@ export function parseTaskParams(params: any): Record<string, any> {
 
 /**
  * Derive input images from various param locations
+ * Checks top-level params, orchestrator_details, and full_orchestrator_payload
  */
 export function deriveInputImages(parsedParams: Record<string, any>): string[] {
   const urls: string[] = [];
   const p = parsedParams;
+  const od = p?.orchestrator_details;
+  const op = p?.full_orchestrator_payload;
+  const isp = p?.individual_segment_params;
+  
+  // Image edit task paths
   if (typeof p?.image_url === 'string') urls.push(p.image_url);
   if (typeof p?.image === 'string') urls.push(p.image);
   if (typeof p?.input_image === 'string') urls.push(p.input_image);
@@ -118,7 +124,68 @@ export function deriveInputImages(parsedParams: Record<string, any>): string[] {
   if (Array.isArray(p?.images)) urls.push(...p.images.filter((x: any) => typeof x === 'string'));
   if (Array.isArray(p?.input_images)) urls.push(...p.input_images.filter((x: any) => typeof x === 'string'));
   if (typeof p?.mask_url === 'string') urls.push(p.mask_url);
+  
+  // Travel/video task paths (input_image_paths_resolved)
+  // For individual_travel_segment, check top-level first (segment-specific images)
+  if (Array.isArray(p?.input_image_paths_resolved)) {
+    urls.push(...p.input_image_paths_resolved.filter((x: any) => typeof x === 'string'));
+  }
+  // Check orchestrator_details
+  if (Array.isArray(od?.input_image_paths_resolved)) {
+    urls.push(...od.input_image_paths_resolved.filter((x: any) => typeof x === 'string'));
+  }
+  // Check full_orchestrator_payload
+  if (Array.isArray(op?.input_image_paths_resolved)) {
+    urls.push(...op.input_image_paths_resolved.filter((x: any) => typeof x === 'string'));
+  }
+  // Check individual_segment_params
+  if (Array.isArray(isp?.input_image_paths_resolved)) {
+    urls.push(...isp.input_image_paths_resolved.filter((x: any) => typeof x === 'string'));
+  }
+  
   return Array.from(new Set(urls.filter(Boolean)));
+}
+
+/**
+ * Extract LoRAs from task params (checks multiple locations)
+ */
+export interface LoraInfo {
+  url: string;
+  strength: number;
+  displayName: string;
+}
+
+export function extractLoras(parsedParams: Record<string, any>): LoraInfo[] {
+  const p = parsedParams;
+  const od = p?.orchestrator_details;
+  const op = p?.full_orchestrator_payload;
+  
+  // Check for array format (image edit tasks use this)
+  const lorasArray = p?.loras || od?.loras || op?.loras;
+  if (Array.isArray(lorasArray) && lorasArray.length > 0) {
+    return lorasArray.map((lora: any) => ({
+      url: lora.url || '',
+      strength: lora.strength ?? lora.multiplier ?? 1,
+      displayName: extractLoraDisplayName(lora.url || ''),
+    }));
+  }
+  
+  // Check for object format (video tasks use additional_loras)
+  const additionalLoras = p?.additional_loras || od?.additional_loras || op?.additional_loras;
+  if (additionalLoras && typeof additionalLoras === 'object' && Object.keys(additionalLoras).length > 0) {
+    return Object.entries(additionalLoras).map(([url, strength]) => ({
+      url,
+      strength: strength as number,
+      displayName: extractLoraDisplayName(url),
+    }));
+  }
+  
+  return [];
+}
+
+function extractLoraDisplayName(url: string): string {
+  const fileName = url.split('/').pop() || 'Unknown';
+  return fileName.replace(/\.(safetensors|ckpt|pt)$/i, '').replace(/_/g, ' ');
 }
 
 /**

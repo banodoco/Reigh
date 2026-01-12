@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-import { TaskDetailsProps, getVariantConfig, parseTaskParams, deriveInputImages } from './taskDetailsConfig';
+import { TaskDetailsProps, getVariantConfig, parseTaskParams, deriveInputImages, extractLoras } from './taskDetailsConfig';
 
 /**
  * Task details for image editing tasks (img2img, inpaint, magic edit, etc.)
- * Shows: input image, prompt (if any), strength (for img2img)
+ * Shows: input image, prompt (if any), strength (for img2img), LoRAs
  */
 export const ImageEditTaskDetails: React.FC<TaskDetailsProps> = ({
   task,
@@ -15,6 +15,7 @@ export const ImageEditTaskDetails: React.FC<TaskDetailsProps> = ({
   const parsedParams = useMemo(() => parseTaskParams(task?.params), [task?.params]);
   const derivedImages = useMemo(() => deriveInputImages(parsedParams), [parsedParams]);
   const effectiveInputImages = inputImages.length > 0 ? inputImages : derivedImages;
+  const loras = useMemo(() => extractLoras(parsedParams), [parsedParams]);
 
   const prompt = parsedParams?.prompt;
   const strength = parsedParams?.strength;
@@ -55,6 +56,30 @@ export const ImageEditTaskDetails: React.FC<TaskDetailsProps> = ({
           <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
             {strength.toFixed(2)}
           </p>
+        </div>
+      )}
+
+      {/* LoRAs */}
+      {loras.length > 0 && (
+        <div className="space-y-1.5">
+          <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs</p>
+          <div className="space-y-1">
+            {loras.slice(0, config.maxLoras).map((lora, idx) => (
+              <div key={idx} className={`flex items-center justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
+                <span className={`${config.fontWeight} truncate`} title={lora.displayName}>
+                  {lora.displayName.length > config.loraNameLength 
+                    ? lora.displayName.slice(0, config.loraNameLength) + '...' 
+                    : lora.displayName}
+                </span>
+                <span className="text-muted-foreground ml-1">{lora.strength}</span>
+              </div>
+            ))}
+            {loras.length > config.maxLoras && (
+              <p className={`${config.textSize} text-muted-foreground`}>
+                +{loras.length - config.maxLoras} more
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
