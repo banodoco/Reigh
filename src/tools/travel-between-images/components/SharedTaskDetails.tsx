@@ -45,11 +45,44 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [characterVideoLoaded, setCharacterVideoLoaded] = useState(false);
 
+  // Normalize task params (some callers may pass stringified params)
+  const parsedParams = useMemo(() => {
+    const p = task?.params;
+    if (!p) return {};
+    if (typeof p === 'string') {
+      try {
+        return JSON.parse(p);
+      } catch {
+        return {};
+      }
+    }
+    return p;
+  }, [task?.params]);
+
+  // Fallback: derive a minimal set of "input images" for image edit tasks
+  // (some tasks use `image_url` / `mask_url` instead of `input_images`)
+  const derivedInputImages = useMemo(() => {
+    const urls: string[] = [];
+    const p: any = parsedParams;
+    if (typeof p?.image_url === 'string') urls.push(p.image_url);
+    if (typeof p?.image === 'string') urls.push(p.image);
+    if (typeof p?.input_image === 'string') urls.push(p.input_image);
+    if (typeof p?.init_image === 'string') urls.push(p.init_image);
+    if (Array.isArray(p?.images)) urls.push(...p.images.filter((x: any) => typeof x === 'string'));
+    if (Array.isArray(p?.input_images)) urls.push(...p.input_images.filter((x: any) => typeof x === 'string'));
+    // Include mask preview as "input" for inpainting tasks (useful context)
+    if (typeof p?.mask_url === 'string') urls.push(p.mask_url);
+    // De-dupe while preserving order
+    return Array.from(new Set(urls.filter(Boolean)));
+  }, [parsedParams]);
+
+  const effectiveInputImages = (inputImages && inputImages.length > 0) ? inputImages : derivedInputImages;
+
   // Helper to safely access orchestrator payload from multiple possible locations (memoized)
-  const orchestratorPayload = useMemo(() => task?.params?.full_orchestrator_payload as any, [task?.params?.full_orchestrator_payload]);
-  const orchestratorDetails = useMemo(() => task?.params?.orchestrator_details as any, [task?.params?.orchestrator_details]);
+  const orchestratorPayload = useMemo(() => (parsedParams as any)?.full_orchestrator_payload as any, [parsedParams]);
+  const orchestratorDetails = useMemo(() => (parsedParams as any)?.orchestrator_details as any, [parsedParams]);
   // For individual_travel_segment tasks, UI overrides are stored in individual_segment_params
-  const individualSegmentParams = useMemo(() => task?.params?.individual_segment_params as any, [task?.params?.individual_segment_params]);
+  const individualSegmentParams = useMemo(() => (parsedParams as any)?.individual_segment_params as any, [parsedParams]);
   const isIndividualSegmentTask = task?.taskType === 'individual_travel_segment';
 
   // Check if this is a character animate task
@@ -64,7 +97,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
     individualSegmentParams?.additional_loras ||
     orchestratorPayload?.additional_loras || 
     orchestratorDetails?.additional_loras || 
-    task?.params?.additional_loras
+    (parsedParams as any)?.additional_loras
   ) as Record<string, any> | undefined;
 
   // Get phase_config for phase-by-phase LoRA display (memoized to prevent random changes)
@@ -74,9 +107,9 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       individualSegmentParams?.phase_config ||
       orchestratorPayload?.phase_config || 
       orchestratorDetails?.phase_config || 
-      task?.params?.phase_config
+      (parsedParams as any)?.phase_config
     ) as any;
-  }, [individualSegmentParams?.phase_config, orchestratorPayload?.phase_config, orchestratorDetails?.phase_config, task?.params?.phase_config]);
+  }, [individualSegmentParams?.phase_config, orchestratorPayload?.phase_config, orchestratorDetails?.phase_config, parsedParams]);
 
   // Memoize computed phase values to prevent flickering
   const phaseStepsDisplay = useMemo(() => {
@@ -169,56 +202,56 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   // Join Clips specific data
   // New multi-clip format
   const clipsArray = isJoinClipsTask ? (
-    task?.params?.clips || 
+    (parsedParams as any)?.clips || 
     orchestratorDetails?.clips || 
     orchestratorPayload?.clips
   ) : null;
   
   const perJoinSettings = isJoinClipsTask ? (
-    task?.params?.per_join_settings || 
+    (parsedParams as any)?.per_join_settings || 
     orchestratorDetails?.per_join_settings || 
     orchestratorPayload?.per_join_settings
   ) : null;
   
   // Legacy two-video format (fallback for backward compatibility)
   const startingVideoPath = isJoinClipsTask && !clipsArray ? (
-    task?.params?.starting_video_path || 
+    (parsedParams as any)?.starting_video_path || 
     orchestratorDetails?.starting_video_path || 
     orchestratorPayload?.starting_video_path
   ) : null;
   
   const endingVideoPath = isJoinClipsTask && !clipsArray ? (
-    task?.params?.ending_video_path || 
+    (parsedParams as any)?.ending_video_path || 
     orchestratorDetails?.ending_video_path || 
     orchestratorPayload?.ending_video_path
   ) : null;
   
   const joinClipsPrompt = isJoinClipsTask && !clipsArray ? (
-    task?.params?.prompt || 
+    (parsedParams as any)?.prompt || 
     orchestratorDetails?.prompt || 
     orchestratorPayload?.prompt
   ) : null;
   
   const contextFrameCount = isJoinClipsTask ? (
-    task?.params?.context_frame_count || 
+    (parsedParams as any)?.context_frame_count || 
     orchestratorDetails?.context_frame_count || 
     orchestratorPayload?.context_frame_count
   ) : null;
   
   const gapFrameCount = isJoinClipsTask ? (
-    task?.params?.gap_frame_count || 
+    (parsedParams as any)?.gap_frame_count || 
     orchestratorDetails?.gap_frame_count || 
     orchestratorPayload?.gap_frame_count
   ) : null;
   
   const replaceMode = isJoinClipsTask ? (
-    task?.params?.replace_mode ?? 
+    (parsedParams as any)?.replace_mode ?? 
     orchestratorDetails?.replace_mode ?? 
     orchestratorPayload?.replace_mode
   ) : null;
   
   const keepBridgingImages = isJoinClipsTask ? (
-    task?.params?.keep_bridging_images ?? 
+    (parsedParams as any)?.keep_bridging_images ?? 
     orchestratorDetails?.keep_bridging_images ?? 
     orchestratorPayload?.keep_bridging_images
   ) : null;
@@ -236,10 +269,25 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   const showPhaseContentInRightColumn = isVideoTravelTask && phaseConfig?.phases;
 
   // Check if this is a segment task (child generation)
-  const isSegmentTask = task?.params?.segment_index !== undefined;
-  const segmentIndex = task?.params?.segment_index;
-  const isFirstSegment = task?.params?.is_first_segment;
-  const isLastSegment = task?.params?.is_last_segment;
+  const isSegmentTask = (parsedParams as any)?.segment_index !== undefined;
+  const segmentIndex = (parsedParams as any)?.segment_index;
+  const isFirstSegment = (parsedParams as any)?.is_first_segment;
+  const isLastSegment = (parsedParams as any)?.is_last_segment;
+
+  // Image edit task detection (for showing key params like Img2Img strength)
+  const isImageEditTask = useMemo(() => {
+    const t = task?.taskType;
+    if (!t) return false;
+    return [
+      'z_image_turbo_i2i',
+      'z_image_turbo',
+      'image_inpaint',
+      'qwen_image_edit',
+      'magic_edit',
+      'kontext_image_edit',
+      'flux_image_edit',
+    ].includes(t);
+  }, [task?.taskType]);
 
   return (
     <div className={`p-3 bg-muted/30 rounded-lg border ${showPhaseContentInRightColumn ? 'w-full' : variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'} ${showPhaseContentInRightColumn ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3'}`}>
@@ -642,7 +690,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       )}
 
       {/* Guidance Images Section (for non-character-animate and non-join-clips tasks) */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && inputImages.length > 0 && (
+      {!isCharacterAnimateTask && !isJoinClipsTask && effectiveInputImages.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center">
             <div className="flex items-center space-x-2">
@@ -650,12 +698,12 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                 Image Guidance
               </p>
               <span className={`${config.textSize} text-foreground`}>
-                ({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})
+                ({effectiveInputImages.length} image{effectiveInputImages.length !== 1 ? 's' : ''})
               </span>
             </div>
           </div>
           <div className={`grid gap-1 ${config.imageGridCols} justify-center`}>
-            {(showAllImages ? inputImages : inputImages.slice(0, config.maxImages)).map((img: string, index: number) => (
+            {(showAllImages ? effectiveInputImages : effectiveInputImages.slice(0, config.maxImages)).map((img: string, index: number) => (
               <div key={index} className="relative group">
                 <img 
                   src={img} 
@@ -664,14 +712,14 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                 />
               </div>
             ))}
-            {inputImages.length > config.maxImages && !showAllImages && (
+            {effectiveInputImages.length > config.maxImages && !showAllImages && (
               <div 
                 className="relative group cursor-pointer"
                 onClick={() => onShowAllImagesChange?.(true)}
               >
                 <div className="w-full aspect-square bg-muted/50 hover:bg-muted/70 rounded border shadow-sm transition-all group-hover:scale-105 flex items-center justify-center">
                   <span className={`${config.textSize} text-muted-foreground font-medium text-center`}>
-                    {inputImages.length - config.maxImages} more
+                    {effectiveInputImages.length - config.maxImages} more
                   </span>
                 </div>
               </div>
@@ -907,18 +955,18 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           {(() => {
             // For segment tasks, prioritize segment-specific base_prompt over orchestrator_details
             // For individual_travel_segment, check individual_segment_params first (UI overrides)
-            const isSegmentTask = task?.params?.segment_index !== undefined;
+            const isSegmentTask = (parsedParams as any)?.segment_index !== undefined;
             const prompt = individualSegmentParams?.base_prompt ||
               (isSegmentTask 
-                ? (task?.params?.base_prompt || task?.params?.prompt)
+                ? ((parsedParams as any)?.base_prompt || (parsedParams as any)?.prompt)
                 : (orchestratorDetails?.base_prompts_expanded?.[0] || 
                    orchestratorPayload?.base_prompts_expanded?.[0] || 
                    orchestratorDetails?.base_prompt ||
                    orchestratorPayload?.base_prompt ||
-                   task?.params?.prompt));
+                   (parsedParams as any)?.prompt));
             const enhancePrompt = orchestratorDetails?.enhance_prompt || 
                                  orchestratorPayload?.enhance_prompt || 
-                                 task?.params?.enhance_prompt;
+                                 (parsedParams as any)?.enhance_prompt;
             if (prompt) {
               const shouldTruncate = prompt.length > config.promptLength;
               const displayText = showFullPrompt || !shouldTruncate ? prompt : prompt.slice(0, config.promptLength) + '...';
@@ -958,11 +1006,11 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           {(() => {
             // For segment tasks, prioritize segment-specific negative_prompt
             // For individual_travel_segment, check individual_segment_params first (UI overrides)
-            const isSegmentTask = task?.params?.segment_index !== undefined;
+            const isSegmentTask = (parsedParams as any)?.segment_index !== undefined;
             const negativePrompt = individualSegmentParams?.negative_prompt ||
               (isSegmentTask 
-                ? task?.params?.negative_prompt
-                : (orchestratorDetails?.negative_prompts_expanded?.[0] || orchestratorPayload?.negative_prompts_expanded?.[0] || task?.params?.negative_prompt));
+                ? (parsedParams as any)?.negative_prompt
+                : (orchestratorDetails?.negative_prompts_expanded?.[0] || orchestratorPayload?.negative_prompts_expanded?.[0] || (parsedParams as any)?.negative_prompt));
             if (negativePrompt && negativePrompt !== 'N/A') {
               const shouldTruncate = negativePrompt.length > config.negativePromptLength;
               const displayText = showFullNegativePrompt || !shouldTruncate ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...';
@@ -1031,6 +1079,40 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         
         {/* Technical Settings */}
         <div className="space-y-3">
+          {/* Image Edit Task Details (key parameters) */}
+          {isImageEditTask && (
+            <div className="space-y-2 pb-2 border-b border-muted-foreground/20">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Edit Settings</p>
+              {/* Img2Img: denoising strength */}
+              {task?.taskType === 'z_image_turbo_i2i' && typeof (parsedParams as any)?.strength === 'number' && (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Denoising Strength</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {(parsedParams as any).strength.toFixed(2)}
+                  </p>
+                </div>
+              )}
+              {/* Img2Img: prompt expansion */}
+              {task?.taskType === 'z_image_turbo_i2i' && (parsedParams as any)?.enable_prompt_expansion !== undefined && (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt Expansion</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {(parsedParams as any).enable_prompt_expansion ? 'On' : 'Off'}
+                  </p>
+                </div>
+              )}
+              {/* Inpaint: mask */}
+              {task?.taskType === 'image_inpaint' && (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Mask</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {typeof (parsedParams as any)?.mask_url === 'string' && (parsedParams as any).mask_url ? 'Provided' : 'N/A'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Model Type */}
           {(() => {
             const modelName = orchestratorDetails?.model_name || orchestratorPayload?.model_name || task?.params?.model_name;

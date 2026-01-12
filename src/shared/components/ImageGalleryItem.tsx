@@ -177,11 +177,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const taskType = taskData?.taskType;
   const { data: taskTypeInfo } = useTaskType(taskType || null);
   
-  // Determine if this should show video task details (SharedTaskDetails)
-  // Check if content_type is 'video' from task_types table
-  // Fallback: if no taskTypeInfo, check metadata.tool_type for legacy support
+  // Determine if this should show task details (SharedTaskDetails)
+  // Use content_type from task_types table. Fallback to legacy tool_type for video travel.
   const isVideoTask = taskTypeInfo?.content_type === 'video' || 
     (!taskTypeInfo && (image.metadata as any)?.tool_type === 'travel-between-images');
+  const isImageTask = taskTypeInfo?.content_type === 'image';
+  const shouldShowTaskDetails = (!!taskData) && (isVideoTask || isImageTask);
 
   // Share functionality
   const { handleShare, isCreatingShare, shareCopied, shareSlug } = useShareGeneration(image.id, taskId);
@@ -1488,7 +1489,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       >
                         {shouldShowMetadata && image.metadata && (
                           <>
-                            {isVideoTask && taskData ? (
+                            {shouldShowTaskDetails ? (
                               <SharedTaskDetails
                                 task={taskData}
                                 inputImages={inputImages}
@@ -1526,7 +1527,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     >
                       {shouldShowMetadata && image.metadata && (
                         <>
-                          {isVideoTask && taskData ? (
+                          {shouldShowTaskDetails ? (
                             <SharedTaskDetails
                               task={taskData}
                               inputImages={inputImages}

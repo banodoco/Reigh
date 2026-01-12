@@ -1390,10 +1390,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
             className="relative cursor-pointer hover:bg-background/90 transition-colors rounded-lg group"
             onClick={handleTooltipClick}
           >
-            {taskInfo.isVideoTask ? (
+            {(taskInfo.isVideoTask || taskInfo.isImageTask) ? (
               <SharedTaskDetails
                 task={task}
-                inputImages={travelData.imageUrls}
+                inputImages={taskInfo.isVideoTask ? travelData.imageUrls : []}
                 variant="hover"
                 isMobile={false}
               />
