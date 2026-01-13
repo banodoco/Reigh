@@ -344,6 +344,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // State for CreateShotModal
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState<boolean>(false);
   const [isCreatingShot, setIsCreatingShot] = useState<boolean>(false);
+  // Track when ShotSelector popover is open to keep parent visible
+  const [isShotSelectorOpen, setIsShotSelectorOpen] = useState<boolean>(false);
   // Check if this image was already cached by the preloader using centralized function
   const isPreloadedAndCached = isImageCached(image);
   const [imageLoaded, setImageLoaded] = useState<boolean>(isPreloadedAndCached);
@@ -1090,7 +1092,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
           {/* Add to Shot UI - Top Left (for non-video content) */}
           {showAddToShot && simplifiedShotOptions.length > 0 && onAddToLastShot && (
-          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <div className={cn(
+            "absolute top-2 left-2 flex flex-col items-start gap-1 transition-opacity z-20",
+            isShotSelectorOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          )}>
               {!isVideoContent && (
               <ShotSelector
                   value={selectedShotIdLocal}
@@ -1111,6 +1116,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   align="start"
                   sideOffset={4}
                   onNavigateToShot={(shot) => navigateToShot(shot as any, { scrollToTop: true })}
+                  open={isShotSelectorOpen}
+                  onOpenChange={setIsShotSelectorOpen}
               />
               )}
 

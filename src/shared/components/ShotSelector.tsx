@@ -1,14 +1,10 @@
-import React, { useMemo } from "react";
-import { PlusCircle, Check, ArrowRight } from "lucide-react";
+import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { PlusCircle, Check, ArrowRight, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/shared/components/ui/command";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { cn } from "@/shared/lib/utils";
 
 export interface ShotOption {
   id: string;
@@ -31,7 +27,7 @@ export interface ShotSelectorProps {
   
   // Add Shot functionality
   showAddShot?: boolean;
-  onCreateShot?: () => void;
+  onCreateShot?: (shotName?: string) => void;
   isCreatingShot?: boolean;
   
   // Quick create success state
@@ -82,153 +78,37 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   const isMobile = useIsMobile();
   
   // Internal state for uncontrolled mode
-  const [internalOpen, setInternalOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   
-  // Ref to track the trigger element for click-outside detection
-  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  // Search query state
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Ref for auto-focusing the search input
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Use controlled state if provided, otherwise use internal state
   const isOpen = open !== undefined ? open : internalOpen;
-  const setIsOpen = React.useCallback((newOpen: boolean) => {
+  const setIsOpen = useCallback((newOpen: boolean) => {
     if (open === undefined) {
       setInternalOpen(newOpen);
     }
     onOpenChange?.(newOpen);
+    // Reset search when closing
+    if (!newOpen) {
+      setSearchQuery('');
+    }
   }, [open, onOpenChange]);
   
-  // Global click handler to close dropdown when clicking outside
-  // This is needed because Radix Select's outside click detection
-  // doesn't work properly when nested inside a Dialog
-  React.useEffect(() => {
-    if (!isOpen) return;
-    
-    const handleGlobalPointerDown = (e: PointerEvent) => {
-      const target = e.target as HTMLElement;
-      
-      console.log('[ShotSelectorDebug] Global pointerdown detected:', {
-        tagName: target.tagName,
-        className: target.className,
-        hasRadixContent: !!target.closest('[data-radix-select-content]'),
-        hasRadixViewport: !!target.closest('[data-radix-select-viewport]'),
-        hasRadixItem: !!target.closest('[data-radix-select-item]'),
-        hasScrollButton: !!target.closest('[data-select-scroll-button]'),
-        hasHeader: !!target.closest('[data-shot-selector-header]'),
-        hasTrigger: triggerRef.current?.contains(target),
-      });
-      
-      // Don't close if clicking on the trigger
-      if (triggerRef.current?.contains(target)) {
-        console.log('[ShotSelectorDebug] Click on trigger - not closing');
-        return;
-      }
-      
-      // Don't close if clicking on select content (including portal)
-      // Check for data-radix-select attributes to identify select elements
-      // Also check for scroll buttons which have custom data-select-scroll-button attribute
-      if (
-        target.closest('[data-radix-select-content]') ||
-        target.closest('[data-radix-select-viewport]') ||
-        target.closest('[data-radix-select-item]') ||
-        target.closest('[data-select-scroll-button]')
-      ) {
-        console.log('[ShotSelectorDebug] Click on select content - not closing');
-        return;
-      }
-      
-      // Don't close if clicking on the header (like "Add Shot" button)
-      // The header is marked with data-shot-selector-header
-      if (target.closest('[data-shot-selector-header]')) {
-        console.log('[ShotSelectorDebug] Click on header - not closing');
-        return;
-      }
-      
-      // Click was outside - close the dropdown
-      console.log('[ShotSelectorDebug] Global pointerdown outside - closing dropdown');
-      setIsOpen(false);
-    };
-    
-    // Use pointerdown instead of click, and add a longer delay
-    // to avoid closing immediately when opening (the opening click might still be processing)
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('pointerdown', handleGlobalPointerDown, true);
-    }, 100);
-    
-    return () => {
-      clearTimeout(timeoutId);
-      document.removeEventListener('pointerdown', handleGlobalPointerDown, true);
-    };
-  }, [isOpen, setIsOpen]);
-  
-  // Create the "Add Shot" header if needed
-  const addShotHeader = useMemo(() => {
-    if (!showAddShot || !onCreateShot) return null;
-    
-    return (
-      <div className="bg-zinc-900 border-b border-zinc-700 p-1" data-shot-selector-header>
-        {quickCreateSuccess?.isSuccessful ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full h-8 text-xs justify-center bg-zinc-600 hover:bg-zinc-500 text-white border-zinc-500"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              // Don't navigate if still loading
-              if (quickCreateSuccess.isLoading) return;
-              console.log('[VisitShotDebug] 1. ShotSelector button clicked', {
-                quickCreateSuccess,
-                hasOnQuickCreateSuccess: !!onQuickCreateSuccess,
-                timestamp: Date.now()
-              });
-              // Close dropdown before navigating
-              setIsOpen(false);
-              if (onQuickCreateSuccess) {
-                onQuickCreateSuccess();
-              }
-            }}
-            disabled={quickCreateSuccess.isLoading}
-          >
-            {quickCreateSuccess.isLoading ? (
-              <>
-                <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white mr-1"></div>
-                Preparing {quickCreateSuccess.shotName}...
-              </>
-            ) : (
-              <>
-                <Check className="h-3 w-3 mr-1" />
-                Visit {quickCreateSuccess.shotName}
-              </>
-            )}
-          </Button>
-        ) : (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full h-8 text-xs justify-center bg-zinc-600 hover:bg-zinc-500 text-white border-zinc-500"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              // Don't close dropdown - let it show the success state with "Visit Shot" button
-              onCreateShot();
-            }}
-            disabled={isCreatingShot}
-          >
-            {isCreatingShot ? (
-              <>
-                <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white mr-1"></div>
-                Creating...
-              </>
-            ) : (
-              <>
-                <PlusCircle className="h-3 w-3 mr-1" />
-                Add Shot
-              </>
-            )}
-          </Button>
-        )}
-      </div>
-    );
-  }, [showAddShot, onCreateShot, quickCreateSuccess, onQuickCreateSuccess, isCreatingShot, setIsOpen]);
+  // Auto-focus search input when popover opens
+  useEffect(() => {
+    if (isOpen) {
+      // Small delay to ensure the popover content is rendered
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   // Get the selected shot
   const selectedShot = useMemo(() => {
@@ -238,6 +118,55 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
 
   // Get the display name for the selected shot
   const selectedShotName = selectedShot?.name || null;
+  
+  // Check if search query matches any shot
+  const hasMatchingShot = useMemo(() => {
+    if (!searchQuery.trim()) return true;
+    return shots.some(s => 
+      s.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery, shots]);
+  
+  // Handle Enter key to create shot with search query
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && searchQuery.trim() && !hasMatchingShot && onCreateShot) {
+      e.preventDefault();
+      onCreateShot(searchQuery.trim());
+    }
+  }, [searchQuery, hasMatchingShot, onCreateShot]);
+
+  // Variant-specific styles
+  const getVariantStyles = () => {
+    switch (variant) {
+      case "retro":
+        return {
+          trigger: cn(
+            "bg-background hover:bg-[#6a8a8a]/10 rounded-sm border-2 border-[#6a8a8a]/30 hover:border-[#6a8a8a]/45",
+            "dark:border-[#6a7a7a] dark:hover:bg-transparent text-[#5a7a7a] dark:text-[#c8c4bb]",
+            "font-heading font-light tracking-wide transition-all duration-200"
+          ),
+          content: "rounded-sm border-2 border-[#6a8a8a] dark:border-[#6a7a7a] bg-background",
+          command: "retro" as const,
+        };
+      case "retro-dark":
+        return {
+          trigger: cn(
+            "bg-zinc-800/90 hover:bg-zinc-700/90 rounded-sm border border-zinc-600",
+            "text-zinc-200 font-heading font-light tracking-wide transition-all duration-200"
+          ),
+          content: "rounded-sm border border-zinc-600 bg-zinc-800",
+          command: "retro" as const,
+        };
+      default:
+        return {
+          trigger: "border border-input bg-background",
+          content: "rounded-md border bg-popover",
+          command: "default" as const,
+        };
+    }
+  };
+  
+  const styles = getVariantStyles();
 
   console.log('[ShotSelectorDebug] ShotSelector render:', {
     value,
@@ -247,95 +176,189 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   });
 
   return (
-    <div className={`flex items-center gap-1 ${className || ''}`}>
-      <Select
-        value={value}
-        open={isOpen}
-        onValueChange={(newValue) => {
-          console.log('[ShotSelectorDebug] 🎯 Shot selected:', newValue);
-          onValueChange(newValue);
-          // Close the dropdown after selection
-          setIsOpen(false);
-        }}
-        onOpenChange={(newOpen) => {
-          console.log('[ShotSelectorDebug] Dropdown open state changed:', newOpen);
-          setIsOpen(newOpen);
-        }}
-      >
-        <SelectTrigger
-          ref={triggerRef}
-          variant={variant}
-          size="sm"
-          className={triggerClassName}
-          aria-label="Select target shot"
-          onMouseEnter={(e) => e.stopPropagation()}
-          onMouseLeave={(e) => e.stopPropagation()}
-          onPointerDown={(e) => {
-            console.log('[ShotSelectorDebug] SelectTrigger onPointerDown');
-            e.stopPropagation();
-          }}
-          onClick={(e) => {
-            console.log('[ShotSelectorDebug] SelectTrigger onClick');
-            e.stopPropagation();
-          }}
-        >
-          <SelectValue placeholder={placeholder}>
-            {selectedShotName 
-              ? (selectedShotName.length > 10 ? `${selectedShotName.substring(0, 10)}...` : selectedShotName)
-              : (value ? "Loading..." : placeholder)}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent 
-          variant={variant}
-          header={addShotHeader}
-          className={`z-[9999] max-h-60 ${contentClassName || ''}`}
-          style={{ zIndex: 10000 }}
-          position="popper"
+    <div 
+      className={`flex items-center gap-1 ${className || ''}`}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <button
+            role="combobox"
+            aria-expanded={isOpen}
+            className={cn(
+              "flex items-center justify-between px-2 py-1 text-xs",
+              "focus:outline-none focus:ring-1 focus:ring-zinc-500",
+              "disabled:cursor-not-allowed disabled:opacity-50",
+              styles.trigger,
+              triggerClassName
+            )}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="truncate">
+              {selectedShotName 
+                ? (selectedShotName.length > 10 ? `${selectedShotName.substring(0, 10)}...` : selectedShotName)
+                : (value ? "Loading..." : placeholder)}
+            </span>
+            <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent 
+          className={cn(
+            "p-0 z-[10000]",
+            styles.content,
+            contentClassName
+          )}
+          style={{ zIndex: 10000, width: 'var(--radix-popover-trigger-width)', minWidth: '160px' }}
           side={side}
           sideOffset={sideOffset}
           align={align}
           collisionPadding={8}
           container={container}
+          onKeyDown={handleKeyDown}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
         >
-          {shots.map(shot => (
-            <div key={shot.id} className="group relative flex items-center">
-              <SelectItem 
-                variant={variant}
-                value={shot.id} 
-                className="text-xs flex-1 pr-8"
-                onPointerDown={(e) => {
-                  console.log('[ShotSelectorDebug] SelectItem onPointerDown:', shot.name);
-                }}
-                onClick={(e) => {
-                  console.log('[ShotSelectorDebug] SelectItem onClick:', shot.name);
-                }}
-              >
-                {shot.name}
-              </SelectItem>
-              {/* Jump arrow - appears on hover, visible on both dark and highlighted backgrounds, hidden on mobile */}
-              {onNavigateToShot && !isMobile && (
-                <button
-                  className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded bg-zinc-800/90 hover:bg-zinc-700 border border-zinc-600/50"
+          {/* Add Shot Header */}
+          {showAddShot && onCreateShot && (
+            <div className="bg-zinc-900 border-b border-zinc-700 p-1" data-shot-selector-header>
+              {quickCreateSuccess?.isSuccessful ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full h-8 text-xs justify-center bg-zinc-600 hover:bg-zinc-500 text-white border-zinc-500"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    // Close dropdown before navigating
+                    if (quickCreateSuccess.isLoading) return;
                     setIsOpen(false);
-                    onNavigateToShot(shot);
+                    if (onQuickCreateSuccess) {
+                      onQuickCreateSuccess();
+                    }
                   }}
-                  onPointerDown={(e) => {
+                  disabled={quickCreateSuccess.isLoading}
+                >
+                  {quickCreateSuccess.isLoading ? (
+                    <>
+                      <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white mr-1"></div>
+                      Preparing {quickCreateSuccess.shotName}...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-3 w-3 mr-1" />
+                      Visit {quickCreateSuccess.shotName}
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full h-8 text-xs justify-center bg-zinc-600 hover:bg-zinc-500 text-white border-zinc-500"
+                  onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    onCreateShot();
                   }}
-                  title={`Jump to ${shot.name}`}
+                  disabled={isCreatingShot}
                 >
-                  <ArrowRight className="h-3 w-3 text-white" />
-                </button>
+                  {isCreatingShot ? (
+                    <>
+                      <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white mr-1"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="h-3 w-3 mr-1" />
+                      Add Shot
+                    </>
+                  )}
+                </Button>
               )}
             </div>
-          ))}
-        </SelectContent>
-      </Select>
+          )}
+          
+          <Command 
+            variant={styles.command} 
+            className="rounded-none"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <CommandInput 
+              ref={searchInputRef}
+              placeholder="Search shots..." 
+              className="h-8 text-xs border-none"
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <CommandList className="max-h-48">
+              <CommandEmpty>
+                <div className="text-center py-2">
+                  <p className="text-xs text-muted-foreground">No shots found.</p>
+                  {searchQuery.trim() && onCreateShot && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Press <kbd className="px-1 py-0.5 text-[9px] bg-muted rounded border">Enter</kbd> to create "{searchQuery.trim()}"
+                    </p>
+                  )}
+                </div>
+              </CommandEmpty>
+              <CommandGroup>
+                {shots.map(shot => (
+                  <CommandItem
+                    key={shot.id}
+                    value={shot.name}
+                    variant={styles.command}
+                    className="text-xs group relative"
+                    onSelect={() => {
+                      console.log('[ShotSelectorDebug] 🎯 Shot selected:', shot.name);
+                      onValueChange(shot.id);
+                      setIsOpen(false);
+                    }}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className={cn(
+                        "truncate",
+                        value === shot.id && "font-medium"
+                      )}>
+                        {shot.name}
+                      </span>
+                      {value === shot.id && (
+                        <Check className="h-3 w-3 shrink-0 ml-1" />
+                      )}
+                    </div>
+                    {/* Jump arrow - appears on hover, hidden on mobile */}
+                    {onNavigateToShot && !isMobile && (
+                      <button
+                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded bg-zinc-800/90 hover:bg-zinc-700 border border-zinc-600/50"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsOpen(false);
+                          onNavigateToShot(shot);
+                        }}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        title={`Jump to ${shot.name}`}
+                      >
+                        <ArrowRight className="h-3 w-3 text-white" />
+                      </button>
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };

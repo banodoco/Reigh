@@ -42,8 +42,8 @@ export interface UseQuickShotCreateReturn {
   isCreatingShot: boolean;
   /** Success state for showing "Visit" button */
   quickCreateSuccess: QuickCreateSuccessState;
-  /** Main function to create shot and add image atomically */
-  handleQuickCreateAndAdd: () => Promise<void>;
+  /** Main function to create shot and add image atomically. Optionally pass a shot name. */
+  handleQuickCreateAndAdd: (shotName?: string) => Promise<void>;
   /** Navigate to the newly created shot */
   handleQuickCreateSuccess: () => void;
   /** Clear the success state manually */
@@ -94,9 +94,10 @@ export const useQuickShotCreate = ({
     });
   }, []);
 
-  const handleQuickCreateAndAdd = useCallback(async () => {
+  const handleQuickCreateAndAdd = useCallback(async (shotName?: string) => {
     console.log('[useQuickShotCreate] Starting quick shot creation:', {
       generationId: generationId?.substring(0, 8),
+      shotName: shotName || '(auto)',
     });
 
     onLoadingStart?.();
@@ -106,7 +107,8 @@ export const useQuickShotCreate = ({
       const result = await createShot({
         generationId,
         generationPreview,
-        // Let useShotCreation auto-generate name
+        // Use provided name or let useShotCreation auto-generate
+        name: shotName || undefined,
         // Settings inheritance and lastAffectedShot are handled automatically
       });
 

@@ -22,11 +22,12 @@ import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
 interface CreateProjectModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  initialName?: string;
 }
 
 
-export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onOpenChange }) => {
-  const [projectName, setProjectName] = useState('');
+export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onOpenChange, initialName }) => {
+  const [projectName, setProjectName] = useState(initialName || '');
   const [aspectRatio, setAspectRatio] = useState<string>('16:9');
   const { addNewProject, isCreatingProject, projects, selectedProjectId } = useProject();
   const isMobile = useIsMobile();
@@ -44,6 +45,14 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
       setAspectRatio(currentProject.aspectRatio);
     }
   }, [isOpen, currentProject?.aspectRatio]);
+  
+  // Set initial name when modal opens with one provided, or reset when closing
+  useEffect(() => {
+    if (isOpen) {
+      // When opening, set to initialName if provided, otherwise reset
+      setProjectName(initialName || '');
+    }
+  }, [isOpen, initialName]);
 
   const handleCreateProject = async () => {
     let finalProjectName = projectName.trim();

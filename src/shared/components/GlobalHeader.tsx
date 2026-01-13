@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { Button } from '@/shared/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/shared/components/ui/command';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { CreateProjectModal } from '@/shared/components/CreateProjectModal';
 import { ReferralModal } from '@/shared/components/ReferralModal';
-import { PlusCircle, Settings, Palette, Sparkles, Crown, Star, Gem, Wrench, ChevronDown } from 'lucide-react';
+import { PlusCircle, Settings, Palette, Crown, Star, Wrench, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { ProjectSettingsModal } from '@/shared/components/ProjectSettingsModal';
 import { toast } from "sonner";
@@ -198,6 +199,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isProjectSettingsModalOpen, setIsProjectSettingsModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
+  const [isProjectSelectorMobileOpen, setIsProjectSelectorMobileOpen] = useState(false);
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
+  const [projectSearchQueryMobile, setProjectSearchQueryMobile] = useState('');
+  const [createProjectInitialName, setCreateProjectInitialName] = useState<string | undefined>(undefined);
 
 
 
@@ -349,15 +355,32 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 </div>
               ) : (
                 <div className="flex items-center space-x-3 relative z-50">
-                  <Select 
-                    value={selectedProjectId || ''} 
-                    onValueChange={handleProjectChange}
-                    disabled={isLoadingProjects || projects.length === 0}
+                  <Popover 
+                    open={isProjectSelectorOpen} 
+                    onOpenChange={(open) => {
+                      setIsProjectSelectorOpen(open);
+                      if (!open) setProjectSearchQuery('');
+                    }}
                   >
-                    <SelectTrigger variant="retro" className="w-[280px] h-12 relative z-50">
-                      <SelectValue placeholder="Select a project">
-                        {selectedProject && (
-                          <div className="flex items-center space-x-2">
+                    <PopoverTrigger asChild>
+                      <button
+                        role="combobox"
+                        aria-expanded={isProjectSelectorOpen}
+                        disabled={isLoadingProjects || projects.length === 0}
+                        className={cn(
+                          "flex w-[280px] h-12 items-center justify-between px-3 py-2",
+                          "bg-background hover:bg-[#6a8a8a]/10 rounded-sm border-2 border-[#6a8a8a]/30 hover:border-[#6a8a8a]/45",
+                          "dark:border-[#6a7a7a] dark:hover:bg-transparent text-[#5a7a7a] dark:text-[#c8c4bb]",
+                          "font-heading font-light tracking-wide transition-all duration-200",
+                          "shadow-[0_1px_2px_0_rgba(106,138,138,0.06)] hover:shadow-[0_2px_4px_-1px_rgba(106,138,138,0.1)]",
+                          "dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)]",
+                          "dark:hover:translate-x-[-0.5px] dark:hover:translate-y-[0.5px]",
+                          "focus:outline-none focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
+                          "disabled:cursor-not-allowed disabled:opacity-50"
+                        )}
+                      >
+                        {selectedProject ? (
+                          <div className="flex items-center space-x-2 min-w-0">
                             <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                               <Star className="h-2 w-2 text-white flex-shrink-0" fill="white" strokeWidth={0} />
                             </div>
@@ -365,52 +388,96 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                               {selectedProject.name.length > 30 ? `${selectedProject.name.substring(0, 30)}...` : selectedProject.name}
                             </span>
                           </div>
+                        ) : (
+                          <span className="text-muted-foreground">Select a project</span>
                         )}
-                      </SelectValue>
-                    </SelectTrigger>
-                  <SelectContent 
-                    variant="retro"
-                    className="z-[9999] max-h-60 overflow-y-auto"
-                  >
-                      {projects.map(project => (
-                        <SelectItem 
-                          variant="retro"
-                          key={project.id} 
-                          value={project.id}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
-                              <Star className="h-2 w-2 text-white flex-shrink-0" />
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                      className="w-[280px] p-0 z-[9999] rounded-sm border-2 border-[#6a8a8a] dark:border-[#6a7a7a] shadow-[-3px_3px_0_0_rgba(106,138,138,0.15)] dark:shadow-[-3px_3px_0_0_rgba(20,30,30,0.4)]"
+                      align="start"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && projectSearchQuery.trim()) {
+                          // Check if any project matches
+                          const hasMatch = projects.some(p => 
+                            p.name.toLowerCase().includes(projectSearchQuery.toLowerCase())
+                          );
+                          if (!hasMatch) {
+                            setCreateProjectInitialName(projectSearchQuery.trim());
+                            setIsCreateProjectModalOpen(true);
+                            setIsProjectSelectorOpen(false);
+                            setProjectSearchQuery('');
+                            e.preventDefault();
+                          }
+                        }
+                      }}
+                    >
+                      <Command variant="retro" className="rounded-sm">
+                        <CommandInput 
+                          placeholder="Search projects..." 
+                          className="h-9"
+                          value={projectSearchQuery}
+                          onValueChange={setProjectSearchQuery}
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            <div className="text-center py-2">
+                              <p className="text-sm text-muted-foreground">No projects found.</p>
+                              {projectSearchQuery.trim() && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border">Enter</kbd> to create "{projectSearchQuery.trim()}"
+                                </p>
+                              )}
                             </div>
-                            <span className="truncate">
-                              {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                      {projects.length > 0 && (
-                        <div className="px-2 py-2">
-                          <div className="border-t-2 border-[#6a8a8a]/30 dark:border-[#8a9a9a]/30 relative">
-                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6a8a8a]/40 dark:via-[#8a9a9a]/40 to-transparent" />
-                          </div>
-                        </div>
-                      )}
-                      <SelectItem 
-                        variant="retro"
-                        value="create-new"
-                        className="mt-1"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 bg-[#5a7a7a] dark:bg-[#7a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
-                            <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
-                          </div>
-                          <span className="font-crimson font-light text-primary">
-                            Create New Project
-                          </span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {projects.map(project => (
+                              <CommandItem
+                                key={project.id}
+                                value={project.name}
+                                variant="retro"
+                                onSelect={() => {
+                                  handleProjectChange(project.id);
+                                  setIsProjectSelectorOpen(false);
+                                }}
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
+                                    <Star className="h-2 w-2 text-white flex-shrink-0" />
+                                  </div>
+                                  <span className="truncate">
+                                    {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          {projects.length > 0 && <CommandSeparator className="border-t-2 border-[#6a8a8a]/30 dark:border-[#8a9a9a]/30" />}
+                          <CommandGroup>
+                            <CommandItem
+                              value="create-new-project"
+                              variant="retro"
+                              onSelect={() => {
+                                setCreateProjectInitialName(undefined);
+                                setIsCreateProjectModalOpen(true);
+                                setIsProjectSelectorOpen(false);
+                              }}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <div className="w-4 h-4 bg-[#5a7a7a] dark:bg-[#7a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
+                                  <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
+                                </div>
+                                <span className="font-crimson font-light text-primary">
+                                  Create New Project
+                                </span>
+                              </div>
+                            </CommandItem>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
               
@@ -430,7 +497,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => setIsCreateProjectModalOpen(true)} 
+                onClick={() => { setCreateProjectInitialName(undefined); setIsCreateProjectModalOpen(true); }} 
                 className="h-12 w-12 wes-button-pulse gradient-icon-yellow dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[1px] hover:translate-y-[1px] group transition-all duration-300"
                 style={getDarkIconStyle(darkIconColors.yellow)}
               >
@@ -554,7 +621,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => setIsCreateProjectModalOpen(true)} 
+                onClick={() => { setCreateProjectInitialName(undefined); setIsCreateProjectModalOpen(true); }} 
                 className="h-10 w-10 wes-button-pulse gradient-icon-yellow dark:bg-none dark:border-2 rounded-sm shadow-[-2px_2px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-2px_2px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] group transition-all duration-300"
                 style={getDarkIconStyle(darkIconColors.yellow)}
               >
@@ -606,15 +673,32 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                   </div>
                 </div>
               ) : (
-                <Select 
-                  value={selectedProjectId || ''} 
-                  onValueChange={handleProjectChange}
-                  disabled={isLoadingProjects || projects.length === 0}
+                <Popover 
+                  open={isProjectSelectorMobileOpen} 
+                  onOpenChange={(open) => {
+                    setIsProjectSelectorMobileOpen(open);
+                    if (!open) setProjectSearchQueryMobile('');
+                  }}
                 >
-                  <SelectTrigger variant="retro" size="sm" className="w-full h-10 relative z-50">
-                    <SelectValue placeholder="Select project">
-                      {selectedProject && (
-                        <div className="flex items-center space-x-2">
+                  <PopoverTrigger asChild>
+                    <button
+                      role="combobox"
+                      aria-expanded={isProjectSelectorMobileOpen}
+                      disabled={isLoadingProjects || projects.length === 0}
+                      className={cn(
+                        "flex w-full h-10 items-center justify-between px-2 py-2 text-sm",
+                        "bg-background hover:bg-[#6a8a8a]/10 rounded-sm border-2 border-[#6a8a8a]/30 hover:border-[#6a8a8a]/45",
+                        "dark:border-[#6a7a7a] dark:hover:bg-transparent text-[#5a7a7a] dark:text-[#c8c4bb]",
+                        "font-heading font-light tracking-wide transition-all duration-200",
+                        "shadow-[0_1px_2px_0_rgba(106,138,138,0.06)] hover:shadow-[0_2px_4px_-1px_rgba(106,138,138,0.1)]",
+                        "dark:shadow-[-2px_2px_0_0_rgba(20,30,30,0.4)] dark:hover:shadow-[-1px_1px_0_0_rgba(20,30,30,0.4)]",
+                        "dark:hover:translate-x-[-0.5px] dark:hover:translate-y-[0.5px]",
+                        "focus:outline-none focus:ring-2 focus:ring-[#6a8a8a]/30 focus:ring-offset-0",
+                        "disabled:cursor-not-allowed disabled:opacity-50"
+                      )}
+                    >
+                      {selectedProject ? (
+                        <div className="flex items-center space-x-2 min-w-0">
                           <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                             <Star className="h-2 w-2 text-white flex-shrink-0" fill="white" strokeWidth={0} />
                           </div>
@@ -622,52 +706,95 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                             {selectedProject.name.length > 30 ? `${selectedProject.name.substring(0, 30)}...` : selectedProject.name}
                           </span>
                         </div>
+                      ) : (
+                        <span className="text-muted-foreground">Select project</span>
                       )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent 
-                    variant="retro"
-                    className="z-[9999] max-h-60 overflow-y-auto"
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    className="w-[calc(100vw-2rem)] max-w-[400px] p-0 z-[9999] rounded-sm border-2 border-[#6a8a8a] dark:border-[#6a7a7a] shadow-[-3px_3px_0_0_rgba(106,138,138,0.15)] dark:shadow-[-3px_3px_0_0_rgba(20,30,30,0.4)]"
+                    align="start"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && projectSearchQueryMobile.trim()) {
+                        const hasMatch = projects.some(p => 
+                          p.name.toLowerCase().includes(projectSearchQueryMobile.toLowerCase())
+                        );
+                        if (!hasMatch) {
+                          setCreateProjectInitialName(projectSearchQueryMobile.trim());
+                          setIsCreateProjectModalOpen(true);
+                          setIsProjectSelectorMobileOpen(false);
+                          setProjectSearchQueryMobile('');
+                          e.preventDefault();
+                        }
+                      }
+                    }}
                   >
-                    {projects.map(project => (
-                      <SelectItem 
-                        variant="retro"
-                        key={project.id} 
-                        value={project.id}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
-                            <Star className="h-2 w-2 text-white flex-shrink-0" />
+                    <Command variant="retro" className="rounded-sm">
+                      <CommandInput 
+                        placeholder="Search projects..." 
+                        className="h-9"
+                        value={projectSearchQueryMobile}
+                        onValueChange={setProjectSearchQueryMobile}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="text-center py-2">
+                            <p className="text-sm text-muted-foreground">No projects found.</p>
+                            {projectSearchQueryMobile.trim() && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded border">Enter</kbd> to create "{projectSearchQueryMobile.trim()}"
+                              </p>
+                            )}
                           </div>
-                          <span className="text-sm truncate">
-                            {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                    {projects.length > 0 && (
-                      <div className="px-2 py-2">
-                        <div className="border-t-2 border-[#6a8a8a]/30 dark:border-[#8a9a9a]/30 relative">
-                          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6a8a8a]/40 dark:via-[#8a9a9a]/40 to-transparent" />
-                        </div>
-                      </div>
-                    )}
-                    <SelectItem 
-                      variant="retro"
-                      value="create-new"
-                      className="mt-1"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 bg-[#5a7a7a] dark:bg-[#7a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
-                          <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
-                        </div>
-                        <span className="text-sm">
-                          Create New Project
-                        </span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {projects.map(project => (
+                            <CommandItem
+                              key={project.id}
+                              value={project.name}
+                              variant="retro"
+                              onSelect={() => {
+                                handleProjectChange(project.id);
+                                setIsProjectSelectorMobileOpen(false);
+                              }}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
+                                  <Star className="h-2 w-2 text-white flex-shrink-0" />
+                                </div>
+                                <span className="text-sm truncate">
+                                  {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                        {projects.length > 0 && <CommandSeparator className="border-t-2 border-[#6a8a8a]/30 dark:border-[#8a9a9a]/30" />}
+                        <CommandGroup>
+                          <CommandItem
+                            value="create-new-project"
+                            variant="retro"
+                            onSelect={() => {
+                              setCreateProjectInitialName(undefined);
+                              setIsCreateProjectModalOpen(true);
+                              setIsProjectSelectorMobileOpen(false);
+                            }}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <div className="w-4 h-4 bg-[#5a7a7a] dark:bg-[#7a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
+                                <PlusCircle className="h-2 w-2 text-white flex-shrink-0" />
+                              </div>
+                              <span className="text-sm">
+                                Create New Project
+                              </span>
+                            </div>
+                          </CommandItem>
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
           </div>
@@ -689,7 +816,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
       
       <CreateProjectModal 
         isOpen={isCreateProjectModalOpen} 
-        onOpenChange={setIsCreateProjectModalOpen} 
+        onOpenChange={(open) => {
+          setIsCreateProjectModalOpen(open);
+          if (!open) setCreateProjectInitialName(undefined);
+        }}
+        initialName={createProjectInitialName}
       />
       {selectedProject && (
         <ProjectSettingsModal
