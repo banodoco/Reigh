@@ -135,8 +135,8 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
     }
   }, [searchQuery, hasMatchingShot, onCreateShot]);
 
-  // Variant-specific styles
-  const getVariantStyles = () => {
+  // Variant-specific styles (memoized to avoid recalculating on every render)
+  const styles = useMemo(() => {
     switch (variant) {
       case "retro":
         return {
@@ -164,16 +164,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
           command: "default" as const,
         };
     }
-  };
-  
-  const styles = getVariantStyles();
-
-  console.log('[ShotSelectorDebug] ShotSelector render:', {
-    value,
-    selectedShotName,
-    shotsCount: shots.length,
-    container: container ? 'provided' : 'none'
-  });
+  }, [variant]);
 
   return (
     <div 
@@ -193,8 +184,6 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
               styles.trigger,
               triggerClassName
             )}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
           >
             <span className="truncate">
               {selectedShotName 
@@ -210,19 +199,16 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
             styles.content,
             contentClassName
           )}
-          style={{ zIndex: 10000, width: 'var(--radix-popover-trigger-width)', minWidth: '160px' }}
+          style={{ width: 'var(--radix-popover-trigger-width)', minWidth: '160px' }}
           side={side}
           sideOffset={sideOffset}
           align={align}
           collisionPadding={8}
           container={container}
           onKeyDown={handleKeyDown}
-          onPointerDown={(e) => e.stopPropagation()}
-          onPointerUp={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onTouchEnd={(e) => e.stopPropagation()}
+          // Stop all pointer/touch events from bubbling to parent (prevents lightbox opens, etc.)
+          onPointerDownCapture={(e) => e.stopPropagation()}
+          onClickCapture={(e) => e.stopPropagation()}
         >
           {/* Add Shot Header */}
           {showAddShot && onCreateShot && (
@@ -283,20 +269,13 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
             </div>
           )}
           
-          <Command 
-            variant={styles.command} 
-            className="rounded-none"
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
+          <Command variant={styles.command} className="rounded-none">
             <CommandInput 
               ref={searchInputRef}
               placeholder="Search shots..." 
               className="h-8 text-xs border-none"
               value={searchQuery}
               onValueChange={setSearchQuery}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
             />
             <CommandList className="max-h-48">
               <CommandEmpty>
@@ -315,9 +294,8 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
                     key={shot.id}
                     value={shot.name}
                     variant={styles.command}
-                    className="text-xs group relative"
+                    className="text-xs group/shot relative"
                     onSelect={() => {
-                      console.log('[ShotSelectorDebug] 🎯 Shot selected:', shot.name);
                       onValueChange(shot.id);
                       setIsOpen(false);
                     }}
@@ -336,7 +314,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
                     {/* Jump arrow - appears on hover, hidden on mobile */}
                     {onNavigateToShot && !isMobile && (
                       <button
-                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded bg-zinc-800/90 hover:bg-zinc-700 border border-zinc-600/50"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/shot:opacity-100 transition-opacity p-1 rounded bg-zinc-800/90 hover:bg-zinc-700 border border-zinc-600/50"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
