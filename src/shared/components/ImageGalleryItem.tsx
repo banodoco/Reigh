@@ -37,6 +37,7 @@ import { useGetTask } from "@/shared/hooks/useTasks";
 import { useShareGeneration } from "@/shared/hooks/useShareGeneration";
 import { deriveInputImages } from "./ImageGallery/utils";
 import { isImageEditTaskType } from "@/tools/travel-between-images/components/TaskDetails";
+import { VariantBadge } from "@/shared/components/VariantBadge";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -1039,36 +1040,13 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
               
               {/* "X new" badge + Variant Count - show below variant name */}
-              {image.derivedCount && image.derivedCount > 1 && (
-                <div className="flex items-center gap-1">
-                  {image.hasUnviewedVariants && image.unviewedVariantCount && image.unviewedVariantCount > 0 && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="bg-yellow-500 text-black text-[8px] font-bold px-1 py-0.5 rounded cursor-help">
-                            {image.unviewedVariantCount} new
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{image.unviewedVariantCount} unviewed variant{image.unviewedVariantCount !== 1 ? 's' : ''}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help">
-                          {image.derivedCount}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{image.derivedCount} variant{image.derivedCount !== 1 ? 's' : ''}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              )}
+              <VariantBadge
+                derivedCount={image.derivedCount}
+                unviewedVariantCount={image.unviewedVariantCount}
+                hasUnviewedVariants={image.hasUnviewedVariants}
+                variant="inline"
+                size="md"
+              />
 
               {/* Shot Navigation Button */}
               {image.shot_id && simplifiedShotOptions.length > 0 && (
@@ -1559,35 +1537,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
 
                 {/* "X new" badge + Variant Count - positioned to the right of Info button */}
-                {!isVideoContent && image.derivedCount && image.derivedCount > 1 && (
-                  <div className="flex items-center gap-1">
-                    {image.hasUnviewedVariants && image.unviewedVariantCount && image.unviewedVariantCount > 0 && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="bg-yellow-500 text-black text-[8px] font-bold px-1 py-0.5 rounded cursor-help">
-                              {image.unviewedVariantCount} new
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="right">
-                            <p>{image.unviewedVariantCount} unviewed variant{image.unviewedVariantCount !== 1 ? 's' : ''}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="bg-black/50 text-white text-[10px] font-medium px-1.5 py-0.5 rounded backdrop-blur-sm cursor-help">
-                            {image.derivedCount}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                          <p>{image.derivedCount} variant{image.derivedCount !== 1 ? 's' : ''}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
+                {!isVideoContent && (
+                  <VariantBadge
+                    derivedCount={image.derivedCount}
+                    unviewedVariantCount={image.unviewedVariantCount}
+                    hasUnviewedVariants={image.hasUnviewedVariants}
+                    variant="inline"
+                    size="md"
+                    tooltipSide="right"
+                  />
                 )}
               </div>
 

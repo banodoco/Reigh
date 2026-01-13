@@ -11,6 +11,7 @@ import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 import { MobileImageItemProps } from './types';
 import { framesToSeconds } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
+import { VariantBadge } from '@/shared/components/VariantBadge';
 
 export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   image,
@@ -127,6 +128,15 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             <span className="inline-block">{framesToSeconds(frameNumber)}</span>
           </div>
         )}
+
+        {/* Variant Count + NEW badge - top left */}
+        <VariantBadge
+          derivedCount={(image as any).derivedCount}
+          unviewedVariantCount={(image as any).unviewedVariantCount}
+          hasUnviewedVariants={(image as any).hasUnviewedVariants}
+          variant="overlay"
+          size="sm"
+        />
 
         {/* Selection overlay - removed blue tick */}
 

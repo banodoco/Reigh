@@ -8,6 +8,7 @@ import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoadin
 import { useDoubleTapWithSelection } from "@/shared/hooks/useDoubleTapWithSelection";
 import { framesToSeconds } from "./utils/time-utils";
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_IMAGE_HALF_WIDTH, TIMELINE_PADDING_OFFSET } from "./constants";
+import { VariantBadge } from "@/shared/components/VariantBadge";
 
 // Props for individual timeline items
 interface TimelineItemProps {
@@ -484,24 +485,14 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
               {/* Duplicate Button */}
               {/* "X new" badge + Variant Count - top left */}
-              {(image as any).derivedCount && (image as any).derivedCount > 1 && (
-                <div className="absolute top-1 left-1 flex items-center gap-0.5 z-20 pointer-events-none">
-                  {(image as any).hasUnviewedVariants && (image as any).unviewedVariantCount > 0 && (
-                    <div
-                      className="bg-yellow-500 text-black text-[7px] font-bold px-1 py-0.5 rounded"
-                      title={`${(image as any).unviewedVariantCount} unviewed variant${(image as any).unviewedVariantCount !== 1 ? 's' : ''}`}
-                    >
-                      {(image as any).unviewedVariantCount} new
-                    </div>
-                  )}
-                  <div
-                    className="h-5 w-5 rounded-full bg-black/60 text-white text-[9px] font-medium flex items-center justify-center backdrop-blur-sm"
-                    title={`${(image as any).derivedCount} variants`}
-                  >
-                    {(image as any).derivedCount}
-                  </div>
-                </div>
-              )}
+              <VariantBadge
+                derivedCount={(image as any).derivedCount}
+                unviewedVariantCount={(image as any).unviewedVariantCount}
+                hasUnviewedVariants={(image as any).hasUnviewedVariants}
+                variant="overlay"
+                size="sm"
+                zIndex={20}
+              />
               
               <Button
                 variant="secondary"

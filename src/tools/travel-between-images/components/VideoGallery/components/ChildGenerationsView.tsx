@@ -40,6 +40,7 @@ import { useVariants } from '@/shared/hooks/useVariants';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { VariantBadge } from '@/shared/components/VariantBadge';
 
 // TypeScript declaration for global mobile video preload map
 declare global {
@@ -2287,37 +2288,15 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                 style={aspectRatioStyle}
             >
                     {/* Top right overlay - NEW badge and Variant count */}
-                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
-                        {/* "X new" badge - shown if any variants haven't been viewed */}
-                        {(child as any).hasUnviewedVariants && (child as any).unviewedVariantCount > 0 && (
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span className="text-[10px] px-1.5 py-0.5 bg-yellow-500 text-black rounded font-bold cursor-help">
-                                            {(child as any).unviewedVariantCount} new
-                                        </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="left">
-                                        <p>{(child as any).unviewedVariantCount} unviewed variant{(child as any).unviewedVariantCount !== 1 ? 's' : ''}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        )}
-                        {/* Variant count badge - show when 2+ variants (matches gallery behavior) */}
-                        {(child as any).derivedCount > 1 && (
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className="h-6 w-6 rounded-full bg-black/50 text-white text-[10px] font-medium flex items-center justify-center backdrop-blur-sm cursor-help">
-                                            {(child as any).derivedCount}
-                                        </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="left">
-                                        <p>{(child as any).derivedCount} variant{(child as any).derivedCount !== 1 ? 's' : ''}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        )}
+                    <div className="absolute top-2 right-2 z-10">
+                        <VariantBadge
+                            derivedCount={(child as any).derivedCount}
+                            unviewedVariantCount={(child as any).unviewedVariantCount}
+                            hasUnviewedVariants={(child as any).hasUnviewedVariants}
+                            variant="inline"
+                            size="md"
+                            tooltipSide="left"
+                        />
                     </div>
 
                     {/* Action buttons - bottom right overlay, appears on hover */}
