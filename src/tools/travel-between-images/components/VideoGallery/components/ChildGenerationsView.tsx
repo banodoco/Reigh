@@ -6,7 +6,7 @@ import { Separator } from '@/shared/components/ui/separator';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
-import { ChevronLeft, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2, Upload, Play, Pause, Maximize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2, Upload, Play, Pause, Maximize2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -1355,6 +1355,44 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         }
     }, [isPreviewTogetherOpen]);
 
+    // Keyboard navigation for Preview Together dialog
+    React.useEffect(() => {
+        if (!isPreviewTogetherOpen) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't handle if user is typing in an input
+            const target = e.target as HTMLElement;
+            const isTyping = target && (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable
+            );
+            if (isTyping) return;
+
+            // Get videos for navigation bounds
+            const videosWithLocation = sortedSegments
+                .filter(c => c.location)
+                .sort((a, b) => ((a as any).child_order ?? 0) - ((b as any).child_order ?? 0));
+            
+            if (videosWithLocation.length === 0) return;
+
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                setCurrentPreviewIndex(prev => 
+                    prev > 0 ? prev - 1 : videosWithLocation.length - 1
+                );
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                setCurrentPreviewIndex(prev => 
+                    (prev + 1) % videosWithLocation.length
+                );
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isPreviewTogetherOpen, sortedSegments]);
+
     const handleConfirmJoin = async () => {
         if (!projectId || sortedSegments.length < 2) return;
 
@@ -1981,50 +2019,84 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                 return { aspectRatio: '16/9' };
                             })();
 
-                            return (
-                                <div className="space-y-4">
-                                    <div className="relative bg-black rounded-lg overflow-hidden" style={aspectRatioStyle}>
-                                        <video
-                                            ref={previewVideoRef}
-                                            src={currentVideo?.url}
-                                            className="w-full h-full object-contain cursor-pointer"
-                                            autoPlay
-                                            playsInline
-                                            onClick={() => {
-                                                const video = previewVideoRef.current;
-                                                if (video) {
-                                                    if (video.paused) {
-                                                        video.play();
-                                                    } else {
-                                                        video.pause();
-                                                    }
-                                                }
-                                            }}
-                                            onPlay={() => setPreviewIsPlaying(true)}
-                                            onPause={() => setPreviewIsPlaying(false)}
-                                            onTimeUpdate={() => {
-                                                const video = previewVideoRef.current;
-                                                if (video) {
-                                                    setPreviewCurrentTime(video.currentTime);
-                                                }
-                                            }}
-                                            onLoadedMetadata={() => {
-                                                const video = previewVideoRef.current;
-                                                if (video) {
-                                                    setPreviewDuration(video.duration);
-                                                    setPreviewCurrentTime(0);
-                                                }
-                                            }}
-                                            onEnded={() => {
-                                                // When current video ends, play next one (loop back to start after last)
-                                                const nextIndex = (safeIndex + 1) % videosWithLocation.length;
-                                                setCurrentPreviewIndex(nextIndex);
-                                            }}
-                                            key={currentVideo.url}
-                                        />
-                                        
-                                        {/* Open in lightbox button - top left */}
-                                        <button
+                                            return (
+                                                <div className="space-y-4">
+                                                    <div className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center">
+                                                        <video
+                                                            ref={previewVideoRef}
+                                                            src={currentVideo?.url}
+                                                            className="max-w-full max-h-[60vh] object-contain cursor-pointer"
+                                                            autoPlay
+                                                            playsInline
+                                                            onClick={() => {
+                                                                const video = previewVideoRef.current;
+                                                                if (video) {
+                                                                    if (video.paused) {
+                                                                        video.play();
+                                                                    } else {
+                                                                        video.pause();
+                                                                    }
+                                                                }
+                                                            }}
+                                                            onPlay={() => setPreviewIsPlaying(true)}
+                                                            onPause={() => setPreviewIsPlaying(false)}
+                                                            onTimeUpdate={() => {
+                                                                const video = previewVideoRef.current;
+                                                                if (video) {
+                                                                    setPreviewCurrentTime(video.currentTime);
+                                                                }
+                                                            }}
+                                                            onLoadedMetadata={() => {
+                                                                const video = previewVideoRef.current;
+                                                                if (video) {
+                                                                    setPreviewDuration(video.duration);
+                                                                    setPreviewCurrentTime(0);
+                                                                }
+                                                            }}
+                                                            onEnded={() => {
+                                                                // When current video ends, play next one (loop back to start after last)
+                                                                const nextIndex = (safeIndex + 1) % videosWithLocation.length;
+                                                                setCurrentPreviewIndex(nextIndex);
+                                                            }}
+                                                            key={currentVideo.url}
+                                                        />
+                                                        
+                                                        {/* Left chevron navigation */}
+                                                        {videosWithLocation.length > 1 && (
+                                                            <Button
+                                                                variant="secondary"
+                                                                size="lg"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setCurrentPreviewIndex(prev => 
+                                                                        prev > 0 ? prev - 1 : videosWithLocation.length - 1
+                                                                    );
+                                                                }}
+                                                                className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-10 w-10 sm:h-12 sm:w-12"
+                                                            >
+                                                                <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
+                                                            </Button>
+                                                        )}
+                                                        
+                                                        {/* Right chevron navigation */}
+                                                        {videosWithLocation.length > 1 && (
+                                                            <Button
+                                                                variant="secondary"
+                                                                size="lg"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setCurrentPreviewIndex(prev => 
+                                                                        (prev + 1) % videosWithLocation.length
+                                                                    );
+                                                                }}
+                                                                className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-10 w-10 sm:h-12 sm:w-12"
+                                                            >
+                                                                <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
+                                                            </Button>
+                                                        )}
+                                                        
+                                                        {/* Open in lightbox button - top left */}
+                                                        <button
                                             type="button"
                                             onClick={(e) => {
                                                 e.stopPropagation();

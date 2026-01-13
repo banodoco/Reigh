@@ -41,6 +41,26 @@ export interface PositionMetadata {
   enhanced_prompt?: string;
 }
 
+// Helper: Batch execute promises with concurrency limit to prevent connection exhaustion
+async function batchExecute<T>(
+  items: T[],
+  executor: (item: T) => Promise<any>,
+  concurrencyLimit: number = 5
+): Promise<{ id: string; success: boolean }[]> {
+  const results: { id: string; success: boolean }[] = [];
+  
+  for (let i = 0; i < items.length; i += concurrencyLimit) {
+    const batch = items.slice(i, i + concurrencyLimit);
+    const batchResults = await Promise.all(batch.map(executor));
+    results.push(...batchResults);
+  }
+  
+  return results;
+}
+
+// Error backoff constants
+const ERROR_COOLDOWN_MS = 5000; // Wait 5 seconds after an error before allowing new requests
+
 /**
  * Enhanced hook for managing shot positions with unified timeline and batch support
  */
@@ -53,6 +73,11 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   const invalidateGenerations = useInvalidateGenerations();
   const [error, setError] = useState<string | null>(null);
 
+  // Error backoff and request deduplication refs
+  const lastErrorTimeRef = useRef<number>(0);
+  const isRequestInFlightRef = useRef<boolean>(false);
+  const currentShotIdRef = useRef<string | null>(null);
+
   // Load all shot_generations data for the shot
   const loadPositions = useCallback(async (opts?: { silent?: boolean; reason?: 'shot_change' | 'invalidation' | 'reorder' }) => {
     if (!shotId) {
@@ -60,6 +85,31 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       setIsInitialLoad(false);
       return;
     }
+
+    // ERROR BACKOFF: Skip if we recently had an error (unless it's a shot change which resets everything)
+    const now = Date.now();
+    const timeSinceError = now - lastErrorTimeRef.current;
+    if (timeSinceError < ERROR_COOLDOWN_MS && opts?.reason !== 'shot_change') {
+      console.debug('[useEnhancedShotPositions] Skipping load - in error cooldown period', {
+        timeSinceError,
+        cooldownRemaining: ERROR_COOLDOWN_MS - timeSinceError,
+        reason: opts?.reason
+      });
+      return;
+    }
+
+    // REQUEST DEDUPLICATION: Skip if a request is already in flight for the same shot
+    if (isRequestInFlightRef.current && currentShotIdRef.current === shotId) {
+      console.debug('[useEnhancedShotPositions] Skipping load - request already in flight', {
+        shotId: shotId.substring(0, 8),
+        reason: opts?.reason
+      });
+      return;
+    }
+
+    // Mark request as in-flight
+    isRequestInFlightRef.current = true;
+    currentShotIdRef.current = shotId;
 
     // Show loading unless silent mode is requested
     const shouldShowLoading = !opts?.silent && (
@@ -137,8 +187,12 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load shot positions';
       setError(errorMessage);
+      // Set error time for backoff - prevents rapid retry loops that exhaust browser connections
+      lastErrorTimeRef.current = Date.now();
       console.error('[useEnhancedShotPositions] Load error:', err);
     } finally {
+      // Clear in-flight flag
+      isRequestInFlightRef.current = false;
       if (shouldShowLoading) {
         setIsLoading(false);
       }
@@ -336,7 +390,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
       // Update each generation to clear enhanced_prompt
-      const updates = generations.map(async (gen) => {
+      // BATCHED: Execute updates in batches of 5 to prevent connection exhaustion
+      const results = await batchExecute(generations, async (gen) => {
         const existingMetadata = gen.metadata as Record<string, any> | null;
         const updatedMetadata = {
           ...(existingMetadata || {}),
@@ -353,9 +408,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         }
 
         return { id: gen.id, success: !updateError };
-      });
-
-      const results = await Promise.all(updates);
+      }, 5); // Limit to 5 concurrent requests
       const successCount = results.filter(r => r.success).length;
       
       console.log(`[PromptClearLog] ✅ POSITION CHANGE - Successfully cleared prompts`, {
@@ -1306,7 +1359,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
       // Update all generations to clear enhanced_prompt
-      const updates = generations.map(async (gen) => {
+      // BATCHED: Execute updates in batches of 5 to prevent connection exhaustion
+      const results = await batchExecute(generations, async (gen) => {
         const existingMetadata = gen.metadata as Record<string, any> | null;
         const updatedMetadata = {
           ...(existingMetadata || {}),
@@ -1323,9 +1377,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         }
 
         return { id: gen.id, success: !updateError };
-      });
-
-      const results = await Promise.all(updates);
+      }, 5); // Limit to 5 concurrent requests
       const successCount = results.filter(r => r.success).length;
       
       console.log(`[PromptClearLog] ✅ CLEAR ALL - Successfully cleared all enhanced prompts`, {
