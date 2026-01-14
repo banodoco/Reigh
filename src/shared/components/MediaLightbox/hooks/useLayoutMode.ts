@@ -15,6 +15,7 @@ interface UseLayoutModeReturn {
   isTouchLikeDevice: boolean;
   shouldShowSidePanel: boolean;
   isUnifiedEditMode: boolean;
+  isPortraitMode: boolean;
 }
 
 /**
@@ -60,7 +61,8 @@ export const useLayoutMode = ({
     isTabletOrLarger,
     isTouchLikeDevice,
     shouldShowSidePanel,
-    isUnifiedEditMode
+    isUnifiedEditMode,
+    isPortraitMode: isPortrait
   };
 };
 

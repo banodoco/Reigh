@@ -63,10 +63,14 @@ export interface SegmentRegenerateControlsProps {
   initialParams: Record<string, any>;
   /** Project ID for task creation */
   projectId: string | null;
-  /** Generation ID to use as parent for the new child generation */
-  generationId: string;
+  /** Generation ID to use as parent for the new child generation (optional if shotId provided) */
+  generationId?: string;
+  /** Shot ID to link new parent generation to (used when no generationId exists) */
+  shotId?: string;
   /** Optional existing child generation ID (for Replace mode) */
   childGenerationId?: string;
+  /** Whether this is regenerating an existing segment (shows "Make primary variant" toggle) */
+  isRegeneration?: boolean;
   /** Segment index (defaults to 0 for single-segment videos) */
   segmentIndex?: number;
   /** Start image URL for the segment */
@@ -77,6 +81,8 @@ export interface SegmentRegenerateControlsProps {
   startImageGenerationId?: string;
   /** End image generation ID */
   endImageGenerationId?: string;
+  /** Shot generation ID for the start image (for video-to-timeline tethering) */
+  pairShotGenerationId?: string;
   /** Project resolution for output */
   projectResolution?: string;
   /** Unique key prefix for React Query caching */
@@ -105,18 +111,23 @@ export interface SegmentRegenerateControlsProps {
   showSmoothContinuation?: boolean;
   /** Callback when user overrides change - for persisting to database */
   onOverridesChange?: (overrides: Record<string, any> | null) => void;
+  /** Callback when frame count changes - for updating timeline */
+  onFrameCountChange?: (frameCount: number) => void;
 }
 
 export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps> = ({
   initialParams,
   projectId,
   generationId,
+  shotId,
   childGenerationId,
+  isRegeneration = false,
   segmentIndex = 0,
   startImageUrl,
   endImageUrl,
   startImageGenerationId,
   endImageGenerationId,
+  pairShotGenerationId,
   projectResolution,
   queryKeyPrefix = 'segment-regenerate',
   onStartImageClick,
@@ -131,7 +142,18 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   predecessorVideoUrl,
   showSmoothContinuation = false,
   onOverridesChange,
+  onFrameCountChange,
 }) => {
+  // [PairModalDebug] Log props received by SegmentRegenerateControls
+  console.log('[PairModalDebug] SegmentRegenerateControls props:', {
+    projectId: projectId?.substring(0, 8) || null,
+    generationId: generationId?.substring(0, 8) || null,
+    shotId: shotId?.substring(0, 8) || null,
+    segmentIndex,
+    isRegeneration,
+    showMakePrimaryToggle: isRegeneration,
+  });
+
   const { toast } = useToast();
 
   // File input refs for image uploads
@@ -162,40 +184,70 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
   // Track user overrides - these persist across variant switches
   const [userOverrides, setUserOverrides] = useState<Record<string, any>>(
-    () => initialParams.user_overrides || {}
+    () => {
+      const overrides = initialParams.user_overrides || {};
+      const oKeys = Object.keys(overrides);
+      console.log(`[PerPairData] 🎛️ CONTROLS INIT (SegmentRegenerate) | segment=${segmentIndex} | overrides=${oKeys.length > 0 ? oKeys.join(',') : 'none'}`);
+      return overrides;
+    }
   );
 
   // Use shared normalization utility, then apply user overrides on top
   const [params, setParams] = useState<any>(() => {
     const normalized = getNormalizedParams(initialParams, { segmentIndex });
     const overrides = initialParams.user_overrides || {};
-    return { ...normalized, ...overrides };
+    const final = { ...normalized, ...overrides };
+    const initP = initialParams.base_prompt || initialParams.prompt;
+    const normP = normalized.base_prompt;
+    const finalP = final.base_prompt;
+    console.log(`[PerPairData]   PROMPT CHAIN | initial=${initP ? `"${initP.substring(0, 25)}..."` : 'null'} → normalized=${normP ? `"${normP.substring(0, 25)}..."` : 'null'} → final=${finalP ? `"${finalP.substring(0, 25)}..."` : 'null'}`);
+    return final;
   });
   const [isDirty, setIsDirty] = useState(false);
 
   // Debounce timer ref for saving overrides
   const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  // Track pending overrides so we can flush on unmount
+  const pendingOverridesRef = React.useRef<Record<string, any> | null>(null);
+  // Stable ref for the callback so unmount can access it
+  const onOverridesChangeRef = React.useRef(onOverridesChange);
+  onOverridesChangeRef.current = onOverridesChange;
 
   // Debounced save function
   const debouncedSaveOverrides = useCallback((overrides: Record<string, any>) => {
+    // Track pending overrides for flush-on-unmount
+    pendingOverridesRef.current = overrides;
+    
     // Clear any pending save
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
     // Schedule save after 1 second of no changes
     saveTimeoutRef.current = setTimeout(() => {
-      onOverridesChange?.(Object.keys(overrides).length > 0 ? overrides : null);
+      const oKeys = Object.keys(overrides);
+      const hasPrompt = 'base_prompt' in overrides || 'prompt' in overrides;
+      console.log(`[PerPairData] 💾 TRIGGER SAVE (SegmentRegenerate) | segment=${segmentIndex} | keys=${oKeys.join(',') || 'none'} | hasPrompt=${hasPrompt}`);
+      onOverridesChangeRef.current?.(Object.keys(overrides).length > 0 ? overrides : null);
+      pendingOverridesRef.current = null; // Clear after save
     }, 1000);
-  }, [onOverridesChange]);
+  }, [segmentIndex]);
 
-  // Cleanup timeout on unmount
+  // Flush pending save on unmount (don't lose user's changes)
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
+      // If there are pending changes, save them immediately on unmount
+      if (pendingOverridesRef.current) {
+        const oKeys = Object.keys(pendingOverridesRef.current);
+        console.log(`[PerPairData] 💾 FLUSH ON UNMOUNT | segment=${segmentIndex} | keys=${oKeys.join(',') || 'none'}`);
+        const pending = pendingOverridesRef.current;
+        onOverridesChangeRef.current?.(Object.keys(pending).length > 0 ? pending : null);
+        pendingOverridesRef.current = null;
+      }
     };
-  }, []);
+  }, [segmentIndex]);
 
   // Helper to update a field and track it as a user override
   const updateOverride = useCallback((field: string, value: any) => {
@@ -505,6 +557,15 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       return;
     }
 
+    if (!generationId && !shotId) {
+      toast({
+        title: "Error",
+        description: "Missing generation or shot context for regeneration",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!startImageUrl || !endImageUrl) {
       toast({
         title: "Error",
@@ -559,16 +620,76 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       const uiBasePrompt = params.base_prompt || params.prompt || '';
       const uiNegativePrompt = params.negative_prompt || '';
 
+      // If the user explicitly changed num_frames in this form, update the corresponding entry
+      // in segment_frames_expanded so positioning math stays consistent.
+      // Otherwise, keep the injected "current timeline" arrays as-is.
+      const paramsForTask = (() => {
+        const orch = paramsWithResolution.orchestrator_details;
+        const segFrames = orch?.segment_frames_expanded;
+        if (!Array.isArray(segFrames) || typeof segmentIndex !== 'number') return paramsWithResolution;
+
+        // "Explicit in this form" means it exists in user_overrides (i.e., user touched the control),
+        // not merely that params.num_frames has some value.
+        const hasExplicitNumFramesOverride = Object.prototype.hasOwnProperty.call(userOverrides || {}, 'num_frames');
+        const explicitNumFrames = hasExplicitNumFramesOverride && typeof params.num_frames === 'number'
+          ? params.num_frames
+          : undefined;
+        if (explicitNumFrames === undefined) return paramsWithResolution;
+
+        const prev = segFrames[segmentIndex];
+        if (prev === explicitNumFrames) return paramsWithResolution;
+
+        const nextSegFrames = [...segFrames];
+        nextSegFrames[segmentIndex] = explicitNumFrames;
+
+        console.log('[SegmentRegenerateControls] [TimelineGaps] Overriding segment_frames_expanded for this segment due to explicit form input:', {
+          segmentIndex,
+          prev,
+          explicitNumFrames,
+          totalSegments: nextSegFrames.length,
+        });
+
+        return {
+          ...paramsWithResolution,
+          orchestrator_details: {
+            ...(orch || {}),
+            segment_frames_expanded: nextSegFrames,
+            // Keep num_new_segments_to_generate consistent if present / used downstream
+            ...(typeof orch?.num_new_segments_to_generate === 'number'
+              ? { num_new_segments_to_generate: nextSegFrames.length }
+              : {}),
+          },
+        };
+      })();
+
+      // [MultiStructureDebug] Log the orchestrator_details being passed for multi-structure video support
+      const orchDetails = paramsForTask.orchestrator_details || {};
+      console.log('[SegmentRegenerateControls] [MultiStructureDebug] Orchestrator details being passed:', {
+        hasOrchestratorDetails: !!paramsForTask.orchestrator_details,
+        hasStructureVideos: !!orchDetails.structure_videos && orchDetails.structure_videos.length > 0,
+        structureVideosCount: orchDetails.structure_videos?.length ?? 0,
+        hasSegmentFramesExpanded: !!orchDetails.segment_frames_expanded,
+        segmentFramesExpandedLength: orchDetails.segment_frames_expanded?.length ?? 0,
+        hasFrameOverlapExpanded: !!orchDetails.frame_overlap_expanded,
+        frameOverlapExpandedLength: orchDetails.frame_overlap_expanded?.length ?? 0,
+        fpsHelpers: orchDetails.fps_helpers ?? '(not set)',
+        segmentIndex,
+        generationId: generationId?.substring(0, 8),
+        shotId: shotId?.substring(0, 8),
+      });
+
       await createIndividualTravelSegmentTask({
         project_id: projectId,
-        parent_generation_id: generationId,
+        parent_generation_id: generationId, // Optional - if not provided, will be created from shot_id
+        shot_id: shotId, // Used to create parent generation if none exists
         child_generation_id: childGenerationId,
         segment_index: segmentIndex,
         start_image_url: startImageUrl,
         end_image_url: endImageUrl,
         start_image_generation_id: startImageGenerationId,
         end_image_generation_id: endImageGenerationId,
-        originalParams: paramsWithResolution,
+        pair_shot_generation_id: pairShotGenerationId,
+        originalParams: paramsForTask,
         // UI overrides
         base_prompt: uiBasePrompt,
         negative_prompt: uiNegativePrompt,
@@ -581,7 +702,9 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         motion_mode: motionMode,
         selected_phase_preset_id: selectedPhasePresetId,
         loras: lorasForTask,
-        make_primary_variant: makePrimaryVariant,
+        // When creating a new segment, always make it primary
+        // When regenerating existing, use the user's preference
+        make_primary_variant: isRegeneration ? makePrimaryVariant : true,
         // HARDCODED: SVI (smooth continuations) feature has been removed from UX
         // Always disable regardless of any persisted settings
         use_svi: false,
@@ -606,7 +729,9 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   }, [
     projectId,
     generationId,
+    shotId,
     childGenerationId,
+    isRegeneration,
     segmentIndex,
     params,
     selectedLoras,
@@ -614,6 +739,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     endImageUrl,
     startImageGenerationId,
     endImageGenerationId,
+    pairShotGenerationId,
     amountOfMotion,
     advancedMode,
     phaseConfig,
@@ -816,7 +942,12 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
               </div>
               <Slider
                 value={[quantizeFrameCount(params.num_frames || 9, 9)]}
-                onValueChange={([value]) => updateOverride('num_frames', quantizeFrameCount(value, 9))}
+                onValueChange={([value]) => {
+                  const quantized = quantizeFrameCount(value, 9);
+                  console.log('[FrameCountDebug] Slider changed:', { value, quantized, hasCallback: !!onFrameCountChange });
+                  updateOverride('num_frames', quantized);
+                  onFrameCountChange?.(quantized);
+                }}
                 min={9}
                 max={maxFrames}
                 step={4}
@@ -980,69 +1111,76 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
               </span>
             </div>
 
-            {/* Motion Settings */}
-            <MotionPresetSelector
-              builtinPreset={builtinPreset}
-              featuredPresetIds={[]}
-              generationTypeMode={generationMode}
-              selectedPhasePresetId={selectedPhasePresetId}
-              phaseConfig={phaseConfig ?? builtinPreset.metadata.phaseConfig}
-              motionMode={motionMode}
-              onPresetSelect={handlePhasePresetSelect}
-              onPresetRemove={handlePhasePresetRemove}
-              onModeChange={handleMotionModeChange}
-              onPhaseConfigChange={handlePhaseConfigChange}
-              availableLoras={availableLoras}
-              randomSeed={randomSeed}
-              onRandomSeedChange={handleRandomSeedChange}
-              queryKeyPrefix={queryKeyPrefix}
-              renderBasicModeContent={() => (
-                <div className="space-y-3">
-                  <ActiveLoRAsDisplay
-                    selectedLoras={selectedLoras}
-                    onRemoveLora={handleRemoveLora}
-                    onLoraStrengthChange={handleLoraStrengthChange}
-                    availableLoras={availableLoras}
-                  />
-                  <button
-                    onClick={handleAddLoraClick}
-                    className="w-full text-sm text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 rounded-lg py-2 transition-colors"
-                  >
-                    Add or manage LoRAs
-                  </button>
-                </div>
-              )}
-            />
+            {/* Motion/LoRAs/Phase Config - only show when regenerating existing segment */}
+            {/* For first-time generation, use project defaults; these are regen-only tweaks */}
+            {isRegeneration && (
+              <MotionPresetSelector
+                builtinPreset={builtinPreset}
+                featuredPresetIds={[]}
+                generationTypeMode={generationMode}
+                selectedPhasePresetId={selectedPhasePresetId}
+                phaseConfig={phaseConfig ?? builtinPreset.metadata.phaseConfig}
+                motionMode={motionMode}
+                onPresetSelect={handlePhasePresetSelect}
+                onPresetRemove={handlePhasePresetRemove}
+                onModeChange={handleMotionModeChange}
+                onPhaseConfigChange={handlePhaseConfigChange}
+                availableLoras={availableLoras}
+                randomSeed={randomSeed}
+                onRandomSeedChange={handleRandomSeedChange}
+                queryKeyPrefix={queryKeyPrefix}
+                renderBasicModeContent={() => (
+                  <div className="space-y-3">
+                    <ActiveLoRAsDisplay
+                      selectedLoras={selectedLoras}
+                      onRemoveLora={handleRemoveLora}
+                      onLoraStrengthChange={handleLoraStrengthChange}
+                      availableLoras={availableLoras}
+                    />
+                    <button
+                      onClick={handleAddLoraClick}
+                      className="w-full text-sm text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 rounded-lg py-2 transition-colors"
+                    >
+                      Add or manage LoRAs
+                    </button>
+                  </div>
+                )}
+              />
+            )}
           </div>
 
-          {/* LoRA Selector Modal */}
-          <LoraSelectorModal
-            isOpen={isLoraModalOpen}
-            onClose={() => setIsLoraModalOpen(false)}
-            onSelect={handleLoraSelect}
-            availableLoras={availableLoras}
-            selectedLoras={selectedLoras.map(l => l.id)}
-          />
+          {/* LoRA Selector Modal - only needed for regeneration */}
+          {isRegeneration && (
+            <LoraSelectorModal
+              isOpen={isLoraModalOpen}
+              onClose={() => setIsLoraModalOpen(false)}
+              onSelect={handleLoraSelect}
+              availableLoras={availableLoras}
+              selectedLoras={selectedLoras.map(l => l.id)}
+            />
+          )}
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Make Primary Variant Toggle */}
-      <div className="flex items-center justify-between py-2">
-        <Label htmlFor="make-primary" className="text-sm cursor-pointer">
-          Make primary variant
-        </Label>
-        <Switch
-          id="make-primary"
-          checked={makePrimaryVariant}
-          onCheckedChange={setMakePrimaryVariant}
-        />
-      </div>
+      {/* Make Primary Variant Toggle - only show when regenerating existing video */}
+      {isRegeneration && (
+        <div className="flex items-center justify-between py-2">
+          <Label htmlFor="make-primary" className="text-sm cursor-pointer">
+            Make primary variant
+          </Label>
+          <Switch
+            id="make-primary"
+            checked={makePrimaryVariant}
+            onCheckedChange={setMakePrimaryVariant}
+          />
+        </div>
+      )}
 
       {/* Regenerate Button */}
       <Button
         size="sm"
         onClick={handleRegenerateSegment}
-        disabled={isRegenerating || !startImageUrl || !endImageUrl}
+        disabled={isRegenerating || !startImageUrl || !endImageUrl || (!generationId && !shotId)}
         className="w-full gap-2"
         variant={regenerateSuccess ? "outline" : "default"}
       >

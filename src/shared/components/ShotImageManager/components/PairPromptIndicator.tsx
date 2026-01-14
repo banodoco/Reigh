@@ -22,7 +22,7 @@ interface PairPromptIndicatorProps {
 
 /**
  * PairPromptIndicator - Shows a visual indicator between consecutive images in batch/mobile views
- * Displays pair information and can be clicked to open the PairPromptModal
+ * Displays pair information and can be clicked to open the SegmentSettingsModal
  */
 const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
   pairIndex,

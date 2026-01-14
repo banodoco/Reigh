@@ -21,6 +21,7 @@ import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useState, useEffect, useCallback } from 'react';
 import { useTaskDetails } from './hooks/useTaskDetails';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
+import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
 
 interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   selection: any;
@@ -32,6 +33,9 @@ interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   getFramePosition: (index: number) => number | undefined;
   lightboxSelectedShotId?: string;
   setLightboxSelectedShotId?: (shotId: string | undefined) => void;
+  // Segment video output props
+  segmentSlots?: SegmentSlot[];
+  onSegmentClick?: (slotIndex: number) => void;
 }
 
 export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = ({
@@ -44,6 +48,8 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   getFramePosition,
   lightboxSelectedShotId,
   setLightboxSelectedShotId,
+  segmentSlots,
+  onSegmentClick,
   ...props
 }) => {
   // State for showing success tick after adding to shot (positioned)
@@ -172,8 +178,11 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               enhancedPrompts={props.enhancedPrompts}
               defaultPrompt={props.defaultPrompt}
               defaultNegativePrompt={props.defaultNegativePrompt}
+              onClearEnhancedPrompt={props.onClearEnhancedPrompt}
               activeDragId={dragAndDrop.activeId}
               dropTargetIndex={dropTargetIndex}
+              segmentSlots={segmentSlots}
+              onSegmentClick={onSegmentClick}
             />
           </SortableContext>
           

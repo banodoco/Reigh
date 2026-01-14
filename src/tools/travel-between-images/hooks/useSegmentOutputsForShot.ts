@@ -1,0 +1,513 @@
+/**
+ * useSegmentOutputsForShot Hook
+ * 
+ * Manages segment outputs for inline display above the timeline.
+ * Handles multiple parent generations (different "runs"), their children,
+ * and the slot system for partial results.
+ */
+
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { GenerationRow } from '@/types/shots';
+import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
+
+// Slot type - either a real child or a placeholder for a processing segment
+export type SegmentSlot = 
+  | { type: 'child'; child: GenerationRow; index: number }
+  | { type: 'placeholder'; index: number; expectedFrames?: number; expectedPrompt?: string; startImage?: string; endImage?: string };
+
+export interface ExpectedSegmentData {
+  count: number;
+  frames: number[];
+  prompts: string[];
+  inputImages: string[];
+  inputImageGenIds: string[];
+  pairShotGenIds: string[];
+}
+
+export interface UseSegmentOutputsReturn {
+  // Multiple parent generations (different "runs")
+  parentGenerations: GenerationRow[];
+  selectedParentId: string | null;
+  setSelectedParentId: (id: string | null) => void;
+  
+  // Currently selected parent's data
+  selectedParent: GenerationRow | null;
+  hasFinalOutput: boolean; // parent.location exists
+  
+  // Segment slots for current parent
+  segmentSlots: SegmentSlot[];
+  segments: GenerationRow[]; // Actual segment children (not placeholders)
+  segmentProgress: { completed: number; total: number };
+  expectedSegmentData: ExpectedSegmentData | null;
+  
+  // Loading states
+  isLoading: boolean;
+  isRefetching: boolean;
+  
+  // Actions
+  refetch: () => void;
+}
+
+/**
+ * Extract expected segment data from parent's orchestrator_details
+ */
+function extractExpectedSegmentData(parentParams: Record<string, any> | null): ExpectedSegmentData | null {
+  if (!parentParams) return null;
+  
+  const orchestratorDetails = parentParams.orchestrator_details;
+  if (!orchestratorDetails) return null;
+  
+  const segmentCount = orchestratorDetails.num_new_segments_to_generate 
+    || orchestratorDetails.segment_frames_expanded?.length 
+    || 0;
+  
+  if (segmentCount === 0) return null;
+  
+  return {
+    count: segmentCount,
+    frames: orchestratorDetails.segment_frames_expanded || [],
+    prompts: orchestratorDetails.enhanced_prompts_expanded || orchestratorDetails.base_prompts_expanded || [],
+    inputImages: orchestratorDetails.input_image_paths_resolved || [],
+    // Include IDs for tethering videos to shot_generations
+    inputImageGenIds: orchestratorDetails.input_image_generation_ids || [],
+    pairShotGenIds: orchestratorDetails.pair_shot_generation_ids || [],
+  };
+}
+
+/**
+ * Extract pair identifiers from a video's params
+ */
+function getPairIdentifiers(params: Record<string, any> | null): { pairShotGenId?: string; startGenId?: string } {
+  if (!params) return {};
+  const individualParams = params.individual_segment_params || {};
+  return {
+    pairShotGenId: individualParams.pair_shot_generation_id || params.pair_shot_generation_id,
+    startGenId: individualParams.start_image_generation_id || params.start_image_generation_id,
+  };
+}
+
+/**
+ * Check if a generation is a travel segment (has segment_index in params)
+ * vs a join output (no segment_index)
+ */
+function isSegment(params: Record<string, any> | null): boolean {
+  return typeof params?.segment_index === 'number';
+}
+
+/**
+ * Transform raw generation data to GenerationRow format
+ */
+function transformToGenerationRow(gen: any): GenerationRow {
+  return {
+    id: gen.id,
+    location: gen.location || '',
+    imageUrl: gen.location || '',
+    thumbUrl: gen.thumbnail_url || gen.location || '',
+    type: gen.type || 'video',
+    created_at: gen.updated_at || gen.created_at || new Date().toISOString(),
+    createdAt: gen.updated_at || gen.created_at || new Date().toISOString(),
+    params: gen.params,
+    parent_generation_id: gen.parent_generation_id,
+    child_order: gen.child_order,
+    starred: gen.starred,
+  } as GenerationRow;
+}
+
+export function useSegmentOutputsForShot(
+  shotId: string | null,
+  projectId: string | null,
+  /** Local shot_generation positions for instant updates during drag */
+  localShotGenPositions?: Map<string, number>
+): UseSegmentOutputsReturn {
+  // Debug: Log hook inputs
+  console.log(`[useSegmentOutputsForShot] CALLED shotId=${shotId?.substring(0, 8) || 'NULL'} projectId=${projectId?.substring(0, 8) || 'NULL'} localPositions=${localShotGenPositions?.size || 0}`);
+  
+  // Debug: Log when local positions are passed
+  if (localShotGenPositions && localShotGenPositions.size > 0) {
+    console.log('[PairSlot] 📍 LOCAL POSITIONS received:', 
+      [...localShotGenPositions.entries()].map(([id, pos]) => `[${pos}]→${id.substring(0, 8)}`).join(' | ')
+    );
+  }
+  
+  // Track selected parent generation
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  
+  // Fetch parent generations (video outputs without parent_generation_id)
+  const {
+    data: parentGenerationsData,
+    isLoading: isLoadingParents,
+    isFetching: isFetchingParents,
+    refetch: refetchParents,
+  } = useQuery({
+    queryKey: ['segment-parent-generations', shotId, projectId],
+    queryFn: async () => {
+      if (!shotId || !projectId) return [];
+      
+      console.log('[useSegmentOutputsForShot] Fetching parent generations for shot:', shotId.substring(0, 8));
+      
+      // First, get all generation_ids associated with this shot via shot_generations
+      const { data: shotGensData, error: shotGensError } = await supabase
+        .from('shot_generations')
+        .select('generation_id')
+        .eq('shot_id', shotId);
+      
+      if (shotGensError) {
+        console.error('[useSegmentOutputsForShot] Error fetching shot_generations:', shotGensError);
+        throw shotGensError;
+      }
+      
+      const generationIdsInShot = new Set((shotGensData || []).map(sg => sg.generation_id));
+      
+      if (generationIdsInShot.size === 0) {
+        console.log('[useSegmentOutputsForShot] No generations in shot');
+        return [];
+      }
+      
+      // Get video generations for this project that are parents
+      const { data: generations, error } = await supabase
+        .from('generations')
+        .select(`
+          id,
+          location,
+          thumbnail_url,
+          type,
+          created_at,
+          updated_at,
+          params,
+          starred,
+          parent_generation_id
+        `)
+        .eq('project_id', projectId)
+        .eq('type', 'video')
+        .is('parent_generation_id', null) // Only parents
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[useSegmentOutputsForShot] Error fetching generations:', error);
+        throw error;
+      }
+      
+      // Filter to only include generations associated with this shot
+      // and that have orchestrator_details (indicating they are travel outputs)
+      const shotGenerations: any[] = [];
+      
+      // Batch check for child counts - get all parent IDs and check at once
+      const potentialParentIds = (generations || [])
+        .filter(gen => generationIdsInShot.has(gen.id))
+        .map(gen => gen.id);
+      
+      // Get child counts for all potential parents in one query
+      const { data: childCounts } = await supabase
+        .from('generations')
+        .select('parent_generation_id')
+        .in('parent_generation_id', potentialParentIds);
+      
+      const parentIdsWithChildren = new Set((childCounts || []).map(c => c.parent_generation_id));
+      
+      for (const gen of generations || []) {
+        // Must be associated with this shot
+        if (!generationIdsInShot.has(gen.id)) continue;
+        
+        // Check if it has orchestrator_details (travel output) or has children
+        const params = gen.params as any;
+        const hasOrchestratorDetails = !!params?.orchestrator_details;
+        const hasChildren = parentIdsWithChildren.has(gen.id);
+        
+        if (hasOrchestratorDetails || hasChildren) {
+          shotGenerations.push(gen);
+        }
+      }
+      
+      console.log('[useSegmentOutputsForShot] Found parent generations:', shotGenerations.length);
+      
+      return shotGenerations.map(transformToGenerationRow);
+    },
+    enabled: !!shotId && !!projectId,
+    staleTime: 30000, // 30 seconds
+  });
+  
+  const parentGenerations = parentGenerationsData || [];
+  
+  // Debug: Log parent generations state
+  console.log(`[useSegmentOutputsForShot] parentGenerations=${parentGenerations.length} selectedParentId=${selectedParentId?.substring(0, 8) || 'NULL'}`);
+  
+  // Auto-select the first (most recent) parent if none selected
+  useEffect(() => {
+    if (parentGenerations.length > 0 && !selectedParentId) {
+      console.log(`[useSegmentOutputsForShot] Auto-selecting parent: ${parentGenerations[0].id.substring(0, 8)}`);
+      setSelectedParentId(parentGenerations[0].id);
+    } else if (parentGenerations.length === 0) {
+      setSelectedParentId(null);
+    }
+  }, [parentGenerations, selectedParentId]);
+  
+  // Get the selected parent
+  const selectedParent = useMemo(() => {
+    if (!selectedParentId) return null;
+    return parentGenerations.find(p => p.id === selectedParentId) || null;
+  }, [parentGenerations, selectedParentId]);
+  
+  // Smart polling for segment children - allows new segments to appear after task completion
+  const childrenQueryKey = ['segment-child-generations', selectedParentId];
+  const childrenPollingConfig = useSmartPollingConfig(childrenQueryKey);
+  
+  // Fetch children for selected parent
+  const {
+    data: childGenerationsData,
+    isLoading: isLoadingChildren,
+    isFetching: isFetchingChildren,
+    refetch: refetchChildren,
+  } = useQuery({
+    queryKey: childrenQueryKey,
+    queryFn: async () => {
+      if (!selectedParentId) return [];
+      
+      console.log('[useSegmentOutputsForShot] Fetching children for parent:', selectedParentId.substring(0, 8));
+      
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('parent_generation_id', selectedParentId)
+        .order('child_order', { ascending: true })
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[useSegmentOutputsForShot] Error fetching children:', error);
+        throw error;
+      }
+      
+      console.log('[useSegmentOutputsForShot] Found children:', data?.length || 0);
+      
+      return (data || []).map(transformToGenerationRow);
+    },
+    enabled: !!selectedParentId,
+    // Smart polling config - polls when realtime is unhealthy, otherwise relies on invalidation
+    ...childrenPollingConfig,
+    refetchOnWindowFocus: false,
+  });
+  
+  const childGenerations = childGenerationsData || [];
+  
+  // Filter to only segments (not join outputs)
+  const segments = useMemo(() => {
+    return childGenerations.filter(child => isSegment(child.params as any));
+  }, [childGenerations]);
+  
+  // Debug: Log segments found
+  console.log(`[useSegmentOutputsForShot] childGenerations=${childGenerations.length} segments=${segments.length}`);
+  
+  // Fetch LIVE shot_generations to get current timeline order
+  // This is the source of truth for video positioning - videos move with their images
+  const {
+    data: liveTimelineData,
+    refetch: refetchTimeline,
+  } = useQuery({
+    queryKey: ['segment-live-timeline', shotId],
+    queryFn: async () => {
+      if (!shotId) return [];
+      
+      console.log('[PairSlot] 🟡 Fetching LIVE timeline for shot:', shotId.substring(0, 8));
+      
+      const { data, error } = await supabase
+        .from('shot_generations')
+        .select('id, generation_id, timeline_frame')
+        .eq('shot_id', shotId)
+        .gte('timeline_frame', 0) // Only positioned images
+        .order('timeline_frame', { ascending: true });
+      
+      if (error) {
+        console.error('[PairSlot] Error fetching live timeline:', error);
+        throw error;
+      }
+      
+      console.log('[PairSlot] 🟡 LIVE timeline result:', data?.length, 'images');
+      
+      return data || [];
+    },
+    enabled: !!shotId,
+    staleTime: 10000, // Refresh more frequently to catch timeline changes
+  });
+  
+  // Build map of shot_generation.id → current position (live, not snapshot)
+  const liveShotGenIdToPosition = useMemo(() => {
+    const map = new Map<string, number>();
+    (liveTimelineData || []).forEach((sg, index) => {
+      map.set(sg.id, index);
+    });
+    
+    // Log the live timeline state
+    if (liveTimelineData && liveTimelineData.length > 0) {
+      console.log('[PairSlot] 🟣 LIVE TIMELINE MAP:', liveTimelineData.map((sg, i) => 
+        `[${i}]→${sg.id} (frame:${sg.timeline_frame})`
+      ).join(' | '));
+    }
+    
+    return map;
+  }, [liveTimelineData]);
+  
+  // Extract expected segment data from selected parent
+  const expectedSegmentData = useMemo(() => {
+    if (!selectedParent) return null;
+    return extractExpectedSegmentData(selectedParent.params as any);
+  }, [selectedParent]);
+  
+  // Build segment slots
+  // Uses LOCAL positions (instant during drag) or LIVE timeline (from DB) for slot assignment
+  const segmentSlots = useMemo((): SegmentSlot[] => {
+    // Prefer local positions (instant updates) over live DB query
+    const useLocalPositions = localShotGenPositions && localShotGenPositions.size > 0;
+    const positionMap = useLocalPositions ? localShotGenPositions : liveShotGenIdToPosition;
+    const slotCount = useLocalPositions 
+      ? localShotGenPositions.size - 1  // N images = N-1 pairs
+      : (liveTimelineData?.length ? liveTimelineData.length - 1 : 0);
+    
+    const expectedCount = expectedSegmentData?.count || slotCount;
+    
+    // Summary log: show full state in one place
+    const positionSummary = [...positionMap.entries()]
+      .sort((a, b) => a[1] - b[1])
+      .map(([id, pos]) => `[${pos}]=${id.substring(0, 8)}`)
+      .join(' ');
+    const videoSummary = segments.map(v => {
+      const { pairShotGenId } = getPairIdentifiers(v.params as any);
+      const pos = pairShotGenId ? positionMap.get(pairShotGenId) : undefined;
+      return `${v.id.substring(0, 8)}→${pairShotGenId?.substring(0, 8) || 'NULL'}@${pos ?? '?'}`;
+    }).join(' | ');
+    
+    console.log(`[PairSlot] 📊 SUMMARY: slotCount=${slotCount} | positions: ${positionSummary} | videos: ${videoSummary}`);
+    
+    // Use slotCount (current timeline) for positioning, not expectedCount (original generation)
+    if (slotCount === 0) {
+      // No position data, just show what we have
+      return segments.map((child, index) => ({
+        type: 'child' as const,
+        child,
+        index: (child as any).child_order ?? index,
+      }));
+    }
+    
+    // Create slots for all expected segments
+    const slots: SegmentSlot[] = [];
+    const childrenBySlot = new Map<number, GenerationRow>();
+    const usedSlots = new Set<number>();
+    const childrenWithoutValidSlot: GenerationRow[] = [];
+    
+    // Priority chain for slot mapping:
+    // 1. pair_shot_generation_id → position (LOCAL for instant, LIVE as fallback)
+    // 2. child_order (fallback ONLY for videos without pair_shot_generation_id)
+    segments.forEach(child => {
+      const { pairShotGenId } = getPairIdentifiers(child.params as any);
+      const childOrder = (child as any).child_order;
+      
+      let derivedSlot: number | undefined;
+      let slotSource = 'NONE';
+      let pairShotGenPosition: number | undefined;
+      
+      // Priority 1: pair_shot_generation_id → look up position (instant from local, or from DB)
+      // Videos should move with their images
+      if (pairShotGenId && positionMap.has(pairShotGenId)) {
+        pairShotGenPosition = positionMap.get(pairShotGenId)!;
+        // Only validate against slot count (current timeline)
+        // Position N means "start of pair N", but pair N only exists if there's an image at N+1
+        if (pairShotGenPosition < slotCount) {
+          derivedSlot = pairShotGenPosition;
+          slotSource = useLocalPositions ? 'LOCAL_POSITION' : 'PAIR_SHOT_GEN_ID_LIVE';
+        } else {
+          // Image is at last position - no valid pair starts there
+          slotSource = 'PAIR_AT_END_NO_SLOT';
+        }
+      }
+      
+      // Priority 2: child_order (fallback ONLY if no pair_shot_generation_id exists)
+      // If the video HAS a pair_shot_gen_id but it's at an invalid position (end), don't fallback
+      if (derivedSlot === undefined && !pairShotGenId && typeof childOrder === 'number' && 
+          childOrder >= 0 && childOrder < slotCount) {
+        derivedSlot = childOrder;
+        slotSource = 'CHILD_ORDER';
+      }
+      
+      console.log(`[PairSlot] 🟢 Video ${child.id.substring(0, 8)} | pairShotGenId=${pairShotGenId || 'NULL'} | pos=${pairShotGenPosition ?? 'N/A'} | childOrder=${childOrder} | derivedSlot=${derivedSlot} | source=${slotSource}`);
+      
+      // Skip videos whose pair_shot_gen is at an invalid position (e.g., last image)
+      // These videos can't be shown because their start image has no following image
+      if (slotSource === 'PAIR_AT_END_NO_SLOT') {
+        console.log(`[PairSlot] ⏭️ Skipping video ${child.id.substring(0, 8)} - its pair_shot_gen is at position ${pairShotGenPosition} (last image, no pair)`);
+        return; // Skip this video entirely
+      }
+      
+      // Check if slot is valid and not already used
+      if (derivedSlot !== undefined && !usedSlots.has(derivedSlot)) {
+        childrenBySlot.set(derivedSlot, child);
+        usedSlots.add(derivedSlot);
+      } else {
+        childrenWithoutValidSlot.push(child);
+      }
+    });
+    
+    // Assign orphans to available slots
+    let nextAvailableSlot = 0;
+    childrenWithoutValidSlot.forEach(child => {
+      while (nextAvailableSlot < slotCount && childrenBySlot.has(nextAvailableSlot)) {
+        nextAvailableSlot++;
+      }
+      if (nextAvailableSlot < slotCount) {
+        childrenBySlot.set(nextAvailableSlot, child);
+        nextAvailableSlot++;
+      }
+    });
+    
+    // Fill in slots using LIVE timeline data for placeholders
+    for (let i = 0; i < slotCount; i++) {
+      const child = childrenBySlot.get(i);
+      if (child) {
+        slots.push({ type: 'child', child, index: i });
+      } else {
+        // Use live timeline for placeholder images if available
+        const liveStartImage = liveTimelineData?.[i];
+        const liveEndImage = liveTimelineData?.[i + 1];
+        slots.push({
+          type: 'placeholder',
+          index: i,
+          expectedFrames: expectedSegmentData?.frames[i],
+          expectedPrompt: expectedSegmentData?.prompts[i],
+          startImage: liveStartImage?.generation_id || expectedSegmentData?.inputImages[i],
+          endImage: liveEndImage?.generation_id || expectedSegmentData?.inputImages[i + 1],
+        });
+      }
+    }
+    
+    return slots;
+  }, [segments, expectedSegmentData, liveTimelineData, liveShotGenIdToPosition, localShotGenPositions]);
+  
+  // Calculate progress
+  const segmentProgress = useMemo(() => {
+    const completed = segmentSlots.filter(s => s.type === 'child' && (s.child as any).location).length;
+    const total = segmentSlots.length;
+    return { completed, total };
+  }, [segmentSlots]);
+  
+  // Combined refetch
+  const refetch = useCallback(() => {
+    refetchParents();
+    refetchChildren();
+    refetchTimeline();
+  }, [refetchParents, refetchChildren, refetchTimeline]);
+  
+  return {
+    parentGenerations,
+    selectedParentId,
+    setSelectedParentId,
+    selectedParent,
+    hasFinalOutput: !!(selectedParent?.location),
+    segmentSlots,
+    segments, // Actual segment children (for join functionality)
+    segmentProgress,
+    expectedSegmentData,
+    isLoading: isLoadingParents || isLoadingChildren,
+    isRefetching: isFetchingParents || isFetchingChildren,
+    refetch,
+  };
+}
+

@@ -145,6 +145,19 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
 
       // ONLY invalidate generation data if tasks completed
       if (hasCompleteTask) {
+        // 🚀 Segment strip (Travel Between Images): ensure new segments appear without refresh
+        // These queries are custom to the timeline segment output strip and are not covered by
+        // unified-generations invalidation.
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'segment-parent-generations'
+        });
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'segment-child-generations'
+        });
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'segment-live-timeline'
+        });
+
         // Invalidate derived generations (edits based on source images)
         queryClient.invalidateQueries({ queryKey: ['derived-generations'] });
         queryClient.invalidateQueries({ queryKey: ['derived-items'] });
@@ -191,6 +204,17 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
       
       if (isComplete) {
+          // 🚀 Segment strip (Travel Between Images): ensure new segments appear without refresh
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === 'segment-parent-generations'
+          });
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === 'segment-child-generations'
+          });
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === 'segment-live-timeline'
+          });
+
           // Always invalidate project-level queries for ChildGenerationsView
           queryClient.invalidateQueries({
             predicate: (query) => query.queryKey[0] === 'unified-generations' && query.queryKey[1] === 'project'

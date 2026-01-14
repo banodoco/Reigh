@@ -6,6 +6,64 @@ export type EditMode = 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img
 export type LoraMode = 'none' | 'in-scene' | 'next-scene' | 'custom';
 
 /**
+ * Advanced settings for image editing tasks (similar to HiresFixConfig from image generation)
+ * Controls two-pass generation quality settings.
+ */
+export interface EditAdvancedSettings {
+  /** Whether advanced settings are enabled */
+  enabled: boolean;
+  /** Scale factor for initial resolution (1.0-2.5x) */
+  resolution_scale: number;
+  /** Number of inference steps for base pass */
+  base_steps: number;
+  /** Upscale factor for hires pass (e.g., 1.1 = 10% upscale) */
+  hires_scale: number;
+  /** Number of steps for hires/refinement pass */
+  hires_steps: number;
+  /** Denoising strength for hires pass (0-1) */
+  hires_denoise: number;
+  /** Lightning LoRA strength for phase 1 (initial generation, 0-1) */
+  lightning_lora_strength_phase_1: number;
+  /** Lightning LoRA strength for phase 2 (hires/refinement pass, 0-1) */
+  lightning_lora_strength_phase_2: number;
+}
+
+export const DEFAULT_ADVANCED_SETTINGS: EditAdvancedSettings = {
+  enabled: false, // Disabled by default for edits (optional feature)
+  resolution_scale: 1.5,
+  base_steps: 8,
+  hires_scale: 1.1,
+  hires_steps: 8,
+  hires_denoise: 0.5, // Lower than image generation (0.55) for edits
+  lightning_lora_strength_phase_1: 0.9,
+  lightning_lora_strength_phase_2: 0.5,
+};
+
+/**
+ * Converts EditAdvancedSettings to HiresFixApiParams for task creation.
+ * Returns undefined if advanced settings are disabled.
+ */
+export function convertToHiresFixApiParams(settings: EditAdvancedSettings | undefined): {
+  hires_scale?: number;
+  hires_steps?: number;
+  hires_denoise?: number;
+  lightning_lora_strength_phase_1?: number;
+  lightning_lora_strength_phase_2?: number;
+} | undefined {
+  if (!settings || !settings.enabled) {
+    return undefined;
+  }
+  
+  return {
+    hires_scale: settings.hires_scale,
+    hires_steps: settings.hires_steps,
+    hires_denoise: settings.hires_denoise,
+    lightning_lora_strength_phase_1: settings.lightning_lora_strength_phase_1,
+    lightning_lora_strength_phase_2: settings.lightning_lora_strength_phase_2,
+  };
+}
+
+/**
  * Settings stored per-generation in generations.params.ui.editSettings
  */
 export interface GenerationEditSettings {
@@ -19,6 +77,8 @@ export interface GenerationEditSettings {
   img2imgPromptHasBeenSet: boolean;
   img2imgStrength: number;
   img2imgEnablePromptExpansion: boolean;
+  // Advanced settings for two-pass generation
+  advancedSettings: EditAdvancedSettings;
 }
 
 export const DEFAULT_EDIT_SETTINGS: GenerationEditSettings = {
@@ -32,6 +92,8 @@ export const DEFAULT_EDIT_SETTINGS: GenerationEditSettings = {
   img2imgPromptHasBeenSet: false,
   img2imgStrength: 0.6,
   img2imgEnablePromptExpansion: false,
+  // Advanced settings defaults
+  advancedSettings: DEFAULT_ADVANCED_SETTINGS,
 };
 
 export interface UseGenerationEditSettingsReturn {
@@ -48,6 +110,8 @@ export interface UseGenerationEditSettingsReturn {
   setImg2imgPrompt: (prompt: string) => void;
   setImg2imgStrength: (strength: number) => void;
   setImg2imgEnablePromptExpansion: (enabled: boolean) => void;
+  // Advanced settings setter
+  setAdvancedSettings: (settings: Partial<EditAdvancedSettings>) => void;
   
   // Bulk update
   updateSettings: (updates: Partial<GenerationEditSettings>) => void;
@@ -345,6 +409,18 @@ export function useGenerationEditSettings({
     });
   }, [triggerSave]);
   
+  // Advanced settings setter (merges with existing)
+  const setAdvancedSettings = useCallback((updates: Partial<EditAdvancedSettings>) => {
+    setSettings(prev => {
+      const updated = {
+        ...prev,
+        advancedSettings: { ...prev.advancedSettings, ...updates },
+      };
+      triggerSave(updated);
+      return updated;
+    });
+  }, [triggerSave]);
+  
   // Bulk update
   const updateSettings = useCallback((updates: Partial<GenerationEditSettings>) => {
     setSettings(prev => {
@@ -388,6 +464,7 @@ export function useGenerationEditSettings({
     setImg2imgPrompt,
     setImg2imgStrength,
     setImg2imgEnablePromptExpansion,
+    setAdvancedSettings,
     updateSettings,
     isLoading,
     hasPersistedSettings,

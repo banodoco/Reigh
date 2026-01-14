@@ -9,8 +9,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shar
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useEnhancedShotImageReorder } from "@/shared/hooks/useEnhancedShotImageReorder";
 import { useTimelinePositionUtils } from "@/shared/hooks/useTimelinePositionUtils";
-import PairPromptModal from "./Timeline/PairPromptModal";
-import { Download, Loader2 } from "lucide-react";
+import SegmentSettingsModal from "./Timeline/SegmentSettingsModal";
+import { Download, Loader2, Play, Pause, ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { useSegmentOutputsForShot } from '../hooks/useSegmentOutputsForShot';
 import { toast } from "sonner";
 import { getDisplayUrl } from '@/shared/lib/utils';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
@@ -20,6 +22,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Video } from 'lucide-react';
 import { isVideoGeneration, isPositioned, isVideoAny } from '@/shared/lib/typeGuards';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
+import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -95,6 +98,7 @@ interface ShotImagesEditorProps {
   defaultNegativePrompt?: string;
   onDefaultNegativePromptChange?: (prompt: string) => void;
   /** Structure video props - passed from parent for task generation */
+  // Structure video props - legacy single-video interface
   structureVideoPath?: string | null;
   structureVideoMetadata?: VideoMetadata | null;
   structureVideoTreatment?: 'adjust' | 'clip';
@@ -112,6 +116,11 @@ interface ShotImagesEditorProps {
   ) => void;
   /** Callback for changing uni3c end percent */
   onUni3cEndPercentChange?: (value: number) => void;
+  // NEW: Multi-video array interface
+  structureVideos?: import("@/shared/lib/tasks/travelBetweenImages").StructureVideoConfigWithMetadata[];
+  onAddStructureVideo?: (video: import("@/shared/lib/tasks/travelBetweenImages").StructureVideoConfigWithMetadata) => void;
+  onUpdateStructureVideo?: (index: number, updates: Partial<import("@/shared/lib/tasks/travelBetweenImages").StructureVideoConfigWithMetadata>) => void;
+  onRemoveStructureVideo?: (index: number) => void;
   /** Audio strip props */
   audioUrl?: string | null;
   audioMetadata?: { duration: number; name?: string } | null;
@@ -177,7 +186,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onDefaultPromptChange,
   defaultNegativePrompt = "",
   onDefaultNegativePromptChange,
-  // Structure video props
+  // Structure video props (legacy single-video)
   structureVideoPath: propStructureVideoPath,
   structureVideoMetadata: propStructureVideoMetadata,
   structureVideoTreatment: propStructureVideoTreatment = 'adjust',
@@ -186,6 +195,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   uni3cEndPercent: propUni3cEndPercent = 0.1,
   onStructureVideoChange: propOnStructureVideoChange,
   onUni3cEndPercentChange: propOnUni3cEndPercentChange,
+  // NEW: Multi-video array props
+  structureVideos: propStructureVideos,
+  onAddStructureVideo: propOnAddStructureVideo,
+  onUpdateStructureVideo: propOnUpdateStructureVideo,
+  onRemoveStructureVideo: propOnRemoveStructureVideo,
   // Audio strip props
   audioUrl: propAudioUrl,
   audioMetadata: propAudioMetadata,
@@ -202,6 +216,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   maxFrameLimit = 81,
   smoothContinuations = false,
 }) => {
+  // Convert aspect ratio (e.g. "4:3") to concrete resolution string (e.g. "768x576").
+  // IMPORTANT: Segment regeneration expects WxH; passing the aspect ratio string would
+  // incorrectly store parsed_resolution_wh as "4:3".
+  const resolvedProjectResolution = projectAspectRatio
+    ? ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio]
+    : undefined;
+
   // Track local drag state to suppress hook reloads during drag operations
   // This is forwarded via onDragStateChange but we also need it locally for useEnhancedShotPositions
   const [isDragInProgress, setIsDragInProgress] = useState(false);
@@ -431,9 +452,96 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // State for download functionality
   const [isDownloadingImages, setIsDownloadingImages] = useState(false);
   
+  // State for segment preview dialog
+  const [isPreviewTogetherOpen, setIsPreviewTogetherOpen] = useState(false);
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const previewAudioRef = useRef<HTMLAudioElement>(null);
+  const [previewIsPlaying, setPreviewIsPlaying] = useState(true);
+  const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
+  const [previewDuration, setPreviewDuration] = useState(0);
+  
+  // Audio sync state for preview
+  const [segmentDurations, setSegmentDurations] = useState<number[]>([]);
+  const [segmentOffsets, setSegmentOffsets] = useState<number[]>([]);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [isLoadingDurations, setIsLoadingDurations] = useState(false);
+  
+  // Fetch segment outputs for preview
+  const {
+    segmentSlots,
+    selectedParentId,
+    selectedParent,
+    isLoading: segmentsLoading,
+  } = useSegmentOutputsForShot(selectedShotId, projectId || '');
+  
+  // [PairModalDebug] Log segment output state
+  console.log('[PairModalDebug] ShotImagesEditor segment outputs:', {
+    selectedShotId: selectedShotId?.substring(0, 8),
+    selectedParentId: selectedParentId?.substring(0, 8) || null,
+    hasSelectedParent: !!selectedParent,
+    segmentSlotsCount: segmentSlots.length,
+  });
+  
+  // Log segment slots details for preview debugging
+  console.log('[PreviewCrossfade] segmentSlots from hook:', {
+    count: segmentSlots.length,
+    slots: segmentSlots.map(slot => ({
+      type: slot.type,
+      index: slot.index,
+      hasLocation: slot.type === 'child' ? !!slot.child?.location : false,
+    })),
+  });
+  
+  // State for crossfade animation (moved here, actual memo is after shotGenerations is defined)
+  const [crossfadeProgress, setCrossfadeProgress] = useState(0);
+  const crossfadeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Preview video effects - handles video segments
+  React.useEffect(() => {
+    if (isPreviewTogetherOpen && previewVideoRef.current) {
+      previewVideoRef.current.load();
+      previewVideoRef.current.play().catch(() => {});
+    }
+  }, [currentPreviewIndex, isPreviewTogetherOpen]);
+  
+  // Auto-start playback when dialog opens OR when segment changes (for both video and image segments)
+  React.useEffect(() => {
+    if (isPreviewTogetherOpen) {
+      // Start playing immediately - this triggers on dialog open AND segment change
+      setPreviewIsPlaying(true);
+      console.log('[PreviewCrossfade] Auto-starting playback for segment:', currentPreviewIndex);
+    }
+  }, [isPreviewTogetherOpen, currentPreviewIndex]);
+  
+  // Reset preview state when dialog closes
+  React.useEffect(() => {
+    if (!isPreviewTogetherOpen) {
+      setCurrentPreviewIndex(0);
+      setPreviewCurrentTime(0);
+      setPreviewDuration(0);
+      setPreviewIsPlaying(false); // Reset to false when closed
+      // Reset audio state
+      setSegmentDurations([]);
+      setSegmentOffsets([]);
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current.currentTime = 0;
+      }
+      // Reset crossfade state
+      setCrossfadeProgress(0);
+      if (crossfadeTimerRef.current) {
+        clearInterval(crossfadeTimerRef.current);
+        crossfadeTimerRef.current = null;
+      }
+    }
+  }, [isPreviewTogetherOpen]);
+  
+  // Note: Preview-related effects are defined after previewableSegments memo (see below)
+  
   // Note: Pair prompts are retrieved from the enhanced shot positions hook below
   
-  const [pairPromptModalData, setPairPromptModalData] = useState<{
+  const [segmentSettingsModalData, setSegmentSettingsModalData] = useState<{
     isOpen: boolean;
     pairData: { 
       index: number; 
@@ -549,6 +657,298 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     unpositioned: shotGenerations.filter((img: any) => img.timeline_frame == null || img.timeline_frame === -1).length,
     hookDataShotGensCount: hookData.shotGenerations.length,
   });
+  
+  // Get ALL segments for preview (both with videos and image-only)
+  // NOTE: This must be after shotGenerations is defined
+  // IMPORTANT: Build from IMAGE PAIRS, not segmentSlots - otherwise we miss image-only segments
+  const allSegmentsForPreview = React.useMemo(() => {
+    // Get sorted images to find start/end for each pair
+    const sortedImages = [...(shotGenerations || [])]
+      .filter((img: any) => img.timeline_frame != null && img.timeline_frame >= 0)
+      .sort((a: any, b: any) => a.timeline_frame - b.timeline_frame);
+    
+    // Build a lookup of segment slots by index for quick access
+    const slotsByIndex = new Map<number, typeof segmentSlots[0]>();
+    segmentSlots.forEach(slot => {
+      slotsByIndex.set(slot.index, slot);
+    });
+    
+    // Number of pairs = number of images - 1 (each pair is consecutive images)
+    const numPairs = Math.max(0, sortedImages.length - 1);
+    
+    console.log('[PreviewCrossfade] Building allSegmentsForPreview:', {
+      shotGenerationsCount: shotGenerations?.length || 0,
+      sortedImagesCount: sortedImages.length,
+      segmentSlotsCount: segmentSlots.length,
+      numPairs,
+      sortedImageFrames: sortedImages.map((img: any) => img.timeline_frame),
+    });
+    
+    // FPS for calculating duration from frames
+    const FPS = 24;
+    
+    // Build segments from ALL image pairs, enriching with video data from slots if available
+    const segments = [];
+    for (let pairIndex = 0; pairIndex < numPairs; pairIndex++) {
+      // Get start and end images for this pair
+      const startImage = sortedImages[pairIndex];
+      const endImage = sortedImages[pairIndex + 1];
+      
+      // Calculate duration from frame positions
+      const startFrame = startImage?.timeline_frame ?? 0;
+      const endFrame = endImage?.timeline_frame ?? startFrame;
+      const frameCount = endFrame - startFrame;
+      const durationFromFrames = frameCount / FPS;
+      
+      // Check if there's a slot with video for this pair
+      const slot = slotsByIndex.get(pairIndex);
+      const hasVideoInSlot = slot?.type === 'child' && !!slot.child?.location;
+      
+      console.log('[PreviewCrossfade] Processing pair:', {
+        pairIndex,
+        hasSlot: !!slot,
+        slotType: slot?.type,
+        hasVideoInSlot,
+        startImageUrl: startImage?.imageUrl?.substring(0, 50) || null,
+        endImageUrl: endImage?.imageUrl?.substring(0, 50) || null,
+        startFrame,
+        endFrame,
+        durationFromFrames,
+      });
+      
+      if (hasVideoInSlot && slot?.type === 'child') {
+        // Has video
+        segments.push({
+          hasVideo: true,
+          videoUrl: getDisplayUrl(slot.child.location),
+          thumbUrl: getDisplayUrl(slot.child.thumbUrl || slot.child.location),
+          startImageUrl: startImage?.imageUrl || startImage?.thumbUrl || null,
+          endImageUrl: endImage?.imageUrl || endImage?.thumbUrl || null,
+          index: pairIndex,
+          durationFromFrames, // Used as fallback if video duration fails to load
+        });
+      } else {
+        // No video - will show crossfade
+        segments.push({
+          hasVideo: false,
+          videoUrl: null,
+          thumbUrl: startImage?.thumbUrl || startImage?.imageUrl || null,
+          startImageUrl: startImage?.imageUrl || startImage?.thumbUrl || null,
+          endImageUrl: endImage?.imageUrl || endImage?.thumbUrl || null,
+          index: pairIndex,
+          durationFromFrames,
+        });
+      }
+    }
+    
+    console.log('[PreviewCrossfade] allSegmentsForPreview result:', segments.map(s => ({
+      index: s.index,
+      hasVideo: s.hasVideo,
+      hasStartImg: !!s.startImageUrl,
+      hasEndImg: !!s.endImageUrl,
+      duration: s.durationFromFrames,
+    })));
+    
+    return segments;
+  }, [segmentSlots, shotGenerations]);
+  
+  // Filter to just segments we can actually preview (have video OR have both images)
+  const previewableSegments = React.useMemo(() => {
+    const filtered = allSegmentsForPreview.filter(seg => 
+      seg.hasVideo || (seg.startImageUrl && seg.endImageUrl)
+    );
+    console.log('[PreviewCrossfade] previewableSegments:', {
+      allCount: allSegmentsForPreview.length,
+      filteredCount: filtered.length,
+      segments: filtered.map(s => ({ index: s.index, hasVideo: s.hasVideo })),
+    });
+    return filtered;
+  }, [allSegmentsForPreview]);
+  
+  const hasVideosToPreview = previewableSegments.length > 0;
+  console.log('[PreviewCrossfade] hasVideosToPreview:', hasVideosToPreview);
+  
+  // Helper to calculate global time across all segments
+  const getGlobalTime = React.useCallback((segmentIndex: number, timeInSegment: number) => {
+    if (segmentOffsets.length === 0 || segmentIndex >= segmentOffsets.length) return 0;
+    return segmentOffsets[segmentIndex] + timeInSegment;
+  }, [segmentOffsets]);
+  
+  // Sync audio when video plays
+  const syncAudioToVideo = React.useCallback(() => {
+    const video = previewVideoRef.current;
+    const audio = previewAudioRef.current;
+    if (!video || !audio || !isAudioEnabled || !propAudioUrl) return;
+    
+    // Scale video time by playback rate to get "real" elapsed time
+    const scaledVideoTime = video.currentTime / (video.playbackRate || 1);
+    const globalTime = getGlobalTime(currentPreviewIndex, scaledVideoTime);
+    audio.currentTime = globalTime;
+    
+    if (!video.paused) {
+      audio.play().catch(() => {}); // Ignore autoplay errors
+    }
+  }, [currentPreviewIndex, getGlobalTime, isAudioEnabled, propAudioUrl]);
+  
+  // Calculate segment durations and offsets when dialog opens
+  // Uses frame-based duration so videos will be speed-adjusted to match
+  React.useEffect(() => {
+    if (!isPreviewTogetherOpen || previewableSegments.length === 0) return;
+    
+    // Use frame-based duration for all segments (videos will adjust playback rate to match)
+    const durations = previewableSegments.map(segment => 
+      segment.durationFromFrames || 2 // Default 2s if no frame data
+    );
+    
+    // Calculate cumulative offsets: [0, dur1, dur1+dur2, ...]
+    const offsets: number[] = [0];
+    for (let i = 0; i < durations.length - 1; i++) {
+      offsets.push(offsets[i] + durations[i]);
+    }
+    
+    console.log('[PreviewAudio] Segment durations (from frames):', durations);
+    console.log('[PreviewAudio] Calculated offsets:', offsets);
+    
+    setSegmentDurations(durations);
+    setSegmentOffsets(offsets);
+    setIsLoadingDurations(false);
+  }, [isPreviewTogetherOpen, previewableSegments]);
+  
+  // Keyboard navigation for preview dialog
+  React.useEffect(() => {
+    if (!isPreviewTogetherOpen) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isTyping = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      );
+      if (isTyping) return;
+      
+      if (previewableSegments.length === 0) return;
+      
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setCurrentPreviewIndex(prev => 
+          prev > 0 ? prev - 1 : previewableSegments.length - 1
+        );
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setCurrentPreviewIndex(prev => 
+          (prev + 1) % previewableSegments.length
+        );
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPreviewTogetherOpen, previewableSegments.length]);
+  
+  // Crossfade animation effect for image-only segments
+  React.useEffect(() => {
+    console.log('[PreviewCrossfade] Effect triggered:', {
+      isPreviewTogetherOpen,
+      previewableSegmentsLength: previewableSegments.length,
+      currentPreviewIndex,
+      previewIsPlaying,
+    });
+    
+    if (!isPreviewTogetherOpen || previewableSegments.length === 0) {
+      console.log('[PreviewCrossfade] Early return: dialog not open or no segments');
+      return;
+    }
+    
+    const safeIndex = Math.min(currentPreviewIndex, previewableSegments.length - 1);
+    const currentSegment = previewableSegments[safeIndex];
+    
+    console.log('[PreviewCrossfade] Current segment:', {
+      safeIndex,
+      hasSegment: !!currentSegment,
+      hasVideo: currentSegment?.hasVideo,
+      startImageUrl: currentSegment?.startImageUrl?.substring(0, 50),
+      endImageUrl: currentSegment?.endImageUrl?.substring(0, 50),
+    });
+    
+    // Only run crossfade for image-only segments
+    if (!currentSegment || currentSegment.hasVideo || !previewIsPlaying) {
+      console.log('[PreviewCrossfade] Skipping crossfade:', {
+        noSegment: !currentSegment,
+        hasVideo: currentSegment?.hasVideo,
+        notPlaying: !previewIsPlaying,
+      });
+      // Clear timer if video segment or paused
+      if (crossfadeTimerRef.current) {
+        clearInterval(crossfadeTimerRef.current);
+        crossfadeTimerRef.current = null;
+      }
+      return;
+    }
+    
+    // Image-only segment - start crossfade animation
+    const segmentDuration = segmentDurations[safeIndex] || currentSegment.durationFromFrames || 2;
+    const startTime = Date.now();
+    const duration = segmentDuration * 1000; // Convert to ms
+    
+    console.log('[PreviewCrossfade] 🎬 STARTING crossfade animation:', {
+      segmentDuration,
+      durationMs: duration,
+      startImageUrl: currentSegment.startImageUrl?.substring(0, 50),
+      endImageUrl: currentSegment.endImageUrl?.substring(0, 50),
+    });
+    
+    // Sync audio at start
+    const audio = previewAudioRef.current;
+    if (audio && isAudioEnabled && propAudioUrl) {
+      const globalTime = getGlobalTime(safeIndex, 0);
+      audio.currentTime = globalTime;
+      audio.play().catch(() => {});
+    }
+    
+    setCrossfadeProgress(0);
+    setPreviewCurrentTime(0);
+    setPreviewDuration(segmentDuration);
+    
+    // Clear any existing timer first
+    if (crossfadeTimerRef.current) {
+      clearInterval(crossfadeTimerRef.current);
+    }
+    
+    crossfadeTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Log every 500ms to avoid spam
+      if (Math.floor(elapsed / 500) !== Math.floor((elapsed - 50) / 500)) {
+        console.log('[PreviewCrossfade] ⏱️ Tick:', { elapsed, progress: progress.toFixed(2), duration });
+      }
+      
+      setCrossfadeProgress(progress);
+      setPreviewCurrentTime(progress * segmentDuration);
+      
+      if (progress >= 1) {
+        console.log('[PreviewCrossfade] ✅ Crossfade complete, advancing to next segment');
+        // Crossfade complete - advance to next segment
+        clearInterval(crossfadeTimerRef.current!);
+        crossfadeTimerRef.current = null;
+        const nextIndex = (safeIndex + 1) % previewableSegments.length;
+        setCurrentPreviewIndex(nextIndex);
+      }
+    }, 50); // Update ~20 times per second
+    
+    console.log('[PreviewCrossfade] ✅ Timer started, ref:', !!crossfadeTimerRef.current);
+    
+    return () => {
+      console.log('[PreviewCrossfade] Cleanup: clearing timer');
+      if (crossfadeTimerRef.current) {
+        clearInterval(crossfadeTimerRef.current);
+        crossfadeTimerRef.current = null;
+      }
+    };
+  // Note: We use JSON.stringify for segment data to avoid re-running on every render
+  // when the array reference changes but content is the same
+  }, [isPreviewTogetherOpen, currentPreviewIndex, JSON.stringify(previewableSegments.map(s => ({ hasVideo: s.hasVideo, index: s.index }))), previewIsPlaying, segmentDurations.length, isAudioEnabled, propAudioUrl]);
   
   // Enhanced reorder management for batch mode - pass parent hook to avoid duplication
   // When using preloaded images, still need shotId for mutations!
@@ -922,6 +1322,30 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               )}
             </CardTitle>
             
+            {/* Preview Together Button - Icon only, show when segments are available (hidden in read-only mode) */}
+            {!readOnly && hasVideosToPreview && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setCurrentPreviewIndex(0);
+                        setIsPreviewTogetherOpen(true);
+                      }}
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <Play className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Preview all generated segments together</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            
             {/* Download All Images Button - Icon only, next to title (hidden in read-only mode) */}
             {!readOnly && (
               <TooltipProvider>
@@ -1057,7 +1481,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 hookData={preloadedImages ? undefined : hookData}
                 onDragStateChange={handleDragStateChange}
                 onPairClick={(pairIndex, pairData) => {
-                  setPairPromptModalData({
+                  setSegmentSettingsModalData({
                     isOpen: true,
                     pairData,
                   });
@@ -1127,6 +1551,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 onStructureVideoChange={propOnStructureVideoChange}
                 uni3cEndPercent={propUni3cEndPercent}
                 onUni3cEndPercentChange={propOnUni3cEndPercentChange}
+                // NEW: Multi-video array props
+                structureVideos={propStructureVideos}
+                onAddStructureVideo={propOnAddStructureVideo}
+                onUpdateStructureVideo={propOnUpdateStructureVideo}
+                onRemoveStructureVideo={propOnRemoveStructureVideo}
                 // Audio strip props
                 audioUrl={propAudioUrl}
                 audioMetadata={propAudioMetadata}
@@ -1201,6 +1630,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   onFileDrop={onBatchFileDrop}
                   onGenerationDrop={onBatchGenerationDrop}
                   shotId={selectedShotId}
+                  projectId={projectId}
                   toolTypeOverride="travel-between-images"
                   // Shot management for external generation viewing
                   allShots={allShots}
@@ -1226,7 +1656,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   // Pair prompt props
                   onPairClick={(pairIndex, pairData) => {
                     console.log('[PairIndicatorDebug] ShotImagesEditor onPairClick called', { pairIndex, pairData });
-                    setPairPromptModalData({
+                    setSegmentSettingsModalData({
                       isOpen: true,
                       pairData,
                     });
@@ -1405,6 +1835,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       uni3cEndPercent={propUni3cEndPercent}
                       onUni3cEndPercentChange={propOnUni3cEndPercentChange}
                       readOnly={readOnly}
+                      hideStructureSettings={true}
                     />
                   </>
                 )}
@@ -1414,53 +1845,138 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         )}
       </CardContent>
 
-      {/* Pair Prompt Modal */}
-      <PairPromptModal
-        isOpen={pairPromptModalData.isOpen}
-        onClose={() => setPairPromptModalData({ isOpen: false, pairData: null })}
-        pairData={pairPromptModalData.pairData}
-        readOnly={readOnly}
-        pairPrompt={(() => {
-          // CRITICAL: Read prompt from the exact shot_generation being displayed
-          // Look up by id (which is the shot_generation.id)
-          if (!pairPromptModalData.pairData?.startImage?.id) {
-            return "";
+      {/* Segment Settings Modal - Uses SegmentRegenerateControls form */}
+      <SegmentSettingsModal
+        isOpen={segmentSettingsModalData.isOpen}
+        onClose={() => setSegmentSettingsModalData({ isOpen: false, pairData: null })}
+        pairData={segmentSettingsModalData.pairData}
+        projectId={projectId || null}
+        shotId={selectedShotId}
+        generationId={selectedParentId || undefined}
+        isRegeneration={(() => {
+          // Check if this specific pair has a child generation (is regenerating existing)
+          const pairIndex = segmentSettingsModalData.pairData?.index;
+          if (pairIndex === undefined) return false;
+          const pairSlot = segmentSlots.find(slot => slot.index === pairIndex);
+          const hasChildForPair = pairSlot?.type === 'child';
+          console.log('[PairModalDebug] Checking pair child:', { pairIndex, hasChildForPair, pairSlotType: pairSlot?.type });
+          return hasChildForPair;
+        })()}
+        initialParams={(() => {
+          const parentParams = selectedParent?.params as Record<string, any> | undefined;
+          if (!parentParams) return undefined;
+
+          // Recompute segment frame gaps from the CURRENT timeline, matching full generation behavior.
+          // In timeline mode, full generation sets:
+          // - segment_frames = diffs between successive timeline_frame positions
+          // - frame_overlap = 10 for each segment (today; may be configurable later)
+          const sortedTimelineImages = [...(shotGenerations || [])]
+            .filter((sg: any) => sg?.timeline_frame != null && sg.timeline_frame >= 0)
+            .sort((a: any, b: any) => a.timeline_frame - b.timeline_frame);
+
+          const timelineFrameGaps: number[] = [];
+          for (let i = 0; i < sortedTimelineImages.length - 1; i++) {
+            const gap = (sortedTimelineImages[i + 1].timeline_frame as number) - (sortedTimelineImages[i].timeline_frame as number);
+            if (Number.isFinite(gap) && gap >= 0) timelineFrameGaps.push(gap);
           }
-          const shotGen = shotGenerations.find(sg => sg.id === pairPromptModalData.pairData.startImage.id);
-          const prompt = shotGen?.metadata?.pair_prompt || "";
-          
-          // Only log when modal is actually open
-          if (pairPromptModalData.isOpen) {
-            console.log('[PairPromptFlow] 📖 Looking for ID:', pairPromptModalData.pairData.startImage.id.substring(0, 8));
-            console.log('[PairPromptFlow] 📖 Total shotGenerations:', shotGenerations.length);
-            console.log('[PairPromptFlow] 📖 Found in array?', !!shotGen);
-            console.log('[PairPromptFlow] 📖 Source:', preloadedImages ? 'preloadedImages' : 'dbShotGenerations');
-            console.log('[PairPromptFlow] 📖 Received prompt:', prompt || '(empty)');
-            
-            // Show ALL available IDs
-            const allIds = shotGenerations.map((sg, i) => ({
-              index: i,
-              id: sg.id?.substring(0, 8), // shot_generations.id
-              generation_id: sg.generation_id?.substring(0, 8),
-              hasMetadata: !!sg.metadata,
-              hasPairPrompt: !!sg.metadata?.pair_prompt,
+
+          const existingOverlap =
+            (parentParams.orchestrator_details?.frame_overlap_expanded?.[0] as number | undefined) ??
+            (parentParams.frame_overlap_expanded?.[0] as number | undefined) ??
+            10;
+          const timelineOverlaps = timelineFrameGaps.map(() => existingOverlap);
+
+          console.log('[SegmentSettingsModal] [TimelineGaps] Using current timeline gaps for regeneration params:', {
+            shotId: selectedShotId?.substring(0, 8),
+            gapsCount: timelineFrameGaps.length,
+            firstGaps: timelineFrameGaps.slice(0, 5),
+            overlap: existingOverlap,
+            // Helpful for debugging off-by-ones
+            firstFrames: sortedTimelineImages.slice(0, 5).map((img: any) => img.timeline_frame),
+          });
+
+          // Inject structure_videos for segment regeneration if configured on the shot.
+          // Parent generations can be missing this field (older runs / legacy format),
+          // but regen needs it for multi-structure video support.
+          const cleanedStructureVideos = (propStructureVideos || [])
+            .filter(v => !!v?.path)
+            .map(v => ({
+              path: v.path,
+              start_frame: v.start_frame,
+              end_frame: v.end_frame,
+              treatment: v.treatment,
+              motion_strength: v.motion_strength,
+              structure_type: v.structure_type,
+              ...(v.source_start_frame !== undefined ? { source_start_frame: v.source_start_frame } : {}),
+              ...(v.source_end_frame !== undefined && v.source_end_frame !== null ? { source_end_frame: v.source_end_frame } : {}),
+              ...(v.uni3c_start_percent !== undefined ? { uni3c_start_percent: v.uni3c_start_percent } : {}),
+              ...(v.uni3c_end_percent !== undefined ? { uni3c_end_percent: v.uni3c_end_percent } : {}),
             }));
-            console.log('[PairPromptFlow] 📖 ALL IDs in shotGenerations:', allIds);
+
+          if (cleanedStructureVideos.length > 0) {
+            console.log('[SegmentSettingsModal] [MultiStructureDebug] Injecting structure_videos into regeneration params:', {
+              shotId: selectedShotId?.substring(0, 8),
+              count: cleanedStructureVideos.length,
+              ranges: cleanedStructureVideos.map(v => ({ start_frame: v.start_frame, end_frame: v.end_frame, structure_type: v.structure_type })),
+            });
           }
-          return prompt;
+
+          // Load user_overrides from the start image's shot_generation.metadata so user edits persist
+          const startImageId = segmentSettingsModalData.pairData?.startImage?.id;
+          const startShotGen = startImageId ? shotGenerations.find(sg => sg.id === startImageId) : undefined;
+          const userOverrides = startShotGen?.metadata?.user_overrides as Record<string, any> | undefined;
+          const pairPromptVal = startShotGen?.metadata?.pair_prompt;
+          const enhancedPromptVal = startShotGen?.metadata?.enhanced_prompt;
+
+          // Only log when we have actual pair data (avoid noise from closed modal)
+          if (segmentSettingsModalData.pairData?.index !== undefined) {
+            const pairIdx = segmentSettingsModalData.pairData?.index;
+            const pp = pairPromptVal ? `"${pairPromptVal.substring(0, 30)}..."` : 'null';
+            const ep = enhancedPromptVal ? 'yes' : 'null';
+            const uo = userOverrides ? Object.keys(userOverrides).join(',') : 'null';
+            const indexMap = sortedTimelineImages.map((sg: any, i: number) => `[${i}]→${sg.id?.substring(0, 8)}`).join(' ');
+            
+            console.log(`[PerPairData] 📥 FORM LOAD (SegmentSettingsModal) | pair=${pairIdx} → ${startImageId?.substring(0, 8)} | pair_prompt=${pp} | enhanced=${ep} | overrides=${uo} | default=${defaultPrompt ? `"${defaultPrompt.substring(0, 20)}..."` : 'null'}`);
+            console.log(`[PerPairData]   INDEX MAP (SegmentSettingsModal): ${indexMap}`);
+          }
+
+          return {
+            ...parentParams,
+            orchestrator_details: {
+              ...(parentParams.orchestrator_details || {}),
+              ...(timelineFrameGaps.length > 0 ? {
+                // These MUST match the current timeline spacing for correct segment positioning.
+                segment_frames_expanded: timelineFrameGaps,
+                frame_overlap_expanded: timelineOverlaps,
+                num_new_segments_to_generate: timelineFrameGaps.length,
+              } : {}),
+              ...(cleanedStructureVideos.length > 0 ? { structure_videos: cleanedStructureVideos } : {}),
+            },
+            // Include user_overrides so SegmentRegenerateControls can apply them on top
+            user_overrides: userOverrides,
+          };
+        })()}
+        projectResolution={resolvedProjectResolution}
+        pairPrompt={(() => {
+          if (!segmentSettingsModalData.pairData?.startImage?.id) return "";
+          const shotGen = shotGenerations.find(sg => sg.id === segmentSettingsModalData.pairData.startImage.id);
+          return shotGen?.metadata?.pair_prompt || "";
         })()}
         pairNegativePrompt={(() => {
-          // CRITICAL: Read negative prompt from the exact shot_generation being displayed
-          // Look up by id (which is the shot_generation.id)
-          if (!pairPromptModalData.pairData?.startImage?.id) return "";
-          const shotGen = shotGenerations.find(sg => sg.id === pairPromptModalData.pairData.startImage.id);
+          if (!segmentSettingsModalData.pairData?.startImage?.id) return "";
+          const shotGen = shotGenerations.find(sg => sg.id === segmentSettingsModalData.pairData.startImage.id);
           return shotGen?.metadata?.pair_negative_prompt || "";
+        })()}
+        enhancedPrompt={(() => {
+          if (!segmentSettingsModalData.pairData?.startImage?.id) return "";
+          const shotGen = shotGenerations.find(sg => sg.id === segmentSettingsModalData.pairData.startImage.id);
+          return shotGen?.metadata?.enhanced_prompt || "";
         })()}
         defaultPrompt={defaultPrompt}
         defaultNegativePrompt={defaultNegativePrompt}
         onNavigatePrevious={(() => {
-          if (!pairPromptModalData.pairData) return undefined;
-          const currentIndex = pairPromptModalData.pairData.index;
+          if (!segmentSettingsModalData.pairData) return undefined;
+          const currentIndex = segmentSettingsModalData.pairData.index;
           if (currentIndex <= 0) return undefined;
           
           // Calculate previous pair data
@@ -1481,7 +1997,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             const startLocation = startImage.imageUrl || startImage.location;
             const endLocation = endImage.imageUrl || endImage.location;
             
-            setPairPromptModalData({
+            setSegmentSettingsModalData({
               isOpen: true,
               pairData: {
                 index: prevIndex,
@@ -1507,8 +2023,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           };
         })()}
         onNavigateNext={(() => {
-          if (!pairPromptModalData.pairData) return undefined;
-          const currentIndex = pairPromptModalData.pairData.index;
+          if (!segmentSettingsModalData.pairData) return undefined;
+          const currentIndex = segmentSettingsModalData.pairData.index;
           
           // Calculate if there's a next pair
           const sortedImages = [...shotGenerations]
@@ -1529,7 +2045,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             const startLocation = startImage.imageUrl || startImage.location;
             const endLocation = endImage.imageUrl || endImage.location;
             
-            setPairPromptModalData({
+            setSegmentSettingsModalData({
               isOpen: true,
               pairData: {
                 index: nextIndex,
@@ -1555,61 +2071,477 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           };
         })()}
         hasPrevious={(() => {
-          if (!pairPromptModalData.pairData) return false;
-          return pairPromptModalData.pairData.index > 0;
+          if (!segmentSettingsModalData.pairData) return false;
+          return segmentSettingsModalData.pairData.index > 0;
         })()}
         hasNext={(() => {
-          if (!pairPromptModalData.pairData) return false;
+          if (!segmentSettingsModalData.pairData) return false;
           const sortedImages = [...shotGenerations]
             .filter(sg => sg.timeline_frame != null && sg.timeline_frame >= 0)
             .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
           
           console.log('[PairPromptFlow] 📊 hasNext calculation:', {
-            currentPairIndex: pairPromptModalData.pairData.index,
+            currentPairIndex: segmentSettingsModalData.pairData.index,
             totalSortedImages: sortedImages.length,
             totalPairs: sortedImages.length - 1,
-            hasNext: pairPromptModalData.pairData.index < sortedImages.length - 2,
+            hasNext: segmentSettingsModalData.pairData.index < sortedImages.length - 2,
           });
           
-          return pairPromptModalData.pairData.index < sortedImages.length - 2;
+          return segmentSettingsModalData.pairData.index < sortedImages.length - 2;
         })()}
-        onSave={async (pairIndex, prompt, negativePrompt) => {
-          try {
-            console.log('[PairPromptFlow] 📥 ONSAVE CALLBACK RECEIVED:', {
-              pairIndex,
-              promptLength: prompt?.length || 0,
-              negativePromptLength: negativePrompt?.length || 0,
-              hasPrompt: !!prompt,
-              hasNegativePrompt: !!negativePrompt,
+        onFrameCountChange={(frameCount: number) => {
+          console.log('[FrameCountDebug] onFrameCountChange CALLED with:', frameCount);
+          // Update the end image's timeline_frame when frame count changes
+          // AND shift all subsequent images by the delta
+          const pairData = segmentSettingsModalData.pairData;
+          if (!pairData?.endImage?.id || pairData.startFrame === undefined) {
+            console.warn('[FrameCountDebug] Cannot update frame count: missing endImage or startFrame', {
+              hasEndImage: !!pairData?.endImage,
+              endImageId: pairData?.endImage?.id,
+              startFrame: pairData?.startFrame,
             });
-            
-            // CRITICAL FIX: Use the actual shot_generation.id from the timeline
-            // instead of recalculating it from index (which can be wrong with duplicates)
-            const shotGenerationId = pairPromptModalData.pairData?.startImage?.id;
-            
-            if (!shotGenerationId) {
-              console.error('[PairPromptFlow] ❌ No shot_generation.id found in pairData:', pairPromptModalData.pairData);
-              return;
-            }
-            
-            console.log(`[PairPromptFlow] 🎯 CALLING updatePairPrompts for Pair ${pairIndex + 1}:`, {
-              shotGenerationId: shotGenerationId.substring(0, 8),
-              fullShotGenerationId: shotGenerationId,
-              prompt: prompt?.substring(0, 50) + (prompt?.length > 50 ? '...' : ''),
-              negativePrompt: negativePrompt?.substring(0, 50) + (negativePrompt?.length > 50 ? '...' : ''),
-              startFrame: pairPromptModalData.pairData?.startFrame,
-              endFrame: pairPromptModalData.pairData?.endFrame,
-            });
-            
-            await updatePairPrompts(shotGenerationId, prompt, negativePrompt);
-            
-            console.log(`[PairPromptFlow] ✅ updatePairPrompts COMPLETED for Pair ${pairIndex + 1}`);
-            // Timeline now uses shared hook data, so changes are reactive
-          } catch (error) {
-            console.error(`[PairPromptFlow] ❌ FAILED to save prompts for Pair ${pairIndex + 1}:`, error);
+            return;
           }
+          
+          const oldEndFrame = pairData.endFrame;
+          const newEndFrame = pairData.startFrame + frameCount;
+          const delta = newEndFrame - oldEndFrame;
+
+          if (delta === 0) {
+            // Nothing to do
+            return;
+          }
+          
+          console.log('[FrameCountDebug] Updating timeline frames:', {
+            frameCount,
+            startFrame: pairData.startFrame,
+            oldEndFrame,
+            newEndFrame,
+            delta,
+            endImageId: pairData.endImage.id.substring(0, 8),
+          });
+          
+          // Get all images sorted by timeline_frame
+          const sortedImages = [...shotGenerations]
+            .filter(sg => sg.timeline_frame != null && sg.timeline_frame >= 0)
+            .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
+
+          // Find the end image in the ordered list, then shift it and everything after it.
+          // Index-based shifting avoids accidentally shifting unrelated images that happen to share the same frame.
+          let startShiftIndex = sortedImages.findIndex(sg => sg.id === pairData.endImage?.id);
+          if (startShiftIndex === -1) {
+            console.warn('[FrameCountDebug] End image not found in sortedImages; falling back to frame-based cutoff', {
+              endImageId: pairData.endImage.id.substring(0, 8),
+              oldEndFrame,
+            });
+            startShiftIndex = sortedImages.findIndex(sg => sg.timeline_frame === oldEndFrame);
+          }
+
+          if (startShiftIndex === -1) {
+            console.warn('[FrameCountDebug] Could not determine shift start index; aborting shift', {
+              endImageId: pairData.endImage.id.substring(0, 8),
+              oldEndFrame,
+            });
+            return;
+          }
+
+          const imagesToShift = sortedImages.slice(startShiftIndex);
+          
+          console.log('[FrameCountDebug] Images to shift:', {
+            total: imagesToShift.length,
+            ids: imagesToShift.map(sg => sg.id.substring(0, 8)),
+            frames: imagesToShift.map(sg => sg.timeline_frame),
+          });
+
+          const updates = imagesToShift.map(sg => {
+            const nextFrame = (sg.timeline_frame as number) + delta;
+            console.log('[FrameCountDebug] Shifting image:', sg.id.substring(0, 8), sg.timeline_frame, '->', nextFrame);
+            return { id: sg.id, newFrame: nextFrame };
+          });
+
+          // Prefer batch update to avoid N sequential writes/races
+          batchExchangePositions(updates as any)
+            .then(() => {
+              console.log('[FrameCountDebug] All frames shifted successfully (batch)');
+            })
+            .catch(err => {
+              console.error('[FrameCountDebug] Error shifting frames (batch):', err);
+            });
+          
+          // Also update the local modal state so the display stays in sync
+          setSegmentSettingsModalData(prev => ({
+            ...prev,
+            pairData: prev.pairData ? {
+              ...prev.pairData,
+              frames: frameCount,
+              endFrame: newEndFrame,
+              endImage: prev.pairData.endImage ? {
+                ...prev.pairData.endImage,
+                timeline_frame: newEndFrame,
+              } : undefined,
+            } : null,
+          }));
         }}
       />
+      
+      {/* Preview Together Dialog */}
+      <Dialog open={isPreviewTogetherOpen} onOpenChange={setIsPreviewTogetherOpen}>
+        <DialogContent className="max-w-4xl w-full p-0 gap-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Preview Segments</DialogTitle>
+          </DialogHeader>
+          <div className="p-4">
+            {previewableSegments.length === 0 ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                No segments available to preview
+              </div>
+            ) : (() => {
+              const safeIndex = Math.min(currentPreviewIndex, previewableSegments.length - 1);
+              const currentSegment = previewableSegments[safeIndex];
+              
+              console.log('[PreviewCrossfade] Rendering preview:', {
+                safeIndex,
+                currentPreviewIndex,
+                previewableSegmentsLength: previewableSegments.length,
+                hasSegment: !!currentSegment,
+                hasVideo: currentSegment?.hasVideo,
+                startImageUrl: currentSegment?.startImageUrl?.substring(0, 50),
+                endImageUrl: currentSegment?.endImageUrl?.substring(0, 50),
+                crossfadeProgress,
+              });
+              
+              return (
+                <div className="space-y-4">
+                  <div className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ minHeight: '300px' }}>
+                    {currentSegment.hasVideo ? (
+                      // Video segment
+                      <video
+                        ref={previewVideoRef}
+                        src={currentSegment.videoUrl!}
+                        className="max-w-full max-h-[60vh] object-contain cursor-pointer"
+                        autoPlay
+                        playsInline
+                        onClick={() => {
+                          const video = previewVideoRef.current;
+                          if (video) {
+                            if (video.paused) {
+                              video.play();
+                            } else {
+                              video.pause();
+                            }
+                          }
+                        }}
+                        onPlay={() => {
+                          setPreviewIsPlaying(true);
+                          const audio = previewAudioRef.current;
+                          if (audio && isAudioEnabled && propAudioUrl) {
+                            syncAudioToVideo();
+                          }
+                        }}
+                        onPause={() => {
+                          setPreviewIsPlaying(false);
+                          const audio = previewAudioRef.current;
+                          if (audio) {
+                            audio.pause();
+                          }
+                        }}
+                        onTimeUpdate={() => {
+                          const video = previewVideoRef.current;
+                          if (video) {
+                            // Scale current time by playback rate to show "real" time elapsed
+                            const scaledTime = video.currentTime / (video.playbackRate || 1);
+                            setPreviewCurrentTime(scaledTime);
+                          }
+                        }}
+                        onSeeked={() => {
+                          syncAudioToVideo();
+                        }}
+                        onLoadedMetadata={() => {
+                          const video = previewVideoRef.current;
+                          if (video) {
+                            const actualDuration = video.duration;
+                            const expectedDuration = currentSegment.durationFromFrames || actualDuration;
+                            
+                            // Adjust playback rate so video matches segment duration
+                            if (expectedDuration > 0 && actualDuration > 0) {
+                              const playbackRate = actualDuration / expectedDuration;
+                              // Clamp to reasonable range (0.25x to 4x)
+                              video.playbackRate = Math.max(0.25, Math.min(4, playbackRate));
+                              console.log('[PreviewVideo] Adjusting playback rate:', {
+                                actual: actualDuration.toFixed(2),
+                                expected: expectedDuration.toFixed(2),
+                                rate: video.playbackRate.toFixed(2),
+                              });
+                            }
+                            
+                            // Show expected duration in UI (what the segment should last)
+                            setPreviewDuration(expectedDuration);
+                            setPreviewCurrentTime(0);
+                            syncAudioToVideo();
+                          }
+                        }}
+                        onEnded={() => {
+                          const nextIndex = (safeIndex + 1) % previewableSegments.length;
+                          setCurrentPreviewIndex(nextIndex);
+                        }}
+                        key={currentSegment.videoUrl}
+                      />
+                    ) : (
+                      // Image crossfade segment
+                      <div 
+                        className="relative w-full cursor-pointer"
+                        style={{ maxHeight: '60vh' }}
+                        onClick={() => {
+                          // Toggle play/pause for crossfade
+                          setPreviewIsPlaying(prev => {
+                            const newPlaying = !prev;
+                            const audio = previewAudioRef.current;
+                            if (audio) {
+                              if (newPlaying) {
+                                audio.play().catch(() => {});
+                              } else {
+                                audio.pause();
+                              }
+                            }
+                            return newPlaying;
+                          });
+                        }}
+                      >
+                        {/* Base image to establish dimensions */}
+                        <img
+                          src={currentSegment.startImageUrl || currentSegment.endImageUrl || ''}
+                          alt="Base"
+                          className="w-full h-auto max-h-[60vh] object-contain invisible"
+                        />
+                        {/* Start image - fades out */}
+                        {currentSegment.startImageUrl && (
+                          <img
+                            src={currentSegment.startImageUrl}
+                            alt="Start"
+                            className="absolute inset-0 w-full h-full object-contain"
+                            style={{ 
+                              opacity: 1 - crossfadeProgress,
+                              transition: 'opacity 100ms ease-out'
+                            }}
+                          />
+                        )}
+                        {/* End image - fades in */}
+                        {currentSegment.endImageUrl && (
+                          <img
+                            src={currentSegment.endImageUrl}
+                            alt="End"
+                            className="absolute inset-0 w-full h-full object-contain"
+                            style={{ 
+                              opacity: crossfadeProgress,
+                              transition: 'opacity 100ms ease-out'
+                            }}
+                          />
+                        )}
+                        {/* "No video" indicator */}
+                        <div className="absolute top-3 left-3 px-2 py-1 rounded bg-black/50 text-white text-xs">
+                          Crossfade (no video)
+                        </div>
+                        {/* Play/pause indicator */}
+                        {!previewIsPlaying && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="bg-black/50 rounded-full p-4">
+                              <Play className="h-8 w-8 text-white" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Hidden audio element for background audio sync */}
+                    {propAudioUrl && (
+                      <audio
+                        ref={previewAudioRef}
+                        src={propAudioUrl}
+                        preload="auto"
+                        style={{ display: 'none' }}
+                      />
+                    )}
+                    
+                    {/* Navigation arrows */}
+                    {previewableSegments.length > 1 && (
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="lg"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentPreviewIndex(prev => 
+                              prev > 0 ? prev - 1 : previewableSegments.length - 1
+                            );
+                          }}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-10 w-10"
+                        >
+                          <ChevronLeft className="h-6 w-6" />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="lg"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentPreviewIndex(prev => 
+                              (prev + 1) % previewableSegments.length
+                            );
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-10 w-10"
+                        >
+                          <ChevronRight className="h-6 w-6" />
+                        </Button>
+                      </>
+                    )}
+                    
+                    {/* Controls overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-8">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (currentSegment.hasVideo) {
+                              const video = previewVideoRef.current;
+                              if (video) {
+                                if (video.paused) {
+                                  video.play();
+                                } else {
+                                  video.pause();
+                                }
+                              }
+                            } else {
+                              // Toggle crossfade play/pause
+                              setPreviewIsPlaying(prev => {
+                                const newPlaying = !prev;
+                                const audio = previewAudioRef.current;
+                                if (audio) {
+                                  if (newPlaying) {
+                                    audio.play().catch(() => {});
+                                  } else {
+                                    audio.pause();
+                                  }
+                                }
+                                return newPlaying;
+                              });
+                            }
+                          }}
+                          className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition-colors"
+                        >
+                          {previewIsPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+                        </button>
+                        
+                        {/* Audio toggle */}
+                        {propAudioUrl && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newEnabled = !isAudioEnabled;
+                              setIsAudioEnabled(newEnabled);
+                              const audio = previewAudioRef.current;
+                              if (audio) {
+                                if (newEnabled && previewIsPlaying) {
+                                  if (currentSegment.hasVideo) {
+                                    syncAudioToVideo();
+                                  } else {
+                                    const globalTime = getGlobalTime(safeIndex, previewCurrentTime);
+                                    audio.currentTime = globalTime;
+                                    audio.play().catch(() => {});
+                                  }
+                                } else {
+                                  audio.pause();
+                                }
+                              }
+                            }}
+                            className={`w-10 h-10 rounded-full backdrop-blur-sm text-white flex items-center justify-center transition-colors ${
+                              isAudioEnabled ? 'bg-white/20 hover:bg-white/30' : 'bg-white/10 hover:bg-white/20'
+                            }`}
+                            title={isAudioEnabled ? 'Mute audio' : 'Unmute audio'}
+                          >
+                            {isAudioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                          </button>
+                        )}
+                        
+                        <span className="text-white text-sm tabular-nums min-w-[85px]">
+                          {Math.floor(previewCurrentTime / 60)}:{Math.floor(previewCurrentTime % 60).toString().padStart(2, '0')} / {Math.floor(previewDuration / 60)}:{Math.floor(previewDuration % 60).toString().padStart(2, '0')}
+                        </span>
+                        
+                        <div className="flex-1 relative h-4 flex items-center">
+                          <div className="absolute inset-x-0 h-1.5 bg-white/30 rounded-full" />
+                          <div 
+                            className="absolute left-0 h-1.5 bg-white rounded-full"
+                            style={{ width: `${(previewCurrentTime / (previewDuration || 1)) * 100}%` }}
+                          />
+                          <div 
+                            className="absolute w-3 h-3 bg-white rounded-full shadow-md cursor-pointer"
+                            style={{ 
+                              left: `calc(${(previewCurrentTime / (previewDuration || 1)) * 100}% - 6px)`,
+                            }}
+                          />
+                          <input
+                            type="range"
+                            min={0}
+                            max={previewDuration || 100}
+                            step={0.1}
+                            value={previewCurrentTime}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              if (currentSegment.hasVideo) {
+                                const video = previewVideoRef.current;
+                                if (video) {
+                                  const newTime = parseFloat(e.target.value);
+                                  video.currentTime = newTime;
+                                  setPreviewCurrentTime(newTime);
+                                }
+                              }
+                              // For crossfade, scrubbing is disabled (would need more complex state)
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Segment thumbnail indicators */}
+                  <div className="flex items-center justify-center gap-2">
+                    {previewableSegments.map((segment, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className={`relative transition-all duration-200 rounded-lg overflow-hidden ${
+                          idx === safeIndex
+                            ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                            : 'opacity-60 hover:opacity-100'
+                        }`}
+                        style={{ width: 64, height: 36 }}
+                        onClick={() => setCurrentPreviewIndex(idx)}
+                        aria-label={`Go to segment ${segment.index + 1}`}
+                      >
+                        <img
+                          src={segment.thumbUrl || segment.startImageUrl || ''}
+                          alt={`Segment ${segment.index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {!segment.hasVideo && (
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <span className="text-[8px] text-white">IMG</span>
+                          </div>
+                        )}
+                        <span className="absolute bottom-0.5 right-1 text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                          {segment.index + 1}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

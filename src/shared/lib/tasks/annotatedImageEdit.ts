@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { HiresFixApiParams } from './imageGeneration';
 
 export interface CreateAnnotatedImageEditTaskParams {
   project_id: string;
@@ -11,6 +12,8 @@ export interface CreateAnnotatedImageEditTaskParams {
   tool_type?: string;
   loras?: Array<{ url: string; strength: number }>;
   create_as_generation?: boolean; // If true, create a new generation instead of a variant
+  // Advanced hires fix settings
+  hires_fix?: HiresFixApiParams;
 }
 
 /**
@@ -33,6 +36,7 @@ export async function createAnnotatedImageEditTask(params: CreateAnnotatedImageE
     tool_type,
     loras,
     create_as_generation,
+    hires_fix,
   } = params;
 
   console.log('[AnnotatedImageEdit] Creating annotated image edit tasks:', {
@@ -53,6 +57,18 @@ export async function createAnnotatedImageEditTask(params: CreateAnnotatedImageE
     tool_type_value: tool_type
   });
 
+  // Build hires fix params if provided
+  const hiresFixParams: Record<string, unknown> = {};
+  if (hires_fix) {
+    if (hires_fix.hires_scale !== undefined) hiresFixParams.hires_scale = hires_fix.hires_scale;
+    if (hires_fix.hires_steps !== undefined) hiresFixParams.hires_steps = hires_fix.hires_steps;
+    if (hires_fix.hires_denoise !== undefined) hiresFixParams.hires_denoise = hires_fix.hires_denoise;
+    if (hires_fix.lightning_lora_strength_phase_1 !== undefined) hiresFixParams.lightning_lora_strength_phase_1 = hires_fix.lightning_lora_strength_phase_1;
+    if (hires_fix.lightning_lora_strength_phase_2 !== undefined) hiresFixParams.lightning_lora_strength_phase_2 = hires_fix.lightning_lora_strength_phase_2;
+    if (hires_fix.additional_loras && Object.keys(hires_fix.additional_loras).length > 0) hiresFixParams.additional_loras = hires_fix.additional_loras;
+    console.log('[AnnotatedImageEdit] Added hires fix params:', hiresFixParams);
+  }
+
   // Create multiple tasks (one per generation)
   const tasksToCreate = Array(num_generations).fill(null).map(() => ({
     project_id,
@@ -69,6 +85,7 @@ export async function createAnnotatedImageEditTask(params: CreateAnnotatedImageE
       ...(tool_type ? { tool_type } : {}), // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
       ...(loras && loras.length > 0 ? { loras } : {}), // Include loras if provided
       ...(create_as_generation ? { create_as_generation: true } : {}), // If true, create a new generation instead of a variant
+      ...hiresFixParams, // Include hires fix settings if provided
     },
   }));
 

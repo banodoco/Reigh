@@ -828,7 +828,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     const quantizedTotal = quantizeTotalFrames(actualTotal);
 
     return (
-        <div className={cn("space-y-8 max-w-6xl mx-auto", className)}>
+        <div className={cn("space-y-8", className)}>
             {/* Global Settings & Visualization */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Controls Column */}

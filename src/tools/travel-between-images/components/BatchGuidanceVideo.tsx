@@ -29,6 +29,8 @@ interface BatchGuidanceVideoProps {
   imageCount?: number; // Number of images in the batch
   timelineFramePositions?: number[]; // Actual frame positions from timeline
   readOnly?: boolean;
+  /** Hide structure type and strength controls (when shown elsewhere like Structure section) */
+  hideStructureSettings?: boolean;
 }
 
 export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
@@ -48,6 +50,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   imageCount = 0,
   timelineFramePositions = [],
   readOnly = false,
+  hideStructureSettings = false,
 }) => {
   // ALL HOOKS MUST BE AT THE TOP - before any conditional returns
   const [isUploading, setIsUploading] = useState(false);
@@ -505,93 +508,95 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             </div>
           </div>
 
-          {/* Structure type and Motion strength - stacked on mobile, side by side on desktop */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Structure type selector */}
-            {onStructureTypeChange && (
-              <div className="space-y-2">
-                <Label className="text-sm">What type of guidance would you like to use?</Label>
-                <Select
-                  value={structureType}
-                  onValueChange={(type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
-                    onStructureTypeChange(type);
-                  }}
-                  disabled={readOnly}
-                >
-                  <SelectTrigger variant="retro" size="sm" className="h-9 w-full text-sm">
-                    <SelectValue>
-                      {structureType === 'uni3c' ? 'Uni3C (I2V)' : 
-                       structureType === 'flow' ? 'Optical flow (VACE)' : 
-                       structureType === 'canny' ? 'Canny (VACE)' : 'Depth (VACE)'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent variant="retro">
-                    <SelectItem variant="retro" value="uni3c">
-                      <span className="text-sm">Uni3C (I2V)</span>
-                    </SelectItem>
-                    <SelectItem variant="retro" value="flow">
-                      <span className="text-sm">Optical flow (VACE)</span>
-                    </SelectItem>
-                    <SelectItem variant="retro" value="canny">
-                      <span className="text-sm">Canny (VACE)</span>
-                    </SelectItem>
-                    <SelectItem variant="retro" value="depth">
-                      <span className="text-sm">Depth (VACE)</span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Motion strength and End Percent (when uni3c) */}
-            <div className="space-y-4">
-              {/* Strength slider */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Strength:</Label>
-                  <span className="text-sm font-medium">{motionStrength.toFixed(1)}x</span>
+          {/* Structure type and Motion strength - hidden when shown elsewhere (like Structure section) */}
+          {!hideStructureSettings && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Structure type selector */}
+              {onStructureTypeChange && (
+                <div className="space-y-2">
+                  <Label className="text-sm">What type of guidance would you like to use?</Label>
+                  <Select
+                    value={structureType}
+                    onValueChange={(type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
+                      onStructureTypeChange(type);
+                    }}
+                    disabled={readOnly}
+                  >
+                    <SelectTrigger variant="retro" size="sm" className="h-9 w-full text-sm">
+                      <SelectValue>
+                        {structureType === 'uni3c' ? 'Uni3C (I2V)' : 
+                         structureType === 'flow' ? 'Optical flow (VACE)' : 
+                         structureType === 'canny' ? 'Canny (VACE)' : 'Depth (VACE)'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent variant="retro">
+                      <SelectItem variant="retro" value="uni3c">
+                        <span className="text-sm">Uni3C (I2V)</span>
+                      </SelectItem>
+                      <SelectItem variant="retro" value="flow">
+                        <span className="text-sm">Optical flow (VACE)</span>
+                      </SelectItem>
+                      <SelectItem variant="retro" value="canny">
+                        <span className="text-sm">Canny (VACE)</span>
+                      </SelectItem>
+                      <SelectItem variant="retro" value="depth">
+                        <span className="text-sm">Depth (VACE)</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Slider
-                  value={[motionStrength]}
-                  onValueChange={([value]) => onMotionStrengthChange(value)}
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  className="w-full"
-                  disabled={readOnly}
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>0x</span>
-                  <span>1x</span>
-                  <span>2x</span>
-                </div>
-              </div>
+              )}
 
-              {/* Uni3C End Percent - shown below strength when uni3c is selected */}
-              {structureType === 'uni3c' && onUni3cEndPercentChange && (
+              {/* Motion strength and End Percent (when uni3c) */}
+              <div className="space-y-4">
+                {/* Strength slider */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm">End Percent:</Label>
-                    <span className="text-sm font-medium">{(uni3cEndPercent * 100).toFixed(0)}%</span>
+                    <Label className="text-sm">Strength:</Label>
+                    <span className="text-sm font-medium">{motionStrength.toFixed(1)}x</span>
                   </div>
                   <Slider
-                    value={[uni3cEndPercent]}
-                    onValueChange={([value]) => onUni3cEndPercentChange(value)}
+                    value={[motionStrength]}
+                    onValueChange={([value]) => onMotionStrengthChange(value)}
                     min={0}
-                    max={1}
-                    step={0.05}
+                    max={2}
+                    step={0.1}
                     className="w-full"
                     disabled={readOnly}
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>0%</span>
-                    <span>50%</span>
-                    <span>100%</span>
+                    <span>0x</span>
+                    <span>1x</span>
+                    <span>2x</span>
                   </div>
                 </div>
-              )}
+
+                {/* Uni3C End Percent - shown below strength when uni3c is selected */}
+                {structureType === 'uni3c' && onUni3cEndPercentChange && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">End Percent:</Label>
+                      <span className="text-sm font-medium">{(uni3cEndPercent * 100).toFixed(0)}%</span>
+                    </div>
+                    <Slider
+                      value={[uni3cEndPercent]}
+                      onValueChange={([value]) => onUni3cEndPercentChange(value)}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      className="w-full"
+                      disabled={readOnly}
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>0%</span>
+                      <span>50%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Delete button at bottom - desktop only */}
           <div className="mt-auto pt-2 hidden md:block">

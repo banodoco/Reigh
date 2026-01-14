@@ -1016,7 +1016,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [noShotPrompts, setNoShotPrompts] = useState<PromptEntry[]>([]);
   const [noShotMasterPrompt, setNoShotMasterPrompt] = useState('');
 
-  // Button state for automated mode: idle → submitting → success → idle
+  // Optimistic button state for immediate feedback: idle → submitting → success → idle
   const automatedSubmitButton = useSubmitButtonState();
 
   // Removed unused currentShotId that was causing unnecessary re-renders
@@ -2681,7 +2681,34 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     const taskParams = getTaskParams(prompts);
     if (!taskParams) return;
 
-    onGenerate(taskParams);
+    // Trigger button state: submitting (1s) → success (2s) → idle
+    automatedSubmitButton.trigger();
+
+    // Add incoming task immediately - appears as filler in TasksPane
+    const firstPrompt = prompts.find(p => p.fullPrompt.trim())?.fullPrompt || 'Generating...';
+    const truncatedPrompt = firstPrompt.length > 50
+      ? firstPrompt.substring(0, 50) + '...'
+      : firstPrompt;
+    const incomingTaskId = addIncomingTask({
+      taskType: 'image_generation',
+      label: truncatedPrompt,
+      expectedCount: actionablePromptsCount * imagesPerPrompt,
+    });
+
+    console.log('[ImageGenerationForm] Managed mode: Starting task creation for:', truncatedPrompt);
+
+    // Fire-and-forget: run task creation in background
+    (async () => {
+      try {
+        await onGenerate(taskParams);
+      } catch (error) {
+        console.error('[ImageGenerationForm] Managed mode: Error creating tasks:', error);
+        toast.error("Failed to create tasks. Please try again.");
+      } finally {
+        // Remove the incoming task filler
+        removeIncomingTask(incomingTaskId);
+      }
+    })();
   };
 
   // Handle creating a new shot
@@ -2815,7 +2842,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               prompts={prompts}
               ready={ready}
               lastKnownPromptCount={lastKnownPromptCount}
-              isGenerating={isGenerating || automatedSubmitButton.isSubmitting}
+              isGenerating={automatedSubmitButton.isSubmitting}
               hasApiKey={hasApiKey}
               actionablePromptsCount={actionablePromptsCount}
               activePromptId={directFormActivePromptId}
@@ -2860,7 +2887,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             <ShotSelector
               shots={shots}
               associatedShotId={associatedShotId}
-              isGenerating={isGenerating}
+              isGenerating={automatedSubmitButton.isSubmitting}
               hasApiKey={hasApiKey}
               onChangeShot={handleShotChange}
               onClearShot={() => {
@@ -2874,7 +2901,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           
           {/* Right Column - Reference Image and Settings */}
           <ModelSection
-            isGenerating={isGenerating}
+            isGenerating={automatedSubmitButton.isSubmitting}
             styleReferenceImage={styleReferenceImageDisplay}
             styleReferenceStrength={styleReferenceStrength}
             subjectStrength={subjectStrength}
@@ -2928,7 +2955,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             onHiresFixConfigChange={setHiresFixConfig}
             projectResolution={projectResolution}
             projectAspectRatio={projectAspectRatio}
-            disabled={isGenerating || !hasApiKey}
+            disabled={automatedSubmitButton.isSubmitting || !hasApiKey}
             isLocalGeneration={isLocalGenerationEnabled}
           />
         </div>
@@ -2950,9 +2977,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                 imagesPerPrompt={imagesPerPrompt}
                 onChangeImagesPerPrompt={handleSliderChange(setImagesPerPrompt)}
                 actionablePromptsCount={actionablePromptsCount}
-                isGenerating={isGenerating || automatedSubmitButton.isSubmitting}
+                isGenerating={automatedSubmitButton.isSubmitting}
                 hasApiKey={hasApiKey}
-                justQueued={justQueued || automatedSubmitButton.isSuccess}
+                justQueued={automatedSubmitButton.isSuccess}
                 promptMode={effectivePromptMode}
                 onUseExistingPrompts={handleUseExistingPrompts}
                 onNewPromptsLikeExisting={handleNewPromptsLikeExisting}

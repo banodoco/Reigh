@@ -771,6 +771,9 @@ export const useTaskStatusCounts = (projectId: string | null) => {
         return { processing: 0, recentSuccesses: 0, recentFailures: 0 };
       }
 
+      // Match TasksPane list semantics: only count visible task types (and parent tasks)
+      const visibleTaskTypes = getVisibleTaskTypes();
+
       // Get 1 hour ago timestamp
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
@@ -782,7 +785,8 @@ export const useTaskStatusCounts = (projectId: string | null) => {
           .select('id', { count: 'exact', head: true })
           .eq('project_id', projectId)
           .in('status', ['Queued', 'In Progress'])
-          .is('params->orchestrator_task_id_ref', null), // Only parent tasks; include orchestrators
+          .is('params->orchestrator_task_id_ref', null) // Only parent tasks; include orchestrators
+          .in('task_type', visibleTaskTypes), // Only visible task types
           
         // Query for recent successes (last hour)
         supabase
@@ -790,8 +794,10 @@ export const useTaskStatusCounts = (projectId: string | null) => {
           .select('id', { count: 'exact', head: true })
           .eq('project_id', projectId)
           .eq('status', 'Complete')
-          .gte('updated_at', oneHourAgo)
-          .is('params->orchestrator_task_id_ref', null), // Only parent tasks
+          // `updated_at` is often null/unreliable in this schema; `generation_processed_at` is the real completion timestamp.
+          .gte('generation_processed_at', oneHourAgo)
+          .is('params->orchestrator_task_id_ref', null) // Only parent tasks
+          .in('task_type', visibleTaskTypes), // Only visible task types
           
         // Query for recent failures (last hour)
         supabase
@@ -799,8 +805,9 @@ export const useTaskStatusCounts = (projectId: string | null) => {
           .select('id', { count: 'exact', head: true })
           .eq('project_id', projectId)
           .in('status', ['Failed', 'Cancelled'])
-          .gte('updated_at', oneHourAgo)
+          .gte('generation_processed_at', oneHourAgo)
           .is('params->orchestrator_task_id_ref', null) // Only parent tasks
+          .in('task_type', visibleTaskTypes) // Only visible task types
       ]);
 
       // Handle processing count result

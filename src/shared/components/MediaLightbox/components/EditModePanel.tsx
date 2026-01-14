@@ -18,6 +18,8 @@ import type { GenerationVariant } from '@/shared/hooks/useVariants';
 import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { LoraSelectorModal, LoraModel } from '@/shared/components/LoraSelectorModal';
 import type { UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
+import { EditAdvancedSettings } from './EditAdvancedSettings';
+import type { EditAdvancedSettings as EditAdvancedSettingsType } from '../hooks/useGenerationEditSettings';
 
 export interface EditModePanelProps {
   // Source generation
@@ -112,6 +114,11 @@ export interface EditModePanelProps {
   // LoRA manager for img2img (uses shared LoRA selector)
   img2imgLoraManager?: UseLoraManagerReturn;
   availableLoras?: LoraModel[];
+  // LoRA manager for other edit modes (text, inpaint, annotate, reposition)
+  editLoraManager?: UseLoraManagerReturn;
+  // Advanced settings for two-pass generation
+  advancedSettings?: EditAdvancedSettingsType;
+  setAdvancedSettings?: (updates: Partial<EditAdvancedSettingsType>) => void;
 }
 
 /**
@@ -183,6 +190,9 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   handleGenerateImg2Img,
   img2imgLoraManager,
   availableLoras = [],
+  editLoraManager,
+  advancedSettings,
+  setAdvancedSettings,
 }) => {
   const isMobile = variant === 'mobile';
   
@@ -236,10 +246,10 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   );
 
   return (
-    <div className="w-full">
-      {/* Top bar with Edit Image title (left) and Info/Edit Toggle + Close (right) - Sticky */}
+    <div className={cn("w-full", !isMobile && "h-full flex flex-col")}>
+      {/* Top bar with Edit Image title (left) and Info/Edit Toggle + Close (right) */}
       <div className={cn(
-        "flex items-center justify-between border-b border-border sticky top-0 z-[80] bg-background",
+        "flex items-center justify-between border-b border-border bg-background flex-shrink-0",
         isMobile ? "px-3 py-2" : "p-4"
       )}>
         {/* Left side - Edit Image title */}
@@ -277,6 +287,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         </div>
       </div>
       
+      {/* Scrollable content wrapper for desktop */}
+      <div className={cn(!isMobile && "flex-1 overflow-y-auto min-h-0")}>
       <div className={`${padding} ${spacing}`}>
       {/* Edit Mode Section */}
       <div className={isMobile ? 'mb-1' : 'mb-4'}>
@@ -432,11 +444,11 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             {/* Strength Slider */}
             <div>
               <SectionLabel>Strength</SectionLabel>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 {!isMobile && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <label className={`${labelSize} font-medium cursor-help mr-4`}>Strength:</label>
+                      <label className={`${labelSize} font-medium cursor-help`}>Strength:</label>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-[200px]">
                       <p className="text-xs">
@@ -445,7 +457,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                     </TooltipContent>
                   </Tooltip>
                 )}
-                <div className={cn("flex items-center gap-2 flex-1", isMobile && "w-full")}>
+                <div className={cn("flex items-center gap-2", isMobile ? "w-full" : "w-[70%]")}>
                   <span className={cn(sliderTextSize, "text-muted-foreground", isMobile && "text-[10px]")}>Keep</span>
                   <input
                     type="range"
@@ -466,7 +478,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             {img2imgLoraManager && (
               <div className={generationsSpacing}>
                 <SectionLabel>Style LoRAs</SectionLabel>
-                <div className={cn("flex items-center justify-between", isMobile ? "mb-1" : "mb-2")}>
+                <div className={cn("flex items-center gap-2", isMobile ? "mb-1" : "mb-2")}>
                   {!isMobile && <label className={`${labelSize} font-medium`}>LoRAs (optional):</label>}
                   <Button
                     variant="outline"
@@ -495,8 +507,39 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           </div>
         )}
         
-        {/* LoRA Selector - Hidden for img2img mode (has its own LoRA selector) */}
-        {editMode !== 'img2img' && (
+        {/* LoRA Selector - Shown for non-img2img edit modes when editLoraManager is provided */}
+        {editMode !== 'img2img' && editLoraManager && (
+          <div className={generationsSpacing}>
+            <SectionLabel>Style LoRAs</SectionLabel>
+            <div className={cn("flex items-center gap-2", isMobile ? "mb-1" : "mb-2")}>
+              {!isMobile && <label className={`${labelSize} font-medium`}>LoRAs (optional):</label>}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => editLoraManager.setIsLoraModalOpen(true)}
+                className={cn("h-7 px-2 text-xs", isMobile && "h-6 text-[10px]")}
+              >
+                <Plus className={cn("mr-1", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
+                Add LoRA
+              </Button>
+            </div>
+            
+            {/* Display selected LoRAs */}
+            {editLoraManager.selectedLoras.length > 0 && (
+              <ActiveLoRAsDisplay
+                selectedLoras={editLoraManager.selectedLoras}
+                onRemoveLora={editLoraManager.handleRemoveLora}
+                onLoraStrengthChange={editLoraManager.handleLoraStrengthChange}
+                isGenerating={isGeneratingInpaint || isCreatingMagicEditTasks}
+                availableLoras={availableLoras}
+                className={isMobile ? "mt-1" : "mt-2"}
+              />
+            )}
+          </div>
+        )}
+        
+        {/* Legacy LoRA Selector - Fallback for when editLoraManager is not provided */}
+        {editMode !== 'img2img' && !editLoraManager && (
         <div>
           <SectionLabel>Style LoRA</SectionLabel>
           <div className="flex items-center gap-2">
@@ -545,6 +588,14 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             />
           )}
         </div>
+        )}
+        
+        {/* Advanced Settings - shown for edit modes that support hires fix (not img2img) */}
+        {advancedSettings && setAdvancedSettings && editMode !== 'img2img' && !isMobile && (
+          <EditAdvancedSettings
+            settings={advancedSettings}
+            onSettingsChange={setAdvancedSettings}
+          />
         )}
         
         {/* Number of Generations + Create as Variant - shown for all image edit modes */}
@@ -810,6 +861,31 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           />
         </Suspense>
       )}
+      
+      {/* Edit Mode LoRA Selector Modal (for text, inpaint, annotate, reposition modes) */}
+      {editLoraManager && (
+        <Suspense fallback={null}>
+          <LoraSelectorModal
+            isOpen={editLoraManager.isLoraModalOpen}
+            onClose={() => editLoraManager.setIsLoraModalOpen(false)}
+            loras={availableLoras}
+            onAddLora={editLoraManager.handleAddLora}
+            onRemoveLora={editLoraManager.handleRemoveLora}
+            onUpdateLoraStrength={editLoraManager.handleLoraStrengthChange}
+            selectedLoras={editLoraManager.selectedLoras.map(lora => {
+              const fullLora = availableLoras.find(l => l['Model ID'] === lora.id);
+              return {
+                ...fullLora,
+                "Model ID": lora.id,
+                Name: lora.name,
+                strength: lora.strength,
+              } as LoraModel & { strength: number };
+            })}
+            lora_type="Qwen Edit"
+          />
+        </Suspense>
+      )}
+    </div>
     </div>
   );
 };

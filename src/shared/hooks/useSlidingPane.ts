@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useIsMobile, useIsTablet } from '@/shared/hooks/use-mobile';
 import { useLocation } from 'react-router-dom';
 import { PANE_CONFIG } from '@/shared/config/panes';
@@ -38,7 +38,9 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
   }, [isLocked, side, isSmallMobile]);
 
   // Sync open state with lock state (all devices including mobile)
-  useEffect(() => {
+  // Using useLayoutEffect to ensure state updates synchronously before paint
+  // This prevents visual glitches when lock state changes from external sources (like MediaLightbox)
+  useLayoutEffect(() => {
     // Locked panes are always open, unlocked panes close
     if (isLocked) {
       setIsOpen(true);

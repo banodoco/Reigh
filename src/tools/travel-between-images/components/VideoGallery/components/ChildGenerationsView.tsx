@@ -6,7 +6,7 @@ import { Separator } from '@/shared/components/ui/separator';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2, Upload, Play, Pause, Maximize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Film, Loader2, Check, RotateCcw, Clock, Scissors, Trash2, Upload, Play, Pause, Maximize2, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -89,10 +89,16 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [isPreviewTogetherOpen, setIsPreviewTogetherOpen] = useState(false);
     const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
     const previewVideoRef = React.useRef<HTMLVideoElement>(null);
+    const previewAudioRef = React.useRef<HTMLAudioElement>(null);
     // Custom video control state
     const [previewIsPlaying, setPreviewIsPlaying] = useState(true);
     const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
     const [previewDuration, setPreviewDuration] = useState(0);
+    
+    // Audio sync state for preview
+    const [segmentDurations, setSegmentDurations] = useState<number[]>([]);
+    const [segmentOffsets, setSegmentOffsets] = useState<number[]>([]);
+    const [isAudioEnabled, setIsAudioEnabled] = useState(true);
     const isMobile = useIsMobile();
     const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth, isGenerationsPaneLocked } = usePanes();
     
@@ -505,6 +511,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             frames: orchestratorDetails.segment_frames_expanded || [],
             prompts: orchestratorDetails.enhanced_prompts_expanded || orchestratorDetails.base_prompts_expanded || [],
             inputImages: orchestratorDetails.input_image_paths_resolved || [],
+            // Include generation IDs for tethering videos to shot_generations
+            inputImageGenIds: orchestratorDetails.input_image_generation_ids || [],
+            // Include pair_shot_generation_ids for stable slot mapping (Phase 4 will populate this)
+            pairShotGenIds: orchestratorDetails.pair_shot_generation_ids || [],
         };
     }, [parentGeneration?.params]);
 
@@ -513,13 +523,28 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         | { type: 'child'; child: GenerationRow; index: number }
         | { type: 'placeholder'; index: number; expectedFrames?: number; expectedPrompt?: string; startImage?: string; endImage?: string };
 
+    // Helper to extract pair_shot_generation_id or start_image_generation_id from a video's params
+    const getPairIdentifiers = (child: GenerationRow): { pairShotGenId?: string; startGenId?: string } => {
+        const params = child.params as any;
+        if (!params) return {};
+        const individualParams = params.individual_segment_params || {};
+        return {
+            pairShotGenId: individualParams.pair_shot_generation_id || params.pair_shot_generation_id,
+            startGenId: individualParams.start_image_generation_id || params.start_image_generation_id,
+        };
+    };
+
     // Create merged array with placeholders for missing segments
     const segmentSlots = React.useMemo((): SegmentSlot[] => {
+        const inputImageGenIds = expectedSegmentData?.inputImageGenIds || [];
+        const pairShotGenIds = expectedSegmentData?.pairShotGenIds || [];
+        
         console.log('[SegmentSlots] Computing segment slots', {
             hasExpectedData: !!expectedSegmentData,
             expectedCount: expectedSegmentData?.count,
             actualChildrenCount: sortedSegments.length,
-            childOrders: sortedSegments.map(c => (c as any).child_order),
+            hasInputImageGenIds: inputImageGenIds.length > 0,
+            hasPairShotGenIds: pairShotGenIds.length > 0,
             timestamp: Date.now()
         });
 
@@ -535,45 +560,76 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
         // Create slots for all expected segments
         const slots: SegmentSlot[] = [];
-        const childrenByOrder = new Map<number, GenerationRow>();
+        const childrenBySlot = new Map<number, GenerationRow>();
+        const usedSlots = new Set<number>();
+        const childrenWithoutValidSlot: GenerationRow[] = [];
 
-        // Map children by their child_order if valid, otherwise track for fallback
-        const childrenWithoutValidOrder: GenerationRow[] = [];
-        const usedOrders = new Set<number>();
-
+        // Priority chain for slot mapping:
+        // 1. pair_shot_generation_id (best - stable shot_generation row ID)
+        // 2. start_image_generation_id (good - find by image's generation ID)
+        // 3. child_order (fallback)
         sortedSegments.forEach(child => {
-            const order = (child as any).child_order;
+            const { pairShotGenId, startGenId } = getPairIdentifiers(child);
+            const childOrder = (child as any).child_order;
             
-            // Check if this child has a valid, unique order
-            const isValidOrder = typeof order === 'number' && 
-                order >= 0 && 
-                order < expectedSegmentData.count &&
-                !usedOrders.has(order);
+            let derivedSlot: number | undefined;
+            let slotSource = 'none';
             
-            if (isValidOrder) {
-                console.log('[SegmentSlots] Mapping child by child_order', {
+            // Priority 1: pair_shot_generation_id (stable!)
+            if (pairShotGenId && pairShotGenIds.length > 0) {
+                const foundIndex = pairShotGenIds.indexOf(pairShotGenId);
+                if (foundIndex !== -1 && foundIndex < expectedSegmentData.count) {
+                    derivedSlot = foundIndex;
+                    slotSource = 'PAIR_SHOT_GENERATION_ID';
+                }
+            }
+            
+            // Priority 2: start_image_generation_id
+            if (derivedSlot === undefined && startGenId && inputImageGenIds.length > 0) {
+                const foundIndex = inputImageGenIds.indexOf(startGenId);
+                if (foundIndex !== -1 && foundIndex < expectedSegmentData.count) {
+                    derivedSlot = foundIndex;
+                    slotSource = 'START_IMAGE_GEN_ID';
+                }
+            }
+            
+            // Priority 3: child_order (fallback)
+            if (derivedSlot === undefined && typeof childOrder === 'number' && 
+                childOrder >= 0 && childOrder < expectedSegmentData.count) {
+                derivedSlot = childOrder;
+                slotSource = 'CHILD_ORDER';
+            }
+            
+            // Check if slot is valid and not already used
+            if (derivedSlot !== undefined && !usedSlots.has(derivedSlot)) {
+                console.log('[SegmentSlots] Mapping child to slot', {
                     childId: child.id?.substring(0, 8),
-                    child_order: order
+                    slot: derivedSlot,
+                    source: slotSource,
+                    pairShotGenId: pairShotGenId?.substring(0, 8),
+                    startGenId: startGenId?.substring(0, 8),
+                    childOrder
                 });
-                childrenByOrder.set(order, child);
-                usedOrders.add(order);
+                childrenBySlot.set(derivedSlot, child);
+                usedSlots.add(derivedSlot);
             } else {
-                console.log('[SegmentSlots] Child has invalid/missing order, will assign to first available slot', {
+                console.log('[SegmentSlots] Child needs fallback slot assignment', {
                     childId: child.id?.substring(0, 8),
-                    child_order: order,
-                    reason: typeof order !== 'number' ? 'not a number' : 
-                            order < 0 ? 'negative' : 
-                            order >= expectedSegmentData.count ? 'out of range' : 
-                            'duplicate'
+                    derivedSlot,
+                    slotSource,
+                    reason: derivedSlot === undefined ? 'no valid slot found' : 'slot already used',
+                    pairShotGenId: pairShotGenId?.substring(0, 8),
+                    startGenId: startGenId?.substring(0, 8),
+                    childOrder
                 });
-                childrenWithoutValidOrder.push(child);
+                childrenWithoutValidSlot.push(child);
             }
         });
         
-        // Assign children without valid orders to the first available slots
+        // Assign children without valid slots to the first available slots
         let nextAvailableSlot = 0;
-        childrenWithoutValidOrder.forEach(child => {
-            while (nextAvailableSlot < expectedSegmentData.count && childrenByOrder.has(nextAvailableSlot)) {
+        childrenWithoutValidSlot.forEach(child => {
+            while (nextAvailableSlot < expectedSegmentData.count && childrenBySlot.has(nextAvailableSlot)) {
                 nextAvailableSlot++;
             }
             if (nextAvailableSlot < expectedSegmentData.count) {
@@ -581,20 +637,20 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     childId: child.id?.substring(0, 8),
                     assignedSlot: nextAvailableSlot
                 });
-                childrenByOrder.set(nextAvailableSlot, child);
+                childrenBySlot.set(nextAvailableSlot, child);
                 nextAvailableSlot++;
             }
         });
         
         console.log('[SegmentSlots] Mapping complete', {
-            childrenMapped: childrenByOrder.size,
-            ordersUsed: Array.from(usedOrders),
-            orphansAssigned: childrenWithoutValidOrder.length
+            childrenMapped: childrenBySlot.size,
+            slotsUsed: Array.from(usedSlots),
+            orphansAssigned: childrenWithoutValidSlot.length
         });
 
         // Fill in slots
         for (let i = 0; i < expectedSegmentData.count; i++) {
-            const child = childrenByOrder.get(i);
+            const child = childrenBySlot.get(i);
             if (child) {
                 console.log('[SegmentSlots] Slot', i, '= child', child.id?.substring(0, 8));
                 slots.push({ type: 'child', child, index: i });
@@ -1352,8 +1408,87 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             setPreviewCurrentTime(0);
             setPreviewDuration(0);
             setPreviewIsPlaying(true);
+            // Reset audio state
+            setSegmentDurations([]);
+            setSegmentOffsets([]);
+            if (previewAudioRef.current) {
+                previewAudioRef.current.pause();
+                previewAudioRef.current.currentTime = 0;
+            }
         }
     }, [isPreviewTogetherOpen]);
+    
+    // Load segment durations and calculate offsets when preview dialog opens
+    React.useEffect(() => {
+        if (!isPreviewTogetherOpen) return;
+        
+        const videosWithLocation = sortedSegments
+            .filter(c => c.location)
+            .map(c => ({
+                url: getDisplayUrl(c.location!),
+                index: (c as any).child_order ?? sortedSegments.indexOf(c),
+            }))
+            .sort((a, b) => a.index - b.index);
+        
+        if (videosWithLocation.length === 0) return;
+        
+        const loadDurations = async () => {
+            const durations: number[] = [];
+            
+            for (const video of videosWithLocation) {
+                try {
+                    const duration = await new Promise<number>((resolve, reject) => {
+                        const tempVideo = document.createElement('video');
+                        tempVideo.preload = 'metadata';
+                        tempVideo.onloadedmetadata = () => {
+                            resolve(tempVideo.duration);
+                            tempVideo.src = ''; // Clean up
+                        };
+                        tempVideo.onerror = () => reject(new Error('Failed to load video metadata'));
+                        tempVideo.src = video.url;
+                    });
+                    durations.push(duration);
+                } catch (error) {
+                    console.error('[PreviewAudio] Failed to get duration for segment:', video.index, error);
+                    durations.push(0);
+                }
+            }
+            
+            // Calculate cumulative offsets
+            const offsets: number[] = [0];
+            for (let i = 0; i < durations.length - 1; i++) {
+                offsets.push(offsets[i] + durations[i]);
+            }
+            
+            console.log('[PreviewAudio:ChildView] Loaded segment durations:', durations);
+            console.log('[PreviewAudio:ChildView] Calculated offsets:', offsets);
+            
+            setSegmentDurations(durations);
+            setSegmentOffsets(offsets);
+        };
+        
+        loadDurations();
+    }, [isPreviewTogetherOpen, sortedSegments]);
+    
+    // Helper to calculate global time across all segments
+    const getGlobalTime = React.useCallback((segmentIndex: number, timeInSegment: number) => {
+        if (segmentOffsets.length === 0 || segmentIndex >= segmentOffsets.length) return 0;
+        return segmentOffsets[segmentIndex] + timeInSegment;
+    }, [segmentOffsets]);
+    
+    // Sync audio when video plays
+    const syncAudioToVideo = React.useCallback(() => {
+        const video = previewVideoRef.current;
+        const audio = previewAudioRef.current;
+        if (!video || !audio || !isAudioEnabled || !audioUrl) return;
+        
+        const globalTime = getGlobalTime(currentPreviewIndex, video.currentTime);
+        audio.currentTime = globalTime;
+        
+        if (!video.paused) {
+            audio.play().catch(() => {}); // Ignore autoplay errors
+        }
+    }, [currentPreviewIndex, getGlobalTime, isAudioEnabled, audioUrl]);
 
     // Keyboard navigation for Preview Together dialog
     React.useEffect(() => {
@@ -2038,28 +2173,58 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                                     }
                                                                 }
                                                             }}
-                                                            onPlay={() => setPreviewIsPlaying(true)}
-                                                            onPause={() => setPreviewIsPlaying(false)}
+                                                            onPlay={() => {
+                                                                setPreviewIsPlaying(true);
+                                                                // Sync audio on play
+                                                                const audio = previewAudioRef.current;
+                                                                if (audio && isAudioEnabled && audioUrl) {
+                                                                    syncAudioToVideo();
+                                                                }
+                                                            }}
+                                                            onPause={() => {
+                                                                setPreviewIsPlaying(false);
+                                                                // Pause audio when video pauses
+                                                                const audio = previewAudioRef.current;
+                                                                if (audio) {
+                                                                    audio.pause();
+                                                                }
+                                                            }}
                                                             onTimeUpdate={() => {
                                                                 const video = previewVideoRef.current;
                                                                 if (video) {
                                                                     setPreviewCurrentTime(video.currentTime);
                                                                 }
                                                             }}
+                                                            onSeeked={() => {
+                                                                // Sync audio when user seeks in video
+                                                                syncAudioToVideo();
+                                                            }}
                                                             onLoadedMetadata={() => {
                                                                 const video = previewVideoRef.current;
                                                                 if (video) {
                                                                     setPreviewDuration(video.duration);
                                                                     setPreviewCurrentTime(0);
+                                                                    // Sync audio when segment loads
+                                                                    syncAudioToVideo();
                                                                 }
                                                             }}
                                                             onEnded={() => {
-                                                                // When current video ends, play next one (loop back to start after last)
+                                                                // Audio continues playing - it's already at the right position
                                                                 const nextIndex = (safeIndex + 1) % videosWithLocation.length;
                                                                 setCurrentPreviewIndex(nextIndex);
                                                             }}
                                                             key={currentVideo.url}
                                                         />
+                                                        
+                                                        {/* Hidden audio element for background audio sync */}
+                                                        {audioUrl && (
+                                                            <audio
+                                                                ref={previewAudioRef}
+                                                                src={audioUrl}
+                                                                preload="auto"
+                                                                style={{ display: 'none' }}
+                                                            />
+                                                        )}
                                                         
                                                         {/* Left chevron navigation */}
                                                         {videosWithLocation.length > 1 && (
@@ -2132,6 +2297,32 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                                 >
                                                     {previewIsPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
                                                 </button>
+                                                
+                                                {/* Audio toggle - only show if audio is available */}
+                                                {audioUrl && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const newEnabled = !isAudioEnabled;
+                                                            setIsAudioEnabled(newEnabled);
+                                                            const audio = previewAudioRef.current;
+                                                            if (audio) {
+                                                                if (newEnabled && previewIsPlaying) {
+                                                                    syncAudioToVideo();
+                                                                } else {
+                                                                    audio.pause();
+                                                                }
+                                                            }
+                                                        }}
+                                                        className={`w-10 h-10 rounded-full backdrop-blur-sm text-white flex items-center justify-center transition-colors ${
+                                                            isAudioEnabled ? 'bg-white/20 hover:bg-white/30' : 'bg-white/10 hover:bg-white/20'
+                                                        }`}
+                                                        title={isAudioEnabled ? 'Mute audio' : 'Unmute audio'}
+                                                    >
+                                                        {isAudioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                                                    </button>
+                                                )}
                                                 
                                                 {/* Time display */}
                                                 <span className="text-white text-sm tabular-nums min-w-[85px]">
@@ -2436,6 +2627,7 @@ const SegmentCard: React.FC<SegmentCardProps> = React.memo(({ child, index, proj
                     endImageUrl={segmentImages.end?.url}
                     startImageGenerationId={segmentImages.start?.generationId}
                     endImageGenerationId={segmentImages.end?.generationId}
+                    pairShotGenerationId={childParams?.pair_shot_generation_id}
                     projectResolution={projectResolution}
                     queryKeyPrefix={`segment-${index}-presets`}
                     onStartImageClick={segmentImages.start ? () => {

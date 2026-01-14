@@ -122,14 +122,18 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   }, [effectiveImageUrl, thumbUrl, debugContext, onImageLoad]);
   
   // Variant-specific styling
-  const getMediaStyle = () => {
+  const getMediaStyle = (): React.CSSProperties => {
     switch (variant) {
       case 'desktop-side-panel':
         // Adjust max-width to account for tasks pane if present
         const adjustedMaxWidth = tasksPaneWidth > 0 
           ? `calc(55vw - ${tasksPaneWidth * 0.55}px)` // 55% of remaining space after tasks pane
           : '55vw';
-        return { maxWidth: adjustedMaxWidth, maxHeight: '98vh' };
+        return { 
+          maxWidth: adjustedMaxWidth, 
+          maxHeight: '98vh',
+          transition: 'max-width 300ms ease', // Smooth resize when tasks pane opens/closes
+        };
       case 'mobile-stacked':
         // Use 100% to fit within the container (which is 45dvh in InlineEditView)
         // instead of fixed vh/vw which might overflow

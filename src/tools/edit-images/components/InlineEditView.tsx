@@ -87,12 +87,14 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
   // Variants hook - moved early so activeVariantId is available for other hooks
   const actualGenerationId = (media as any).generation_id || media.id;
 
-  // Edit settings persistence - for img2img strength and enablePromptExpansion
+  // Edit settings persistence - for img2img strength, enablePromptExpansion, and editMode
   const editSettingsPersistence = useEditSettingsPersistence({
     generationId: actualGenerationId,
     projectId: selectedProjectId,
   });
   const {
+    editMode: persistedEditMode,
+    setEditMode: setPersistedEditMode,
     img2imgStrength: persistedImg2imgStrength,
     img2imgEnablePromptExpansion: persistedImg2imgEnablePromptExpansion,
     img2imgPrompt: persistedImg2imgPrompt,
@@ -104,6 +106,8 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     setPrompt: setPersistedPrompt,
     numGenerations,
     setNumGenerations,
+    isReady: isEditSettingsReady,
+    hasPersistedSettings,
   } = editSettingsPersistence;
   const {
     activeVariant,
@@ -291,12 +295,19 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
 
   // Sync persistence → useInpainting (on initial load)
   useEffect(() => {
-    if (!editSettingsPersistence.isReady || hasInitializedFromPersistenceRef.current) return;
+    if (!isEditSettingsReady || hasInitializedFromPersistenceRef.current) return;
     
     console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: Initializing from persistence');
-    console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: hasPersistedSettings:', editSettingsPersistence.hasPersistedSettings);
+    console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: hasPersistedSettings:', hasPersistedSettings);
+    console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: persistedEditMode:', persistedEditMode);
     console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: persistedPrompt:', persistedPrompt ? `"${persistedPrompt.substring(0, 30)}..."` : '(empty)');
     console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: numGenerations:', numGenerations);
+    
+    // Sync editMode
+    if (persistedEditMode && persistedEditMode !== editMode) {
+      console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: Setting editMode from', editMode, 'to', persistedEditMode);
+      setEditMode(persistedEditMode);
+    }
     
     // Sync numGenerations
     if (numGenerations !== inpaintNumGenerations) {
@@ -305,28 +316,38 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     }
     
     // Sync prompt (only if has persisted settings - otherwise leave empty to avoid resetting user input)
-    if (editSettingsPersistence.hasPersistedSettings && persistedPrompt && persistedPrompt !== inpaintPrompt) {
+    if (hasPersistedSettings && persistedPrompt && persistedPrompt !== inpaintPrompt) {
       console.log('[EDIT_DEBUG] 🔄 SYNC TO UI: Setting prompt from persistence');
       setInpaintPrompt(persistedPrompt);
       lastUserPromptRef.current = persistedPrompt;
     }
     
     hasInitializedFromPersistenceRef.current = true;
-  }, [editSettingsPersistence.isReady, editSettingsPersistence.hasPersistedSettings, numGenerations, inpaintNumGenerations, setInpaintNumGenerations, persistedPrompt, inpaintPrompt, setInpaintPrompt]);
+  }, [isEditSettingsReady, hasPersistedSettings, persistedEditMode, editMode, setEditMode, numGenerations, inpaintNumGenerations, setInpaintNumGenerations, persistedPrompt, inpaintPrompt, setInpaintPrompt]);
+
+  // Sync editMode: useInpainting → persistence (on change)
+  useEffect(() => {
+    if (!hasInitializedFromPersistenceRef.current || !isEditSettingsReady) return;
+    
+    if (editMode !== persistedEditMode) {
+      console.log('[EDIT_DEBUG] 🔄 SYNC FROM UI: editMode changed to:', editMode);
+      setPersistedEditMode(editMode);
+    }
+  }, [editMode, persistedEditMode, setPersistedEditMode, isEditSettingsReady]);
 
   // Sync numGenerations: useInpainting → persistence (on change)
   useEffect(() => {
-    if (!hasInitializedFromPersistenceRef.current || !editSettingsPersistence.isReady) return;
+    if (!hasInitializedFromPersistenceRef.current || !isEditSettingsReady) return;
     
     if (inpaintNumGenerations !== numGenerations) {
       console.log('[EDIT_DEBUG] 🔄 SYNC FROM UI: numGenerations changed to:', inpaintNumGenerations);
       setNumGenerations(inpaintNumGenerations);
     }
-  }, [inpaintNumGenerations, numGenerations, setNumGenerations, editSettingsPersistence.isReady]);
+  }, [inpaintNumGenerations, numGenerations, setNumGenerations, isEditSettingsReady]);
 
   // Sync prompt: useInpainting → persistence (on change, with debounce to prevent race conditions)
   useEffect(() => {
-    if (!hasInitializedFromPersistenceRef.current || !editSettingsPersistence.isReady) return;
+    if (!hasInitializedFromPersistenceRef.current || !isEditSettingsReady) return;
     
     // If inpaintPrompt is reset to empty but we had a user prompt, it's likely a race condition - ignore
     if (inpaintPrompt === '' && lastUserPromptRef.current !== '' && persistedPrompt !== '') {
@@ -347,7 +368,7 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
       setPersistedPrompt(inpaintPrompt);
       lastUserPromptRef.current = inpaintPrompt;
     }
-  }, [inpaintPrompt, persistedPrompt, setPersistedPrompt, setInpaintPrompt, editSettingsPersistence.isReady]);
+  }, [inpaintPrompt, persistedPrompt, setPersistedPrompt, setInpaintPrompt, isEditSettingsReady]);
   
   // Cleanup timer on unmount
   useEffect(() => {

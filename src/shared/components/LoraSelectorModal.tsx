@@ -43,6 +43,19 @@ function getFilterCategory(loraType: string | undefined): ModelFilterCategory {
   return 'all';
 }
 
+function getDefaultSubFilter(loraType: string | undefined): string {
+  if (!loraType) return 'all';
+  const normalized = loraType.trim();
+  // If the passed lora_type matches a sub-filter option, default to it.
+  const qwenOptions = getSubFilterOptions('qwen').map(opt => opt.value);
+  const wanOptions = getSubFilterOptions('wan').map(opt => opt.value);
+  const zImageOptions = getSubFilterOptions('z-image').map(opt => opt.value);
+  if (qwenOptions.includes(normalized)) return normalized;
+  if (wanOptions.includes(normalized)) return normalized;
+  if (zImageOptions.includes(normalized)) return normalized;
+  return 'all';
+}
+
 // Check if a lora matches a filter category
 function matchesFilterCategory(loraType: string | undefined, filter: ModelFilterCategory): boolean {
   if (filter === 'all') return true;
@@ -64,6 +77,7 @@ function getSubFilterOptions(category: ModelFilterCategory): { value: string; la
         { value: 'all', label: 'All' },
         { value: 'Qwen Image', label: 'Qwen Image' },
         { value: 'Qwen Image 2512', label: 'Qwen Image 2512' },
+        { value: 'Qwen Edit', label: 'Qwen Edit' },
       ];
     case 'wan':
       return [
@@ -347,10 +361,9 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
       });
     }
 
-    // Filter out items without any media to display
-    filtered = filtered.filter(lora =>
-      lora.main_generation || (lora.Images && lora.Images.length > 0)
-    );
+    // Helper to check if a LoRA has media to display
+    const hasMedia = (lora: LoraModel) => 
+      lora.main_generation || (lora.Images && lora.Images.length > 0);
 
     const sorted = [...filtered];
     switch (sortOption) {
@@ -375,6 +388,14 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
         // No specific sort for default, keeps original (potentially pre-filtered) order
         break;
     }
+    
+    // Secondary sort: items without media go to the end (stable sort preserves primary order)
+    sorted.sort((a, b) => {
+      const aHasMedia = hasMedia(a) ? 0 : 1;
+      const bHasMedia = hasMedia(b) ? 0 : 1;
+      return aHasMedia - bHasMedia;
+    });
+    
     return sorted;
   }, [allLoras, searchTerm, sortOption, showMyLorasOnly, showAddedLorasOnly, myLoraModelIds, selectedLoraMap]);
 
@@ -2016,19 +2037,23 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
 
   // Model filter state - initialized from prop mapped to broad category
   const [selectedModelFilter, setSelectedModelFilter] = useState<ModelFilterCategory>(() => getFilterCategory(lora_type));
-  // Sub-filter for specific model type within category (default 'all')
-  const [selectedSubFilter, setSelectedSubFilter] = useState<string>('all');
+  // Sub-filter for specific model type within category (defaulted from lora_type when possible)
+  const [selectedSubFilter, setSelectedSubFilter] = useState<string>(() => getDefaultSubFilter(lora_type));
 
   // Reset model filter when prop changes (e.g., when opening from different context)
   React.useEffect(() => {
     setSelectedModelFilter(getFilterCategory(lora_type));
-    setSelectedSubFilter('all');
+    setSelectedSubFilter(getDefaultSubFilter(lora_type));
   }, [lora_type]);
 
   // Reset sub-filter when category changes
   React.useEffect(() => {
-    setSelectedSubFilter('all');
-  }, [selectedModelFilter]);
+    // Only reset if the current sub-filter is invalid for the new category
+    const options = getSubFilterOptions(selectedModelFilter).map(opt => opt.value);
+    if (!options.includes(selectedSubFilter)) {
+      setSelectedSubFilter('all');
+    }
+  }, [selectedModelFilter, selectedSubFilter]);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(0);

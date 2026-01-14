@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ArrowLeftRight } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
+import { Label } from "@/shared/components/ui/label";
+import { Slider } from "@/shared/components/ui/slider";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { toast } from "sonner";
 import { useUpdateShotImageOrder, useAddImageToShotWithoutPosition } from "@/shared/hooks/useShots";
@@ -12,7 +14,7 @@ import { useDeviceDetection } from "@/shared/hooks/useDeviceDetection";
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { GenerationRow } from '@/types/shots';
-import VideoOutputsGallery from "../VideoOutputsGallery";
+import FinalVideoSection from "../FinalVideoSection";
 import BatchSettingsForm from "../BatchSettingsForm";
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
@@ -49,6 +51,11 @@ import * as ApplySettingsService from './services/applySettingsService';
 import { generateVideo } from './services/generateVideoService';
 import { GenerateVideoCTA } from '../GenerateVideoCTA';
 import { useRenderCount } from '@/shared/components/debug/RefactorMetricsCollector';
+import { JoinClipsSettingsForm, DEFAULT_JOIN_CLIPS_PHASE_CONFIG, BUILTIN_JOIN_CLIPS_DEFAULT_ID } from '@/tools/join-clips/components/JoinClipsSettingsForm';
+import { useJoinSegmentsSettings } from '../../hooks/useJoinSegmentsSettings';
+import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
+import { useLoraManager } from '@/shared/hooks/useLoraManager';
+import { useSegmentOutputsForShot } from '../../hooks/useSegmentOutputsForShot';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -234,6 +241,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     structureVideoType,
     handleStructureVideoChange,
     isLoading: isStructureVideoSettingsLoading,
+    // NEW: Multi-video array support
+    structureVideos,
+    addStructureVideo,
+    updateStructureVideo,
+    removeStructureVideo,
   } = useStructureVideo({
     projectId,
     shotId: selectedShot?.id,
@@ -246,6 +258,45 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       uni3c_end_percent: value,
     });
   }, [structureVideoConfig, setStructureVideoConfig]);
+
+  // Handler for changing just the structure video motion strength (from MotionControl)
+  const handleStructureVideoMotionStrengthChange = useCallback((strength: number) => {
+    if (structureVideoPath && structureVideoMetadata) {
+      handleStructureVideoChange(
+        structureVideoPath,
+        structureVideoMetadata,
+        structureVideoTreatment,
+        strength,
+        structureVideoType
+      );
+    }
+  }, [structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoType, handleStructureVideoChange]);
+
+  // Handler for changing just the structure video type (from MotionControl)
+  const handleStructureTypeChangeFromMotionControl = useCallback((type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
+    handleStructureVideoChange(
+      structureVideoPath,
+      structureVideoMetadata,
+      structureVideoTreatment,
+      structureVideoMotionStrength,
+      type
+    );
+    
+    // Auto-switch generation type mode based on structure type
+    if (onGenerationTypeModeChange) {
+      if (type === 'uni3c') {
+        if (generationTypeMode !== 'i2v') {
+          console.log('[GenerationTypeMode] Auto-switching to I2V because uni3c structure type was selected');
+          onGenerationTypeModeChange('i2v');
+        }
+      } else {
+        if (generationTypeMode !== 'vace') {
+          console.log('[GenerationTypeMode] Auto-switching to VACE because VACE structure type was selected:', type);
+          onGenerationTypeModeChange('vace');
+        }
+      }
+    }
+  }, [structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, handleStructureVideoChange, onGenerationTypeModeChange, generationTypeMode]);
 
   // Wrapper for structure video change that also auto-switches generation type mode
   const handleStructureVideoChangeWithModeSwitch = useCallback((
@@ -684,6 +735,163 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // (the old implementation had shot-specific LoRA settings from database)
   const isShotLoraSettingsLoading = false;
 
+  // ============================================================================
+  // GENERATE MODE TOGGLE (Batch Generate vs Join Segments) - PERSISTED PER SHOT
+  // ============================================================================
+  // Join Segments settings (shot-level persistence)
+  // Settings are persisted per-shot, similar to video generation settings
+  // Includes: generateMode toggle, all join settings, and LoRAs for join mode
+  const joinSettings = useJoinSegmentsSettings(selectedShotId, projectId);
+  const {
+    prompt: joinPrompt = '',
+    negativePrompt: joinNegativePrompt = '',
+    contextFrameCount: joinContextFrames = 15,
+    gapFrameCount: joinGapFrames = 23,
+    replaceMode: joinReplaceMode = true,
+    keepBridgingImages: joinKeepBridgingImages = false,
+    enhancePrompt: joinEnhancePrompt = true,
+    // Motion preset settings
+    motionMode: joinMotionMode = 'basic',
+    phaseConfig: joinPhaseConfig,
+    selectedPhasePresetId: joinSelectedPhasePresetId,
+    randomSeed: joinRandomSeed = true,
+    // NEW: Persisted generate mode and LoRAs
+    generateMode = 'batch',
+    selectedLoras: joinSelectedLoras = [],
+  } = joinSettings.settings;
+  
+  // Setter for generate mode (persisted)
+  const setGenerateMode = useCallback((mode: 'batch' | 'join') => {
+    joinSettings.updateField('generateMode', mode);
+  }, [joinSettings]);
+  
+  // Join clips state
+  const [isJoiningClips, setIsJoiningClips] = useState(false);
+  const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
+  
+  // LoRA manager interface for Join Segments (shot-level persistence via joinSettings)
+  // This creates a compatible interface with useLoraManager for the JoinClipsSettingsForm
+  const joinLoraManager = useMemo(() => ({
+    selectedLoras: joinSelectedLoras,
+    setSelectedLoras: (loras: typeof joinSelectedLoras) => {
+      joinSettings.updateField('selectedLoras', loras);
+    },
+    isLoraModalOpen: false,
+    setIsLoraModalOpen: () => {},
+    handleAddLora: (loraToAdd: any, _isManualAction = true, initialStrength?: number) => {
+      if (joinSelectedLoras.find(sl => sl.id === loraToAdd["Model ID"])) {
+        return; // Already exists
+      }
+      if (loraToAdd["Model Files"] && loraToAdd["Model Files"].length > 0) {
+        const loraName = loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"];
+        const hasHighNoise = !!loraToAdd.high_noise_url;
+        const hasLowNoise = !!loraToAdd.low_noise_url;
+        const isMultiStage = hasHighNoise || hasLowNoise;
+        const primaryPath = isMultiStage
+          ? (loraToAdd.high_noise_url || loraToAdd.low_noise_url)
+          : (loraToAdd["Model Files"][0].url || loraToAdd["Model Files"][0].path);
+        
+        const newLora = {
+          id: loraToAdd["Model ID"],
+          name: loraName,
+          path: hasHighNoise ? loraToAdd.high_noise_url : primaryPath,
+          strength: initialStrength || 1.0,
+          previewImageUrl: loraToAdd.Images?.[0]?.url,
+          trigger_word: loraToAdd.trigger_word,
+          lowNoisePath: hasLowNoise ? loraToAdd.low_noise_url : undefined,
+          isMultiStage,
+        };
+        joinSettings.updateField('selectedLoras', [...joinSelectedLoras, newLora]);
+      }
+    },
+    handleRemoveLora: (loraId: string) => {
+      joinSettings.updateField('selectedLoras', joinSelectedLoras.filter(l => l.id !== loraId));
+    },
+    handleLoraStrengthChange: (loraId: string, newStrength: number) => {
+      joinSettings.updateField('selectedLoras', 
+        joinSelectedLoras.map(l => l.id === loraId ? { ...l, strength: newStrength } : l)
+      );
+    },
+    hasEverSetLoras: joinSelectedLoras.length > 0,
+    shouldApplyDefaults: false,
+    markAsUserSet: () => {},
+  }), [joinSelectedLoras, joinSettings]);
+  
+  // Get properly ordered segment outputs from useSegmentOutputsForShot
+  // This hook correctly orders videos by their pair_shot_generation_id → timeline position
+  // Unlike videoOutputs which requires position field (never set for videos)
+  const {
+    segmentSlots: joinSegmentSlots,
+    segments: joinSegments,
+    selectedParent: joinSelectedParent,
+  } = useSegmentOutputsForShot(selectedShotId, projectId);
+  
+  // Calculate shortest clip frame count for join clips validation
+  // Uses segmentSlots which properly excludes videos at invalid positions (e.g., last image)
+  const joinValidationData = useMemo(() => {
+    // Count segments that are in valid slots AND have a location (completed videos)
+    const readySlots = joinSegmentSlots.filter(
+      slot => slot.type === 'child' && Boolean((slot.child as any).location)
+    );
+    
+    if (readySlots.length < 2) {
+      return { shortestClipFrames: undefined, videoCount: readySlots.length };
+    }
+    
+    // Get frame counts from video params or metadata
+    const frameCounts = readySlots.map(slot => {
+      const child = (slot as any).child;
+      const params = child.params as any;
+      const metadata = child.metadata as any;
+      // Try params.frame_count first (set during generation), then metadata
+      return params?.frame_count || params?.num_frames || metadata?.frame_count || metadata?.frameCount || 61;
+    });
+    
+    return {
+      shortestClipFrames: Math.min(...frameCounts),
+      videoCount: readySlots.length,
+    };
+  }, [joinSegmentSlots]);
+
+  // [JoinSegmentsDebug] Explain why the "Join Segments" UI is (or isn't) available.
+  // Now uses useSegmentOutputsForShot which correctly orders videos by pair position.
+  useEffect(() => {
+    if (!selectedShotId) return;
+
+    const readySegments = joinSegments.filter(seg => Boolean(seg.location));
+
+    // Sample segments to see their state
+    const sample = joinSegments.slice(0, 8).map(seg => {
+      const params = seg.params as any;
+      return {
+        id: seg.id?.substring(0, 8),
+        type: seg.type,
+        hasLocation: Boolean(seg.location),
+        pairShotGenId: params?.individual_segment_params?.pair_shot_generation_id?.substring(0, 8) 
+          || params?.pair_shot_generation_id?.substring(0, 8) 
+          || null,
+        segmentIndex: params?.segment_index,
+        childOrder: (seg as any).child_order,
+      };
+    });
+
+    console.log('[JoinSegmentsDebug] Eligibility summary (via useSegmentOutputsForShot):', {
+      shotId: selectedShotId.substring(0, 8),
+      totals: {
+        totalSegments: joinSegments.length,
+        readyToJoin: readySegments.length,
+        segmentSlots: joinSegmentSlots.length,
+        hasParent: !!joinSelectedParent,
+      },
+      computed: joinValidationData,
+      sample,
+      hint:
+        readySegments.length < 2
+          ? 'Join Segments requires >= 2 completed video segments with locations.'
+          : 'Join Segments should be available.',
+    });
+  }, [selectedShotId, joinSegments, joinSegmentSlots, joinSelectedParent, joinValidationData]);
+
   // Expose shot-specific generation data to parent via mutable ref
   // This is called by parent (VideoTravelToolPage) when generating video
   useEffect(() => {
@@ -1063,6 +1271,158 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [handleNameSave, handleNameCancel]);
 
+  // ============================================================================
+  // JOIN SEGMENTS HANDLER
+  // ============================================================================
+  const handleJoinSegments = useCallback(async () => {
+    if (!projectId || joinValidationData.videoCount < 2) {
+      toast.error('Need at least 2 completed video segments to join');
+      return;
+    }
+
+    setIsJoiningClips(true);
+
+    try {
+      // Get ordered segments from segmentSlots (already sorted by pair position)
+      // Filter to only child slots with locations
+      const orderedSegments = joinSegmentSlots
+        .filter((slot): slot is { type: 'child'; child: GenerationRow; index: number } => 
+          slot.type === 'child' && Boolean(slot.child.location)
+        )
+        .map(slot => slot.child);
+
+      // Fetch fresh URLs from database to ensure we get current video locations
+      const videoIds = orderedSegments.map(v => v.id).filter(Boolean);
+      const { data: freshVideos, error: fetchError } = await supabase
+        .from('generations')
+        .select('id, location')
+        .in('id', videoIds);
+      
+      if (fetchError) {
+        console.error('[JoinSegments] Error fetching fresh video URLs:', fetchError);
+        throw new Error('Failed to fetch video URLs');
+      }
+
+      // Build a map of id -> fresh location
+      const freshUrlMap = new Map(freshVideos?.map(v => [v.id, v.location]) || []);
+      
+      console.log('[JoinSegments] Fresh URL fetch:', {
+        requestedIds: videoIds.length,
+        receivedIds: freshVideos?.length || 0,
+        urlsChanged: orderedSegments.filter(v => v.location !== freshUrlMap.get(v.id)).length,
+      });
+
+      const clips = orderedSegments.map((video, index) => ({
+        url: freshUrlMap.get(video.id) || video.location || '',
+        name: `Segment ${index + 1}`,
+      })).filter(c => c.url);
+
+      // Convert selected LoRAs
+      const lorasForTask = joinLoraManager.selectedLoras.map(lora => ({
+        path: lora.path,
+        strength: lora.strength,
+      }));
+
+      // Parse resolution from aspect ratio
+      let resolutionTuple: [number, number] | undefined;
+      if (effectiveAspectRatio && ASPECT_RATIO_TO_RESOLUTION[effectiveAspectRatio]) {
+        const res = ASPECT_RATIO_TO_RESOLUTION[effectiveAspectRatio];
+        const [w, h] = res.split('x').map(Number);
+        if (w && h) {
+          resolutionTuple = [w, h];
+        }
+      }
+
+      console.log('[JoinSegments] Creating join task:', {
+        clipCount: clips.length,
+        clipUrls: clips.map(c => c.url.substring(c.url.lastIndexOf('/') + 1)),
+        prompt: joinPrompt,
+        contextFrames: joinContextFrames,
+        gapFrames: joinGapFrames,
+        replaceMode: joinReplaceMode,
+        keepBridgingImages: joinKeepBridgingImages,
+        loras: lorasForTask.length,
+        resolution: resolutionTuple,
+        shotId: selectedShotId,
+      });
+
+      await createJoinClipsTask({
+        project_id: projectId,
+        clips,
+        prompt: joinPrompt,
+        negative_prompt: joinNegativePrompt,
+        context_frame_count: joinContextFrames,
+        gap_frame_count: joinGapFrames,
+        replace_mode: joinReplaceMode,
+        keep_bridging_images: joinKeepBridgingImages,
+        enhance_prompt: joinEnhancePrompt,
+        model: 'wan_2_2_vace_lightning_baseline_2_2_2',
+        num_inference_steps: 6,
+        guidance_scale: 3.0,
+        seed: -1,
+        // Use first clip as parent so downstream lineage + shot-association logic can attach output
+        parent_generation_id: orderedSegments[0]?.id,
+        // Attribute to travel-between-images tool
+        tool_type: 'travel-between-images',
+        use_input_video_resolution: false,
+        use_input_video_fps: false,
+        motion_mode: joinMotionMode,
+        selected_phase_preset_id: joinSelectedPhasePresetId ?? null,
+        ...(lorasForTask.length > 0 && { loras: lorasForTask }),
+        ...(resolutionTuple && { resolution: resolutionTuple }),
+        // Pass audio URL from timeline if available
+        ...(audioUrl && { audio_url: audioUrl }),
+        // Pass phase config for motion presets
+        ...(joinPhaseConfig && { phase_config: joinPhaseConfig }),
+      });
+
+      setJoinClipsSuccess(true);
+      setTimeout(() => setJoinClipsSuccess(false), 3000);
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    } catch (error: any) {
+      console.error('[JoinSegments] Error creating join task:', error);
+      toast.error(error.message || 'Failed to create join task');
+    } finally {
+      setIsJoiningClips(false);
+    }
+  }, [
+    projectId,
+    joinValidationData.videoCount,
+    joinSegmentSlots,
+    joinPrompt,
+    joinNegativePrompt,
+    joinContextFrames,
+    joinGapFrames,
+    joinReplaceMode,
+    joinKeepBridgingImages,
+    joinEnhancePrompt,
+    joinLoraManager.selectedLoras,
+    effectiveAspectRatio,
+    selectedShotId,
+    audioUrl,
+    joinPhaseConfig,
+    queryClient,
+  ]);
+
+  // Handler to restore join clips defaults
+  // Note: Does NOT reset generateMode (that's a mode toggle, not a setting)
+  const handleRestoreJoinDefaults = useCallback(() => {
+    joinSettings.updateFields({
+      prompt: '',
+      negativePrompt: '',
+      contextFrameCount: 15,
+      gapFrameCount: 23,
+      replaceMode: true,
+      keepBridgingImages: false,
+      enhancePrompt: true,
+      motionMode: 'basic',
+      phaseConfig: DEFAULT_JOIN_CLIPS_PHASE_CONFIG,
+      selectedPhasePresetId: BUILTIN_JOIN_CLIPS_DEFAULT_ID,
+      randomSeed: true,
+      selectedLoras: [], // Also reset LoRAs
+    });
+  }, [joinSettings]);
+
   // [SelectorPattern] Filtered views now come from selector hooks defined above.
   // simpleFilteredImages is replaced by timelineImages (same filtering logic)
   // unpositionedImagesCount is replaced by unpositionedImages.length
@@ -1294,6 +1654,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         use_svi: false,
       },
       structureVideoConfig,
+      structureVideos, // NEW: Multi-video array support
       batchVideoFrames,
       selectedLoras: loraManager.selectedLoras.map(lora => ({
         id: lora.id,
@@ -1522,19 +1883,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       />
       </div>
 
-      {/* Output Videos Section - Always at top, both desktop and mobile */}
+      {/* Final Video Section - Shows selected output with dropdown to switch between generations */}
       <div ref={videoGalleryRef} className="flex flex-col gap-4">
-        <VideoOutputsGallery 
-          projectId={projectId}
+        <FinalVideoSection 
           shotId={selectedShotId}
-          onDelete={generationActions.handleDeleteVideoOutput}
-          deletingVideoId={state.deletingVideoId}
-          onApplySettingsFromTask={applySettingsFromTask}
-          shotKey={selectedShotId}
-          getShotVideoCount={getShotVideoCount}
-          invalidateVideoCountsCache={invalidateVideoCountsCache}
+          projectId={projectId}
           projectAspectRatio={effectiveAspectRatio}
-          localZeroHint={videoOutputs.length === 0}
+          onApplySettingsFromTask={applySettingsFromTask}
         />
       </div>
 
@@ -1589,7 +1944,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onDefaultPromptChange={onBatchVideoPromptChange}
             defaultNegativePrompt={steerableMotionSettings.negative_prompt || ""}
             onDefaultNegativePromptChange={handleDefaultNegativePromptChange}
-            // Structure video props
+            // Structure video props (legacy single-video)
             structureVideoPath={structureVideoPath}
             structureVideoMetadata={structureVideoMetadata}
             structureVideoTreatment={structureVideoTreatment}
@@ -1598,6 +1953,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onStructureVideoChange={handleStructureVideoChangeWithModeSwitch}
             uni3cEndPercent={structureVideoConfig.uni3c_end_percent}
             onUni3cEndPercentChange={handleUni3cEndPercentChange}
+            // NEW: Multi-video array props
+            structureVideos={structureVideos}
+            onAddStructureVideo={addStructureVideo}
+            onUpdateStructureVideo={updateStructureVideo}
+            onRemoveStructureVideo={removeStructureVideo}
             // Audio strip props
             audioUrl={audioUrl}
             audioMetadata={audioMetadata}
@@ -1621,10 +1981,64 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         {/* Generation Settings */}
         <div className="w-full" ref={generateVideosCardRef}>
           <Card>
-            <CardHeader>
-                <CardTitle className="text-base sm:text-lg font-light">Generate Videos</CardTitle>
+            <CardHeader className="pb-4">
+                {/* Toggle header - selected option on left, swap icon, other option on right */}
+                <div className="flex items-center gap-2">
+                  {/* Left position: active option */}
+                  <span className="text-base sm:text-lg font-light text-foreground">
+                    {generateMode === 'batch' ? 'Batch Generate' : 'Join Segments'}
+                  </span>
+                  
+                  {/* Swap button with arrows */}
+                  <button
+                    onClick={() => {
+                      console.log('[JoinSegmentsDebug] Toggle clicked (swap button):', {
+                        shotId: selectedShotId?.substring(0, 8),
+                        from: generateMode,
+                        to: generateMode === 'batch' ? 'join' : 'batch',
+                        joinValidationData,
+                        videoOutputsCount: videoOutputs.length,
+                      });
+                      setGenerateMode(generateMode === 'batch' ? 'join' : 'batch');
+                    }}
+                    className={`p-1 rounded-full transition-colors ${
+                      (generateMode === 'batch' && joinValidationData.videoCount < 2)
+                        ? 'text-muted-foreground/30 cursor-not-allowed'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer'
+                    }`}
+                    title={generateMode === 'batch' ? 'Switch to Join Segments' : 'Switch to Batch Generate'}
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                  </button>
+                  
+                  {/* Right position: inactive option (clickable) */}
+                  <button
+                    onClick={() => {
+                      console.log('[JoinSegmentsDebug] Toggle clicked (label button):', {
+                        shotId: selectedShotId?.substring(0, 8),
+                        from: generateMode,
+                        to: generateMode === 'batch' ? 'join' : 'batch',
+                        joinValidationData,
+                        videoOutputsCount: videoOutputs.length,
+                      });
+                      setGenerateMode(generateMode === 'batch' ? 'join' : 'batch');
+                    }}
+                    className={`text-sm transition-colors ${
+                      (generateMode === 'batch' && joinValidationData.videoCount < 2)
+                        ? 'text-muted-foreground/30 cursor-not-allowed'
+                        : 'text-muted-foreground hover:text-foreground cursor-pointer'
+                    }`}
+                  >
+                    {generateMode === 'batch' 
+                      ? `Join Segments${joinValidationData.videoCount >= 2 ? ` (${joinValidationData.videoCount})` : ''}`
+                      : 'Batch Generate'
+                    }
+                  </button>
+                </div>
             </CardHeader>
             <CardContent>
+              {generateMode === 'batch' ? (
+                <>
                 <div className="flex flex-col lg:flex-row gap-6">
                     {/* Left Column: Main Settings */}
                     <div className="lg:w-1/2 order-2 lg:order-1">
@@ -1682,8 +2096,91 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         />
                     </div>
 
-                    {/* Right Column: Motion Control */}
+                    {/* Right Column: Structure (if video exists) + Motion Control */}
                     <div className="lg:w-1/2 order-1 lg:order-2">
+                        {/* Structure Section - shown only when structure video is present */}
+                        {structureVideoPath && (
+                          <div className="mb-6">
+                            <div className="mb-4">
+                              <SectionHeader title="Structure" theme="green" />
+                            </div>
+                            <div className="space-y-4">
+                              {/* Structure type selector */}
+                              <div className="space-y-2">
+                                <Label className="text-sm">Type:</Label>
+                                <Select 
+                                  value={structureVideoType || 'uni3c'} 
+                                  onValueChange={(type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
+                                    handleStructureTypeChangeFromMotionControl(type);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-full h-9">
+                                    <SelectValue>
+                                      {structureVideoType === 'uni3c' ? 'Uni3C (I2V)' : 
+                                       structureVideoType === 'flow' ? 'Optical flow (VACE)' : 
+                                       structureVideoType === 'canny' ? 'Canny (VACE)' : 
+                                       structureVideoType === 'depth' ? 'Depth (VACE)' : 'Uni3C (I2V)'}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="uni3c">Uni3C (I2V)</SelectItem>
+                                    <SelectItem value="flow">Optical flow (VACE)</SelectItem>
+                                    <SelectItem value="canny">Canny (VACE)</SelectItem>
+                                    <SelectItem value="depth">Depth (VACE)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              {/* Strength and End side by side for uni3c, just Strength otherwise */}
+                              <div className={structureVideoType === 'uni3c' ? "grid grid-cols-2 gap-4" : ""}>
+                                {/* Strength slider */}
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-sm">Strength:</Label>
+                                    <span className="text-sm font-medium">{structureVideoMotionStrength.toFixed(1)}x</span>
+                                  </div>
+                                  <Slider
+                                    value={[structureVideoMotionStrength]}
+                                    onValueChange={([value]) => handleStructureVideoMotionStrengthChange(value)}
+                                    min={0}
+                                    max={2}
+                                    step={0.1}
+                                    className="w-full"
+                                  />
+                                  <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>0x</span>
+                                    <span>1x</span>
+                                    <span>2x</span>
+                                  </div>
+                                </div>
+                                
+                                {/* Uni3C End Percent - shown only when uni3c is selected */}
+                                {structureVideoType === 'uni3c' && (
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <Label className="text-sm">End:</Label>
+                                      <span className="text-sm font-medium">{((structureVideoConfig.uni3c_end_percent || 0.1) * 100).toFixed(0)}%</span>
+                                    </div>
+                                    <Slider
+                                      value={[structureVideoConfig.uni3c_end_percent || 0.1]}
+                                      onValueChange={([value]) => handleUni3cEndPercentChange(value)}
+                                      min={0}
+                                      max={1}
+                                      step={0.05}
+                                      className="w-full"
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                      <span>0%</span>
+                                      <span>50%</span>
+                                      <span>100%</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
                         <div className="mb-4">
                             <SectionHeader title="Motion" theme="purple" />
                         </div>
@@ -1695,6 +2192,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onGenerationTypeModeChange={onGenerationTypeModeChange}
                             hasStructureVideo={!!structureVideoPath}
                             structureType={structureVideoType}
+                            // Structure video controls
+                            structureVideoMotionStrength={structureVideoMotionStrength}
+                            onStructureVideoMotionStrengthChange={handleStructureVideoMotionStrengthChange}
+                            onStructureTypeChange={handleStructureTypeChangeFromMotionControl}
+                            uni3cEndPercent={structureVideoConfig.uni3c_end_percent}
+                            onUni3cEndPercentChange={handleUni3cEndPercentChange}
                             selectedLoras={loraManager.selectedLoras}
                             availableLoras={availableLoras}
                             onAddLoraClick={() => loraManager.setIsLoraModalOpen(true)}
@@ -1735,6 +2238,61 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     inputId="variant-name"
                   />
                 </div>
+                </>
+              ) : (
+                /* Join Segments Mode */
+                <JoinClipsSettingsForm
+                  headerContent={
+                    <div className="mb-2">
+                      <p className="text-sm text-muted-foreground">
+                        Join {joinValidationData.videoCount} positioned videos from your timeline into a seamless video with smooth transitions.
+                      </p>
+                    </div>
+                  }
+                  gapFrames={joinGapFrames}
+                  setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
+                  contextFrames={joinContextFrames}
+                  setContextFrames={(val) => joinSettings.updateField('contextFrameCount', val)}
+                  replaceMode={joinReplaceMode}
+                  setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
+                  keepBridgingImages={joinKeepBridgingImages}
+                  setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
+                  prompt={joinPrompt}
+                  setPrompt={(val) => joinSettings.updateField('prompt', val)}
+                  negativePrompt={joinNegativePrompt}
+                  setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
+                  enhancePrompt={joinEnhancePrompt}
+                  setEnhancePrompt={(val) => joinSettings.updateField('enhancePrompt', val)}
+                  availableLoras={availableLoras}
+                  projectId={projectId}
+                  loraPersistenceKey="join-clips-shot-editor"
+                  loraManager={joinLoraManager}
+                  onGenerate={handleJoinSegments}
+                  isGenerating={isJoiningClips}
+                  generateSuccess={joinClipsSuccess}
+                  generateButtonText="Join Segments"
+                  isGenerateDisabled={joinValidationData.videoCount < 2}
+                  onRestoreDefaults={handleRestoreJoinDefaults}
+                  shortestClipFrames={joinValidationData.shortestClipFrames}
+                  // Motion preset settings
+                  motionMode={joinMotionMode}
+                  onMotionModeChange={(mode) => joinSettings.updateField('motionMode', mode)}
+                  phaseConfig={joinPhaseConfig ?? DEFAULT_JOIN_CLIPS_PHASE_CONFIG}
+                  onPhaseConfigChange={(config) => joinSettings.updateField('phaseConfig', config)}
+                  randomSeed={joinRandomSeed}
+                  onRandomSeedChange={(val) => joinSettings.updateField('randomSeed', val)}
+                  selectedPhasePresetId={joinSelectedPhasePresetId ?? BUILTIN_JOIN_CLIPS_DEFAULT_ID}
+                  onPhasePresetSelect={(presetId, config) => {
+                    joinSettings.updateFields({
+                      selectedPhasePresetId: presetId,
+                      phaseConfig: config,
+                    });
+                  }}
+                  onPhasePresetRemove={() => {
+                    joinSettings.updateField('selectedPhasePresetId', null);
+                  }}
+                />
+              )}
             </CardContent>
           </Card>
         </div>

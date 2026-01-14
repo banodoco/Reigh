@@ -23,6 +23,8 @@ export interface UseImg2ImgModeProps {
   img2imgPromptHasBeenSet: boolean;
   // Number of generations (shared with other edit modes)
   numGenerations: number;
+  // Active variant's image URL - use this instead of sourceUrlForTasks when editing a variant
+  activeVariantLocation?: string | null;
 }
 
 export interface UseImg2ImgModeReturn {
@@ -71,6 +73,8 @@ export const useImg2ImgMode = ({
   img2imgPromptHasBeenSet,
   // Number of generations (shared)
   numGenerations,
+  // Active variant location
+  activeVariantLocation,
 }: UseImg2ImgModeProps): UseImg2ImgModeReturn => {
   
   console.log('[EDIT_DEBUG] ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
@@ -128,7 +132,7 @@ export const useImg2ImgMode = ({
       return;
     }
 
-    if (!sourceUrlForTasks) {
+    if (!sourceUrlForTasks && !activeVariantLocation) {
       toast.error('No source image URL available');
       return;
     }
@@ -149,6 +153,9 @@ export const useImg2ImgMode = ({
         scale: lora.strength,
       }));
 
+      // Use active variant's location if editing a variant, otherwise use sourceUrlForTasks
+      const effectiveImageUrl = activeVariantLocation || sourceUrlForTasks;
+
       console.log('[Img2Img] Starting generation...', {
         mediaId: media.id,
         prompt: img2imgPrompt,
@@ -156,6 +163,10 @@ export const useImg2ImgMode = ({
         enablePromptExpansion,
         numGenerations,
         loraCount: loras.length,
+        activeVariantLocation: activeVariantLocation?.substring(0, 50),
+        sourceUrlForTasks: sourceUrlForTasks?.substring(0, 50),
+        effectiveImageUrl: effectiveImageUrl?.substring(0, 50),
+        isUsingVariant: !!activeVariantLocation,
       });
 
       // Get actual generation ID (handle shot_generations case)
@@ -164,7 +175,7 @@ export const useImg2ImgMode = ({
       // Create tasks based on numGenerations
       await createBatchZImageTurboI2ITasks({
         project_id: selectedProjectId,
-        image_url: sourceUrlForTasks,
+        image_url: effectiveImageUrl,
         prompt: img2imgPrompt.trim() || undefined,
         strength: img2imgStrength,
         enable_prompt_expansion: enablePromptExpansion,
@@ -196,6 +207,7 @@ export const useImg2ImgMode = ({
     selectedProjectId,
     isVideo,
     sourceUrlForTasks,
+    activeVariantLocation,
     media,
     img2imgPrompt,
     img2imgStrength,

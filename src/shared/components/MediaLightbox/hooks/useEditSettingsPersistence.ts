@@ -4,7 +4,9 @@ import {
   type GenerationEditSettings,
   type EditMode,
   type LoraMode,
+  type EditAdvancedSettings,
   DEFAULT_EDIT_SETTINGS,
+  DEFAULT_ADVANCED_SETTINGS,
 } from './useGenerationEditSettings';
 import { 
   useLastUsedEditSettings,
@@ -29,6 +31,8 @@ export interface UseEditSettingsPersistenceReturn {
   img2imgPromptHasBeenSet: boolean;
   img2imgStrength: number;
   img2imgEnablePromptExpansion: boolean;
+  // Advanced settings for two-pass generation
+  advancedSettings: EditAdvancedSettings;
   
   // Setters (each triggers persistence)
   setEditMode: (mode: EditMode) => void;
@@ -40,6 +44,8 @@ export interface UseEditSettingsPersistenceReturn {
   setImg2imgPrompt: (prompt: string) => void;
   setImg2imgStrength: (strength: number) => void;
   setImg2imgEnablePromptExpansion: (enabled: boolean) => void;
+  // Advanced settings setter
+  setAdvancedSettings: (updates: Partial<EditAdvancedSettings>) => void;
   
   // Computed LoRAs for task creation
   editModeLoRAs: Array<{ url: string; strength: number }> | undefined;
@@ -182,6 +188,7 @@ export function useEditSettingsPersistence({
         img2imgPromptHasBeenSet: generationSettings.settings.img2imgPromptHasBeenSet || false,
         img2imgStrength: lastUsedSettings.lastUsed.img2imgStrength,
         img2imgEnablePromptExpansion: lastUsedSettings.lastUsed.img2imgEnablePromptExpansion,
+        advancedSettings: lastUsedSettings.lastUsed.advancedSettings ?? DEFAULT_ADVANCED_SETTINGS,
       };
     }
 
@@ -247,6 +254,15 @@ export function useEditSettingsPersistence({
     lastUsedSettings.updateLastUsed({ img2imgEnablePromptExpansion: enabled });
   }, [generationSettings, lastUsedSettings]);
   
+  // Advanced settings setter (merges with existing, saves to both generation and "last used")
+  const setAdvancedSettings = useCallback((updates: Partial<EditAdvancedSettings>) => {
+    console.log('[EDIT_DEBUG] 🔧 SET: advancedSettings →', updates);
+    generationSettings.setAdvancedSettings(updates);
+    // Merge updates with current advancedSettings for lastUsed
+    const currentAdvanced = effectiveSettings.advancedSettings ?? DEFAULT_ADVANCED_SETTINGS;
+    lastUsedSettings.updateLastUsed({ advancedSettings: { ...currentAdvanced, ...updates } });
+  }, [generationSettings, lastUsedSettings, effectiveSettings.advancedSettings]);
+  
   // Computed LoRAs based on mode (replaces useEditModeLoRAs logic)
   const editModeLoRAs = useMemo(() => {
     const { loraMode, customLoraUrl } = effectiveSettings;
@@ -300,6 +316,8 @@ export function useEditSettingsPersistence({
     img2imgPromptHasBeenSet: effectiveSettings.img2imgPromptHasBeenSet,
     img2imgStrength: effectiveSettings.img2imgStrength,
     img2imgEnablePromptExpansion: effectiveSettings.img2imgEnablePromptExpansion,
+    // Advanced settings (hires fix config)
+    advancedSettings: effectiveSettings.advancedSettings ?? DEFAULT_ADVANCED_SETTINGS,
     
     // Setters
     setEditMode,
@@ -311,6 +329,8 @@ export function useEditSettingsPersistence({
     setImg2imgPrompt,
     setImg2imgStrength,
     setImg2imgEnablePromptExpansion,
+    // Advanced settings setter
+    setAdvancedSettings,
     
     // Computed
     editModeLoRAs,
@@ -327,6 +347,6 @@ export function useEditSettingsPersistence({
 }
 
 // Re-export types for convenience
-export type { EditMode, LoraMode, GenerationEditSettings, LastUsedEditSettings };
-export { DEFAULT_EDIT_SETTINGS };
+export type { EditMode, LoraMode, EditAdvancedSettings, GenerationEditSettings, LastUsedEditSettings };
+export { DEFAULT_EDIT_SETTINGS, DEFAULT_ADVANCED_SETTINGS };
 

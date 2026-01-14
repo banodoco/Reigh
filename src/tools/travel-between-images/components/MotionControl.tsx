@@ -64,6 +64,13 @@ export interface MotionControlProps {
   hasStructureVideo?: boolean; // Whether a structure video is currently set
   structureType?: 'uni3c' | 'flow' | 'canny' | 'depth'; // Type of structure video guidance
   
+  // Structure video controls (shown when structure video is present)
+  structureVideoMotionStrength?: number;
+  onStructureVideoMotionStrengthChange?: (strength: number) => void;
+  onStructureTypeChange?: (type: 'uni3c' | 'flow' | 'canny' | 'depth') => void;
+  uni3cEndPercent?: number;
+  onUni3cEndPercentChange?: (value: number) => void;
+  
   // LoRA management (for Basic mode - LoRAs are added to phaseConfig)
   selectedLoras: ActiveLora[];
   availableLoras: LoraModel[];
@@ -119,6 +126,11 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   onGenerationTypeModeChange,
   hasStructureVideo = false,
   structureType,
+  structureVideoMotionStrength = 1.0,
+  onStructureVideoMotionStrengthChange,
+  onStructureTypeChange,
+  uni3cEndPercent = 0.1,
+  onUni3cEndPercentChange,
   selectedLoras,
   availableLoras,
   onAddLoraClick,

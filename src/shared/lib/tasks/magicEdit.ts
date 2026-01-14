@@ -6,6 +6,7 @@ import {
   TaskValidationError,
   BaseTaskParams,
 } from '../taskCreation';
+import type { HiresFixApiParams } from './imageGeneration';
 
 /**
  * Parameters for creating a magic edit task
@@ -34,6 +35,8 @@ export interface MagicEditTaskParams {
   based_on?: string; // Optional: source generation ID for lineage tracking
   source_variant_id?: string; // Optional: source variant ID when editing from a non-primary variant
   create_as_generation?: boolean; // Optional: if true, create a new generation instead of a variant
+  // Advanced hires fix settings
+  hires_fix?: HiresFixApiParams;
 }
 
 /**
@@ -58,6 +61,8 @@ export interface BatchMagicEditTaskParams {
   based_on?: string; // Optional: source generation ID for lineage tracking
   source_variant_id?: string; // Optional: source variant ID when editing from a non-primary variant
   create_as_generation?: boolean; // Optional: if true, create a new generation instead of a variant
+  // Advanced hires fix settings
+  hires_fix?: HiresFixApiParams;
 }
 
 /**
@@ -199,6 +204,29 @@ function buildMagicEditTaskParams(
     console.log('[MagicEdit] Will create as new generation instead of variant');
   }
 
+  // Add hires fix params if provided
+  if (params.hires_fix) {
+    if (params.hires_fix.hires_scale !== undefined) {
+      taskParams.hires_scale = params.hires_fix.hires_scale;
+    }
+    if (params.hires_fix.hires_steps !== undefined) {
+      taskParams.hires_steps = params.hires_fix.hires_steps;
+    }
+    if (params.hires_fix.hires_denoise !== undefined) {
+      taskParams.hires_denoise = params.hires_fix.hires_denoise;
+    }
+    if (params.hires_fix.lightning_lora_strength_phase_1 !== undefined) {
+      taskParams.lightning_lora_strength_phase_1 = params.hires_fix.lightning_lora_strength_phase_1;
+    }
+    if (params.hires_fix.lightning_lora_strength_phase_2 !== undefined) {
+      taskParams.lightning_lora_strength_phase_2 = params.hires_fix.lightning_lora_strength_phase_2;
+    }
+    if (params.hires_fix.additional_loras && Object.keys(params.hires_fix.additional_loras).length > 0) {
+      taskParams.additional_loras = params.hires_fix.additional_loras;
+    }
+    console.log('[MagicEdit] Added hires fix params:', params.hires_fix);
+  }
+
   return taskParams;
 }
 
@@ -284,6 +312,7 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
         based_on: params.based_on, // Pass through source generation ID for lineage tracking
         source_variant_id: params.source_variant_id, // Pass through source variant ID for relationship tracking
         create_as_generation: params.create_as_generation, // Pass through create as generation flag
+        hires_fix: params.hires_fix, // Pass through hires fix settings
       } as MagicEditTaskParams;
     });
 

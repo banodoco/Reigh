@@ -7,6 +7,9 @@ import { STORAGE_KEYS } from '@/tools/travel-between-images/storageKeys';
  * 
  * NOTE: LoRAs are now part of mainSettings (selectedLoras field) and are
  * inherited along with all other shot settings. No separate LoRA handling needed.
+ * 
+ * Join Segments settings are also inherited separately (joinSegmentsSettings)
+ * to preserve the user's last Join mode configuration.
  */
 export interface InheritSettingsParams {
   newShotId: string;
@@ -22,6 +25,7 @@ export interface InheritSettingsParams {
 export interface InheritedSettings {
   mainSettings: any;
   uiSettings: any;
+  joinSegmentsSettings: any; // Join Segments mode settings
 }
 
 /**
@@ -29,6 +33,7 @@ export interface InheritedSettings {
  * Priority: localStorage (last active) → Database (last created) → Project defaults
  * 
  * LoRAs are included in mainSettings.selectedLoras (unified with other settings)
+ * Join Segments settings are inherited separately in joinSegmentsSettings
  */
 export async function getInheritedSettings(
   params: InheritSettingsParams
@@ -37,6 +42,7 @@ export async function getInheritedSettings(
   
   let mainSettings: any = null;
   let uiSettings: any = null;
+  let joinSegmentsSettings: any = null;
 
   console.warn('[ShotSettingsInherit] 🔍 Starting standardized inheritance check');
 
@@ -63,6 +69,17 @@ export async function getInheritedSettings(
       uiSettings = JSON.parse(storedUI);
       console.warn('[ShotSettingsInherit] ✅ Inheriting UI settings from project localStorage');
     }
+    
+    // Join Segments settings
+    const joinStorageKey = STORAGE_KEYS.LAST_ACTIVE_JOIN_SEGMENTS_SETTINGS(projectId);
+    const storedJoin = localStorage.getItem(joinStorageKey);
+    if (storedJoin) {
+      joinSegmentsSettings = JSON.parse(storedJoin);
+      console.warn('[ShotSettingsInherit] ✅ Inheriting Join Segments settings from project localStorage', {
+        generateMode: joinSegmentsSettings.generateMode,
+        loraCount: joinSegmentsSettings.selectedLoras?.length || 0
+      });
+    }
   } catch (e) {
     console.error('[ShotSettingsInherit] ❌ Failed to read project localStorage', e);
   }
@@ -86,15 +103,28 @@ export async function getInheritedSettings(
       } else {
         console.warn('[ShotSettingsInherit] ⚠️ No global settings in localStorage');
       }
+      
+      // Also try global Join Segments settings
+      if (!joinSegmentsSettings) {
+        const globalJoinStored = localStorage.getItem(STORAGE_KEYS.GLOBAL_LAST_ACTIVE_JOIN_SEGMENTS_SETTINGS);
+        if (globalJoinStored) {
+          joinSegmentsSettings = JSON.parse(globalJoinStored);
+          console.warn('[ShotSettingsInherit] ✅ Inheriting Join Segments settings from GLOBAL localStorage (cross-project)', {
+            generateMode: joinSegmentsSettings.generateMode,
+            loraCount: joinSegmentsSettings.selectedLoras?.length || 0
+          });
+        }
+      }
     } catch (e) {
       console.error('[ShotSettingsInherit] ❌ Failed to read global localStorage', e);
     }
   }
 
   // 2. If not found, fall back to latest created shot from DB
-  if (!mainSettings && shots && shots.length > 0) {
+  if ((!mainSettings || !joinSegmentsSettings) && shots && shots.length > 0) {
     console.warn('[ShotSettingsInherit] 🔍 Checking DB fallback', {
       needsMainSettings: !mainSettings,
+      needsJoinSettings: !joinSegmentsSettings,
       shotsCount: shots.length
     });
     
@@ -109,13 +139,22 @@ export async function getInheritedSettings(
     if (latestShot) {
       console.warn('[ShotSettingsInherit] 🔍 Latest shot from DB:', {
         name: latestShot.name,
-        hasMainSettings: !!latestShot.settings?.['travel-between-images']
+        hasMainSettings: !!latestShot.settings?.['travel-between-images'],
+        hasJoinSettings: !!latestShot.settings?.['join-segments']
       });
       
       if (!mainSettings && latestShot.settings?.['travel-between-images']) {
         mainSettings = latestShot.settings['travel-between-images'];
         console.warn('[ShotSettingsInherit] ✅ Inheriting main settings from DB shot:', latestShot.name, {
           loraCount: mainSettings.selectedLoras?.length || 0
+        });
+      }
+      
+      if (!joinSegmentsSettings && latestShot.settings?.['join-segments']) {
+        joinSegmentsSettings = latestShot.settings['join-segments'];
+        console.warn('[ShotSettingsInherit] ✅ Inheriting Join Segments settings from DB shot:', latestShot.name, {
+          generateMode: joinSegmentsSettings.generateMode,
+          loraCount: joinSegmentsSettings.selectedLoras?.length || 0
         });
       }
     }
@@ -148,26 +187,31 @@ export async function getInheritedSettings(
   console.warn('[ShotSettingsInherit] 📋 Final inherited settings:', {
     hasMainSettings: !!mainSettings,
     hasUISettings: !!uiSettings,
+    hasJoinSettings: !!joinSegmentsSettings,
     generationMode: mainSettings?.generationMode,
-    loraCount: mainSettings?.selectedLoras?.length || 0
+    loraCount: mainSettings?.selectedLoras?.length || 0,
+    joinGenerateMode: joinSegmentsSettings?.generateMode,
+    joinLoraCount: joinSegmentsSettings?.selectedLoras?.length || 0
   });
 
   return {
     mainSettings,
-    uiSettings
+    uiSettings,
+    joinSegmentsSettings
   };
 }
 
 /**
  * Applies inherited settings to a new shot
  * Saves main settings (including LoRAs) to sessionStorage for useShotSettings to pick up
+ * Also saves Join Segments settings to sessionStorage for useJoinSegmentsSettings to pick up
  */
 export async function applyInheritedSettings(
   params: InheritSettingsParams,
   inherited: InheritedSettings
 ): Promise<void> {
   const { newShotId } = params;
-  const { mainSettings, uiSettings } = inherited;
+  const { mainSettings, uiSettings, joinSegmentsSettings } = inherited;
 
   // Save main settings to sessionStorage for useShotSettings to pick up
   // LoRAs are included in mainSettings.selectedLoras
@@ -192,7 +236,24 @@ export async function applyInheritedSettings(
       loraCount: defaultsToApply.selectedLoras?.length || 0
     });
   } else {
-    console.warn('[ShotSettingsInherit] ⚠️ No settings to save to sessionStorage');
+    console.warn('[ShotSettingsInherit] ⚠️ No main settings to save to sessionStorage');
+  }
+  
+  // Save Join Segments settings to sessionStorage for useJoinSegmentsSettings to pick up
+  if (joinSegmentsSettings) {
+    const joinDefaultsToApply = {
+      ...joinSegmentsSettings,
+      // Clear prompt for new shots (shot-specific, shouldn't inherit)
+      prompt: '',
+      negativePrompt: '',
+    };
+    const joinStorageKey = STORAGE_KEYS.APPLY_JOIN_SEGMENTS_DEFAULTS(newShotId);
+    sessionStorage.setItem(joinStorageKey, JSON.stringify(joinDefaultsToApply));
+    
+    console.warn('[ShotSettingsInherit] 💾 SAVED JOIN SEGMENTS TO SESSION STORAGE:', joinStorageKey, {
+      generateMode: joinDefaultsToApply.generateMode,
+      loraCount: joinDefaultsToApply.selectedLoras?.length || 0
+    });
   }
   
   // NOTE: LoRAs no longer need separate DB save - they're part of mainSettings

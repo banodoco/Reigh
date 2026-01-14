@@ -69,6 +69,24 @@ function extractSegmentSpecificParams(
     specificParams.frame_overlap = specificOverlap;
   }
 
+  // Extract pair_shot_generation_id for video-to-timeline tethering
+  // This is the shot_generations.id of the START image for this segment's pair
+  const pairShotGenId = extractFromArray(orchDetails.pair_shot_generation_ids, segmentIndex);
+  if (pairShotGenId !== undefined) {
+    specificParams.pair_shot_generation_id = pairShotGenId;
+    console.log(`[GenMigration] Set pair_shot_generation_id: ${pairShotGenId}`);
+  }
+
+  // Also extract start_image_generation_id from input_image_generation_ids if available
+  const startImageGenId = extractFromArray(orchDetails.input_image_generation_ids, segmentIndex);
+  if (startImageGenId !== undefined) {
+    specificParams.start_image_generation_id = startImageGenId;
+  }
+  const endImageGenId = extractFromArray(orchDetails.input_image_generation_ids, segmentIndex + 1);
+  if (endImageGenId !== undefined) {
+    specificParams.end_image_generation_id = endImageGenId;
+  }
+
   return specificParams;
 }
 

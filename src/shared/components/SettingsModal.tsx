@@ -456,7 +456,7 @@ python -m pip install --no-cache-dir -r requirements.txt
 ${torchInstall}
 echo Checking CUDA availability...
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))"
-python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
+python worker.py --reigh-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux command
       // Install torch LAST to ensure CUDA version doesn't get overwritten by requirements
@@ -469,7 +469,7 @@ python -m pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 python -m pip install --no-cache-dir -r requirements.txt && \\
 ${torchInstall} && \\
 python -c "import torch; assert torch.cuda.is_available(), 'ERROR: CUDA not available! Reinstall PyTorch with CUDA support.'; print('CUDA OK:', torch.cuda.get_device_name(0))" && \\
-python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
+python worker.py --reigh-access-token ${token}${debugFlag}${profileFlag}`;
     }
   };
 
@@ -491,13 +491,13 @@ python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
       return `${cdCheck}
 git pull
 ${activateCmd}
-python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
+python worker.py --reigh-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux / Mac command - auto-cd if not in correct folder
       return `[ ! -f "worker.py" ] && cd Reigh-Worker
 git pull && \\
 source venv/bin/activate && \\
-python worker.py --supabase-access-token ${token}${debugFlag}${profileFlag}`;
+python worker.py --reigh-access-token ${token}${debugFlag}${profileFlag}`;
     }
   };
 

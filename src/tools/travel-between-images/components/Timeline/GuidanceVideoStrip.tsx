@@ -27,6 +27,24 @@ interface GuidanceVideoStripProps {
   timelineFrameCount: number;
   frameSpacing: number;
   readOnly?: boolean; // Hide interactive controls in read-only mode
+  
+  // NEW: Output range - where in timeline this video is positioned
+  outputStartFrame?: number; // Default: fullMin (legacy behavior)
+  outputEndFrame?: number; // Default: fullMax (legacy behavior)
+  
+  // NEW: Source range - which frames from source video to use
+  sourceStartFrame?: number; // Default: 0
+  sourceEndFrame?: number | null; // Default: null (end of video)
+  
+  // NEW: Callbacks for range changes
+  onRangeChange?: (startFrame: number, endFrame: number) => void;
+  onSourceRangeChange?: (sourceStartFrame: number, sourceEndFrame: number | null) => void;
+  
+  // NEW: Position absolutely within parent (for multi-video same-row layout)
+  useAbsolutePosition?: boolean;
+  
+  // NEW: Sibling video ranges for collision detection (prevents overlap)
+  siblingRanges?: Array<{ start: number; end: number }>;
 }
 
 /**
@@ -94,8 +112,23 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   zoomLevel,
   timelineFrameCount,
   frameSpacing,
-  readOnly = false
+  readOnly = false,
+  // NEW: Output range props (defaults for legacy behavior)
+  outputStartFrame,
+  outputEndFrame,
+  // NEW: Source range props
+  sourceStartFrame,
+  sourceEndFrame,
+  // NEW: Range change callbacks
+  onRangeChange,
+  onSourceRangeChange,
+  useAbsolutePosition = false,
+  siblingRanges = [],
 }) => {
+  // Calculate effective output range (use props or fall back to fullMin/fullMax for legacy)
+  const effectiveOutputStart = outputStartFrame ?? fullMin;
+  const effectiveOutputEnd = outputEndFrame ?? fullMax;
+  const outputFrameCount = effectiveOutputEnd - effectiveOutputStart;
   const videoRef = useRef<HTMLVideoElement>(null);
   const stripContainerRef = useRef<HTMLDivElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -114,6 +147,17 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   const lastBlankCheckRef = useRef<number>(0);
   const SEEK_THROTTLE_MS = 30; // Minimum time between seeks (reduced for responsiveness)
   const BLANK_CHECK_THROTTLE_MS = 200; // Minimum time between blank checks to avoid infinite resets
+  
+  // Drag state for moving/resizing the strip
+  const [isDragging, setIsDragging] = useState<'move' | 'left' | 'right' | null>(null);
+  const [dragPreviewRange, setDragPreviewRange] = useState<{ start: number; end: number } | null>(null);
+  const dragStartRef = useRef<{ mouseX: number; startFrame: number; endFrame: number } | null>(null);
+  const outerContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Use drag preview range during drag, otherwise use actual props
+  const displayOutputStart = dragPreviewRange?.start ?? effectiveOutputStart;
+  const displayOutputEnd = dragPreviewRange?.end ?? effectiveOutputEnd;
+  const displayOutputFrameCount = displayOutputEnd - displayOutputStart;
   
   // Extract metadata if not provided
   const [extractedMetadata, setExtractedMetadata] = useState<VideoMetadata | null>(null);
@@ -158,9 +202,34 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   const timelineFrames = fullMax - fullMin + 1;
   const totalVideoFrames = effectiveMetadata?.total_frames || 0;
   
-  // Calculate video coverage for clip mode
-  const videoCoversFrames = treatment === 'clip' ? Math.min(totalVideoFrames, timelineFrames) : timelineFrames;
-  const videoCoverageRatio = timelineFrames > 0 ? videoCoversFrames / timelineFrames : 1;
+  // NEW: Calculate effective source range
+  const effectiveSourceStart = sourceStartFrame ?? 0;
+  const effectiveSourceEnd = sourceEndFrame ?? totalVideoFrames;
+  const sourceFrameCount = Math.max(0, effectiveSourceEnd - effectiveSourceStart);
+  
+  // Calculate video coverage for clip mode (using source range, not full video)
+  const videoCoversFrames = treatment === 'clip' ? Math.min(sourceFrameCount, outputFrameCount) : outputFrameCount;
+  const videoCoverageRatio = outputFrameCount > 0 ? videoCoversFrames / outputFrameCount : 1;
+  
+  // NEW: Calculate position on timeline (for multi-video support)
+  // Use the same coordinate system as SegmentOutputStrip for alignment
+  const stripEffectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+  // Calculate pixel positions using same formula as timeline
+  const startPixel = fullRange > 0 
+    ? TIMELINE_PADDING_OFFSET + ((displayOutputStart - fullMin) / fullRange) * stripEffectiveWidth
+    : TIMELINE_PADDING_OFFSET;
+  const endPixel = fullRange > 0
+    ? TIMELINE_PADDING_OFFSET + ((displayOutputEnd - fullMin) / fullRange) * stripEffectiveWidth
+    : TIMELINE_PADDING_OFFSET + stripEffectiveWidth;
+  const widthPixel = Math.max(0, endPixel - startPixel);
+  
+  // Convert to percentages of containerWidth (same approach as SegmentOutputStrip)
+  const stripLeftPercent = (startPixel / containerWidth) * 100;
+  const stripWidthPercent = (widthPixel / containerWidth) * 100;
+  
+  // Legacy percentage-based positioning (for non-absolute/relative mode)
+  const legacyPositionPercent = fullRange > 0 ? ((displayOutputStart - fullMin) / fullRange) * 100 : 0;
+  const legacyWidthPercent = fullRange > 0 ? (displayOutputFrameCount / fullRange) * 100 : 100;
   
   // Calculate playback speed for adjust mode
   const playbackSpeed = treatment === 'adjust' 
@@ -204,6 +273,11 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     const video = videoRef.current;
     if (!video) return;
     
+    // Skip extraction during drag - will re-extract when drag ends
+    if (isDragging) {
+      return;
+    }
+    
     // CRITICAL: Don't start extraction until we have metadata!
     if (!effectiveMetadata) {
       console.log('[GuidanceVideoStrip] ⏳ Waiting for metadata before extracting frames...');
@@ -215,7 +289,10 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         treatment,
         totalFrames: effectiveMetadata.total_frames,
         frameRate: effectiveMetadata.frame_rate,
-        duration: effectiveMetadata.duration_seconds
+        duration: effectiveMetadata.duration_seconds,
+        // NEW: Log source range
+        sourceRange: { start: effectiveSourceStart, end: effectiveSourceEnd, count: sourceFrameCount },
+        outputRange: { start: effectiveOutputStart, end: effectiveOutputEnd, count: outputFrameCount },
       });
       setIsExtractingFrames(true);
       // Don't set isVideoReady to false - keep old frames visible during re-extraction
@@ -239,16 +316,17 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       
       try {
         // Extract frames based on treatment mode
-        // In adjust mode: video is stretched/compressed to fit timeline
-        // In clip mode: video plays as-is, so extract totalVideoFrames thumbnails (all video frames)
+        // NEW: Use source range instead of full video
+        // In adjust mode: source range is stretched/compressed to fit output range
+        // In clip mode: source frames map 1:1 to output frames
         
-        // Use a FIXED number of thumbnails based on video duration, not container width
+        // Use a FIXED number of thumbnails based on source range, not container width
         // This prevents re-extraction on zoom
         const maxThumbnails = treatment === 'adjust' 
-          ? Math.min(timelineFrames, 80) // Fixed max for adjust mode
-          : Math.min(totalVideoFrames, 80); // Fixed max for clip mode
+          ? Math.min(outputFrameCount, 80) // Fixed max for adjust mode
+          : Math.min(sourceFrameCount, 80); // Fixed max for clip mode
         
-        const numFrames = maxThumbnails;
+        const numFrames = Math.max(1, maxThumbnails);
         
         // Validate inputs before extraction to prevent NaN/Infinity errors
         if (numFrames < 1) {
@@ -284,20 +362,26 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         canvas.height = video.videoHeight;
         
         // Calculate which frames to extract based on treatment mode
+        // NEW: Use source range instead of full video
         for (let i = 0; i < numFrames; i++) {
           let frameIndex: number;
           
-          // Handle edge case: if only extracting 1 frame, use the first frame
+          // Handle edge case: if only extracting 1 frame, use the first source frame
           if (numFrames === 1) {
-            frameIndex = 0;
+            frameIndex = effectiveSourceStart;
           } else if (treatment === 'adjust') {
-            // Adjust mode: show entire video stretched/compressed to fit timeline
-            frameIndex = Math.floor((i / (numFrames - 1)) * (effectiveMetadata.total_frames - 1));
+            // Adjust mode: sample across entire source range, stretched/compressed to fit output
+            // Maps evenly across sourceStartFrame to sourceEndFrame
+            frameIndex = effectiveSourceStart + Math.floor((i / (numFrames - 1)) * (sourceFrameCount - 1));
           } else {
-            // Clip mode: show only frames within timeline range
-            const timelinePosition = (i / (numFrames - 1)) * timelineFrameCount;
-            frameIndex = Math.floor(Math.min(timelinePosition, effectiveMetadata.total_frames - 1));
+            // Clip mode: 1:1 mapping from source to output
+            // Map thumbnail index to source frame within source range
+            const sourcePosition = (i / (numFrames - 1)) * (sourceFrameCount - 1);
+            frameIndex = effectiveSourceStart + Math.floor(sourcePosition);
           }
+          
+          // Clamp to valid source range
+          frameIndex = Math.max(effectiveSourceStart, Math.min(frameIndex, effectiveSourceEnd - 1));
           
           // Validate frameIndex after calculation
           if (!isFinite(frameIndex) || frameIndex < 0) {
@@ -390,7 +474,9 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('error', handleError);
     };
-}, [videoUrl, effectiveMetadata, treatment]); // REMOVED: containerWidth, fullMin, fullMax
+// Include source/output range in deps so thumbnails update when ranges change
+// BUT skip extraction during drag operations to prevent stuttering
+}, [videoUrl, effectiveMetadata, treatment, effectiveSourceStart, effectiveSourceEnd, effectiveOutputStart, effectiveOutputEnd, outputFrameCount, sourceFrameCount, isDragging]);
   
   const isCanvasBlank = useCallback((canvas: HTMLCanvasElement): boolean => {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -658,6 +744,8 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   }, []);
   
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // Skip hover preview updates during drag - it's not useful and causes performance issues
+    if (isDragging) return;
     if (!videoRef.current || !isVideoReady) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
@@ -686,7 +774,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         seekToFrame(videoRef.current, videoFrame, effectiveMetadata.frame_rate);
       }
     }
-  }, [treatment, containerWidth, fullMin, fullMax, effectiveMetadata, currentFrame, isVideoReady, seekToFrame]);
+  }, [treatment, containerWidth, fullMin, fullMax, effectiveMetadata, currentFrame, isVideoReady, seekToFrame, isDragging]);
   
   const handleMouseEnter = useCallback(() => {
     setIsHovering(true);
@@ -698,13 +786,197 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     // Don't reset here - causes issues when preview appears/disappears
   }, []);
 
+  // Drag handlers for moving/resizing the strip
+  const handleDragStart = useCallback((type: 'move' | 'left' | 'right', e: React.MouseEvent) => {
+    if (readOnly || !onRangeChange) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setIsDragging(type);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      startFrame: effectiveOutputStart,
+      endFrame: effectiveOutputEnd,
+    };
+  }, [readOnly, onRangeChange, effectiveOutputStart, effectiveOutputEnd]);
+
+  // Handle drag move and end via document events
+  useEffect(() => {
+    if (!isDragging || !dragStartRef.current || !onRangeChange) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      
+      // Use containerWidth prop (adjusted for zoom) for reliable frame calculations
+      // This is the same width used for positioning, so drag movement will match
+      const effectiveWidth = (containerWidth * (zoomLevel > 1 ? zoomLevel : 1)) - (TIMELINE_PADDING_OFFSET * 2);
+      if (effectiveWidth <= 0) return; // Safety check
+      
+      const pixelDelta = e.clientX - dragStartRef.current.mouseX;
+      const frameDelta = Math.round((pixelDelta / effectiveWidth) * fullRange);
+      
+      const { startFrame, endFrame } = dragStartRef.current;
+      const duration = endFrame - startFrame;
+      
+      let newStart = startFrame;
+      let newEnd = endFrame;
+      const MIN_DURATION_FRAMES = 10;
+      
+      if (isDragging === 'move') {
+        // Generalized "drag into obstacle reduces the side you hit" rule.
+        //
+        // Phase 1: Normal translation until we hit an obstacle (wall or sibling)
+        // Phase 2: The non-contact side STAYS FIXED (where it was at first contact),
+        //          the contact side REDUCES (moves inward, away from obstacle)
+        //
+        // Example: Clip at 0-90, wall at 90, push 5 frames into wall
+        //   → start stays at 0 (fixed at contact position)
+        //   → end reduces from 90 to 85 (moves away from wall)
+        //   → Clip shrinks from the RIGHT side (the side you dragged into)
+        
+        // Find obstacle limits
+        const prevNeighborEnd = Math.max(
+          0,
+          ...siblingRanges
+            .filter((s) => s.end <= startFrame)
+            .map((s) => s.end)
+        );
+        const nextNeighborStart = Math.min(
+          fullMax,
+          ...siblingRanges
+            .filter((s) => s.start >= endFrame)
+            .map((s) => s.start)
+        );
+
+        const startLimit = Math.max(0, prevNeighborEnd);
+        const endLimit = Math.min(fullMax, nextNeighborStart);
+
+        if (frameDelta >= 0) {
+          // Dragging RIGHT
+          const maxTranslateDelta = endLimit - endFrame; // furthest we can translate right
+
+          if (frameDelta <= maxTranslateDelta) {
+            // Phase 1: pure translate (no obstacle hit yet)
+            newStart = startFrame + frameDelta;
+            newEnd = endFrame + frameDelta;
+          } else {
+            // Phase 2: hit right obstacle
+            // - End stays PINNED at the wall
+            // - Start keeps moving right at the drag rate
+            // This shrinks the clip proportionally to how far you drag
+            newEnd = endLimit; // pinned at wall
+            newStart = startFrame + frameDelta; // keeps moving at drag rate
+            
+            // Cap start so we maintain minimum duration
+            if (newStart > newEnd - MIN_DURATION_FRAMES) {
+              newStart = newEnd - MIN_DURATION_FRAMES;
+            }
+          }
+        } else {
+          // Dragging LEFT
+          const minTranslateDelta = startLimit - startFrame; // most negative delta
+
+          if (frameDelta >= minTranslateDelta) {
+            // Phase 1: pure translate (no obstacle hit yet)
+            newStart = startFrame + frameDelta;
+            newEnd = endFrame + frameDelta;
+          } else {
+            // Phase 2: hit left obstacle
+            // - Start stays PINNED at the wall (0 or sibling end)
+            // - End keeps moving left at the drag rate
+            // This shrinks the clip proportionally to how far you drag
+            newStart = startLimit; // pinned at wall
+            newEnd = endFrame + frameDelta; // keeps moving at drag rate
+            
+            // Cap end so we maintain minimum duration
+            if (newEnd < newStart + MIN_DURATION_FRAMES) {
+              newEnd = newStart + MIN_DURATION_FRAMES;
+            }
+          }
+        }
+
+        // Clamp to limits
+        newStart = Math.max(startLimit, newStart);
+        newEnd = Math.min(endLimit, newEnd);
+      } else if (isDragging === 'left') {
+        // Resize from left - change start, keep end fixed
+        newStart = Math.max(0, Math.min(endFrame - MIN_DURATION_FRAMES, startFrame + frameDelta)); // Min duration
+        newEnd = endFrame;
+        
+        // Collision detection - can't resize past a sibling's end
+        for (const sibling of siblingRanges) {
+          if (sibling.end <= newEnd && newStart < sibling.end) {
+            newStart = sibling.end;
+          }
+        }
+      } else if (isDragging === 'right') {
+        // Resize from right - keep start, change end
+        newStart = startFrame;
+        newEnd = Math.max(startFrame + MIN_DURATION_FRAMES, endFrame + frameDelta); // Min duration
+        
+        // Collision detection - can't resize past a sibling's start
+        for (const sibling of siblingRanges) {
+          if (sibling.start >= newStart && newEnd > sibling.start) {
+            newEnd = sibling.start;
+          }
+        }
+      }
+      
+      // Clamp to timeline boundaries for resize operations
+      if (newEnd > fullMax) {
+        newEnd = fullMax;
+      }
+      if (newStart < 0) {
+        newStart = 0;
+      }
+      
+      // Ensure minimum duration
+      if (newEnd - newStart < MIN_DURATION_FRAMES) {
+        if (isDragging === 'left') {
+          newStart = newEnd - MIN_DURATION_FRAMES;
+        } else if (isDragging === 'right') {
+          newEnd = newStart + MIN_DURATION_FRAMES;
+        }
+      }
+      
+      // Update local preview state only - don't save to database during drag
+      setDragPreviewRange({ start: newStart, end: newEnd });
+    };
+
+    const handleMouseUp = () => {
+      // Commit the final range to parent (saves to database)
+      if (dragPreviewRange) {
+        const newDuration = dragPreviewRange.end - dragPreviewRange.start;
+        const videoFrames = effectiveMetadata?.total_frames || 0;
+        
+        // Auto-switch to "Fit to range" if dragging made range longer than video in 1:1 mode
+        if (treatment === 'clip' && videoFrames > 0 && newDuration > videoFrames) {
+          onTreatmentChange('adjust');
+        }
+        
+        onRangeChange(dragPreviewRange.start, dragPreviewRange.end);
+      }
+      setIsDragging(null);
+      setDragPreviewRange(null);
+      dragStartRef.current = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, onRangeChange, fullRange, fullMax, dragPreviewRange, containerWidth, zoomLevel, siblingRanges, treatment, effectiveMetadata, onTreatmentChange]);
+
   // Close hover state when treatment changes
   useEffect(() => {
     setIsHovering(false);
   }, [treatment]);
   
   return (
-    <div className="w-full relative">
+    <div className={useAbsolutePosition ? 'contents' : 'w-full relative'}>
       {/* Floating preview box above video strip and header - rendered via portal to document.body */}
       {/* Canvas always mounted but only visible when hovering */}
       {createPortal(
@@ -715,7 +987,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
             top: `${hoverPosition.y - 140}px`, // Position above cursor (adjusted for frame label)
             transform: 'translateX(-50%)',
             zIndex: 999999, // Above GlobalHeader and all other elements
-            display: isHovering && isVideoReady ? 'block' : 'none'
+            display: isHovering && isVideoReady && !isDragging ? 'block' : 'none'
           }}
         >
           <div className="bg-background border-2 border-primary rounded-lg shadow-2xl overflow-hidden">
@@ -736,28 +1008,69 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         document.body
       )}
 
-      {/* Structure video strip - outer container always full width */}
+      {/* Structure video strip - outer container with positioning for multi-video support */}
       <div
-        className="relative h-28 mb-0"
+        ref={outerContainerRef}
+        className={`${useAbsolutePosition ? 'absolute' : 'relative'} h-20 mb-0 group ${isDragging ? 'select-none' : ''}`}
         data-tour="structure-video"
         style={{
-          width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
-          minWidth: '100%',
-          paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
-          paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`,
+          // Position strip at its output range on timeline
+          // Use absolute positioning when in multi-video mode, otherwise use margins
+          ...(useAbsolutePosition ? {
+            // Absolute positioning: use percentages of containerWidth (same as SegmentOutputStrip)
+            left: `${stripLeftPercent}%`,
+            width: `${stripWidthPercent}%`,
+            top: 0,
+            bottom: 0,
+          } : {
+            // Relative positioning (legacy): use margin/width with padding
+            width: outputStartFrame !== undefined 
+              ? `${legacyWidthPercent * (zoomLevel > 1 ? zoomLevel : 1)}%`
+              : (zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%'),
+            marginLeft: outputStartFrame !== undefined 
+              ? `${legacyPositionPercent}%`
+              : 0,
+            minWidth: outputStartFrame !== undefined ? 0 : '100%',
+            paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
+            paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`,
+          }),
           overflow: 'visible',
+          cursor: isDragging === 'move' ? 'grabbing' : undefined,
         }}
       >
-        {/* Inner container for video content - shortened in clip mode */}
+        {/* Left resize handle */}
+        {!readOnly && onRangeChange && (
+          <div
+            className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize z-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            onMouseDown={(e) => handleDragStart('left', e)}
+            style={{ marginLeft: useAbsolutePosition ? '0px' : `${TIMELINE_HORIZONTAL_PADDING - 6}px` }}
+          >
+            <div className="w-1 h-12 bg-primary/60 rounded-full hover:bg-primary" />
+          </div>
+        )}
+        
+        {/* Right resize handle */}
+        {!readOnly && onRangeChange && (
+          <div
+            className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize z-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            onMouseDown={(e) => handleDragStart('right', e)}
+            style={{ marginRight: useAbsolutePosition ? '0px' : `${TIMELINE_HORIZONTAL_PADDING - 6}px` }}
+          >
+            <div className="w-1 h-12 bg-primary/60 rounded-full hover:bg-primary" />
+          </div>
+        )}
+        {/* Inner container for video content - shortened in clip mode when source < output */}
         <div
           ref={stripContainerRef}
           className="absolute left-0 top-0 bottom-0"
           style={{
-            width: treatment === 'clip' 
-              ? `${videoCoverageRatio * 100}%` // Parent already handles zoom scaling
+            // In clip mode with source shorter than output, shrink to show "no guidance" zone
+            width: treatment === 'clip' && sourceFrameCount < outputFrameCount
+              ? `${videoCoverageRatio * 100}%`
               : '100%',
-            paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
-            paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`,
+            // No internal padding for absolute positioning (edge-to-edge videos)
+            paddingLeft: useAbsolutePosition ? '0px' : `${TIMELINE_HORIZONTAL_PADDING}px`,
+            paddingRight: useAbsolutePosition ? '0px' : `${TIMELINE_HORIZONTAL_PADDING}px`,
           }}
           onMouseMove={handleMouseMove}
           onMouseEnter={handleMouseEnter}
@@ -774,80 +1087,13 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           playsInline
         />
         
-          {/* Treatment selector - top left (hidden in readOnly) */}
-          {!readOnly && (
-            <div className="absolute top-3 left-2 z-30">
-              <Select value={treatment} onValueChange={(treatment: 'adjust' | 'clip') => {
-                onTreatmentChange(treatment);
-              }}>
-                <SelectTrigger variant="retro" size="sm" className="h-6 w-[180px] text-[9px] px-2 py-0 bg-background/95 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
-                  <SelectValue>
-                    {treatment === 'adjust' 
-                      ? ((effectiveMetadata?.total_frames || 0) > timelineFrames ? 'Compress' : (effectiveMetadata?.total_frames || 0) < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
-                      : 'Use video as is'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent variant="retro">
-                  <SelectItem variant="retro" value="adjust">
-                    <div className="flex flex-col gap-0.5 py-1">
-                      <span className="text-xs font-medium">
-                        {(effectiveMetadata?.total_frames || 0) > timelineFrames ? 'Compress' : (effectiveMetadata?.total_frames || 0) < timelineFrames ? 'Stretch' : 'Match'} to timeline
-                      </span>
-                      <span className="text-[10px] text-muted-foreground leading-tight">
-                        {(() => {
-                          const totalVideoFrames = effectiveMetadata?.total_frames || 0;
-                          const timelineRange = fullMax - fullMin + 1;
-                          if (totalVideoFrames === 0 || timelineRange === 0) return '';
-                          if (totalVideoFrames > timelineRange) {
-                            const framesToDrop = totalVideoFrames - timelineRange;
-                            return `Your input video has ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} so we'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to fit timeline frames ${fullMin}-${fullMax} (${timelineRange} frame${timelineRange === 1 ? '' : 's'}).`;
-                          } else if (totalVideoFrames < timelineRange) {
-                            const framesToDuplicate = timelineRange - totalVideoFrames;
-                            return `Your input video has ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} so we'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to fit timeline frames ${fullMin}-${fullMax} (${timelineRange} frame${timelineRange === 1 ? '' : 's'}).`;
-                          } else {
-                            return `Perfect! Your input video has ${timelineRange} frame${timelineRange === 1 ? '' : 's'}, matching timeline frames ${fullMin}-${fullMax} exactly.`;
-                          }
-                        })()}
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem variant="retro" value="clip">
-                    <div className="flex flex-col gap-0.5 py-1">
-                      <span className="text-xs font-medium">Use video as is</span>
-                      <span className="text-[10px] text-muted-foreground leading-tight">
-                        {(() => {
-                          const totalVideoFrames = effectiveMetadata?.total_frames || 0;
-                          const timelineRange = fullMax - fullMin + 1;
-                          if (totalVideoFrames === 0 || timelineRange === 0) return '';
-                          if (totalVideoFrames > timelineRange) {
-                            const unusedFrames = totalVideoFrames - timelineRange;
-                            return `Your video will guide timeline frames ${fullMin}-${fullMax} (${timelineRange} frame${timelineRange === 1 ? '' : 's'}). The last ${unusedFrames} frame${unusedFrames === 1 ? '' : 's'} of your video (video frame${unusedFrames === 1 ? '' : 's'} ${timelineRange + 1}-${totalVideoFrames}) will be ignored.`;
-                          } else if (totalVideoFrames < timelineRange) {
-                            const uncoveredFrames = timelineRange - totalVideoFrames;
-                            const guidedEnd = fullMin + totalVideoFrames - 1;
-                            return `Your video will guide timeline frames ${fullMin}-${guidedEnd} (${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'}). Timeline frames ${guidedEnd + 1}-${fullMax} (${uncoveredFrames} frame${uncoveredFrames === 1 ? '' : 's'}) won't have video guidance.`;
-                          } else {
-                            return `Perfect! Your video length matches timeline frames ${fullMin}-${fullMax} exactly (${timelineRange} frame${timelineRange === 1 ? '' : 's'}).`;
-                          }
-                        })()}
-                      </span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           {/* Delete button - top right (hidden in readOnly) */}
           {!readOnly && (
             <Button
               variant="destructive"
               size="sm"
-              className="absolute top-2 z-30 h-7 w-7 p-0 opacity-90 hover:opacity-100 shadow-lg rounded-full"
-              style={{
-                right: '8px',
-                left: 'max(200px, calc(100% - 36px))' // At least 200px from left, or natural right position
-              }}
+              className="absolute top-1 right-1 z-30 h-6 w-6 p-0 opacity-90 hover:opacity-100 shadow-lg rounded-full"
               onClick={onRemove}
               title="Remove guidance video"
             >
@@ -857,9 +1103,22 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
 
           {/* Frame strip - showing frames side by side with padding to align with timeline */}
         {displayFrameImages.length > 0 ? (
-          <div className="absolute left-4 right-4 top-6 bottom-2 flex border-2 border-primary/40 rounded overflow-hidden shadow-md">
-            {/* Blur overlay when extracting new frames - only show if strip is wide enough */}
-            {isExtractingFrames && videoCoverageRatio > 0.3 && (
+          <div 
+            className={`absolute top-5 bottom-1 flex border-2 rounded overflow-hidden shadow-md ${
+              isDragging === 'move' ? 'border-primary cursor-grabbing' : 'border-primary/40 cursor-grab'
+            } ${!readOnly && onRangeChange ? 'hover:border-primary/70' : ''}`}
+            style={{
+              left: useAbsolutePosition ? '2px' : '16px',
+              right: useAbsolutePosition ? '2px' : '16px',
+            }}
+            onMouseDown={(e) => {
+              // Only start move drag if not clicking on controls
+              if ((e.target as HTMLElement).closest('button, select, [role="listbox"]')) return;
+              handleDragStart('move', e);
+            }}
+          >
+            {/* Blur overlay when extracting new frames - only show if strip is wide enough and NOT dragging */}
+            {isExtractingFrames && !isDragging && videoCoverageRatio > 0.3 && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/20 backdrop-blur-sm z-10">
                 <span className="text-xs font-medium text-foreground bg-background/90 px-3 py-1.5 rounded-md border shadow-sm">
                   Loading updated timeline...
@@ -879,7 +1138,16 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
             ))}
           </div>
         ) : (
-          <div className="absolute left-4 right-4 top-6 bottom-2 flex items-center justify-center bg-muted/50 dark:bg-muted-foreground/15 border border-border/30 rounded-sm">
+          <div 
+            className={`absolute top-5 bottom-1 flex items-center justify-center bg-muted/50 dark:bg-muted-foreground/15 border rounded-sm ${
+              !readOnly && onRangeChange ? 'cursor-grab hover:border-primary/50' : 'border-border/30'
+            }`}
+            style={{
+              left: useAbsolutePosition ? '2px' : '16px',
+              right: useAbsolutePosition ? '2px' : '16px',
+            }}
+            onMouseDown={(e) => handleDragStart('move', e)}
+          >
             <span className="text-xs text-muted-foreground font-medium">
               {isVideoReady ? 'Loading frames...' : 'Loading video...'}
             </span>
@@ -887,6 +1155,61 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         )}
         </div>
         {/* End inner container */}
+        
+        {/* Frame range indicator - bottom of strip */}
+        {outputStartFrame !== undefined && !readOnly && (
+          <div 
+            className="absolute bottom-0 flex justify-between items-center text-[9px] text-muted-foreground font-mono"
+            style={{
+              left: useAbsolutePosition ? '2px' : '16px',
+              right: useAbsolutePosition ? '2px' : '16px',
+            }}
+          >
+            <div className="flex items-center gap-1">
+              <span className={`px-1 rounded bg-background/80 pointer-events-none ${isDragging ? 'ring-1 ring-primary' : ''}`}>f{displayOutputStart}</span>
+              {/* Treatment selector - inline with frame count */}
+              <Select value={treatment} onValueChange={(newTreatment: 'adjust' | 'clip') => {
+                // When switching to 1:1 mapping, shrink range to match video duration
+                if (newTreatment === 'clip' && onRangeChange) {
+                  const videoFrames = effectiveMetadata?.total_frames || 0;
+                  const currentDuration = displayOutputEnd - displayOutputStart;
+                  
+                  if (videoFrames > 0 && currentDuration > videoFrames) {
+                    // Shrink the end to match video duration
+                    onRangeChange(displayOutputStart, displayOutputStart + videoFrames);
+                  }
+                }
+                onTreatmentChange(newTreatment);
+              }}>
+                <SelectTrigger variant="retro" size="sm" className="h-4 w-[72px] text-[8px] px-1 py-0 bg-background/90 font-sans [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                  <SelectValue>
+                    {treatment === 'adjust' ? 'Fit to range' : '1:1 mapping'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent variant="retro">
+                  <SelectItem variant="retro" value="adjust">
+                    <div className="flex flex-col gap-0.5 py-1">
+                      <span className="text-xs font-medium">Fit to range</span>
+                      <span className="text-[10px] text-muted-foreground leading-tight">
+                        Stretch or compress video to fill the entire range
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem variant="retro" value="clip">
+                    <div className="flex flex-col gap-0.5 py-1">
+                      <span className="text-xs font-medium">1:1 mapping</span>
+                      <span className="text-[10px] text-muted-foreground leading-tight">
+                        Each video frame maps to one output frame
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <span className={`px-1 rounded bg-background/80 pointer-events-none ${isDragging ? 'ring-1 ring-primary' : ''}`}>f{displayOutputEnd}</span>
+          </div>
+        )}
+        
       </div>
       {/* End outer container */}
     </div>

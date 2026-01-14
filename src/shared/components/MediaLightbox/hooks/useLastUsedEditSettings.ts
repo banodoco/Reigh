@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
-import type { EditMode, LoraMode } from './useGenerationEditSettings';
+import type { EditMode, LoraMode, EditAdvancedSettings } from './useGenerationEditSettings';
+import { DEFAULT_ADVANCED_SETTINGS } from './useGenerationEditSettings';
 
 /**
  * "Last used" settings - stored at user/project level, no prompt
@@ -14,6 +15,8 @@ export interface LastUsedEditSettings {
   // Img2Img specific
   img2imgStrength: number;
   img2imgEnablePromptExpansion: boolean;
+  // Advanced settings for two-pass generation
+  advancedSettings: EditAdvancedSettings;
 }
 
 export const DEFAULT_LAST_USED: LastUsedEditSettings = {
@@ -24,6 +27,8 @@ export const DEFAULT_LAST_USED: LastUsedEditSettings = {
   // Img2Img defaults
   img2imgStrength: 0.6,
   img2imgEnablePromptExpansion: false,
+  // Advanced settings defaults
+  advancedSettings: DEFAULT_ADVANCED_SETTINGS,
 };
 
 // localStorage keys for instant access (no loading delay)

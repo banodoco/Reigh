@@ -18,6 +18,19 @@ export const STORAGE_KEYS = {
   
   // Key for passing inherited settings to a new shot via sessionStorage
   APPLY_PROJECT_DEFAULTS: (shotId: string) => `apply-project-defaults-${shotId}`,
+  
+  // ============================================================================
+  // JOIN SEGMENTS SETTINGS (separate from main video generation settings)
+  // ============================================================================
+  
+  // Key for storing Join Segments settings of the last active shot (for inheritance within project)
+  LAST_ACTIVE_JOIN_SEGMENTS_SETTINGS: (projectId: string) => `last-active-join-segments-${projectId}`,
+  
+  // Global key for cross-project inheritance of Join Segments settings
+  GLOBAL_LAST_ACTIVE_JOIN_SEGMENTS_SETTINGS: 'global-last-active-join-segments',
+  
+  // Key for passing inherited Join Segments settings to a new shot via sessionStorage
+  APPLY_JOIN_SEGMENTS_DEFAULTS: (shotId: string) => `apply-join-segments-defaults-${shotId}`,
 };
 
 

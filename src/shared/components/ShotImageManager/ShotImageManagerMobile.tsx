@@ -15,6 +15,7 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { MobileImageItem } from './MobileImageItem';
 import { BaseShotImageManagerProps } from './types';
 import { PairPromptIndicator } from './components/PairPromptIndicator';
+import { BatchSegmentVideo } from './components/BatchSegmentVideo';
 
 const DOUBLE_TAP_WINDOW_MS = 275;
 
@@ -41,6 +42,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   defaultPrompt,
   defaultNegativePrompt,
   onClearEnhancedPrompt,
+  segmentSlots,
+  onSegmentClick,
 }) => {
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
@@ -76,6 +79,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   } | null>(null);
   const pendingSingleTapClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // In selection/move mode, use configured columns. Otherwise, use 2 cols for pair-per-row view
+  const isInMoveMode = mobileSelectedIds.length > 0;
+  const effectiveColumns = isInMoveMode ? columns : 2;
+  
   const mobileGridColsClass = {
     2: 'grid-cols-2',
     3: 'grid-cols-3',
@@ -88,7 +95,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     10: 'grid-cols-10',
     11: 'grid-cols-11',
     12: 'grid-cols-12',
-  }[columns] || 'grid-cols-4';
+  }[effectiveColumns] || 'grid-cols-2';
 
   // Use optimistic order if available, otherwise use props images
   const currentImages = isOptimisticUpdate && optimisticOrder.length > 0 ? optimisticOrder : images;
@@ -395,13 +402,152 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   });
 
   // Determine grid columns for positioning logic
-  const gridColumns = {
-    2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 12,
-  }[columns] || 4;
+  const gridColumns = isInMoveMode ? columns : 2;
+
+  // Build pairs for pair-per-row view (each transition gets its own row)
+  const pairs = React.useMemo(() => {
+    if (isInMoveMode || currentImages.length < 2) return [];
+    const result: Array<{
+      index: number;
+      leftImage: typeof currentImages[0];
+      rightImage: typeof currentImages[0];
+      segmentSlot: typeof segmentSlots extends (infer T)[] | undefined ? T | undefined : never;
+    }> = [];
+    for (let i = 0; i < currentImages.length - 1; i++) {
+      result.push({
+        index: i,
+        leftImage: currentImages[i],
+        rightImage: currentImages[i + 1],
+        segmentSlot: segmentSlots?.find(s => s.index === i),
+      });
+    }
+    return result;
+  }, [currentImages, segmentSlots, isInMoveMode]);
+
+  // Pair-per-row view (when not in move mode)
+  if (!isInMoveMode && currentImages.length >= 2) {
+    return (
+      <>
+        <div className="flex flex-col gap-4 pt-2">
+          {pairs.map((pair) => (
+            <div key={`pair-${pair.index}`} className="flex items-center gap-2">
+              {/* Left image - tap to enter move mode */}
+              <div className="flex-1 relative">
+                <MobileImageItem
+                  image={pair.leftImage}
+                  index={pair.index}
+                  isSelected={false}
+                  onMobileTap={() => {
+                    // Select this image to enter move mode
+                    setMobileSelectedIds([pair.leftImage.id as string]);
+                    setLastSelectedIndex(pair.index);
+                  }}
+                  onDelete={() => {}}
+                  onOpenLightbox={() => onOpenLightbox?.(pair.index)}
+                  duplicatingImageId={duplicatingImageId}
+                  duplicateSuccessImageId={duplicateSuccessImageId}
+                  frameNumber={pair.index * batchVideoFrames}
+                  projectAspectRatio={projectAspectRatio}
+                  readOnly={true}
+                />
+              </div>
+              
+              {/* Video/indicator in the middle */}
+              <div className="flex flex-col items-center gap-1 w-24 flex-shrink-0">
+                {pair.segmentSlot && (
+                  <BatchSegmentVideo
+                    slot={pair.segmentSlot}
+                    pairIndex={pair.index}
+                    onClick={() => onSegmentClick?.(pair.index)}
+                    onOpenPairSettings={onPairClick ? () => onPairClick(pair.index, {
+                      index: pair.index,
+                      frames: batchVideoFrames,
+                      startFrame: pair.index * batchVideoFrames,
+                      endFrame: (pair.index + 1) * batchVideoFrames,
+                      startImage: {
+                        id: pair.leftImage.id,
+                        url: pair.leftImage.imageUrl || pair.leftImage.location,
+                        thumbUrl: pair.leftImage.thumbUrl,
+                        position: pair.index + 1
+                      },
+                      endImage: {
+                        id: pair.rightImage.id,
+                        url: pair.rightImage.imageUrl || pair.rightImage.location,
+                        thumbUrl: pair.rightImage.thumbUrl,
+                        position: pair.index + 2
+                      }
+                    }) : undefined}
+                    projectAspectRatio={projectAspectRatio}
+                    isMobile={true}
+                    compact={false}
+                  />
+                )}
+                {onPairClick && (
+                  <PairPromptIndicator
+                    pairIndex={pair.index}
+                    frames={batchVideoFrames}
+                    startFrame={pair.index * batchVideoFrames}
+                    endFrame={(pair.index + 1) * batchVideoFrames}
+                    isMobile={true}
+                    onClearEnhancedPrompt={onClearEnhancedPrompt}
+                    onPairClick={() => onPairClick(pair.index, {
+                      index: pair.index,
+                      frames: batchVideoFrames,
+                      startFrame: pair.index * batchVideoFrames,
+                      endFrame: (pair.index + 1) * batchVideoFrames,
+                      startImage: {
+                        id: pair.leftImage.id,
+                        url: pair.leftImage.imageUrl || pair.leftImage.location,
+                        thumbUrl: pair.leftImage.thumbUrl,
+                        position: pair.index + 1
+                      },
+                      endImage: {
+                        id: pair.rightImage.id,
+                        url: pair.rightImage.imageUrl || pair.rightImage.location,
+                        thumbUrl: pair.rightImage.thumbUrl,
+                        position: pair.index + 2
+                      }
+                    })}
+                    hasCustomPrompt={!!(pairPrompts?.[pair.index]?.prompt || pairPrompts?.[pair.index]?.negativePrompt)}
+                    hasEnhancedPrompt={!!enhancedPrompts?.[pair.index]}
+                    defaultPrompt={defaultPrompt}
+                    defaultNegativePrompt={defaultNegativePrompt}
+                  />
+                )}
+              </div>
+              
+              {/* Right image - tap to enter move mode */}
+              <div className="flex-1 relative">
+                <MobileImageItem
+                  image={pair.rightImage}
+                  index={pair.index + 1}
+                  isSelected={false}
+                  onMobileTap={() => {
+                    // Select this image to enter move mode
+                    setMobileSelectedIds([pair.rightImage.id as string]);
+                    setLastSelectedIndex(pair.index + 1);
+                  }}
+                  onDelete={() => {}}
+                  onOpenLightbox={() => onOpenLightbox?.(pair.index + 1)}
+                  duplicatingImageId={duplicatingImageId}
+                  duplicateSuccessImageId={duplicateSuccessImageId}
+                  frameNumber={(pair.index + 1) * batchVideoFrames}
+                  projectAspectRatio={projectAspectRatio}
+                  readOnly={true}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Selection bar - hidden in pair-per-row mode */}
+      </>
+    );
+  }
 
   return (
     <>
-      <div className={cn("grid gap-3", mobileGridColsClass)}>
+      <div className={cn("grid gap-3 pt-6 overflow-visible", mobileGridColsClass)}>
         {currentImages.map((image, index) => {
           // imageKey is shot_generations.id - unique per entry
           const imageKey = image.id;
@@ -432,12 +578,75 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
           const prevStartImage = index > 0 ? currentImages[index - 1] : undefined;
           const prevEndImage = currentImages[index];
           
+          // Get segment slot for this pair (if available)
+          const segmentSlot = segmentSlots?.find(s => s.index === index);
+          const prevSegmentSlot = index > 0 ? segmentSlots?.find(s => s.index === index - 1) : undefined;
+          if (index === 0) {
+            console.log('[BatchSegments:Mobile] slots summary', {
+              slotsCount: segmentSlots?.length ?? 0,
+              firstSlot: segmentSlots?.[0]
+                ? {
+                    index: segmentSlots[0].index,
+                    type: segmentSlots[0].type,
+                    id: segmentSlots[0].type === 'child' ? segmentSlots[0].child.id.substring(0, 8) : 'placeholder'
+                  }
+                : null
+            });
+          }
+          console.log('[BatchSegments:Mobile] pair mapping', {
+            index,
+            imageId: imageKey?.substring(0, 8),
+            segmentSlot: segmentSlot
+              ? {
+                  index: segmentSlot.index,
+                  type: segmentSlot.type,
+                  id: segmentSlot.type === 'child' ? segmentSlot.child.id.substring(0, 8) : 'placeholder',
+                  hasLocation: segmentSlot.type === 'child' ? !!segmentSlot.child.location : false
+                }
+              : null
+          });
+          
           return (
             <React.Fragment key={imageKey}>
               <div className="relative">
-                {/* Pair indicator from previous image - shows on LEFT if at start of row */}
-                {prevImageWasEndOfRow && onPairClick && mobileSelectedIds.length === 0 && (
-                  <div className="absolute top-1/2 -left-[6px] -translate-y-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+                {/* Video output from previous pair - shows on LEFT if at start of row (only in move mode, not pair-per-row) */}
+                {prevImageWasEndOfRow && prevSegmentSlot && mobileSelectedIds.length === 0 && isInMoveMode && (
+                  <div className="absolute -top-4 -left-[6px] -translate-x-1/2 z-20 pointer-events-auto w-20">
+                    <BatchSegmentVideo
+                      slot={prevSegmentSlot}
+                      pairIndex={index - 1}
+                      onClick={() => onSegmentClick?.(index - 1)}
+                      onOpenPairSettings={onPairClick ? (pairIdx) => onPairClick(pairIdx, {
+                        index: pairIdx,
+                        frames: batchVideoFrames,
+                        startFrame: pairIdx * batchVideoFrames,
+                        endFrame: (pairIdx + 1) * batchVideoFrames,
+                        startImage: currentImages[pairIdx] ? {
+                          id: currentImages[pairIdx].id,
+                          url: currentImages[pairIdx].imageUrl || currentImages[pairIdx].location,
+                          thumbUrl: currentImages[pairIdx].thumbUrl,
+                          position: pairIdx + 1
+                        } : null,
+                        endImage: currentImages[pairIdx + 1] ? {
+                          id: currentImages[pairIdx + 1].id,
+                          url: currentImages[pairIdx + 1].imageUrl || currentImages[pairIdx + 1].location,
+                          thumbUrl: currentImages[pairIdx + 1].thumbUrl,
+                          position: pairIdx + 2
+                        } : null
+                      }) : undefined}
+                      projectAspectRatio={projectAspectRatio}
+                      isMobile={true}
+                      compact={true}
+                    />
+                  </div>
+                )}
+                
+                {/* Pair indicator from previous image - shows on LEFT if at start of row (only in move mode, not pair-per-row) */}
+                {prevImageWasEndOfRow && onPairClick && mobileSelectedIds.length === 0 && isInMoveMode && (
+                  <div className={cn(
+                    "absolute -left-[6px] -translate-y-1/2 -translate-x-1/2 z-30 pointer-events-auto",
+                    prevSegmentSlot ? "top-[calc(50%+20px)]" : "top-1/2"
+                  )}>
                     <PairPromptIndicator
                       pairIndex={index - 1}
                       frames={batchVideoFrames}
@@ -529,9 +738,44 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   </div>
                 )}
                 
+                {/* Video output above pair indicator - shows on RIGHT if NOT at end of row */}
+                {!isLastItem && segmentSlot && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (
+                  <div className="absolute -top-4 -right-[6px] translate-x-1/2 z-20 pointer-events-auto w-20">
+                    <BatchSegmentVideo
+                      slot={segmentSlot}
+                      pairIndex={index}
+                      onClick={() => onSegmentClick?.(index)}
+                      onOpenPairSettings={onPairClick ? (pairIdx) => onPairClick(pairIdx, {
+                        index: pairIdx,
+                        frames: batchVideoFrames,
+                        startFrame: pairIdx * batchVideoFrames,
+                        endFrame: (pairIdx + 1) * batchVideoFrames,
+                        startImage: currentImages[pairIdx] ? {
+                          id: currentImages[pairIdx].id,
+                          url: currentImages[pairIdx].imageUrl || currentImages[pairIdx].location,
+                          thumbUrl: currentImages[pairIdx].thumbUrl,
+                          position: pairIdx + 1
+                        } : null,
+                        endImage: currentImages[pairIdx + 1] ? {
+                          id: currentImages[pairIdx + 1].id,
+                          url: currentImages[pairIdx + 1].imageUrl || currentImages[pairIdx + 1].location,
+                          thumbUrl: currentImages[pairIdx + 1].thumbUrl,
+                          position: pairIdx + 2
+                        } : null
+                      }) : undefined}
+                      projectAspectRatio={projectAspectRatio}
+                      isMobile={true}
+                      compact={true}
+                    />
+                  </div>
+                )}
+                
                 {/* Pair indicator after this image - shows on RIGHT if NOT at end of row */}
                 {!isLastItem && onPairClick && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (
-                  <div className="absolute top-1/2 -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto">
+                  <div className={cn(
+                    "absolute -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto",
+                    segmentSlot ? "top-[calc(50%+20px)]" : "top-1/2"
+                  )}>
                     <PairPromptIndicator
                       pairIndex={index}
                       frames={batchVideoFrames}

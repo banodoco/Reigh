@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { ShotImageManagerProps } from './types';
 import { useSelection } from './hooks/useSelection';
@@ -13,6 +13,10 @@ import { DEFAULT_BATCH_VIDEO_FRAMES } from './constants';
 import { EmptyState } from './components/EmptyState';
 import { ShotImageManagerDesktop } from './ShotImageManagerDesktop.tsx';
 import { ShotImageManagerMobileWrapper } from './ShotImageManagerMobileWrapper.tsx';
+import { useSegmentOutputsForShot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
+import MediaLightbox from '../MediaLightbox';
+import { GenerationRow } from '@/types/shots';
+import { filterImagesForDisplay } from '@/shared/lib/typeGuards';
 
 /**
  * Main container component for ShotImageManager
@@ -65,6 +69,77 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
     derivedNavContext: externalGens.derivedNavContext,
     handleOpenExternalGeneration: externalGens.handleOpenExternalGeneration
   });
+
+  // Build local shot_generation positions from the current batch order
+  // This keeps segment outputs aligned with the batch grid order.
+  const localShotGenPositions = useMemo(() => {
+    if (props.generationMode !== 'batch') return undefined;
+    const orderedImages = filterImagesForDisplay(lightbox.currentImages);
+    if (orderedImages.length === 0) return undefined;
+    const map = new Map<string, number>();
+    orderedImages.forEach((img, index) => {
+      if (img.id) {
+        map.set(img.id, index);
+      }
+    });
+    console.log(`[BatchSegments] localShotGenPositions count=${map.size} order=${orderedImages.map((img, idx) => `${idx}:${img.id?.substring(0, 8)}`).join(' ')}`);
+    return map;
+  }, [props.generationMode, lightbox.currentImages]);
+
+  // Segment video outputs for batch view (only when in batch mode)
+  const {
+    segmentSlots,
+    selectedParentId,
+  } = useSegmentOutputsForShot(
+    props.generationMode === 'batch' ? props.shotId || null : null,
+    props.generationMode === 'batch' ? props.projectId || null : null,
+    props.generationMode === 'batch' ? localShotGenPositions : undefined
+  );
+
+  // Log what we're passing to the hook
+  console.log(`[BatchSegments] HOOK INPUTS shotId=${props.shotId?.substring(0, 8) || 'NULL'} projectId=${props.projectId?.substring(0, 8) || 'NULL'} mode=${props.generationMode}`);
+  
+  // Flat log for each slot
+  console.log(`[BatchSegments] segmentSlots count=${segmentSlots.length}`);
+  segmentSlots.forEach((slot) => {
+    const childId = slot.type === 'child' ? slot.child.id?.substring(0, 8) : 'n/a';
+    const hasLoc = slot.type === 'child' ? !!slot.child.location : false;
+    console.log(`[BatchSegments]   slot[${slot.index}] type=${slot.type} childId=${childId} hasLoc=${hasLoc}`);
+  });
+  
+  // Segment video lightbox state
+  const [segmentLightboxIndex, setSegmentLightboxIndex] = useState<number | null>(null);
+  
+  // Handle segment video click - open lightbox
+  const handleSegmentClick = useCallback((slotIndex: number) => {
+    setSegmentLightboxIndex(slotIndex);
+  }, []);
+  
+  // Get current segment lightbox media
+  const currentSegmentSlot = segmentLightboxIndex !== null ? segmentSlots[segmentLightboxIndex] : null;
+  const currentSegmentMedia = currentSegmentSlot?.type === 'child' ? currentSegmentSlot.child : null;
+  
+  // Segment lightbox navigation
+  const segmentChildSlotIndices = useMemo(() => 
+    segmentSlots
+      .map((slot, idx) => slot.type === 'child' && slot.child.location ? idx : null)
+      .filter((idx): idx is number => idx !== null),
+    [segmentSlots]
+  );
+  
+  const handleSegmentLightboxNext = useCallback(() => {
+    if (segmentLightboxIndex === null || segmentChildSlotIndices.length === 0) return;
+    const currentPos = segmentChildSlotIndices.indexOf(segmentLightboxIndex);
+    const nextPos = (currentPos + 1) % segmentChildSlotIndices.length;
+    setSegmentLightboxIndex(segmentChildSlotIndices[nextPos]);
+  }, [segmentLightboxIndex, segmentChildSlotIndices]);
+  
+  const handleSegmentLightboxPrev = useCallback(() => {
+    if (segmentLightboxIndex === null || segmentChildSlotIndices.length === 0) return;
+    const currentPos = segmentChildSlotIndices.indexOf(segmentLightboxIndex);
+    const prevPos = (currentPos - 1 + segmentChildSlotIndices.length) % segmentChildSlotIndices.length;
+    setSegmentLightboxIndex(segmentChildSlotIndices[prevPos]);
+  }, [segmentLightboxIndex, segmentChildSlotIndices]);
   
   // Update externalGens setLightboxIndex with the real one from lightbox
   useEffect(() => {
@@ -148,34 +223,88 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
   if (isMobile && props.generationMode === 'batch') {
     console.log(`[DEBUG] EARLY RETURN - Using dedicated mobile component`);
     return (
-      <ShotImageManagerMobileWrapper
-        {...props}
-        selection={selection}
-        lightbox={lightbox}
-        batchOps={batchOps}
-        mobileGestures={mobileGestures}
-        optimistic={optimistic}
-        externalGens={externalGens}
-        lightboxSelectedShotId={lightboxSelectedShotId}
-        setLightboxSelectedShotId={setLightboxSelectedShotId}
-      />
+      <>
+        <ShotImageManagerMobileWrapper
+          {...props}
+          selection={selection}
+          lightbox={lightbox}
+          batchOps={batchOps}
+          mobileGestures={mobileGestures}
+          optimistic={optimistic}
+          externalGens={externalGens}
+          lightboxSelectedShotId={lightboxSelectedShotId}
+          setLightboxSelectedShotId={setLightboxSelectedShotId}
+          segmentSlots={segmentSlots}
+          onSegmentClick={handleSegmentClick}
+        />
+        
+        {/* Segment video lightbox */}
+        {currentSegmentMedia && (
+          <MediaLightbox
+            media={{
+              ...currentSegmentMedia,
+              parent_generation_id: selectedParentId,
+            } as GenerationRow}
+            onClose={() => setSegmentLightboxIndex(null)}
+            onNext={handleSegmentLightboxNext}
+            onPrevious={handleSegmentLightboxPrev}
+            showNavigation={true}
+            showImageEditTools={false}
+            showDownload={true}
+            hasNext={segmentChildSlotIndices.length > 1}
+            hasPrevious={segmentChildSlotIndices.length > 1}
+            starred={(currentSegmentMedia as any).starred ?? false}
+            shotId={props.shotId}
+            showTaskDetails={true}
+            showVideoTrimEditor={true}
+            fetchVariantsForSelf={true}
+          />
+        )}
+      </>
     );
   }
   
   // Desktop rendering
   return (
-    <ShotImageManagerDesktop
-      {...props}
-      selection={selection}
-      dragAndDrop={dragAndDrop}
-      lightbox={lightbox}
-      batchOps={batchOps}
-      optimistic={optimistic}
-      externalGens={externalGens}
-      getFramePosition={getFramePosition}
-      lightboxSelectedShotId={lightboxSelectedShotId}
-      setLightboxSelectedShotId={setLightboxSelectedShotId}
-    />
+    <>
+      <ShotImageManagerDesktop
+        {...props}
+        selection={selection}
+        dragAndDrop={dragAndDrop}
+        lightbox={lightbox}
+        batchOps={batchOps}
+        optimistic={optimistic}
+        externalGens={externalGens}
+        getFramePosition={getFramePosition}
+        lightboxSelectedShotId={lightboxSelectedShotId}
+        setLightboxSelectedShotId={setLightboxSelectedShotId}
+        segmentSlots={segmentSlots}
+        onSegmentClick={handleSegmentClick}
+      />
+      
+      {/* Segment video lightbox */}
+      {currentSegmentMedia && (
+        <MediaLightbox
+          media={{
+            ...currentSegmentMedia,
+            parent_generation_id: selectedParentId,
+          } as GenerationRow}
+          onClose={() => setSegmentLightboxIndex(null)}
+          onNext={handleSegmentLightboxNext}
+          onPrevious={handleSegmentLightboxPrev}
+          showNavigation={true}
+          showImageEditTools={false}
+          showDownload={true}
+          hasNext={segmentChildSlotIndices.length > 1}
+          hasPrevious={segmentChildSlotIndices.length > 1}
+          starred={(currentSegmentMedia as any).starred ?? false}
+          shotId={props.shotId}
+          showTaskDetails={true}
+          showVideoTrimEditor={true}
+          fetchVariantsForSelf={true}
+        />
+      )}
+    </>
   );
 };
 

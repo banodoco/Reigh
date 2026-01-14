@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
@@ -15,7 +15,9 @@ import TimelineItem from './TimelineItem';
 import SingleImageEndpoint, { SINGLE_IMAGE_ENDPOINT_ID } from './SingleImageEndpoint';
 import { GuidanceVideoStrip } from './GuidanceVideoStrip';
 import { GuidanceVideoUploader } from './GuidanceVideoUploader';
+import { GuidanceVideosContainer } from './GuidanceVideosContainer';
 import { AudioStrip } from './AudioStrip';
+import { SegmentOutputStrip } from './SegmentOutputStrip';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
 import { Button } from '@/shared/components/ui/button';
@@ -120,7 +122,7 @@ interface TimelineContainerProps {
   handleDesktopDoubleClick: (idx: number) => void;
   handleMobileTap: (idx: number) => void;
   handleInpaintClick?: (idx: number) => void;
-  // Structure video props
+  // Structure video props (legacy single-video interface)
   structureVideoPath?: string | null;
   structureVideoMetadata?: VideoMetadata | null;
   structureVideoTreatment?: 'adjust' | 'clip';
@@ -137,6 +139,12 @@ interface TimelineContainerProps {
   /** Uni3C end percent (only used when structureVideoType is 'uni3c') */
   uni3cEndPercent?: number;
   onUni3cEndPercentChange?: (value: number) => void;
+  
+  // NEW: Multi-video array interface
+  structureVideos?: import('@/shared/lib/tasks/travelBetweenImages').StructureVideoConfigWithMetadata[];
+  onAddStructureVideo?: (video: import('@/shared/lib/tasks/travelBetweenImages').StructureVideoConfigWithMetadata) => void;
+  onUpdateStructureVideo?: (index: number, updates: Partial<import('@/shared/lib/tasks/travelBetweenImages').StructureVideoConfigWithMetadata>) => void;
+  onRemoveStructureVideo?: (index: number) => void;
   // Audio strip props
   audioUrl?: string | null;
   audioMetadata?: { duration: number; name?: string } | null;
@@ -194,6 +202,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   onStructureVideoChange,
   uni3cEndPercent = 0.1,
   onUni3cEndPercentChange,
+  // NEW: Multi-video array props
+  structureVideos,
+  onAddStructureVideo,
+  onUpdateStructureVideo,
+  onRemoveStructureVideo,
   audioUrl,
   audioMetadata,
   onAudioChange,
@@ -929,6 +942,17 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const pairInfo = getPairInfo(currentPositions);
   const numPairs = Math.max(0, images.length - 1);
   const maxAllowedGap = 81;
+  
+  // Compute shot_generation_id → position index map for instant video slot updates
+  // This allows videos to move instantly during drag (without waiting for DB refetch)
+  const localShotGenPositions = useMemo(() => {
+    const posMap = new Map<string, number>();
+    const sortedEntries = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
+    sortedEntries.forEach(([shotGenId], index) => {
+      posMap.set(shotGenId, index);
+    });
+    return posMap;
+  }, [currentPositions]);
 
   // Calculate whether to show pair labels globally
   // Check if the average pair has enough space for labels
@@ -1021,9 +1045,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             </Button>
           </div>
 
-          {/* Middle: Add Audio button - show when structure video exists (or uploading) but no audio */}
-          {(structureVideoPath || isUploadingStructureVideo) && !audioUrl && onAudioChange && !readOnly && (
-            <label className="pointer-events-auto cursor-pointer">
+          {/* Middle: Add Audio - absolutely centered */}
+          {!audioUrl && onAudioChange && !readOnly && (
+            <label className="absolute left-1/2 -translate-x-1/2 cursor-pointer pointer-events-auto">
               <input
                 type="file"
                 accept="audio/*"
@@ -1053,86 +1077,14 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             </label>
           )}
 
-          {/* Right side: Structure controls OR Upload button */}
-          {structureVideoPath ? (
-            <div className={`flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
-              {/* Structure type selector */}
-              <Select value={structureVideoType} onValueChange={(type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
-                onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
-              }}>
-                <SelectTrigger variant="retro" size="sm" className="h-7 w-[130px] px-2 py-0 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
-                  <SelectValue>
-                    <span className="text-xs">
-                      {structureVideoType === 'uni3c' ? 'Uni3C (I2V)' : 
-                       structureVideoType === 'flow' ? 'Optical flow (VACE)' : 
-                       structureVideoType === 'canny' ? 'Canny (VACE)' : 'Depth (VACE)'}
-                    </span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent variant="retro">
-                  <SelectItem variant="retro" value="uni3c">
-                    <span className="text-xs">Uni3C (I2V)</span>
-                  </SelectItem>
-                  <SelectItem variant="retro" value="flow">
-                    <span className="text-xs">Optical flow (VACE)</span>
-                  </SelectItem>
-                  <SelectItem variant="retro" value="canny">
-                    <span className="text-xs">Canny (VACE)</span>
-                  </SelectItem>
-                  <SelectItem variant="retro" value="depth">
-                    <span className="text-xs">Depth (VACE)</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Strength display and slider */}
-              <span className="text-xs text-muted-foreground">Strength:</span>
-              <span className={`text-xs font-medium ${
-                structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
-                structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
-                'text-foreground'
-              }`}>
-                {structureVideoMotionStrength.toFixed(1)}x
-              </span>
-
-              {/* Strength slider (compact) */}
-              <div className="w-20">
-                <Slider
-                  value={[structureVideoMotionStrength]}
-                  onValueChange={([value]) => {
-                    onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value, structureVideoType);
-                  }}
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  className="h-4"
-                />
-              </div>
-
-              {/* End Percent - only shown for Uni3C */}
-              {structureVideoType === 'uni3c' && onUni3cEndPercentChange && (
-                <>
-                  <span className="text-xs text-muted-foreground">End:</span>
-                  <span className="text-xs font-medium">
-                    {(uni3cEndPercent * 100).toFixed(0)}%
-                  </span>
-                  <div className="w-20">
-                    <Slider
-                      value={[uni3cEndPercent]}
-                      onValueChange={([value]) => onUni3cEndPercentChange(value)}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      className="h-4"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
+          {/* Right side: Upload button for guidance video (controls moved to Motion section) */}
+          {/* Show upload controls: always for multi-video mode, or when no video in legacy mode */}
+          {(structureVideos ? true : !structureVideoPath) && (
             /* Add guidance video controls - styled like zoom controls, on the right */
             <div className={`flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Add guidance video:</span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                Guidance video:
+              </span>
               <input
                 type="file"
                 accept="video/mp4,video/webm,video/quicktime"
@@ -1159,7 +1111,36 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                     };
                     await createResource.mutateAsync({ type: 'structure-video', metadata: resourceMetadata });
 
-                    onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
+                    // Use multi-video interface if available, otherwise fall back to legacy
+                    if (onAddStructureVideo) {
+                      // Calculate default range for new video
+                      // Use full video length - don't limit to timeline extent
+                      const videoFrameCount = metadata.total_frames;
+                      let start_frame = 0;
+                      let end_frame = videoFrameCount;
+                      
+                      // If there are existing videos, place after last
+                      if (structureVideos && structureVideos.length > 0) {
+                        const sorted = [...structureVideos].sort((a, b) => a.start_frame - b.start_frame);
+                        const lastVideo = sorted[sorted.length - 1];
+                        start_frame = lastVideo.end_frame;
+                        end_frame = start_frame + videoFrameCount;
+                      }
+                      
+                      onAddStructureVideo({
+                        path: videoUrl,
+                        start_frame,
+                        end_frame,
+                        treatment: 'adjust',
+                        motion_strength: 1.0,
+                        structure_type: 'flow',
+                        metadata,
+                        resource_id: null,
+                      });
+                    } else if (onStructureVideoChange) {
+                      // Legacy single-video interface
+                      onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
+                    }
                     e.target.value = '';
                   } catch (error) {
                     console.error('Error uploading video:', error);
@@ -1201,7 +1182,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           }`}
           style={{
             minHeight: "240px",
-            paddingTop: structureVideoPath || isUploadingStructureVideo ? "3.5rem" : "1rem",  // Show padding if structure video exists or uploading
+            paddingTop: structureVideoPath || isUploadingStructureVideo ? "2.5rem" : "2.5rem",  // Same padding for controls bar
             paddingBottom: "7.5rem"
           }}
           onDragEnter={handleDragEnter}
@@ -1210,79 +1191,146 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           onDrop={(e) => handleDrop(e, containerRef)}
         >
 
-        {/* Structure video strip (show if exists) or uploader (only if not readOnly) */}
-        {shotId && projectId && onStructureVideoChange && (
-          structureVideoPath ? (
-            // FIX: Show video strip if there's a path, even without metadata (metadata can be fetched from video)
-            // Show video strip if there's a video (even in readOnly mode for viewing)
-              <GuidanceVideoStrip
-              videoUrl={structureVideoPath}
-              videoMetadata={structureVideoMetadata || null}
-              treatment={structureVideoTreatment}
-              motionStrength={structureVideoMotionStrength}
-              onTreatmentChange={(treatment) => {
-                onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength, structureVideoType);
-              }}
-              onMotionStrengthChange={(strength) => {
-                onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, strength, structureVideoType);
-              }}
-              onRemove={() => {
-                onStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
-              }}
-              onMetadataExtracted={(metadata) => {
-                // Save extracted metadata back to database (backup when metadata wasn't saved initially)
-                console.log('[TimelineContainer] 💾 Saving extracted metadata back to database');
-                onStructureVideoChange(structureVideoPath, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
-              }}
+        {/* Segment output strip - shows generated segments above timeline */}
+        {shotId && projectId && !readOnly && (
+          <SegmentOutputStrip
+            shotId={shotId}
+            projectId={projectId}
+            projectAspectRatio={projectAspectRatio}
+            pairInfo={pairInfo}
+            fullMin={fullMin}
+            fullMax={fullMax}
+            fullRange={fullRange}
+            containerWidth={containerWidth}
+            zoomLevel={zoomLevel}
+            localShotGenPositions={localShotGenPositions}
+            onOpenPairSettings={onPairClick ? (pairIndex: number) => {
+              // Construct pair data for the modal (same logic as PairRegion onPairClick)
+              const sortedPositions = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
+              const startEntry = sortedPositions[pairIndex];
+              const endEntry = sortedPositions[pairIndex + 1];
+              
+              if (!startEntry || !endEntry) return;
+              
+              const startImage = images.find(img => img.id === startEntry[0]);
+              const endImage = images.find(img => img.id === endEntry[0]);
+              
+              const startPosition = pairIndex + 1;
+              const endPosition = pairIndex + 2;
+              
+              onPairClick(pairIndex, {
+                index: pairIndex,
+                frames: endEntry[1] - startEntry[1],
+                startFrame: startEntry[1],
+                endFrame: endEntry[1],
+                startImage: startImage ? {
+                  id: startImage.id,
+                  url: startImage.imageUrl || startImage.thumbUrl,
+                  thumbUrl: startImage.thumbUrl,
+                  timeline_frame: (startImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
+                  position: startPosition
+                } : null,
+                endImage: endImage ? {
+                  id: endImage.id,
+                  url: endImage.imageUrl || endImage.thumbUrl,
+                  thumbUrl: endImage.thumbUrl,
+                  timeline_frame: (endImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
+                  position: endPosition
+                } : null
+              });
+            } : undefined}
+          />
+        )}
+
+        {/* Structure video strip(s) - supports both multi-video and legacy single-video */}
+        {shotId && projectId && (
+          // NEW: Use GuidanceVideosContainer when array interface is available
+          structureVideos && onUpdateStructureVideo && onRemoveStructureVideo ? (
+            <GuidanceVideosContainer
+              structureVideos={structureVideos}
+              onUpdateVideo={onUpdateStructureVideo}
+              onRemoveVideo={onRemoveStructureVideo}
               fullMin={fullMin}
               fullMax={fullMax}
               fullRange={fullRange}
               containerWidth={containerWidth}
               zoomLevel={zoomLevel}
               timelineFrameCount={images.length}
-              frameSpacing={50} // Use default spacing as contextFrames is removed
               readOnly={readOnly}
             />
-          ) : isUploadingStructureVideo ? (
-            // Show loading placeholder while uploading
-            <div
-              className="relative h-28 mb-0"
-              style={{
-                width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
-                minWidth: '100%',
-              }}
-            >
-              <div className="absolute left-4 right-4 top-6 bottom-2 flex items-center justify-center bg-muted/50 dark:bg-muted-foreground/15 border border-border/30 rounded-sm">
-                <span className="text-xs text-muted-foreground font-medium">
-                  Uploading video...
-                </span>
+          ) : onStructureVideoChange && (
+            // LEGACY: Fall back to single-video interface
+            structureVideoPath ? (
+              // Show video strip if there's a path, even without metadata (metadata can be fetched from video)
+              <GuidanceVideoStrip
+                videoUrl={structureVideoPath}
+                videoMetadata={structureVideoMetadata || null}
+                treatment={structureVideoTreatment}
+                motionStrength={structureVideoMotionStrength}
+                onTreatmentChange={(treatment) => {
+                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength, structureVideoType);
+                }}
+                onMotionStrengthChange={(strength) => {
+                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, strength, structureVideoType);
+                }}
+                onRemove={() => {
+                  onStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
+                }}
+                onMetadataExtracted={(metadata) => {
+                  // Save extracted metadata back to database (backup when metadata wasn't saved initially)
+                  console.log('[TimelineContainer] 💾 Saving extracted metadata back to database');
+                  onStructureVideoChange(structureVideoPath, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
+                }}
+                fullMin={fullMin}
+                fullMax={fullMax}
+                fullRange={fullRange}
+                containerWidth={containerWidth}
+                zoomLevel={zoomLevel}
+                timelineFrameCount={images.length}
+                frameSpacing={50}
+                readOnly={readOnly}
+              />
+            ) : isUploadingStructureVideo ? (
+              // Show loading placeholder while uploading
+              <div
+                className="relative h-28 mb-0"
+                style={{
+                  width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
+                  minWidth: '100%',
+                }}
+              >
+                <div className="absolute left-4 right-4 top-6 bottom-2 flex items-center justify-center bg-muted/50 dark:bg-muted-foreground/15 border border-border/30 rounded-sm">
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Uploading video...
+                  </span>
+                </div>
               </div>
-            </div>
-          ) : !readOnly ? (
-            // Only show uploader placeholder if NOT readOnly and no video exists
-            <GuidanceVideoUploader
-              shotId={shotId}
-              projectId={projectId}
-              onVideoUploaded={(videoUrl, metadata) => {
-                if (videoUrl && metadata) {
-                  onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
-                }
-              }}
-              currentVideoUrl={structureVideoPath}
-              compact={false}
-              zoomLevel={zoomLevel}
-              onZoomIn={handleZoomInToCenter}
-              onZoomOut={handleZoomOutFromCenter}
-              onZoomReset={handleZoomReset}
-              onZoomToStart={handleZoomToStart}
-              hasNoImages={hasNoImages}
-            />
-          ) : null
+            ) : !readOnly ? (
+              // Only show uploader placeholder if NOT readOnly and no video exists
+              <GuidanceVideoUploader
+                shotId={shotId}
+                projectId={projectId}
+                onVideoUploaded={(videoUrl, metadata) => {
+                  if (videoUrl && metadata) {
+                    onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
+                  }
+                }}
+                currentVideoUrl={structureVideoPath}
+                compact={false}
+                zoomLevel={zoomLevel}
+                onZoomIn={handleZoomInToCenter}
+                onZoomOut={handleZoomOutFromCenter}
+                onZoomReset={handleZoomReset}
+                onZoomToStart={handleZoomToStart}
+                hasNoImages={hasNoImages}
+              />
+            ) : null
+          )
         )}
 
-        {/* Audio strip - below guidance video (or Add Audio placeholder when no structure video) */}
-        {onAudioChange && (
-          audioUrl ? (
+        {/* Audio strip - shown when audio is uploaded */}
+        {onAudioChange && audioUrl && (
+          <div className="mt-1 mb-2">
             <AudioStrip
               audioUrl={audioUrl}
               audioMetadata={audioMetadata || null}
@@ -1295,61 +1343,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               readOnly={readOnly}
               compact={!!structureVideoPath}
             />
-          ) : !readOnly && !structureVideoPath ? (
-            // Only show Add Audio here when there's NO structure video
-            // (when there IS a structure video, Add Audio is shown above it)
-            <label
-              className="relative block h-8 mb-3 cursor-pointer"
-              style={{
-                width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
-                minWidth: '100%',
-              }}
-            >
-              <input
-                type="file"
-                accept="audio/*"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  try {
-                    // Create a temporary audio element to get duration
-                    const audio = new Audio();
-                    const audioUrl = URL.createObjectURL(file);
-                    audio.src = audioUrl;
-
-                    await new Promise<void>((resolve, reject) => {
-                      audio.addEventListener('loadedmetadata', () => resolve());
-                      audio.addEventListener('error', () => reject(new Error('Failed to load audio')));
-                    });
-
-                    // Upload to storage
-                    const { uploadVideoToStorage } = await import('@/shared/lib/videoUploader');
-                    const uploadedUrl = await uploadVideoToStorage(file, projectId!, shotId);
-
-                    URL.revokeObjectURL(audioUrl);
-
-                    onAudioChange(uploadedUrl, {
-                      duration: audio.duration,
-                      name: file.name
-                    });
-                    e.target.value = '';
-                  } catch (error) {
-                    console.error('Error uploading audio:', error);
-                  }
-                }}
-              />
-              <div
-                className="absolute inset-y-0 flex items-center justify-center text-xs text-muted-foreground hover:text-foreground"
-                style={{
-                  left: TIMELINE_PADDING_OFFSET,
-                  right: TIMELINE_PADDING_OFFSET
-                }}
-              >
-                Add Audio
-              </div>
-            </label>
-          ) : null
+          </div>
         )}
 
         {/* Timeline container - visually connected to structure video above */}
@@ -1505,6 +1499,20 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                   // Calculate actual position numbers (1-based)
                   const startPosition = index + 1; // First image in pair
                   const endPosition = index + 2;   // Second image in pair
+                  
+                  // Debug logging for pair click
+                  console.log('[PairClick] 🔍 PAIR CLICKED:', {
+                    pairIndex,
+                    mapLoopIndex: index,
+                    sortedPositionsLength: sortedDynamicPositions.length,
+                    startEntryId: startEntry?.[0]?.substring(0, 8),
+                    startEntryFrame: startEntry?.[1],
+                    endEntryId: endEntry?.[0]?.substring(0, 8),
+                    endEntryFrame: endEntry?.[1],
+                    startImageFound: !!startImage,
+                    startImageId: startImage?.id?.substring(0, 8),
+                    allSortedIds: sortedDynamicPositions.map(([id, frame]) => `${id.substring(0, 8)}@${frame}`),
+                  });
                   
                   // Call the original onPairClick with enhanced data
                   onPairClick(pairIndex, {
@@ -1928,13 +1936,43 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             resourceId: resource.id,
             videoUrl: metadata.videoUrl,
           });
-          onStructureVideoChange?.(
-            metadata.videoUrl, 
-            metadata.videoMetadata, 
-            structureVideoTreatment, 
-            structureVideoMotionStrength, 
-            structureVideoType
-          );
+          
+          // Use multi-video interface if available, otherwise fall back to legacy
+          if (onAddStructureVideo && metadata.videoMetadata) {
+            // Calculate default range for new video
+            // Use full video length - don't limit to timeline extent
+            const videoFrameCount = metadata.videoMetadata.total_frames;
+            let start_frame = 0;
+            let end_frame = videoFrameCount;
+            
+            // If there are existing videos, place after last
+            if (structureVideos && structureVideos.length > 0) {
+              const sorted = [...structureVideos].sort((a, b) => a.start_frame - b.start_frame);
+              const lastVideo = sorted[sorted.length - 1];
+              start_frame = lastVideo.end_frame;
+              end_frame = start_frame + videoFrameCount;
+            }
+            
+            onAddStructureVideo({
+              path: metadata.videoUrl,
+              start_frame,
+              end_frame,
+              treatment: 'adjust',
+              motion_strength: 1.0,
+              structure_type: 'flow',
+              metadata: metadata.videoMetadata,
+              resource_id: resource.id,
+            });
+          } else if (onStructureVideoChange) {
+            // Legacy single-video interface
+            onStructureVideoChange(
+              metadata.videoUrl, 
+              metadata.videoMetadata, 
+              structureVideoTreatment, 
+              structureVideoMotionStrength, 
+              structureVideoType
+            );
+          }
           setShowVideoBrowser(false);
         }}
       />

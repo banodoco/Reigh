@@ -13,6 +13,8 @@ import {
   type PromptConfig,
   type MotionConfig,
   type ModelConfig,
+  type StructureVideoConfig as ApiStructureVideoConfig,
+  type StructureVideoConfigWithMetadata,
   DEFAULT_VIDEO_STRUCTURE_PARAMS,
   DEFAULT_VIDEO_MOTION_PARAMS,
   DEFAULT_PROMPT_CONFIG,
@@ -20,7 +22,7 @@ import {
   DEFAULT_MODEL_CONFIG,
 } from '@/shared/lib/tasks/travelBetweenImages';
 import {
-  type StructureVideoConfig,
+  type LegacyStructureVideoConfig as StructureVideoConfig,
   DEFAULT_STRUCTURE_VIDEO_CONFIG,
 } from '../hooks/useStructureVideo';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
@@ -197,7 +199,10 @@ export interface GenerateVideoParams {
   promptConfig: PromptConfig;
   motionConfig: MotionConfig;
   modelConfig: ModelConfig;
+  /** Legacy single-video config (deprecated - use structureVideos instead) */
   structureVideoConfig: StructureVideoConfig;
+  /** NEW: Array of structure videos for multi-video support */
+  structureVideos?: StructureVideoConfigWithMetadata[];
 
   // Video settings (used for fallback computation, not direct API params)
   batchVideoFrames: number;
@@ -375,6 +380,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   // This prevents deleted items from appearing in the task
   let absoluteImageUrls: string[];
   let imageGenerationIds: string[] = []; // Track generation IDs for clickable images in SegmentCard
+  let pairShotGenerationIds: string[] = []; // Track shot_generations.id for video-to-timeline tethering
   try {
     console.log('[TaskSubmission] Fetching fresh image data from database for task...');
     const { data: freshShotGenerations, error } = await supabase
@@ -405,12 +411,13 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       .filter(sg => sg.timeline_frame != null && !isVideoShotGenerations(sg as ShotGenerationsLike))
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
 
-    // Extract both URLs and generation IDs
+    // Extract URLs, generation IDs, and shot_generation IDs
     const freshImagesWithIds = filteredShotGenerations.map(sg => {
       const gen = sg.generations as any;
       return {
         location: gen?.location,
-        generationId: gen?.id || sg.generation_id // Prefer joined id, fallback to FK
+        generationId: gen?.id || sg.generation_id, // Prefer joined id, fallback to FK
+        shotGenerationId: sg.id // The shot_generations.id for video-to-timeline tethering
       };
     }).filter(item => Boolean(item.location));
 
@@ -418,19 +425,29 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       .map(item => getDisplayUrl(item.location))
       .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
 
-    // Extract generation IDs in the same order as URLs
-    imageGenerationIds = freshImagesWithIds
-      .filter(item => {
-        const url = getDisplayUrl(item.location);
-        return Boolean(url) && url !== '/placeholder.svg';
-      })
+    // Extract generation IDs and shot_generation IDs in the same order as URLs
+    const filteredImages = freshImagesWithIds.filter(item => {
+      const url = getDisplayUrl(item.location);
+      return Boolean(url) && url !== '/placeholder.svg';
+    });
+
+    imageGenerationIds = filteredImages
       .map(item => item.generationId)
       .filter((id): id is string => Boolean(id));
 
-    console.log('[TaskSubmission] Using fresh image URLs and generation IDs:', {
-      count: absoluteImageUrls.length,
+    // Pair shot generation IDs: for N images, we have N-1 pairs
+    // Each pair_shot_generation_id is the shot_generations.id of the START image of that pair
+    pairShotGenerationIds = filteredImages
+      .slice(0, -1) // Exclude the last image (it can only be an END image, not a pair start)
+      .map(item => item.shotGenerationId)
+      .filter((id): id is string => Boolean(id));
+
+    console.log('[TaskSubmission] Using fresh image URLs and IDs:', {
+      imageCount: absoluteImageUrls.length,
       urls: absoluteImageUrls.map(url => url.substring(0, 50) + '...'),
       generationIds: imageGenerationIds.map(id => id.substring(0, 8) + '...'),
+      pairShotGenIds: pairShotGenerationIds.map(id => id.substring(0, 8) + '...'),
+      pairCount: pairShotGenerationIds.length,
       idsMatchUrls: absoluteImageUrls.length === imageGenerationIds.length
     });
   } catch (err) {
@@ -1044,6 +1061,11 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     ...(imageGenerationIds.length > 0 && imageGenerationIds.length === absoluteImageUrls.length 
       ? { image_generation_ids: imageGenerationIds } 
       : {}),
+    // Include pair_shot_generation_ids for video-to-timeline tethering
+    // These are the shot_generations.id of each pair's START image
+    ...(pairShotGenerationIds.length > 0 
+      ? { pair_shot_generation_ids: pairShotGenerationIds } 
+      : {}),
     base_prompts: basePrompts,
     base_prompt: batchVideoPrompt, // Singular - the default/base prompt used for all segments
     segment_frames: segmentFrames,
@@ -1129,21 +1151,62 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     requestBody.resolution = resolution;
   }
 
-  // Add structure video params if available (spread from grouped config)
+  // Add structure video params - supports both new array format and legacy single-video format
+  // The array format takes precedence when available
+  const structureVideos = params.structureVideos;
+  
   console.log('[Generation] [DEBUG] Structure video config at generation time:', {
-    ...structureVideoConfig,
-    willAddToRequest: !!structureVideoConfig.structure_video_path,
+    hasStructureVideosArray: !!structureVideos && structureVideos.length > 0,
+    structureVideosCount: structureVideos?.length ?? 0,
+    legacyConfigPath: structureVideoConfig.structure_video_path,
     isUni3cMode
   });
 
-  if (structureVideoConfig.structure_video_path) {
+  if (structureVideos && structureVideos.length > 0) {
+    // NEW: Use structure_videos array format
+    // Convert to API format (strip metadata/resource_id which are UI-only)
+    const apiStructureVideos: ApiStructureVideoConfig[] = structureVideos.map(video => {
+      // For uni3c mode, convert 'uni3c' to 'raw' for backend
+      const effectiveStructureType = video.structure_type === 'uni3c' ? 'raw' : video.structure_type;
+      
+      return {
+        path: video.path,
+        start_frame: video.start_frame,
+        end_frame: video.end_frame,
+        treatment: video.treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+        motion_strength: video.motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
+        structure_type: effectiveStructureType ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+        // Only include source range if explicitly set
+        ...(video.source_start_frame !== undefined ? { source_start_frame: video.source_start_frame } : {}),
+        ...(video.source_end_frame !== undefined && video.source_end_frame !== null ? { source_end_frame: video.source_end_frame } : {}),
+        // Uni3C params only if structure_type is uni3c
+        ...(video.structure_type === 'uni3c' ? {
+          uni3c_start_percent: video.uni3c_start_percent ?? 0,
+          uni3c_end_percent: video.uni3c_end_percent ?? (params.uni3cEndPercent ?? 0.1),
+        } : {}),
+      };
+    });
+    
+    requestBody.structure_videos = apiStructureVideos;
+    console.log('[Generation] 🎬 Using structure_videos ARRAY format:', {
+      count: apiStructureVideos.length,
+      videos: apiStructureVideos.map(v => ({
+        path: v.path.substring(0, 50) + '...',
+        start_frame: v.start_frame,
+        end_frame: v.end_frame,
+        treatment: v.treatment,
+        structure_type: v.structure_type,
+      }))
+    });
+  } else if (structureVideoConfig.structure_video_path) {
+    // LEGACY: Use single structure_video_path format (backwards compatible)
     // For uni3c mode, send 'raw' as structure_type instead of 'uni3c'
     // The backend expects 'raw' for uni3c processing
     const effectiveStructureType = structureVideoConfig.structure_video_type === 'uni3c' 
       ? 'raw' 
       : structureVideoConfig.structure_video_type;
     
-    console.log('[Generation] Adding structure video to task (spreading snake_case params):', {
+    console.log('[Generation] Adding structure video to task (LEGACY single-video format):', {
       structure_video_path: structureVideoConfig.structure_video_path,
       structure_video_treatment: structureVideoConfig.structure_video_treatment,
       structure_video_motion_strength: structureVideoConfig.structure_video_motion_strength,

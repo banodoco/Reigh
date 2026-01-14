@@ -104,6 +104,10 @@ export interface ControlsPanelProps extends ModeProps {
   handleGenerateImg2Img?: EditModePanelProps['handleGenerateImg2Img'];
   img2imgLoraManager?: EditModePanelProps['img2imgLoraManager'];
   availableLoras?: EditModePanelProps['availableLoras'];
+  // LoRA manager for other edit modes (text, inpaint, annotate, reposition)
+  editLoraManager?: EditModePanelProps['editLoraManager'];
+  advancedSettings?: EditModePanelProps['advancedSettings'];
+  setAdvancedSettings?: EditModePanelProps['setAdvancedSettings'];
 
   // InfoPanel props
   isVideo: InfoPanelProps['isVideo'];
@@ -218,6 +222,9 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     handleGenerateImg2Img,
     img2imgLoraManager,
     availableLoras,
+    editLoraManager,
+    advancedSettings,
+    setAdvancedSettings,
     // InfoPanel props
     isVideo,
     showImageEditTools,
@@ -360,6 +367,9 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         handleGenerateImg2Img={handleGenerateImg2Img}
         img2imgLoraManager={img2imgLoraManager}
         availableLoras={availableLoras}
+        editLoraManager={editLoraManager}
+        advancedSettings={advancedSettings}
+        setAdvancedSettings={setAdvancedSettings}
       />
     );
   }

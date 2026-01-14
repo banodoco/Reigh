@@ -6,6 +6,8 @@ import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { createImageInpaintTask } from '@/shared/lib/tasks/imageInpaint';
 import { supabase } from '@/integrations/supabase/client';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
+import type { EditAdvancedSettings } from './useGenerationEditSettings';
+import { convertToHiresFixApiParams } from './useGenerationEditSettings';
 
 export interface ImageTransform {
   translateX: number; // percentage (0-100)
@@ -33,6 +35,8 @@ export interface UseRepositionModeProps {
   refetchVariants?: () => void;
   // Create as new generation instead of variant
   createAsGeneration?: boolean;
+  // Advanced settings for hires fix
+  advancedSettings?: EditAdvancedSettings;
 }
 
 export interface UseRepositionModeReturn {
@@ -87,6 +91,7 @@ export const useRepositionMode = ({
   onVariantCreated,
   refetchVariants,
   createAsGeneration,
+  advancedSettings,
 }: UseRepositionModeProps): UseRepositionModeReturn => {
   const queryClient = useQueryClient();
   const [transform, setTransform] = useState<ImageTransform>(DEFAULT_TRANSFORM);
@@ -359,6 +364,7 @@ export const useRepositionMode = ({
         tool_type: toolTypeOverride,
         loras: loras,
         create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
+        hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
       });
       
       console.log('[Reposition] ✅ Reposition inpaint tasks created successfully');

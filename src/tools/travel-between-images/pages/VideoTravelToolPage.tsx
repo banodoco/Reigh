@@ -1792,8 +1792,8 @@ const VideoTravelToolPage: React.FC = () => {
         cropToProjectSize={uploadSettings?.cropToProjectSize ?? true}
       />
       
-      {/* Floating UI Overlays */}
-      <VideoTravelFloatingOverlay
+      {/* Floating UI Overlays - temporarily disabled */}
+      {/* <VideoTravelFloatingOverlay
         sticky={{
           shouldShowShotEditor,
           stickyHeader,
@@ -1825,7 +1825,7 @@ const VideoTravelToolPage: React.FC = () => {
           isGeneratingVideo,
           videoJustQueued,
         }}
-      />
+      /> */}
       
     </div>
   );

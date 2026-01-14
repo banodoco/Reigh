@@ -13,15 +13,18 @@ import { PhaseConfig } from '@/tools/travel-between-images/settings';
 export interface IndividualTravelSegmentParams {
   project_id: string;
   
-  // Parent generation to create variant for
-  parent_generation_id: string;
+  // Parent generation to create variant for (optional - will be created if not provided)
+  parent_generation_id?: string;
+  
+  // Shot ID to link the parent generation to (required if parent_generation_id is not provided)
+  shot_id?: string;
   
   // Child generation being regenerated (for tracking)
   child_generation_id?: string;
   
   // The original segment params from the SegmentCard
   // This contains all the orchestrator_details, phase_config, etc.
-  originalParams: Record<string, any>;
+  originalParams?: Record<string, any>;
   
   // Segment identification
   segment_index: number;
@@ -33,6 +36,10 @@ export interface IndividualTravelSegmentParams {
   // Generation IDs for the input images (for clickable images in SegmentCard)
   start_image_generation_id?: string;
   end_image_generation_id?: string;
+  
+  // Shot generation ID for the start image (for video-to-timeline tethering)
+  // This allows videos to move with their source image when timeline is reordered
+  pair_shot_generation_id?: string;
   
   // Overrides - these can override values from originalParams
   base_prompt?: string;
@@ -73,8 +80,10 @@ function validateIndividualTravelSegmentParams(params: IndividualTravelSegmentPa
     errors.push("project_id is required");
   }
   
-  if (!params.parent_generation_id) {
-    errors.push("parent_generation_id is required");
+  // Either parent_generation_id OR shot_id must be provided
+  // (shot_id is used to create a new parent if none exists)
+  if (!params.parent_generation_id && !params.shot_id) {
+    errors.push("Either parent_generation_id or shot_id is required");
   }
   
   if (typeof params.segment_index !== 'number' || params.segment_index < 0) {
@@ -197,6 +206,26 @@ function buildIndividualTravelSegmentParams(
     ...orchDetailsWithoutOrchestratorRefs 
   } = orchDetails;
   
+  // MULTI-STRUCTURE VIDEO SUPPORT: Explicitly preserve critical orchestrator fields
+  // These are REQUIRED for the GPU worker to handle individual segment generation correctly
+  const fpsHelpers = orig.fps_helpers ?? orchDetails.fps_helpers ?? 16;
+  const segmentFramesExpanded = orchDetails.segment_frames_expanded;
+  const frameOverlapExpanded = orchDetails.frame_overlap_expanded;
+  // Prefer orchestrator_details (canonical), but also support callers that store structure_videos at top-level.
+  const structureVideos = orchDetails.structure_videos ?? orig.structure_videos;
+  
+  // Log the multi-structure video data being preserved
+  console.log('[IndividualTravelSegment] [MultiStructure] Preserving orchestrator data:', {
+    hasStructureVideos: !!structureVideos && structureVideos.length > 0,
+    structureVideosCount: structureVideos?.length ?? 0,
+    hasSegmentFramesExpanded: !!segmentFramesExpanded,
+    segmentFramesExpandedLength: segmentFramesExpanded?.length ?? 0,
+    hasFrameOverlapExpanded: !!frameOverlapExpanded,
+    frameOverlapExpandedLength: frameOverlapExpanded?.length ?? 0,
+    fpsHelpers,
+    segmentIndex: params.segment_index,
+  });
+
   const orchestratorDetails: Record<string, any> = {
     ...orchDetailsWithoutOrchestratorRefs,
     // Ensure key fields are set
@@ -217,6 +246,15 @@ function buildIndividualTravelSegmentParams(
     amount_of_motion: amountOfMotion,
     // Add parent_generation_id for variant creation
     parent_generation_id: params.parent_generation_id,
+    
+    // MULTI-STRUCTURE VIDEO SUPPORT: Explicitly preserve these critical fields
+    // These are REQUIRED for position calculation and video creation
+    fps_helpers: fpsHelpers,
+    // Preserve segment frame counts and overlaps for position calculation
+    ...(segmentFramesExpanded ? { segment_frames_expanded: segmentFramesExpanded } : {}),
+    ...(frameOverlapExpanded ? { frame_overlap_expanded: frameOverlapExpanded } : {}),
+    // Preserve structure_videos array for multi-structure video support
+    ...(structureVideos && structureVideos.length > 0 ? { structure_videos: structureVideos } : {}),
   };
 
   // HARDCODED: SVI (smooth continuations) feature has been removed from UX
@@ -291,6 +329,11 @@ function buildIndividualTravelSegmentParams(
     // Input images at top level for TaskItem image display
     input_image_paths_resolved: [params.start_image_url, params.end_image_url],
     
+    // Image tethering IDs - stored at top level so they're on the generation params
+    ...(params.start_image_generation_id && { start_image_generation_id: params.start_image_generation_id }),
+    ...(params.end_image_generation_id && { end_image_generation_id: params.end_image_generation_id }),
+    ...(params.pair_shot_generation_id && { pair_shot_generation_id: params.pair_shot_generation_id }),
+    
     // Post-processing
     after_first_post_generation_saturation: orig.after_first_post_generation_saturation ?? 
       orchDetails.after_first_post_generation_saturation ?? 1,
@@ -318,6 +361,11 @@ function buildIndividualTravelSegmentParams(
     input_image_paths_resolved: [params.start_image_url, params.end_image_url],
     start_image_url: params.start_image_url,
     end_image_url: params.end_image_url,
+    
+    // Shot generation IDs for image tethering (video follows its source image on timeline)
+    ...(params.start_image_generation_id && { start_image_generation_id: params.start_image_generation_id }),
+    ...(params.end_image_generation_id && { end_image_generation_id: params.end_image_generation_id }),
+    ...(params.pair_shot_generation_id && { pair_shot_generation_id: params.pair_shot_generation_id }),
     
     // Prompts
     base_prompt: basePrompt,
@@ -363,6 +411,9 @@ function buildIndividualTravelSegmentParams(
  * a single segment and creates a variant on the parent generation when complete.
  * The task params match the exact structure of travel_segment for GPU worker compatibility.
  * 
+ * If no parent_generation_id is provided but shot_id is, a placeholder parent
+ * generation will be created and linked to the shot.
+ * 
  * @param params - Individual travel segment parameters
  * @returns Promise resolving to the created task
  */
@@ -370,6 +421,7 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
   console.log("[IndividualTravelSegment] Creating task with params:", {
     project_id: params.project_id,
     parent_generation_id: params.parent_generation_id,
+    shot_id: params.shot_id,
     segment_index: params.segment_index,
     hasOriginalParams: !!params.originalParams,
     originalParamsKeys: params.originalParams ? Object.keys(params.originalParams).slice(0, 10) : [],
@@ -379,35 +431,150 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
     // 1. Validate parameters
     validateIndividualTravelSegmentParams(params);
 
-    // 2. Look up existing child at this segment_index (to create variant instead of new child)
-    // If child_generation_id wasn't explicitly provided, check if one exists
-    let effectiveChildGenerationId = params.child_generation_id;
-    if (!effectiveChildGenerationId && params.parent_generation_id && params.segment_index !== undefined) {
-      const { data: existingChild } = await supabase
+    // 2. Ensure we have a parent_generation_id (create placeholder if needed)
+    let effectiveParentGenerationId = params.parent_generation_id;
+    
+    if (!effectiveParentGenerationId && params.shot_id) {
+      console.log("[IndividualTravelSegment] No parent_generation_id provided, creating placeholder parent");
+      
+      // Create a placeholder parent generation
+      const newParentId = crypto.randomUUID();
+      const placeholderParams = {
+        tool_type: 'travel-between-images',
+        created_from: 'individual_segment_first_generation',
+        // Include basic orchestrator_details structure so it shows in segment outputs
+        orchestrator_details: {
+          num_new_segments_to_generate: 1, // Will be updated as more segments are generated
+          input_image_paths_resolved: [params.start_image_url, params.end_image_url],
+        },
+      };
+      
+      const { data: newParent, error: parentError } = await supabase
         .from('generations')
-        .select('id')
-        .eq('parent_generation_id', params.parent_generation_id)
-        .eq('child_order', params.segment_index)
-        .limit(1)
+        .insert({
+          id: newParentId,
+          project_id: params.project_id,
+          type: 'video',
+          is_child: false,
+          location: null, // Placeholder - no video yet
+          params: placeholderParams,
+          created_at: new Date().toISOString(),
+        })
+        .select()
         .single();
-
-      if (existingChild) {
-        effectiveChildGenerationId = existingChild.id;
-        console.log("[IndividualTravelSegment] Found existing child at segment_index:", {
-          parent_generation_id: params.parent_generation_id,
-          segment_index: params.segment_index,
-          existing_child_id: effectiveChildGenerationId,
-        });
+      
+      if (parentError) {
+        console.error("[IndividualTravelSegment] Error creating placeholder parent:", parentError);
+        throw new Error(`Failed to create placeholder parent generation: ${parentError.message}`);
+      }
+      
+      console.log("[IndividualTravelSegment] Created placeholder parent:", newParentId);
+      effectiveParentGenerationId = newParentId;
+      
+      // Link the parent to the shot using the RPC
+      const { error: linkError } = await supabase.rpc('add_generation_to_shot', {
+        p_shot_id: params.shot_id,
+        p_generation_id: newParentId,
+        p_with_position: false, // Don't add to timeline position
+      });
+      
+      if (linkError) {
+        console.error("[IndividualTravelSegment] Error linking parent to shot:", linkError);
+        // Don't fail - the generation was created, just not linked
+      } else {
+        console.log("[IndividualTravelSegment] Linked parent to shot:", params.shot_id);
       }
     }
+    
+    if (!effectiveParentGenerationId) {
+      throw new Error("Could not determine or create parent_generation_id");
+    }
 
-    // Update params with the effective child_generation_id
-    const paramsWithChild = {
+    // 3. Look up existing child to create variant on
+    // Priority: pair_shot_generation_id match > child_order match
+    // This ensures we regenerate the correct video even if timeline was reordered
+    let effectiveChildGenerationId = params.child_generation_id;
+    
+    console.log("[IndividualTravelSegment] 🔍 CHILD LOOKUP START:", {
+      providedChildGenId: params.child_generation_id?.substring(0, 8) || null,
+      parentGenId: effectiveParentGenerationId?.substring(0, 8) || null,
+      pairShotGenId: params.pair_shot_generation_id?.substring(0, 8) || null,
+      segmentIndex: params.segment_index,
+      willSkipLookup: !!effectiveChildGenerationId,
+    });
+    
+    if (!effectiveChildGenerationId && effectiveParentGenerationId) {
+      // Strategy 1: Look for child with matching pair_shot_generation_id (most accurate)
+      if (params.pair_shot_generation_id) {
+        console.log("[IndividualTravelSegment] 🔍 Strategy 1: Looking for child by pair_shot_generation_id...");
+        const { data: childByPairId, error: pairIdError } = await supabase
+          .from('generations')
+          .select('id')
+          .eq('parent_generation_id', effectiveParentGenerationId)
+          .eq('params->>pair_shot_generation_id', params.pair_shot_generation_id)
+          .limit(1)
+          .maybeSingle();
+
+        if (pairIdError) {
+          console.log("[IndividualTravelSegment] ⚠️ Strategy 1 query error:", pairIdError.message);
+        } else if (childByPairId) {
+          effectiveChildGenerationId = childByPairId.id;
+          console.log("[IndividualTravelSegment] ✅ Strategy 1 SUCCESS - Found child by pair_shot_generation_id:", {
+            parent_generation_id: effectiveParentGenerationId?.substring(0, 8),
+            pair_shot_generation_id: params.pair_shot_generation_id?.substring(0, 8),
+            existing_child_id: effectiveChildGenerationId?.substring(0, 8),
+          });
+        } else {
+          console.log("[IndividualTravelSegment] ❌ Strategy 1 MISS - No child found with pair_shot_generation_id:", params.pair_shot_generation_id?.substring(0, 8));
+        }
+      } else {
+        console.log("[IndividualTravelSegment] ⏭️ Strategy 1 SKIPPED - No pair_shot_generation_id provided");
+      }
+
+      // Strategy 2: Fallback to child_order match (legacy ONLY - skip if pair_shot_generation_id was provided)
+      // If pair_shot_generation_id was provided but no match found, we want a NEW child for that pair,
+      // not a variant on some unrelated video that happens to have the same child_order
+      if (!effectiveChildGenerationId && params.segment_index !== undefined && !params.pair_shot_generation_id) {
+        console.log("[IndividualTravelSegment] 🔍 Strategy 2: Looking for child by child_order (legacy fallback)...");
+        const { data: childByOrder, error: orderError } = await supabase
+          .from('generations')
+          .select('id')
+          .eq('parent_generation_id', effectiveParentGenerationId)
+          .eq('child_order', params.segment_index)
+          .limit(1)
+          .maybeSingle();
+
+        if (orderError) {
+          console.log("[IndividualTravelSegment] ⚠️ Strategy 2 query error:", orderError.message);
+        } else if (childByOrder) {
+          effectiveChildGenerationId = childByOrder.id;
+          console.log("[IndividualTravelSegment] ✅ Strategy 2 SUCCESS - Found child by child_order:", {
+            parent_generation_id: effectiveParentGenerationId?.substring(0, 8),
+            segment_index: params.segment_index,
+            existing_child_id: effectiveChildGenerationId?.substring(0, 8),
+          });
+        } else {
+          console.log("[IndividualTravelSegment] ❌ Strategy 2 MISS - No child found with child_order:", params.segment_index);
+        }
+      } else if (!effectiveChildGenerationId && params.pair_shot_generation_id) {
+        console.log("[IndividualTravelSegment] ⏭️ Strategy 2 SKIPPED - pair_shot_generation_id was provided but no match found, will create NEW child for this pair");
+      }
+    }
+    
+    console.log("[IndividualTravelSegment] 🔍 CHILD LOOKUP RESULT:", {
+      finalChildGenId: effectiveChildGenerationId?.substring(0, 8) || null,
+      willCreateVariant: !!effectiveChildGenerationId,
+      willCreateNewChild: !effectiveChildGenerationId,
+    });
+
+    // Update params with the effective IDs
+    const paramsWithIds = {
       ...params,
+      parent_generation_id: effectiveParentGenerationId,
       child_generation_id: effectiveChildGenerationId,
     };
 
-    // 3. Resolve project resolution (use original if available)
+    // 4. Resolve project resolution (use original if available)
     const origResolution = params.originalParams?.parsed_resolution_wh ||
                           params.originalParams?.orchestrator_details?.parsed_resolution_wh;
     const { resolution: finalResolution } = await resolveProjectResolution(
@@ -415,8 +582,8 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
       origResolution
     );
 
-    // 4. Build task params matching travel_segment structure
-    const taskParams = buildIndividualTravelSegmentParams(paramsWithChild, finalResolution);
+    // 5. Build task params matching travel_segment structure
+    const taskParams = buildIndividualTravelSegmentParams(paramsWithIds, finalResolution);
 
     console.log("[IndividualTravelSegment] Built task params:", {
       model_name: taskParams.model_name,
@@ -432,7 +599,7 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
       additionalLorasCount: Object.keys(taskParams.additional_loras as Record<string, number> || {}).length,
     });
 
-    // 5. Create task using unified create-task function
+    // 6. Create task using unified create-task function
     const result = await createTask({
       project_id: params.project_id,
       task_type: 'individual_travel_segment',

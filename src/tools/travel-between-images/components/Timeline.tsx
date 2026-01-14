@@ -27,7 +27,7 @@
  *   • TimelineItem.tsx - Individual draggable timeline items
  *   • PairRegion.tsx - Pair visualization and context display
  *   • DropIndicator.tsx - Visual feedback for file drops
- *   • PairPromptModal.tsx - Modal for editing pair prompts
+ *   • SegmentSettingsModal.tsx - Modal for editing segment settings (prompts, frames, motion, LoRAs)
  * 
  * 🏗️ ARCHITECTURE BENEFITS:
  *   • Single Responsibility - Each module has one clear purpose
@@ -132,7 +132,7 @@ export interface TimelineProps {
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   projectAspectRatio?: string;
-  // Structure video props (matches backend parameter names)
+  // Structure video props (legacy single-video, matches backend parameter names)
   structureVideoPath?: string | null;
   structureVideoMetadata?: import("@/shared/lib/videoUploader").VideoMetadata | null;
   structureVideoTreatment?: 'adjust' | 'clip';
@@ -149,6 +149,11 @@ export interface TimelineProps {
   /** Uni3C end percent (only used when structureVideoType is 'uni3c') */
   uni3cEndPercent?: number;
   onUni3cEndPercentChange?: (value: number) => void;
+  // NEW: Multi-video array interface
+  structureVideos?: import("@/shared/lib/tasks/travelBetweenImages").StructureVideoConfigWithMetadata[];
+  onAddStructureVideo?: (video: import("@/shared/lib/tasks/travelBetweenImages").StructureVideoConfigWithMetadata) => void;
+  onUpdateStructureVideo?: (index: number, updates: Partial<import("@/shared/lib/tasks/travelBetweenImages").StructureVideoConfigWithMetadata>) => void;
+  onRemoveStructureVideo?: (index: number) => void;
   // Audio strip props
   audioUrl?: string | null;
   audioMetadata?: { duration: number; name?: string } | null;
@@ -208,7 +213,7 @@ const Timeline: React.FC<TimelineProps> = ({
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio,
-  // Structure video props
+  // Structure video props (legacy single-video)
   structureVideoPath,
   structureVideoMetadata,
   structureVideoTreatment,
@@ -217,6 +222,11 @@ const Timeline: React.FC<TimelineProps> = ({
   onStructureVideoChange,
   uni3cEndPercent,
   onUni3cEndPercentChange,
+  // NEW: Multi-video array props
+  structureVideos,
+  onAddStructureVideo,
+  onUpdateStructureVideo,
+  onRemoveStructureVideo,
   // Audio strip props
   audioUrl,
   audioMetadata,
@@ -906,6 +916,11 @@ const Timeline: React.FC<TimelineProps> = ({
         onStructureVideoChange={onStructureVideoChange}
         uni3cEndPercent={uni3cEndPercent}
         onUni3cEndPercentChange={onUni3cEndPercentChange}
+        // NEW: Multi-video array props
+        structureVideos={structureVideos}
+        onAddStructureVideo={onAddStructureVideo}
+        onUpdateStructureVideo={onUpdateStructureVideo}
+        onRemoveStructureVideo={onRemoveStructureVideo}
         audioUrl={audioUrl}
         audioMetadata={audioMetadata}
         onAudioChange={onAudioChange}

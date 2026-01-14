@@ -6,6 +6,8 @@ import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { createImageInpaintTask } from '@/shared/lib/tasks/imageInpaint';
 import { createAnnotatedImageEditTask } from '@/shared/lib/tasks/annotatedImageEdit';
 import { supabase } from '@/integrations/supabase/client';
+import type { EditAdvancedSettings } from './useGenerationEditSettings';
+import { convertToHiresFixApiParams } from './useGenerationEditSettings';
 
 export interface BrushStroke {
   id: string;
@@ -30,8 +32,12 @@ export interface UseInpaintingProps {
   loras?: Array<{ url: string; strength: number }>;
   // Active variant ID - strokes are stored per-variant, not per-generation
   activeVariantId?: string | null;
+  // Active variant's image URL - use this instead of media.url when editing a variant
+  activeVariantLocation?: string | null;
   // Create as new generation instead of variant
   createAsGeneration?: boolean;
+  // Advanced settings for hires fix
+  advancedSettings?: EditAdvancedSettings;
 }
 
 export interface UseInpaintingReturn {
@@ -89,7 +95,9 @@ export const useInpainting = ({
   handleExitInpaintMode,
   loras,
   activeVariantId,
+  activeVariantLocation,
   createAsGeneration,
+  advancedSettings,
 }: UseInpaintingProps): UseInpaintingReturn => {
   console.log('[InpaintDebug] 🎣 useInpainting hook received props:', {
     shotId: shotId?.substring(0, 8),
@@ -1943,9 +1951,17 @@ export const useInpainting = ({
       const maskUrl = await uploadImageToStorage(maskFile);
       console.log('[Inpaint] Mask uploaded:', maskUrl);
 
-      // Get source image URL - location already contains the best version
-      // FIX: Use 'url' field which is what the media object actually has
-      const sourceUrl = (media as any).url || media.location || media.imageUrl;
+      // Get source image URL - use active variant's location if editing a variant
+      // Otherwise fall back to media's URL fields
+      const mediaUrl = (media as any).url || media.location || media.imageUrl;
+      const sourceUrl = activeVariantLocation || mediaUrl;
+      
+      console.log('[Inpaint] Source URL selection:', {
+        activeVariantLocation: activeVariantLocation?.substring(0, 50),
+        mediaUrl: mediaUrl?.substring(0, 50),
+        selectedSourceUrl: sourceUrl?.substring(0, 50),
+        isUsingVariant: !!activeVariantLocation,
+      });
 
       // Create inpaint task
       // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
@@ -1971,6 +1987,7 @@ export const useInpainting = ({
         tool_type: toolTypeOverride, // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
         create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
+        hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
       });
 
       console.log('[Inpaint] ✅ Inpaint tasks created successfully');
@@ -1990,7 +2007,7 @@ export const useInpainting = ({
     } finally {
       setIsGeneratingInpaint(false);
     }
-  }, [selectedProjectId, isVideo, inpaintStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, imageDimensions, displayCanvasRef, maskCanvasRef]);
+  }, [selectedProjectId, isVideo, inpaintStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, imageDimensions, displayCanvasRef, maskCanvasRef, activeVariantLocation]);
 
   // Generate annotated edit
   const handleGenerateAnnotatedEdit = useCallback(async () => {
@@ -2078,9 +2095,17 @@ export const useInpainting = ({
       const maskUrl = await uploadImageToStorage(maskFile);
       console.log('[AnnotatedEdit] Mask uploaded:', maskUrl);
 
-      // Get source image URL - location already contains the best version
-      // FIX: Use 'url' field which is what the media object actually has
-      const sourceUrl = (media as any).url || media.location || media.imageUrl;
+      // Get source image URL - use active variant's location if editing a variant
+      // Otherwise fall back to media's URL fields
+      const mediaUrl = (media as any).url || media.location || media.imageUrl;
+      const sourceUrl = activeVariantLocation || mediaUrl;
+      
+      console.log('[AnnotatedEdit] Source URL selection:', {
+        activeVariantLocation: activeVariantLocation?.substring(0, 50),
+        mediaUrl: mediaUrl?.substring(0, 50),
+        selectedSourceUrl: sourceUrl?.substring(0, 50),
+        isUsingVariant: !!activeVariantLocation,
+      });
 
       // Create annotated image edit task
       // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
@@ -2106,6 +2131,7 @@ export const useInpainting = ({
         tool_type: toolTypeOverride, // Override tool_type if provided
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
         create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
+        hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
       });
 
       console.log('[AnnotatedEdit] ✅ Annotated edit tasks created successfully');
@@ -2125,7 +2151,7 @@ export const useInpainting = ({
     } finally {
       setIsGeneratingInpaint(false);
     }
-  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, displayCanvasRef, maskCanvasRef]);
+  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, displayCanvasRef, maskCanvasRef, activeVariantLocation]);
 
   // Get delete button position for selected shape
   const getDeleteButtonPosition = useCallback((): { x: number; y: number } | null => {

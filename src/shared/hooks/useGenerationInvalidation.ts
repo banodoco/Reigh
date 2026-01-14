@@ -272,6 +272,12 @@ export async function invalidateVariantChange(
   if (projectId) {
     queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
   }
+  
+  // 6. Invalidate segment output queries (for timeline segment strip)
+  // This ensures variant changes are reflected in the segment strip
+  queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === 'segment-child-generations'
+  });
 }
 
 /**
@@ -318,4 +324,13 @@ export function invalidateGenerationUpdate(
   // 4. Invalidate derived-generations (for child/variant galleries)
   queryClient.invalidateQueries({ queryKey: ['derived-generations'] });
   queryClient.invalidateQueries({ queryKey: ['derived-items'] });
+  
+  // 5. Invalidate segment output queries (for timeline segment strip)
+  // This ensures new segments appear immediately on the timeline
+  queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === 'segment-child-generations'
+  });
+  queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === 'segment-parent-generations'
+  });
 }

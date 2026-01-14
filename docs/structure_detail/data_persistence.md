@@ -30,11 +30,15 @@ const [value, setValue] = usePersistentState('my-key', defaultValue);
 
 ### Settings Hooks (Database)
 
-All three hooks write to the same `tool_settings` table:
+All three hooks write to the same **JSONB settings columns** (cross-device persistence):
+
+- `shots.settings` (shot scope)
+- `projects.settings` (project scope)
+- `users.settings` (user scope)
 
 ```
 useAutoSaveSettings ──────┐
-                          ├──► useToolSettings ──► tool_settings table
+                          ├──► useToolSettings ──► Postgres JSONB (shots/projects/users).settings
 usePersistentToolState ───┘
 ```
 
@@ -51,6 +55,10 @@ usePersistentToolState ───┘
 
 ⚠️ **Avoid multiple tool IDs for the same form.** Each tool ID creates a separate DB record. If you use both `usePersistentToolState` and direct `useToolSettings` calls, use the SAME tool ID or you'll have duplicate/conflicting storage.
 
+✅ It *is* fine to have multiple tool IDs on the same page when they represent **distinct persisted forms**. Example in travel-between-images:
+- `shots.settings['travel-between-images']`: Batch Generate / timeline generation settings
+- `shots.settings['join-segments']`: Join Segments form settings (including its LoRAs and the last selected mode)
+
 For full details, see **[settings_system.md](settings_system.md)**.
 
 ---
@@ -65,6 +73,11 @@ For full details, see **[settings_system.md](settings_system.md)**.
   "travel-between-images": {
     "batchVideoPrompt": "A cinematic scene",
     "generationMode": "timeline"
+  },
+  "join-segments": {
+    "generateMode": "join",
+    "contextFrameCount": 15,
+    "gapFrameCount": 23
   },
   "travel-ui-state": {
     "acceleratedMode": true,

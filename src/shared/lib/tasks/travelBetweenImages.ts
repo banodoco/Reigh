@@ -8,6 +8,7 @@ import {
   TaskValidationError,
   safeParseJson
 } from "../taskCreation";
+import { supabase } from '@/integrations/supabase/client';
 import { PhaseConfig } from '@/tools/travel-between-images/settings';
 
 // ============================================================================
@@ -17,8 +18,9 @@ import { PhaseConfig } from '@/tools/travel-between-images/settings';
 // UI code should re-export these types and use them when building task params.
 
 /**
- * Structure video parameters for VACE mode.
+ * Structure video parameters for VACE mode (LEGACY - single video format).
  * Controls how a reference video guides the motion/structure of generation.
+ * @deprecated Use `structure_videos` array format instead for multi-video support.
  */
 export interface VideoStructureApiParams {
   /** Path to structure video (S3/Storage URL) */
@@ -31,6 +33,69 @@ export interface VideoStructureApiParams {
   structure_video_type?: 'uni3c' | 'flow' | 'canny' | 'depth';
   /** Uni3C end percent (0-1, only used when structure_video_type is 'uni3c') */
   uni3c_end_percent?: number;
+}
+
+/**
+ * Single structure video configuration within the structure_videos array.
+ * Defines which OUTPUT timeline frames this video guides and which SOURCE frames to use.
+ * 
+ * Frame ranges are half-open: start_frame inclusive, end_frame exclusive.
+ * Example: start_frame=0, end_frame=81 covers frames 0-80 (81 frames total).
+ */
+export interface StructureVideoConfig {
+  /** Path to structure video (S3/Storage URL) - REQUIRED */
+  path: string;
+  
+  /** Where in OUTPUT timeline this video starts guiding (inclusive, 0-based) */
+  start_frame: number;
+  
+  /** Where in OUTPUT timeline this video ends (exclusive) */
+  end_frame: number;
+  
+  /**
+   * How to handle frame count mismatches between SOURCE range and OUTPUT range:
+   * - "adjust": resample (stretch/compress) SOURCE frames to exactly fill output range
+   * - "clip": 1:1 mapping; if source shorter, remaining output frames are unguided;
+   *           if source longer, extra source frames are ignored.
+   * Default: "adjust"
+   */
+  treatment?: 'adjust' | 'clip';
+  
+  /** Motion strength: 0.0 = no motion, 1.0 = full, >1.0 = amplified. Default: 1.0 */
+  motion_strength?: number;
+  
+  /** Type of structure extraction. Default: "flow" */
+  structure_type?: 'uni3c' | 'flow' | 'canny' | 'depth';
+  
+  /**
+   * Optional: Start frame within SOURCE video (inclusive, 0-based).
+   * Default: 0
+   */
+  source_start_frame?: number;
+  
+  /**
+   * Optional: End frame within SOURCE video (exclusive).
+   * Default: null (meaning end of video)
+   */
+  source_end_frame?: number | null;
+  
+  /** Uni3C start percent (0-1, only used when structure_type is 'uni3c') */
+  uni3c_start_percent?: number;
+  
+  /** Uni3C end percent (0-1, only used when structure_type is 'uni3c') */
+  uni3c_end_percent?: number;
+}
+
+/**
+ * Extended structure video config with UI-only fields (not sent to backend).
+ * Used for local state management in useStructureVideo hook.
+ */
+export interface StructureVideoConfigWithMetadata extends StructureVideoConfig {
+  /** Video metadata (UI only - not sent to backend) */
+  metadata?: import('@/shared/lib/videoUploader').VideoMetadata | null;
+  
+  /** Resource ID tracking (UI only - not sent to backend) */
+  resource_id?: string | null;
 }
 
 /**
@@ -217,8 +282,15 @@ export interface TravelBetweenImagesTaskParams extends
 
   // Optional task-specific fields (not in shared interfaces)
   shot_id?: string;
+  /** Parent generation ID - if not provided, one will be created */
+  parent_generation_id?: string;
   /** Generation IDs corresponding to image_urls (for clickable images in SegmentCard) */
   image_generation_ids?: string[];
+  /**
+   * NEW: Stable IDs for tethering segment videos to timeline pairs.
+   * For N images, this should be N-1 IDs: the `shot_generations.id` of each pair's START image.
+   */
+  pair_shot_generation_ids?: string[];
   resolution?: string;
   params_json_str?: string;
   main_output_dir_for_run?: string;
@@ -244,6 +316,13 @@ export interface TravelBetweenImagesTaskParams extends
   uni3c_start_percent?: number;
   /** Uni3C end percent (0-1, used when structure_video_type is 'raw'/uni3c) */
   uni3c_end_percent?: number;
+  
+  /**
+   * NEW: Array of structure video configurations for multi-video support.
+   * Each video can target a specific output frame range with its own settings.
+   * Takes precedence over legacy single-video params when provided.
+   */
+  structure_videos?: StructureVideoConfig[];
 }
 
 /**
@@ -302,13 +381,15 @@ function validateTravelBetweenImagesParams(params: TravelBetweenImagesTaskParams
  * This replicates the logic from the original steerable-motion edge function
  * 
  * @param params - Raw travel between images parameters
+ * @param parentGenerationId - Parent generation ID to include in payload
  * @returns Processed orchestrator payload
  */
 function buildTravelBetweenImagesPayload(
   params: TravelBetweenImagesTaskParams, 
   finalResolution: string,
   taskId: string,
-  runId: string
+  runId: string,
+  parentGenerationId?: string
 ): Record<string, unknown> {
   // Calculate number of segments (matching original logic)
   const numSegments = Math.max(1, params.image_urls.length - 1);
@@ -360,6 +441,10 @@ function buildTravelBetweenImagesPayload(
     ...(params.image_generation_ids && params.image_generation_ids.length > 0 
       ? { input_image_generation_ids: params.image_generation_ids } 
       : {}),
+    // Include pair shot generation IDs for stable segment tethering
+    ...(params.pair_shot_generation_ids && params.pair_shot_generation_ids.length > 0
+      ? { pair_shot_generation_ids: params.pair_shot_generation_ids }
+      : {}),
     num_new_segments_to_generate: numSegments,
     base_prompts_expanded: basePromptsExpanded,
     base_prompt: params.base_prompt, // Singular - the default/base prompt
@@ -379,6 +464,8 @@ function buildTravelBetweenImagesPayload(
     after_first_post_generation_brightness: params.after_first_post_generation_brightness ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.after_first_post_generation_brightness,
     debug_mode_enabled: params.debug ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.debug,
     shot_id: params.shot_id ?? undefined,
+    // Include parent_generation_id so complete_task uses it instead of creating a new one
+    ...(parentGenerationId ? { parent_generation_id: parentGenerationId } : {}),
     main_output_dir_for_run: params.main_output_dir_for_run ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.main_output_dir_for_run,
     enhance_prompt: params.enhance_prompt ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt,
     show_input_images: params.show_input_images ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.show_input_images,
@@ -412,8 +499,40 @@ function buildTravelBetweenImagesPayload(
     WARNING: orchestratorPayload.enhance_prompt === true ? '⚠️ enhance_prompt is TRUE - check if this is intentional' : '✅ enhance_prompt is false'
   });
 
-  // Add structure video parameters if provided (use defaults from single source of truth)
-  if (params.structure_video_path) {
+  // Add structure video parameters - supports both new array format and legacy single-video format
+  // New array format takes precedence when provided
+  if (params.structure_videos && params.structure_videos.length > 0) {
+    // NEW: Multi-video array format
+    // Clean the array to only include backend-relevant fields (no metadata/resource_id)
+    const cleanedStructureVideos = params.structure_videos.map(video => ({
+      path: video.path,
+      start_frame: video.start_frame,
+      end_frame: video.end_frame,
+      treatment: video.treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+      motion_strength: video.motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
+      structure_type: video.structure_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+      // Only include source range if explicitly set
+      ...(video.source_start_frame !== undefined ? { source_start_frame: video.source_start_frame } : {}),
+      ...(video.source_end_frame !== undefined && video.source_end_frame !== null ? { source_end_frame: video.source_end_frame } : {}),
+      // Uni3C params only if structure_type is uni3c
+      ...(video.structure_type === 'uni3c' ? {
+        uni3c_start_percent: video.uni3c_start_percent ?? 0,
+        uni3c_end_percent: video.uni3c_end_percent ?? 0.1,
+      } : {}),
+    }));
+    
+    orchestratorPayload.structure_videos = cleanedStructureVideos;
+    console.log("[createTravelBetweenImagesTask] Using structure_videos array format:", {
+      count: cleanedStructureVideos.length,
+      videos: cleanedStructureVideos.map(v => ({
+        path: v.path.substring(0, 50) + '...',
+        start_frame: v.start_frame,
+        end_frame: v.end_frame,
+        treatment: v.treatment,
+      }))
+    });
+  } else if (params.structure_video_path) {
+    // LEGACY: Single video format (backwards compatible)
     orchestratorPayload.structure_video_path = params.structure_video_path;
     orchestratorPayload.structure_video_treatment = params.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment;
     orchestratorPayload.structure_video_motion_strength = params.structure_video_motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength;
@@ -428,6 +547,8 @@ function buildTravelBetweenImagesPayload(
         uni3c_end_percent: orchestratorPayload.uni3c_end_percent
       });
     }
+    
+    console.log("[createTravelBetweenImagesTask] Using legacy single structure_video_path format");
   }
 
   // Attach additional_loras mapping if provided (matching original logic)
@@ -483,22 +604,89 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
     const orchestratorTaskId = generateTaskId("sm_travel_orchestrator");
     const runId = generateRunId();
 
-    // 4. Build orchestrator payload
+    // 4. Ensure we have a parent_generation_id (create placeholder if needed)
+    // This ensures the parent generation exists BEFORE segments start completing
+    let effectiveParentGenerationId = params.parent_generation_id;
+    
+    if (!effectiveParentGenerationId && params.shot_id) {
+      console.log("[createTravelBetweenImagesTask] No parent_generation_id provided, creating placeholder parent");
+      
+      // Create a placeholder parent generation
+      const newParentId = crypto.randomUUID();
+      const placeholderParams = {
+        tool_type: 'travel-between-images',
+        created_from: 'travel_orchestrator_upfront',
+        // Include basic orchestrator_details structure so it shows in segment outputs
+        orchestrator_details: {
+          num_new_segments_to_generate: Math.max(1, params.image_urls.length - 1),
+          input_image_paths_resolved: params.image_urls,
+          shot_id: params.shot_id,
+        },
+        // Include generation name if provided
+        ...(params.generation_name ? { generation_name: params.generation_name } : {}),
+      };
+      
+      const { data: newParent, error: parentError } = await supabase
+        .from('generations')
+        .insert({
+          id: newParentId,
+          project_id: params.project_id,
+          type: 'video',
+          is_child: false,
+          location: null, // Placeholder - no video yet
+          params: placeholderParams,
+          name: params.generation_name || null,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      
+      if (parentError) {
+        console.error("[createTravelBetweenImagesTask] Error creating placeholder parent:", parentError);
+        throw new Error(`Failed to create placeholder parent generation: ${parentError.message}`);
+      }
+      
+      console.log("[createTravelBetweenImagesTask] Created placeholder parent:", newParentId);
+      effectiveParentGenerationId = newParentId;
+      
+      // Link the parent to the shot using the RPC
+      try {
+        const { error: linkError } = await supabase.rpc('add_generation_to_shot', {
+          p_shot_id: params.shot_id,
+          p_generation_id: newParentId,
+          p_with_position: false // Parent videos don't get timeline positions
+        });
+        
+        if (linkError) {
+          console.error("[createTravelBetweenImagesTask] Error linking parent to shot:", linkError);
+          // Don't throw - the generation was created, just not linked
+        } else {
+          console.log("[createTravelBetweenImagesTask] Linked parent to shot:", params.shot_id);
+        }
+      } catch (linkErr) {
+        console.error("[createTravelBetweenImagesTask] Exception linking parent to shot:", linkErr);
+        // Don't throw - the generation was created, just not linked
+      }
+    }
+
+    // 5. Build orchestrator payload (now includes parent_generation_id)
     const orchestratorPayload = buildTravelBetweenImagesPayload(
       params, 
       finalResolution, 
       orchestratorTaskId, 
-      runId
+      runId,
+      effectiveParentGenerationId
     );
 
-  // 5. Determine task type based on turbo mode
-  const isTurboMode = params.turbo_mode === true;
-  const taskType = isTurboMode ? 'wan_2_2_i2v' : 'travel_orchestrator';
+    // 6. Determine task type based on turbo mode
+    const isTurboMode = params.turbo_mode === true;
+    const taskType = isTurboMode ? 'wan_2_2_i2v' : 'travel_orchestrator';
     
     console.log("[createTravelBetweenImagesTask] Task type determination:", {
       modelName: params.model_name,
       turboMode: isTurboMode,
-      taskType
+      taskType,
+      parentGenerationId: effectiveParentGenerationId?.substring(0, 8)
     });
 
     // Create task using unified create-task function (no task_id - let DB auto-generate)
@@ -508,6 +696,8 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
       params: {
         tool_type: 'travel-between-images', // Override tool_type for proper generation tagging
         orchestrator_details: orchestratorPayload,
+        // Also store parent_generation_id at top level for easy access
+        ...(effectiveParentGenerationId ? { parent_generation_id: effectiveParentGenerationId } : {}),
         // Also store at top level for direct access by worker (not just in orchestrator_details)
         ...(params.generation_name ? { generation_name: params.generation_name } : {}),
       }

@@ -28,15 +28,20 @@ import {
   Star,
   Check,
   Loader2,
+  LockIcon,
+  UnlockIcon,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { usePanes } from '@/shared/contexts/PanesContext';
+import { useTaskStatusCounts } from '@/shared/hooks/useTasks';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 import { useListPublicResources } from '@/shared/hooks/useResources';
+import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 // Import all extracted hooks
@@ -309,6 +314,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
 
+  // Tasks pane control - allows opening tasks pane from within the lightbox
+  const { 
+    isTasksPaneLocked,
+    setIsTasksPaneLocked,
+    isTasksPaneOpen: isTasksPaneOpenContext,
+    setIsTasksPaneOpen: setTasksPaneOpenContext,
+    tasksPaneWidth: contextTasksPaneWidth,
+  } = usePanes();
+  
+  // Determine if we should leave space for the tasks pane:
+  // - When the tasks pane is locked open (globally)
+  // - When the context says the pane is open (for programmatic control)
+  // Note: We don't use the tasksPaneOpen prop anymore because it's a static value
+  // that doesn't react to changes made from within the lightbox (e.g., unlocking)
+  const effectiveTasksPaneOpen = isTasksPaneLocked || isTasksPaneOpenContext;
+  const effectiveTasksPaneWidth = contextTasksPaneWidth || tasksPaneWidth;
+  
+  // Get active task count for the badge
+  const { data: statusCounts } = useTaskStatusCounts(selectedProjectId ?? '');
+  const cancellableTaskCount = statusCounts?.processing || 0;
+
   // Video edit mode - unified state for video editing with sub-modes (like image edit has text/inpaint/annotate/reposition)
   // Sub-modes: 'trim' for trimming video, 'replace' for portion replacement, 'regenerate' for full regeneration
   const [videoEditSubMode, setVideoEditSubMode] = useState<'trim' | 'replace' | 'regenerate' | null>(
@@ -430,6 +456,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     isLoading: isLoadingEditSettings,
     isReady: isEditSettingsReady,
     hasPersistedSettings,
+    // Advanced settings for two-pass generation
+    advancedSettings,
+    setAdvancedSettings,
   } = editSettingsPersistence;
 
   // Variants hook - fetch available variants for this generation
@@ -538,6 +567,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     console.log('[VariantRelationship] - willPassSourceVariantId:', isViewingNonPrimaryVariant ? activeVariant?.id : null);
   }, [activeVariant, isViewingNonPrimaryVariant]);
 
+  // Fetch available LoRAs - needed by edit modes and img2img
+  const { data: publicLorasData } = useListPublicResources('lora');
+  const availableLoras: LoraModel[] = useMemo(() => {
+    return (Array.isArray(publicLorasData) ? publicLorasData.map(resource => resource.metadata) : []) || [];
+  }, [publicLorasData]);
+
+  // LoRA manager for edit modes (text, inpaint, annotate, reposition)
+  // Uses "Qwen Edit" type LoRAs from the resources table
+  const editLoraManager = useLoraManager(availableLoras, {
+    projectId: selectedProjectId || undefined,
+    persistenceScope: 'none', // Don't persist for edit modes - quick tools
+    enableProjectPersistence: false,
+    disableAutoLoad: true,
+  });
+
+  // Compute effective LoRAs for edit mode task creation
+  // Prioritize editLoraManager.selectedLoras over legacy editModeLoRAs
+  const effectiveEditModeLoRAs = useMemo(() => {
+    // If we have LoRAs selected via the new modal selector, use those
+    if (editLoraManager.selectedLoras.length > 0) {
+      return editLoraManager.selectedLoras.map(lora => ({
+        url: lora.path,
+        strength: lora.strength,
+      }));
+    }
+    // Fall back to legacy editModeLoRAs (from dropdown selector)
+    return editModeLoRAs;
+  }, [editLoraManager.selectedLoras, editModeLoRAs]);
+
   // Inpainting hook
   const inpaintingHook = useInpainting({
     media,
@@ -552,9 +610,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleExitInpaintMode: () => {
       // The hook will handle the state reset
     },
-    loras: editModeLoRAs,
+    loras: effectiveEditModeLoRAs,
     activeVariantId: activeVariant?.id, // Store strokes per-variant, not per-generation
+    activeVariantLocation: activeVariant?.location, // Use variant's image URL when editing a variant
     createAsGeneration, // If true, create a new generation instead of a variant
+    advancedSettings, // Pass advanced settings for hires fix
   });
   const {
     isInpaintMode,
@@ -712,7 +772,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setInpaintPrompt,
     inpaintNumGenerations,
     setInpaintNumGenerations,
-    editModeLoRAs,
+    editModeLoRAs: effectiveEditModeLoRAs,
     sourceUrlForTasks,
     imageDimensions,
     toolTypeOverride,
@@ -722,6 +782,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     activeVariantId: isViewingNonPrimaryVariant ? activeVariant?.id : null,
     activeVariantLocation: isViewingNonPrimaryVariant ? activeVariant?.location : null,
     createAsGeneration, // If true, create a new generation instead of a variant
+    advancedSettings, // Pass advanced settings for hires fix
   });
   const {
         isMagicEditMode,
@@ -746,7 +807,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     selectedProjectId,
     imageDimensions,
     imageContainerRef,
-    loras: editModeLoRAs,
+    loras: effectiveEditModeLoRAs,
     inpaintPrompt,
     inpaintNumGenerations,
     handleExitInpaintMode: handleExitMagicEditMode,
@@ -755,6 +816,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     onVariantCreated: setActiveVariantId,
     refetchVariants,
     createAsGeneration, // If true, create a new generation instead of a variant
+    advancedSettings, // Pass advanced settings for hires fix
   });
   const {
     transform: repositionTransform,
@@ -774,12 +836,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleSaveAsVariant,
     getTransformStyle,
   } = repositionHook;
-
-  // Fetch available LoRAs for img2img mode
-  const { data: publicLorasData } = useListPublicResources('lora');
-  const availableLoras: LoraModel[] = useMemo(() => {
-    return (Array.isArray(publicLorasData) ? publicLorasData.map(resource => resource.metadata) : []) || [];
-  }, [publicLorasData]);
 
   // Img2Img mode hook - uses persisted settings for strength and enablePromptExpansion
   console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
@@ -808,6 +864,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     img2imgPromptHasBeenSet: persistedImg2imgPromptHasBeenSet,
     // Number of generations (shared with other edit modes)
     numGenerations: persistedNumGenerations,
+    // Use variant's image URL when editing a variant
+    activeVariantLocation: activeVariant?.location,
   });
   const {
     img2imgPrompt,
@@ -1796,8 +1854,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     <TooltipProvider delayDuration={500}>
       <DialogPrimitive.Root 
         open={true} 
-        // Allow scrolling/interactions outside when tasks pane is open on desktop
-        modal={!(tasksPaneOpen && !isMobile)}
+        // Always modal to block body scroll and trap focus
+        modal={true}
         onOpenChange={() => {
           // Prevent automatic closing - we handle all closing manually
         }}
@@ -2068,14 +2126,62 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               top: 0,
               left: 0,
               // Adjust for tasks pane on desktop
-              right: tasksPaneOpen && !isMobile ? `${tasksPaneWidth}px` : 0,
+              right: effectiveTasksPaneOpen && !isMobile ? `${effectiveTasksPaneWidth}px` : 0,
               bottom: 0,
+              // Smooth transition when tasks pane opens/closes
+              transition: 'right 300ms ease, width 300ms ease',
               // Adjust width for tasks pane on desktop
-              ...(tasksPaneOpen && !isMobile ? {
-                width: `calc(100vw - ${tasksPaneWidth}px)`
+              ...(effectiveTasksPaneOpen && !isMobile ? {
+                width: `calc(100vw - ${effectiveTasksPaneWidth}px)`
               } : {})
             }}
           />
+          
+          {/* Task pane handle - visible above lightbox overlay when pane is closed */}
+          {!isMobile && (
+            <div 
+              className="fixed top-1/2 -translate-y-1/2 flex flex-col items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-l-md gap-1 touch-none"
+              style={{ 
+                zIndex: 100001, 
+                pointerEvents: 'auto',
+                right: effectiveTasksPaneOpen ? `${effectiveTasksPaneWidth}px` : 0,
+                transition: 'right 300ms ease',
+              }}
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+              onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            >
+              <TooltipProvider delayDuration={300}>
+                {/* Single button showing task count + lock state */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onPointerUp={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const willBeLocked = !isTasksPaneLocked;
+                        setIsTasksPaneLocked(willBeLocked);
+                        setTasksPaneOpenContext(willBeLocked);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                      aria-label={isTasksPaneLocked ? "Unlock tasks pane" : "Lock tasks pane open"}
+                    >
+                      {isTasksPaneLocked 
+                        ? <UnlockIcon className="h-4 w-4" /> 
+                        : <LockIcon className="h-4 w-4" />
+                      }
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="text-xs">
+                    {isTasksPaneLocked ? "Unlock tasks pane" : `${cancellableTaskCount} task${cancellableTaskCount === 1 ? '' : 's'} - click to lock open`}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
+          
           <DialogPrimitive.Content
             ref={contentRef}
             tabIndex={-1} // Make the content focusable so it can receive key events
@@ -2085,6 +2191,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               event.preventDefault();
               // Manually focus the dialog content so keyboard navigation works right away
               contentRef.current?.focus();
+            }}
+            // Prevent Escape key from auto-closing - we handle closing manually via safeClose
+            onEscapeKeyDown={(event) => {
+              event.preventDefault();
             }}
             // Ensure clicks within the dialog never reach the app behind it
             onPointerDown={(e) => {
@@ -2205,11 +2315,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   ? "inset-0 w-full h-full" // Mobile: full screen
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
-            style={shouldShowSidePanel && tasksPaneOpen && !isMobile ? {
-              width: `calc(100vw - ${tasksPaneWidth}px)`
-            } : shouldShowSidePanelWithTrim ? {
-              width: '100vw'
-            } : undefined}
+            style={{
+              // Smooth transition when tasks pane opens/closes
+              transition: 'width 300ms ease',
+              ...(shouldShowSidePanel && effectiveTasksPaneOpen && !isMobile ? {
+                width: `calc(100vw - ${effectiveTasksPaneWidth}px)`
+              } : shouldShowSidePanelWithTrim ? {
+                width: '100vw'
+              } : {})
+            }}
             onPointerDownOutside={(event) => {
               const target = event.target as Element;
               
@@ -2358,7 +2472,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handlePointerUp={handlePointerUp}
                       variant="desktop-side-panel"
                       containerClassName="max-w-full max-h-full"
-                      tasksPaneWidth={tasksPaneOpen && !isMobile ? tasksPaneWidth : 0}
+                      tasksPaneWidth={effectiveTasksPaneOpen && !isMobile ? effectiveTasksPaneWidth : 0}
                       debugContext="Desktop"
                     />
                   )}
@@ -2602,6 +2716,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     handleGenerateImg2Img={handleGenerateImg2Img}
                     img2imgLoraManager={img2imgLoraManager}
                     availableLoras={availableLoras}
+                    editLoraManager={editLoraManager}
+                    // Advanced settings for two-pass generation
+                    advancedSettings={advancedSettings}
+                    setAdvancedSettings={setAdvancedSettings}
                     // InfoPanel props
                     isVideo={isVideo}
                     showImageEditTools={showImageEditTools}
@@ -2926,6 +3044,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     handleGenerateImg2Img={handleGenerateImg2Img}
                     img2imgLoraManager={img2imgLoraManager}
                     availableLoras={availableLoras}
+                    editLoraManager={editLoraManager}
+                    // Advanced settings for two-pass generation
+                    advancedSettings={advancedSettings}
+                    setAdvancedSettings={setAdvancedSettings}
                     // InfoPanel props
                     isVideo={isVideo}
                     showImageEditTools={showImageEditTools}

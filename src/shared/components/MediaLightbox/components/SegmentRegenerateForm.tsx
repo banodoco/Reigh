@@ -27,8 +27,12 @@ export interface SegmentRegenerateFormProps {
   startImageGenerationId?: string;
   /** End image generation ID */
   endImageGenerationId?: string;
+  /** Shot generation ID for the start image (for video-to-timeline tethering) */
+  pairShotGenerationId?: string;
   /** Project resolution for output */
   projectResolution?: string;
+  /** Callback when user overrides change - for persisting to database */
+  onOverridesChange?: (overrides: Record<string, any> | null) => void;
 }
 
 export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
@@ -41,7 +45,9 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   endImageUrl,
   startImageGenerationId,
   endImageGenerationId,
+  pairShotGenerationId,
   projectResolution,
+  onOverridesChange,
 }) => {
   return (
     <div className="p-4">
@@ -55,10 +61,12 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         endImageUrl={endImageUrl}
         startImageGenerationId={startImageGenerationId}
         endImageGenerationId={endImageGenerationId}
+        pairShotGenerationId={pairShotGenerationId}
         projectResolution={projectResolution}
         queryKeyPrefix="lightbox-segment-presets"
         buttonLabel="Regenerate Video"
         showHeader={false}
+        onOverridesChange={onOverridesChange}
       />
     </div>
   );

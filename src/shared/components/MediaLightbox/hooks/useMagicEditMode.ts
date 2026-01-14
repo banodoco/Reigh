@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useShotGenerationMetadata } from '@/shared/hooks/useShotGenerationMetadata';
 import { createBatchMagicEditTasks } from '@/shared/lib/tasks/magicEdit';
+import type { EditAdvancedSettings } from './useGenerationEditSettings';
+import { convertToHiresFixApiParams } from './useGenerationEditSettings';
 
 interface UseMagicEditModeParams {
   media: GenerationRow;
@@ -30,6 +32,8 @@ interface UseMagicEditModeParams {
   activeVariantLocation?: string | null;
   // Create as new generation instead of variant
   createAsGeneration?: boolean;
+  // Advanced settings for hires fix
+  advancedSettings?: EditAdvancedSettings;
 }
 
 interface UseMagicEditModeReturn {
@@ -76,6 +80,7 @@ export const useMagicEditMode = ({
   activeVariantId,
   activeVariantLocation,
   createAsGeneration,
+  advancedSettings,
 }: UseMagicEditModeParams): UseMagicEditModeReturn => {
   // Magic Edit mode state
   const [isMagicEditMode, setIsMagicEditMode] = useState(false);
@@ -228,6 +233,7 @@ export const useMagicEditMode = ({
           based_on: actualGenerationId, // Track source generation for lineage (must be generations.id, not shot_generations.id)
           source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
           create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
+          hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
         };
         
         console.log('[VariantRelationship] Task params source_variant_id:', batchParams.source_variant_id);
@@ -279,7 +285,8 @@ export const useMagicEditMode = ({
     toolTypeOverride,
     media.id,
     addMagicEditPrompt,
-    createAsGeneration
+    createAsGeneration,
+    advancedSettings
   ]);
 
   return {

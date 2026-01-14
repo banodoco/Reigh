@@ -1,4 +1,5 @@
 import { GenerationRow } from '@/types/shots';
+import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
 
 export interface ShotImageManagerProps {
   images: GenerationRow[];
@@ -22,6 +23,7 @@ export interface ShotImageManagerProps {
   onFileDrop?: (files: File[], targetPosition?: number, framePosition?: number) => Promise<void>;
   onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetPosition?: number, framePosition?: number) => Promise<void>;
   shotId?: string;
+  projectId?: string;
   toolTypeOverride?: string;
   allShots?: Array<{ id: string; name: string }>;
   selectedShotId?: string;
@@ -38,6 +40,17 @@ export interface ShotImageManagerProps {
   defaultNegativePrompt?: string;
   /** Callback to notify parent of drag state changes - used to suppress query refetches during drag */
   onDragStateChange?: (isDragging: boolean) => void;
+  /** Callback to clear enhanced prompt for a pair */
+  onClearEnhancedPrompt?: (pairIndex: number) => void;
+}
+
+/** Props for segment video outputs in batch view */
+export interface BatchSegmentOutputProps {
+  segmentSlots: SegmentSlot[];
+  onSegmentClick: (slotIndex: number) => void;
+  onOpenPairSettings?: (pairIndex: number) => void;
+  projectAspectRatio?: string;
+  isMobile?: boolean;
 }
 
 export interface DerivedNavContext {
@@ -74,6 +87,10 @@ export interface BaseShotImageManagerProps {
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
+  onClearEnhancedPrompt?: (pairIndex: number) => void;
+  // Segment video output props
+  segmentSlots?: SegmentSlot[];
+  onSegmentClick?: (slotIndex: number) => void;
 }
 
 export interface MobileImageItemProps {

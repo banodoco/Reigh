@@ -4,6 +4,7 @@ import { ShotImageManagerMobile } from './ShotImageManagerMobile';
 import MediaLightbox from '../MediaLightbox';
 import { useTaskDetails } from './hooks/useTaskDetails';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
+import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
 
 interface ShotImageManagerMobileWrapperProps extends ShotImageManagerProps {
   selection: any;
@@ -14,6 +15,9 @@ interface ShotImageManagerMobileWrapperProps extends ShotImageManagerProps {
   externalGens: any;
   lightboxSelectedShotId?: string;
   setLightboxSelectedShotId?: (shotId: string | undefined) => void;
+  // Segment video output props
+  segmentSlots?: SegmentSlot[];
+  onSegmentClick?: (slotIndex: number) => void;
 }
 
 export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapperProps> = ({
@@ -25,6 +29,8 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
   externalGens,
   lightboxSelectedShotId,
   setLightboxSelectedShotId,
+  segmentSlots,
+  onSegmentClick,
   ...props
 }) => {
   // State for showing success tick after adding to shot (positioned)
@@ -113,6 +119,8 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
         defaultPrompt={props.defaultPrompt}
         defaultNegativePrompt={props.defaultNegativePrompt}
         onClearEnhancedPrompt={props.onClearEnhancedPrompt}
+        segmentSlots={segmentSlots}
+        onSegmentClick={onSegmentClick}
       />
       
       {lightbox.lightboxIndex !== null && lightbox.currentImages[lightbox.lightboxIndex] && (() => {
