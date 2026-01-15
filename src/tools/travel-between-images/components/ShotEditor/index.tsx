@@ -891,13 +891,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     parentGenerations,
     segmentProgress,
   } = useSegmentOutputsForShot(
-    selectedShotId, 
-    projectId, 
+    selectedShotId,
+    projectId,
     undefined, // localShotGenPositions not needed here
     outputSelectionReady ? selectedOutputId : undefined,
     outputSelectionReady ? setSelectedOutputId : undefined
   );
-  
+
+  // Auto-select first parent generation when controlled mode is ready but no selection exists
+  useEffect(() => {
+    if (!outputSelectionReady) return;
+    if (parentGenerations.length === 0) return;
+
+    // Select first if nothing selected or current selection doesn't exist
+    const selectionExists = selectedOutputId && parentGenerations.some(p => p.id === selectedOutputId);
+    if (!selectionExists) {
+      setSelectedOutputId(parentGenerations[0].id);
+    }
+  }, [outputSelectionReady, parentGenerations, selectedOutputId, setSelectedOutputId]);
+
   // Calculate shortest clip frame count for join clips validation
   // Uses segmentSlots which properly excludes videos at invalid positions (e.g., last image)
   const joinValidationData = useMemo(() => {

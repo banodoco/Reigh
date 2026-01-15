@@ -325,12 +325,31 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   }, [pairInfo, fullMin, fullRange, containerWidth]);
   
   // ===== NOW WE CAN HAVE EARLY RETURNS =====
-  
-  // Don't render if no parent generations
-  if (parentGenerations.length === 0) {
+
+  // Build placeholder slots from pairInfo when no segment data exists
+  // This ensures placeholders show even before any videos are generated
+  const displaySlots = useMemo(() => {
+    // If we have actual segment slots, use them
+    if (segmentSlots.length > 0) {
+      return segmentSlots;
+    }
+
+    // No segment data - create placeholder slots from pairInfo
+    return pairInfo.map((pair) => ({
+      type: 'placeholder' as const,
+      index: pair.index,
+      expectedFrames: undefined,
+      expectedPrompt: undefined,
+      startImage: undefined,
+      endImage: undefined,
+    }));
+  }, [segmentSlots, pairInfo]);
+
+  // Don't render if no pairs (need at least 2 images for a pair)
+  if (pairInfo.length === 0) {
     return null;
   }
-  
+
   return (
     <div className="w-full relative">
       {/* Segment output strip - compact height for segment thumbnails */}
@@ -357,9 +376,9 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
 
         {/* Segment thumbnails - positioned to align with timeline pairs */}
         <div className="absolute left-0 right-0 top-5 bottom-1 overflow-hidden">
-          {segmentSlots.length > 0 && segmentPositions.length > 0 ? (
+          {displaySlots.length > 0 && segmentPositions.length > 0 ? (
             <div className="relative w-full h-full">
-              {segmentSlots.map((slot, index) => {
+              {displaySlots.map((slot, index) => {
                 // Get position for this slot's pair index
                 const position = segmentPositions.find(p => p.pairIndex === slot.index);
                 

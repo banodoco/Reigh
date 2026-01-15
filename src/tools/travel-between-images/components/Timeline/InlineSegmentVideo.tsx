@@ -163,7 +163,7 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   // Placeholder (no video generated yet) state - show CTA to generate
   if (slot.type === 'placeholder') {
     return (
-      <button 
+      <button
         className="bg-muted/30 rounded-lg border-2 border-dashed border-border/40 flex items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-colors group"
         style={adjustedPositionStyle}
         onClick={() => onOpenPairSettings?.(pairIndex)}

@@ -49,7 +49,7 @@ export const GuidanceVideosContainer: React.FC<GuidanceVideosContainerProps> = (
 
   return (
     <div 
-      className="relative h-20 mb-0"
+      className="relative h-20 -mt-1 mb-3"
       style={{
         // Standard width matching other timeline rows
         width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',

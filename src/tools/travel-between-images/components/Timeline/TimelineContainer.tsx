@@ -1318,7 +1318,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             ) : isUploadingStructureVideo ? (
               // Show loading placeholder while uploading
               <div
-                className="relative h-28 mb-0"
+                className="relative h-28 -mt-1 mb-3"
                 style={{
                   width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
                   minWidth: '100%',

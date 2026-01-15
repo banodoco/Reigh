@@ -22,7 +22,7 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
 
   return (
     <div
-      className="relative h-2 mb-0"
+      className="relative h-2 -mt-1 mb-3"
       style={{
         width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
         minWidth: '100%',

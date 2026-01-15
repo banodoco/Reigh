@@ -148,17 +148,17 @@ export const BatchSegmentVideo: React.FC<BatchSegmentVideoProps> = ({
   // Placeholder state - show CTA to generate
   if (slot.type === 'placeholder') {
     return (
-      <button 
+      <button
         className={cn(
-          "w-full bg-muted/50 rounded-md border-2 border-dashed border-border",
+          "w-full bg-muted/70 rounded-md border-2 border-dashed border-primary/50",
           "flex items-center justify-center cursor-pointer shadow-sm",
-          "hover:bg-muted/70 hover:border-primary/50 transition-colors group",
+          "hover:bg-muted hover:border-primary hover:scale-[1.02] transition-all duration-150 group",
           thumbnailHeight
         )}
         onClick={() => onOpenPairSettings?.(pairIndex)}
       >
-        <div className="flex items-center gap-1.5 text-muted-foreground group-hover:text-foreground transition-colors">
-          <Sparkles className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+        <div className="flex items-center gap-1.5 text-foreground group-hover:text-primary transition-colors">
+          <Sparkles className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
           <span className="text-[10px] font-medium">Generate</span>
         </div>
       </button>
