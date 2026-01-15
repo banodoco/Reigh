@@ -2363,7 +2363,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
                   {/* Swap to Join Segments */}
                   <button
-                    onClick={() => setGenerateMode('join')}
+                    onClick={() => {
+                      setGenerateMode('join');
+                      requestAnimationFrame(() => {
+                        generateVideosCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      });
+                    }}
                     className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
                   >
                     <ArrowLeftRight className="w-4 h-4" />
@@ -2428,7 +2433,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
                   {/* Swap to Batch Generate */}
                   <button
-                    onClick={() => setGenerateMode('batch')}
+                    onClick={() => {
+                      setGenerateMode('batch');
+                      // Scroll to keep the card in view after content shrinks
+                      requestAnimationFrame(() => {
+                        generateVideosCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      });
+                    }}
                     className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
                   >
                     <ArrowLeftRight className="w-4 h-4" />
