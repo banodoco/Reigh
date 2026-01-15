@@ -32,7 +32,6 @@ import { useVideoTravelData } from '../hooks/useVideoTravelData';
 import { useVideoTravelDropHandlers } from '../hooks/useVideoTravelDropHandlers';
 import { useVideoTravelAddToShot } from '../hooks/useVideoTravelAddToShot';
 import { useStableSkeletonVisibility } from '../hooks/useStableSkeletonVisibility';
-import { useVideoTravelFloatingUI } from '../hooks/useVideoTravelFloatingUI';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
@@ -43,12 +42,9 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
-import { useFloatingCTA } from '../hooks/useFloatingCTA';
-import { useStickyHeader } from '../hooks/useStickyHeader';
 import { useRenderCount } from '@/shared/components/debug/RefactorMetricsCollector';
 import { VideoTravelListHeader } from '../components/VideoTravelListHeader';
 import { VideoTravelVideosGallery } from '../components/VideoTravelVideosGallery';
-import { VideoTravelFloatingOverlay } from '../components/VideoTravelFloatingOverlay';
 
 // ShotEditor is imported eagerly to avoid dynamic import issues on certain mobile browsers.
 // useVideoTravelData moved to hooks/useVideoTravelData.ts
@@ -357,34 +353,6 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Add ref for main container
   const mainContainerRef = useRef<HTMLDivElement>(null);
-  
-  // ============================================================================
-  // FLOATING UI - Refs and State (extracted to useVideoTravelFloatingUI hook)
-  // ============================================================================
-  const {
-    headerContainerRef,
-    timelineSectionRef,
-    ctaContainerRef,
-    headerReady,
-    timelineReady,
-    ctaReady,
-    headerCallbackRef,
-    timelineCallbackRef,
-    ctaCallbackRef,
-    hasActiveSelection,
-    handleSelectionChange,
-    resetSelection,
-    variantName,
-    setVariantName,
-    isGeneratingVideo,
-    videoJustQueued,
-    getGenerationDataRef,
-    generateVideoRef,
-    nameClickRef,
-    handleGenerateVideo,
-    handleFloatingHeaderNameClick,
-  } = useVideoTravelFloatingUI();
-  
   
   // Use the shot navigation hook
   const { navigateToPreviousShot, navigateToNextShot, navigateToShot } = useShotNavigation();
@@ -905,34 +873,6 @@ const VideoTravelToolPage: React.FC = () => {
     tasksPaneWidth 
   } = usePanes();
 
-  // Use sticky/floating hooks only when editor is visible
-  const floatingCTA = useFloatingCTA({
-    timelineRef: timelineSectionRef,
-    ctaRef: ctaContainerRef,
-    hasActiveSelection,
-    isMobile,
-    enabled: shouldShowShotEditor && timelineReady && ctaReady
-  });
-  
-  const stickyHeader = useStickyHeader({
-    headerRef: headerContainerRef,
-    isMobile,
-    enabled: shouldShowShotEditor && headerReady
-  });
-
-  // ============================================================================
-  // FLOATING UI COORDINATION
-  // ============================================================================
-  // Rule: CTA takes priority - when floating CTA is visible, hide sticky header
-  // This prevents visual clutter from having both floating elements on screen
-  const shouldShowFloatingCTA = floatingCTA.showElement && floatingCTA.isFloating;
-  const shouldShowStickyHeader = stickyHeader.isSticky && !shouldShowFloatingCTA;
-
-  // Reset selection tracking whenever the active shot changes
-  useEffect(() => {
-    resetSelection();
-  }, [shotToEdit?.id, resetSelection]);
-  
   // Initialize video gallery thumbnail preloader (after dependencies are defined)
   const preloaderState = useVideoGalleryPreloader({
     selectedShot,
@@ -1692,19 +1632,6 @@ const VideoTravelToolPage: React.FC = () => {
               onTextBeforePromptsChange={handleTextBeforePromptsChange}
               textAfterPrompts={textAfterPrompts}
               onTextAfterPromptsChange={handleTextAfterPromptsChange}
-              // Callback refs for floating UI (trigger state updates when attached)
-              headerContainerRef={headerCallbackRef}
-              timelineSectionRef={timelineCallbackRef}
-              ctaContainerRef={ctaCallbackRef}
-              onSelectionChange={handleSelectionChange}
-              getGenerationDataRef={getGenerationDataRef}
-              generateVideoRef={generateVideoRef}
-              nameClickRef={nameClickRef}
-              // CTA state
-              variantName={variantName}
-              onVariantNameChange={setVariantName}
-              isGeneratingVideo={isGeneratingVideo}
-              videoJustQueued={videoJustQueued}
               onBatchVideoFramesChange={handleBatchVideoFramesChange}
               batchVideoSteps={batchVideoSteps}
               onBatchVideoStepsChange={handleBatchVideoStepsChange}
@@ -1791,41 +1718,6 @@ const VideoTravelToolPage: React.FC = () => {
         projectId={selectedProjectId}
         cropToProjectSize={uploadSettings?.cropToProjectSize ?? true}
       />
-      
-      {/* Floating UI Overlays - temporarily disabled */}
-      {/* <VideoTravelFloatingOverlay
-        sticky={{
-          shouldShowShotEditor,
-          stickyHeader,
-          shotToEdit,
-          isMobile,
-          isShotsPaneLocked,
-          shotsPaneWidth,
-          isTasksPaneLocked,
-          tasksPaneWidth,
-          hasPrevious,
-          hasNext,
-          onPreviousShot: handlePreviousShot,
-          onNextShot: handleNextShot,
-          onBackToShotList: handleBackToShotList,
-          onFloatingHeaderNameClick: handleFloatingHeaderNameClick,
-        }}
-        cta={{
-          shouldShowShotEditor,
-          floatingCTA,
-          shotToEdit,
-          isMobile,
-          isShotsPaneLocked,
-          shotsPaneWidth,
-          isTasksPaneLocked,
-          tasksPaneWidth,
-          variantName,
-          setVariantName,
-          onGenerateVideo: handleGenerateVideo,
-          isGeneratingVideo,
-          videoJustQueued,
-        }}
-      /> */}
       
     </div>
   );

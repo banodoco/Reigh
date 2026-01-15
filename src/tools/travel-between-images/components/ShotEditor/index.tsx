@@ -56,6 +56,7 @@ import { useJoinSegmentsSettings } from '../../hooks/useJoinSegmentsSettings';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useSegmentOutputsForShot } from '../../hooks/useSegmentOutputsForShot';
+import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -147,6 +148,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
+  const { addIncomingTask, removeIncomingTask } = useIncomingTasks();
   const { getApiKey } = useApiKeys();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
   
@@ -274,6 +276,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Handler for changing just the structure video type (from MotionControl)
   const handleStructureTypeChangeFromMotionControl = useCallback((type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
+    // Update legacy single-video config
     handleStructureVideoChange(
       structureVideoPath,
       structureVideoMetadata,
@@ -281,7 +284,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       structureVideoMotionStrength,
       type
     );
-    
+
+    // Also update ALL videos in the structureVideos array to keep them in sync
+    structureVideos.forEach((_, index) => {
+      updateStructureVideo(index, { structure_type: type });
+    });
+
     // Auto-switch generation type mode based on structure type
     if (onGenerationTypeModeChange) {
       if (type === 'uni3c') {
@@ -296,7 +304,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         }
       }
     }
-  }, [structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, handleStructureVideoChange, onGenerationTypeModeChange, generationTypeMode]);
+  }, [structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, handleStructureVideoChange, structureVideos, updateStructureVideo, onGenerationTypeModeChange, generationTypeMode]);
 
   // Wrapper for structure video change that also auto-switches generation type mode
   const handleStructureVideoChangeWithModeSwitch = useCallback((
@@ -706,6 +714,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const centerSectionRef = useRef<HTMLDivElement>(null);
   const videoGalleryRef = useRef<HTMLDivElement>(null);
   const generateVideosCardRef = useRef<HTMLDivElement>(null);
+  const joinSegmentsSectionRef = useRef<HTMLDivElement>(null);
   
   // Selection state (forwarded to parent for floating button control)
   // 🎯 PERF FIX: Uses ref to prevent callback recreation
@@ -1677,74 +1686,84 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Handle video generation - accepts variantName as parameter from parent
   // Now uses generateVideoService for the complex logic
-  const handleGenerateBatch = useCallback(async (variantNameParam: string) => {
-    // Set loading state immediately to provide instant user feedback
-    setIsSteerableMotionEnqueuing(true);
-    setSteerableMotionJustQueued(false);
-
-    // Call the service with all required parameters
-    const result = await generateVideo({
-      projectId,
-      selectedShotId,
-      selectedShot,
-      queryClient,
-      onShotImagesUpdate,
-      effectiveAspectRatio,
-      generationMode,
-      // Grouped configs (snake_case matching API)
-      promptConfig: {
-        base_prompt: batchVideoPrompt,
-        enhance_prompt: enhancePrompt,
-        text_before_prompts: textBeforePrompts,
-        text_after_prompts: textAfterPrompts,
-        default_negative_prompt: steerableMotionSettings.negative_prompt,
-      },
-      motionConfig: {
-        amount_of_motion: amountOfMotion,
-        motion_mode: motionMode || 'basic',
-        advanced_mode: advancedMode,
-        phase_config: phaseConfig,
-        selected_phase_preset_id: selectedPhasePresetId,
-      },
-      modelConfig: {
-        seed: steerableMotionSettings.seed,
-        random_seed: randomSeed,
-        turbo_mode: turboMode,
-        debug: steerableMotionSettings.debug || false,
-        generation_type_mode: generationTypeMode || 'i2v',
-        // HARDCODED: SVI (smooth continuations) feature has been removed from UX
-        // Always set to false regardless of persisted shot settings
-        use_svi: false,
-      },
-      structureVideoConfig,
-      structureVideos, // NEW: Multi-video array support
-      batchVideoFrames,
-      selectedLoras: loraManager.selectedLoras.map(lora => ({
-        id: lora.id,
-        path: lora.path,
-        strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0,
-        name: lora.name
-      })),
-      variantNameParam,
-      clearAllEnhancedPrompts,
-      // Uni3C end percent (from structure video config)
-      uni3cEndPercent: structureVideoConfig.uni3c_end_percent,
-      // Pass selected output ID so new segments become children of the selected parent
-      // instead of creating a new parent generation
-      parentGenerationId: selectedOutputId ?? undefined,
+  // Uses fire-and-forget pattern: returns immediately, task creation happens in background
+  const handleGenerateBatch = useCallback((variantNameParam: string) => {
+    // Add incoming task immediately for instant TasksPane feedback
+    const taskLabel = variantNameParam || selectedShot?.name || 'Travel video';
+    const incomingTaskId = addIncomingTask({
+      taskType: 'travel_orchestrator',
+      label: taskLabel.length > 50 ? taskLabel.substring(0, 50) + '...' : taskLabel,
     });
 
-    // Handle the result
-    if (result.success) {
-      // Show success feedback and update state
-      setSteerableMotionJustQueued(true);
-      
-      // Reset success state after 2 seconds
-      setTimeout(() => setSteerableMotionJustQueued(false), 2000);
-    }
-    
-    // Always reset loading state
-    setIsSteerableMotionEnqueuing(false);
+    // Show success feedback immediately (task is being created)
+    setSteerableMotionJustQueued(true);
+    setTimeout(() => setSteerableMotionJustQueued(false), 2000);
+
+    // Fire-and-forget: run task creation in background
+    (async () => {
+      try {
+        // Call the service with all required parameters
+        const result = await generateVideo({
+          projectId,
+          selectedShotId,
+          selectedShot,
+          queryClient,
+          onShotImagesUpdate,
+          effectiveAspectRatio,
+          generationMode,
+          // Grouped configs (snake_case matching API)
+          promptConfig: {
+            base_prompt: batchVideoPrompt,
+            enhance_prompt: enhancePrompt,
+            text_before_prompts: textBeforePrompts,
+            text_after_prompts: textAfterPrompts,
+            default_negative_prompt: steerableMotionSettings.negative_prompt,
+          },
+          motionConfig: {
+            amount_of_motion: amountOfMotion,
+            motion_mode: motionMode || 'basic',
+            advanced_mode: advancedMode,
+            phase_config: phaseConfig,
+            selected_phase_preset_id: selectedPhasePresetId,
+          },
+          modelConfig: {
+            seed: steerableMotionSettings.seed,
+            random_seed: randomSeed,
+            turbo_mode: turboMode,
+            debug: steerableMotionSettings.debug || false,
+            generation_type_mode: generationTypeMode || 'i2v',
+            // HARDCODED: SVI (smooth continuations) feature has been removed from UX
+            // Always set to false regardless of persisted shot settings
+            use_svi: false,
+          },
+          structureVideoConfig,
+          structureVideos, // NEW: Multi-video array support
+          batchVideoFrames,
+          selectedLoras: loraManager.selectedLoras.map(lora => ({
+            id: lora.id,
+            path: lora.path,
+            strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0,
+            name: lora.name
+          })),
+          variantNameParam,
+          clearAllEnhancedPrompts,
+          // Uni3C end percent (from structure video config)
+          uni3cEndPercent: structureVideoConfig.uni3c_end_percent,
+          // Pass selected output ID so new segments become children of the selected parent
+          // instead of creating a new parent generation
+          parentGenerationId: selectedOutputId ?? undefined,
+        });
+
+        // Invalidate and wait for refetch so real task appears before we remove placeholder
+        await queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated'] });
+      } catch (error) {
+        console.error('[handleGenerateBatch] Error creating task:', error);
+        toast.error('Failed to create video task. Please try again.');
+      } finally {
+        // Remove the incoming task filler - real task should now be visible
+        removeIncomingTask(incomingTaskId);
+      }
+    })();
   }, [
     projectId,
     selectedShotId,
@@ -1776,6 +1795,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     structureVideoConfig,
     clearAllEnhancedPrompts,
     selectedOutputId,
+    // IncomingTasks deps
+    addIncomingTask,
+    removeIncomingTask,
   ]);
 
   // Expose generateVideo function and state to parent via mutable ref
@@ -1957,6 +1979,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           projectId={projectId}
           projectAspectRatio={effectiveAspectRatio}
           onApplySettingsFromTask={applySettingsFromTask}
+          onJoinSegmentsClick={() => {
+            setGenerateMode('join');
+            requestAnimationFrame(() => {
+              const target = joinSegmentsSectionRef.current || generateVideosCardRef.current;
+              target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+          }}
           selectedParentId={selectedOutputId}
           onSelectedParentChange={setSelectedOutputId}
           parentGenerations={parentGenerations}
@@ -2103,8 +2132,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         : 'text-muted-foreground hover:text-foreground cursor-pointer'
                     }`}
                   >
-                    {generateMode === 'batch' 
-                      ? `Join Segments${joinValidationData.videoCount >= 2 ? ` (${joinValidationData.videoCount})` : ''}`
+                    {generateMode === 'batch'
+                      ? 'Join Segments'
                       : 'Batch Generate'
                     }
                   </button>
@@ -2315,57 +2344,59 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 </>
               ) : (
                 /* Join Segments Mode */
-                <JoinClipsSettingsForm
-                  headerContent={
-                    <div className="mb-2">
-                      <p className="text-sm text-muted-foreground">
-                        Join {joinValidationData.videoCount} positioned videos from your timeline into a seamless video with smooth transitions.
-                      </p>
-                    </div>
-                  }
-                  gapFrames={joinGapFrames}
-                  setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
-                  contextFrames={joinContextFrames}
-                  setContextFrames={(val) => joinSettings.updateField('contextFrameCount', val)}
-                  replaceMode={joinReplaceMode}
-                  setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
-                  keepBridgingImages={joinKeepBridgingImages}
-                  setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
-                  prompt={joinPrompt}
-                  setPrompt={(val) => joinSettings.updateField('prompt', val)}
-                  negativePrompt={joinNegativePrompt}
-                  setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
-                  enhancePrompt={joinEnhancePrompt}
-                  setEnhancePrompt={(val) => joinSettings.updateField('enhancePrompt', val)}
-                  availableLoras={availableLoras}
-                  projectId={projectId}
-                  loraPersistenceKey="join-clips-shot-editor"
-                  loraManager={joinLoraManager}
-                  onGenerate={handleJoinSegments}
-                  isGenerating={isJoiningClips}
-                  generateSuccess={joinClipsSuccess}
-                  generateButtonText="Join Segments"
-                  isGenerateDisabled={joinValidationData.videoCount < 2}
-                  onRestoreDefaults={handleRestoreJoinDefaults}
-                  shortestClipFrames={joinValidationData.shortestClipFrames}
-                  // Motion preset settings
-                  motionMode={joinMotionMode}
-                  onMotionModeChange={(mode) => joinSettings.updateField('motionMode', mode)}
-                  phaseConfig={joinPhaseConfig ?? DEFAULT_JOIN_CLIPS_PHASE_CONFIG}
-                  onPhaseConfigChange={(config) => joinSettings.updateField('phaseConfig', config)}
-                  randomSeed={joinRandomSeed}
-                  onRandomSeedChange={(val) => joinSettings.updateField('randomSeed', val)}
-                  selectedPhasePresetId={joinSelectedPhasePresetId ?? BUILTIN_JOIN_CLIPS_DEFAULT_ID}
-                  onPhasePresetSelect={(presetId, config) => {
-                    joinSettings.updateFields({
-                      selectedPhasePresetId: presetId,
-                      phaseConfig: config,
-                    });
-                  }}
-                  onPhasePresetRemove={() => {
-                    joinSettings.updateField('selectedPhasePresetId', null);
-                  }}
-                />
+                <div ref={joinSegmentsSectionRef}>
+                  <JoinClipsSettingsForm
+                    headerContent={
+                      <div className="mb-2">
+                        <p className="text-sm text-muted-foreground">
+                          Join {joinValidationData.videoCount} positioned videos from your timeline into a seamless video with smooth transitions.
+                        </p>
+                      </div>
+                    }
+                    gapFrames={joinGapFrames}
+                    setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
+                    contextFrames={joinContextFrames}
+                    setContextFrames={(val) => joinSettings.updateField('contextFrameCount', val)}
+                    replaceMode={joinReplaceMode}
+                    setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
+                    keepBridgingImages={joinKeepBridgingImages}
+                    setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
+                    prompt={joinPrompt}
+                    setPrompt={(val) => joinSettings.updateField('prompt', val)}
+                    negativePrompt={joinNegativePrompt}
+                    setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
+                    enhancePrompt={joinEnhancePrompt}
+                    setEnhancePrompt={(val) => joinSettings.updateField('enhancePrompt', val)}
+                    availableLoras={availableLoras}
+                    projectId={projectId}
+                    loraPersistenceKey="join-clips-shot-editor"
+                    loraManager={joinLoraManager}
+                    onGenerate={handleJoinSegments}
+                    isGenerating={isJoiningClips}
+                    generateSuccess={joinClipsSuccess}
+                    generateButtonText="Join Segments"
+                    isGenerateDisabled={joinValidationData.videoCount < 2}
+                    onRestoreDefaults={handleRestoreJoinDefaults}
+                    shortestClipFrames={joinValidationData.shortestClipFrames}
+                    // Motion preset settings
+                    motionMode={joinMotionMode}
+                    onMotionModeChange={(mode) => joinSettings.updateField('motionMode', mode)}
+                    phaseConfig={joinPhaseConfig ?? DEFAULT_JOIN_CLIPS_PHASE_CONFIG}
+                    onPhaseConfigChange={(config) => joinSettings.updateField('phaseConfig', config)}
+                    randomSeed={joinRandomSeed}
+                    onRandomSeedChange={(val) => joinSettings.updateField('randomSeed', val)}
+                    selectedPhasePresetId={joinSelectedPhasePresetId ?? BUILTIN_JOIN_CLIPS_DEFAULT_ID}
+                    onPhasePresetSelect={(presetId, config) => {
+                      joinSettings.updateFields({
+                        selectedPhasePresetId: presetId,
+                        phaseConfig: config,
+                      });
+                    }}
+                    onPhasePresetRemove={() => {
+                      joinSettings.updateField('selectedPhasePresetId', null);
+                    }}
+                  />
+                </div>
               )}
             </CardContent>
           </Card>
