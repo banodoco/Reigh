@@ -1156,7 +1156,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                         end_frame,
                         treatment: 'adjust',
                         motion_strength: 1.0,
-                        structure_type: 'flow',
+                        structure_type: structureVideoType,
                         metadata,
                         resource_id: null,
                       });
@@ -2000,7 +2000,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               end_frame,
               treatment: 'adjust',
               motion_strength: 1.0,
-              structure_type: 'flow',
+              structure_type: structureVideoType,
               metadata: metadata.videoMetadata,
               resource_id: resource.id,
             });

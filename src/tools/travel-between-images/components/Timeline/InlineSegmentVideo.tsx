@@ -8,7 +8,7 @@
 
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Loader2, ImageOff, Sparkles } from 'lucide-react';
+import { Play, Loader2, ImageOff, Sparkles, Trash2 } from 'lucide-react';
 import { SegmentSlot } from '../../hooks/useSegmentOutputsForShot';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
@@ -26,6 +26,10 @@ interface InlineSegmentVideoProps {
   widthPercent: number;
   /** Callback to open pair settings modal */
   onOpenPairSettings?: (pairIndex: number) => void;
+  /** Callback to delete this segment */
+  onDelete?: (generationId: string) => void;
+  /** Whether deletion is in progress for this segment */
+  isDeleting?: boolean;
 }
 
 export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
@@ -37,6 +41,8 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   leftPercent,
   widthPercent,
   onOpenPairSettings,
+  onDelete,
+  isDeleting = false,
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
@@ -57,19 +63,9 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   );
   const badgeData = generationId ? getBadgeData(generationId) : null;
   
-  // Check if this is a recently created segment (show NEW for segments created in last 10 minutes)
-  // This catches NEW generations that aren't variants of existing ones
-  const isRecentlyCreated = useMemo(() => {
-    if (slot.type !== 'child') return false;
-    const createdAt = slot.child.created_at || slot.child.createdAt;
-    if (!createdAt) return false;
-    const createdTime = new Date(createdAt).getTime();
-    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-    return createdTime > tenMinutesAgo;
-  }, [slot]);
-  
-  // Show NEW badge if: has unviewed variants OR is recently created with no variants yet
-  const showNewBadge = badgeData?.hasUnviewedVariants || (isRecentlyCreated && (badgeData?.derivedCount || 0) === 0);
+  // Show NEW badge if: generation has any unviewed variants (including the auto-created primary)
+  // The DB trigger auto-creates a primary variant with viewed_at=null when a generation is inserted
+  const showNewBadge = badgeData?.hasUnviewedVariants || false;
   
   // Calculate preview width and aspect ratio (let height be determined by aspect ratio)
   const previewStyle = useMemo(() => {
@@ -240,12 +236,39 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
         {(badgeData || showNewBadge) && (
           <VariantBadge
             derivedCount={badgeData?.derivedCount || 0}
-            unviewedVariantCount={badgeData?.unviewedVariantCount || 0}
+            unviewedVariantCount={showNewBadge ? 1 : (badgeData?.unviewedVariantCount || 0)}
             hasUnviewedVariants={showNewBadge}
+            alwaysShowNew={showNewBadge}
             variant="overlay"
             size="lg"
             position="top-2 left-2"
           />
+        )}
+        
+        {/* Delete button - top right, appears on hover */}
+        {onDelete && (
+          <button
+            className={cn(
+              "absolute top-1 right-1 z-20 w-6 h-6 rounded-md flex items-center justify-center",
+              "bg-destructive/90 hover:bg-destructive text-destructive-foreground",
+              "transition-opacity duration-150",
+              isDeleting ? "opacity-100" : isHovering ? "opacity-100" : "opacity-0"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isDeleting) {
+                onDelete(child.id);
+              }
+            }}
+            disabled={isDeleting}
+            title="Delete segment"
+          >
+            {isDeleting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5" />
+            )}
+          </button>
         )}
         
         {/* Play icon overlay - center */}
@@ -317,8 +340,9 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
                 {(badgeData || showNewBadge) && (
                   <VariantBadge
                     derivedCount={badgeData?.derivedCount || 0}
-                    unviewedVariantCount={badgeData?.unviewedVariantCount || 0}
+                    unviewedVariantCount={showNewBadge ? 1 : (badgeData?.unviewedVariantCount || 0)}
                     hasUnviewedVariants={showNewBadge}
+                    alwaysShowNew={showNewBadge}
                     variant="inline"
                     size="md"
                     tooltipSide="top"

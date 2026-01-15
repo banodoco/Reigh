@@ -260,6 +260,8 @@ function buildIndividualTravelSegmentParams(
 
   const orchestratorDetails: Record<string, any> = {
     ...orchDetailsWithoutOrchestratorRefs,
+    // Common identifier for comparing batch vs individual segment generation
+    generation_source: 'individual_segment',
     // Ensure key fields are set
     parsed_resolution_wh: finalResolution,
     input_image_paths_resolved: allInputImages,

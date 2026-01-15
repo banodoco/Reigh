@@ -434,6 +434,8 @@ function buildTravelBetweenImagesPayload(
 
   // Build orchestrator payload matching the original edge function structure
   const orchestratorPayload: Record<string, unknown> = {
+    // Common identifier for comparing batch vs individual segment generation
+    generation_source: 'batch',
     orchestrator_task_id: taskId,
     run_id: runId,
     input_image_paths_resolved: params.image_urls,

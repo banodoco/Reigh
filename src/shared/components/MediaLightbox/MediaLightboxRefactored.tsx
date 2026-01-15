@@ -337,7 +337,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Video edit mode - unified state for video editing with sub-modes (like image edit has text/inpaint/annotate/reposition)
   // Sub-modes: 'trim' for trimming video, 'replace' for portion replacement, 'regenerate' for full regeneration
-  const [videoEditSubMode, setVideoEditSubMode] = useState<'trim' | 'replace' | 'regenerate' | null>(
+  // Note: The persisted value is read from editSettingsPersistence and used to restore on re-entry
+  // The wrapper setVideoEditSubMode is defined after editSettingsPersistence to access the persist setter
+  const [videoEditSubMode, setVideoEditSubModeLocal] = useState<'trim' | 'replace' | 'regenerate' | null>(
     initialVideoTrimMode ? 'trim' : null
   );
 
@@ -459,7 +461,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     // Advanced settings for two-pass generation
     advancedSettings,
     setAdvancedSettings,
+    // Video/Panel mode persistence
+    videoEditSubMode: persistedVideoEditSubMode,
+    panelMode: persistedPanelMode,
+    setVideoEditSubMode: setPersistedVideoEditSubMode,
+    setPanelMode: setPersistedPanelMode,
   } = editSettingsPersistence;
+
+  // Wrapper for setVideoEditSubMode that also persists to localStorage/DB
+  const setVideoEditSubMode = useCallback((mode: 'trim' | 'replace' | 'regenerate' | null) => {
+    console.log('[EDIT_DEBUG] 🎬 setVideoEditSubMode called:', mode, '(persisted was:', persistedVideoEditSubMode, ')');
+    setVideoEditSubModeLocal(mode);
+    if (mode) {
+      // Persist when entering a sub-mode (not when exiting to null)
+      setPersistedVideoEditSubMode(mode);
+    }
+  }, [setPersistedVideoEditSubMode, persistedVideoEditSubMode]);
 
   // Variants hook - fetch available variants for this generation
   // Moved early so activeVariant is available for edit hooks
@@ -800,6 +817,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleUnifiedGenerate,
     isSpecialEditMode
   } = magicEditHook;
+
+  // Persist panel mode for images when isSpecialEditMode changes
+  useEffect(() => {
+    // Only persist for images (videos have separate handling)
+    if (!isVideo) {
+      const newPanelMode = isSpecialEditMode ? 'edit' : 'info';
+      console.log('[EDIT_DEBUG] 🖼️ Image edit mode changed:', isSpecialEditMode, '→ panelMode:', newPanelMode);
+      setPersistedPanelMode(newPanelMode);
+    }
+  }, [isSpecialEditMode, isVideo, setPersistedPanelMode]);
 
   // Reposition mode hook
   const repositionHook = useRepositionMode({
@@ -1338,10 +1365,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // IMPORTANT: Use PRIMARY variant's params for regeneration, not the active variant's
   // This ensures regeneration respects the "main" variant's settings (e.g., LoRAs)
   const regenerateForm = useMemo(() => {
-    if (!isVideo || !adjustedTaskDetailsData?.task?.params) {
+    // Use media.params as fallback when task params aren't available
+    // This handles race conditions where task data hasn't loaded yet
+    const mediaParams = (media as any).params as Record<string, any> | undefined;
+    const taskDataParams = adjustedTaskDetailsData?.task?.params;
+
+    if (!isVideo || (!taskDataParams && !mediaParams)) {
       console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (not video or no params)', {
         isVideo,
-        hasTaskParams: !!adjustedTaskDetailsData?.task?.params,
+        hasTaskParams: !!taskDataParams,
+        hasMediaParams: !!mediaParams,
       });
       return null;
     }
@@ -1355,12 +1388,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       primaryParams.additional_loras
     );
 
+    // Priority: primaryVariant params > task data params > media params (fallback)
     const taskParams = primaryHasTaskData
       ? primaryParams
-      : adjustedTaskDetailsData.task.params as Record<string, any>;
+      : (taskDataParams ?? mediaParams) as Record<string, any>;
+
+    // Determine source for logging
+    const paramsSource = primaryHasTaskData
+      ? 'primaryVariant'
+      : (taskDataParams ? 'adjustedTaskDetailsData' : 'mediaParams');
 
     console.log('[MediaLightbox] [RegenerateParams] Using params from:', {
-      source: primaryHasTaskData ? 'primaryVariant' : 'adjustedTaskDetailsData',
+      source: paramsSource,
       primaryVariantId: primaryVariant?.id?.substring(0, 8),
       primaryHasTaskData,
       hasAdditionalLoras: !!(taskParams.additional_loras || taskParams.orchestrator_details?.additional_loras),
@@ -1374,7 +1413,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     // Fall back to passed inputImages if task params don't have them
     // This is critical for parent videos after "Join Segments" - the join task
     // doesn't have original input images, but the caller derives them from generation params
-    if (!segmentImageInfo.hasImages && adjustedTaskDetailsData.inputImages?.length > 0) {
+    if (!segmentImageInfo.hasImages && adjustedTaskDetailsData?.inputImages?.length > 0) {
         console.log('[MediaLightbox] [RegenerateImages] Using passed inputImages as fallback:', adjustedTaskDetailsData.inputImages.length);
         const passedImages = adjustedTaskDetailsData.inputImages;
         segmentImageInfo = {
@@ -1442,10 +1481,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     );
   }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant]);
 
-  // Handle entering video edit mode (unified) - defaults to trim sub-mode
+  // Handle entering video edit mode (unified) - restores last used sub-mode
   const handleEnterVideoEditMode = useCallback(() => {
-    setVideoEditSubMode('trim');
-    onTrimModeChange?.(true);
+    // Restore from persisted value (defaults to 'trim' if not set)
+    const restoredMode = persistedVideoEditSubMode || 'trim';
+    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoEditMode: restoring to', restoredMode, '(persisted:', persistedVideoEditSubMode, ')');
+    setVideoEditSubMode(restoredMode);
+    setPersistedPanelMode('edit');
+
+    // Only trigger trim mode change if restoring to trim
+    if (restoredMode === 'trim') {
+      onTrimModeChange?.(true);
+    }
 
     // Try to capture video duration from already-loaded video element
     setTimeout(() => {
@@ -1456,18 +1503,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         }
       });
     }, 100);
-  }, [onTrimModeChange, setVideoDuration]);
+  }, [onTrimModeChange, setVideoDuration, persistedVideoEditSubMode, setVideoEditSubMode, setPersistedPanelMode]);
 
   // Handle exiting video edit mode entirely
   const handleExitVideoEditMode = useCallback(() => {
+    console.log('[EDIT_DEBUG] 🎬 handleExitVideoEditMode: switching to Info panel');
     setVideoEditSubMode(null);
+    setPersistedPanelMode('info');
     resetTrim();
     videoEditing.setIsVideoEditMode(false);
     onTrimModeChange?.(false);
-  }, [resetTrim, videoEditing, onTrimModeChange]);
+  }, [resetTrim, videoEditing, onTrimModeChange, setVideoEditSubMode, setPersistedPanelMode]);
 
   // Handle switching to trim sub-mode
   const handleEnterVideoTrimMode = useCallback(() => {
+    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoTrimMode');
     setVideoEditSubMode('trim');
     videoEditing.setIsVideoEditMode(false);
     onTrimModeChange?.(true);
@@ -1481,28 +1531,31 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         }
       });
     }, 100);
-  }, [videoEditing, onTrimModeChange, setVideoDuration]);
+  }, [videoEditing, onTrimModeChange, setVideoDuration, setVideoEditSubMode]);
 
   // Handle switching to replace (portion) sub-mode
   const handleEnterVideoReplaceMode = useCallback(() => {
+    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoReplaceMode');
     setVideoEditSubMode('replace');
     videoEditing.setIsVideoEditMode(true);
     resetTrim();
-  }, [videoEditing, resetTrim]);
+  }, [videoEditing, resetTrim, setVideoEditSubMode]);
 
   // Handle switching to regenerate (full segment) sub-mode
   const handleEnterVideoRegenerateMode = useCallback(() => {
+    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoRegenerateMode');
     setVideoEditSubMode('regenerate');
     videoEditing.setIsVideoEditMode(false);
     resetTrim();
-  }, [videoEditing, resetTrim]);
+  }, [videoEditing, resetTrim, setVideoEditSubMode]);
 
   // Legacy handler for exiting trim mode specifically
   const handleExitVideoTrimMode = useCallback(() => {
+    console.log('[EDIT_DEBUG] 🎬 handleExitVideoTrimMode');
     setVideoEditSubMode(null);
     resetTrim();
     onTrimModeChange?.(false);
-  }, [resetTrim, onTrimModeChange]);
+  }, [resetTrim, onTrimModeChange, setVideoEditSubMode]);
 
   // Track if we're in any video edit sub-mode (trim, replace, or regenerate)
   const isVideoTrimModeActive = isVideo && isVideoTrimMode;
@@ -1540,6 +1593,58 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       isVideo,
     });
   }, [media.id, variantFetchGenerationId, variants, isLoadingVariants, shouldShowSidePanel, shouldShowSidePanelWithTrim, isVideoTrimModeActive, isVideoEditModeActive, isSpecialEditMode, showTaskDetails, isVideo]);
+
+  // ========================================
+  // AUTO-RESTORE PANEL MODE - Restore Edit mode if that was last used
+  // ========================================
+  const hasRestoredPanelModeRef = useRef(false);
+
+  useEffect(() => {
+    // Only restore once per media (prevent loops)
+    if (hasRestoredPanelModeRef.current) return;
+
+    // Don't restore if initialVideoTrimMode or autoEnterInpaint is set (explicit modes take precedence)
+    if (initialVideoTrimMode || autoEnterInpaint) {
+      console.log('[EDIT_DEBUG] 🔄 Skipping panelMode restore: explicit mode requested', {
+        initialVideoTrimMode,
+        autoEnterInpaint,
+      });
+      hasRestoredPanelModeRef.current = true;
+      return;
+    }
+
+    // Don't restore if already in edit mode
+    if (isSpecialEditMode || isInVideoEditMode) {
+      console.log('[EDIT_DEBUG] 🔄 Skipping panelMode restore: already in edit mode');
+      hasRestoredPanelModeRef.current = true;
+      return;
+    }
+
+    console.log('[EDIT_DEBUG] 🔄 Checking panelMode restore:', {
+      persistedPanelMode,
+      isVideo,
+      hasRestoredPanelModeRef: hasRestoredPanelModeRef.current,
+    });
+
+    if (persistedPanelMode === 'edit') {
+      hasRestoredPanelModeRef.current = true;
+      if (isVideo) {
+        console.log('[EDIT_DEBUG] 🔄 Restoring video Edit mode from persisted panelMode');
+        // Use setTimeout to avoid state update during render
+        setTimeout(() => handleEnterVideoEditMode(), 0);
+      } else {
+        console.log('[EDIT_DEBUG] 🔄 Restoring image Edit mode from persisted panelMode');
+        setTimeout(() => handleEnterMagicEditMode(), 0);
+      }
+    } else {
+      hasRestoredPanelModeRef.current = true;
+    }
+  }, [persistedPanelMode, isVideo, handleEnterVideoEditMode, handleEnterMagicEditMode, initialVideoTrimMode, autoEnterInpaint, isSpecialEditMode, isInVideoEditMode]);
+
+  // Reset restore flag when media changes
+  useEffect(() => {
+    hasRestoredPanelModeRef.current = false;
+  }, [media.id]);
 
   // ========================================
   // SWIPE NAVIGATION - Mobile/iPad gesture support

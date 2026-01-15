@@ -40,9 +40,11 @@ export type {
 } from './useGenerationEditSettings';
 
 export { useLastUsedEditSettings } from './useLastUsedEditSettings';
-export type { 
-  LastUsedEditSettings, 
+export type {
+  LastUsedEditSettings,
   UseLastUsedEditSettingsReturn,
+  VideoEditSubMode,
+  PanelMode,
 } from './useLastUsedEditSettings';
 
 export { useEditSettingsPersistence } from './useEditSettingsPersistence';

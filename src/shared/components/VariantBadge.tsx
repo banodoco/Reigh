@@ -45,6 +45,8 @@ export interface VariantBadgeProps {
   position?: string;
   /** Whether to show the "new" badge (default: true) */
   showNewBadge?: boolean;
+  /** Show NEW badge even when derivedCount <= 1 (won't show count badge, just NEW) */
+  alwaysShowNew?: boolean;
   /** Tooltip side for inline variant */
   tooltipSide?: 'top' | 'right' | 'bottom' | 'left';
   /** Additional class names */
@@ -53,7 +55,7 @@ export interface VariantBadgeProps {
 
 /**
  * Displays variant count badge and optional "X new" indicator
- * Only renders when derivedCount > 1
+ * Only renders when derivedCount > 1, or when alwaysShowNew is set and there's unviewed content
  */
 export const VariantBadge: React.FC<VariantBadgeProps> = ({
   derivedCount,
@@ -64,15 +66,17 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
   zIndex = 10,
   position = 'top-1 left-1',
   showNewBadge = true,
+  alwaysShowNew = false,
   tooltipSide = 'left',
   className,
 }) => {
-  // Don't render if no variants or only 1
-  if (!derivedCount || derivedCount <= 1) {
+  const hasNew = showNewBadge && hasUnviewedVariants && unviewedVariantCount && unviewedVariantCount > 0;
+  const showCountBadge = derivedCount && derivedCount > 1;
+
+  // Don't render if no variants/only 1, unless alwaysShowNew is set and there's something new
+  if (!showCountBadge && !(alwaysShowNew && hasNew)) {
     return null;
   }
-
-  const hasNew = showNewBadge && hasUnviewedVariants && unviewedVariantCount && unviewedVariantCount > 0;
 
   // Size classes for the count badge
   const sizeClasses = {
@@ -107,7 +111,7 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
   // Overlay variant: absolute positioned, uses title attributes
   if (variant === 'overlay') {
     return (
-      <div 
+      <div
         className={cn(
           'absolute flex items-center gap-0.5 pointer-events-none',
           position,
@@ -116,7 +120,7 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
         style={{ zIndex }}
       >
         {NewBadge}
-        {CountBadge}
+        {showCountBadge && CountBadge}
       </div>
     );
   }
@@ -138,23 +142,25 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
           </Tooltip>
         </TooltipProvider>
       )}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div
-              className={cn(
-                'rounded-full bg-black/50 text-white font-medium flex items-center justify-center backdrop-blur-sm cursor-help',
-                sizeClasses
-              )}
-            >
-              {derivedCount}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side={tooltipSide}>
-            <p>{derivedCount} variant{derivedCount !== 1 ? 's' : ''}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      {showCountBadge && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className={cn(
+                  'rounded-full bg-black/50 text-white font-medium flex items-center justify-center backdrop-blur-sm cursor-help',
+                  sizeClasses
+                )}
+              >
+                {derivedCount}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side={tooltipSide}>
+              <p>{derivedCount} variant{derivedCount !== 1 ? 's' : ''}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </div>
   );
 };

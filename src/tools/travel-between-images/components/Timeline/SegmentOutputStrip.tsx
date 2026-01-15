@@ -7,12 +7,15 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { Play, Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useSegmentOutputsForShot } from '../../hooks/useSegmentOutputsForShot';
 import { InlineSegmentVideo } from './InlineSegmentVideo';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { GenerationRow } from '@/types/shots';
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PairInfo {
   index: number;
@@ -63,6 +66,10 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
   
+  // Deletion state
+  const [deletingSegmentId, setDeletingSegmentId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  
   // Fetch segment outputs data - uses controlled state if provided
   const {
     parentGenerations,
@@ -81,10 +88,69 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     onSelectedParentChange
   );
   
+  // Log when segmentSlots changes (to track what's being displayed)
+  React.useEffect(() => {
+    const childSlots = segmentSlots.filter(s => s.type === 'child');
+    console.log('[SegmentDisplay] 📺 CURRENT DISPLAY:', {
+      totalSlots: segmentSlots.length,
+      childSlots: childSlots.length,
+      placeholderSlots: segmentSlots.length - childSlots.length,
+      displayedIds: childSlots.map(s => s.type === 'child' ? s.child.id : null),
+      displayedLocations: childSlots.map(s => s.type === 'child' ? s.child.location?.substring(0, 40) : null),
+    });
+  }, [segmentSlots]);
+  
+  // Mark generation as viewed (updates the primary variant's viewed_at)
+  const markGenerationViewed = useCallback(async (generationId: string) => {
+    try {
+      // First check if a variant exists
+      const { data: variants, error: checkError } = await supabase
+        .from('generation_variants')
+        .select('id, viewed_at')
+        .eq('generation_id', generationId)
+        .eq('is_primary', true);
+
+      console.log('[SegmentOutputStrip] Checking variants for generation:', generationId.substring(0, 8), variants);
+
+      if (checkError) {
+        console.error('[SegmentOutputStrip] Error checking variants:', checkError);
+        return;
+      }
+
+      if (!variants || variants.length === 0) {
+        console.log('[SegmentOutputStrip] No primary variant found for generation:', generationId.substring(0, 8));
+        return;
+      }
+
+      // Update the primary variant's viewed_at
+      const { error } = await supabase
+        .from('generation_variants')
+        .update({ viewed_at: new Date().toISOString() })
+        .eq('generation_id', generationId)
+        .eq('is_primary', true)
+        .is('viewed_at', null); // Only update if not already viewed
+
+      if (error) {
+        console.error('[SegmentOutputStrip] Error marking variant as viewed:', error);
+      } else {
+        console.log('[SegmentOutputStrip] Marked variant as viewed, invalidating queries');
+        // Invalidate variant badges to refresh NEW state
+        queryClient.invalidateQueries({ queryKey: ['variant-badges'] });
+      }
+    } catch (error) {
+      console.error('[SegmentOutputStrip] Failed to mark as viewed:', error);
+    }
+  }, [queryClient]);
+
   // Handle opening segment in lightbox
   const handleSegmentClick = useCallback((slotIndex: number) => {
+    const slot = segmentSlots[slotIndex];
+    if (slot?.type === 'child') {
+      // Mark as viewed when opening lightbox
+      markGenerationViewed(slot.child.id);
+    }
     setLightboxIndex(slotIndex);
-  }, []);
+  }, [segmentSlots, markGenerationViewed]);
   
   // Lightbox navigation - get indices of child slots that have locations
   const childSlotIndices = useMemo(() => 
@@ -111,6 +177,101 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   const handleLightboxClose = useCallback(() => {
     setLightboxIndex(null);
   }, []);
+  
+  const getPairShotGenIdFromParams = useCallback((params: Record<string, any> | null | undefined) => {
+    if (!params) return null;
+    const individualParams = params.individual_segment_params || {};
+    return individualParams.pair_shot_generation_id || params.pair_shot_generation_id || null;
+  }, []);
+
+  // Handle segment deletion - delete ALL children for the same pair
+  const handleDeleteSegment = useCallback(async (generationId: string) => {
+    setDeletingSegmentId(generationId);
+    try {
+      console.log('[SegmentDelete] Start delete:', generationId.substring(0, 8));
+
+      // Fetch the generation to find its parent and pair_shot_generation_id
+      const { data: beforeData, error: fetchError } = await supabase
+        .from('generations')
+        .select('id, type, parent_generation_id, location, params, primary_variant_id')
+        .eq('id', generationId)
+        .single();
+      
+      if (!beforeData) {
+        console.log('[SegmentDelete] Generation not found before delete');
+        return;
+      }
+
+      const pairShotGenId = getPairShotGenIdFromParams(beforeData.params as any);
+      const parentId = beforeData.parent_generation_id;
+
+      // Delete ALL child generations for this pair (prevents another segment from taking its slot)
+      let idsToDelete = [generationId];
+      if (pairShotGenId && parentId) {
+        const { data: siblings } = await supabase
+          .from('generations')
+          .select('id, params')
+          .eq('parent_generation_id', parentId);
+
+        idsToDelete = (siblings || [])
+          .filter(child => getPairShotGenIdFromParams(child.params as any) === pairShotGenId)
+          .map(child => child.id);
+      }
+
+      console.log('[SegmentDelete] Deleting children for pair:', {
+        pairShotGenId: pairShotGenId?.substring(0, 8) || 'none',
+        count: idsToDelete.length,
+        ids: idsToDelete.map(id => id.substring(0, 8))
+      });
+
+      const { error: deleteError } = await supabase
+        .from('generations')
+        .delete()
+        .in('id', idsToDelete);
+
+      if (deleteError) {
+        throw new Error(`Failed to delete: ${deleteError.message}`);
+      }
+      
+      // OPTIMISTIC UPDATE: Remove the deleted item from cache immediately
+      console.log('[SegmentDelete] Applying optimistic cache update...');
+      
+      // Find and update the segment-child-generations cache
+      queryClient.setQueriesData(
+        { predicate: (query) => query.queryKey[0] === 'segment-child-generations' },
+        (oldData: any) => {
+          if (!oldData || !Array.isArray(oldData)) return oldData;
+          const filtered = oldData.filter((item: any) => !idsToDelete.includes(item.id));
+          console.log('[SegmentDelete] Optimistic update: removed from cache', {
+            before: oldData.length,
+            after: filtered.length,
+            removedIds: idsToDelete.map(id => id.substring(0, 8))
+          });
+          return filtered;
+        }
+      );
+      
+      // Then invalidate and refetch to get fresh data from server
+      console.log('[SegmentDelete] Invalidating and refetching caches...');
+      await queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === 'segment-child-generations',
+        refetchType: 'all'
+      });
+      await queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === 'segment-parent-generations',
+        refetchType: 'all'
+      });
+      await queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+      await queryClient.invalidateQueries({ queryKey: ['generations'] });
+      
+      console.log('[SegmentDelete] Delete complete');
+    } catch (error) {
+      console.error('[SegmentDelete] ❌ FAILED:', error);
+      toast.error(`Failed to delete segment: ${(error as Error).message}`);
+    } finally {
+      setDeletingSegmentId(null);
+    }
+  }, [getPairShotGenIdFromParams, queryClient]);
   
   // Get current lightbox media
   const currentLightboxSlot = useMemo(() => 
@@ -202,10 +363,6 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
                 // Get position for this slot's pair index
                 const position = segmentPositions.find(p => p.pairIndex === slot.index);
                 
-                // Debug: log what position each video is getting
-                const videoId = slot.type === 'child' ? slot.child.id.substring(0, 8) : 'placeholder';
-                console.log(`[PairSlot] 🎨 RENDER: ${videoId} | slot.index=${slot.index} | position.pairIndex=${position?.pairIndex} | leftPercent=${position?.leftPercent?.toFixed(1)}%`);
-                
                 if (!position) return null;
                 
                 return (
@@ -219,6 +376,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
                     leftPercent={position.leftPercent}
                     widthPercent={position.widthPercent}
                     onOpenPairSettings={onOpenPairSettings}
+                    onDelete={handleDeleteSegment}
+                    isDeleting={slot.type === 'child' && slot.child.id === deletingSegmentId}
                   />
                 );
               })}

@@ -478,55 +478,33 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     return { success: false, error: 'No project selected' };
   }
 
-  // CRITICAL: Wait for any pending mutations (add/reorder/delete images) to complete before submitting task
+  // Wait for any pending mutations (add/reorder/delete images) to complete before submitting task
   // This prevents race conditions where the user adds/reorders images and immediately clicks Generate,
   // causing the task to be submitted with stale data (before the mutation commits to the database)
-  const pendingMutations = queryClient.isMutating();
+  const mutationCache = queryClient.getMutationCache();
+  const pendingMutations = mutationCache.getAll().filter(m => m.state.status === 'pending');
 
-  if (pendingMutations > 0) {
-    console.log('[TaskSubmission] ⏳ Waiting for pending mutations to complete...', { count: pendingMutations });
+  if (pendingMutations.length > 0) {
+    console.log('[TaskSubmission] ⏳ Awaiting', pendingMutations.length, 'pending mutations...');
 
-    const maxWaitTime = 5000; // 5 second max wait
-    const pollInterval = 50; // Check every 50ms
-    let totalWaitTime = 0;
+    const startTime = Date.now();
+    // Await all pending mutations directly (with 1s safety cap)
+    await Promise.race([
+      Promise.all(pendingMutations.map(m => m.state.promise?.catch(() => {}))),
+      new Promise(resolve => setTimeout(resolve, 1000))
+    ]);
 
-    while (queryClient.isMutating() > 0 && totalWaitTime < maxWaitTime) {
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-      totalWaitTime += pollInterval;
-    }
+    const elapsed = Date.now() - startTime;
+    const stillPending = mutationCache.getAll().filter(m => m.state.status === 'pending').length;
 
-    if (queryClient.isMutating() > 0) {
-      console.warn('[TaskSubmission] ⚠️ Mutations still pending after timeout, proceeding anyway');
+    if (stillPending > 0) {
+      console.warn('[TaskSubmission] ⚠️', stillPending, 'mutations still pending after 1s, proceeding anyway');
     } else {
-      console.log('[TaskSubmission] ✅ All mutations completed after', totalWaitTime, 'ms');
+      console.log('[TaskSubmission] ✅ All mutations completed in', elapsed, 'ms');
     }
-
-    // Small additional delay to ensure database consistency after mutation completes
-    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
-  // CRITICAL: Refresh shot data from database before task submission to ensure we have the latest images
-  console.log('[TaskSubmission] Refreshing shot data before video generation...');
-  try {
-    // Invalidate and wait for fresh data
-    queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-    await queryClient.refetchQueries({ queryKey: ['shots', projectId] });
-    
-    // Also refresh the shot-specific data if we have the hook available
-    if (onShotImagesUpdate) {
-      onShotImagesUpdate();
-    }
-    
-    console.log('[TaskSubmission] Shot data refreshed successfully');
-    
-    // Small delay to ensure state propagation completes
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-  } catch (error) {
-    console.error('[TaskSubmission] Failed to refresh shot data:', error);
-    toast.error('Failed to refresh image data. Please try again.');
-    return { success: false, error: 'Failed to refresh shot data' };
-  }
+  // Note: We query the database directly below (not from cache), so no need to refresh React Query cache here
 
   let resolution: string | undefined = undefined;
 

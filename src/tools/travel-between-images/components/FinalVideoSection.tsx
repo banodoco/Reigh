@@ -9,6 +9,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Check, Film, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
 import { Separator } from '@/shared/components/ui/separator';
 import {
   Select,
@@ -34,6 +35,7 @@ interface FinalVideoSectionProps {
   projectId: string;
   projectAspectRatio?: string;
   onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+  onJoinSegmentsClick?: () => void;
   /** Optional controlled selected parent ID (shared with other components) */
   selectedParentId?: string | null;
   /** Optional callback when selected parent changes (for controlled mode) */
@@ -49,6 +51,7 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   projectId,
   projectAspectRatio,
   onApplySettingsFromTask,
+  onJoinSegmentsClick,
   selectedParentId: controlledSelectedParentId,
   onSelectedParentChange,
   parentGenerations: parentGenerationsFromProps,
@@ -195,20 +198,15 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
               )}
               
               {/* Progress indicator */}
-              {currentProgress.total > 0 && (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  {currentProgress.completed === currentProgress.total ? (
-                    <>
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>{currentProgress.total} {currentProgress.total === 1 ? 'segment' : 'segments'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                      <span>{currentProgress.completed}/{currentProgress.total} segments</span>
-                    </>
-                  )}
-                </div>
+              {currentProgress.total > 0 && currentProgress.completed === currentProgress.total && onJoinSegmentsClick && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onJoinSegmentsClick}
+                >
+                  Join clips
+                </Button>
               )}
             </div>
           </div>
@@ -262,7 +260,7 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center pt-4 pb-2 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center pt-4 pb-1 text-muted-foreground">
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -270,8 +268,7 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
                 </div>
               ) : currentProgress.total > 0 && currentProgress.completed < currentProgress.total ? (
                 <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                  <span className="text-sm">Generating... {currentProgress.completed}/{currentProgress.total}</span>
+                  <span className="text-sm">{currentProgress.completed}/{currentProgress.total} segments generated...</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">

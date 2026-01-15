@@ -662,12 +662,27 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         };
       })();
 
+      // CRITICAL: Always use structure_videos from initialParams (the prop) rather than local state.
+      // This ensures that any changes to structure video settings made while the modal is open
+      // are reflected in the task, avoiding race conditions between useEffect and button clicks.
+      const freshStructureVideos = initialParams?.orchestrator_details?.structure_videos;
+      const paramsForTaskWithFreshStructureVideos = freshStructureVideos?.length > 0
+        ? {
+            ...paramsForTask,
+            orchestrator_details: {
+              ...(paramsForTask.orchestrator_details || {}),
+              structure_videos: freshStructureVideos,
+            },
+          }
+        : paramsForTask;
+
       // [MultiStructureDebug] Log the orchestrator_details being passed for multi-structure video support
-      const orchDetails = paramsForTask.orchestrator_details || {};
+      const orchDetails = paramsForTaskWithFreshStructureVideos.orchestrator_details || {};
       console.log('[SegmentRegenerateControls] [MultiStructureDebug] Orchestrator details being passed:', {
-        hasOrchestratorDetails: !!paramsForTask.orchestrator_details,
+        hasOrchestratorDetails: !!paramsForTaskWithFreshStructureVideos.orchestrator_details,
         hasStructureVideos: !!orchDetails.structure_videos && orchDetails.structure_videos.length > 0,
         structureVideosCount: orchDetails.structure_videos?.length ?? 0,
+        freshStructureVideosFromProps: freshStructureVideos?.length ?? 0,
         hasSegmentFramesExpanded: !!orchDetails.segment_frames_expanded,
         segmentFramesExpandedLength: orchDetails.segment_frames_expanded?.length ?? 0,
         hasFrameOverlapExpanded: !!orchDetails.frame_overlap_expanded,
@@ -689,7 +704,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         start_image_generation_id: startImageGenerationId,
         end_image_generation_id: endImageGenerationId,
         pair_shot_generation_id: pairShotGenerationId,
-        originalParams: paramsForTask,
+        originalParams: paramsForTaskWithFreshStructureVideos,
         // UI overrides
         base_prompt: uiBasePrompt,
         negative_prompt: uiNegativePrompt,

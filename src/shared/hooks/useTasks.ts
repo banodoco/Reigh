@@ -705,12 +705,14 @@ async function cancelPendingTasks(projectId: string): Promise<CancelAllPendingTa
 // Hook to cancel a task using Supabase
 export const useCancelTask = (projectId: string | null) => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: cancelTask,
     onSuccess: (_, taskId) => {
-      console.log(`[${Date.now()}] [useCancelTask] Task cancelled, emitting domain event for projectId:`, projectId);
-      // Task cancellation event is now handled by DataFreshnessManager via realtime events
+      console.log(`[${Date.now()}] [useCancelTask] Task cancelled, invalidating queries for projectId:`, projectId);
+      // Immediately invalidate tasks queries so cancelled task disappears
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
     },
     onError: (error: Error) => {
       console.error('Error cancelling task:', error);
@@ -722,12 +724,14 @@ export const useCancelTask = (projectId: string | null) => {
 // Hook to cancel pending tasks using Supabase
 export const useCancelPendingTasks = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: cancelPendingTasks,
     onSuccess: (data, projectId) => {
-      console.log(`[${Date.now()}] [useCancelPendingTasks] Tasks cancelled, emitting batch domain event for projectId:`, projectId);
-      // Task batch cancellation event is now handled by DataFreshnessManager via realtime events
+      console.log(`[${Date.now()}] [useCancelPendingTasks] Tasks cancelled, invalidating queries for projectId:`, projectId);
+      // Immediately invalidate tasks queries so cancelled tasks disappear
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
     },
     onError: (error: Error) => {
       console.error('Error cancelling pending tasks:', error);

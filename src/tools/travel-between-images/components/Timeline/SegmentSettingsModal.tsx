@@ -250,39 +250,37 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
         {...{...modal.props}}
       >
         <div className={modal.headerClass}>
-          <DialogHeader className="pl-4 pr-10 pt-2 pb-0 flex-shrink-0">
+          <DialogHeader className="px-10 pt-2 pb-0 flex-shrink-0">
             {/* Navigation Header */}
-            <div className="flex items-center justify-between mb-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleNavigatePrevious}
-                disabled={!hasPrevious}
-                className="h-8 w-8 p-0"
-                title="Previous pair"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-
-              <div className="flex flex-col items-center text-center">
+            <div className="flex flex-col items-center mb-2">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNavigatePrevious}
+                  disabled={!hasPrevious}
+                  className="h-8 w-8 p-0"
+                  title="Previous pair"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
                 <DialogTitle className={modal.isMobile ? 'text-base' : 'text-lg'}>
                   Pair {pairData.index + 1}
                 </DialogTitle>
-                <span className="text-sm font-normal text-muted-foreground">
-                  {framesToSeconds(pairData.frames)} ({pairData.frames} frames)
-                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNavigateNext}
+                  disabled={!hasNext}
+                  className="h-8 w-8 p-0"
+                  title="Next pair"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
               </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleNavigateNext}
-                disabled={!hasNext}
-                className="h-8 w-8 p-0"
-                title="Next pair"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
+              <span className="text-sm font-normal text-muted-foreground">
+                {framesToSeconds(pairData.frames)} ({pairData.frames} frames)
+              </span>
             </div>
           </DialogHeader>
         </div>

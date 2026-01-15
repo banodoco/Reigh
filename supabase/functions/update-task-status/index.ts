@@ -513,6 +513,12 @@ serve(async (req) => {
     if (status === "In Progress") {
       updatePayload.generation_started_at = new Date().toISOString();
     }
+
+    // Reset generation_started_at when explicitly requested (after model loading)
+    // This allows billing to start from when actual work begins, not when task was claimed
+    if (requestBody.reset_generation_started_at === true) {
+      updatePayload.generation_started_at = new Date().toISOString();
+    }
     
     if (status === "Complete") {
       updatePayload.generation_processed_at = new Date().toISOString();

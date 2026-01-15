@@ -3,6 +3,12 @@ import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import type { EditMode, LoraMode, EditAdvancedSettings } from './useGenerationEditSettings';
 import { DEFAULT_ADVANCED_SETTINGS } from './useGenerationEditSettings';
 
+// Video edit sub-mode type
+export type VideoEditSubMode = 'trim' | 'replace' | 'regenerate';
+
+// Panel mode type (Info vs Edit)
+export type PanelMode = 'info' | 'edit';
+
 /**
  * "Last used" settings - stored at user/project level, no prompt
  * Used as defaults when opening a generation for the first time
@@ -17,6 +23,10 @@ export interface LastUsedEditSettings {
   img2imgEnablePromptExpansion: boolean;
   // Advanced settings for two-pass generation
   advancedSettings: EditAdvancedSettings;
+  // Video edit sub-mode (trim/replace/regenerate)
+  videoEditSubMode: VideoEditSubMode;
+  // Panel mode (info/edit) - whether user was last viewing Info or Edit panel
+  panelMode: PanelMode;
 }
 
 export const DEFAULT_LAST_USED: LastUsedEditSettings = {
@@ -29,6 +39,10 @@ export const DEFAULT_LAST_USED: LastUsedEditSettings = {
   img2imgEnablePromptExpansion: false,
   // Advanced settings defaults
   advancedSettings: DEFAULT_ADVANCED_SETTINGS,
+  // Video defaults
+  videoEditSubMode: 'trim',
+  // Panel defaults
+  panelMode: 'info',
 };
 
 // localStorage keys for instant access (no loading delay)
@@ -85,21 +99,27 @@ export function useLastUsedEditSettings({
       const projectStored = localStorage.getItem(STORAGE_KEY_PROJECT(projectId));
       if (projectStored) {
         const parsed = JSON.parse(projectStored);
+        const merged = { ...DEFAULT_LAST_USED, ...parsed };
         console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: From project localStorage');
         console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: projectId:', projectId.substring(0, 8));
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: editMode:', parsed.editMode);
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: loraMode:', parsed.loraMode);
-        return { ...DEFAULT_LAST_USED, ...parsed };
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: editMode:', merged.editMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: loraMode:', merged.loraMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: videoEditSubMode:', merged.videoEditSubMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: panelMode:', merged.panelMode);
+        return merged;
       }
-      
+
       // Fall back to global (for new projects)
       const globalStored = localStorage.getItem(STORAGE_KEY_GLOBAL);
       if (globalStored) {
         const parsed = JSON.parse(globalStored);
+        const merged = { ...DEFAULT_LAST_USED, ...parsed };
         console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: From GLOBAL localStorage (new project fallback)');
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: editMode:', parsed.editMode);
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: loraMode:', parsed.loraMode);
-        return { ...DEFAULT_LAST_USED, ...parsed };
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: editMode:', merged.editMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: loraMode:', merged.loraMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: videoEditSubMode:', merged.videoEditSubMode);
+        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: panelMode:', merged.panelMode);
+        return merged;
       }
       
       console.log('[EDIT_DEBUG] ⚠️ LAST-USED LOAD: No localStorage found, using defaults');
@@ -137,6 +157,8 @@ export function useLastUsedEditSettings({
       console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: Synced from DB to localStorage');
       console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: editMode:', merged.editMode);
       console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: loraMode:', merged.loraMode);
+      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: videoEditSubMode:', merged.videoEditSubMode);
+      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: panelMode:', merged.panelMode);
       
       // Update localStorage with DB values
       try {
@@ -154,22 +176,37 @@ export function useLastUsedEditSettings({
     const merged = { ...prev, ...updates };
 
     // If nothing actually changed, don't write (prevents save loops)
+    // IMPORTANT: Check ALL fields in LastUsedEditSettings, not just a subset
+    const advancedSettingsChanged =
+      JSON.stringify(prev.advancedSettings) !== JSON.stringify(merged.advancedSettings);
+
     if (
       prev.editMode === merged.editMode &&
       prev.loraMode === merged.loraMode &&
       prev.customLoraUrl === merged.customLoraUrl &&
-      prev.numGenerations === merged.numGenerations
+      prev.numGenerations === merged.numGenerations &&
+      prev.img2imgStrength === merged.img2imgStrength &&
+      prev.img2imgEnablePromptExpansion === merged.img2imgEnablePromptExpansion &&
+      prev.videoEditSubMode === merged.videoEditSubMode &&
+      prev.panelMode === merged.panelMode &&
+      !advancedSettingsChanged
     ) {
+      console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: No changes detected, skipping save');
       return;
     }
 
     currentValueRef.current = merged;
-    
+
     console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: Updating "last used" settings');
     console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: editMode:', merged.editMode);
     console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: loraMode:', merged.loraMode);
     console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: numGenerations:', merged.numGenerations);
     console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: customLoraUrl:', merged.customLoraUrl || '(empty)');
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: img2imgStrength:', merged.img2imgStrength);
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: img2imgEnablePromptExpansion:', merged.img2imgEnablePromptExpansion);
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: videoEditSubMode:', merged.videoEditSubMode);
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: panelMode:', merged.panelMode);
+    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: advancedSettingsChanged:', advancedSettingsChanged);
     
     // 1. Update localStorage (instant for next time)
     try {

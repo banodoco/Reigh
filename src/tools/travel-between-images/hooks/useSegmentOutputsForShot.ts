@@ -302,7 +302,7 @@ export function useSegmentOutputsForShot(
       }
       
       console.log('[useSegmentOutputsForShot] Found children:', data?.length || 0);
-      
+
       return (data || []).map(transformToGenerationRow);
     },
     enabled: !!selectedParentId,
@@ -461,22 +461,24 @@ export function useSegmentOutputsForShot(
       if (derivedSlot !== undefined && !usedSlots.has(derivedSlot)) {
         childrenBySlot.set(derivedSlot, child);
         usedSlots.add(derivedSlot);
+        console.log(`[PairSlot] ✅ Assigned video ${child.id.substring(0, 8)} to slot ${derivedSlot}`);
+      } else if (derivedSlot !== undefined && usedSlots.has(derivedSlot)) {
+        // Slot collision! Another segment wants the same slot
+        const existingChild = childrenBySlot.get(derivedSlot);
+        console.log(`[PairSlot] ⚠️ SLOT COLLISION: Video ${child.id.substring(0, 8)} wants slot ${derivedSlot} but it's taken by ${existingChild?.id.substring(0, 8)}`);
+        childrenWithoutValidSlot.push(child);
       } else {
         childrenWithoutValidSlot.push(child);
       }
     });
     
-    // Assign orphans to available slots
-    let nextAvailableSlot = 0;
-    childrenWithoutValidSlot.forEach(child => {
-      while (nextAvailableSlot < slotCount && childrenBySlot.has(nextAvailableSlot)) {
-        nextAvailableSlot++;
-      }
-      if (nextAvailableSlot < slotCount) {
-        childrenBySlot.set(nextAvailableSlot, child);
-        nextAvailableSlot++;
-      }
-    });
+    // DON'T assign orphans to available slots - this was causing deleted segments
+    // to be replaced by other segments. Orphan segments (without valid pair_shot_generation_id)
+    // should NOT be displayed. They'll remain hidden until regenerated for the correct slot.
+    if (childrenWithoutValidSlot.length > 0) {
+      console.log(`[PairSlot] ⚠️ ${childrenWithoutValidSlot.length} orphan segments will NOT be displayed:`, 
+        childrenWithoutValidSlot.map(c => c.id.substring(0, 8)));
+    }
     
     // Fill in slots using LIVE timeline data for placeholders
     for (let i = 0; i < slotCount; i++) {

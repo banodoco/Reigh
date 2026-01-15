@@ -8,9 +8,11 @@ import {
   DEFAULT_EDIT_SETTINGS,
   DEFAULT_ADVANCED_SETTINGS,
 } from './useGenerationEditSettings';
-import { 
+import {
   useLastUsedEditSettings,
   type LastUsedEditSettings,
+  type VideoEditSubMode,
+  type PanelMode,
 } from './useLastUsedEditSettings';
 
 export interface UseEditSettingsPersistenceProps {
@@ -46,7 +48,13 @@ export interface UseEditSettingsPersistenceReturn {
   setImg2imgEnablePromptExpansion: (enabled: boolean) => void;
   // Advanced settings setter
   setAdvancedSettings: (updates: Partial<EditAdvancedSettings>) => void;
-  
+
+  // Video/Panel mode settings (persisted to "last used" only)
+  videoEditSubMode: VideoEditSubMode;
+  panelMode: PanelMode;
+  setVideoEditSubMode: (mode: VideoEditSubMode) => void;
+  setPanelMode: (mode: PanelMode) => void;
+
   // Computed LoRAs for task creation
   editModeLoRAs: Array<{ url: string; strength: number }> | undefined;
   
@@ -160,19 +168,25 @@ export function useEditSettingsPersistence({
   ]);
   
   // Compute effective values
-  // When no persisted settings, use lastUsed values (not defaults from generationSettings)
-  // This fixes the race condition where generationSettings.settings hasn't been updated yet
+  // editMode is ALWAYS from lastUsed (user-level, not per-generation) so it stays consistent across images/videos
+  // Other settings like prompt, loraMode are per-generation
   const effectiveSettings = useMemo(() => {
     if (generationSettings.isLoading) {
-      // Still loading, use defaults
-      return DEFAULT_EDIT_SETTINGS;
+      // Still loading, use defaults but editMode from lastUsed
+      return {
+        ...DEFAULT_EDIT_SETTINGS,
+        editMode: lastUsedSettings.lastUsed.editMode,
+      };
     }
-    
+
     if (generationSettings.hasPersistedSettings) {
-      // Has persisted settings, use them
-      return generationSettings.settings;
+      // Has persisted settings, use them BUT override editMode with lastUsed (user-level)
+      return {
+        ...generationSettings.settings,
+        editMode: lastUsedSettings.lastUsed.editMode,
+      };
     }
-    
+
     // No persisted settings yet.
     // Before the coordinator finishes initialization, we use lastUsed as defaults.
     // After initialization, always prefer the live generationSettings state so controls
@@ -192,9 +206,11 @@ export function useEditSettingsPersistence({
       };
     }
 
-    // Initialized: use the live per-generation state (it already has lastUsed applied,
-    // with prompts intentionally blank).
-    return generationSettings.settings;
+    // Initialized: use the live per-generation state BUT override editMode with lastUsed (user-level)
+    return {
+      ...generationSettings.settings,
+      editMode: lastUsedSettings.lastUsed.editMode,
+    };
   }, [
     isReady,
     generationSettings.isLoading,
@@ -205,11 +221,11 @@ export function useEditSettingsPersistence({
   
   // Wrapper setters that also update "last used" (except prompt)
   // IMPORTANT: memoize these so downstream effects don't fire every render.
+  // editMode is user-level only (not per-generation) so it stays consistent across images/videos
   const setEditMode = useCallback((mode: EditMode) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: editMode →', mode);
-    generationSettings.setEditMode(mode);
+    console.log('[EDIT_DEBUG] 🔧 SET: editMode →', mode, '(user-level only)');
     lastUsedSettings.updateLastUsed({ editMode: mode });
-  }, [generationSettings, lastUsedSettings]);
+  }, [lastUsedSettings]);
   
   const setLoraMode = useCallback((mode: LoraMode) => {
     console.log('[EDIT_DEBUG] 🔧 SET: loraMode →', mode);
@@ -262,7 +278,18 @@ export function useEditSettingsPersistence({
     const currentAdvanced = effectiveSettings.advancedSettings ?? DEFAULT_ADVANCED_SETTINGS;
     lastUsedSettings.updateLastUsed({ advancedSettings: { ...currentAdvanced, ...updates } });
   }, [generationSettings, lastUsedSettings, effectiveSettings.advancedSettings]);
-  
+
+  // Video/Panel mode setters (only save to "last used", not per-generation)
+  const setVideoEditSubMode = useCallback((mode: VideoEditSubMode) => {
+    console.log('[EDIT_DEBUG] 🔧 SET: videoEditSubMode →', mode);
+    lastUsedSettings.updateLastUsed({ videoEditSubMode: mode });
+  }, [lastUsedSettings]);
+
+  const setPanelMode = useCallback((mode: PanelMode) => {
+    console.log('[EDIT_DEBUG] 🔧 SET: panelMode →', mode);
+    lastUsedSettings.updateLastUsed({ panelMode: mode });
+  }, [lastUsedSettings]);
+
   // Computed LoRAs based on mode (replaces useEditModeLoRAs logic)
   const editModeLoRAs = useMemo(() => {
     const { loraMode, customLoraUrl } = effectiveSettings;
@@ -302,6 +329,8 @@ export function useEditSettingsPersistence({
   console.log('[EDIT_DEBUG] 📊 img2imgPromptHasBeenSet:', effectiveSettings.img2imgPromptHasBeenSet);
   console.log('[EDIT_DEBUG] 📊 img2imgStrength:', effectiveSettings.img2imgStrength);
   console.log('[EDIT_DEBUG] 📊 img2imgEnablePromptExpansion:', effectiveSettings.img2imgEnablePromptExpansion);
+  console.log('[EDIT_DEBUG] 📊 videoEditSubMode:', lastUsedSettings.lastUsed.videoEditSubMode);
+  console.log('[EDIT_DEBUG] 📊 panelMode:', lastUsedSettings.lastUsed.panelMode);
   console.log('[EDIT_DEBUG] ───────────────────────────────────────────────────────────────');
 
   return {
@@ -331,7 +360,13 @@ export function useEditSettingsPersistence({
     setImg2imgEnablePromptExpansion,
     // Advanced settings setter
     setAdvancedSettings,
-    
+
+    // Video/Panel mode (from "last used")
+    videoEditSubMode: lastUsedSettings.lastUsed.videoEditSubMode,
+    panelMode: lastUsedSettings.lastUsed.panelMode,
+    setVideoEditSubMode,
+    setPanelMode,
+
     // Computed
     editModeLoRAs,
     
@@ -347,6 +382,6 @@ export function useEditSettingsPersistence({
 }
 
 // Re-export types for convenience
-export type { EditMode, LoraMode, EditAdvancedSettings, GenerationEditSettings, LastUsedEditSettings };
+export type { EditMode, LoraMode, EditAdvancedSettings, GenerationEditSettings, LastUsedEditSettings, VideoEditSubMode, PanelMode };
 export { DEFAULT_EDIT_SETTINGS, DEFAULT_ADVANCED_SETTINGS };
 

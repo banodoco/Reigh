@@ -237,16 +237,25 @@ export function getContentType(filename: string): string {
  * Build generation params starting from normalized task params
  */
 export function buildGenerationParams(
-  baseParams: any, 
-  toolType: string, 
-  contentType?: string, 
-  shotId?: string, 
-  thumbnailUrl?: string
+  baseParams: any,
+  toolType: string,
+  contentType?: string,
+  shotId?: string,
+  thumbnailUrl?: string,
+  sourceTaskId?: string
 ): any {
   let generationParams = { ...baseParams };
 
   // Add tool_type to the params JSONB
   generationParams.tool_type = toolType;
+
+  // Add source_task_id if provided
+  // IMPORTANT: This is used by the auto_view_manual_upload_variant trigger
+  // to distinguish task-created generations (which should show NEW badge)
+  // from manual uploads (which should be auto-marked as viewed)
+  if (sourceTaskId) {
+    generationParams.source_task_id = sourceTaskId;
+  }
 
   // Add content_type to params for download/display purposes
   if (contentType) {

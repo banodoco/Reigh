@@ -344,15 +344,6 @@ const TaskList: React.FC<TaskListProps> = ({
       {!showSkeleton && (filteredTasks.length > 0 || (activeFilter === 'Processing' && incomingTasks.length > 0)) && (
         <div className="flex-grow -mr-4">
           <ScrollArea className="h-full pr-4">
-              {/* Incoming/filler tasks - only show on Processing filter */}
-              {activeFilter === 'Processing' && incomingTasks.map((incoming, idx) => (
-                <React.Fragment key={incoming.id}>
-                  <IncomingTaskItem task={incoming} />
-                  {(idx < incomingTasks.length - 1 || filteredTasks.length > 0) && (
-                    <div className="h-0 border-b border-zinc-700/40 my-1" />
-                  )}
-                </React.Fragment>
-              ))}
               {/* Real tasks */}
               {filteredTasks.map((task: Task, idx: number) => (
                   <React.Fragment key={task.id}>
@@ -367,10 +358,19 @@ const TaskList: React.FC<TaskListProps> = ({
                       showProjectIndicator={showProjectIndicator}
                       projectName={projectNameMap[task.projectId]}
                     />
-                    {idx < filteredTasks.length - 1 && (
+                    {(idx < filteredTasks.length - 1 || (activeFilter === 'Processing' && incomingTasks.length > 0)) && (
                       <div className="h-0 border-b border-zinc-700/40 my-1" />
                     )}
                   </React.Fragment>
+              ))}
+              {/* Incoming/placeholder tasks at bottom - only show on Processing filter */}
+              {activeFilter === 'Processing' && incomingTasks.map((incoming, idx) => (
+                <React.Fragment key={incoming.id}>
+                  <IncomingTaskItem task={incoming} />
+                  {idx < incomingTasks.length - 1 && (
+                    <div className="h-0 border-b border-zinc-700/40 my-1" />
+                  )}
+                </React.Fragment>
               ))}
           </ScrollArea>
         </div>
