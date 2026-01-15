@@ -154,7 +154,10 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
         "px-4 pt-4 pb-2 flex-shrink-0",
         isMobile && "border-b border-border"
       )}>
-        <div className="grid grid-cols-3 gap-1 border border-border rounded-lg overflow-hidden bg-muted/30">
+        <div className={cn(
+          "grid gap-1 border border-border rounded-lg overflow-hidden bg-muted/30",
+          regenerateForm ? "grid-cols-3" : "grid-cols-2"
+        )}>
           <button
             onClick={onEnterTrimMode}
             className={cn(
