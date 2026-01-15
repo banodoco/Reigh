@@ -23,6 +23,8 @@ interface BatchSegmentVideoProps {
   isMobile?: boolean;
   /** Compact mode for smaller display */
   compact?: boolean;
+  /** Whether a task is pending (Queued/In Progress) for this segment */
+  isPending?: boolean;
 }
 
 export const BatchSegmentVideo: React.FC<BatchSegmentVideoProps> = ({
@@ -33,6 +35,7 @@ export const BatchSegmentVideo: React.FC<BatchSegmentVideoProps> = ({
   projectAspectRatio,
   isMobile = false,
   compact = false,
+  isPending = false,
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
@@ -145,8 +148,27 @@ export const BatchSegmentVideo: React.FC<BatchSegmentVideoProps> = ({
   // Thumbnail dimensions - consistent sizing for visibility
   const thumbnailHeight = isMobile ? 'h-12' : (compact ? 'h-16' : 'h-18');
 
-  // Placeholder state - show CTA to generate
+  // Placeholder state - show pending indicator or CTA to generate
   if (slot.type === 'placeholder') {
+    // If a task is pending (Queued/In Progress), show loading state
+    if (isPending) {
+      return (
+        <div
+          className={cn(
+            "w-full bg-muted/40 rounded-md border-2 border-dashed border-primary/40",
+            "flex items-center justify-center shadow-sm",
+            thumbnailHeight
+          )}
+        >
+          <div className="flex items-center gap-1.5 text-primary">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span className="text-[10px] font-medium">Pending</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Otherwise show generate CTA
     return (
       <button
         className={cn(

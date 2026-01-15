@@ -54,6 +54,8 @@ interface SegmentSettingsModalProps {
   hasNext?: boolean;
   /** Callback when frame count changes - for updating timeline */
   onFrameCountChange?: (frameCount: number) => void;
+  /** Callback when generate is initiated (for optimistic UI updates) */
+  onGenerateStarted?: (pairShotGenerationId: string | null | undefined) => void;
 }
 
 const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
@@ -76,6 +78,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
   hasPrevious = false,
   hasNext = false,
   onFrameCountChange,
+  onGenerateStarted,
 }) => {
   // [SegmentSettingsModal] Log props received
   console.log('[SegmentSettingsModal] props:', {
@@ -301,6 +304,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
             buttonLabel={isRegeneration ? "Regenerate Segment" : "Generate Segment"}
             onFrameCountChange={onFrameCountChange}
             onOverridesChange={handleOverridesChange}
+            onGenerateStarted={onGenerateStarted}
           />
           {!generationId && !shotId && (
             <p className="text-xs text-muted-foreground text-center mt-2">

@@ -13,9 +13,9 @@ import { GenerationRow } from '@/types/shots';
 import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
 
 // Slot type - either a real child or a placeholder for a processing segment
-export type SegmentSlot = 
-  | { type: 'child'; child: GenerationRow; index: number }
-  | { type: 'placeholder'; index: number; expectedFrames?: number; expectedPrompt?: string; startImage?: string; endImage?: string };
+export type SegmentSlot =
+  | { type: 'child'; child: GenerationRow; index: number; pairShotGenerationId?: string }
+  | { type: 'placeholder'; index: number; expectedFrames?: number; expectedPrompt?: string; startImage?: string; endImage?: string; pairShotGenerationId?: string };
 
 export interface ExpectedSegmentData {
   count: number;
@@ -145,7 +145,16 @@ export function useSegmentOutputsForShot(
       setInternalSelectedParentId(id);
     }
   }, [isControlled, onSelectedParentChange]);
-  
+
+  // [BatchModeSelection] Debug: trace controlled state in hook
+  console.log('[BatchModeSelection] useSegmentOutputsForShot state:', {
+    isControlled,
+    controlledSelectedParentId: controlledSelectedParentId?.substring(0, 8) || 'undefined',
+    internalSelectedParentId: internalSelectedParentId?.substring(0, 8) || 'null',
+    effectiveSelectedParentId: selectedParentId?.substring(0, 8) || 'null',
+    shotId: shotId?.substring(0, 8) || 'null',
+  });
+
   // Fetch parent generations (video outputs without parent_generation_id)
   const {
     data: parentGenerationsData,
@@ -483,12 +492,15 @@ export function useSegmentOutputsForShot(
     // Fill in slots using LIVE timeline data for placeholders
     for (let i = 0; i < slotCount; i++) {
       const child = childrenBySlot.get(i);
+      // Use live timeline for pair_shot_generation_id (shot_generations.id of start image)
+      const liveStartImage = liveTimelineData?.[i];
+      const liveEndImage = liveTimelineData?.[i + 1];
+      // Get pair_shot_generation_id: prefer live data, fall back to expected data
+      const pairShotGenerationId = liveStartImage?.id || expectedSegmentData?.pairShotGenIds?.[i];
+
       if (child) {
-        slots.push({ type: 'child', child, index: i });
+        slots.push({ type: 'child', child, index: i, pairShotGenerationId });
       } else {
-        // Use live timeline for placeholder images if available
-        const liveStartImage = liveTimelineData?.[i];
-        const liveEndImage = liveTimelineData?.[i + 1];
         slots.push({
           type: 'placeholder',
           index: i,
@@ -496,6 +508,7 @@ export function useSegmentOutputsForShot(
           expectedPrompt: expectedSegmentData?.prompts[i],
           startImage: liveStartImage?.generation_id || expectedSegmentData?.inputImages[i],
           endImage: liveEndImage?.generation_id || expectedSegmentData?.inputImages[i + 1],
+          pairShotGenerationId,
         });
       }
     }

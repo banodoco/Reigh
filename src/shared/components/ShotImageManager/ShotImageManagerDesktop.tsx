@@ -36,6 +36,8 @@ interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   // Segment video output props
   segmentSlots?: SegmentSlot[];
   onSegmentClick?: (slotIndex: number) => void;
+  /** Check if a pair_shot_generation_id has a pending task */
+  hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
 }
 
 export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = ({
@@ -50,6 +52,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   setLightboxSelectedShotId,
   segmentSlots,
   onSegmentClick,
+  hasPendingTask,
   ...props
 }) => {
   // State for showing success tick after adding to shot (positioned)
@@ -151,6 +154,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               images={lightbox.currentImages}
               selectedIds={selection.selectedIds}
               gridColsClass={gridColsClass}
+              columns={props.columns || 4}
               onItemClick={selection.handleItemClick}
               onItemDoubleClick={(idx) => lightbox.setLightboxIndex(idx)}
               onInpaintClick={(idx) => {
@@ -183,6 +187,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               dropTargetIndex={dropTargetIndex}
               segmentSlots={segmentSlots}
               onSegmentClick={onSegmentClick}
+              hasPendingTask={hasPendingTask}
             />
           </SortableContext>
           

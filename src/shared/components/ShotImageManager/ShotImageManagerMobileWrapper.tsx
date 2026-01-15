@@ -18,6 +18,8 @@ interface ShotImageManagerMobileWrapperProps extends ShotImageManagerProps {
   // Segment video output props
   segmentSlots?: SegmentSlot[];
   onSegmentClick?: (slotIndex: number) => void;
+  /** Check if a pair_shot_generation_id has a pending task */
+  hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
 }
 
 export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapperProps> = ({
@@ -31,6 +33,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
   setLightboxSelectedShotId,
   segmentSlots,
   onSegmentClick,
+  hasPendingTask,
   ...props
 }) => {
   // State for showing success tick after adding to shot (positioned)
@@ -121,6 +124,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
         onClearEnhancedPrompt={props.onClearEnhancedPrompt}
         segmentSlots={segmentSlots}
         onSegmentClick={onSegmentClick}
+        hasPendingTask={hasPendingTask}
       />
       
       {lightbox.lightboxIndex !== null && lightbox.currentImages[lightbox.lightboxIndex] && (() => {

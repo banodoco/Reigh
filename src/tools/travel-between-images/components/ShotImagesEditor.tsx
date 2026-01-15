@@ -22,6 +22,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Video } from 'lucide-react';
 import { isVideoGeneration, isPositioned, isVideoAny } from '@/shared/lib/typeGuards';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
+import { usePendingSegmentTasks } from '@/shared/hooks/usePendingSegmentTasks';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 
 interface ShotImagesEditorProps {
@@ -474,13 +475,37 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   const [isLoadingDurations, setIsLoadingDurations] = useState(false);
   
   // Fetch segment outputs for preview
+  // Uses controlled state if provided so batch mode respects FinalVideoSection selection
   const {
     segmentSlots,
     selectedParentId,
     selectedParent,
     isLoading: segmentsLoading,
-  } = useSegmentOutputsForShot(selectedShotId, projectId || '');
-  
+  } = useSegmentOutputsForShot(
+    selectedShotId,
+    projectId || '',
+    undefined, // localShotGenPositions not needed here
+    selectedOutputId,
+    onSelectedOutputChange
+  );
+
+  // [BatchModeSelection] Debug: trace controlled state flow
+  console.log('[BatchModeSelection] ShotImagesEditor hook inputs/outputs:', {
+    // Inputs (controlled state from parent)
+    controlledSelectedOutputId: selectedOutputId?.substring(0, 8) || 'NONE',
+    hasOnSelectedOutputChange: !!onSelectedOutputChange,
+    // Outputs from hook
+    hookSelectedParentId: selectedParentId?.substring(0, 8) || 'NONE',
+    segmentSlotsCount: segmentSlots.length,
+    segmentSlotIds: segmentSlots.slice(0, 3).map(s => s.type === 'child' ? s.child.id.substring(0, 8) : 'placeholder'),
+    // Context
+    generationMode,
+    selectedShotId: selectedShotId?.substring(0, 8),
+  });
+
+  // Get optimistic pending handler for immediate UI feedback when generate is clicked
+  const { addOptimisticPending } = usePendingSegmentTasks(selectedShotId, projectId || null);
+
   // [PairModalDebug] Log segment output state
   console.log('[PairModalDebug] ShotImagesEditor segment outputs:', {
     selectedShotId: selectedShotId?.substring(0, 8),
@@ -1761,8 +1786,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     }
                   }}
                   onDragStateChange={handleDragStateChange}
+                  // Segment slots for video display in batch mode
+                  segmentSlots={segmentSlots}
                 />
-                
+
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}
                 <div className="mt-4" style={{ minHeight: unpositionedGenerationsCount > 0 ? '40px' : '0px' }}>
                   {unpositionedGenerationsCount > 0 && (
@@ -2190,6 +2217,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               } : undefined,
             } : null,
           }));
+        }}
+        onGenerateStarted={(pairShotGenerationId) => {
+          // Optimistic UI update - show pending state immediately before task is detected
+          addOptimisticPending(pairShotGenerationId);
         }}
       />
       

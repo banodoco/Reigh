@@ -12,6 +12,7 @@ import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useSegmentOutputsForShot } from '../../hooks/useSegmentOutputsForShot';
 import { InlineSegmentVideo } from './InlineSegmentVideo';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { usePendingSegmentTasks } from '@/shared/hooks/usePendingSegmentTasks';
 import { GenerationRow } from '@/types/shots';
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
 import { toast } from 'sonner';
@@ -81,12 +82,15 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     segmentProgress,
     isLoading,
   } = useSegmentOutputsForShot(
-    shotId, 
-    projectId, 
+    shotId,
+    projectId,
     localShotGenPositions,
     controlledSelectedParentId,
     onSelectedParentChange
   );
+
+  // Check for pending segment tasks (Queued/In Progress)
+  const { hasPendingTask } = usePendingSegmentTasks(shotId, projectId);
   
   // Log when segmentSlots changes (to track what's being displayed)
   React.useEffect(() => {
@@ -381,9 +385,9 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
               {displaySlots.map((slot, index) => {
                 // Get position for this slot's pair index
                 const position = segmentPositions.find(p => p.pairIndex === slot.index);
-                
+
                 if (!position) return null;
-                
+
                 return (
                   <InlineSegmentVideo
                     key={slot.type === 'child' ? slot.child.id : `placeholder-${index}`}
@@ -397,6 +401,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
                     onOpenPairSettings={onOpenPairSettings}
                     onDelete={handleDeleteSegment}
                     isDeleting={slot.type === 'child' && slot.child.id === deletingSegmentId}
+                    isPending={hasPendingTask(slot.pairShotGenerationId)}
                   />
                 );
               })}

@@ -44,6 +44,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   onClearEnhancedPrompt,
   segmentSlots,
   onSegmentClick,
+  hasPendingTask,
 }) => {
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
@@ -480,6 +481,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                     projectAspectRatio={projectAspectRatio}
                     isMobile={true}
                     compact={false}
+                    isPending={hasPendingTask?.(pair.segmentSlot?.pairShotGenerationId)}
                   />
                 )}
                 {onPairClick && (
@@ -614,6 +616,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       projectAspectRatio={projectAspectRatio}
                       isMobile={true}
                       compact={true}
+                      isPending={hasPendingTask?.(prevSegmentSlot?.pairShotGenerationId)}
                     />
                   </div>
                 )}
@@ -743,6 +746,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       projectAspectRatio={projectAspectRatio}
                       isMobile={true}
                       compact={true}
+                      isPending={hasPendingTask?.(segmentSlot?.pairShotGenerationId)}
                     />
                   </div>
                 )}

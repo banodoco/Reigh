@@ -14,6 +14,7 @@ import { EmptyState } from './components/EmptyState';
 import { ShotImageManagerDesktop } from './ShotImageManagerDesktop.tsx';
 import { ShotImageManagerMobileWrapper } from './ShotImageManagerMobileWrapper.tsx';
 import { useSegmentOutputsForShot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
+import { usePendingSegmentTasks } from '@/shared/hooks/usePendingSegmentTasks';
 import MediaLightbox from '../MediaLightbox';
 import { GenerationRow } from '@/types/shots';
 import { isPositioned, isVideoGeneration } from '@/shared/lib/typeGuards';
@@ -90,13 +91,22 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
   }, [props.generationMode, lightbox.currentImages]);
 
   // Segment video outputs for batch view (only when in batch mode)
-  const {
-    segmentSlots,
-    selectedParentId,
-  } = useSegmentOutputsForShot(
+  // Use props.segmentSlots if provided (controlled from parent), otherwise fetch internally
+  const hookResult = useSegmentOutputsForShot(
+    // Only call hook if props.segmentSlots not provided
+    props.generationMode === 'batch' && !props.segmentSlots ? props.shotId || null : null,
+    props.generationMode === 'batch' && !props.segmentSlots ? props.projectId || null : null,
+    props.generationMode === 'batch' && !props.segmentSlots ? localShotGenPositions : undefined
+  );
+
+  // Use prop if provided, otherwise use hook result
+  const segmentSlots = props.segmentSlots ?? hookResult.segmentSlots;
+  const selectedParentId = hookResult.selectedParentId;
+
+  // Pending segment tasks for showing loading indicator
+  const { hasPendingTask } = usePendingSegmentTasks(
     props.generationMode === 'batch' ? props.shotId || null : null,
-    props.generationMode === 'batch' ? props.projectId || null : null,
-    props.generationMode === 'batch' ? localShotGenPositions : undefined
+    props.generationMode === 'batch' ? props.projectId || null : null
   );
   
   // Segment video lightbox state
@@ -228,6 +238,7 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
           setLightboxSelectedShotId={setLightboxSelectedShotId}
           segmentSlots={segmentSlots}
           onSegmentClick={handleSegmentClick}
+          hasPendingTask={hasPendingTask}
         />
         
         {/* Segment video lightbox */}
@@ -272,6 +283,7 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
         setLightboxSelectedShotId={setLightboxSelectedShotId}
         segmentSlots={segmentSlots}
         onSegmentClick={handleSegmentClick}
+        hasPendingTask={hasPendingTask}
       />
       
       {/* Segment video lightbox */}

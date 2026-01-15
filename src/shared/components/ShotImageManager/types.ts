@@ -91,6 +91,8 @@ export interface BaseShotImageManagerProps {
   // Segment video output props
   segmentSlots?: SegmentSlot[];
   onSegmentClick?: (slotIndex: number) => void;
+  /** Check if a pair_shot_generation_id has a pending task */
+  hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
 }
 
 export interface MobileImageItemProps {

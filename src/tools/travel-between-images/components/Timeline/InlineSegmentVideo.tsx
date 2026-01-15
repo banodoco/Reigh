@@ -30,6 +30,8 @@ interface InlineSegmentVideoProps {
   onDelete?: (generationId: string) => void;
   /** Whether deletion is in progress for this segment */
   isDeleting?: boolean;
+  /** Whether a task is pending (Queued/In Progress) for this segment */
+  isPending?: boolean;
 }
 
 export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
@@ -43,6 +45,7 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   onOpenPairSettings,
   onDelete,
   isDeleting = false,
+  isPending = false,
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
@@ -160,8 +163,24 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
     width: `calc(${widthPercent}% - 4px)`,
   };
 
-  // Placeholder (no video generated yet) state - show CTA to generate
+  // Placeholder (no video generated yet) state - show CTA to generate or pending indicator
   if (slot.type === 'placeholder') {
+    // If a task is pending (Queued/In Progress), show loading state
+    if (isPending) {
+      return (
+        <div
+          className="bg-muted/40 rounded-lg border-2 border-dashed border-primary/40 flex items-center justify-center"
+          style={adjustedPositionStyle}
+        >
+          <div className="flex flex-col items-center gap-1 text-primary">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-[10px] font-medium">Pending</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Otherwise show generate CTA
     return (
       <button
         className="bg-muted/30 rounded-lg border-2 border-dashed border-border/40 flex items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-colors group"

@@ -113,6 +113,8 @@ export interface SegmentRegenerateControlsProps {
   onOverridesChange?: (overrides: Record<string, any> | null) => void;
   /** Callback when frame count changes - for updating timeline */
   onFrameCountChange?: (frameCount: number) => void;
+  /** Callback when generate is initiated (for optimistic UI updates) */
+  onGenerateStarted?: (pairShotGenerationId: string | null | undefined) => void;
 }
 
 export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps> = ({
@@ -143,6 +145,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   showSmoothContinuation = false,
   onOverridesChange,
   onFrameCountChange,
+  onGenerateStarted,
 }) => {
   // [PairModalDebug] Log props received by SegmentRegenerateControls
   console.log('[PairModalDebug] SegmentRegenerateControls props:', {
@@ -578,6 +581,9 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     setIsRegenerating(true);
     setRegenerateSuccess(false);
 
+    // Notify parent immediately for optimistic UI update
+    onGenerateStarted?.(pairShotGenerationId);
+
     try {
       // Convert selectedLoras to the format expected by the task
       const lorasForTask = selectedLoras.map(lora => ({
@@ -767,7 +773,8 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     sviStrength1,
     sviStrength2,
     predecessorVideoUrl,
-    toast
+    toast,
+    onGenerateStarted,
   ]);
 
   // Update local state when params prop changes, preserving user overrides
