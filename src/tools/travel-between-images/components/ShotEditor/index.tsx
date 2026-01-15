@@ -15,6 +15,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { GenerationRow } from '@/types/shots';
 import FinalVideoSection from "../FinalVideoSection";
+import { OutputSelector } from "../Timeline/OutputSelector";
 import BatchSettingsForm from "../BatchSettingsForm";
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
@@ -2162,6 +2163,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             <CardContent>
               {generateMode === 'batch' ? (
                 <>
+                {/* Output selector - shows which parent generation new segments will be added to */}
+                {parentGenerations.length > 0 && (
+                  <div className="mb-4 pb-4 border-b">
+                    <OutputSelector
+                      parentGenerations={parentGenerations}
+                      selectedParentId={selectedOutputId}
+                      onSelect={setSelectedOutputId}
+                      segmentProgress={segmentProgress}
+                    />
+                  </div>
+                )}
                 <div className="flex flex-col lg:flex-row gap-6">
                     {/* Left Column: Main Settings */}
                     <div className="lg:w-1/2 order-2 lg:order-1">
