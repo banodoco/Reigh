@@ -1375,7 +1375,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         <div
           ref={containerRef}
           id="timeline-container"
-          className={`relative h-36 mb-2`}
+          className={`relative h-36 mt-3 mb-2`}
           onDoubleClick={(e) => {
             // Don't zoom if double-clicking on an item or button
             const target = e.target as HTMLElement;

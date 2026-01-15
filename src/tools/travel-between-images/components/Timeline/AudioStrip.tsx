@@ -182,8 +182,25 @@ export const AudioStrip: React.FC<AudioStripProps> = ({
         }}
         onClick={handleStripClick}
       >
+        {/* Play/Pause button - inside strip */}
+        {!readOnly && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-blue-500/30 z-10"
+            onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+            disabled={!isLoaded}
+          >
+            {isPlaying ? (
+              <Pause className="h-3.5 w-3.5 text-blue-400" />
+            ) : (
+              <Play className="h-3.5 w-3.5 text-blue-400" />
+            )}
+          </Button>
+        )}
+
         {/* Audio icon and label */}
-        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-blue-400/70 pointer-events-none">
+        <div className="absolute left-8 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-blue-400/70 pointer-events-none">
           <Volume2 className="w-3.5 h-3.5" />
           <span className="text-[10px] font-medium">
             {isLoaded
@@ -191,6 +208,18 @@ export const AudioStrip: React.FC<AudioStripProps> = ({
               : 'Loading...'}
           </span>
         </div>
+
+        {/* Delete button - inside strip */}
+        {!readOnly && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-red-500/20 z-10"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          >
+            <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-400" />
+          </Button>
+        )}
       </div>
 
       {/* Playhead */}
@@ -205,35 +234,6 @@ export const AudioStrip: React.FC<AudioStripProps> = ({
           {/* Playhead handle */}
           <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-2 h-2 bg-blue-400 rounded-full" />
         </div>
-      )}
-
-      {/* Play/Pause button */}
-      {!readOnly && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute left-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-blue-500/20"
-          onClick={togglePlay}
-          disabled={!isLoaded}
-        >
-          {isPlaying ? (
-            <Pause className="h-3.5 w-3.5 text-blue-400" />
-          ) : (
-            <Play className="h-3.5 w-3.5 text-blue-400" />
-          )}
-        </Button>
-      )}
-
-      {/* Delete button */}
-      {!readOnly && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-red-500/20"
-          onClick={onRemove}
-        >
-          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-400" />
-        </Button>
       )}
 
       {/* Hidden audio element */}

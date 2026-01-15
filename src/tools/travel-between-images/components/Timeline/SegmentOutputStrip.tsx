@@ -354,7 +354,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     <div className="w-full relative">
       {/* Segment output strip - compact height for segment thumbnails */}
       <div
-        className="relative h-32 mt-3 mb-0"
+        className="relative h-32 mt-3 mb-1"
         style={{
           width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
           minWidth: '100%',
