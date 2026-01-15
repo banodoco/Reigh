@@ -54,7 +54,8 @@ export const GuidanceVideosContainer: React.FC<GuidanceVideosContainerProps> = (
         // Standard width matching other timeline rows
         width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
         minWidth: '100%',
-        overflow: 'visible',
+        // Clip videos that extend beyond the timeline boundaries
+        overflow: 'hidden',
       }}
     >
       {/* Visual background - positioned to align with video frame strips */}

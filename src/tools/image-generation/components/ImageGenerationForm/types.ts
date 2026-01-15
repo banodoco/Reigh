@@ -1,5 +1,6 @@
 // Import API types from shared (used in interfaces below, re-exported at bottom)
 import { ReferenceMode } from '@/shared/lib/tasks/imageGeneration';
+import type { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 
 export type GenerationMode = 'wan-local' | 'qwen-image';
 
@@ -153,6 +154,15 @@ export interface HydratedReferenceImage {
   isOwner: boolean; // Whether the current user owns this reference
 }
 
+// LoRA category for storage - Qwen models and by-reference share one bucket, Z-Image has its own
+export type LoraCategory = 'qwen' | 'z-image';
+
+// Get the LoRA category for a given model (used for per-category LORA storage)
+// Any model starting with 'z-' is categorized as z-image, everything else is qwen
+export function getLoraCategoryForModel(model: TextToImageModel): LoraCategory {
+  return model.startsWith('z-') ? 'z-image' : 'qwen';
+}
+
 // Project-level settings for model and style reference
 // Note: Prompt-related no-shot settings (prompts, masterPrompt, promptMode, beforeEachPromptText,
 // afterEachPromptText, associatedShotId) are persisted via usePersistentToolState with toolId='image-generation'.
@@ -164,6 +174,10 @@ export interface ProjectImageSettings {
   generationSource?: GenerationSource;
   // Model for just-text mode
   selectedTextModel?: TextToImageModel;
+  // Per-category LoRA selections: 'qwen' (shared by all Qwen models + by-reference) and 'z-image'
+  selectedLorasByCategory?: Record<LoraCategory, ActiveLora[]>;
+  // DEPRECATED: per-model storage (migrated to selectedLorasByCategory)
+  selectedLorasByTextModel?: Record<TextToImageModel, ActiveLora[]>;
 
   // DEPRECATED: projectPrompts moved to 'image-generation' tool settings via usePersistentToolState
   // Kept for migration - will be removed after all users migrate

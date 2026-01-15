@@ -1130,8 +1130,24 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                       if (structureVideos && structureVideos.length > 0) {
                         const sorted = [...structureVideos].sort((a, b) => a.start_frame - b.start_frame);
                         const lastVideo = sorted[sorted.length - 1];
+                        const lastVideoIndex = structureVideos.findIndex(v => v.path === lastVideo.path && v.start_frame === lastVideo.start_frame);
                         start_frame = lastVideo.end_frame;
                         end_frame = start_frame + videoFrameCount;
+                        
+                        // If no space on timeline (start would be at or past fullMax),
+                        // clip 1/5 of the last video's range and place new video there
+                        if (start_frame >= fullMax && onUpdateStructureVideo && lastVideoIndex >= 0) {
+                          const lastVideoRange = lastVideo.end_frame - lastVideo.start_frame;
+                          const clipAmount = Math.max(10, Math.floor(lastVideoRange / 5)); // At least 10 frames
+                          const newLastVideoEnd = lastVideo.end_frame - clipAmount;
+                          
+                          // Only clip if the last video would still have meaningful duration
+                          if (newLastVideoEnd > lastVideo.start_frame + 10) {
+                            onUpdateStructureVideo(lastVideoIndex, { end_frame: newLastVideoEnd });
+                            start_frame = newLastVideoEnd;
+                            end_frame = start_frame + videoFrameCount;
+                          }
+                        }
                       }
                       
                       onAddStructureVideo({
@@ -1958,8 +1974,24 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             if (structureVideos && structureVideos.length > 0) {
               const sorted = [...structureVideos].sort((a, b) => a.start_frame - b.start_frame);
               const lastVideo = sorted[sorted.length - 1];
+              const lastVideoIndex = structureVideos.findIndex(v => v.path === lastVideo.path && v.start_frame === lastVideo.start_frame);
               start_frame = lastVideo.end_frame;
               end_frame = start_frame + videoFrameCount;
+              
+              // If no space on timeline (start would be at or past fullMax),
+              // clip 1/5 of the last video's range and place new video there
+              if (start_frame >= fullMax && onUpdateStructureVideo && lastVideoIndex >= 0) {
+                const lastVideoRange = lastVideo.end_frame - lastVideo.start_frame;
+                const clipAmount = Math.max(10, Math.floor(lastVideoRange / 5)); // At least 10 frames
+                const newLastVideoEnd = lastVideo.end_frame - clipAmount;
+                
+                // Only clip if the last video would still have meaningful duration
+                if (newLastVideoEnd > lastVideo.start_frame + 10) {
+                  onUpdateStructureVideo(lastVideoIndex, { end_frame: newLastVideoEnd });
+                  start_frame = newLastVideoEnd;
+                  end_frame = start_frame + videoFrameCount;
+                }
+              }
             }
             
             onAddStructureVideo({

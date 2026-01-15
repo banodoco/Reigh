@@ -158,7 +158,12 @@ function buildIndividualTravelSegmentParams(
   const loraMultipliers = orig.lora_multipliers || orchDetails.lora_multipliers || [];
   
   // Determine model settings
-  const modelName = orig.model_name || orchDetails.model_name || "wan_2_2_i2v_480p";
+  // Select model based on whether structure videos are present (VACE vs I2V)
+  const hasStructureVideos = !!(orchDetails.structure_videos?.length > 0 || orig.structure_videos?.length > 0);
+  const defaultModelName = hasStructureVideos 
+    ? "wan_2_2_vace_lightning_baseline_2_2_2"
+    : "wan_2_2_i2v_lightning_baseline_2_2_2";
+  const modelName = orig.model_name || orchDetails.model_name || defaultModelName;
   const flowShift = orig.flow_shift ?? orchDetails.flow_shift ?? 5;
   const sampleSolver = orig.sample_solver || orchDetails.sample_solver || "euler";
   const guidanceScale = orig.guidance_scale ?? orchDetails.guidance_scale ?? 3;

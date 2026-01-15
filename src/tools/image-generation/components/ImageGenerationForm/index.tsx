@@ -59,7 +59,9 @@ import {
   DEFAULT_HIRES_FIX_CONFIG,
   GenerationSource,
   TextToImageModel,
+  LoraCategory,
   getLoraTypeForModel,
+  getLoraCategoryForModel,
   getHiresFixDefaultsForModel,
   BY_REFERENCE_LORA_TYPE,
   ReferenceApiParams,
@@ -704,7 +706,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [projectImageSettings?.selectedModel]);
 
   // Initialize generationSource and selectedTextModel from project settings
+  // (LORA initialization is done separately after loraManager is created)
   const hasInitializedGenerationSource = useRef(false);
+  const initializedTextModelRef = useRef<TextToImageModel | null>(null);
   useEffect(() => {
     if (isLoadingProjectSettings) return;
     if (hasInitializedGenerationSource.current) return;
@@ -713,9 +717,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     if (projectImageSettings.generationSource) {
       setGenerationSource(projectImageSettings.generationSource);
     }
+    const textModel = projectImageSettings.selectedTextModel || 'qwen-image';
     if (projectImageSettings.selectedTextModel) {
       setSelectedTextModel(projectImageSettings.selectedTextModel);
     }
+    // Store for LORA initialization (done in separate effect after loraManager is created)
+    initializedTextModelRef.current = textModel;
     hasInitializedGenerationSource.current = true;
   }, [projectImageSettings, selectedProjectId, isLoadingProjectSettings]);
 
@@ -1084,6 +1091,34 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     disableAutoLoad: true, // Disable auto-load since we handle our own default logic
   });
 
+  // Initialize LORAs from per-category storage (runs after loraManager is created)
+  // Categories: 'qwen' (all Qwen models + by-reference) and 'z-image'
+  const hasInitializedLoras = useRef(false);
+  useEffect(() => {
+    if (isLoadingProjectSettings) return;
+    if (hasInitializedLoras.current) return;
+    
+    // Determine current category based on generation source and model
+    const textModel = initializedTextModelRef.current || selectedTextModel;
+    const currentSource = projectImageSettings?.generationSource || generationSource;
+    // by-reference always uses 'qwen' category
+    const category: LoraCategory = currentSource === 'by-reference' ? 'qwen' : getLoraCategoryForModel(textModel);
+    
+    // Try new category-based storage first, fall back to old per-model storage for migration
+    let categoryLoras: ActiveLora[] = [];
+    if (projectImageSettings?.selectedLorasByCategory) {
+      categoryLoras = projectImageSettings.selectedLorasByCategory[category] ?? [];
+    } else if (projectImageSettings?.selectedLorasByTextModel) {
+      // Migration: use old per-model storage
+      categoryLoras = projectImageSettings.selectedLorasByTextModel[textModel] ?? [];
+    }
+    
+    if (categoryLoras.length > 0) {
+      loraManager.setSelectedLoras(categoryLoras);
+    }
+    hasInitializedLoras.current = true;
+  }, [projectImageSettings?.selectedLorasByCategory, projectImageSettings?.selectedLorasByTextModel, projectImageSettings?.generationSource, isLoadingProjectSettings, loraManager, selectedTextModel, generationSource]);
+
   // Default settings for shot prompts - recomputed when shot changes to pick up fresh localStorage
   // Inheritance chain: localStorage (last edited shot) → project-level settings → hardcoded defaults
   // Reference selection defaults to most-recent reference (handled in auto-select effect)
@@ -1146,7 +1181,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   );
 
   // Persist generationSource changes to project settings and apply model-specific hires defaults
+  // Also swap LORAs when changing categories (e.g., by-reference → just-text z-image)
   const handleGenerationSourceChange = useCallback(async (source: GenerationSource) => {
+    const previousSource = generationSource;
     setGenerationSource(source);
     markAsInteracted();
 
@@ -1154,27 +1191,93 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     const modelName = source === 'by-reference' ? 'qwen-image' : selectedTextModel;
     setHiresFixConfig(getHiresFixDefaultsForModel(modelName));
 
-    try {
-      await updateProjectImageSettings('project', { generationSource: source });
-    } catch (error) {
-      console.error('[GenerationSourcePersist] Failed to save generationSource:', error);
+    // Determine categories for LORA swapping
+    // by-reference always uses 'qwen' category
+    const previousCategory: LoraCategory = previousSource === 'by-reference' ? 'qwen' : getLoraCategoryForModel(selectedTextModel);
+    const newCategory: LoraCategory = source === 'by-reference' ? 'qwen' : getLoraCategoryForModel(selectedTextModel);
+
+    // Only swap LORAs if changing categories
+    if (previousCategory !== newCategory) {
+      const currentLorasByCategory = projectImageSettings?.selectedLorasByCategory ?? {
+        'qwen': [],
+        'z-image': [],
+      };
+
+      // Save current LORAs to the previous category's slot
+      const updatedLorasByCategory = {
+        ...currentLorasByCategory,
+        [previousCategory]: loraManager.selectedLoras,
+      };
+
+      // Load LORAs for the new category
+      const newCategoryLoras = currentLorasByCategory[newCategory] ?? [];
+      loraManager.setSelectedLoras(newCategoryLoras);
+
+      try {
+        await updateProjectImageSettings('project', { 
+          generationSource: source,
+          selectedLorasByCategory: updatedLorasByCategory,
+        });
+      } catch (error) {
+        console.error('[GenerationSourcePersist] Failed to save generationSource:', error);
+      }
+    } else {
+      try {
+        await updateProjectImageSettings('project', { generationSource: source });
+      } catch (error) {
+        console.error('[GenerationSourcePersist] Failed to save generationSource:', error);
+      }
     }
-  }, [updateProjectImageSettings, markAsInteracted, selectedTextModel]);
+  }, [updateProjectImageSettings, markAsInteracted, selectedTextModel, generationSource, projectImageSettings?.selectedLorasByCategory, loraManager]);
 
   // Persist selectedTextModel changes to project settings and apply model-specific hires defaults
+  // Swap LORAs only when changing categories (qwen ↔ z-image), not between Qwen variants
   const handleTextModelChange = useCallback(async (model: TextToImageModel) => {
+    const previousModel = selectedTextModel;
+    const previousCategory = getLoraCategoryForModel(previousModel);
+    const newCategory = getLoraCategoryForModel(model);
+    
     setSelectedTextModel(model);
     markAsInteracted();
 
     // Apply model-specific hires fix defaults when changing text model
     setHiresFixConfig(getHiresFixDefaultsForModel(model));
 
-    try {
-      await updateProjectImageSettings('project', { selectedTextModel: model });
-    } catch (error) {
-      console.error('[GenerationSourcePersist] Failed to save selectedTextModel:', error);
+    // Only swap LORAs if changing categories (qwen ↔ z-image)
+    if (previousCategory !== newCategory) {
+      // Get current per-category LORA storage
+      const currentLorasByCategory = projectImageSettings?.selectedLorasByCategory ?? {
+        'qwen': [],
+        'z-image': [],
+      };
+
+      // Save current LORAs to the previous category's slot
+      const updatedLorasByCategory = {
+        ...currentLorasByCategory,
+        [previousCategory]: loraManager.selectedLoras,
+      };
+
+      // Load LORAs for the new category (or empty if none saved)
+      const newCategoryLoras = currentLorasByCategory[newCategory] ?? [];
+      loraManager.setSelectedLoras(newCategoryLoras);
+
+      try {
+        await updateProjectImageSettings('project', { 
+          selectedTextModel: model,
+          selectedLorasByCategory: updatedLorasByCategory,
+        });
+      } catch (error) {
+        console.error('[GenerationSourcePersist] Failed to save selectedTextModel:', error);
+      }
+    } else {
+      // Same category, just update the model selection
+      try {
+        await updateProjectImageSettings('project', { selectedTextModel: model });
+      } catch (error) {
+        console.error('[GenerationSourcePersist] Failed to save selectedTextModel:', error);
+      }
     }
-  }, [updateProjectImageSettings, markAsInteracted]);
+  }, [updateProjectImageSettings, markAsInteracted, selectedTextModel, projectImageSettings?.selectedLorasByCategory, loraManager]);
 
   // Single source of truth for whether shot settings are ready
   // Used by all shot-level field accessors to prevent flash of project values
@@ -1572,18 +1675,55 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } 
   }, [selectedModel, availableLoras, ready, loraManager.shouldApplyDefaults, markAsInteracted]);
 
-  // Wrap loraManager handlers to maintain markAsInteracted behavior
+  // Wrap loraManager handlers to maintain markAsInteracted behavior AND persist to per-category storage
+  // Categories: 'qwen' (all Qwen models + by-reference) and 'z-image'
+  const persistLorasToCategory = useCallback(async (loras: ActiveLora[]) => {
+    if (!updateProjectImageSettings) return;
+    // Determine current category based on generation source and model
+    const category: LoraCategory = generationSource === 'by-reference' ? 'qwen' : getLoraCategoryForModel(selectedTextModel);
+    
+    const currentLorasByCategory = projectImageSettings?.selectedLorasByCategory ?? {
+      'qwen': [],
+      'z-image': [],
+    };
+    const updatedLorasByCategory = {
+      ...currentLorasByCategory,
+      [category]: loras,
+    };
+    try {
+      await updateProjectImageSettings('project', { selectedLorasByCategory: updatedLorasByCategory });
+    } catch (error) {
+      console.error('[LoRAPersist] Failed to save LORAs to category slot:', error);
+    }
+  }, [updateProjectImageSettings, projectImageSettings?.selectedLorasByCategory, selectedTextModel, generationSource]);
+
   const handleAddLora = (loraToAdd: LoraModel) => { 
     markAsInteracted();
     loraManager.handleAddLora(loraToAdd); // markAsUserSet is now handled internally
+    // Persist to per-model storage after adding
+    const newLora: ActiveLora = {
+      id: loraToAdd["Model ID"],
+      name: loraToAdd.Name !== "N/A" ? loraToAdd.Name : loraToAdd["Model ID"],
+      path: loraToAdd.high_noise_url || loraToAdd["Model Files"]?.[0]?.url || loraToAdd["Model Files"]?.[0]?.path || '',
+      strength: 1.0,
+      previewImageUrl: loraToAdd.Images?.[0]?.url,
+      trigger_word: loraToAdd.trigger_word,
+      lowNoisePath: loraToAdd.low_noise_url,
+      isMultiStage: !!(loraToAdd.high_noise_url || loraToAdd.low_noise_url),
+    };
+    persistLorasToCategory([...loraManager.selectedLoras, newLora]);
   };
   const handleRemoveLora = (loraIdToRemove: string) => {
     markAsInteracted();
     loraManager.handleRemoveLora(loraIdToRemove); // markAsUserSet is now handled internally
+    // Persist to per-model storage after removing
+    persistLorasToCategory(loraManager.selectedLoras.filter(l => l.id !== loraIdToRemove));
   };
   const handleLoraStrengthChange = (loraId: string, newStrength: number) => {
     markAsInteracted();
     loraManager.handleLoraStrengthChange(loraId, newStrength); // markAsUserSet is now handled internally
+    // Persist to per-model storage after updating strength
+    persistLorasToCategory(loraManager.selectedLoras.map(l => l.id === loraId ? { ...l, strength: newStrength } : l));
   };
 
   // Wrap the load project LoRAs function to mark as interacted
@@ -2941,10 +3081,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             onTextModelChange={handleTextModelChange}
             selectedLoras={loraManager.selectedLoras}
             onOpenLoraModal={() => loraManager.setIsLoraModalOpen(true)}
-            onRemoveLora={(loraId) => loraManager.setSelectedLoras(loraManager.selectedLoras.filter(l => l.id !== loraId))}
-            onUpdateLoraStrength={(loraId, strength) => loraManager.setSelectedLoras(
-              loraManager.selectedLoras.map(l => l.id === loraId ? { ...l, strength } : l)
-            )}
+            onRemoveLora={handleRemoveLora}
+            onUpdateLoraStrength={handleLoraStrengthChange}
           />
         </div>
 

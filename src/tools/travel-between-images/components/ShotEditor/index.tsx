@@ -1729,6 +1729,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       clearAllEnhancedPrompts,
       // Uni3C end percent (from structure video config)
       uni3cEndPercent: structureVideoConfig.uni3c_end_percent,
+      // Pass selected output ID so new segments become children of the selected parent
+      // instead of creating a new parent generation
+      parentGenerationId: selectedOutputId ?? undefined,
     });
 
     // Handle the result
@@ -1772,6 +1775,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     loraManager.selectedLoras,
     structureVideoConfig,
     clearAllEnhancedPrompts,
+    selectedOutputId,
   ]);
 
   // Expose generateVideo function and state to parent via mutable ref

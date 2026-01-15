@@ -218,6 +218,10 @@ export interface GenerateVideoParams {
 
   // Uni3C settings (only used when structure_video_type is 'uni3c')
   uni3cEndPercent?: number;
+  
+  // Parent generation ID - if provided, new segments will be children of this generation
+  // instead of creating a new parent. Used when regenerating under a selected output.
+  parentGenerationId?: string;
 }
 
 export interface GenerateVideoResult {
@@ -254,6 +258,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     selectedLoras,
     variantNameParam,
     clearAllEnhancedPrompts,
+    parentGenerationId,
   } = params;
 
   // Destructure prompt config for convenience (snake_case matches API)
@@ -1066,6 +1071,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     ...(pairShotGenerationIds.length > 0 
       ? { pair_shot_generation_ids: pairShotGenerationIds } 
       : {}),
+    // Include parent_generation_id if provided - segments will become children of this parent
+    // instead of creating a new parent generation
+    ...(parentGenerationId ? { parent_generation_id: parentGenerationId } : {}),
     base_prompts: basePrompts,
     base_prompt: batchVideoPrompt, // Singular - the default/base prompt used for all segments
     segment_frames: segmentFrames,

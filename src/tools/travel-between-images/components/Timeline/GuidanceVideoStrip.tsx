@@ -215,11 +215,15 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   // Use the same coordinate system as SegmentOutputStrip for alignment
   const stripEffectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
   // Calculate pixel positions using same formula as timeline
+  // IMPORTANT: Clamp visual display to timeline boundaries (fullMin to fullMax)
+  // This prevents overflow while preserving actual data range
+  const clampedDisplayStart = Math.max(fullMin, displayOutputStart);
+  const clampedDisplayEnd = Math.min(fullMax, displayOutputEnd);
   const startPixel = fullRange > 0 
-    ? TIMELINE_PADDING_OFFSET + ((displayOutputStart - fullMin) / fullRange) * stripEffectiveWidth
+    ? TIMELINE_PADDING_OFFSET + ((clampedDisplayStart - fullMin) / fullRange) * stripEffectiveWidth
     : TIMELINE_PADDING_OFFSET;
   const endPixel = fullRange > 0
-    ? TIMELINE_PADDING_OFFSET + ((displayOutputEnd - fullMin) / fullRange) * stripEffectiveWidth
+    ? TIMELINE_PADDING_OFFSET + ((clampedDisplayEnd - fullMin) / fullRange) * stripEffectiveWidth
     : TIMELINE_PADDING_OFFSET + stripEffectiveWidth;
   const widthPixel = Math.max(0, endPixel - startPixel);
   
