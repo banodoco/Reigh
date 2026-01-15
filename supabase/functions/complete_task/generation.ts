@@ -411,7 +411,8 @@ async function createVariantOnParent(
   taskId: string,
   variantType: string,
   extraParams: Record<string, any> = {},
-  variantName?: string | null
+  variantName?: string | null,
+  makePrimary: boolean = true
 ): Promise<any | null> {
   console.log(`[GenMigration] ${taskData.task_type} task ${taskId} - creating variant for parent generation ${parentGenId}`);
 
@@ -439,7 +440,7 @@ async function createVariantOnParent(
       publicUrl,
       thumbnailUrl,
       variantParams,
-      true,           // is_primary
+      makePrimary,     // is_primary
       variantType,
       variantName || null
     );
@@ -786,57 +787,56 @@ export async function createGenerationFromTask(
     if (pairShotGenId && parentGenerationId && isTravelSegment) {
       console.log(`[TravelSegmentVariant] Checking for existing generation at position ${pairShotGenId}`);
       
-      // Query for existing generation with same pair_shot_generation_id that is a child of the same parent
-      const { data: existingGen, error: existingGenError } = await supabase
+      // Prefer the stable “pair anchor” over child_order, because child_order can drift if images get reordered.
+      // We scope the lookup to the same parent_generation_id and child generations only.
+      const { data: matchingGen, error: matchingGenError } = await supabase
         .from('generations')
-        .select('id, params')
+        .select('id')
         .eq('parent_generation_id', parentGenerationId)
         .eq('is_child', true)
-        .not('id', 'is', null)
-        .execute();
-      
-      if (!existingGenError && existingGen) {
-        // Find a generation with matching pair_shot_generation_id in params
-        const matchingGen = existingGen.find((gen: any) => 
-          gen.params?.pair_shot_generation_id === pairShotGenId
+        // PostgREST JSON filter: params->>pair_shot_generation_id == pairShotGenId
+        .eq('params->>pair_shot_generation_id', pairShotGenId)
+        .maybeSingle();
+
+      if (matchingGenError) {
+        console.error(`[TravelSegmentVariant] Error checking for existing generation at position ${pairShotGenId}:`, matchingGenError);
+      } else if (matchingGen?.id) {
+        console.log(`[TravelSegmentVariant] Found existing generation ${matchingGen.id} at position ${pairShotGenId} - adding as non-primary variant`);
+        logger?.info("Adding travel segment as variant to existing generation", {
+          task_id: taskId,
+          existing_generation_id: matchingGen.id,
+          pair_shot_generation_id: pairShotGenId,
+          parent_generation_id: parentGenerationId,
+          action: "add_variant_to_existing_segment"
+        });
+
+        // IMPORTANT: makePrimary=false so we *don't* replace what the user is currently seeing for that segment.
+        const variantResult = await createVariantOnParent(
+          supabase,
+          matchingGen.id,
+          publicUrl,
+          thumbnailUrl || null,
+          taskData,
+          taskId,
+          VARIANT_TYPES.TRAVEL_SEGMENT,
+          {
+            tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES,
+            created_from: 'segment_variant_at_position',
+            segment_index: childOrder,
+            pair_shot_generation_id: pairShotGenId
+          },
+          null,
+          false
         );
-        
-        if (matchingGen) {
-          console.log(`[TravelSegmentVariant] Found existing generation ${matchingGen.id} at position ${pairShotGenId} - adding as variant`);
-          logger?.info("Adding travel segment as variant to existing generation", {
-            task_id: taskId,
-            existing_generation_id: matchingGen.id,
-            pair_shot_generation_id: pairShotGenId,
-            parent_generation_id: parentGenerationId,
-            action: "add_variant_to_existing_segment"
-          });
-          
-          // Create variant on the existing generation
-          const variantResult = await createVariantOnParent(
-            supabase, 
-            matchingGen.id, 
-            publicUrl, 
-            thumbnailUrl || null, 
-            taskData, 
-            taskId,
-            VARIANT_TYPES.TRAVEL_SEGMENT, 
-            { 
-              tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, 
-              created_from: 'segment_variant_at_position',
-              segment_index: childOrder,
-              pair_shot_generation_id: pairShotGenId
-            }
-          );
-          
-          if (variantResult) {
-            console.log(`[TravelSegmentVariant] Successfully added variant to existing generation ${matchingGen.id}`);
-            return variantResult;
-          } else {
-            console.error(`[TravelSegmentVariant] Failed to create variant, falling through to new generation creation`);
-          }
-        } else {
-          console.log(`[TravelSegmentVariant] No existing generation found at position ${pairShotGenId} - will create new`);
+
+        if (variantResult) {
+          console.log(`[TravelSegmentVariant] Successfully added variant to existing generation ${matchingGen.id}`);
+          return variantResult;
         }
+
+        console.error(`[TravelSegmentVariant] Failed to create variant, falling through to new generation creation`);
+      } else {
+        console.log(`[TravelSegmentVariant] No existing generation found at position ${pairShotGenId} - will create new`);
       }
     }
 
