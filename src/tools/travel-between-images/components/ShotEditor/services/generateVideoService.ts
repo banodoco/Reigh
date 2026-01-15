@@ -53,6 +53,181 @@ export {
 };
 
 // ============================================================================
+// MASTER TIMELINE STATE LOG - For debugging FE vs BE discrepancies
+// ============================================================================
+
+/**
+ * Logs a comprehensive summary of the timeline state at generation time.
+ * This allows direct comparison between what's shown in the UI and what's submitted to the backend.
+ * 
+ * Call this right before task submission to see the exact data being sent.
+ */
+export function logTimelineMasterState(params: {
+  shotId: string;
+  shotName?: string;
+  generationMode: 'batch' | 'timeline';
+  // Timeline images
+  images: Array<{
+    shotGenId: string;
+    generationId: string;
+    timelineFrame: number | null;
+    location: string;
+  }>;
+  // Calculated pairs/segments
+  segments: Array<{
+    pairIndex: number;
+    startImageId: string;
+    endImageId: string;
+    startFrame: number;
+    endFrame: number;
+    frameCount: number;
+    basePrompt: string;
+    negativePrompt: string;
+    enhancedPrompt: string;
+    hasCustomPrompt: boolean;
+    hasEnhancedPrompt: boolean;
+  }>;
+  // Structure videos
+  structureVideos: Array<{
+    index: number;
+    path: string;
+    startFrame: number;
+    endFrame: number;
+    treatment: string;
+    motionStrength: number;
+    structureType: string;
+    affectedSegments: number[]; // Which pair indexes this video affects
+  }>;
+  // Settings
+  settings: {
+    basePrompt: string;
+    defaultNegativePrompt: string;
+    amountOfMotion: number;
+    motionMode: string;
+    advancedMode: boolean;
+    turboMode: boolean;
+    enhancePrompt: boolean;
+    modelName: string;
+    modelType: string;
+    resolution?: string;
+    loras: Array<{ name: string; path: string; strength: number }>;
+  };
+  // Total frame info
+  totalFrames: number;
+  totalDurationSeconds: number;
+}) {
+  const TAG = '[TIMELINE_MASTER_STATE]';
+  const divider = '═'.repeat(80);
+  const sectionDivider = '─'.repeat(60);
+  
+  console.log(`\n${divider}`);
+  console.log(`${TAG} 📊 TIMELINE MASTER STATE SUMMARY`);
+  console.log(`${TAG} Shot: ${params.shotName || 'Unknown'} (${params.shotId.substring(0, 8)})`);
+  console.log(`${TAG} Mode: ${params.generationMode.toUpperCase()}`);
+  console.log(`${TAG} Timestamp: ${new Date().toISOString()}`);
+  console.log(divider);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 1: TIMELINE IMAGES
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log(`\n${TAG} 🖼️  TIMELINE IMAGES (${params.images.length} images)`);
+  console.log(sectionDivider);
+  console.log(`${TAG} ${'#'.padStart(3)} | ${'Frame'.padStart(6)} | ${'ShotGen ID'.padEnd(10)} | ${'Gen ID'.padEnd(10)} | Location`);
+  console.log(sectionDivider);
+  
+  params.images.forEach((img, i) => {
+    const frameStr = img.timelineFrame !== null ? String(img.timelineFrame).padStart(6) : '  NULL';
+    const locationShort = img.location.length > 40 ? '...' + img.location.slice(-37) : img.location;
+    console.log(`${TAG} ${String(i).padStart(3)} | ${frameStr} | ${img.shotGenId.substring(0, 10)} | ${img.generationId.substring(0, 10)} | ${locationShort}`);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 2: SEGMENTS (PAIRS)
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log(`\n${TAG} 🎬 SEGMENTS / PAIRS (${params.segments.length} segments)`);
+  console.log(sectionDivider);
+  
+  params.segments.forEach((seg) => {
+    const promptPreview = seg.basePrompt 
+      ? (seg.basePrompt.length > 50 ? seg.basePrompt.substring(0, 47) + '...' : seg.basePrompt)
+      : '(using default)';
+    const enhancedPreview = seg.enhancedPrompt
+      ? (seg.enhancedPrompt.length > 50 ? seg.enhancedPrompt.substring(0, 47) + '...' : seg.enhancedPrompt)
+      : '';
+    
+    console.log(`${TAG} ┌─ Segment ${seg.pairIndex}: Frame ${seg.startFrame} → ${seg.endFrame} (${seg.frameCount} frames, ~${(seg.frameCount / 24).toFixed(1)}s)`);
+    console.log(`${TAG} │  Images: ${seg.startImageId.substring(0, 8)} → ${seg.endImageId.substring(0, 8)}`);
+    console.log(`${TAG} │  Prompt: ${seg.hasCustomPrompt ? '✏️ CUSTOM: ' : '📝 DEFAULT: '}${promptPreview}`);
+    if (seg.hasEnhancedPrompt) {
+      console.log(`${TAG} │  Enhanced: ✨ ${enhancedPreview}`);
+    }
+    if (seg.negativePrompt && seg.negativePrompt !== params.settings.defaultNegativePrompt) {
+      const negPreview = seg.negativePrompt.length > 40 ? seg.negativePrompt.substring(0, 37) + '...' : seg.negativePrompt;
+      console.log(`${TAG} │  Negative: 🚫 CUSTOM: ${negPreview}`);
+    }
+    console.log(`${TAG} └${sectionDivider.substring(0, 20)}`);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 3: STRUCTURE VIDEOS
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log(`\n${TAG} 🎥 STRUCTURE VIDEOS (${params.structureVideos.length} videos)`);
+  console.log(sectionDivider);
+  
+  if (params.structureVideos.length === 0) {
+    console.log(`${TAG}   (No structure videos configured - using I2V mode)`);
+  } else {
+    params.structureVideos.forEach((sv) => {
+      const pathShort = sv.path.length > 50 ? '...' + sv.path.slice(-47) : sv.path;
+      console.log(`${TAG} ┌─ Structure Video ${sv.index}:`);
+      console.log(`${TAG} │  Path: ${pathShort}`);
+      console.log(`${TAG} │  Output Range: Frame ${sv.startFrame} → ${sv.endFrame} (${sv.endFrame - sv.startFrame} frames)`);
+      console.log(`${TAG} │  Type: ${sv.structureType} | Treatment: ${sv.treatment} | Motion: ${sv.motionStrength}`);
+      console.log(`${TAG} │  Affects Segments: ${sv.affectedSegments.length > 0 ? sv.affectedSegments.join(', ') : '(all)'}`);
+      console.log(`${TAG} └${sectionDivider.substring(0, 20)}`);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 4: SETTINGS
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log(`\n${TAG} ⚙️  SETTINGS`);
+  console.log(sectionDivider);
+  console.log(`${TAG}   Model: ${params.settings.modelName} (${params.settings.modelType})`);
+  console.log(`${TAG}   Resolution: ${params.settings.resolution || '(auto)'}`);
+  console.log(`${TAG}   Motion: ${params.settings.amountOfMotion}% | Mode: ${params.settings.motionMode} | Advanced: ${params.settings.advancedMode}`);
+  console.log(`${TAG}   Turbo: ${params.settings.turboMode} | Enhance Prompt: ${params.settings.enhancePrompt}`);
+  console.log(`${TAG}   Base Prompt: "${params.settings.basePrompt.length > 60 ? params.settings.basePrompt.substring(0, 57) + '...' : params.settings.basePrompt}"`);
+  
+  if (params.settings.loras.length > 0) {
+    console.log(`${TAG}   LoRAs (${params.settings.loras.length}):`);
+    params.settings.loras.forEach((lora) => {
+      console.log(`${TAG}     - ${lora.name}: ${lora.strength} (${lora.path.substring(0, 40)}...)`);
+    });
+  } else {
+    console.log(`${TAG}   LoRAs: (none)`);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 5: SUMMARY
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log(`\n${TAG} 📈 SUMMARY`);
+  console.log(sectionDivider);
+  console.log(`${TAG}   Total Images: ${params.images.length}`);
+  console.log(`${TAG}   Total Segments: ${params.segments.length}`);
+  console.log(`${TAG}   Total Frames: ${params.totalFrames} (~${params.totalDurationSeconds.toFixed(1)}s at 24fps)`);
+  console.log(`${TAG}   Structure Videos: ${params.structureVideos.length}`);
+  
+  // Calculate custom vs default prompts
+  const customPromptCount = params.segments.filter(s => s.hasCustomPrompt).length;
+  const enhancedPromptCount = params.segments.filter(s => s.hasEnhancedPrompt).length;
+  console.log(`${TAG}   Custom Prompts: ${customPromptCount}/${params.segments.length}`);
+  console.log(`${TAG}   Enhanced Prompts: ${enhancedPromptCount}/${params.segments.length}`);
+  
+  console.log(`\n${divider}\n`);
+}
+
+// ============================================================================
 // PHASE CONFIG HELPERS FOR BASIC MODE
 // ============================================================================
 
@@ -1057,6 +1232,127 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     base_prompts_array: basePrompts,
     willAppendBasePrompt: enhancePrompt
   });
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MASTER TIMELINE STATE LOG - Call before task submission for debugging
+  // ═══════════════════════════════════════════════════════════════════════════
+  try {
+    // Build the structure videos array with affected segments info
+    const structureVideosForLog: Parameters<typeof logTimelineMasterState>[0]['structureVideos'] = [];
+    const structureVideos = params.structureVideos;
+    
+    if (structureVideos && structureVideos.length > 0) {
+      structureVideos.forEach((sv, index) => {
+        // Determine which segments this video affects based on frame ranges
+        const affectedSegments: number[] = [];
+        let cumulativeFrame = 0;
+        segmentFrames.forEach((frameCount, segIdx) => {
+          const segStart = cumulativeFrame;
+          const segEnd = cumulativeFrame + frameCount;
+          // Check if this structure video overlaps with this segment
+          if (sv.start_frame < segEnd && sv.end_frame > segStart) {
+            affectedSegments.push(segIdx);
+          }
+          cumulativeFrame = segEnd;
+        });
+        
+        structureVideosForLog.push({
+          index,
+          path: sv.path,
+          startFrame: sv.start_frame,
+          endFrame: sv.end_frame,
+          treatment: sv.treatment ?? 'adjust',
+          motionStrength: sv.motion_strength ?? 1.0,
+          structureType: sv.structure_type ?? 'flow',
+          affectedSegments,
+        });
+      });
+    } else if (structureVideoConfig.structure_video_path) {
+      // Legacy single video - affects all segments
+      structureVideosForLog.push({
+        index: 0,
+        path: structureVideoConfig.structure_video_path,
+        startFrame: 0,
+        endFrame: segmentFrames.reduce((a, b) => a + b, 0),
+        treatment: structureVideoConfig.structure_video_treatment ?? 'adjust',
+        motionStrength: structureVideoConfig.structure_video_motion_strength ?? 1.0,
+        structureType: structureVideoConfig.structure_video_type ?? 'flow',
+        affectedSegments: [], // Empty = all segments
+      });
+    }
+
+    // Build the segments array from the calculated data
+    const segmentsForLog: Parameters<typeof logTimelineMasterState>[0]['segments'] = [];
+    let cumulativeFrame = 0;
+    for (let i = 0; i < segmentFrames.length; i++) {
+      const frameCount = segmentFrames[i];
+      const startFrame = cumulativeFrame;
+      const endFrame = cumulativeFrame + frameCount;
+      
+      segmentsForLog.push({
+        pairIndex: i,
+        startImageId: imageGenerationIds[i] || `img-${i}`,
+        endImageId: imageGenerationIds[i + 1] || `img-${i + 1}`,
+        startFrame,
+        endFrame,
+        frameCount,
+        basePrompt: basePrompts[i] || '',
+        negativePrompt: negativePrompts[i] || defaultNegativePrompt,
+        enhancedPrompt: enhancedPromptsArray[i] || '',
+        hasCustomPrompt: !!(basePrompts[i] && basePrompts[i].trim()),
+        hasEnhancedPrompt: !!(enhancedPromptsArray[i] && enhancedPromptsArray[i].trim()),
+      });
+      
+      cumulativeFrame = endFrame;
+    }
+
+    // Build the images array
+    // Note: We calculate frame positions based on segment frames for accurate logging
+    // In timeline mode, positions are cumulative; in batch mode they're evenly spaced
+    const imagesForLog: Parameters<typeof logTimelineMasterState>[0]['images'] = absoluteImageUrls.map((url, i) => {
+      // Calculate cumulative frame position from segment frames
+      let framePosition = 0;
+      for (let j = 0; j < i && j < segmentFrames.length; j++) {
+        framePosition += segmentFrames[j];
+      }
+      return {
+        shotGenId: pairShotGenerationIds[i] || `shotgen-${i}`,
+        generationId: imageGenerationIds[i] || `gen-${i}`,
+        timelineFrame: framePosition,
+        location: url,
+      };
+    });
+
+    const totalFrames = segmentFrames.reduce((a, b) => a + b, 0);
+    
+    logTimelineMasterState({
+      shotId: selectedShotId,
+      shotName: selectedShot?.name,
+      generationMode,
+      images: imagesForLog,
+      segments: segmentsForLog,
+      structureVideos: structureVideosForLog,
+      settings: {
+        basePrompt: batchVideoPrompt,
+        defaultNegativePrompt,
+        amountOfMotion,
+        motionMode: motionMode || 'basic',
+        advancedMode: useAdvancedMode,
+        turboMode,
+        enhancePrompt,
+        modelName: actualModelName,
+        modelType,
+        resolution,
+        loras: selectedLoras.map(l => ({ name: l.name, path: l.path, strength: l.strength })),
+      },
+      totalFrames,
+      totalDurationSeconds: totalFrames / 24,
+    });
+  } catch (logError) {
+    // Don't let logging errors break generation
+    console.warn('[TIMELINE_MASTER_STATE] Error logging master state:', logError);
+  }
+  // ═══════════════════════════════════════════════════════════════════════════
   
   const requestBody: any = {
     project_id: projectId,
