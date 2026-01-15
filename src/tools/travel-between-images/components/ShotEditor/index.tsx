@@ -149,7 +149,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
-  const { addIncomingTask, completeIncomingTask } = useIncomingTasks();
+  const { addIncomingTask, removeIncomingTask } = useIncomingTasks();
   const { data: taskStatusCounts } = useTaskStatusCounts(selectedProjectId);
   const { getApiKey } = useApiKeys();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
@@ -1776,11 +1776,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         console.error('[handleGenerateBatch] Error creating task:', error);
         toast.error('Failed to create video task. Please try again.');
       } finally {
-        // Wait for task queries to refetch, then do a clean swap
+        // Wait for task queries to refetch, then remove placeholder
         await queryClient.refetchQueries({ queryKey: ['tasks', 'paginated'] });
         await queryClient.refetchQueries({ queryKey: ['task-status-counts'] });
-        const newCount = queryClient.getQueryData<{ processing: number }>(['task-status-counts', selectedProjectId])?.processing ?? 0;
-        completeIncomingTask(incomingTaskId, newCount);
+        console.log('[handleGenerateBatch] Removing incoming task placeholder:', incomingTaskId);
+        removeIncomingTask(incomingTaskId);
       }
     })();
   }, [
@@ -1817,8 +1817,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     selectedOutputId,
     // IncomingTasks deps
     addIncomingTask,
-    completeIncomingTask,
-    taskStatusCounts,
+    removeIncomingTask,
   ]);
 
   // Expose generateVideo function and state to parent via mutable ref
