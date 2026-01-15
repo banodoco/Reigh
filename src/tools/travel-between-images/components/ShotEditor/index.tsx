@@ -2166,6 +2166,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 {/* Output selector - shows which parent generation new segments will be added to */}
                 {parentGenerations.length > 0 && (
                   <div className="mb-4 pb-4 border-b">
+                    {console.log('[BatchMode] OutputSelector render:', {
+                      selectedOutputId: selectedOutputId?.substring(0, 8),
+                      segmentProgress,
+                      parentCount: parentGenerations.length,
+                    })}
                     <OutputSelector
                       parentGenerations={parentGenerations}
                       selectedParentId={selectedOutputId}
