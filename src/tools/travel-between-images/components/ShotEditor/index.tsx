@@ -57,6 +57,7 @@ import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useSegmentOutputsForShot } from '../../hooks/useSegmentOutputsForShot';
 import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
+import { useTaskStatusCounts } from '@/shared/hooks/useTasks';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -148,7 +149,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
-  const { addIncomingTask, removeIncomingTask } = useIncomingTasks();
+  const { addIncomingTask, completeIncomingTask } = useIncomingTasks();
+  const { data: taskStatusCounts } = useTaskStatusCounts(selectedProjectId);
   const { getApiKey } = useApiKeys();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
   
@@ -1432,6 +1434,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
       await createJoinClipsTask({
         project_id: projectId,
+        shot_id: selectedShotId, // For "Visit Shot" button in TasksPane
         clips,
         prompt: joinPrompt,
         negative_prompt: joinNegativePrompt,
@@ -1444,8 +1447,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         num_inference_steps: 6,
         guidance_scale: 3.0,
         seed: -1,
-        // Use first clip as parent so downstream lineage + shot-association logic can attach output
-        parent_generation_id: orderedSegments[0]?.id,
+        // Use the root parent generation so the joined video updates the Final Video display
+        parent_generation_id: joinSelectedParent?.id,
         // Attribute to travel-between-images tool
         tool_type: 'travel-between-images',
         use_input_video_resolution: false,
@@ -1485,6 +1488,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     selectedShotId,
     audioUrl,
     joinPhaseConfig,
+    joinSelectedParent,
     queryClient,
   ]);
 
@@ -1702,9 +1706,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const handleGenerateBatch = useCallback((variantNameParam: string) => {
     // Add incoming task immediately for instant TasksPane feedback
     const taskLabel = variantNameParam || selectedShot?.name || 'Travel video';
+    const currentBaseline = taskStatusCounts?.processing ?? 0;
     const incomingTaskId = addIncomingTask({
       taskType: 'travel_orchestrator',
       label: taskLabel.length > 50 ? taskLabel.substring(0, 50) + '...' : taskLabel,
+      baselineCount: currentBaseline,
     });
 
     // Show success feedback immediately (task is being created)
@@ -1766,18 +1772,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           parentGenerationId: selectedOutputId ?? undefined,
         });
 
-        // Invalidate and wait for refetch so real task appears before we remove placeholder
-        await queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated'] });
       } catch (error) {
         console.error('[handleGenerateBatch] Error creating task:', error);
         toast.error('Failed to create video task. Please try again.');
       } finally {
-        // Remove the incoming task filler - real task should now be visible
-        removeIncomingTask(incomingTaskId);
+        // Wait for task queries to refetch, then do a clean swap
+        await queryClient.refetchQueries({ queryKey: ['tasks', 'paginated'] });
+        await queryClient.refetchQueries({ queryKey: ['task-status-counts'] });
+        const newCount = queryClient.getQueryData<{ processing: number }>(['task-status-counts', selectedProjectId])?.processing ?? 0;
+        completeIncomingTask(incomingTaskId, newCount);
       }
     })();
   }, [
     projectId,
+    selectedProjectId,
     selectedShotId,
     selectedShot,
     queryClient,
@@ -1809,7 +1817,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     selectedOutputId,
     // IncomingTasks deps
     addIncomingTask,
-    removeIncomingTask,
+    completeIncomingTask,
+    taskStatusCounts,
   ]);
 
   // Expose generateVideo function and state to parent via mutable ref
