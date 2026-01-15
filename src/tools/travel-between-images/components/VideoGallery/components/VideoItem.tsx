@@ -292,6 +292,10 @@ export const VideoItem = React.memo<VideoItemProps>(({
         }
       }
       
+      // Extract shot_id from video params for "Visit Shot" button in TasksPane
+      const videoParams = video.params as Record<string, any> | undefined;
+      const videoShotId = videoParams?.shot_id || videoParams?.orchestrator_details?.shot_id;
+
       console.log('[JoinClips] Creating join task for segments:', {
         parentId: video.id?.substring(0, 8),
         clipCount: clips.length,
@@ -303,11 +307,13 @@ export const VideoItem = React.memo<VideoItemProps>(({
         clips: clips.map(c => ({ name: c.name, url: c.url?.substring(0, 50) + '...' })),
         projectAspectRatio,
         resolution: resolutionTuple,
+        shotId: videoShotId?.substring(0, 8),
       });
-      
+
       // Create the join clips task with user settings
       await createJoinClipsTask({
         project_id: projectId,
+        ...(videoShotId && { shot_id: videoShotId }), // For "Visit Shot" button in TasksPane
         clips,
         prompt: joinPrompt,
         negative_prompt: joinNegativePrompt,

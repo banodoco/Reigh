@@ -1370,6 +1370,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     const mediaParams = (media as any).params as Record<string, any> | undefined;
     const taskDataParams = adjustedTaskDetailsData?.task?.params;
 
+    // Don't show regenerate for root parent videos (final videos)
+    // They don't have a parent_generation_id and regeneration doesn't make sense for them
+    const isRootParent = !(media as any).parent_generation_id;
+    if (isRootParent) {
+      console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (root parent video)');
+      return null;
+    }
+
     if (!isVideo || (!taskDataParams && !mediaParams)) {
       console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (not video or no params)', {
         isVideo,

@@ -13,6 +13,7 @@ export interface IncomingTask {
   taskType: string;       // e.g., 'image_generation', 'travel_video', 'upscale', etc.
   label: string;          // Display text (e.g., "cinematic shot of...", "Travel video")
   expectedCount?: number; // Optional: expected number of tasks to create
+  baselineCount?: number; // DB count when placeholder was added (for accurate count calculation)
 }
 
 interface IncomingTasksContextValue {
@@ -24,6 +25,14 @@ interface IncomingTasksContextValue {
 
   /** Remove an incoming task by ID (call when real tasks appear or on error) */
   removeIncomingTask: (id: string) => void;
+
+  /**
+   * Complete an incoming task: remove it and update remaining placeholders' baselines.
+   * Call this after refetching queries to ensure a clean count swap.
+   * @param id - The task to remove
+   * @param newBaseline - The current DB count (remaining placeholders will use this as their new baseline)
+   */
+  completeIncomingTask: (id: string, newBaseline: number) => void;
 
   /** Quick check if there are any incoming tasks */
   hasIncomingTasks: boolean;
@@ -55,14 +64,24 @@ export const IncomingTasksProvider: React.FC<{ children: React.ReactNode }> = ({
     setIncomingTasks(prev => prev.filter(task => task.id !== id));
   }, []);
 
+  const completeIncomingTask = useCallback((id: string, newBaseline: number) => {
+    console.log('[IncomingTasks] Completing incoming task:', id, 'new baseline for remaining:', newBaseline);
+    setIncomingTasks(prev =>
+      prev
+        .filter(task => task.id !== id)  // Remove completed task
+        .map(task => ({ ...task, baselineCount: newBaseline }))  // Update remaining baselines
+    );
+  }, []);
+
   const hasIncomingTasks = incomingTasks.length > 0;
 
   const value = useMemo(() => ({
     incomingTasks,
     addIncomingTask,
     removeIncomingTask,
+    completeIncomingTask,
     hasIncomingTasks,
-  }), [incomingTasks, addIncomingTask, removeIncomingTask, hasIncomingTasks]);
+  }), [incomingTasks, addIncomingTask, removeIncomingTask, completeIncomingTask, hasIncomingTasks]);
 
   return (
     <IncomingTasksContext.Provider value={value}>

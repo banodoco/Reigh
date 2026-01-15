@@ -2011,7 +2011,21 @@ export const useInpainting = ({
 
   // Generate annotated edit
   const handleGenerateAnnotatedEdit = useCallback(async () => {
+    console.log('[AnnotatedEdit] 🚀 handleGenerateAnnotatedEdit called', {
+      selectedProjectId: selectedProjectId?.substring(0, 8),
+      isVideo,
+      annotationStrokesLength: annotationStrokes.length,
+      inpaintPrompt: inpaintPrompt?.substring(0, 30),
+      hasPrompt: !!inpaintPrompt?.trim()
+    });
+
     if (!selectedProjectId || isVideo || annotationStrokes.length === 0 || !inpaintPrompt.trim()) {
+      console.log('[AnnotatedEdit] ❌ Validation failed', {
+        noProjectId: !selectedProjectId,
+        isVideo,
+        noStrokes: annotationStrokes.length === 0,
+        noPrompt: !inpaintPrompt.trim()
+      });
       toast.error('Please add annotations and enter a prompt');
       return;
     }
@@ -2151,7 +2165,7 @@ export const useInpainting = ({
     } finally {
       setIsGeneratingInpaint(false);
     }
-  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, displayCanvasRef, maskCanvasRef, activeVariantLocation]);
+  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, displayCanvasRef, maskCanvasRef, activeVariantLocation, imageDimensions, createAsGeneration, advancedSettings]);
 
   // Get delete button position for selected shape
   const getDeleteButtonPosition = useCallback((): { x: number; y: number } | null => {

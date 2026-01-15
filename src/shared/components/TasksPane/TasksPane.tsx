@@ -5,12 +5,14 @@ import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import TaskList from './TaskList';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { Loader2 } from 'lucide-react';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useCancelAllPendingTasks, useTaskStatusCounts, usePaginatedTasks, useAllTaskTypes } from '@/shared/hooks/useTasks';
+import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { TasksPaneProcessingWarning } from '../ProcessingWarnings';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
@@ -98,6 +100,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const { data: shots } = useListShots(selectedProjectId);
   const { currentShotId } = useCurrentShot();
   const { lastAffectedShotId } = useLastAffectedShot();
+
+  // Get incoming/placeholder tasks for count calculation
+  const { incomingTasks } = useIncomingTasks();
   
   // Simplified shot options for MediaLightbox
   const simplifiedShotOptions = useMemo(() => shots?.map(s => ({ id: s.id, name: s.name })) || [], [shots]);
@@ -183,9 +188,24 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     }
   }, [statusCounts, isStatusCountsLoading, displayStatusCounts]);
 
-  const cancellableTaskCount = selectedFilter === 'Processing' 
+  // Calculate the effective count including incoming/placeholder tasks
+  const dbCount = selectedFilter === 'Processing'
     ? ((paginatedData as any)?.total || 0)
     : (displayStatusCounts?.processing || 0);
+
+  const cancellableTaskCount = useMemo(() => {
+    if (incomingTasks.length === 0) return dbCount;
+
+    // While placeholders exist, show a fixed expected count (ignore dbCount fluctuations)
+    // Use the oldest placeholder's baseline (last in array since we prepend new ones)
+    const oldestTask = incomingTasks[incomingTasks.length - 1];
+    const baseline = oldestTask.baselineCount ?? dbCount;
+    const totalExpected = incomingTasks.reduce((sum, t) => sum + (t.expectedCount ?? 1), 0);
+
+    // Show expected final count, but never less than actual dbCount
+    // (handles case where other unrelated tasks complete)
+    return Math.max(dbCount, baseline + totalExpected);
+  }, [dbCount, incomingTasks]);
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();
@@ -244,11 +264,11 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     
     queryClient.setQueryData(queryKey, (oldData: any) => {
       if (!oldData?.tasks) return oldData;
-      
+
       return {
         ...oldData,
         tasks: oldData.tasks.map((task: any) => {
-          if (task.status === 'Queued' || task.status === 'In Progress') {
+          if (task.status === 'Queued') {
             return { ...task, status: 'Cancelled' };
           }
           return task;
@@ -372,22 +392,27 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
               <h2 className="text-xl font-light text-zinc-200 ml-2">Tasks</h2>
               <div className="flex gap-2">
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleCancelAllPending}
-                  disabled={cancelAllPendingMutation.isPending || cancellableTaskCount === 0}
-                  className="flex items-center gap-2"
-                >
-                  {cancelAllPendingMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Cancel All
-                    </>
-                  ) : (
-                    'Cancel All'
-                  )}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleCancelAllPending}
+                      disabled={cancelAllPendingMutation.isPending || cancellableTaskCount === 0}
+                      className="flex items-center gap-2"
+                    >
+                      {cancelAllPendingMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Cancel All
+                        </>
+                      ) : (
+                        'Cancel All'
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Cancel all queued tasks</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           

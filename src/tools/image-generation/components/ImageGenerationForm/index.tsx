@@ -32,6 +32,7 @@ import { nanoid } from 'nanoid';
 import { supabase } from "@/integrations/supabase/client";
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
 import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
+import { useTaskStatusCounts } from '@/shared/hooks/useTasks';
 import { useSubmitButtonState } from '@/shared/hooks/useSubmitButtonState';
 import { useHydratedReferences } from '../../hooks/useHydratedReferences';
 
@@ -63,6 +64,7 @@ import {
   getLoraTypeForModel,
   getLoraCategoryForModel,
   getHiresFixDefaultsForModel,
+  getReferenceModeDefaults,
   BY_REFERENCE_LORA_TYPE,
   ReferenceApiParams,
   DEFAULT_REFERENCE_PARAMS,
@@ -296,7 +298,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
-  const { addIncomingTask, removeIncomingTask } = useIncomingTasks();
+  const { addIncomingTask, completeIncomingTask } = useIncomingTasks();
+
+  // Get current task count for baseline tracking
+  const { data: taskStatusCounts } = useTaskStatusCounts(selectedProjectId);
 
   // Derive project aspect ratio and resolution for GenerationSettingsSection
   const { projectAspectRatio, projectResolution } = useMemo(() => {
@@ -2000,37 +2005,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // Explicitly set subjectDescription and styleBoostTerms to empty strings
       // so they don't inherit from the resource's metadata
       // Preserve the current referenceMode and set corresponding strength values
+      const modeDefaults = referenceMode === 'custom'
+        ? { styleReferenceStrength, subjectStrength, inThisScene, inThisSceneStrength }
+        : getReferenceModeDefaults(referenceMode, isLocalGenerationEnabled);
+
       const newPointer: ReferenceImage = {
         id: nanoid(),
         resourceId: resource.id,
         subjectDescription: '',
         styleBoostTerms: '',
         referenceMode: referenceMode,
-        // Set strength values based on mode (same logic as handleReferenceModeChange)
-        ...(referenceMode === 'style' && {
-          styleReferenceStrength: 1.1,
-          subjectStrength: 0,
-          inThisScene: false,
-          inThisSceneStrength: 0,
-        }),
-        ...(referenceMode === 'subject' && {
-          styleReferenceStrength: 1.1,
-          subjectStrength: 0.4,
-          inThisScene: false,
-          inThisSceneStrength: 0,
-        }),
-        ...(referenceMode === 'scene' && {
-          styleReferenceStrength: 1.1,
-          subjectStrength: 0,
-          inThisScene: true,
-          inThisSceneStrength: 0.4,
-        }),
-        ...(referenceMode === 'custom' && {
-          styleReferenceStrength: styleReferenceStrength,
-          subjectStrength: subjectStrength,
-          inThisScene: inThisScene,
-          inThisSceneStrength: inThisSceneStrength,
-        }),
+        ...modeDefaults,
       };
       
       console.log('[RefBrowser] 🔗 Linking existing resource:', {
@@ -2384,50 +2369,27 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const handleReferenceModeChange = useCallback(async (mode: ReferenceMode) => {
     if (!selectedReferenceId) return;
     console.log('[RefModeDebug] 🎯 User changed mode to:', mode);
-    
+
+    // Get defaults for this mode and generation environment
+    const defaults = getReferenceModeDefaults(mode, isLocalGenerationEnabled);
+
     // Build update object with mode AND auto-set strength values
     const updates: Partial<ReferenceImage> = {
-      referenceMode: mode
+      referenceMode: mode,
+      ...defaults,
     };
-    
-    // Auto-set strength values based on mode (same logic as RadioGroup)
-    if (mode === 'style') {
-      updates.styleReferenceStrength = 1.1;
-      updates.subjectStrength = 0;
-      updates.inThisScene = false;
-      updates.inThisSceneStrength = 0;
-    } else if (mode === 'subject') {
-      // Different defaults for local vs cloud generation
-      if (isLocalGenerationEnabled) {
-        updates.styleReferenceStrength = 0.70;
-        updates.subjectStrength = 1.10;
-      } else {
-        updates.styleReferenceStrength = 1.1;
-        updates.subjectStrength = 0.4;
-      }
-      updates.inThisScene = false;
-      updates.inThisSceneStrength = 0;
-    } else if (mode === 'scene') {
-      // Different defaults for local vs cloud generation
-      if (isLocalGenerationEnabled) {
-        updates.styleReferenceStrength = 0.60;
-        updates.subjectStrength = 0;
-        updates.inThisSceneStrength = 1.20;
-      } else {
-        updates.styleReferenceStrength = 1.1;
-        updates.subjectStrength = 0;
-        updates.inThisSceneStrength = 0.4;
-      }
-      updates.inThisScene = true;
-    } else if (mode === 'custom') {
-      // Ensure we have valid starting values if coming from a mode with low strength (like scene)
+
+    // For custom mode, only apply defaults if current strengths are too low
+    if (mode === 'custom') {
       const currentTotal = styleReferenceStrength + subjectStrength;
-      if (currentTotal < 0.5) {
+      if (currentTotal >= 0.5) {
+        // Keep current values, just update the mode
+        delete updates.styleReferenceStrength;
+        delete updates.subjectStrength;
+        delete updates.inThisScene;
+        delete updates.inThisSceneStrength;
+      } else {
         console.log('[RefModeDebug] ⚠️ Custom mode selected but strengths are too low. Resetting to defaults.');
-        updates.styleReferenceStrength = 0.8;
-        updates.subjectStrength = 0.8;
-        updates.inThisScene = false;
-        updates.inThisSceneStrength = 0;
       }
     }
     
@@ -2456,7 +2418,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.log('[RefModeDebug] → setInThisSceneStrength:', updates.inThisSceneStrength);
       setInThisSceneStrength(updates.inThisSceneStrength);
     }
-    
+
+    // Set denoise to 0.5 for Subject and Scene modes
+    if (mode === 'subject' || mode === 'scene') {
+      setHiresFixConfig(prev => ({ ...prev, hires_denoise: 0.5 }));
+    }
+
     // Single batched update to avoid race conditions
     console.log('[RefModeDebug] Calling handleUpdateReference with:', { referenceId: selectedReferenceId, updates });
     await handleUpdateReference(selectedReferenceId, updates);
@@ -2738,10 +2705,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const truncatedPrompt = capturedMasterPrompt.length > 50
         ? capturedMasterPrompt.substring(0, 50) + '...'
         : capturedMasterPrompt;
+      const currentBaseline = taskStatusCounts?.processing ?? 0;
       const incomingTaskId = addIncomingTask({
         taskType: 'image_generation',
         label: truncatedPrompt,
         expectedCount: capturedImagesPerPrompt * capturedPromptMultiplier,
+        baselineCount: currentBaseline,
       });
 
       console.log('[ImageGenerationForm] Automated mode: Starting background prompt generation for:', truncatedPrompt);
@@ -2808,8 +2777,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           console.error('[ImageGenerationForm] Automated mode: Error generating prompts:', error);
           toast.error("Failed to generate prompts. Please try again.");
         } finally {
-          // Remove the incoming task filler
-          removeIncomingTask(incomingTaskId);
+          // Wait for task queries to refetch, then do a clean swap
+          await queryClient.refetchQueries({ queryKey: ['tasks', 'paginated'] });
+          await queryClient.refetchQueries({ queryKey: ['task-status-counts'] });
+          const newCount = queryClient.getQueryData<{ processing: number }>(['task-status-counts', selectedProjectId])?.processing ?? 0;
+          completeIncomingTask(incomingTaskId, newCount);
         }
       })();
 
@@ -2829,10 +2801,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     const truncatedPrompt = firstPrompt.length > 50
       ? firstPrompt.substring(0, 50) + '...'
       : firstPrompt;
+    const managedBaseline = taskStatusCounts?.processing ?? 0;
     const incomingTaskId = addIncomingTask({
       taskType: 'image_generation',
       label: truncatedPrompt,
       expectedCount: actionablePromptsCount * imagesPerPrompt,
+      baselineCount: managedBaseline,
     });
 
     console.log('[ImageGenerationForm] Managed mode: Starting task creation for:', truncatedPrompt);
@@ -2845,8 +2819,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         console.error('[ImageGenerationForm] Managed mode: Error creating tasks:', error);
         toast.error("Failed to create tasks. Please try again.");
       } finally {
-        // Remove the incoming task filler
-        removeIncomingTask(incomingTaskId);
+        // Wait for task queries to refetch, then do a clean swap
+        await queryClient.refetchQueries({ queryKey: ['tasks', 'paginated'] });
+        await queryClient.refetchQueries({ queryKey: ['task-status-counts'] });
+        const newCount = queryClient.getQueryData<{ processing: number }>(['task-status-counts', selectedProjectId])?.processing ?? 0;
+        completeIncomingTask(incomingTaskId, newCount);
       }
     })();
   };

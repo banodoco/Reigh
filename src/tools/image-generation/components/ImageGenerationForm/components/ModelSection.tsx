@@ -793,8 +793,8 @@ const StyleReferenceSection: React.FC<{
                   label="Style strength"
                   value={styleReferenceStrength}
                   onChange={(value) => {
-                    // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                    const newTotal = value + subjectStrength;
+                    // Validation: style + subject + scene must be >= 0.5
+                    const newTotal = value + subjectStrength + inThisSceneStrength;
                     if (newTotal < 0.5) {
                       return;
                     }
@@ -810,8 +810,8 @@ const StyleReferenceSection: React.FC<{
                   label="Subject strength"
                   value={subjectStrength}
                   onChange={(value) => {
-                    // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                    const newTotal = styleReferenceStrength + value;
+                    // Validation: style + subject + scene must be >= 0.5
+                    const newTotal = styleReferenceStrength + value + inThisSceneStrength;
                     if (newTotal < 0.5) {
                       return;
                     }
@@ -826,7 +826,14 @@ const StyleReferenceSection: React.FC<{
                 <SliderWithValue
                   label="Scene strength"
                   value={inThisSceneStrength}
-                  onChange={onInThisSceneStrengthChange}
+                  onChange={(value) => {
+                    // Validation: style + subject + scene must be >= 0.5
+                    const newTotal = styleReferenceStrength + subjectStrength + value;
+                    if (newTotal < 0.5) {
+                      return;
+                    }
+                    onInThisSceneStrengthChange(value);
+                  }}
                   min={0.0}
                   max={2.0}
                   step={0.1}

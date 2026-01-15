@@ -1107,7 +1107,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
 
           {/* Frame strip - showing frames side by side with padding to align with timeline */}
         {displayFrameImages.length > 0 ? (
-          <div 
+          <div
             className={`absolute top-5 bottom-1 flex border-2 rounded overflow-hidden shadow-md ${
               isDragging === 'move' ? 'border-primary cursor-grabbing' : 'border-primary/40 cursor-grab'
             } ${!readOnly && onRangeChange ? 'hover:border-primary/70' : ''}`}
@@ -1142,7 +1142,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
             ))}
           </div>
         ) : (
-          <div 
+          <div
             className={`absolute top-5 bottom-1 flex items-center justify-center bg-muted/50 dark:bg-muted-foreground/15 border rounded-sm ${
               !readOnly && onRangeChange ? 'cursor-grab hover:border-primary/50' : 'border-border/30'
             }`}

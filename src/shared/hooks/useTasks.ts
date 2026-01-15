@@ -605,7 +605,7 @@ async function cancelTask(taskId: string): Promise<void> {
       .from('tasks')
       .select('id, params')
       .eq('project_id', task.project_id)
-      .in('status', ['Queued', 'In Progress']);
+      .in('status', ['Queued']);
 
     if (!subtaskFetchError && subtasks) {
       const subtaskIds = subtasks.filter(subtask => {
@@ -642,7 +642,7 @@ async function cancelPendingTasks(projectId: string): Promise<CancelAllPendingTa
     .from('tasks')
     .select('id, task_type')
     .eq('project_id', projectId)
-    .in('status', ['Queued', 'In Progress']);
+    .in('status', ['Queued']);
 
   if (fetchError) {
     throw new Error(`Failed to fetch pending tasks: ${fetchError.message}`);
@@ -665,7 +665,7 @@ async function cancelPendingTasks(projectId: string): Promise<CancelAllPendingTa
       .from('tasks')
       .select('id, params')
       .eq('project_id', projectId)
-      .in('status', ['Queued', 'In Progress']);
+      .in('status', ['Queued']);
 
     if (!allTasksError && allProjectTasks) {
       allProjectTasks.forEach(task => {

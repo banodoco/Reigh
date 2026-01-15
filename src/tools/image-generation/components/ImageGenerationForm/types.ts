@@ -387,3 +387,36 @@ export const MODEL_HIRES_FIX_DEFAULTS: Record<string, HiresFixConfig> = {
 export function getHiresFixDefaultsForModel(modelName: string): HiresFixConfig {
   return MODEL_HIRES_FIX_DEFAULTS[modelName] ?? DEFAULT_HIRES_FIX_CONFIG;
 }
+
+// ============================================================================
+// Reference Mode Strength Defaults
+// ============================================================================
+
+export interface ReferenceModeStrengths {
+  styleReferenceStrength: number;
+  subjectStrength: number;
+  inThisSceneStrength: number;
+  inThisScene: boolean;
+}
+
+/** Default strength values for each reference mode, by generation environment */
+export const REFERENCE_MODE_DEFAULTS: Record<'local' | 'cloud', Record<ReferenceMode, ReferenceModeStrengths>> = {
+  local: {
+    style: { styleReferenceStrength: 1.1, subjectStrength: 0, inThisSceneStrength: 0, inThisScene: false },
+    subject: { styleReferenceStrength: 0.4, subjectStrength: 1.0, inThisSceneStrength: 0, inThisScene: false },
+    scene: { styleReferenceStrength: 0.4, subjectStrength: 0, inThisSceneStrength: 1.0, inThisScene: true },
+    custom: { styleReferenceStrength: 0.8, subjectStrength: 0.8, inThisSceneStrength: 0, inThisScene: false },
+  },
+  cloud: {
+    style: { styleReferenceStrength: 1.1, subjectStrength: 0, inThisSceneStrength: 0, inThisScene: false },
+    subject: { styleReferenceStrength: 1.1, subjectStrength: 0.4, inThisSceneStrength: 0, inThisScene: false },
+    scene: { styleReferenceStrength: 1.1, subjectStrength: 0, inThisSceneStrength: 0.4, inThisScene: true },
+    custom: { styleReferenceStrength: 0.8, subjectStrength: 0.8, inThisSceneStrength: 0, inThisScene: false },
+  },
+};
+
+/** Get the default strength values for a given reference mode and generation environment */
+export function getReferenceModeDefaults(mode: ReferenceMode, isLocalGeneration: boolean): ReferenceModeStrengths {
+  const env = isLocalGeneration ? 'local' : 'cloud';
+  return REFERENCE_MODE_DEFAULTS[env][mode] ?? REFERENCE_MODE_DEFAULTS[env].style;
+}

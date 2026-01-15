@@ -557,6 +557,10 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       // Invalidate generations to ensure they refresh when tasks complete
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
 
+      // Invalidate tasks query so TasksPane count updates promptly
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
+
       const generateDuration = Date.now() - generateStartTime;
       console.log(`[GenerationDiag:${generateId}] ✅ GENERATION COMPLETE:`, {
         duration: `${generateDuration}ms`,

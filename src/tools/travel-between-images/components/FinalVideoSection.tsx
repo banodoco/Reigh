@@ -26,6 +26,10 @@ import { formatDistanceToNow } from 'date-fns';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
+import { VariantBadge } from '@/shared/components/VariantBadge';
 
 // Stable empty function reference to avoid re-renders from inline () => {}
 const noop = () => {};
@@ -86,7 +90,14 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   }, [parentGenerations, selectedParentId]);
   
   const hasFinalOutput = !!(selectedParent?.location);
-  
+
+  // Get variant badge data for the selected parent
+  const { getBadgeData } = useVariantBadges(
+    selectedParentId ? [selectedParentId] : [],
+    !!selectedParentId && hasFinalOutput
+  );
+  const badgeData = selectedParentId ? getBadgeData(selectedParentId) : null;
+
   // Transform selected parent for VideoItem/Lightbox
   const parentVideoRow = useMemo(() => {
     if (!selectedParent) return null;
@@ -101,7 +112,74 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   const { data: taskMapping } = useTaskFromUnifiedCache(selectedParentId || '');
   const taskId = typeof taskMapping?.taskId === 'string' ? taskMapping.taskId : '';
   const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(taskId);
-  
+
+  // Check for active join_clips_orchestrator tasks for this shot
+  // Include parentGenerations IDs in query key so we can match by parent_generation_id
+  const parentGenIdsForQuery = useMemo(() => parentGenerations.map(p => p.id), [parentGenerations]);
+  const { data: activeJoinTask } = useQuery({
+    queryKey: ['active-join-clips-task', shotId, projectId, parentGenIdsForQuery],
+    queryFn: async () => {
+      if (!shotId || !projectId) return null;
+
+      // Query for join_clips_orchestrator tasks that are queued or generating
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('id, status, params')
+        .eq('task_type', 'join_clips_orchestrator')
+        .eq('project_id', projectId)
+        .in('status', ['Queued', 'In Progress'])
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[FinalVideoSection] Error checking for active join tasks:', error);
+        return null;
+      }
+
+      console.log('[FinalVideoSection] Found active join tasks:', data?.length, 'for project:', projectId.substring(0, 8));
+
+      // Filter to find tasks that have this shot_id in their params
+      // Also check parent_generation_id as fallback for tasks created before shot_id was added
+      const parentGenIds = new Set(parentGenIdsForQuery);
+
+      const matchingTask = (data || []).find((task: any) => {
+        const params = task.params as Record<string, any>;
+        const taskShotId = params?.orchestrator_details?.shot_id || params?.shot_id;
+        const taskParentGenId = params?.orchestrator_details?.parent_generation_id || params?.parent_generation_id;
+
+        // Match by shot_id (preferred)
+        if (taskShotId === shotId) {
+          console.log('[FinalVideoSection] Task matches by shot_id:', task.id.substring(0, 8));
+          return true;
+        }
+
+        // Fallback: match by parent_generation_id (for tasks without shot_id)
+        if (taskParentGenId && parentGenIds.has(taskParentGenId)) {
+          console.log('[FinalVideoSection] Task matches by parent_generation_id:', task.id.substring(0, 8), 'parent:', taskParentGenId.substring(0, 8));
+          return true;
+        }
+
+        return false;
+      });
+
+      if (matchingTask) {
+        console.log('[FinalVideoSection] Found matching join task:', matchingTask.id.substring(0, 8), 'status:', matchingTask.status);
+      } else if (data && data.length > 0) {
+        console.log('[FinalVideoSection] No matching join task for this shot. Tasks found:', data.map((t: any) => ({
+          id: t.id.substring(0, 8),
+          shot_id: (t.params?.orchestrator_details?.shot_id || t.params?.shot_id)?.substring(0, 8) || 'NONE',
+          parent_gen_id: (t.params?.orchestrator_details?.parent_generation_id || t.params?.parent_generation_id)?.substring(0, 8) || 'NONE'
+        })));
+      }
+
+      return matchingTask || null;
+    },
+    enabled: !!shotId && !!projectId,
+    refetchInterval: 3000, // Poll every 3 seconds to catch status changes
+    staleTime: 1000,
+  });
+
+  const hasActiveJoinTask = !!activeJoinTask;
+
   // Derive input images from task params for lightbox
   const inputImages: string[] = useMemo(() => {
     if (!task?.params) return [];
@@ -162,6 +240,16 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
             <h2 className="text-base sm:text-lg font-light flex items-center gap-2">
               <Film className="w-5 h-5 text-muted-foreground" />
               Final Video
+              {/* Variant count and NEW badge */}
+              {hasFinalOutput && badgeData && (badgeData.derivedCount > 0 || badgeData.hasUnviewedVariants) && (
+                <VariantBadge
+                  derivedCount={badgeData.derivedCount}
+                  unviewedVariantCount={badgeData.unviewedVariantCount}
+                  hasUnviewedVariants={badgeData.hasUnviewedVariants}
+                  variant="inline"
+                  size="md"
+                />
+              )}
             </h2>
             
             <div className="flex items-center gap-3">
@@ -266,8 +354,14 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm">Loading...</span>
                 </div>
+              ) : hasActiveJoinTask ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Generating joined clip...</span>
+                </div>
               ) : currentProgress.total > 0 && currentProgress.completed < currentProgress.total ? (
                 <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm">{currentProgress.completed}/{currentProgress.total} segments generated...</span>
                 </div>
               ) : (

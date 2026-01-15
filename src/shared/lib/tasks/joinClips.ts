@@ -53,6 +53,7 @@ export interface PortionToRegenerate {
 
 export interface JoinClipsTaskParams {
   project_id: string;
+  shot_id?: string; // Associate task with a shot for "Visit Shot" button in TasksPane
 
   // New multi-clip structure
   clips?: JoinClipDescriptor[];
@@ -282,6 +283,7 @@ function buildJoinClipsPayload(
       ...(clip.name ? { name: clip.name } : {}),
     })),
     run_id: runId,
+    shot_id: params.shot_id ?? undefined, // For "Visit Shot" button in TasksPane
     prompt: params.prompt ?? DEFAULT_JOIN_CLIPS_VALUES.prompt,
     gap_frame_count: params.gap_frame_count ?? DEFAULT_JOIN_CLIPS_VALUES.gap_frame_count,
     context_frame_count: params.context_frame_count ?? DEFAULT_JOIN_CLIPS_VALUES.context_frame_count,

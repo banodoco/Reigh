@@ -1603,6 +1603,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
             await createJoinClipsTask({
                 project_id: projectId,
+                ...(parentShotId && { shot_id: parentShotId }), // For "Visit Shot" button in TasksPane
                 clips,
                 prompt: joinPrompt,
                 negative_prompt: joinNegativePrompt,

@@ -48,7 +48,7 @@ export const GuidanceVideosContainer: React.FC<GuidanceVideosContainerProps> = (
   }
 
   return (
-    <div 
+    <div
       className="relative h-20 -mt-1 mb-3"
       style={{
         // Standard width matching other timeline rows
@@ -61,7 +61,7 @@ export const GuidanceVideosContainer: React.FC<GuidanceVideosContainerProps> = (
       {/* Visual background - positioned to align with video frame strips */}
       {/* Videos use left: (TIMELINE_PADDING_OFFSET / containerWidth) * 100% which equals ~6.8% at typical widths */}
       {/* So background uses same percentage positioning to stay aligned */}
-      <div 
+      <div
         className="absolute top-5 bottom-1 bg-muted/30 dark:bg-muted/20 rounded-sm border border-dashed border-muted-foreground/30 pointer-events-none"
         style={{
           // Use same percentage calculation as video strips for alignment

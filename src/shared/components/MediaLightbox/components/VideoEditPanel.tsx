@@ -179,18 +179,21 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
             <RefreshCw className="h-3.5 w-3.5" />
             <span className="truncate">Replace Portion</span>
           </button>
-          <button
-            onClick={onEnterRegenerateMode}
-            className={cn(
-              "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
-              videoEditSubMode === 'regenerate'
-                ? "bg-background text-foreground font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span className="truncate">Regenerate Video</span>
-          </button>
+          {/* Only show Regenerate button if regenerateForm is provided (not for root parent videos) */}
+          {regenerateForm && (
+            <button
+              onClick={onEnterRegenerateMode}
+              className={cn(
+                "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
+                videoEditSubMode === 'regenerate'
+                  ? "bg-background text-foreground font-medium shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span className="truncate">Regenerate Video</span>
+            </button>
+          )}
         </div>
       </div>
 
