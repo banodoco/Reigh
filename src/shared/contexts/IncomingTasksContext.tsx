@@ -1,4 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+
+// Auto-cleanup stale incoming tasks after this many seconds
+const STALE_TASK_TIMEOUT_SECONDS = 60;
 
 /**
  * Generic incoming task - represents a task that is being prepared/created
@@ -74,6 +77,33 @@ export const IncomingTasksProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const hasIncomingTasks = incomingTasks.length > 0;
+
+  // Auto-cleanup stale incoming tasks that have been sitting too long
+  // This prevents stuck placeholders if completeIncomingTask is never called (e.g., due to errors)
+  useEffect(() => {
+    if (incomingTasks.length === 0) return;
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      setIncomingTasks(prev => {
+        const staleTasks = prev.filter(task => {
+          const ageSeconds = (now.getTime() - task.startedAt.getTime()) / 1000;
+          return ageSeconds > STALE_TASK_TIMEOUT_SECONDS;
+        });
+
+        if (staleTasks.length > 0) {
+          console.log('[IncomingTasks] Auto-removing stale tasks:', staleTasks.map(t => t.id));
+          return prev.filter(task => {
+            const ageSeconds = (now.getTime() - task.startedAt.getTime()) / 1000;
+            return ageSeconds <= STALE_TASK_TIMEOUT_SECONDS;
+          });
+        }
+        return prev;
+      });
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [incomingTasks.length]);
 
   const value = useMemo(() => ({
     incomingTasks,
