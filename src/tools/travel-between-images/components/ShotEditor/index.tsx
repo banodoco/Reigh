@@ -2362,15 +2362,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                   />
 
                   {/* Swap to Join Segments */}
-                  {joinValidationData.videoCount >= 2 && (
-                    <button
-                      onClick={() => setGenerateMode('join')}
-                      className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-                    >
-                      <ArrowLeftRight className="w-4 h-4" />
-                      <span>Swap to Join Segments</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setGenerateMode('join')}
+                    className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                    <span>Swap to Join Segments</span>
+                  </button>
                 </div>
                 </>
               ) : (
