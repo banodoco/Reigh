@@ -34,6 +34,14 @@ interface FinalVideoSectionProps {
   projectId: string;
   projectAspectRatio?: string;
   onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+  /** Optional controlled selected parent ID (shared with other components) */
+  selectedParentId?: string | null;
+  /** Optional callback when selected parent changes (for controlled mode) */
+  onSelectedParentChange?: (id: string | null) => void;
+  /** Parent generations passed from parent (to avoid duplicate fetch) */
+  parentGenerations?: any[];
+  /** Segment progress passed from parent */
+  segmentProgress?: { completed: number; total: number };
 }
 
 export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
@@ -41,20 +49,40 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   projectId,
   projectAspectRatio,
   onApplySettingsFromTask,
+  selectedParentId: controlledSelectedParentId,
+  onSelectedParentChange,
+  parentGenerations: parentGenerationsFromProps,
+  segmentProgress: segmentProgressFromProps,
 }) => {
   const isMobile = useIsMobile();
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   
-  // Fetch segment outputs data
-  const {
-    parentGenerations,
-    selectedParentId,
-    setSelectedParentId,
-    selectedParent,
-    hasFinalOutput,
-    segmentProgress,
-    isLoading,
-  } = useSegmentOutputsForShot(shotId, projectId);
+  // Determine if we're in controlled mode (props provided from parent)
+  const isControlled = controlledSelectedParentId !== undefined && onSelectedParentChange !== undefined;
+  
+  // Fetch segment outputs data - only needed if not in controlled mode
+  const hookResult = useSegmentOutputsForShot(
+    isControlled ? null : shotId, // Don't fetch if controlled
+    isControlled ? null : projectId,
+    undefined,
+    controlledSelectedParentId,
+    onSelectedParentChange
+  );
+  
+  // Use props if controlled, otherwise use hook result
+  const parentGenerations = parentGenerationsFromProps || hookResult.parentGenerations;
+  const selectedParentId = isControlled ? controlledSelectedParentId : hookResult.selectedParentId;
+  const setSelectedParentId = isControlled ? onSelectedParentChange! : hookResult.setSelectedParentId;
+  const segmentProgress = segmentProgressFromProps || hookResult.segmentProgress;
+  const isLoading = hookResult.isLoading;
+  
+  // Derive selectedParent from parentGenerations (works in both controlled and uncontrolled mode)
+  const selectedParent = useMemo(() => {
+    if (!selectedParentId) return null;
+    return parentGenerations.find((p: any) => p.id === selectedParentId) || null;
+  }, [parentGenerations, selectedParentId]);
+  
+  const hasFinalOutput = !!(selectedParent?.location);
   
   // Transform selected parent for VideoItem/Lightbox
   const parentVideoRow = useMemo(() => {

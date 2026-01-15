@@ -769,6 +769,58 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isJoiningClips, setIsJoiningClips] = useState(false);
   const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
   
+  // ============================================================================
+  // SHARED OUTPUT SELECTION STATE (PERSISTED PER SHOT)
+  // ============================================================================
+  // This state is shared between FinalVideoSection and SegmentOutputStrip (via Timeline)
+  // so selecting a different output updates both the final video display and the segment strip.
+  // Persisted to shot settings so selection survives page refreshes and shot switching.
+  const { 
+    settings: outputSelectionSettings, 
+    update: updateOutputSelectionSettings,
+    isLoading: isOutputSelectionLoading 
+  } = useToolSettings<{
+    selectedParentGenerationId?: string | null;
+  }>('travel-selected-output', { 
+    projectId: selectedProjectId, 
+    shotId: selectedShot?.id,
+    enabled: !!selectedShot?.id 
+  });
+  
+  // Internal state for immediate UI updates
+  const [selectedOutputId, setSelectedOutputIdState] = useState<string | null>(null);
+  const hasInitializedOutputSelection = useRef<string | null>(null);
+  // Track if we're currently persisting to avoid re-loading our own writes
+  const isPersistingRef = useRef(false);
+  
+  // Load persisted selection when shot loads (one-time init per shot)
+  useEffect(() => {
+    // Skip if still loading, no shot, or we're persisting
+    if (isOutputSelectionLoading || !selectedShot?.id || isPersistingRef.current) return;
+    if (hasInitializedOutputSelection.current === selectedShot.id) return;
+    
+    const persistedId = outputSelectionSettings?.selectedParentGenerationId ?? null;
+    setSelectedOutputIdState(persistedId);
+    hasInitializedOutputSelection.current = selectedShot.id;
+  }, [isOutputSelectionLoading, outputSelectionSettings, selectedShot?.id]);
+  
+  // Reset initialization flag when shot changes
+  useEffect(() => {
+    if (selectedShot?.id !== hasInitializedOutputSelection.current) {
+      hasInitializedOutputSelection.current = null;
+    }
+  }, [selectedShot?.id]);
+  
+  // Setter that updates both state and persists to DB
+  const setSelectedOutputId = useCallback((id: string | null) => {
+    setSelectedOutputIdState(id);
+    // Mark that we're persisting to avoid re-loading our own write
+    isPersistingRef.current = true;
+    updateOutputSelectionSettings('shot', { selectedParentGenerationId: id });
+    // Clear the flag after a short delay
+    setTimeout(() => { isPersistingRef.current = false; }, 100);
+  }, [updateOutputSelectionSettings]);
+  
   // LoRA manager interface for Join Segments (shot-level persistence via joinSettings)
   // This creates a compatible interface with useLoraManager for the JoinClipsSettingsForm
   const joinLoraManager = useMemo(() => ({
@@ -820,11 +872,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Get properly ordered segment outputs from useSegmentOutputsForShot
   // This hook correctly orders videos by their pair_shot_generation_id → timeline position
   // Unlike videoOutputs which requires position field (never set for videos)
+  // Uses controlled selectedOutputId so selection is shared with FinalVideoSection and SegmentOutputStrip
+  // IMPORTANT: Only pass controlled state AFTER persistence has loaded to avoid race conditions
+  const outputSelectionReady = hasInitializedOutputSelection.current === selectedShot?.id;
   const {
     segmentSlots: joinSegmentSlots,
     segments: joinSegments,
     selectedParent: joinSelectedParent,
-  } = useSegmentOutputsForShot(selectedShotId, projectId);
+    parentGenerations,
+    segmentProgress,
+  } = useSegmentOutputsForShot(
+    selectedShotId, 
+    projectId, 
+    undefined, // localShotGenPositions not needed here
+    outputSelectionReady ? selectedOutputId : undefined,
+    outputSelectionReady ? setSelectedOutputId : undefined
+  );
   
   // Calculate shortest clip frame count for join clips validation
   // Uses segmentSlots which properly excludes videos at invalid positions (e.g., last image)
@@ -1890,6 +1953,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           projectId={projectId}
           projectAspectRatio={effectiveAspectRatio}
           onApplySettingsFromTask={applySettingsFromTask}
+          selectedParentId={selectedOutputId}
+          onSelectedParentChange={setSelectedOutputId}
+          parentGenerations={parentGenerations}
+          segmentProgress={segmentProgress}
         />
       </div>
 
@@ -1975,6 +2042,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             maxFrameLimit={smoothContinuations ? 77 : 81}
             // Pass smoothContinuations to trigger timeline gap compaction when enabled
             smoothContinuations={smoothContinuations}
+            // Shared output selection (syncs FinalVideoSection with SegmentOutputStrip)
+            selectedOutputId={selectedOutputId}
+            onSelectedOutputChange={setSelectedOutputId}
           />
         </div>
 

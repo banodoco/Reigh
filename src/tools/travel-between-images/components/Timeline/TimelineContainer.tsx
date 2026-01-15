@@ -164,6 +164,9 @@ interface TimelineContainerProps {
   onSingleImageEndFrameChange?: (endFrame: number) => void;
   // Maximum frame limit for timeline gaps (77 with smooth continuations, 81 otherwise)
   maxFrameLimit?: number;
+  // Shared output selection state (syncs FinalVideoSection with SegmentOutputStrip)
+  selectedOutputId?: string | null;
+  onSelectedOutputChange?: (id: string | null) => void;
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
@@ -214,6 +217,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   singleImageEndFrame,
   onSingleImageEndFrameChange,
   maxFrameLimit = 81,
+  selectedOutputId,
+  onSelectedOutputChange,
 }) => {
   // [ZoomDebug] Track component mounts to detect unwanted remounts
   const mountCountRef = useRef(0);
@@ -1241,6 +1246,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 } : null
               });
             } : undefined}
+            selectedParentId={selectedOutputId}
+            onSelectedParentChange={onSelectedOutputChange}
           />
         )}
 

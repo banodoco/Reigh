@@ -35,6 +35,10 @@ interface SegmentOutputStripProps {
   localShotGenPositions?: Map<string, number>;
   /** Callback to open pair settings modal for a specific pair index */
   onOpenPairSettings?: (pairIndex: number) => void;
+  /** Optional controlled selected parent ID (shared with FinalVideoSection) */
+  selectedParentId?: string | null;
+  /** Optional callback when selected parent changes (for controlled mode) */
+  onSelectedParentChange?: (id: string | null) => void;
 }
 
 export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
@@ -49,6 +53,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   zoomLevel,
   localShotGenPositions,
   onOpenPairSettings,
+  selectedParentId: controlledSelectedParentId,
+  onSelectedParentChange,
 }) => {
   // ===== ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP =====
   const isMobile = useIsMobile();
@@ -57,7 +63,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
   
-  // Fetch segment outputs data
+  // Fetch segment outputs data - uses controlled state if provided
   const {
     parentGenerations,
     selectedParentId,
@@ -67,7 +73,13 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     segmentSlots,
     segmentProgress,
     isLoading,
-  } = useSegmentOutputsForShot(shotId, projectId, localShotGenPositions);
+  } = useSegmentOutputsForShot(
+    shotId, 
+    projectId, 
+    localShotGenPositions,
+    controlledSelectedParentId,
+    onSelectedParentChange
+  );
   
   // Handle opening segment in lightbox
   const handleSegmentClick = useCallback((slotIndex: number) => {

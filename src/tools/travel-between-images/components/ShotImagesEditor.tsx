@@ -144,6 +144,10 @@ interface ShotImagesEditorProps {
   maxFrameLimit?: number;
   /** Whether smooth continuations is enabled - used to compact timeline gaps when toggled */
   smoothContinuations?: boolean;
+  /** Shared selected output parent ID (for syncing FinalVideoSection with SegmentOutputStrip) */
+  selectedOutputId?: string | null;
+  /** Callback when selected output changes */
+  onSelectedOutputChange?: (id: string | null) => void;
 }
 
 // Force TypeScript to re-evaluate this interface
@@ -215,6 +219,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onSingleImageDurationChange,
   maxFrameLimit = 81,
   smoothContinuations = false,
+  selectedOutputId,
+  onSelectedOutputChange,
 }) => {
   // Convert aspect ratio (e.g. "4:3") to concrete resolution string (e.g. "768x576").
   // IMPORTANT: Segment regeneration expects WxH; passing the aspect ratio string would
@@ -1579,6 +1585,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 onSingleImageEndFrameChange={handleSingleImageEndFrameChange}
                 // Frame limit (77 with smooth continuations, 81 otherwise)
                 maxFrameLimit={maxFrameLimit}
+                // Shared output selection (syncs FinalVideoSection with SegmentOutputStrip)
+                selectedOutputId={selectedOutputId}
+                onSelectedOutputChange={onSelectedOutputChange}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}

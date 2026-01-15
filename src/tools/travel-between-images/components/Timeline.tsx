@@ -178,6 +178,9 @@ export interface TimelineProps {
   onSingleImageEndFrameChange?: (endFrame: number) => void;
   // Maximum frame limit for timeline gaps (77 with smooth continuations, 81 otherwise)
   maxFrameLimit?: number;
+  // Shared output selection state (syncs FinalVideoSection with SegmentOutputStrip)
+  selectedOutputId?: string | null;
+  onSelectedOutputChange?: (id: string | null) => void;
 }
 
 /**
@@ -246,6 +249,9 @@ const Timeline: React.FC<TimelineProps> = ({
   onSingleImageEndFrameChange,
   // Frame limit
   maxFrameLimit = 81,
+  // Shared output selection (syncs FinalVideoSection with SegmentOutputStrip)
+  selectedOutputId,
+  onSelectedOutputChange,
 }) => {
   // [RefactorMetrics] Track render count for baseline measurements
   useRenderCount('Timeline');
@@ -931,6 +937,8 @@ const Timeline: React.FC<TimelineProps> = ({
         singleImageEndFrame={singleImageEndFrame}
         onSingleImageEndFrameChange={onSingleImageEndFrameChange}
         maxFrameLimit={maxFrameLimit}
+        selectedOutputId={selectedOutputId}
+        onSelectedOutputChange={onSelectedOutputChange}
       />
 
       {/* Lightbox */}

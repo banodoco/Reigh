@@ -119,7 +119,11 @@ export function useSegmentOutputsForShot(
   shotId: string | null,
   projectId: string | null,
   /** Local shot_generation positions for instant updates during drag */
-  localShotGenPositions?: Map<string, number>
+  localShotGenPositions?: Map<string, number>,
+  /** Optional controlled selected parent ID (lifted state from parent) */
+  controlledSelectedParentId?: string | null,
+  /** Optional callback when selected parent changes (for controlled mode) */
+  onSelectedParentChange?: (id: string | null) => void
 ): UseSegmentOutputsReturn {
   // Debug: Log when local positions are passed
   if (localShotGenPositions && localShotGenPositions.size > 0) {
@@ -128,8 +132,19 @@ export function useSegmentOutputsForShot(
     );
   }
   
-  // Track selected parent generation
-  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  // Track selected parent generation - use controlled value if provided, otherwise internal state
+  const [internalSelectedParentId, setInternalSelectedParentId] = useState<string | null>(null);
+  
+  // Determine if we're in controlled mode
+  const isControlled = controlledSelectedParentId !== undefined;
+  const selectedParentId = isControlled ? controlledSelectedParentId : internalSelectedParentId;
+  const setSelectedParentId = useCallback((id: string | null) => {
+    if (isControlled && onSelectedParentChange) {
+      onSelectedParentChange(id);
+    } else {
+      setInternalSelectedParentId(id);
+    }
+  }, [isControlled, onSelectedParentChange]);
   
   // Fetch parent generations (video outputs without parent_generation_id)
   const {
@@ -228,13 +243,28 @@ export function useSegmentOutputsForShot(
   const parentGenerations = parentGenerationsData || [];
   
   // Auto-select the first (most recent) parent if none selected
+  // IMPORTANT: Only auto-select when:
+  // 1. The query is enabled (shotId exists) - prevents controlled components with disabled queries from clearing selection
+  // 2. NOT in controlled mode - parent component manages selection
+  // 3. There are parent generations to select from
   useEffect(() => {
+    // Don't auto-select if query is disabled (we're just using controlled state passthrough)
+    if (!shotId) return;
+    
+    // Don't auto-select if in controlled mode - parent component manages selection
+    if (isControlled) return;
+    
     if (parentGenerations.length > 0 && !selectedParentId) {
       setSelectedParentId(parentGenerations[0].id);
-    } else if (parentGenerations.length === 0) {
-      setSelectedParentId(null);
+    } else if (parentGenerations.length > 0 && selectedParentId) {
+      // Validate that current selection exists in the list
+      const selectionExists = parentGenerations.some(p => p.id === selectedParentId);
+      if (!selectionExists) {
+        setSelectedParentId(parentGenerations[0].id);
+      }
     }
-  }, [parentGenerations, selectedParentId]);
+    // Note: We don't set to null when parentGenerations is empty - keep last selection
+  }, [parentGenerations, selectedParentId, shotId, isControlled, setSelectedParentId]);
   
   // Get the selected parent
   const selectedParent = useMemo(() => {
