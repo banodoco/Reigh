@@ -158,12 +158,39 @@ function buildIndividualTravelSegmentParams(
   const loraMultipliers = orig.lora_multipliers || orchDetails.lora_multipliers || [];
   
   // Determine model settings
-  // Select model based on whether structure videos are present (VACE vs I2V)
-  const hasStructureVideos = !!(orchDetails.structure_videos?.length > 0 || orig.structure_videos?.length > 0);
-  const defaultModelName = hasStructureVideos 
+  // Model selection depends on structure video TYPE:
+  // - Uni3C (structure_type === 'uni3c'): use I2V model
+  // - VACE types (flow, canny, depth): use VACE model
+  // - No structure video: use I2V model (default)
+  // Check both array format (structure_videos) and legacy single-video format (structure_video_path)
+  const hasStructureVideos = !!(
+    orchDetails.structure_videos?.length > 0 || 
+    orig.structure_videos?.length > 0 ||
+    orchDetails.structure_video_path ||
+    orig.structure_video_path
+  );
+  // Get structure type from: top-level fields, array format, or legacy single-video format
+  const structureType = orig.structure_type || orchDetails.structure_type || 
+    orchDetails.structure_videos?.[0]?.structure_type || orig.structure_videos?.[0]?.structure_type ||
+    orchDetails.structure_video_type || orig.structure_video_type;
+  const isUni3c = structureType === 'uni3c' && hasStructureVideos;
+  const useVaceModel = hasStructureVideos && !isUni3c;
+  const defaultModelName = useVaceModel
     ? "wan_2_2_vace_lightning_baseline_2_2_2"
     : "wan_2_2_i2v_lightning_baseline_2_2_2";
   const modelName = orig.model_name || orchDetails.model_name || defaultModelName;
+  
+  // Log model selection for debugging
+  console.log('[IndividualTravelSegment] Model selection:', {
+    origModelName: orig.model_name,
+    orchModelName: orchDetails.model_name,
+    hasStructureVideos,
+    structureType,
+    isUni3c,
+    useVaceModel,
+    defaultModelName,
+    finalModelName: modelName,
+  });
   const flowShift = orig.flow_shift ?? orchDetails.flow_shift ?? 5;
   const sampleSolver = orig.sample_solver || orchDetails.sample_solver || "euler";
   const guidanceScale = orig.guidance_scale ?? orchDetails.guidance_scale ?? 3;
