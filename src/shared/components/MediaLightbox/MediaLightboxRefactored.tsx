@@ -926,7 +926,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         isTabletOrLarger,
     isTouchLikeDevice,
         shouldShowSidePanel,
-    isUnifiedEditMode
+    isUnifiedEditMode,
+    isPortraitMode
   } = layoutHook;
 
   // Source generation hook
@@ -1580,8 +1581,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const isAnySpecialEditMode = isSpecialEditMode || isVideoTrimModeActive || isVideoEditModeActive;
 
   // Should show side panel (includes video trim mode and video edit mode)
-  // On mobile, use stacked layout even for video editing modes to match image edit behavior
-  const shouldShowSidePanelWithTrim = !isMobile && (shouldShowSidePanel || isVideoTrimModeActive || isVideoEditModeActive);
+  // On portrait mode or phones, use stacked layout; on landscape tablet+, use side panel layout
+  const shouldShowSidePanelWithTrim = shouldShowSidePanel || ((!isPortraitMode && isTabletOrLarger) && (isVideoTrimModeActive || isVideoEditModeActive));
 
   // DEBUG: Log variants state for troubleshooting variant display issues
   React.useEffect(() => {
@@ -2431,7 +2432,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             style={{
               // Smooth transition when tasks pane opens/closes
               transition: 'width 300ms ease',
-              ...(shouldShowSidePanel && effectiveTasksPaneOpen && !isMobile ? {
+              ...(shouldShowSidePanel && effectiveTasksPaneOpen && !isPortraitMode && isTabletOrLarger ? {
                 width: `calc(100vw - ${effectiveTasksPaneWidth}px)`
               } : shouldShowSidePanelWithTrim ? {
                 width: '100vw'
