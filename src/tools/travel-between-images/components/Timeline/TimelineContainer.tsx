@@ -945,14 +945,16 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   
   // Compute shot_generation_id → position index map for instant video slot updates
   // This allows videos to move instantly during drag (without waiting for DB refetch)
-  const localShotGenPositions = useMemo(() => {
+  // IMPORTANT: compute this every render (not memoized) because currentPositions may be mutated in-place.
+  // This keeps segment outputs moving instantly during drag/reorder.
+  const localShotGenPositions = (() => {
     const posMap = new Map<string, number>();
     const sortedEntries = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
     sortedEntries.forEach(([shotGenId], index) => {
       posMap.set(shotGenId, index);
     });
     return posMap;
-  }, [currentPositions]);
+  })();
 
   // Calculate whether to show pair labels globally
   // Check if the average pair has enough space for labels

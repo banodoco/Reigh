@@ -121,9 +121,6 @@ export function useSegmentOutputsForShot(
   /** Local shot_generation positions for instant updates during drag */
   localShotGenPositions?: Map<string, number>
 ): UseSegmentOutputsReturn {
-  // Debug: Log hook inputs
-  console.log(`[useSegmentOutputsForShot] CALLED shotId=${shotId?.substring(0, 8) || 'NULL'} projectId=${projectId?.substring(0, 8) || 'NULL'} localPositions=${localShotGenPositions?.size || 0}`);
-  
   // Debug: Log when local positions are passed
   if (localShotGenPositions && localShotGenPositions.size > 0) {
     console.log('[PairSlot] 📍 LOCAL POSITIONS received:', 
@@ -230,13 +227,9 @@ export function useSegmentOutputsForShot(
   
   const parentGenerations = parentGenerationsData || [];
   
-  // Debug: Log parent generations state
-  console.log(`[useSegmentOutputsForShot] parentGenerations=${parentGenerations.length} selectedParentId=${selectedParentId?.substring(0, 8) || 'NULL'}`);
-  
   // Auto-select the first (most recent) parent if none selected
   useEffect(() => {
     if (parentGenerations.length > 0 && !selectedParentId) {
-      console.log(`[useSegmentOutputsForShot] Auto-selecting parent: ${parentGenerations[0].id.substring(0, 8)}`);
       setSelectedParentId(parentGenerations[0].id);
     } else if (parentGenerations.length === 0) {
       setSelectedParentId(null);
@@ -294,9 +287,6 @@ export function useSegmentOutputsForShot(
   const segments = useMemo(() => {
     return childGenerations.filter(child => isSegment(child.params as any));
   }, [childGenerations]);
-  
-  // Debug: Log segments found
-  console.log(`[useSegmentOutputsForShot] childGenerations=${childGenerations.length} segments=${segments.length}`);
   
   // Fetch LIVE shot_generations to get current timeline order
   // This is the source of truth for video positioning - videos move with their images

@@ -581,30 +581,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
           // Get segment slot for this pair (if available)
           const segmentSlot = segmentSlots?.find(s => s.index === index);
           const prevSegmentSlot = index > 0 ? segmentSlots?.find(s => s.index === index - 1) : undefined;
-          if (index === 0) {
-            console.log('[BatchSegments:Mobile] slots summary', {
-              slotsCount: segmentSlots?.length ?? 0,
-              firstSlot: segmentSlots?.[0]
-                ? {
-                    index: segmentSlots[0].index,
-                    type: segmentSlots[0].type,
-                    id: segmentSlots[0].type === 'child' ? segmentSlots[0].child.id.substring(0, 8) : 'placeholder'
-                  }
-                : null
-            });
-          }
-          console.log('[BatchSegments:Mobile] pair mapping', {
-            index,
-            imageId: imageKey?.substring(0, 8),
-            segmentSlot: segmentSlot
-              ? {
-                  index: segmentSlot.index,
-                  type: segmentSlot.type,
-                  id: segmentSlot.type === 'child' ? segmentSlot.child.id.substring(0, 8) : 'placeholder',
-                  hasLocation: segmentSlot.type === 'child' ? !!segmentSlot.child.location : false
-                }
-              : null
-          });
+          // (debug logs removed)
           
           return (
             <React.Fragment key={imageKey}>

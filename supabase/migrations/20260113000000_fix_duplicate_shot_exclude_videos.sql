@@ -74,3 +74,4 @@ $$ LANGUAGE plpgsql;
 -- Update comment to reflect new behavior
 COMMENT ON FUNCTION duplicate_shot IS 'Duplicates a shot including only positioned images (timeline_frame >= 0, excludes videos). Returns the new shot ID.';
 
+

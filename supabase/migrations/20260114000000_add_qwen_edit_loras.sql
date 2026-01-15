@@ -70,3 +70,4 @@ BEGIN
     RAISE NOTICE 'Successfully added Qwen Edit LoRAs (InScene and Next Scene)';
 END $$;
 
+

@@ -16,7 +16,7 @@ import { ShotImageManagerMobileWrapper } from './ShotImageManagerMobileWrapper.t
 import { useSegmentOutputsForShot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
 import MediaLightbox from '../MediaLightbox';
 import { GenerationRow } from '@/types/shots';
-import { filterImagesForDisplay } from '@/shared/lib/typeGuards';
+import { isPositioned, isVideoGeneration } from '@/shared/lib/typeGuards';
 
 /**
  * Main container component for ShotImageManager
@@ -74,7 +74,11 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
   // This keeps segment outputs aligned with the batch grid order.
   const localShotGenPositions = useMemo(() => {
     if (props.generationMode !== 'batch') return undefined;
-    const orderedImages = filterImagesForDisplay(lightbox.currentImages);
+    // IMPORTANT: preserve current UI order (including optimistic reorder)
+    // Do NOT sort by timeline_frame here, otherwise videos won't move during reorder.
+    const orderedImages = lightbox.currentImages.filter(
+      (img) => isPositioned(img) && !isVideoGeneration(img)
+    );
     if (orderedImages.length === 0) return undefined;
     const map = new Map<string, number>();
     orderedImages.forEach((img, index) => {
@@ -82,7 +86,6 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
         map.set(img.id, index);
       }
     });
-    console.log(`[BatchSegments] localShotGenPositions count=${map.size} order=${orderedImages.map((img, idx) => `${idx}:${img.id?.substring(0, 8)}`).join(' ')}`);
     return map;
   }, [props.generationMode, lightbox.currentImages]);
 
@@ -95,17 +98,6 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
     props.generationMode === 'batch' ? props.projectId || null : null,
     props.generationMode === 'batch' ? localShotGenPositions : undefined
   );
-
-  // Log what we're passing to the hook
-  console.log(`[BatchSegments] HOOK INPUTS shotId=${props.shotId?.substring(0, 8) || 'NULL'} projectId=${props.projectId?.substring(0, 8) || 'NULL'} mode=${props.generationMode}`);
-  
-  // Flat log for each slot
-  console.log(`[BatchSegments] segmentSlots count=${segmentSlots.length}`);
-  segmentSlots.forEach((slot) => {
-    const childId = slot.type === 'child' ? slot.child.id?.substring(0, 8) : 'n/a';
-    const hasLoc = slot.type === 'child' ? !!slot.child.location : false;
-    console.log(`[BatchSegments]   slot[${slot.index}] type=${slot.type} childId=${childId} hasLoc=${hasLoc}`);
-  });
   
   // Segment video lightbox state
   const [segmentLightboxIndex, setSegmentLightboxIndex] = useState<number | null>(null);

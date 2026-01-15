@@ -102,16 +102,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
         
         // Get segment slot for this pair (if available)
         const segmentSlot = segmentSlots?.find(s => s.index === index);
-        if (index === 0) {
-          const firstType = segmentSlots?.[0]?.type || 'none';
-          const firstChildId = segmentSlots?.[0]?.type === 'child' ? segmentSlots[0].child.id?.substring(0, 8) : 'n/a';
-          console.log(`[BatchSegments:Desktop] SUMMARY slotsCount=${segmentSlots?.length ?? 0} first.type=${firstType} first.childId=${firstChildId}`);
-        }
-        // FLAT LOG for visibility
-        const slotType = segmentSlot?.type || 'none';
-        const slotChildId = segmentSlot?.type === 'child' ? segmentSlot.child.id?.substring(0, 8) : 'n/a';
-        const slotHasLocation = segmentSlot?.type === 'child' ? !!segmentSlot.child.location : false;
-        console.log(`[BatchSegments:Desktop] idx=${index} type=${slotType} childId=${slotChildId} hasLoc=${slotHasLocation}`);
+        // (debug logs removed)
         
         // Hide indicator if this item is being dragged OR if an external file is being dropped into this gap
         // The gap after item 'index' corresponds to insertion at 'index + 1'
@@ -143,11 +134,6 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             />
             
             {/* Video output above pair indicator - positioned in the gap to the right */}
-            {(() => {
-              const shouldRenderVideo = !isLastImage && segmentSlot && !shouldHideIndicator;
-              console.log(`[BatchSegments:Desktop] RENDER idx=${index} last=${isLastImage} slot=${!!segmentSlot} hide=${shouldHideIndicator} → render=${shouldRenderVideo}`);
-              return null;
-            })()}
             {!isLastImage && segmentSlot && !shouldHideIndicator && (
               <div className="absolute -top-4 -right-[6px] translate-x-1/2 z-20 pointer-events-auto w-28">
                 <BatchSegmentVideo

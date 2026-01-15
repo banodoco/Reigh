@@ -34,11 +34,6 @@ export const BatchSegmentVideo: React.FC<BatchSegmentVideoProps> = ({
   isMobile = false,
   compact = false,
 }) => {
-  // Debug log - FLAT for visibility
-  const childId = slot.type === 'child' ? slot.child.id?.substring(0, 8) : 'n/a';
-  const hasLoc = slot.type === 'child' ? !!slot.child.location : false;
-  console.log(`[BatchSegmentVideo] pair=${pairIndex} type=${slot.type} childId=${childId} hasLoc=${hasLoc}`);
-  
   const [isHovering, setIsHovering] = useState(false);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
