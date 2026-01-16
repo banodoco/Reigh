@@ -9,6 +9,12 @@ import { cn } from '@/shared/lib/utils';
 import { Task } from '@/types/tasks';
 import { GenerationRow } from '@/types/shots';
 
+// Orchestrator task types don't have their own video output - they spawn subtasks
+const ORCHESTRATOR_TASK_TYPES = [
+  'travel_orchestrator',
+  'wan_2_2_i2v', // This is also an orchestrator that spawns individual segments
+] as const;
+
 interface TaskItemActionsProps {
   task: Task;
   isMobile: boolean;
@@ -109,8 +115,8 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
         </Tooltip>
       )}
       
-      {/* Open Video button */}
-      {isCompletedVideoTask && (
+      {/* Open Video button - hidden for orchestrator tasks that don't have their own video */}
+      {isCompletedVideoTask && !ORCHESTRATOR_TASK_TYPES.includes(task.taskType as any) && (
         <Tooltip>
           <TooltipTrigger asChild>
             <button
