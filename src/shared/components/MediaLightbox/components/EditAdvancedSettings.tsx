@@ -63,23 +63,24 @@ export const EditAdvancedSettings: React.FC<EditAdvancedSettingsProps> = ({
   );
 
   return (
-    <CollapsibleSection title="Advanced settings" headerAction={resetButton}>
-      <div className="space-y-4">
-        {/* Steps slider - only shown when running local and two-pass is disabled */}
-        {isLocalGeneration && !settings.enabled && (
-          <SliderWithValue
-            label="Inference Steps"
-            value={settings.num_inference_steps}
-            onChange={(v) => updateField('num_inference_steps', Math.round(v))}
-            min={1}
-            max={30}
-            step={1}
-            disabled={disabled}
-            numberInputClassName="w-20"
-          />
-        )}
+    <div className="space-y-4">
+      {/* Steps slider - shown above advanced settings when running local and two-pass is disabled */}
+      {isLocalGeneration && !settings.enabled && (
+        <SliderWithValue
+          label="Inference Steps"
+          value={settings.num_inference_steps}
+          onChange={(v) => updateField('num_inference_steps', Math.round(v))}
+          min={1}
+          max={30}
+          step={1}
+          disabled={disabled}
+          numberInputClassName="w-20"
+        />
+      )}
 
-        {/* Enable/Disable Toggle */}
+      <CollapsibleSection title="Advanced settings" headerAction={resetButton}>
+        <div className="space-y-4">
+          {/* Enable/Disable Toggle */}
         <div className="flex items-center justify-between">
           <Label htmlFor="advanced-enabled" className="text-sm font-medium">
             Enable two-pass generation
@@ -176,8 +177,9 @@ export const EditAdvancedSettings: React.FC<EditAdvancedSettingsProps> = ({
             </div>
           </>
         )}
-      </div>
-    </CollapsibleSection>
+        </div>
+      </CollapsibleSection>
+    </div>
   );
 };
 
