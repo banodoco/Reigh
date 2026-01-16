@@ -316,6 +316,8 @@ export interface TravelBetweenImagesTaskParams extends
   uni3c_start_percent?: number;
   /** Uni3C end percent (0-1, used when structure_video_type is 'raw'/uni3c) */
   uni3c_end_percent?: number;
+  /** Enable Uni3C mode (GPU worker checks this flag) */
+  use_uni3c?: boolean;
   
   /**
    * NEW: Array of structure video configurations for multi-video support.
@@ -524,8 +526,15 @@ function buildTravelBetweenImagesPayload(
     }));
     
     orchestratorPayload.structure_videos = cleanedStructureVideos;
+    
+    // Forward use_uni3c flag if set (GPU worker checks this)
+    if (params.use_uni3c) {
+      orchestratorPayload.use_uni3c = true;
+    }
+    
     console.log("[createTravelBetweenImagesTask] Using structure_videos array format:", {
       count: cleanedStructureVideos.length,
+      use_uni3c: params.use_uni3c,
       videos: cleanedStructureVideos.map(v => ({
         path: v.path.substring(0, 50) + '...',
         start_frame: v.start_frame,
@@ -540,13 +549,18 @@ function buildTravelBetweenImagesPayload(
     orchestratorPayload.structure_video_motion_strength = params.structure_video_motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength;
     orchestratorPayload.structure_video_type = params.structure_video_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type;
     
-    // Add uni3c parameters if structure_video_type is 'raw' (uni3c mode)
-    if (params.structure_video_type === 'raw' || params.uni3c_start_percent !== undefined || params.uni3c_end_percent !== undefined) {
+    // Add uni3c parameters if structure_video_type is 'raw' (uni3c mode) or use_uni3c is explicitly set
+    if (params.structure_video_type === 'raw' || params.use_uni3c || params.uni3c_start_percent !== undefined || params.uni3c_end_percent !== undefined) {
       orchestratorPayload.uni3c_start_percent = params.uni3c_start_percent ?? 0;
       orchestratorPayload.uni3c_end_percent = params.uni3c_end_percent ?? 0.1;
+      // CRITICAL: Forward use_uni3c flag - GPU worker checks this to enable uni3c processing
+      if (params.use_uni3c) {
+        orchestratorPayload.use_uni3c = true;
+      }
       console.log("[createTravelBetweenImagesTask] Uni3C mode - adding uni3c parameters:", {
         uni3c_start_percent: orchestratorPayload.uni3c_start_percent,
-        uni3c_end_percent: orchestratorPayload.uni3c_end_percent
+        uni3c_end_percent: orchestratorPayload.uni3c_end_percent,
+        use_uni3c: orchestratorPayload.use_uni3c
       });
     }
     

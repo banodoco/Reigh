@@ -1447,6 +1447,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   if (structureVideos && structureVideos.length > 0) {
     // NEW: Use structure_videos array format
     // Convert to API format (strip metadata/resource_id which are UI-only)
+    // Check if ANY video uses uni3c mode
+    const hasUni3cVideo = structureVideos.some(v => v.structure_type === 'uni3c');
+    
     const apiStructureVideos: ApiStructureVideoConfig[] = structureVideos.map(video => {
       // For uni3c mode, convert 'uni3c' to 'raw' for backend
       const effectiveStructureType = video.structure_type === 'uni3c' ? 'raw' : video.structure_type;
@@ -1470,8 +1473,17 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     });
     
     requestBody.structure_videos = apiStructureVideos;
+    
+    // CRITICAL: Set use_uni3c flag when any video uses uni3c mode
+    // GPU worker checks this flag to enable uni3c processing
+    if (hasUni3cVideo) {
+      requestBody.use_uni3c = true;
+      console.log('[Generation] 🔵 Uni3C mode ENABLED via structure_videos array');
+    }
+    
     console.log('[Generation] 🎬 Using structure_videos ARRAY format:', {
       count: apiStructureVideos.length,
+      hasUni3cVideo,
       videos: apiStructureVideos.map(v => ({
         path: v.path.substring(0, 50) + '...',
         start_frame: v.start_frame,
@@ -1503,13 +1515,16 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // Send the effective structure type ('raw' for uni3c, otherwise the original value)
     requestBody.structure_video_type = effectiveStructureType;
     
-    // For uni3c mode, also send uni3c_start_percent and uni3c_end_percent
+    // For uni3c mode, also send uni3c_start_percent, uni3c_end_percent, and use_uni3c flag
     if (isUni3cMode) {
       requestBody.uni3c_start_percent = 0;
       requestBody.uni3c_end_percent = params.uni3cEndPercent ?? 0.1;
+      // CRITICAL: Set use_uni3c flag - GPU worker checks this to enable uni3c processing
+      requestBody.use_uni3c = true;
       console.log('[Generation] 🔵 Uni3C mode params:', {
         uni3c_start_percent: requestBody.uni3c_start_percent,
-        uni3c_end_percent: requestBody.uni3c_end_percent
+        uni3c_end_percent: requestBody.uni3c_end_percent,
+        use_uni3c: requestBody.use_uni3c
       });
     }
   }
