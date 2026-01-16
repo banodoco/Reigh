@@ -246,10 +246,20 @@ const TaskItem: React.FC<TaskItemProps> = ({
     e.preventDefault();
     setIsHoveringTaskItem(false);
 
+    console.log('[VideoQueryDebug] handleViewVideo clicked:', {
+      taskId: task.id.substring(0, 8),
+      hasVideoOutputs: !!videoOutputs,
+      videoOutputsLength: videoOutputs?.length || 0,
+      isCompletedVideoTask: taskInfo.isCompletedVideoTask,
+      isVideoTask: taskInfo.isVideoTask,
+    });
+
     if (onOpenVideoLightbox && videoOutputs && videoOutputs.length > 0) {
+      console.log('[VideoQueryDebug] Opening lightbox with existing videoOutputs');
       const initialVariantId = (videoOutputs[0] as any)?._variant_id;
       onOpenVideoLightbox(task, videoOutputs, 0, initialVariantId);
     } else {
+      console.log('[VideoQueryDebug] No videoOutputs yet, triggering fetch...');
       if (!isMobile) {
         setActiveTaskId(task.id);
         setIsTasksPaneOpen(true);

@@ -26,16 +26,31 @@ export function useVideoGenerations({
 }: UseVideoGenerationsOptions) {
   // State to control when to fetch video generations (on hover)
   const [shouldFetchVideo, setShouldFetchVideo] = useState(false);
-  
+
   // State to track if user clicked the button (not just hovered)
   const [waitingForVideoToOpen, setWaitingForVideoToOpen] = useState(false);
+
+  // Debug: Log hook inputs on every render
+  console.log('[VideoQueryDebug] Hook called:', {
+    taskId: task.id.substring(0, 8),
+    taskType: task.taskType,
+    status: task.status,
+    isVideoTask,
+    isCompletedVideoTask,
+    isHovering,
+    shouldFetchVideo,
+    waitingForVideoToOpen,
+    hasOutputLocation: !!task.outputLocation,
+    queryEnabled: shouldFetchVideo && isVideoTask && task.status === 'Complete',
+  });
 
   // Trigger video fetch when hovering over completed video tasks
   useEffect(() => {
     if (isHovering && isCompletedVideoTask && !shouldFetchVideo) {
+      console.log('[VideoQueryDebug] Hover triggered fetch for task:', task.id.substring(0, 8));
       setShouldFetchVideo(true);
     }
-  }, [isHovering, isCompletedVideoTask, shouldFetchVideo]);
+  }, [isHovering, isCompletedVideoTask, shouldFetchVideo, task.id]);
 
   // Fetch video generations
   const { data: videoGenerations, isLoading: isLoadingVideoGen } = useQuery({
@@ -185,13 +200,19 @@ export function useVideoGenerations({
 
   // Trigger fetch (for click before hover)
   const ensureFetch = useCallback(() => {
+    console.log('[VideoQueryDebug] ensureFetch called for task:', task.id.substring(0, 8));
     setShouldFetchVideo(true);
-  }, []);
+  }, [task.id]);
 
   const triggerOpen = useCallback(() => {
+    console.log('[VideoQueryDebug] triggerOpen called for task:', task.id.substring(0, 8), {
+      isVideoTask,
+      status: task.status,
+      willEnableQuery: isVideoTask && task.status === 'Complete',
+    });
     setShouldFetchVideo(true);
     setWaitingForVideoToOpen(true);
-  }, []);
+  }, [task.id, isVideoTask, task.status]);
 
   const clearWaiting = () => {
     setWaitingForVideoToOpen(false);
