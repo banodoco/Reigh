@@ -62,26 +62,24 @@ export const EditAdvancedSettings: React.FC<EditAdvancedSettingsProps> = ({
     </div>
   );
 
-  // In local mode, only show inference steps slider (no two-pass generation)
-  if (isLocalGeneration) {
-    return (
-      <div className="space-y-4">
-        <SliderWithValue
-          label="Inference Steps"
-          value={settings.num_inference_steps ?? DEFAULT_ADVANCED_SETTINGS.num_inference_steps}
-          onChange={(v) => updateField('num_inference_steps', Math.round(v))}
-          min={1}
-          max={30}
-          step={1}
-          disabled={disabled}
-          numberInputClassName="w-20"
-        />
-      </div>
-    );
+  // Advanced settings only available in local mode (cloud mode doesn't support these settings)
+  if (!isLocalGeneration) {
+    return null;
   }
 
   return (
     <div className="space-y-4">
+      <SliderWithValue
+        label="Inference Steps"
+        value={settings.num_inference_steps ?? DEFAULT_ADVANCED_SETTINGS.num_inference_steps}
+        onChange={(v) => updateField('num_inference_steps', Math.round(v))}
+        min={1}
+        max={30}
+        step={1}
+        disabled={disabled}
+        numberInputClassName="w-20"
+      />
+
       <CollapsibleSection title="Advanced settings" headerAction={resetButton}>
         <div className="space-y-4">
           {/* Enable/Disable Toggle */}
