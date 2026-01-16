@@ -423,6 +423,7 @@ export async function insertGeneration(supabase: any, record: any): Promise<any>
 
 /**
  * Create a generation variant
+ * @param viewedAt - Optional: if provided, marks the variant as already viewed (for single-segment cases)
  */
 export async function createVariant(
   supabase: any,
@@ -432,9 +433,10 @@ export async function createVariant(
   params: any,
   isPrimary: boolean,
   variantType: string | null,
-  name?: string | null
+  name?: string | null,
+  viewedAt?: string | null
 ): Promise<any> {
-  const variantRecord = {
+  const variantRecord: Record<string, any> = {
     generation_id: generationId,
     location,
     thumbnail_url: thumbnailUrl,
@@ -445,7 +447,12 @@ export async function createVariant(
     created_at: new Date().toISOString()
   };
 
-  console.log(`[Variant] Creating variant for generation ${generationId}: type=${variantType}, isPrimary=${isPrimary}`);
+  // If viewedAt is provided, mark the variant as already viewed
+  if (viewedAt) {
+    variantRecord.viewed_at = viewedAt;
+  }
+
+  console.log(`[Variant] Creating variant for generation ${generationId}: type=${variantType}, isPrimary=${isPrimary}, viewed=${!!viewedAt}`);
 
   const { data, error } = await supabase
     .from('generation_variants')
@@ -593,6 +600,7 @@ export async function getOrCreateParentGeneration(
 
 /**
  * Helper function to create variant and update parent generation
+ * @param viewedAt - Optional: if provided, marks the variant as already viewed (for single-segment cases)
  */
 async function createVariantOnParent(
   supabase: any,
@@ -604,7 +612,8 @@ async function createVariantOnParent(
   variantType: string,
   extraParams: Record<string, any> = {},
   variantName?: string | null,
-  makePrimary: boolean = true
+  makePrimary: boolean = true,
+  viewedAt?: string | null
 ): Promise<any | null> {
   console.log(`[GenMigration] ${taskData.task_type} task ${taskId} - creating variant for parent generation ${parentGenId}`);
 
@@ -634,10 +643,11 @@ async function createVariantOnParent(
       variantParams,
       makePrimary,     // is_primary
       variantType,
-      variantName || null
+      variantName || null,
+      viewedAt || null
     );
 
-    console.log(`[GenMigration] Successfully created ${variantType} variant for parent generation ${parentGen.id}`);
+    console.log(`[GenMigration] Successfully created ${variantType} variant for parent generation ${parentGen.id}${viewedAt ? ' (auto-viewed)' : ''}`);
 
     // Mark task as generation_created
     await supabase
@@ -651,6 +661,66 @@ async function createVariantOnParent(
     console.error(`[GenMigration] Exception creating variant for ${taskData.task_type}:`, variantErr);
     return null;
   }
+}
+
+/**
+ * Determines the viewedAt timestamp for a child generation variant.
+ * For single-segment cases (only one child under parent), returns current timestamp.
+ * For multi-segment cases, returns null.
+ *
+ * This centralizes the single-segment detection logic that was previously scattered
+ * across three different code paths:
+ * 1. individual_travel_segment with child_generation_id (SPECIAL CASE 1a)
+ * 2. Travel segment matching existing generation at position
+ * 3. Standard child generation creation
+ *
+ * @param supabase - Supabase client
+ * @param options - Detection options (check in order of preference)
+ * @returns ISO timestamp string if single-segment, null otherwise
+ */
+async function getChildVariantViewedAt(
+  supabase: any,
+  options: {
+    // Check 1: Explicit flag from orchestrator detection (fastest)
+    taskParams?: { _isSingleSegmentCase?: boolean };
+    // Check 2: Count siblings under parent (slower but works for individual segments)
+    childGeneration?: { parent_generation_id: string | null; is_child: boolean };
+    parentGenerationId?: string;
+  }
+): Promise<string | null> {
+  // Fast path: Check explicit flag first (set during orchestrator detection)
+  if (options.taskParams?._isSingleSegmentCase === true) {
+    console.log('[getChildVariantViewedAt] Single-segment detected via _isSingleSegmentCase flag');
+    return new Date().toISOString();
+  }
+
+  // Slow path: Count siblings to determine if single-segment
+  // Used by individual_travel_segment which doesn't go through orchestrator detection
+  const parentId = options.childGeneration?.parent_generation_id || options.parentGenerationId;
+  // Only count if: (a) we have a parentId from childGeneration with is_child=true, or (b) we have explicit parentGenerationId
+  const shouldCountSiblings = parentId && (
+    options.childGeneration?.is_child === true ||  // childGeneration explicitly marked as child
+    (!options.childGeneration && options.parentGenerationId)  // or explicit parentGenerationId without childGeneration
+  );
+  if (shouldCountSiblings) {
+    try {
+      const { count } = await supabase
+        .from('generations')
+        .select('id', { count: 'exact', head: true })
+        .eq('parent_generation_id', parentId)
+        .eq('is_child', true);
+
+      if (count === 1) {
+        console.log(`[getChildVariantViewedAt] Single-segment detected via sibling count (parent: ${parentId})`);
+        return new Date().toISOString();
+      }
+      console.log(`[getChildVariantViewedAt] Multi-segment case: ${count} siblings under parent ${parentId}`);
+    } catch (err) {
+      console.warn('[getChildVariantViewedAt] Error counting siblings:', err);
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -751,44 +821,43 @@ export async function createGenerationFromTask(
         const makePrimary = taskData.params?.make_primary_variant ?? true;
         console.log(`[GenMigration] Creating variant with isPrimary=${makePrimary}`);
 
-        await createVariant(supabase, childGen.id, publicUrl, thumbnailUrl || null, variantParams, makePrimary, VARIANT_TYPES.INDIVIDUAL_SEGMENT, null);
+        // Use centralized helper for single-segment detection (counts siblings under parent)
+        const childViewedAt = makePrimary ? await getChildVariantViewedAt(supabase, {
+          taskParams: taskData.params,
+          childGeneration: childGen,
+        }) : null;
+        const isSingleSegmentChild = childViewedAt !== null;
 
-        console.log(`[GenMigration] Successfully created variant for child generation ${childGenId}`);
+        await createVariant(supabase, childGen.id, publicUrl, thumbnailUrl || null, variantParams, makePrimary, VARIANT_TYPES.INDIVIDUAL_SEGMENT, null, childViewedAt);
+
+        console.log(`[GenMigration] Successfully created variant for child generation ${childGenId}${isSingleSegmentChild ? ' (auto-viewed)' : ''}`);
 
         // SINGLE-SEGMENT PROPAGATION: If this child is the only child of its parent,
         // also create a variant on the parent so the main generation updates automatically
-        if (makePrimary && childGen.parent_generation_id && childGen.is_child) {
-          const { count: siblingCount } = await supabase
-            .from('generations')
-            .select('id', { count: 'exact', head: true })
-            .eq('parent_generation_id', childGen.parent_generation_id)
-            .eq('is_child', true);
+        if (isSingleSegmentChild && childGen.parent_generation_id) {
+          console.log(`[GenMigration] Single-segment child - also creating variant on parent ${childGen.parent_generation_id}`);
+          logger?.info("Single-segment propagation to parent", {
+            task_id: taskId,
+            child_generation_id: childGenId,
+            parent_generation_id: childGen.parent_generation_id,
+            action: "propagate_to_parent"
+          });
 
-          if (siblingCount === 1) {
-            console.log(`[GenMigration] Single-segment child - also creating variant on parent ${childGen.parent_generation_id}`);
-            logger?.info("Single-segment propagation to parent", {
-              task_id: taskId,
-              child_generation_id: childGenId,
-              parent_generation_id: childGen.parent_generation_id,
-              action: "propagate_to_parent"
-            });
-
-            await createVariant(
-              supabase,
-              childGen.parent_generation_id,
-              publicUrl,
-              thumbnailUrl || null,
-              {
-                ...variantParams,
-                propagated_from_child: childGenId,
-                created_from: 'single_segment_propagation',
-              },
-              true, // is_primary
-              VARIANT_TYPES.TRAVEL_SEGMENT,
-              null
-            );
-            console.log(`[GenMigration] Successfully propagated to parent generation`);
-          }
+          await createVariant(
+            supabase,
+            childGen.parent_generation_id,
+            publicUrl,
+            thumbnailUrl || null,
+            {
+              ...variantParams,
+              propagated_from_child: childGenId,
+              created_from: 'single_segment_propagation',
+            },
+            true, // is_primary
+            VARIANT_TYPES.TRAVEL_SEGMENT,
+            null
+          );
+          console.log(`[GenMigration] Successfully propagated to parent generation`);
         }
 
         await supabase.from('tasks').update({ generation_created: true }).eq('id', taskId);
@@ -933,6 +1002,9 @@ export async function createGenerationFromTask(
 
           // Extract child-specific params from orchestrator_details if available
           const orchDetails = taskData.params?.orchestrator_details;
+          // Track if this is a single-segment orchestrator - we'll create an auto-viewed variant on the child
+          let isSingleSegmentCase = false;
+
           if (orchDetails && !isNaN(childOrder)) {
             console.log(`[GenMigration] Extracting specific params for child segment ${childOrder}`);
 
@@ -941,6 +1013,7 @@ export async function createGenerationFromTask(
           if (childOrder === 0) {
             const numSegments = orchDetails.num_new_segments_to_generate;
             if (numSegments === 1 && parentGenerationId) {
+              isSingleSegmentCase = true;
               console.log(`[TravelSingleSegment] Single-segment orchestrator - creating variant for parent AND child generation`);
               logger?.info("Single-segment orchestrator - creating variant on parent and child", {
                 task_id: taskId,
@@ -950,9 +1023,19 @@ export async function createGenerationFromTask(
               });
 
               // Create variant on parent so the main generation shows the video
+              // Only set as primary if the parent doesn't already have a primary variant
+              const { count: existingVariantCount } = await supabase
+                .from('generation_variants')
+                .select('id', { count: 'exact', head: true })
+                .eq('generation_id', parentGenerationId);
+              const isFirstParentVariant = (existingVariantCount || 0) === 0;
+
               await createVariantOnParent(
                 supabase, parentGenerationId, publicUrl, thumbnailUrl || null, taskData, taskId,
-                VARIANT_TYPES.TRAVEL_SEGMENT, { tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true }
+                VARIANT_TYPES.TRAVEL_SEGMENT,
+                { tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES, created_from: 'single_segment_travel', segment_index: 0, is_single_segment: true },
+                null,  // variantName
+                isFirstParentVariant  // makePrimary - only if first variant
               );
 
               // Mark orchestrator task as having created a generation
@@ -965,6 +1048,11 @@ export async function createGenerationFromTask(
 
             // Extract segment-specific params from expanded arrays
             taskData.params = extractSegmentSpecificParams(taskData.params, orchDetails, childOrder);
+
+            // Store flag in params so it's accessible after generation creation
+            if (isSingleSegmentCase) {
+              taskData.params._isSingleSegmentCase = true;
+            }
           }
         }
       }
@@ -1016,13 +1104,21 @@ export async function createGenerationFromTask(
       }
 
       if (existingGenId) {
-        console.log(`[TravelSegmentVariant] Found existing generation ${existingGenId} - adding as non-primary variant`);
+        // Use centralized helper for single-segment detection
+        const variantViewedAt = await getChildVariantViewedAt(supabase, {
+          taskParams: taskData.params,
+          parentGenerationId: parentGenerationId || undefined,
+        });
+        const isSingleSegment = variantViewedAt !== null;
+
+        console.log(`[TravelSegmentVariant] Found existing generation ${existingGenId} - adding as non-primary variant${isSingleSegment ? ' (auto-viewed)' : ''}`);
         logger?.info("Adding travel segment as variant to existing generation", {
           task_id: taskId,
           existing_generation_id: existingGenId,
           pair_shot_generation_id: pairShotGenId,
           child_order: childOrder,
           parent_generation_id: parentGenerationId,
+          is_single_segment: isSingleSegment,
           action: "add_variant_to_existing_segment"
         });
 
@@ -1042,7 +1138,8 @@ export async function createGenerationFromTask(
             pair_shot_generation_id: pairShotGenId
           },
           null,
-          false
+          false,
+          variantViewedAt // viewedAt - only set for single-segment cases
         );
 
         if (variantResult) {
@@ -1173,6 +1270,35 @@ export async function createGenerationFromTask(
     // They should NOT also be created as variants on the parent - that causes them to appear
     // in the variant selector when viewing the parent, which is incorrect behavior.
     // The ChildGenerationsView component fetches children correctly using the parent_generation_id relationship.
+
+    // For ALL child generations, create an "original" variant as the primary variant.
+    // For single-segment cases, also mark it as viewed (since there's nothing to "drill down" into).
+    if (finalIsChild) {
+      // Use centralized helper for single-segment detection
+      // Note: We only check the flag here (not sibling count) since we just created this generation
+      const autoViewedAt = await getChildVariantViewedAt(supabase, {
+        taskParams: taskData.params,
+      });
+      const isSingleSegment = autoViewedAt !== null;
+
+      console.log(`[ChildGeneration] Creating original variant for child ${newGeneration.id}${isSingleSegment ? ' (auto-viewed)' : ''}`);
+      await createVariant(
+        supabase,
+        newGeneration.id,
+        publicUrl,
+        thumbnailUrl || null,
+        {
+          ...generationParams,
+          source_task_id: taskId,
+          created_from: isSingleSegment ? 'single_segment_child_original' : 'child_generation_original',
+        },
+        true, // is_primary
+        'original',
+        null, // name
+        autoViewedAt // viewedAt - only set for single-segment cases
+      );
+      console.log(`[ChildGeneration] Created original variant for child generation`);
+    }
 
     // Link to shot if applicable (not for child generations)
     if (shotId && !finalIsChild) {
