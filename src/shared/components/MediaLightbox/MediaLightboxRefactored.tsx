@@ -313,6 +313,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { selectedProjectId } = useProject();
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
+  const isLocalGeneration = generationMethods.onComputer && !generationMethods.inCloud;
 
   // Tasks pane control - allows opening tasks pane from within the lightbox
   const { 
@@ -2982,6 +2983,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     // Advanced settings for two-pass generation
                     advancedSettings={advancedSettings}
                     setAdvancedSettings={setAdvancedSettings}
+                    isLocalGeneration={isLocalGeneration}
                     // InfoPanel props
                     isVideo={isVideo}
                     showImageEditTools={showImageEditTools}
@@ -3310,6 +3312,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     // Advanced settings for two-pass generation
                     advancedSettings={advancedSettings}
                     setAdvancedSettings={setAdvancedSettings}
+                    isLocalGeneration={isLocalGeneration}
                     // InfoPanel props
                     isVideo={isVideo}
                     showImageEditTools={showImageEditTools}

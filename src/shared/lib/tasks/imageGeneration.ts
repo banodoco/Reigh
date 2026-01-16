@@ -44,6 +44,8 @@ export const DEFAULT_REFERENCE_PARAMS: ReferenceApiParams = {
  * Uses snake_case to match API directly.
  */
 export interface HiresFixApiParams {
+  /** Number of inference steps (used for single-pass or base pass in two-pass mode) */
+  num_inference_steps?: number;
   hires_scale?: number;
   hires_steps?: number;
   hires_denoise?: number;

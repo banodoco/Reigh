@@ -204,8 +204,13 @@ function buildMagicEditTaskParams(
     console.log('[MagicEdit] Will create as new generation instead of variant');
   }
 
-  // Add hires fix params if provided
+  // Add hires fix / inference params if provided
   if (params.hires_fix) {
+    // Always pass num_inference_steps if provided (for both single-pass and two-pass modes)
+    if (params.hires_fix.num_inference_steps !== undefined) {
+      taskParams.num_inference_steps = params.hires_fix.num_inference_steps;
+    }
+    // Two-pass specific params
     if (params.hires_fix.hires_scale !== undefined) {
       taskParams.hires_scale = params.hires_fix.hires_scale;
     }
@@ -224,7 +229,7 @@ function buildMagicEditTaskParams(
     if (params.hires_fix.additional_loras && Object.keys(params.hires_fix.additional_loras).length > 0) {
       taskParams.additional_loras = params.hires_fix.additional_loras;
     }
-    console.log('[MagicEdit] Added hires fix params:', params.hires_fix);
+    console.log('[MagicEdit] Added inference/hires params:', params.hires_fix);
   }
 
   return taskParams;

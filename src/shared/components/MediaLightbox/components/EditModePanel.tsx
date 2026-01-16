@@ -119,6 +119,8 @@ export interface EditModePanelProps {
   // Advanced settings for two-pass generation
   advancedSettings?: EditAdvancedSettingsType;
   setAdvancedSettings?: (updates: Partial<EditAdvancedSettingsType>) => void;
+  // Whether running in local generation mode (shows steps slider)
+  isLocalGeneration?: boolean;
 }
 
 /**
@@ -193,6 +195,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   editLoraManager,
   advancedSettings,
   setAdvancedSettings,
+  isLocalGeneration = false,
 }) => {
   const isMobile = variant === 'mobile';
   
@@ -595,6 +598,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           <EditAdvancedSettings
             settings={advancedSettings}
             onSettingsChange={setAdvancedSettings}
+            isLocalGeneration={isLocalGeneration}
           />
         )}
         

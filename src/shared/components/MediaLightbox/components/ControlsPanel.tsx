@@ -108,6 +108,7 @@ export interface ControlsPanelProps extends ModeProps {
   editLoraManager?: EditModePanelProps['editLoraManager'];
   advancedSettings?: EditModePanelProps['advancedSettings'];
   setAdvancedSettings?: EditModePanelProps['setAdvancedSettings'];
+  isLocalGeneration?: EditModePanelProps['isLocalGeneration'];
 
   // InfoPanel props
   isVideo: InfoPanelProps['isVideo'];
@@ -225,6 +226,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     editLoraManager,
     advancedSettings,
     setAdvancedSettings,
+    isLocalGeneration,
     // InfoPanel props
     isVideo,
     showImageEditTools,
@@ -370,6 +372,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         editLoraManager={editLoraManager}
         advancedSettings={advancedSettings}
         setAdvancedSettings={setAdvancedSettings}
+        isLocalGeneration={isLocalGeneration}
       />
     );
   }

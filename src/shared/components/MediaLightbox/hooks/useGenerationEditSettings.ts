@@ -10,11 +10,13 @@ export type LoraMode = 'none' | 'in-scene' | 'next-scene' | 'custom';
  * Controls two-pass generation quality settings.
  */
 export interface EditAdvancedSettings {
-  /** Whether advanced settings are enabled */
+  /** Whether two-pass generation is enabled */
   enabled: boolean;
+  /** Number of inference steps for single-pass generation (when two-pass disabled) */
+  num_inference_steps: number;
   /** Scale factor for initial resolution (1.0-2.5x) */
   resolution_scale: number;
-  /** Number of inference steps for base pass */
+  /** Number of inference steps for base pass (when two-pass enabled) */
   base_steps: number;
   /** Upscale factor for hires pass (e.g., 1.1 = 10% upscale) */
   hires_scale: number;
@@ -29,7 +31,8 @@ export interface EditAdvancedSettings {
 }
 
 export const DEFAULT_ADVANCED_SETTINGS: EditAdvancedSettings = {
-  enabled: true, // Enabled by default for better quality
+  enabled: false, // Disabled by default for edits (optional feature)
+  num_inference_steps: 12, // Default steps for single-pass generation
   resolution_scale: 1.5,
   base_steps: 8,
   hires_scale: 1.1,
@@ -40,21 +43,36 @@ export const DEFAULT_ADVANCED_SETTINGS: EditAdvancedSettings = {
 };
 
 /**
- * Converts EditAdvancedSettings to HiresFixApiParams for task creation.
- * Returns undefined if advanced settings are disabled.
+ * Result type for convertToHiresFixApiParams - includes num_inference_steps for single-pass mode.
  */
-export function convertToHiresFixApiParams(settings: EditAdvancedSettings | undefined): {
+export interface EditApiParams {
+  num_inference_steps?: number;
   hires_scale?: number;
   hires_steps?: number;
   hires_denoise?: number;
   lightning_lora_strength_phase_1?: number;
   lightning_lora_strength_phase_2?: number;
-} | undefined {
-  if (!settings || !settings.enabled) {
+}
+
+/**
+ * Converts EditAdvancedSettings to API params for task creation.
+ * Returns hires params if two-pass is enabled, or just num_inference_steps if disabled.
+ */
+export function convertToHiresFixApiParams(settings: EditAdvancedSettings | undefined): EditApiParams | undefined {
+  if (!settings) {
     return undefined;
   }
-  
+
+  if (!settings.enabled) {
+    // Two-pass disabled: just return num_inference_steps for single-pass generation
+    return {
+      num_inference_steps: settings.num_inference_steps,
+    };
+  }
+
+  // Two-pass enabled: return hires params (base_steps is used as num_inference_steps for phase 1)
   return {
+    num_inference_steps: settings.base_steps,
     hires_scale: settings.hires_scale,
     hires_steps: settings.hires_steps,
     hires_denoise: settings.hires_denoise,
