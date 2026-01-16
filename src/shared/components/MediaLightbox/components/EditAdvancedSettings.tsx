@@ -62,10 +62,10 @@ export const EditAdvancedSettings: React.FC<EditAdvancedSettingsProps> = ({
     </div>
   );
 
-  return (
-    <div className="space-y-4">
-      {/* Steps slider - shown above advanced settings when running local and two-pass is disabled */}
-      {isLocalGeneration && !settings.enabled && (
+  // In local mode, only show inference steps slider (no two-pass generation)
+  if (isLocalGeneration) {
+    return (
+      <div className="space-y-4">
         <SliderWithValue
           label="Inference Steps"
           value={settings.num_inference_steps ?? DEFAULT_ADVANCED_SETTINGS.num_inference_steps}
@@ -76,8 +76,12 @@ export const EditAdvancedSettings: React.FC<EditAdvancedSettingsProps> = ({
           disabled={disabled}
           numberInputClassName="w-20"
         />
-      )}
+      </div>
+    );
+  }
 
+  return (
+    <div className="space-y-4">
       <CollapsibleSection title="Advanced settings" headerAction={resetButton}>
         <div className="space-y-4">
           {/* Enable/Disable Toggle */}
