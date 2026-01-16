@@ -1366,6 +1366,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
+    // Add incoming task immediately for instant TasksPane feedback
+    const taskLabel = joinPrompt
+      ? (joinPrompt.length > 50 ? joinPrompt.substring(0, 50) + '...' : joinPrompt)
+      : `Join ${joinValidationData.videoCount} segments`;
+    const currentBaseline = taskStatusCounts?.processing ?? 0;
+    const incomingTaskId = addIncomingTask({
+      taskType: 'join_clips_orchestrator',
+      label: taskLabel,
+      baselineCount: currentBaseline,
+    });
+
     setIsJoiningClips(true);
 
     try {
@@ -1463,12 +1474,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         ...(joinPhaseConfig && { phase_config: joinPhaseConfig }),
       });
 
+      // Remove incoming task placeholder - real task should now appear
+      removeIncomingTask(incomingTaskId);
+
       setJoinClipsSuccess(true);
       setTimeout(() => setJoinClipsSuccess(false), 3000);
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     } catch (error: any) {
       console.error('[JoinSegments] Error creating join task:', error);
       toast.error(error.message || 'Failed to create join task');
+      // Remove incoming task on error too
+      removeIncomingTask(incomingTaskId);
     } finally {
       setIsJoiningClips(false);
     }
@@ -1483,6 +1499,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     joinReplaceMode,
     joinKeepBridgingImages,
     joinEnhancePrompt,
+    joinMotionMode,
+    joinSelectedPhasePresetId,
     joinLoraManager.selectedLoras,
     effectiveAspectRatio,
     selectedShotId,
@@ -1490,6 +1508,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     joinPhaseConfig,
     joinSelectedParent,
     queryClient,
+    taskStatusCounts,
+    addIncomingTask,
+    removeIncomingTask,
   ]);
 
   // Handler to restore join clips defaults

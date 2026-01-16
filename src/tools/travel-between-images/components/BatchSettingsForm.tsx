@@ -242,14 +242,14 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         </TooltipContent>
                       </Tooltip>
                     )}
-                    <Textarea 
+                    <Textarea
                       id="batchVideoPrompt"
                       value={batchVideoPrompt}
                       onChange={(e) => onBatchVideoPromptChange(e.target.value)}
                       onBlur={() => onBlurSave?.()}
                       placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
-                      className="min-h-[70px]"
-                      rows={3}
+                      className="min-h-[120px]"
+                      rows={5}
                       clearable
                       onClear={() => onBatchVideoPromptChange('')}
                       voiceInput
@@ -300,8 +300,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
                     onBlur={() => onBlurSave?.()}
                     placeholder="e.g., blurry, low quality"
-                    className="min-h-[70px]"
-                    rows={3}
+                    className="min-h-[120px]"
+                    rows={5}
                     clearable
                     onClear={() => onSteerableMotionSettingsChange({ negative_prompt: '' })}
                     voiceInput
