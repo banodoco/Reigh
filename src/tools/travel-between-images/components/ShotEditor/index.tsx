@@ -137,6 +137,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onUpdateShotName,
   settingsLoading,
   getShotVideoCount,
+  getFinalVideoCount,
   invalidateVideoCountsCache,
   onDragStateChange,
 }) => {
@@ -892,6 +893,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     selectedParent: joinSelectedParent,
     parentGenerations,
     segmentProgress,
+    isLoading: isSegmentOutputsLoading,
   } = useSegmentOutputsForShot(
     selectedShotId,
     projectId,
@@ -2015,7 +2017,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
       {/* Final Video Section - Shows selected output with dropdown to switch between generations */}
       <div ref={videoGalleryRef} className="flex flex-col gap-4">
-        <FinalVideoSection 
+        <FinalVideoSection
           shotId={selectedShotId}
           projectId={projectId}
           projectAspectRatio={effectiveAspectRatio}
@@ -2031,6 +2033,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           onSelectedParentChange={setSelectedOutputId}
           parentGenerations={parentGenerations}
           segmentProgress={segmentProgress}
+          isParentLoading={isSegmentOutputsLoading}
+          getFinalVideoCount={getFinalVideoCount}
         />
       </div>
 

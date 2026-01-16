@@ -109,6 +109,8 @@ export interface ControlsPanelProps extends ModeProps {
   advancedSettings?: EditModePanelProps['advancedSettings'];
   setAdvancedSettings?: EditModePanelProps['setAdvancedSettings'];
   isLocalGeneration?: EditModePanelProps['isLocalGeneration'];
+  qwenEditModel?: EditModePanelProps['qwenEditModel'];
+  setQwenEditModel?: EditModePanelProps['setQwenEditModel'];
 
   // InfoPanel props
   isVideo: InfoPanelProps['isVideo'];
@@ -227,6 +229,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     advancedSettings,
     setAdvancedSettings,
     isLocalGeneration,
+    qwenEditModel,
+    setQwenEditModel,
     // InfoPanel props
     isVideo,
     showImageEditTools,
@@ -373,6 +377,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         advancedSettings={advancedSettings}
         setAdvancedSettings={setAdvancedSettings}
         isLocalGeneration={isLocalGeneration}
+        qwenEditModel={qwenEditModel}
+        setQwenEditModel={setQwenEditModel}
       />
     );
   }

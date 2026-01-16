@@ -462,6 +462,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     // Advanced settings for two-pass generation
     advancedSettings,
     setAdvancedSettings,
+    // Model selection for cloud mode
+    qwenEditModel,
+    setQwenEditModel,
     // Video/Panel mode persistence
     videoEditSubMode: persistedVideoEditSubMode,
     panelMode: persistedPanelMode,
@@ -801,6 +804,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     activeVariantLocation: isViewingNonPrimaryVariant ? activeVariant?.location : null,
     createAsGeneration, // If true, create a new generation instead of a variant
     advancedSettings, // Pass advanced settings for hires fix
+    qwenEditModel, // Pass model selection for cloud mode
   });
   const {
         isMagicEditMode,
@@ -2984,6 +2988,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     advancedSettings={advancedSettings}
                     setAdvancedSettings={setAdvancedSettings}
                     isLocalGeneration={isLocalGeneration}
+                    // Model selection for cloud mode
+                    qwenEditModel={qwenEditModel}
+                    setQwenEditModel={setQwenEditModel}
                     // InfoPanel props
                     isVideo={isVideo}
                     showImageEditTools={showImageEditTools}
@@ -3313,6 +3320,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     advancedSettings={advancedSettings}
                     setAdvancedSettings={setAdvancedSettings}
                     isLocalGeneration={isLocalGeneration}
+                    // Model selection for cloud mode
+                    qwenEditModel={qwenEditModel}
+                    setQwenEditModel={setQwenEditModel}
                     // InfoPanel props
                     isVideo={isVideo}
                     showImageEditTools={showImageEditTools}

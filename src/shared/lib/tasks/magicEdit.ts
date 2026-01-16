@@ -37,6 +37,8 @@ export interface MagicEditTaskParams {
   create_as_generation?: boolean; // Optional: if true, create a new generation instead of a variant
   // Advanced hires fix settings
   hires_fix?: HiresFixApiParams;
+  // Model selection for cloud mode
+  qwen_edit_model?: 'qwen-edit' | 'qwen-edit-2509' | 'qwen-edit-2511';
 }
 
 /**
@@ -63,6 +65,8 @@ export interface BatchMagicEditTaskParams {
   create_as_generation?: boolean; // Optional: if true, create a new generation instead of a variant
   // Advanced hires fix settings
   hires_fix?: HiresFixApiParams;
+  // Model selection for cloud mode
+  qwen_edit_model?: 'qwen-edit' | 'qwen-edit-2509' | 'qwen-edit-2511';
 }
 
 /**
@@ -142,7 +146,7 @@ function buildMagicEditTaskParams(
     image: params.image_url,
     prompt: params.prompt,
     output_format: params.output_format ?? "jpeg",
-    qwen_endpoint: "qwen-image-edit",
+    qwen_edit_model: params.qwen_edit_model ?? 'qwen-edit',
     enable_sync_mode: params.enable_sync_mode ?? false,
     max_wait_seconds: params.max_wait_seconds ?? 300,
     enable_base64_output: params.enable_base64_output ?? false,
@@ -318,6 +322,7 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
         source_variant_id: params.source_variant_id, // Pass through source variant ID for relationship tracking
         create_as_generation: params.create_as_generation, // Pass through create as generation flag
         hires_fix: params.hires_fix, // Pass through hires fix settings
+        qwen_edit_model: params.qwen_edit_model, // Pass through model selection
       } as MagicEditTaskParams;
     });
 

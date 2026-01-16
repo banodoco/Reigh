@@ -187,6 +187,7 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
     setIsInSceneBoostEnabled,
     toolTypeOverride: 'edit-images',
     createAsGeneration, // If true, create a new generation instead of a variant
+    // qwenEditModel not passed - uses default 'qwen-edit'
   });
   const {
     isCreatingMagicEditTasks,

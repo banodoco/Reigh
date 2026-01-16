@@ -11,7 +11,7 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { GenerationRow } from '@/types/shots';
-import type { LoraMode } from '../hooks';
+import type { LoraMode, QwenEditModel } from '../hooks';
 import type { SourceVariantData } from '../hooks/useSourceGeneration';
 import { VariantSelector } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/components/VariantSelector';
 import type { GenerationVariant } from '@/shared/hooks/useVariants';
@@ -121,6 +121,9 @@ export interface EditModePanelProps {
   setAdvancedSettings?: (updates: Partial<EditAdvancedSettingsType>) => void;
   // Whether running in local generation mode (shows steps slider)
   isLocalGeneration?: boolean;
+  // Model selection for cloud mode
+  qwenEditModel?: QwenEditModel;
+  setQwenEditModel?: (model: QwenEditModel) => void;
 }
 
 /**
@@ -196,6 +199,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   advancedSettings,
   setAdvancedSettings,
   isLocalGeneration = false,
+  qwenEditModel = 'qwen-edit',
+  setQwenEditModel,
 }) => {
   const isMobile = variant === 'mobile';
   
@@ -482,15 +487,15 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               <div className={generationsSpacing}>
                 <SectionLabel>Style LoRAs</SectionLabel>
                 <div className={cn("flex items-center gap-2", isMobile ? "mb-1" : "mb-2")}>
-                  {!isMobile && <label className={`${labelSize} font-medium`}>LoRAs (optional):</label>}
+                  {!isMobile && <label className={`${labelSize} font-medium`}>LoRAs:</label>}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => img2imgLoraManager.setIsLoraModalOpen(true)}
-                    className={cn("h-7 px-2 text-xs", isMobile && "h-6 text-[10px]")}
+                    className={cn("h-10 px-2 text-xs flex flex-col items-center justify-center leading-tight", isMobile && "h-6 text-[10px]")}
                   >
-                    <Plus className={cn("mr-1", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
-                    Add LoRA
+                    <Plus className={cn(isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
+                    <span className="text-[10px]">LoRA</span>
                   </Button>
                 </div>
                 
@@ -510,23 +515,37 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           </div>
         )}
         
-        {/* LoRA Selector - Shown for non-img2img edit modes when editLoraManager is provided */}
+        {/* Model Selector + LoRA Selector - Shown for non-img2img edit modes */}
         {editMode !== 'img2img' && editLoraManager && (
           <div className={generationsSpacing}>
-            <SectionLabel>Style LoRAs</SectionLabel>
+            <SectionLabel>Model & LoRAs</SectionLabel>
             <div className={cn("flex items-center gap-2", isMobile ? "mb-1" : "mb-2")}>
-              {!isMobile && <label className={`${labelSize} font-medium`}>LoRAs (optional):</label>}
+              {/* Model Selector - Only shown in cloud mode (40% width) */}
+              {!isLocalGeneration && setQwenEditModel && (
+                <Select value={qwenEditModel} onValueChange={setQwenEditModel}>
+                  <SelectTrigger variant="retro" className={cn("w-[40%]", isMobile ? "h-7 text-xs" : "h-10")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent variant="retro" className="z-[100001]">
+                    <SelectItem variant="retro" value="qwen-edit">Qwen-Edit</SelectItem>
+                    <SelectItem variant="retro" value="qwen-edit-2509">Qwen-Edit-2509</SelectItem>
+                    <SelectItem variant="retro" value="qwen-edit-2511">Qwen-Edit-2511</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              {/* LoRA button (40% width) */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => editLoraManager.setIsLoraModalOpen(true)}
-                className={cn("h-7 px-2 text-xs", isMobile && "h-6 text-[10px]")}
+                className={cn("w-[40%] h-10 px-2 text-xs flex items-center justify-center gap-1", isMobile && "h-6 text-[10px]")}
               >
-                <Plus className={cn("mr-1", isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
-                Add LoRA
+                <Plus className={cn(isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
+                <span>LoRA</span>
               </Button>
+              {/* 20% empty space is implicit from the remaining width */}
             </div>
-            
+
             {/* Display selected LoRAs */}
             {editLoraManager.selectedLoras.length > 0 && (
               <ActiveLoRAsDisplay

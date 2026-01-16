@@ -33,10 +33,11 @@ export { useMagicEditMode } from './useMagicEditMode';
 
 // New edit settings persistence hooks
 export { useGenerationEditSettings } from './useGenerationEditSettings';
-export type { 
-  GenerationEditSettings, 
+export type {
+  GenerationEditSettings,
   UseGenerationEditSettingsReturn,
   EditMode,
+  QwenEditModel,
 } from './useGenerationEditSettings';
 
 export { useLastUsedEditSettings } from './useLastUsedEditSettings';

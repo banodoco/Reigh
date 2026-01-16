@@ -1,9 +1,10 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
-import { 
-  useGenerationEditSettings, 
+import {
+  useGenerationEditSettings,
   type GenerationEditSettings,
   type EditMode,
   type LoraMode,
+  type QwenEditModel,
   type EditAdvancedSettings,
   DEFAULT_EDIT_SETTINGS,
   DEFAULT_ADVANCED_SETTINGS,
@@ -35,13 +36,16 @@ export interface UseEditSettingsPersistenceReturn {
   img2imgEnablePromptExpansion: boolean;
   // Advanced settings for two-pass generation
   advancedSettings: EditAdvancedSettings;
-  
+  // Model selection for cloud mode
+  qwenEditModel: QwenEditModel;
+
   // Setters (each triggers persistence)
   setEditMode: (mode: EditMode) => void;
   setLoraMode: (mode: LoraMode) => void;
   setCustomLoraUrl: (url: string) => void;
   setNumGenerations: (num: number) => void;
   setPrompt: (prompt: string) => void;
+  setQwenEditModel: (model: QwenEditModel) => void;
   // Img2Img setters
   setImg2imgPrompt: (prompt: string) => void;
   setImg2imgStrength: (strength: number) => void;
@@ -250,7 +254,13 @@ export function useEditSettingsPersistence({
     console.log('[EDIT_DEBUG] 🔧 SET: prompt →', prompt ? `"${prompt.substring(0, 30)}..."` : '(empty)');
     generationSettings.setPrompt(prompt);
   }, [generationSettings]);
-  
+
+  // Model selection (saves to generation, cloud mode only)
+  const setQwenEditModel = useCallback((model: QwenEditModel) => {
+    console.log('[EDIT_DEBUG] 🔧 SET: qwenEditModel →', model);
+    generationSettings.setQwenEditModel(model);
+  }, [generationSettings]);
+
   // Img2Img prompt only saves to generation (never to "last used")
   const setImg2imgPrompt = useCallback((prompt: string) => {
     console.log('[EDIT_DEBUG] 🔧 SET: img2imgPrompt →', prompt ? `"${prompt.substring(0, 30)}..."` : '(empty)');
@@ -347,13 +357,16 @@ export function useEditSettingsPersistence({
     img2imgEnablePromptExpansion: effectiveSettings.img2imgEnablePromptExpansion,
     // Advanced settings (hires fix config)
     advancedSettings: effectiveSettings.advancedSettings ?? DEFAULT_ADVANCED_SETTINGS,
-    
+    // Model selection for cloud mode
+    qwenEditModel: effectiveSettings.qwenEditModel ?? 'qwen-edit',
+
     // Setters
     setEditMode,
     setLoraMode,
     setCustomLoraUrl,
     setNumGenerations,
     setPrompt,
+    setQwenEditModel,
     // Img2Img setters
     setImg2imgPrompt,
     setImg2imgStrength,
@@ -382,6 +395,6 @@ export function useEditSettingsPersistence({
 }
 
 // Re-export types for convenience
-export type { EditMode, LoraMode, EditAdvancedSettings, GenerationEditSettings, LastUsedEditSettings, VideoEditSubMode, PanelMode };
+export type { EditMode, LoraMode, QwenEditModel, EditAdvancedSettings, GenerationEditSettings, LastUsedEditSettings, VideoEditSubMode, PanelMode };
 export { DEFAULT_EDIT_SETTINGS, DEFAULT_ADVANCED_SETTINGS };
 

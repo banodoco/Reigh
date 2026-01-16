@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 export type EditMode = 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
 export type LoraMode = 'none' | 'in-scene' | 'next-scene' | 'custom';
+export type QwenEditModel = 'qwen-edit' | 'qwen-edit-2509' | 'qwen-edit-2511';
 
 /**
  * Advanced settings for image editing tasks (similar to HiresFixConfig from image generation)
@@ -90,6 +91,8 @@ export interface GenerationEditSettings {
   customLoraUrl: string;
   numGenerations: number;
   prompt: string;
+  // Model selection for cloud mode
+  qwenEditModel: QwenEditModel;
   // Img2Img specific settings
   img2imgPrompt: string;
   img2imgPromptHasBeenSet: boolean;
@@ -105,6 +108,8 @@ export const DEFAULT_EDIT_SETTINGS: GenerationEditSettings = {
   customLoraUrl: '',
   numGenerations: 1,
   prompt: '',
+  // Model selection for cloud mode
+  qwenEditModel: 'qwen-edit',
   // Img2Img defaults
   img2imgPrompt: '',
   img2imgPromptHasBeenSet: false,
@@ -124,6 +129,7 @@ export interface UseGenerationEditSettingsReturn {
   setCustomLoraUrl: (url: string) => void;
   setNumGenerations: (num: number) => void;
   setPrompt: (prompt: string) => void;
+  setQwenEditModel: (model: QwenEditModel) => void;
   // Img2Img setters
   setImg2imgPrompt: (prompt: string) => void;
   setImg2imgStrength: (strength: number) => void;
@@ -401,7 +407,15 @@ export function useGenerationEditSettings({
       return updated;
     });
   }, [triggerSave]);
-  
+
+  const setQwenEditModel = useCallback((model: QwenEditModel) => {
+    setSettings(prev => {
+      const updated = { ...prev, qwenEditModel: model };
+      triggerSave(updated);
+      return updated;
+    });
+  }, [triggerSave]);
+
   // Img2Img setters
   const setImg2imgPrompt = useCallback((prompt: string) => {
     setSettings(prev => {
@@ -479,6 +493,7 @@ export function useGenerationEditSettings({
     setCustomLoraUrl,
     setNumGenerations,
     setPrompt,
+    setQwenEditModel,
     setImg2imgPrompt,
     setImg2imgStrength,
     setImg2imgEnablePromptExpansion,

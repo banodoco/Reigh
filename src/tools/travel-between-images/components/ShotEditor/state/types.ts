@@ -164,7 +164,10 @@ export interface ShotEditorProps {
   
   // Project-wide video count lookup function for instant skeleton display
   getShotVideoCount?: (shotId: string | null) => number | null;
-  
+
+  // Project-wide final video count lookup function for FinalVideoSection skeleton
+  getFinalVideoCount?: (shotId: string | null) => number | null;
+
   // Function to invalidate video counts cache when videos are added/deleted
   invalidateVideoCountsCache?: () => void;
   

@@ -3,41 +3,46 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
 
+/** Counts stored per shot */
+interface ShotCounts {
+  videoCount: number;
+  finalVideoCount: number;
+}
+
 /**
  * Project-wide video counts cache
  * Fetches all shot video counts for a project in a single query
  */
 class ProjectVideoCountsCache {
-  private cache = new Map<string, Map<string, number>>(); // projectId -> shotId -> videoCount
-  
-  getProjectCounts(projectId: string): Map<string, number> | null {
+  private cache = new Map<string, Map<string, ShotCounts>>(); // projectId -> shotId -> counts
+
+  getProjectCounts(projectId: string): Map<string, ShotCounts> | null {
     return this.cache.get(projectId) || null;
   }
-  
-  getShotCount(projectId: string, shotId: string): number | null {
+
+  getShotCounts(projectId: string, shotId: string): ShotCounts | null {
     const projectCounts = this.cache.get(projectId);
     if (!projectCounts) return null;
-    const value = projectCounts.get(shotId);
-    return value !== undefined ? value : null;
+    return projectCounts.get(shotId) || null;
   }
-  
-  setProjectCounts(projectId: string, counts: Map<string, number>): void {
+
+  setProjectCounts(projectId: string, counts: Map<string, ShotCounts>): void {
     this.cache.set(projectId, counts);
   }
-  
+
   clear(): void {
     this.cache.clear();
   }
-  
+
   deleteProject(projectId: string): void {
     this.cache.delete(projectId);
   }
-  
+
   // Get cache size for debugging
   size(): number {
     return this.cache.size;
   }
-  
+
   // Get all cached project IDs for debugging
   getCachedProjectIds(): string[] {
     return Array.from(this.cache.keys());
@@ -50,22 +55,25 @@ const globalProjectVideoCountsCache = new ProjectVideoCountsCache();
 /**
  * Fetch all shot video counts for a project using shot_statistics view
  */
-async function fetchProjectVideoCountsFromDB(projectId: string): Promise<Map<string, number>> {
+async function fetchProjectVideoCountsFromDB(projectId: string): Promise<Map<string, ShotCounts>> {
   const { data, error } = await supabase
     .from('shot_statistics')
-    .select('shot_id, video_count')
+    .select('shot_id, video_count, final_video_count')
     .eq('project_id', projectId);
-  
+
   if (error) {
     console.error('[ProjectVideoCountsCache] Error fetching shot statistics:', error);
     throw error;
   }
-  
-  const counts = new Map<string, number>();
+
+  const counts = new Map<string, ShotCounts>();
   data?.forEach(row => {
-    counts.set(row.shot_id, row.video_count || 0);
+    counts.set(row.shot_id, {
+      videoCount: row.video_count || 0,
+      finalVideoCount: row.final_video_count || 0,
+    });
   });
-  
+
   return counts;
 }
 
@@ -75,12 +83,12 @@ async function fetchProjectVideoCountsFromDB(projectId: string): Promise<Map<str
  */
 export function useProjectVideoCountsCache(projectId: string | null) {
   const cacheRef = useRef(globalProjectVideoCountsCache);
-  
+
   // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
   const smartPollingConfig = useSmartPollingConfig(['project-video-counts', projectId]);
-  
+
   // Query to fetch all shot video counts for the project
-  const { data: projectCounts, isLoading, error, refetch } = useQuery<Map<string, number>>({
+  const { data: projectCounts, isLoading, error, refetch } = useQuery<Map<string, ShotCounts>>({
     queryKey: ['project-video-counts', projectId],
     queryFn: () => fetchProjectVideoCountsFromDB(projectId!),
     enabled: !!projectId,
@@ -90,41 +98,59 @@ export function useProjectVideoCountsCache(projectId: string | null) {
     ...smartPollingConfig,
     refetchIntervalInBackground: true, // Enable background polling
   });
-  
+
   // Update cache when data changes
   React.useEffect(() => {
     if (projectCounts && projectId) {
       cacheRef.current.setProjectCounts(projectId, projectCounts);
     }
   }, [projectCounts, projectId]);
-  
+
   const getShotVideoCount = useCallback((shotId: string | null): number | null => {
     if (!projectId || !shotId) return null;
-    
+
     // First try cache
-    const cachedCount = cacheRef.current.getShotCount(projectId, shotId);
-    if (cachedCount !== null) {
-      return cachedCount;
+    const cachedCounts = cacheRef.current.getShotCounts(projectId, shotId);
+    if (cachedCounts !== null) {
+      return cachedCounts.videoCount;
     }
-    
+
     // Then try current query data
     if (projectCounts) {
-      const value = projectCounts.get(shotId);
-      return value !== undefined ? value : null;
+      const counts = projectCounts.get(shotId);
+      return counts !== undefined ? counts.videoCount : null;
     }
-    
+
     return null;
   }, [projectId, projectCounts]);
-  
-  const getAllShotCounts = useCallback((): Map<string, number> | null => {
+
+  const getFinalVideoCount = useCallback((shotId: string | null): number | null => {
+    if (!projectId || !shotId) return null;
+
+    // First try cache
+    const cachedCounts = cacheRef.current.getShotCounts(projectId, shotId);
+    if (cachedCounts !== null) {
+      return cachedCounts.finalVideoCount;
+    }
+
+    // Then try current query data
+    if (projectCounts) {
+      const counts = projectCounts.get(shotId);
+      return counts !== undefined ? counts.finalVideoCount : null;
+    }
+
+    return null;
+  }, [projectId, projectCounts]);
+
+  const getAllShotCounts = useCallback((): Map<string, ShotCounts> | null => {
     if (!projectId) return null;
-    
+
     // First try cache
     const cachedCounts = cacheRef.current.getProjectCounts(projectId);
     if (cachedCounts) {
       return cachedCounts;
     }
-    
+
     // Then try current query data
     return projectCounts || null;
   }, [projectId, projectCounts]);
@@ -161,6 +187,7 @@ export function useProjectVideoCountsCache(projectId: string | null) {
 
   return {
     getShotVideoCount,
+    getFinalVideoCount,
     getAllShotCounts,
     isLoading,
     error,

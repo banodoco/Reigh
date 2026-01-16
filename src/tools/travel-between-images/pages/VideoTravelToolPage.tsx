@@ -144,7 +144,7 @@ const VideoTravelToolPage: React.FC = () => {
   const itemsPerPage = isMobile ? 20 : 12; // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)
   
   // Preload all shot video counts for the project
-  const { getShotVideoCount, logCacheState, isLoading: isLoadingProjectCounts, error: projectCountsError, invalidateOnVideoChanges } = useProjectVideoCountsCache(selectedProjectId);
+  const { getShotVideoCount, getFinalVideoCount, logCacheState, isLoading: isLoadingProjectCounts, error: projectCountsError, invalidateOnVideoChanges } = useProjectVideoCountsCache(selectedProjectId);
   
   // Preload all shot generation modes for the project
   const { getShotGenerationMode, updateShotMode, isLoading: isLoadingProjectModes, error: projectModesError } = useProjectGenerationModesCache(selectedProjectId);
@@ -1679,6 +1679,7 @@ const VideoTravelToolPage: React.FC = () => {
               onUpdateShotName={handleUpdateShotName}
               settingsLoading={shotSettings.status !== 'ready' || shotSettings.shotId !== currentShotId}
               getShotVideoCount={getShotVideoCount}
+              getFinalVideoCount={getFinalVideoCount}
               invalidateVideoCountsCache={invalidateOnVideoChanges}
               onDragStateChange={setIsDraggingInTimeline}
             />

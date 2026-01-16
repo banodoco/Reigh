@@ -11,6 +11,7 @@ import { Check, Film, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Separator } from '@/shared/components/ui/separator';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -48,6 +49,10 @@ interface FinalVideoSectionProps {
   parentGenerations?: any[];
   /** Segment progress passed from parent */
   segmentProgress?: { completed: number; total: number };
+  /** Loading state from parent (when in controlled mode) */
+  isParentLoading?: boolean;
+  /** Cached final video count for showing skeleton during load */
+  getFinalVideoCount?: (shotId: string | null) => number | null;
 }
 
 export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
@@ -60,6 +65,8 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   onSelectedParentChange,
   parentGenerations: parentGenerationsFromProps,
   segmentProgress: segmentProgressFromProps,
+  isParentLoading = false,
+  getFinalVideoCount,
 }) => {
   const isMobile = useIsMobile();
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -221,16 +228,26 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
     handleLightboxOpen();
   }, [handleLightboxOpen]);
   
-  // Don't render if no parent generations
-  if (parentGenerations.length === 0 && !isLoading) {
-    return null;
-  }
-  
-  // Show loading state
-  if (isLoading && parentGenerations.length === 0) {
-    return null; // Don't show skeleton, will just show nothing until data loads
-  }
-  
+  // Determine if currently loading
+  const isCurrentlyLoading = isLoading || isParentLoading;
+
+  // Show skeleton when we know there will be a final video (from cache) but don't have it yet
+  // The cache now accurately counts only videos with orchestrator_details OR children
+  const cachedFinalVideoCount = getFinalVideoCount?.(shotId) ?? null;
+  const willHaveFinalVideo = cachedFinalVideoCount !== null && cachedFinalVideoCount > 0;
+  const shouldShowSkeleton = willHaveFinalVideo && !hasFinalOutput;
+
+  // [FinalVideoSkeleton] Debug logging
+  console.log('[FinalVideoSkeleton]', {
+    shotId: shotId?.substring(0, 8),
+    shouldShowSkeleton,
+    cachedFinalVideoCount,
+    willHaveFinalVideo,
+    hasFinalOutput,
+    selectedParentId: selectedParentId?.substring(0, 8),
+    parentGenerationsCount: parentGenerations.length,
+  });
+
   return (
     <div className="w-full">
       <Card className="border rounded-xl shadow-sm">
@@ -302,10 +319,39 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
           <Separator className="my-3" />
           
           {/* Video Display */}
-          {hasFinalOutput && parentVideoRow ? (
+          {shouldShowSkeleton ? (
+            // Skeleton state - reserve space for video that will load
+            <div className="flex justify-center mt-4">
+              <div
+                style={(() => {
+                  if (!projectAspectRatio) {
+                    return { width: '50%' };
+                  }
+                  const [w, h] = projectAspectRatio.split(':').map(Number);
+                  if (w && h) {
+                    const ratio = w / h;
+                    if (h > w) {
+                      return { width: `min(100%, calc(60vh * ${ratio}))` };
+                    }
+                    return { width: '50%' };
+                  }
+                  return { width: '50%' };
+                })()}
+              >
+                <Skeleton
+                  className="w-full rounded-lg"
+                  style={{
+                    aspectRatio: projectAspectRatio
+                      ? projectAspectRatio.replace(':', '/')
+                      : '16/9'
+                  }}
+                />
+              </div>
+            </div>
+          ) : hasFinalOutput && parentVideoRow ? (
             <div className="flex justify-center mt-4">
               {/* Constrain video size based on aspect ratio */}
-              <div 
+              <div
                 style={(() => {
                   if (!projectAspectRatio) {
                     return { width: '50%' };
@@ -315,7 +361,7 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
                     const ratio = w / h;
                     // Portrait: constrain by height (max 60vh), calculate width from aspect ratio
                     if (h > w) {
-                      return { 
+                      return {
                         width: `min(100%, calc(60vh * ${ratio}))`,
                       };
                     }
@@ -349,7 +395,7 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center pt-4 pb-1 text-muted-foreground">
-              {isLoading ? (
+              {isCurrentlyLoading ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm">Loading...</span>

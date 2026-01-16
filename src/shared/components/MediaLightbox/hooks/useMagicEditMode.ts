@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useShotGenerationMetadata } from '@/shared/hooks/useShotGenerationMetadata';
 import { createBatchMagicEditTasks } from '@/shared/lib/tasks/magicEdit';
-import type { EditAdvancedSettings } from './useGenerationEditSettings';
+import type { EditAdvancedSettings, QwenEditModel } from './useGenerationEditSettings';
 import { convertToHiresFixApiParams } from './useGenerationEditSettings';
 
 interface UseMagicEditModeParams {
@@ -34,6 +34,8 @@ interface UseMagicEditModeParams {
   createAsGeneration?: boolean;
   // Advanced settings for hires fix
   advancedSettings?: EditAdvancedSettings;
+  // Model selection for cloud mode
+  qwenEditModel?: QwenEditModel;
 }
 
 interface UseMagicEditModeReturn {
@@ -81,6 +83,7 @@ export const useMagicEditMode = ({
   activeVariantLocation,
   createAsGeneration,
   advancedSettings,
+  qwenEditModel,
 }: UseMagicEditModeParams): UseMagicEditModeReturn => {
   // Magic Edit mode state
   const [isMagicEditMode, setIsMagicEditMode] = useState(false);
@@ -234,6 +237,7 @@ export const useMagicEditMode = ({
           source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
           create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
           hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
+          qwen_edit_model: qwenEditModel, // Pass model selection for cloud mode
         };
         
         console.log('[VariantRelationship] Task params source_variant_id:', batchParams.source_variant_id);
@@ -286,7 +290,8 @@ export const useMagicEditMode = ({
     media.id,
     addMagicEditPrompt,
     createAsGeneration,
-    advancedSettings
+    advancedSettings,
+    qwenEditModel
   ]);
 
   return {
