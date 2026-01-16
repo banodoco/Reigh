@@ -381,8 +381,10 @@ export function useStructureVideo({
       structure_video_type: structureType,
       metadata: metadata,
       resource_id: resourceId ?? null,
+      // Preserve existing uni3c_end_percent from current config to avoid resetting to default
+      uni3c_end_percent: legacyConfig.uni3c_end_percent,
     });
-  }, [setStructureVideoConfig]);
+  }, [setStructureVideoConfig, legacyConfig.uni3c_end_percent]);
 
   return {
     // NEW: Multi-video array interface
