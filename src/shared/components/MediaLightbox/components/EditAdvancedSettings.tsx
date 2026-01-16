@@ -68,7 +68,7 @@ export const EditAdvancedSettings: React.FC<EditAdvancedSettingsProps> = ({
       {isLocalGeneration && !settings.enabled && (
         <SliderWithValue
           label="Inference Steps"
-          value={settings.num_inference_steps}
+          value={settings.num_inference_steps ?? DEFAULT_ADVANCED_SETTINGS.num_inference_steps}
           onChange={(v) => updateField('num_inference_steps', Math.round(v))}
           min={1}
           max={30}
