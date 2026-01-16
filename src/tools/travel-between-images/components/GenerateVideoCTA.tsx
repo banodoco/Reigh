@@ -10,6 +10,8 @@ interface GenerateVideoCTAProps {
   justQueued: boolean;
   disabled: boolean;
   inputId?: string;
+  /** Number of videos that will be generated (for plural text). Defaults to 1. */
+  videoCount?: number;
 }
 
 /**
@@ -23,8 +25,10 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
   isGenerating,
   justQueued,
   disabled,
-  inputId = 'variant-name'
+  inputId = 'variant-name',
+  videoCount = 1,
 }) => {
+  const isPlural = videoCount >= 2;
   return (
     <div className="flex flex-col items-center">
       {/* Variant Name Input */}
@@ -57,7 +61,7 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
             ? 'Added to queue!'
             : isGenerating
               ? 'Creating Tasks...'
-              : 'Generate Video'}
+              : isPlural ? 'Generate Videos' : 'Generate Video'}
         </span>
       </Button>
     </div>

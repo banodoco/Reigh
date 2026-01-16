@@ -719,6 +719,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const generateVideosCardRef = useRef<HTMLDivElement>(null);
   const joinSegmentsSectionRef = useRef<HTMLDivElement>(null);
   const pendingScrollToJoinRef = useRef<boolean>(false);
+  const swapButtonRef = useRef<HTMLButtonElement>(null);
   
   // Selection state (forwarded to parent for floating button control)
   // 🎯 PERF FIX: Uses ref to prevent callback recreation
@@ -777,6 +778,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const setGenerateMode = useCallback((mode: 'batch' | 'join') => {
     joinSettings.updateField('generateMode', mode);
   }, [joinSettings]);
+
+  // Toggle mode while preserving scroll position (prevents page jump when form height changes)
+  const toggleGenerateModePreserveScroll = useCallback((newMode: 'batch' | 'join') => {
+    const button = swapButtonRef.current;
+    if (!button) {
+      setGenerateMode(newMode);
+      return;
+    }
+    // Capture button's position relative to viewport before mode change
+    const rectBefore = button.getBoundingClientRect();
+    const offsetFromTop = rectBefore.top;
+
+    setGenerateMode(newMode);
+
+    // After DOM updates, restore scroll so the (new) swap button stays in the same place
+    requestAnimationFrame(() => {
+      const newButton = swapButtonRef.current;
+      if (!newButton) return;
+      const rectAfter = newButton.getBoundingClientRect();
+      const scrollDelta = rectAfter.top - offsetFromTop;
+      if (Math.abs(scrollDelta) > 1) {
+        window.scrollBy({ top: scrollDelta, behavior: 'instant' });
+      }
+    });
+  }, [setGenerateMode]);
 
   // Scroll to join section after it renders (when triggered from FinalVideoSection "Join clips" button)
   useEffect(() => {
@@ -2402,13 +2428,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     justQueued={parentVideoJustQueued || steerableMotionJustQueued}
                     disabled={isGenerationDisabled}
                     inputId="variant-name"
+                    videoCount={Math.max(0, simpleFilteredImages.length - 1)}
                   />
 
                   {/* Swap to Join Segments */}
                   <button
-                    onClick={() => {
-                      setGenerateMode('join');
-                    }}
+                    ref={swapButtonRef}
+                    onClick={() => toggleGenerateModePreserveScroll('join')}
                     className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
                   >
                     <ArrowLeftRight className="w-4 h-4" />
@@ -2466,9 +2492,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
                   {/* Swap to Batch Generate */}
                   <button
-                    onClick={() => {
-                      setGenerateMode('batch');
-                    }}
+                    ref={swapButtonRef}
+                    onClick={() => toggleGenerateModePreserveScroll('batch')}
                     className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
                   >
                     <ArrowLeftRight className="w-4 h-4" />
