@@ -41,7 +41,17 @@ export function useVideoGenerations({
   const { data: videoGenerations, isLoading: isLoadingVideoGen } = useQuery({
     queryKey: ['video-generations-for-task', task.id, task.outputLocation],
     queryFn: async () => {
-      if (!isVideoTask || task.status !== 'Complete') return null;
+      console.log('[useVideoGenerations] Starting query for task:', {
+        taskId: task.id,
+        taskType: task.taskType,
+        outputLocation: task.outputLocation?.substring(0, 50),
+        status: task.status,
+      });
+
+      if (!isVideoTask || task.status !== 'Complete') {
+        console.log('[useVideoGenerations] Skipping - not a completed video task');
+        return null;
+      }
 
       // For individual_travel_segment tasks with child_generation_id, fetch that generation directly
       const childGenerationId = taskParams.parsed?.child_generation_id;
@@ -73,6 +83,7 @@ export function useVideoGenerations({
 
       // Try to find generation by output location first (most reliable)
       if (task.outputLocation) {
+        console.log('[useVideoGenerations] Trying generations by location...');
         const { data: byLocation, error: locError } = await supabase
           .from('generations')
           .select('*')
@@ -80,8 +91,10 @@ export function useVideoGenerations({
           .eq('project_id', task.projectId);
 
         if (!locError && byLocation && byLocation.length > 0) {
+          console.log('[useVideoGenerations] Found in generations table:', byLocation.length);
           return byLocation;
         }
+        console.log('[useVideoGenerations] Not found in generations, trying variants...', { locError });
 
         // If not found in generations, check generation_variants by location
         const { data: variantByLocation, error: variantError } = await supabase
@@ -89,6 +102,11 @@ export function useVideoGenerations({
           .select('id, generation_id, location, thumbnail_url, is_primary, params')
           .eq('location', task.outputLocation)
           .limit(1);
+
+        console.log('[useVideoGenerations] Variant query result:', {
+          found: variantByLocation?.length || 0,
+          error: variantError?.message,
+        });
 
         if (!variantError && variantByLocation && variantByLocation.length > 0) {
           const variant = variantByLocation[0];
@@ -99,6 +117,7 @@ export function useVideoGenerations({
             .single();
 
           if (!parentError && parentGen) {
+            console.log('[useVideoGenerations] Found via variant, returning with parent gen');
             return [{
               ...parentGen,
               location: variant.location,
@@ -107,10 +126,14 @@ export function useVideoGenerations({
               _variant_is_primary: variant.is_primary,
             }];
           }
+          console.log('[useVideoGenerations] Variant found but parent gen fetch failed:', parentError);
         }
+      } else {
+        console.log('[useVideoGenerations] No outputLocation on task, skipping location queries');
       }
 
       // Fallback: Search by task ID in the tasks JSONB array
+      console.log('[useVideoGenerations] Trying fallback: search by task ID in tasks array...');
       const { data, error } = await supabase
         .from('generations')
         .select('*')
@@ -123,6 +146,7 @@ export function useVideoGenerations({
         return null;
       }
 
+      console.log('[useVideoGenerations] Fallback result:', { found: data?.length || 0 });
       return data || [];
     },
     enabled: shouldFetchVideo && isVideoTask && task.status === 'Complete',

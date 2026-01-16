@@ -148,14 +148,25 @@ const TaskItem: React.FC<TaskItemProps> = ({
 
   // Auto-open lightbox when video data loads after clicking
   useEffect(() => {
-    if (waitingForVideoToOpen && videoOutputs && videoOutputs.length > 0) {
-      const initialVariantId = (videoOutputs[0] as any)?._variant_id;
-      if (onOpenVideoLightbox) {
-        onOpenVideoLightbox(task, videoOutputs, 0, initialVariantId);
+    if (waitingForVideoToOpen && !isLoadingVideoGen) {
+      if (videoOutputs && videoOutputs.length > 0) {
+        const initialVariantId = (videoOutputs[0] as any)?._variant_id;
+        if (onOpenVideoLightbox) {
+          onOpenVideoLightbox(task, videoOutputs, 0, initialVariantId);
+        }
+        clearVideoWaiting();
+      } else {
+        // Query finished but no video found - show error
+        console.error('[TaskItem] Video query completed but no outputs found for task:', task.id);
+        toast({
+          title: 'Video not found',
+          description: 'Could not locate the video output for this task.',
+          variant: 'destructive',
+        });
+        clearVideoWaiting();
       }
-      clearVideoWaiting();
     }
-  }, [videoOutputs, waitingForVideoToOpen, onOpenVideoLightbox, task, clearVideoWaiting]);
+  }, [videoOutputs, waitingForVideoToOpen, isLoadingVideoGen, onOpenVideoLightbox, task, clearVideoWaiting, toast]);
 
   // Handlers
   const handleCancel = () => {
