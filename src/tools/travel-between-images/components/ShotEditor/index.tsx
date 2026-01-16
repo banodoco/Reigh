@@ -2056,7 +2056,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               requestAnimationFrame(() => {
                 const target = generateVideosCardRef.current;
                 if (target) {
-                  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  const rect = target.getBoundingClientRect();
+                  const scrollTop = window.scrollY + rect.top - 20; // 20px padding above
+                  window.scrollTo({ top: scrollTop, behavior: 'smooth' });
                 }
               });
             });
