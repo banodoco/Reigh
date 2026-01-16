@@ -25,7 +25,7 @@ interface TaskItemTooltipProps {
   actualGeneration: any;
   // Callbacks
   onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number, initialVariantId?: string) => void;
-  onOpenImageLightbox?: (task: Task, media: GenerationRow) => void;
+  onOpenImageLightbox?: (task: Task, media: GenerationRow, initialVariantId?: string) => void;
   onResetHoverState: () => void;
   // The content to wrap
   children: React.ReactNode;
@@ -66,7 +66,8 @@ export const TaskItemTooltip: React.FC<TaskItemTooltipProps> = ({
       const initialVariantId = (videoOutputs[0] as any)?._variant_id;
       onOpenVideoLightbox(task, videoOutputs, 0, initialVariantId);
     } else if (!isVideoTask && hasClickableContent && onOpenImageLightbox && generationData) {
-      onOpenImageLightbox(task, generationData);
+      const initialVariantId = (generationData as any)?._variant_id;
+      onOpenImageLightbox(task, generationData, initialVariantId);
     }
   };
 

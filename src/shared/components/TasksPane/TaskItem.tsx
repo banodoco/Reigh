@@ -31,7 +31,7 @@ interface TaskItemProps {
   task: Task;
   isNew?: boolean;
   isActive?: boolean;
-  onOpenImageLightbox?: (task: Task, media: GenerationRow) => void;
+  onOpenImageLightbox?: (task: Task, media: GenerationRow, initialVariantId?: string) => void;
   onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number, initialVariantId?: string) => void;
   isMobileActive?: boolean;
   onMobileActiveChange?: (taskId: string | null) => void;
@@ -102,7 +102,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
   });
 
   // Image generation hook
-  const { generationData, actualGeneration } = useImageGeneration({
+  const { generationData, actualGeneration, variantId: imageVariantId } = useImageGeneration({
     task,
     taskParams,
     isImageTask: taskInfo.isImageTask,
@@ -262,9 +262,11 @@ const TaskItem: React.FC<TaskItemProps> = ({
     e.stopPropagation();
     e.preventDefault();
     setIsHoveringTaskItem(false);
-    
+
     if (generationData && onOpenImageLightbox) {
-      onOpenImageLightbox(task, generationData);
+      // Pass variant ID if available (for edit tasks that create variants)
+      const initialVariantId = imageVariantId || (generationData as any)?._variant_id;
+      onOpenImageLightbox(task, generationData, initialVariantId);
     }
   };
 
@@ -303,7 +305,8 @@ const TaskItem: React.FC<TaskItemProps> = ({
         
         if (taskInfo.isImageTask && generationData && onOpenImageLightbox) {
           onMobileActiveChange?.(null);
-          onOpenImageLightbox(task, generationData);
+          const initialVariantId = imageVariantId || (generationData as any)?._variant_id;
+          onOpenImageLightbox(task, generationData, initialVariantId);
           return;
         }
       } else {
@@ -404,7 +407,10 @@ const TaskItem: React.FC<TaskItemProps> = ({
             </div>
             {generationData && (
               <button
-                onClick={() => onOpenImageLightbox && onOpenImageLightbox(task, generationData)}
+                onClick={() => {
+                  const initialVariantId = imageVariantId || (generationData as any)?._variant_id;
+                  onOpenImageLightbox && onOpenImageLightbox(task, generationData, initialVariantId);
+                }}
                 className="w-8 h-8 rounded border border-zinc-500 overflow-hidden hover:border-zinc-400 transition-colors flex-shrink-0"
               >
                 <img

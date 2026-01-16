@@ -46,8 +46,8 @@ export function useTasksLightbox({
   } : null;
 
   // Handlers for opening lightbox
-  const handleOpenImageLightbox = useCallback((task: Task, media: GenerationRow) => {
-    setLightboxData({ type: 'image', task, media });
+  const handleOpenImageLightbox = useCallback((task: Task, media: GenerationRow, initialVariantId?: string) => {
+    setLightboxData({ type: 'image', task, media, initialVariantId });
     setActiveTaskId(task.id);
     setIsTasksPaneOpen(true);
   }, [setActiveTaskId, setIsTasksPaneOpen]);

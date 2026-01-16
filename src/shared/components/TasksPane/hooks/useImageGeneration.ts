@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Task } from '@/types/tasks';
 import { GenerationRow } from '@/types/shots';
-import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
 import { extractSourceGenerationId } from '../utils/task-utils';
 
 interface UseImageGenerationOptions {
@@ -14,6 +13,7 @@ interface UseImageGenerationOptions {
 
 /**
  * Hook to fetch generation data for image tasks
+ * Checks both generations table and generation_variants table (for edit tasks)
  */
 export function useImageGeneration({
   task,
@@ -25,35 +25,96 @@ export function useImageGeneration({
     return isImageTask && task.status === 'Complete' && !!task.outputLocation;
   }, [isImageTask, task.status, task.outputLocation]);
 
-  // Use the generalized bridge for task-to-generation mapping
-  const { data: actualGeneration, isLoading: isLoadingGeneration, error: generationError } = useTaskGenerationMapping(
-    task.id, 
-    hasGeneratedImage ? task.outputLocation : null, 
-    task.projectId
-  );
-
-  // Legacy fallback query
-  const { data: legacyGeneration } = useQuery({
-    queryKey: ['generation-for-task-legacy', task.id, task.outputLocation],
+  // Fetch generation data - checks both generations and generation_variants tables
+  const { data: generationResult, isLoading: isLoadingGeneration, error: generationError } = useQuery({
+    queryKey: ['image-generation-for-task', task.id, task.outputLocation],
     queryFn: async () => {
-      if (!hasGeneratedImage || !task.outputLocation || actualGeneration !== undefined) return null;
-      
-      const { data, error } = await supabase
+      if (!task.outputLocation) return null;
+
+      console.log('[useImageGeneration] Starting query for task:', {
+        taskId: task.id,
+        taskType: task.taskType,
+        outputLocation: task.outputLocation?.substring(0, 50),
+      });
+
+      // First try: Look up by location in generations table
+      const { data: genByLocation, error: genError } = await supabase
         .from('generations')
-        .select('*')
+        .select(`
+          *,
+          shot_generations(shot_id, timeline_frame)
+        `)
         .eq('location', task.outputLocation)
         .eq('project_id', task.projectId)
         .maybeSingle();
-      
-      if (error) {
-        console.error('[useImageGeneration] Error fetching generation:', error);
-        return null;
+
+      if (!genError && genByLocation) {
+        console.log('[useImageGeneration] Found in generations table:', genByLocation.id);
+        return { generation: genByLocation, variantId: null };
       }
-      
-      return data;
+
+      // Second try: Check generation_variants by location (for edit tasks that create variants)
+      console.log('[useImageGeneration] Not in generations, checking variants...');
+      const { data: variantByLocation, error: variantError } = await supabase
+        .from('generation_variants')
+        .select('id, generation_id, location, thumbnail_url, is_primary, params')
+        .eq('location', task.outputLocation)
+        .limit(1);
+
+      if (!variantError && variantByLocation && variantByLocation.length > 0) {
+        const variant = variantByLocation[0];
+        console.log('[useImageGeneration] Found variant:', variant.id, 'for generation:', variant.generation_id);
+
+        // Fetch the parent generation
+        const { data: parentGen, error: parentError } = await supabase
+          .from('generations')
+          .select(`
+            *,
+            shot_generations(shot_id, timeline_frame)
+          `)
+          .eq('id', variant.generation_id)
+          .single();
+
+        if (!parentError && parentGen) {
+          console.log('[useImageGeneration] Found parent generation:', parentGen.id);
+          return {
+            generation: {
+              ...parentGen,
+              // Override with variant's location/thumbnail
+              location: variant.location,
+              thumbnail_url: variant.thumbnail_url || parentGen.thumbnail_url,
+            },
+            variantId: variant.id,
+            variantIsPrimary: variant.is_primary,
+          };
+        }
+      }
+
+      // Fallback: Search by task ID in the tasks JSONB array
+      console.log('[useImageGeneration] Trying fallback: search by task ID in tasks array...');
+      const { data: byTaskId, error: taskIdError } = await supabase
+        .from('generations')
+        .select(`
+          *,
+          shot_generations(shot_id, timeline_frame)
+        `)
+        .filter('tasks', 'cs', JSON.stringify([task.id]))
+        .eq('project_id', task.projectId)
+        .maybeSingle();
+
+      if (!taskIdError && byTaskId) {
+        console.log('[useImageGeneration] Found by task ID:', byTaskId.id);
+        return { generation: byTaskId, variantId: null };
+      }
+
+      console.log('[useImageGeneration] No generation found for task:', task.id);
+      return null;
     },
     enabled: hasGeneratedImage && !!task.outputLocation,
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
+
+  const actualGeneration = generationResult?.generation || null;
 
   // Create GenerationRow data for MediaLightbox
   const generationData: GenerationRow | null = useMemo(() => {
@@ -111,8 +172,11 @@ export function useImageGeneration({
       timelineFrames,
       all_shot_associations: allShotAssociations,
       name: (actualGeneration as any).name || undefined,
+      // Include variant info if this was found via variant lookup
+      _variant_id: generationResult?.variantId || undefined,
+      _variant_is_primary: generationResult?.variantIsPrimary || undefined,
     } as GenerationRow;
-  }, [hasGeneratedImage, actualGeneration, task, taskParams.parsed, isImageTask]);
+  }, [hasGeneratedImage, actualGeneration, task, taskParams.parsed, isImageTask, generationResult?.variantId, generationResult?.variantIsPrimary]);
 
   return {
     generationData,
@@ -120,6 +184,8 @@ export function useImageGeneration({
     isLoadingGeneration,
     generationError,
     hasGeneratedImage,
+    // Expose variant ID for passing to lightbox
+    variantId: generationResult?.variantId || null,
   };
 }
 
