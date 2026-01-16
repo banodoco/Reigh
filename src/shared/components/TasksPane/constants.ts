@@ -27,6 +27,16 @@ export const KNOWN_IMAGE_TASK_TYPES = [
   'style_transfer',
 ] as const;
 
+// Image edit task types - these don't show prompt in task list
+// (the edit instruction is less useful to display than generation prompts)
+export const IMAGE_EDIT_TASK_TYPES = [
+  'image_inpaint',
+  'qwen_image_edit',
+  'magic_edit',
+  'kontext_image_edit',
+  'flux_image_edit',
+] as const;
+
 // Task name abbreviations for tight spaces
 export const TASK_NAME_ABBREVIATIONS: Record<string, string> = {
   'Travel Between Images': 'Travel Video',
