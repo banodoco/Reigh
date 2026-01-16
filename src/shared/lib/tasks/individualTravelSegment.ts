@@ -158,22 +158,36 @@ function buildIndividualTravelSegmentParams(
   const loraMultipliers = orig.lora_multipliers || orchDetails.lora_multipliers || [];
   
   // Determine model settings
-  // Model selection depends on structure video TYPE:
-  // - Uni3C (structure_type === 'uni3c'): use I2V model
-  // - VACE types (flow, canny, depth): use VACE model
-  // - No structure video: use I2V model (default)
-  // Check both array format (structure_videos) and legacy single-video format (structure_video_path)
+  // Model selection depends on structure guidance target:
+  // - Uni3C (target === 'uni3c'): use I2V model with guidance video
+  // - VACE (target === 'vace'): use VACE model
+  // - No structure guidance: use I2V model (default)
+  
+  // Check for structure videos (array format or legacy single-video format)
   const hasStructureVideos = !!(
     orchDetails.structure_videos?.length > 0 || 
     orig.structure_videos?.length > 0 ||
     orchDetails.structure_video_path ||
     orig.structure_video_path
   );
-  // Get structure type from: top-level fields, array format, or legacy single-video format
-  const structureType = orig.structure_type || orchDetails.structure_type || 
-    orchDetails.structure_videos?.[0]?.structure_type || orig.structure_videos?.[0]?.structure_type ||
-    orchDetails.structure_video_type || orig.structure_video_type;
-  const isUni3c = structureType === 'uni3c' && hasStructureVideos;
+  
+  // Get structure_guidance from new unified format (preferred) or infer from legacy params
+  const structureGuidance = orig.structure_guidance || orchDetails.structure_guidance;
+  
+  // Determine if using uni3c mode:
+  // 1. NEW: Check structure_guidance.target === 'uni3c'
+  // 2. LEGACY: Check structure_type === 'uni3c'
+  let isUni3c = false;
+  if (structureGuidance?.target === 'uni3c') {
+    isUni3c = hasStructureVideos;
+  } else {
+    // Legacy fallback: check structure_type
+    const structureType = orig.structure_type || orchDetails.structure_type || 
+      orchDetails.structure_videos?.[0]?.structure_type || orig.structure_videos?.[0]?.structure_type ||
+      orchDetails.structure_video_type || orig.structure_video_type;
+    isUni3c = structureType === 'uni3c' && hasStructureVideos;
+  }
+  
   const useVaceModel = hasStructureVideos && !isUni3c;
   const defaultModelName = useVaceModel
     ? "wan_2_2_vace_lightning_baseline_2_2_2"
@@ -185,7 +199,8 @@ function buildIndividualTravelSegmentParams(
     origModelName: orig.model_name,
     orchModelName: orchDetails.model_name,
     hasStructureVideos,
-    structureType,
+    hasStructureGuidance: !!structureGuidance,
+    structureGuidanceTarget: structureGuidance?.target,
     isUni3c,
     useVaceModel,
     defaultModelName,
@@ -250,6 +265,8 @@ function buildIndividualTravelSegmentParams(
   console.log('[IndividualTravelSegment] [MultiStructure] Preserving orchestrator data:', {
     hasStructureVideos: !!structureVideos && structureVideos.length > 0,
     structureVideosCount: structureVideos?.length ?? 0,
+    hasStructureGuidance: !!structureGuidance,
+    structureGuidanceTarget: structureGuidance?.target,
     hasSegmentFramesExpanded: !!segmentFramesExpanded,
     segmentFramesExpandedLength: segmentFramesExpanded?.length ?? 0,
     hasFrameOverlapExpanded: !!frameOverlapExpanded,
@@ -289,6 +306,8 @@ function buildIndividualTravelSegmentParams(
     ...(frameOverlapExpanded ? { frame_overlap_expanded: frameOverlapExpanded } : {}),
     // Preserve structure_videos array for multi-structure video support
     ...(structureVideos && structureVideos.length > 0 ? { structure_videos: structureVideos } : {}),
+    // NEW: Preserve structure_guidance config (unified format)
+    ...(structureGuidance ? { structure_guidance: structureGuidance } : {}),
   };
 
   // HARDCODED: SVI (smooth continuations) feature has been removed from UX
@@ -324,7 +343,13 @@ function buildIndividualTravelSegmentParams(
     sample_solver: sampleSolver,
     segment_index: params.segment_index,
     guidance_scale: guidanceScale,
-    structure_type: orig.structure_type || orchDetails.structure_type || "flow",
+    // NEW: Include structure_guidance at top level for standalone segments
+    ...(structureGuidance ? { structure_guidance: structureGuidance } : {}),
+    // LEGACY: Derive structure_type from structure_guidance for backward compatibility
+    // If structure_guidance exists, use its target/preprocessing; otherwise fall back to legacy values
+    structure_type: structureGuidance 
+      ? (structureGuidance.target === 'uni3c' ? 'raw' : (structureGuidance.preprocessing || 'flow'))
+      : (orig.structure_type || orchDetails.structure_type || "flow"),
     cfg_star_switch: orig.cfg_star_switch ?? 0,
     guidance2_scale: guidance2Scale,
     guidance_phases: guidancePhases,

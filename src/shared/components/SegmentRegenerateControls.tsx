@@ -668,16 +668,22 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         };
       })();
 
-      // CRITICAL: Always use structure_videos from initialParams (the prop) rather than local state.
+      // CRITICAL: Always use structure_videos and structure_guidance from initialParams (the prop) rather than local state.
       // This ensures that any changes to structure video settings made while the modal is open
       // are reflected in the task, avoiding race conditions between useEffect and button clicks.
-      const freshStructureVideos = initialParams?.orchestrator_details?.structure_videos;
-      const paramsForTaskWithFreshStructureVideos = freshStructureVideos?.length > 0
+      const freshStructureVideos = initialParams?.orchestrator_details?.structure_videos || initialParams?.structure_videos;
+      const freshStructureGuidance = initialParams?.orchestrator_details?.structure_guidance || initialParams?.structure_guidance;
+      
+      // Forward both structure_videos and structure_guidance to the task
+      const paramsForTaskWithFreshStructureVideos = (freshStructureVideos?.length > 0 || freshStructureGuidance)
         ? {
             ...paramsForTask,
+            // Include structure_guidance at top level for standalone segment tasks
+            ...(freshStructureGuidance ? { structure_guidance: freshStructureGuidance } : {}),
             orchestrator_details: {
               ...(paramsForTask.orchestrator_details || {}),
-              structure_videos: freshStructureVideos,
+              ...(freshStructureVideos?.length > 0 ? { structure_videos: freshStructureVideos } : {}),
+              ...(freshStructureGuidance ? { structure_guidance: freshStructureGuidance } : {}),
             },
           }
         : paramsForTask;
@@ -689,6 +695,10 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         hasStructureVideos: !!orchDetails.structure_videos && orchDetails.structure_videos.length > 0,
         structureVideosCount: orchDetails.structure_videos?.length ?? 0,
         freshStructureVideosFromProps: freshStructureVideos?.length ?? 0,
+        hasStructureGuidance: !!orchDetails.structure_guidance,
+        structureGuidanceTarget: orchDetails.structure_guidance?.target ?? '(not set)',
+        freshStructureGuidanceFromProps: freshStructureGuidance?.target ?? '(not set)',
+        topLevelStructureGuidance: !!paramsForTaskWithFreshStructureVideos.structure_guidance,
         hasSegmentFramesExpanded: !!orchDetails.segment_frames_expanded,
         segmentFramesExpandedLength: orchDetails.segment_frames_expanded?.length ?? 0,
         hasFrameOverlapExpanded: !!orchDetails.frame_overlap_expanded,

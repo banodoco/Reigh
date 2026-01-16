@@ -1433,8 +1433,13 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     requestBody.resolution = resolution;
   }
 
-  // Add structure video params - supports both new array format and legacy single-video format
-  // The array format takes precedence when available
+  // ============================================================================
+  // STRUCTURE GUIDANCE - NEW UNIFIED FORMAT
+  // ============================================================================
+  // Build structure_guidance config + structure_videos array using the new unified format.
+  // The structure_guidance object contains target (vace/uni3c), preprocessing, strength, etc.
+  // The structure_videos array contains just the video source and frame mapping info.
+  
   const structureVideos = params.structureVideos;
   
   console.log('[Generation] [DEBUG] Structure video config at generation time:', {
@@ -1445,88 +1450,111 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   });
 
   if (structureVideos && structureVideos.length > 0) {
-    // NEW: Use structure_videos array format
-    // Convert to API format (strip metadata/resource_id which are UI-only)
-    // Check if ANY video uses uni3c mode
-    const hasUni3cVideo = structureVideos.some(v => v.structure_type === 'uni3c');
+    // Use NEW unified format with structure_guidance + structure_videos
+    // Determine target and preprocessing from the first video's structure_type
+    // (assuming all videos in the array use the same guidance mode)
+    const firstVideo = structureVideos[0];
+    const isUni3cTarget = firstVideo.structure_type === 'uni3c';
     
-    const apiStructureVideos: ApiStructureVideoConfig[] = structureVideos.map(video => {
-      // For uni3c mode, convert 'uni3c' to 'raw' for backend
-      const effectiveStructureType = video.structure_type === 'uni3c' ? 'raw' : video.structure_type;
-      
-      return {
-        path: video.path,
-        start_frame: video.start_frame,
-        end_frame: video.end_frame,
-        treatment: video.treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
-        motion_strength: video.motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
-        structure_type: effectiveStructureType ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
-        // Only include source range if explicitly set
-        ...(video.source_start_frame !== undefined ? { source_start_frame: video.source_start_frame } : {}),
-        ...(video.source_end_frame !== undefined && video.source_end_frame !== null ? { source_end_frame: video.source_end_frame } : {}),
-        // Uni3C params only if structure_type is uni3c
-        ...(video.structure_type === 'uni3c' ? {
-          uni3c_start_percent: video.uni3c_start_percent ?? 0,
-          uni3c_end_percent: video.uni3c_end_percent ?? (params.uni3cEndPercent ?? 0.1),
-        } : {}),
+    // Build structure_guidance config object
+    const structureGuidance: Record<string, unknown> = {
+      target: isUni3cTarget ? 'uni3c' : 'vace',
+    };
+    
+    if (isUni3cTarget) {
+      // Uni3C specific params
+      structureGuidance.strength = firstVideo.motion_strength ?? 1.0;
+      structureGuidance.step_window = [
+        firstVideo.uni3c_start_percent ?? 0,
+        firstVideo.uni3c_end_percent ?? (params.uni3cEndPercent ?? 1.0),
+      ];
+      structureGuidance.frame_policy = 'fit';
+      structureGuidance.zero_empty_frames = true;
+    } else {
+      // VACE specific params
+      // Map structure_type to preprocessing: flow->flow, canny->canny, depth->depth, raw->none
+      const preprocessingMap: Record<string, string> = {
+        'flow': 'flow',
+        'canny': 'canny',
+        'depth': 'depth',
+        'raw': 'none',
       };
-    });
+      structureGuidance.preprocessing = preprocessingMap[firstVideo.structure_type ?? 'flow'] ?? 'flow';
+      structureGuidance.strength = firstVideo.motion_strength ?? 1.0;
+    }
+    
+    requestBody.structure_guidance = structureGuidance;
+    
+    // Build structure_videos array - now only contains video source info (no structure_type, motion_strength)
+    const apiStructureVideos = structureVideos.map(video => ({
+      path: video.path,
+      start_frame: video.start_frame,
+      end_frame: video.end_frame,
+      treatment: video.treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+      // Only include source range if explicitly set
+      ...(video.source_start_frame !== undefined ? { source_start_frame: video.source_start_frame } : {}),
+      ...(video.source_end_frame !== undefined && video.source_end_frame !== null ? { source_end_frame: video.source_end_frame } : {}),
+    }));
     
     requestBody.structure_videos = apiStructureVideos;
     
-    // CRITICAL: Set use_uni3c flag when any video uses uni3c mode
-    // GPU worker checks this flag to enable uni3c processing
-    if (hasUni3cVideo) {
-      requestBody.use_uni3c = true;
-      console.log('[Generation] 🔵 Uni3C mode ENABLED via structure_videos array');
-    }
-    
-    console.log('[Generation] 🎬 Using structure_videos ARRAY format:', {
-      count: apiStructureVideos.length,
-      hasUni3cVideo,
+    console.log('[Generation] 🎬 Using NEW unified structure_guidance format:', {
+      structure_guidance: structureGuidance,
+      structure_videos_count: apiStructureVideos.length,
       videos: apiStructureVideos.map(v => ({
         path: v.path.substring(0, 50) + '...',
         start_frame: v.start_frame,
         end_frame: v.end_frame,
         treatment: v.treatment,
-        structure_type: v.structure_type,
       }))
     });
   } else if (structureVideoConfig.structure_video_path) {
-    // LEGACY: Use single structure_video_path format (backwards compatible)
-    // For uni3c mode, send 'raw' as structure_type instead of 'uni3c'
-    // The backend expects 'raw' for uni3c processing
-    const effectiveStructureType = structureVideoConfig.structure_video_type === 'uni3c' 
-      ? 'raw' 
-      : structureVideoConfig.structure_video_type;
+    // LEGACY single-video path - convert to new unified format
+    const isUni3cTarget = structureVideoConfig.structure_video_type === 'uni3c';
+    const legacyUni3cEndPercent =
+      structureVideoConfig.uni3c_end_percent ??
+      params.uni3cEndPercent ??
+      1.0;
     
-    console.log('[Generation] Adding structure video to task (LEGACY single-video format):', {
-      structure_video_path: structureVideoConfig.structure_video_path,
-      structure_video_treatment: structureVideoConfig.structure_video_treatment,
-      structure_video_motion_strength: structureVideoConfig.structure_video_motion_strength,
-      structure_video_type: structureVideoConfig.structure_video_type,
-      effectiveStructureType,
-      isUni3cMode
-    });
-    // Spread structure video API params directly (already snake_case)
-    requestBody.structure_video_path = structureVideoConfig.structure_video_path;
-    requestBody.structure_video_treatment = structureVideoConfig.structure_video_treatment;
-    requestBody.structure_video_motion_strength = structureVideoConfig.structure_video_motion_strength;
-    // Send the effective structure type ('raw' for uni3c, otherwise the original value)
-    requestBody.structure_video_type = effectiveStructureType;
+    // Build structure_guidance config object
+    const structureGuidance: Record<string, unknown> = {
+      target: isUni3cTarget ? 'uni3c' : 'vace',
+    };
     
-    // For uni3c mode, also send uni3c_start_percent, uni3c_end_percent, and use_uni3c flag
-    if (isUni3cMode) {
-      requestBody.uni3c_start_percent = 0;
-      requestBody.uni3c_end_percent = params.uni3cEndPercent ?? 0.1;
-      // CRITICAL: Set use_uni3c flag - GPU worker checks this to enable uni3c processing
-      requestBody.use_uni3c = true;
-      console.log('[Generation] 🔵 Uni3C mode params:', {
-        uni3c_start_percent: requestBody.uni3c_start_percent,
-        uni3c_end_percent: requestBody.uni3c_end_percent,
-        use_uni3c: requestBody.use_uni3c
-      });
+    if (isUni3cTarget) {
+      // Uni3C specific params
+      structureGuidance.strength = structureVideoConfig.structure_video_motion_strength ?? 1.0;
+      structureGuidance.step_window = [0, legacyUni3cEndPercent];
+      structureGuidance.frame_policy = 'fit';
+      structureGuidance.zero_empty_frames = true;
+    } else {
+      // VACE specific params
+      const preprocessingMap: Record<string, string> = {
+        'flow': 'flow',
+        'canny': 'canny',
+        'depth': 'depth',
+        'raw': 'none',
+      };
+      structureGuidance.preprocessing = preprocessingMap[structureVideoConfig.structure_video_type ?? 'flow'] ?? 'flow';
+      structureGuidance.strength = structureVideoConfig.structure_video_motion_strength ?? 1.0;
     }
+    
+    requestBody.structure_guidance = structureGuidance;
+    
+    // Create a single-item structure_videos array from legacy config
+    // We need to compute end_frame from the total frames being generated
+    const totalFrames = segmentFrames.reduce((a, b) => a + b, 0);
+    requestBody.structure_videos = [{
+      path: structureVideoConfig.structure_video_path,
+      start_frame: 0,
+      end_frame: totalFrames,
+      treatment: structureVideoConfig.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+    }];
+    
+    console.log('[Generation] 🎬 Converted LEGACY single-video to unified format:', {
+      structure_guidance: structureGuidance,
+      structure_videos: requestBody.structure_videos,
+    });
   }
   
   // Debug logging for enhance_prompt parameter and enhanced_prompts array

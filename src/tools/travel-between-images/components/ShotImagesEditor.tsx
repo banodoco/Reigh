@@ -1941,19 +1941,50 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               start_frame: v.start_frame,
               end_frame: v.end_frame,
               treatment: v.treatment,
-              motion_strength: v.motion_strength,
-              structure_type: v.structure_type,
+              // Only include source range if explicitly set
               ...(v.source_start_frame !== undefined ? { source_start_frame: v.source_start_frame } : {}),
               ...(v.source_end_frame !== undefined && v.source_end_frame !== null ? { source_end_frame: v.source_end_frame } : {}),
-              ...(v.uni3c_start_percent !== undefined ? { uni3c_start_percent: v.uni3c_start_percent } : {}),
-              ...(v.uni3c_end_percent !== undefined ? { uni3c_end_percent: v.uni3c_end_percent } : {}),
             }));
 
+          // Build structure_guidance config (NEW unified format) from the first video's settings
+          // This is needed for individual segment generation to know target (vace/uni3c) and strength
+          let structureGuidance: Record<string, unknown> | undefined;
+          if (cleanedStructureVideos.length > 0 && propStructureVideos?.[0]) {
+            const firstVideo = propStructureVideos[0];
+            const isUni3cTarget = firstVideo.structure_type === 'uni3c';
+            
+            structureGuidance = {
+              target: isUni3cTarget ? 'uni3c' : 'vace',
+            };
+            
+            if (isUni3cTarget) {
+              // Uni3C specific params
+              structureGuidance.strength = firstVideo.motion_strength ?? 1.0;
+              structureGuidance.step_window = [
+                firstVideo.uni3c_start_percent ?? 0,
+                firstVideo.uni3c_end_percent ?? 1.0,
+              ];
+              structureGuidance.frame_policy = 'fit';
+              structureGuidance.zero_empty_frames = true;
+            } else {
+              // VACE specific params
+              const preprocessingMap: Record<string, string> = {
+                'flow': 'flow',
+                'canny': 'canny',
+                'depth': 'depth',
+                'raw': 'none',
+              };
+              structureGuidance.preprocessing = preprocessingMap[firstVideo.structure_type ?? 'flow'] ?? 'flow';
+              structureGuidance.strength = firstVideo.motion_strength ?? 1.0;
+            }
+          }
+
           if (cleanedStructureVideos.length > 0) {
-            console.log('[SegmentSettingsModal] [MultiStructureDebug] Injecting structure_videos into regeneration params:', {
+            console.log('[SegmentSettingsModal] [MultiStructureDebug] Injecting structure guidance into regeneration params:', {
               shotId: selectedShotId?.substring(0, 8),
-              count: cleanedStructureVideos.length,
-              ranges: cleanedStructureVideos.map(v => ({ start_frame: v.start_frame, end_frame: v.end_frame, structure_type: v.structure_type })),
+              structure_guidance: structureGuidance,
+              structure_videos_count: cleanedStructureVideos.length,
+              ranges: cleanedStructureVideos.map(v => ({ start_frame: v.start_frame, end_frame: v.end_frame })),
             });
           }
 
@@ -1978,6 +2009,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
           return {
             ...parentParams,
+            // Include structure_guidance at top level for individual segments
+            ...(structureGuidance ? { structure_guidance: structureGuidance } : {}),
             orchestrator_details: {
               ...(parentParams.orchestrator_details || {}),
               ...(timelineFrameGaps.length > 0 ? {
@@ -1987,6 +2020,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 num_new_segments_to_generate: timelineFrameGaps.length,
               } : {}),
               ...(cleanedStructureVideos.length > 0 ? { structure_videos: cleanedStructureVideos } : {}),
+              // Include structure_guidance in orchestrator_details too (worker checks both)
+              ...(structureGuidance ? { structure_guidance: structureGuidance } : {}),
             },
             // Include user_overrides so SegmentRegenerateControls can apply them on top
             user_overrides: userOverrides,

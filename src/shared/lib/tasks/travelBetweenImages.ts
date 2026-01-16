@@ -17,10 +17,115 @@ import { PhaseConfig } from '@/tools/travel-between-images/settings';
 // These interfaces define the snake_case params sent to the backend.
 // UI code should re-export these types and use them when building task params.
 
+// ============================================================================
+// NEW UNIFIED STRUCTURE GUIDANCE FORMAT
+// ============================================================================
+
+/**
+ * Unified structure guidance configuration.
+ * This is the new format that combines VACE and Uni3C configuration into a single object.
+ * 
+ * Example VACE with flow:
+ * ```
+ * {
+ *   target: "vace",
+ *   preprocessing: "flow",
+ *   strength: 1.2,
+ * }
+ * ```
+ * 
+ * Example Uni3C:
+ * ```
+ * {
+ *   target: "uni3c",
+ *   strength: 0.8,
+ *   step_window: [0.1, 0.9],
+ * }
+ * ```
+ */
+export interface StructureGuidanceConfig {
+  /** Target system for guidance: "vace" for VACE model, "uni3c" for I2V with guidance */
+  target: 'vace' | 'uni3c';
+  
+  /** 
+   * Preprocessing method (VACE only):
+   * - "flow": optical flow extraction
+   * - "canny": edge detection
+   * - "depth": depth estimation
+   * - "none": use raw frames (equivalent to old "raw" structure_type)
+   */
+  preprocessing?: 'flow' | 'canny' | 'depth' | 'none';
+  
+  /** Unified strength parameter (works for both VACE and Uni3C). Default: 1.0 */
+  strength?: number;
+  
+  /** VACE-specific: canny edge detection intensity. Default: 1.0 */
+  canny_intensity?: number;
+  
+  /** VACE-specific: depth contrast. Default: 1.0 */
+  depth_contrast?: number;
+  
+  /** 
+   * Uni3C-specific: step window as [start_percent, end_percent].
+   * Controls when during inference uni3c guidance is applied.
+   * Default: [0.0, 1.0]
+   */
+  step_window?: [number, number];
+  
+  /** Uni3C-specific: frame policy. Default: "fit" */
+  frame_policy?: 'fit' | 'clip';
+  
+  /** Uni3C-specific: zero out empty frames. Default: true */
+  zero_empty_frames?: boolean;
+}
+
+/**
+ * Helper to convert old structure_type to new format
+ */
+export function convertLegacyStructureType(
+  structureType: 'uni3c' | 'flow' | 'canny' | 'depth' | 'raw' | undefined,
+  options?: {
+    motionStrength?: number;
+    uni3cStartPercent?: number;
+    uni3cEndPercent?: number;
+  }
+): StructureGuidanceConfig | undefined {
+  if (!structureType) return undefined;
+  
+  if (structureType === 'uni3c') {
+    return {
+      target: 'uni3c',
+      strength: options?.motionStrength ?? 1.0,
+      step_window: [
+        options?.uni3cStartPercent ?? 0,
+        options?.uni3cEndPercent ?? 1.0,
+      ],
+    };
+  }
+  
+  // VACE modes
+  const preprocessingMap: Record<string, 'flow' | 'canny' | 'depth' | 'none'> = {
+    'flow': 'flow',
+    'canny': 'canny',
+    'depth': 'depth',
+    'raw': 'none',
+  };
+  
+  return {
+    target: 'vace',
+    preprocessing: preprocessingMap[structureType] ?? 'flow',
+    strength: options?.motionStrength ?? 1.0,
+  };
+}
+
+// ============================================================================
+// LEGACY INTERFACES (kept for backward compatibility)
+// ============================================================================
+
 /**
  * Structure video parameters for VACE mode (LEGACY - single video format).
  * Controls how a reference video guides the motion/structure of generation.
- * @deprecated Use `structure_videos` array format instead for multi-video support.
+ * @deprecated Use `structure_guidance` + `structure_videos` array format instead.
  */
 export interface VideoStructureApiParams {
   /** Path to structure video (S3/Storage URL) */
@@ -38,6 +143,10 @@ export interface VideoStructureApiParams {
 /**
  * Single structure video configuration within the structure_videos array.
  * Defines which OUTPUT timeline frames this video guides and which SOURCE frames to use.
+ * 
+ * NOTE: In the new unified format, structure_type and strength params moved to
+ * the separate `structure_guidance` config object. This now only contains
+ * the video source and frame mapping info.
  * 
  * Frame ranges are half-open: start_frame inclusive, end_frame exclusive.
  * Example: start_frame=0, end_frame=81 covers frames 0-80 (81 frames total).
@@ -61,12 +170,6 @@ export interface StructureVideoConfig {
    */
   treatment?: 'adjust' | 'clip';
   
-  /** Motion strength: 0.0 = no motion, 1.0 = full, >1.0 = amplified. Default: 1.0 */
-  motion_strength?: number;
-  
-  /** Type of structure extraction. Default: "flow" */
-  structure_type?: 'uni3c' | 'flow' | 'canny' | 'depth';
-  
   /**
    * Optional: Start frame within SOURCE video (inclusive, 0-based).
    * Default: 0
@@ -79,10 +182,20 @@ export interface StructureVideoConfig {
    */
   source_end_frame?: number | null;
   
-  /** Uni3C start percent (0-1, only used when structure_type is 'uni3c') */
+  // ============================================================================
+  // LEGACY FIELDS (kept for backward compatibility, prefer structure_guidance)
+  // ============================================================================
+  
+  /** @deprecated Use structure_guidance.strength instead */
+  motion_strength?: number;
+  
+  /** @deprecated Use structure_guidance.target + preprocessing instead */
+  structure_type?: 'uni3c' | 'flow' | 'canny' | 'depth';
+  
+  /** @deprecated Use structure_guidance.step_window[0] instead */
   uni3c_start_percent?: number;
   
-  /** Uni3C end percent (0-1, only used when structure_type is 'uni3c') */
+  /** @deprecated Use structure_guidance.step_window[1] instead */
   uni3c_end_percent?: number;
 }
 
@@ -312,19 +425,34 @@ export interface TravelBetweenImagesTaskParams extends
   independent_segments?: boolean;
   /** Enable smooth video interpolation (SVI) for smoother transitions */
   use_svi?: boolean;
-  /** Uni3C start percent (0-1, used when structure_video_type is 'raw'/uni3c) */
-  uni3c_start_percent?: number;
-  /** Uni3C end percent (0-1, used when structure_video_type is 'raw'/uni3c) */
-  uni3c_end_percent?: number;
-  /** Enable Uni3C mode (GPU worker checks this flag) */
-  use_uni3c?: boolean;
+  
+  // ============================================================================
+  // NEW UNIFIED STRUCTURE GUIDANCE FORMAT
+  // ============================================================================
+  
+  /**
+   * NEW: Unified structure guidance configuration.
+   * Contains target (vace/uni3c), preprocessing, strength, and related params.
+   * This is the preferred format - takes precedence over legacy scattered params.
+   */
+  structure_guidance?: StructureGuidanceConfig;
   
   /**
    * NEW: Array of structure video configurations for multi-video support.
    * Each video can target a specific output frame range with its own settings.
-   * Takes precedence over legacy single-video params when provided.
    */
   structure_videos?: StructureVideoConfig[];
+  
+  // ============================================================================
+  // LEGACY PARAMS (kept for backward compatibility, prefer structure_guidance)
+  // ============================================================================
+  
+  /** @deprecated Use structure_guidance.step_window[0] instead */
+  uni3c_start_percent?: number;
+  /** @deprecated Use structure_guidance.step_window[1] instead */
+  uni3c_end_percent?: number;
+  /** @deprecated Use structure_guidance.target === 'uni3c' instead */
+  use_uni3c?: boolean;
 }
 
 /**
@@ -503,38 +631,37 @@ function buildTravelBetweenImagesPayload(
     WARNING: orchestratorPayload.enhance_prompt === true ? '⚠️ enhance_prompt is TRUE - check if this is intentional' : '✅ enhance_prompt is false'
   });
 
-  // Add structure video parameters - supports both new array format and legacy single-video format
-  // New array format takes precedence when provided
+  // ============================================================================
+  // STRUCTURE GUIDANCE - NEW UNIFIED FORMAT
+  // ============================================================================
+  // Forward structure_guidance config and structure_videos array to orchestrator.
+  // The new format separates guidance config (target, preprocessing, strength)
+  // from video source info (path, frame range, treatment).
+  
+  // Forward structure_guidance if provided (new unified format)
+  if (params.structure_guidance) {
+    orchestratorPayload.structure_guidance = params.structure_guidance;
+    console.log("[createTravelBetweenImagesTask] Using NEW structure_guidance format:", params.structure_guidance);
+  }
+  
+  // Forward structure_videos array (cleaned of UI-only fields)
   if (params.structure_videos && params.structure_videos.length > 0) {
-    // NEW: Multi-video array format
     // Clean the array to only include backend-relevant fields (no metadata/resource_id)
     const cleanedStructureVideos = params.structure_videos.map(video => ({
       path: video.path,
       start_frame: video.start_frame,
       end_frame: video.end_frame,
       treatment: video.treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
-      motion_strength: video.motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
-      structure_type: video.structure_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
       // Only include source range if explicitly set
       ...(video.source_start_frame !== undefined ? { source_start_frame: video.source_start_frame } : {}),
       ...(video.source_end_frame !== undefined && video.source_end_frame !== null ? { source_end_frame: video.source_end_frame } : {}),
-      // Uni3C params only if structure_type is uni3c
-      ...(video.structure_type === 'uni3c' ? {
-        uni3c_start_percent: video.uni3c_start_percent ?? 0,
-        uni3c_end_percent: video.uni3c_end_percent ?? 0.1,
-      } : {}),
     }));
     
     orchestratorPayload.structure_videos = cleanedStructureVideos;
     
-    // Forward use_uni3c flag if set (GPU worker checks this)
-    if (params.use_uni3c) {
-      orchestratorPayload.use_uni3c = true;
-    }
-    
     console.log("[createTravelBetweenImagesTask] Using structure_videos array format:", {
       count: cleanedStructureVideos.length,
-      use_uni3c: params.use_uni3c,
+      has_structure_guidance: !!params.structure_guidance,
       videos: cleanedStructureVideos.map(v => ({
         path: v.path.substring(0, 50) + '...',
         start_frame: v.start_frame,
@@ -543,28 +670,25 @@ function buildTravelBetweenImagesPayload(
       }))
     });
   } else if (params.structure_video_path) {
-    // LEGACY: Single video format (backwards compatible)
+    // LEGACY: Single video format (for backward compatibility only)
+    // This path should rarely be used now - generateVideoService converts to new format
     orchestratorPayload.structure_video_path = params.structure_video_path;
     orchestratorPayload.structure_video_treatment = params.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment;
     orchestratorPayload.structure_video_motion_strength = params.structure_video_motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength;
     orchestratorPayload.structure_video_type = params.structure_video_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type;
     
-    // Add uni3c parameters if structure_video_type is 'raw' (uni3c mode) or use_uni3c is explicitly set
-    if (params.structure_video_type === 'raw' || params.use_uni3c || params.uni3c_start_percent !== undefined || params.uni3c_end_percent !== undefined) {
+    // Legacy uni3c parameters
+    if (params.uni3c_start_percent !== undefined || params.uni3c_end_percent !== undefined) {
       orchestratorPayload.uni3c_start_percent = params.uni3c_start_percent ?? 0;
       orchestratorPayload.uni3c_end_percent = params.uni3c_end_percent ?? 0.1;
-      // CRITICAL: Forward use_uni3c flag - GPU worker checks this to enable uni3c processing
-      if (params.use_uni3c) {
-        orchestratorPayload.use_uni3c = true;
-      }
-      console.log("[createTravelBetweenImagesTask] Uni3C mode - adding uni3c parameters:", {
-        uni3c_start_percent: orchestratorPayload.uni3c_start_percent,
-        uni3c_end_percent: orchestratorPayload.uni3c_end_percent,
-        use_uni3c: orchestratorPayload.use_uni3c
-      });
     }
     
-    console.log("[createTravelBetweenImagesTask] Using legacy single structure_video_path format");
+    // Legacy use_uni3c flag
+    if (params.use_uni3c) {
+      orchestratorPayload.use_uni3c = true;
+    }
+    
+    console.log("[createTravelBetweenImagesTask] Using LEGACY single structure_video_path format");
   }
 
   // Attach additional_loras mapping if provided (matching original logic)

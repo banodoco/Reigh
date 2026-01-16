@@ -1300,30 +1300,42 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     return taskDetailsData;
   }, [taskDetailsData, activeVariant, variantSourceTask, isLoadingVariantTask, isLoadingVariants, initialVariantId]);
 
-  // Fetch shot's aspect ratio for regeneration resolution (shot resolution > project resolution)
-  const { data: shotAspectRatioData, isLoading: isLoadingShotAspectRatio } = useQuery({
-    queryKey: ['shot-aspect-ratio', shotId],
+  // Fetch shot's aspect ratio AND structure videos for regeneration
+  // Structure videos are stored in generation_params.structure_videos
+  const { data: shotDataForRegen, isLoading: isLoadingShotAspectRatio } = useQuery({
+    queryKey: ['shot-regen-data', shotId],
     queryFn: async () => {
       if (!shotId) return null;
-      console.log('[MediaLightbox] [ResolutionDebug] Fetching shot aspect ratio for:', shotId?.substring(0, 8));
+      console.log('[MediaLightbox] [RegenData] Fetching shot data for:', shotId?.substring(0, 8));
       const { data, error } = await supabase
         .from('shots')
-        .select('aspect_ratio')
+        .select('aspect_ratio, generation_params')
         .eq('id', shotId)
         .single();
       if (error) {
-        console.warn('[MediaLightbox] [ResolutionDebug] Error fetching shot aspect ratio:', error);
+        console.warn('[MediaLightbox] [RegenData] Error fetching shot data:', error);
         return null;
       }
-      console.log('[MediaLightbox] [ResolutionDebug] Shot aspect ratio fetched:', {
+      const genParams = data?.generation_params as Record<string, any> | null;
+      console.log('[MediaLightbox] [RegenData] Shot data fetched:', {
         shotId: shotId?.substring(0, 8),
         aspectRatio: data?.aspect_ratio,
+        hasStructureVideos: !!(genParams?.structure_videos?.length > 0),
+        structureVideosCount: genParams?.structure_videos?.length ?? 0,
+        hasStructureGuidance: !!genParams?.structure_guidance,
       });
-      return data?.aspect_ratio;
+      return {
+        aspect_ratio: data?.aspect_ratio,
+        structure_videos: genParams?.structure_videos ?? null,
+        structure_guidance: genParams?.structure_guidance ?? null,
+      };
     },
     enabled: !!shotId && isVideo,
     staleTime: 60000, // Cache for 1 minute
   });
+
+  // Extract aspect ratio from combined query (backward compat)
+  const shotAspectRatioData = shotDataForRegen?.aspect_ratio;
 
   // Compute effective resolution for regeneration: shot > project > stale params
   const effectiveRegenerateResolution = useMemo(() => {
@@ -1398,7 +1410,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     );
 
     // Priority: primaryVariant params > task data params > media params (fallback)
-    const taskParams = primaryHasTaskData
+    let taskParams = primaryHasTaskData
       ? primaryParams
       : (taskDataParams ?? mediaParams) as Record<string, any>;
 
@@ -1413,6 +1425,33 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       primaryHasTaskData,
       hasAdditionalLoras: !!(taskParams.additional_loras || taskParams.orchestrator_details?.additional_loras),
     });
+
+    // CRITICAL: Inject CURRENT shot's structure videos/guidance into params
+    // The task params may be stale (from when the segment was created), but the shot
+    // may now have a structure video configured. Use the shot's current config.
+    const shotStructureVideos = shotDataForRegen?.structure_videos;
+    const shotStructureGuidance = shotDataForRegen?.structure_guidance;
+    
+    if (shotStructureVideos?.length > 0 || shotStructureGuidance) {
+      console.log('[MediaLightbox] [RegenerateParams] Injecting shot structure video config:', {
+        hasStructureVideos: shotStructureVideos?.length > 0,
+        structureVideosCount: shotStructureVideos?.length ?? 0,
+        hasStructureGuidance: !!shotStructureGuidance,
+        structureGuidanceTarget: shotStructureGuidance?.target,
+      });
+      
+      taskParams = {
+        ...taskParams,
+        // Include structure_guidance at top level for standalone segments
+        ...(shotStructureGuidance ? { structure_guidance: shotStructureGuidance } : {}),
+        orchestrator_details: {
+          ...(taskParams.orchestrator_details || {}),
+          ...(shotStructureVideos?.length > 0 ? { structure_videos: shotStructureVideos } : {}),
+          ...(shotStructureGuidance ? { structure_guidance: shotStructureGuidance } : {}),
+        },
+      };
+    }
+
     const orchestratorDetails = taskParams.orchestrator_details || {};
 
     // Use shared utility to extract segment images (handles explicit URLs and array formats)
@@ -1488,7 +1527,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         projectResolution={effectiveRegenerateResolution}
       />
     );
-  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant]);
+  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen]);
 
   // Handle entering video edit mode (unified) - restores last used sub-mode
   const handleEnterVideoEditMode = useCallback(() => {
