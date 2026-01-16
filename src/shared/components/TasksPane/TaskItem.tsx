@@ -122,9 +122,12 @@ const TaskItem: React.FC<TaskItemProps> = ({
   const imagesToShow = travelImageUrls.slice(0, 4);
   const extraImageCount = Math.max(0, travelImageUrls.length - imagesToShow.length);
 
-  // Extract shot_id for video tasks
+  // Extract shot_id for video tasks and orchestrators
+  // Orchestrators (travel_orchestrator, join_clips_orchestrator, wan_2_2_i2v) always have shot_id
   const shotId = useMemo(() => {
-    if (!taskInfo.isVideoTask) return null;
+    // Always try to extract for orchestrator types
+    const isOrchestrator = ['travel_orchestrator', 'join_clips_orchestrator', 'wan_2_2_i2v'].includes(task.taskType);
+    if (!taskInfo.isVideoTask && !isOrchestrator) return null;
     return extractShotId(task);
   }, [task, taskInfo.isVideoTask]);
 
