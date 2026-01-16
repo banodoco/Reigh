@@ -158,11 +158,32 @@ export function useVideoGenerations({
 
       if (error) {
         console.error('[useVideoGenerations] Error fetching video generations:', error);
-        return null;
       }
 
-      console.log('[useVideoGenerations] Fallback result:', { found: data?.length || 0 });
-      return data || [];
+      if (data && data.length > 0) {
+        console.log('[useVideoGenerations] Fallback result:', { found: data.length });
+        return data;
+      }
+
+      // FINAL FALLBACK: If no generation record exists but task has outputLocation,
+      // create a minimal pseudo-generation from the task data
+      // This handles cases where complete-task failed to create the generation record
+      if (task.outputLocation) {
+        console.log('[useVideoGenerations] No generation found, creating minimal record from task.outputLocation');
+        return [{
+          id: task.id, // Use task ID as pseudo-generation ID
+          location: task.outputLocation,
+          thumbnail_url: null,
+          type: 'video',
+          created_at: task.createdAt || (task as any).created_at,
+          project_id: task.projectId,
+          params: task.params,
+          _is_fallback: true, // Mark as fallback so we know it's not a real generation
+        }];
+      }
+
+      console.log('[useVideoGenerations] No generation found and no outputLocation');
+      return [];
     },
     enabled: shouldFetchVideo && isVideoTask && task.status === 'Complete',
   });
