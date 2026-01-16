@@ -88,12 +88,16 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
 
   const enhancePrompt = orchestratorDetails?.enhance_prompt || orchestratorPayload?.enhance_prompt || parsedParams?.enhance_prompt;
 
-  // Video/style reference
-  const videoPath = orchestratorDetails?.structure_video_path || orchestratorPayload?.structure_video_path || parsedParams?.structure_video_path;
+  // Structure guidance (new format with videos array, target, strength, step_window)
+  const structureGuidance = orchestratorDetails?.structure_guidance || orchestratorPayload?.structure_guidance || parsedParams?.structure_guidance;
+
+  // Video/style reference - prefer new structure_guidance.videos format, fall back to legacy fields
+  const structureVideo = structureGuidance?.videos?.[0];
+  const videoPath = structureVideo?.path || orchestratorDetails?.structure_video_path || orchestratorPayload?.structure_video_path || parsedParams?.structure_video_path;
+  const videoTreatment = structureVideo?.treatment || orchestratorDetails?.structure_video_treatment || orchestratorPayload?.structure_video_treatment || parsedParams?.structure_video_treatment;
   const videoType = orchestratorDetails?.structure_video_type || orchestratorPayload?.structure_video_type || parsedParams?.structure_video_type;
-  const videoTreatment = orchestratorDetails?.structure_video_treatment || orchestratorPayload?.structure_video_treatment || parsedParams?.structure_video_treatment;
   const motionStrength = orchestratorDetails?.structure_video_motion_strength ?? orchestratorPayload?.structure_video_motion_strength ?? parsedParams?.structure_video_motion_strength;
-  
+
   const styleImage = parsedParams?.style_reference_image || orchestratorDetails?.style_reference_image;
   const styleStrength = parsedParams?.style_reference_strength ?? orchestratorDetails?.style_reference_strength;
 
@@ -181,10 +185,12 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
           </div>
         )}
 
-        {/* Video Guidance */}
+        {/* Video/Structure Guidance */}
         {videoPath && (
           <div className="space-y-2">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>Video Guidance</p>
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>
+              {structureGuidance?.target ? 'Structure Guidance' : 'Video Guidance'}
+            </p>
             <div className="flex items-start gap-3">
               <div className="relative group cursor-pointer" style={{ width: '80px' }} onClick={() => setVideoLoaded(true)}>
                 {!videoLoaded ? (
@@ -196,6 +202,15 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
                 )}
               </div>
               <div className={`${config.textSize} ${config.fontWeight} space-y-1`}>
+                {structureGuidance?.target && (
+                  <div><span className="text-muted-foreground">Target: </span><span className="uppercase">{structureGuidance.target}</span></div>
+                )}
+                {structureGuidance?.strength != null && (
+                  <div><span className="text-muted-foreground">Strength: </span>{structureGuidance.strength}</div>
+                )}
+                {structureGuidance?.step_window && Array.isArray(structureGuidance.step_window) && (
+                  <div><span className="text-muted-foreground">Step Window: </span>{structureGuidance.step_window[0]} → {structureGuidance.step_window[1]}</div>
+                )}
                 {videoType && <div><span className="text-muted-foreground">Type: </span><span className="capitalize">{videoType}</span></div>}
                 {videoTreatment && <div><span className="text-muted-foreground">Treatment: </span><span className="capitalize">{videoTreatment}</span></div>}
                 {motionStrength != null && <div><span className="text-muted-foreground">Strength: </span>{Math.round(motionStrength * 100)}%</div>}

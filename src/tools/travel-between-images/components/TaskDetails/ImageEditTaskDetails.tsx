@@ -48,7 +48,17 @@ export const ImageEditTaskDetails: React.FC<TaskDetailsProps> = ({
           </p>
         </div>
       )}
-      
+
+      {/* Qwen Edit Model (if specified) */}
+      {parsedParams?.qwen_edit_model && (
+        <div className="space-y-1">
+          <p className={`${config.textSize} font-medium text-muted-foreground`}>Model</p>
+          <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+            {parsedParams.qwen_edit_model}
+          </p>
+        </div>
+      )}
+
       {/* Img2Img Strength */}
       {isImg2Img && typeof strength === 'number' && (
         <div className="space-y-1">

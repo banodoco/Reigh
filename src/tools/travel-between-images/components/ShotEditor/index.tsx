@@ -718,6 +718,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const videoGalleryRef = useRef<HTMLDivElement>(null);
   const generateVideosCardRef = useRef<HTMLDivElement>(null);
   const joinSegmentsSectionRef = useRef<HTMLDivElement>(null);
+  const pendingScrollToJoinRef = useRef<boolean>(false);
   
   // Selection state (forwarded to parent for floating button control)
   // 🎯 PERF FIX: Uses ref to prevent callback recreation
@@ -776,7 +777,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const setGenerateMode = useCallback((mode: 'batch' | 'join') => {
     joinSettings.updateField('generateMode', mode);
   }, [joinSettings]);
-  
+
+  // Scroll to join section after it renders (when triggered from FinalVideoSection "Join clips" button)
+  useEffect(() => {
+    if (generateMode === 'join' && pendingScrollToJoinRef.current) {
+      pendingScrollToJoinRef.current = false;
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        const target = joinSegmentsSectionRef.current || generateVideosCardRef.current;
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }, [generateMode]);
+
   // Join clips state
   const [isJoiningClips, setIsJoiningClips] = useState(false);
   const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
@@ -2024,10 +2037,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           onApplySettingsFromTask={applySettingsFromTask}
           onJoinSegmentsClick={() => {
             setGenerateMode('join');
-            requestAnimationFrame(() => {
-              const target = joinSegmentsSectionRef.current || generateVideosCardRef.current;
-              target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            });
+            // Mark that we want to scroll to join section once it renders
+            pendingScrollToJoinRef.current = true;
           }}
           selectedParentId={selectedOutputId}
           onSelectedParentChange={setSelectedOutputId}
