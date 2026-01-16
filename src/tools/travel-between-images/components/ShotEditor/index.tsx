@@ -718,7 +718,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const videoGalleryRef = useRef<HTMLDivElement>(null);
   const generateVideosCardRef = useRef<HTMLDivElement>(null);
   const joinSegmentsSectionRef = useRef<HTMLDivElement>(null);
-  const pendingScrollToJoinRef = useRef<boolean>(false);
   const swapButtonRef = useRef<HTMLButtonElement>(null);
   
   // Selection state (forwarded to parent for floating button control)
@@ -803,18 +802,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
     });
   }, [setGenerateMode]);
-
-  // Scroll to join section after it renders (when triggered from FinalVideoSection "Join clips" button)
-  useEffect(() => {
-    if (generateMode === 'join' && pendingScrollToJoinRef.current) {
-      pendingScrollToJoinRef.current = false;
-      // Use requestAnimationFrame to ensure DOM has updated
-      requestAnimationFrame(() => {
-        const target = joinSegmentsSectionRef.current || generateVideosCardRef.current;
-        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    }
-  }, [generateMode]);
 
   // Join clips state
   const [isJoiningClips, setIsJoiningClips] = useState(false);
@@ -2062,9 +2049,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           projectAspectRatio={effectiveAspectRatio}
           onApplySettingsFromTask={applySettingsFromTask}
           onJoinSegmentsClick={() => {
+            const alreadyInJoinMode = generateMode === 'join';
             setGenerateMode('join');
-            // Mark that we want to scroll to join section once it renders
-            pendingScrollToJoinRef.current = true;
+
+            // Scroll to join section - use RAF to ensure DOM is updated
+            requestAnimationFrame(() => {
+              const target = alreadyInJoinMode
+                ? joinSegmentsSectionRef.current
+                : (joinSegmentsSectionRef.current || generateVideosCardRef.current);
+              if (target) {
+                // Use 'center' to avoid scrolling too far
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            });
           }}
           selectedParentId={selectedOutputId}
           onSelectedParentChange={setSelectedOutputId}
