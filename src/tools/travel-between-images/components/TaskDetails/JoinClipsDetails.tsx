@@ -28,9 +28,9 @@ export const JoinClipsDetails: React.FC<TaskDetailsProps> = ({
   const endingVideoPath = !clipsArray && (parsedParams?.ending_video_path || orchestratorDetails?.ending_video_path || orchestratorPayload?.ending_video_path);
   const joinClipsPrompt = !clipsArray && (parsedParams?.prompt || orchestratorDetails?.prompt || orchestratorPayload?.prompt);
   
-  // Frame configuration
-  const contextFrameCount = parsedParams?.context_frame_count || orchestratorDetails?.context_frame_count || orchestratorPayload?.context_frame_count;
-  const gapFrameCount = parsedParams?.gap_frame_count || orchestratorDetails?.gap_frame_count || orchestratorPayload?.gap_frame_count;
+  // Frame configuration - use ?? to handle 0 values correctly
+  const contextFrameCount = parsedParams?.context_frame_count ?? orchestratorDetails?.context_frame_count ?? orchestratorPayload?.context_frame_count;
+  const gapFrameCount = parsedParams?.gap_frame_count ?? orchestratorDetails?.gap_frame_count ?? orchestratorPayload?.gap_frame_count;
   const replaceMode = parsedParams?.replace_mode ?? orchestratorDetails?.replace_mode ?? orchestratorPayload?.replace_mode;
   const keepBridgingImages = parsedParams?.keep_bridging_images ?? orchestratorDetails?.keep_bridging_images ?? orchestratorPayload?.keep_bridging_images;
 
@@ -128,19 +128,11 @@ export const JoinClipsDetails: React.FC<TaskDetailsProps> = ({
       )}
 
       {/* Frame Configuration */}
-      {(contextFrameCount !== null || gapFrameCount !== null || replaceMode !== null || keepBridgingImages !== null) && (
+      {(contextFrameCount != null || gapFrameCount != null || replaceMode != null || keepBridgingImages != null) && (
         <div className={`space-y-2 ${(clipsArray?.length > 0) || startingVideoPath || endingVideoPath ? 'pt-2 border-t border-muted-foreground/20' : ''}`}>
           <p className={`${config.textSize} font-medium text-muted-foreground`}>Configuration</p>
           <div className="grid grid-cols-2 gap-3">
-            {contextFrameCount !== null && (
-              <div className="space-y-1">
-                <p className={`${config.textSize} text-muted-foreground`}>Context Frames</p>
-                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-                  {framesToSeconds(contextFrameCount)} ({contextFrameCount} frames)
-                </p>
-              </div>
-            )}
-            {gapFrameCount !== null && (
+            {gapFrameCount != null && (
               <div className="space-y-1">
                 <p className={`${config.textSize} text-muted-foreground`}>Gap Frames</p>
                 <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
@@ -148,7 +140,15 @@ export const JoinClipsDetails: React.FC<TaskDetailsProps> = ({
                 </p>
               </div>
             )}
-            {replaceMode !== null && (
+            {contextFrameCount != null && (
+              <div className="space-y-1">
+                <p className={`${config.textSize} text-muted-foreground`}>Context Frames</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                  {framesToSeconds(contextFrameCount)} ({contextFrameCount} frames)
+                </p>
+              </div>
+            )}
+            {replaceMode != null && (
               <div className="space-y-1">
                 <p className={`${config.textSize} text-muted-foreground`}>Transition Mode</p>
                 <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
@@ -156,7 +156,7 @@ export const JoinClipsDetails: React.FC<TaskDetailsProps> = ({
                 </p>
               </div>
             )}
-            {keepBridgingImages !== null && (
+            {keepBridgingImages != null && (
               <div className="space-y-1">
                 <p className={`${config.textSize} text-muted-foreground`}>Bridge Anchors</p>
                 <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
