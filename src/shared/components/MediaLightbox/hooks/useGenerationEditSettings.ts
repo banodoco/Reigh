@@ -29,7 +29,7 @@ export interface EditAdvancedSettings {
 }
 
 export const DEFAULT_ADVANCED_SETTINGS: EditAdvancedSettings = {
-  enabled: false, // Disabled by default for edits (optional feature)
+  enabled: true, // Enabled by default for better quality
   resolution_scale: 1.5,
   base_steps: 8,
   hires_scale: 1.1,
