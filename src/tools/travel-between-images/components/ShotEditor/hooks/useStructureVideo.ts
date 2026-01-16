@@ -189,6 +189,7 @@ export function useStructureVideo({
   timelineEndFrame = 81,
 }: UseStructureVideoParams): UseStructureVideoReturn {
   // Structure video persistence using tool settings (per-shot basis)
+  // NOTE: Uses 'travel-structure-video' key - MediaLightbox and SegmentRegenerateControls must read from this same key
   const {
     settings: structureVideoSettings,
     update: updateStructureVideoSettings,

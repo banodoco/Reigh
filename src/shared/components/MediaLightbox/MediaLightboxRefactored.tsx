@@ -1301,33 +1301,48 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [taskDetailsData, activeVariant, variantSourceTask, isLoadingVariantTask, isLoadingVariants, initialVariantId]);
 
   // Fetch shot's aspect ratio AND structure videos for regeneration
-  // Structure videos are stored in generation_params.structure_videos
+  // Structure videos are stored in shots.settings['travel-structure-video'] (via useStructureVideo hook)
   const { data: shotDataForRegen, isLoading: isLoadingShotAspectRatio } = useQuery({
     queryKey: ['shot-regen-data', shotId],
     queryFn: async () => {
       if (!shotId) return null;
-      console.log('[MediaLightbox] [RegenData] Fetching shot data for:', shotId?.substring(0, 8));
+      console.log('[StructureVideoFix] 🔍 [MediaLightbox] QUERY START - Fetching shot data for:', shotId?.substring(0, 8));
       const { data, error } = await supabase
         .from('shots')
-        .select('aspect_ratio, generation_params')
+        .select('aspect_ratio, settings')
         .eq('id', shotId)
         .single();
       if (error) {
-        console.warn('[MediaLightbox] [RegenData] Error fetching shot data:', error);
+        console.warn('[StructureVideoFix] ❌ [MediaLightbox] QUERY FAILED:', error);
         return null;
       }
-      const genParams = data?.generation_params as Record<string, any> | null;
-      console.log('[MediaLightbox] [RegenData] Shot data fetched:', {
+      
+      // DEBUG: Log ALL keys in settings to see where data actually lives
+      const allSettings = data?.settings as Record<string, any>;
+      const settingsKeys = allSettings ? Object.keys(allSettings) : [];
+      console.log('[StructureVideoFix] 🗃️ [MediaLightbox] ALL SETTINGS KEYS:', settingsKeys);
+      
+      // NOTE: Structure videos are stored under 'travel-structure-video' key (via useStructureVideo hook)
+      const structureVideoSettings = allSettings?.['travel-structure-video'] ?? {};
+      // Also check wrong key for debugging
+      const wrongKeySettings = allSettings?.['travel-between-images'] ?? {};
+      
+      console.log('[StructureVideoFix] 📦 [MediaLightbox] QUERY COMPLETE - Shot data fetched:', {
         shotId: shotId?.substring(0, 8),
         aspectRatio: data?.aspect_ratio,
-        hasStructureVideos: !!(genParams?.structure_videos?.length > 0),
-        structureVideosCount: genParams?.structure_videos?.length ?? 0,
-        hasStructureGuidance: !!genParams?.structure_guidance,
+        // Correct key (travel-structure-video)
+        hasStructureVideos: !!(structureVideoSettings.structure_videos?.length > 0),
+        structureVideosCount: structureVideoSettings.structure_videos?.length ?? 0,
+        hasStructureGuidance: !!structureVideoSettings.structure_guidance,
+        firstVideoPath: structureVideoSettings.structure_videos?.[0]?.path?.substring(0, 50) ?? '(none)',
+        // Wrong key check (travel-between-images) 
+        wrongKeyHasStructureVideos: !!(wrongKeySettings.structure_videos?.length > 0),
+        wrongKeyCount: wrongKeySettings.structure_videos?.length ?? 0,
       });
       return {
         aspect_ratio: data?.aspect_ratio,
-        structure_videos: genParams?.structure_videos ?? null,
-        structure_guidance: genParams?.structure_guidance ?? null,
+        structure_videos: structureVideoSettings.structure_videos ?? null,
+        structure_guidance: structureVideoSettings.structure_guidance ?? null,
       };
     },
     enabled: !!shotId && isVideo,
@@ -1419,7 +1434,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       ? 'primaryVariant'
       : (taskDataParams ? 'adjustedTaskDetailsData' : 'mediaParams');
 
-    console.log('[MediaLightbox] [RegenerateParams] Using params from:', {
+    console.log('[StructureVideoFix] [MediaLightbox] [RegenerateParams] Using params from:', {
       source: paramsSource,
       primaryVariantId: primaryVariant?.id?.substring(0, 8),
       primaryHasTaskData,
@@ -1429,27 +1444,119 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     // CRITICAL: Inject CURRENT shot's structure videos/guidance into params
     // The task params may be stale (from when the segment was created), but the shot
     // may now have a structure video configured. Use the shot's current config.
+    //
+    // NEW UNIFIED FORMAT: structure_guidance contains videos array inside it:
+    // {
+    //   "structure_guidance": {
+    //     "target": "uni3c" | "vace",
+    //     "videos": [{ path, start_frame, end_frame, treatment }],
+    //     "strength": 1.0,
+    //     // Uni3C: step_window, frame_policy, zero_empty_frames
+    //     // VACE: preprocessing, canny_intensity, depth_contrast
+    //   }
+    // }
     const shotStructureVideos = shotDataForRegen?.structure_videos;
-    const shotStructureGuidance = shotDataForRegen?.structure_guidance;
+    let shotStructureGuidance: Record<string, unknown> | null = null;
     
-    if (shotStructureVideos?.length > 0 || shotStructureGuidance) {
-      console.log('[MediaLightbox] [RegenerateParams] Injecting shot structure video config:', {
-        hasStructureVideos: shotStructureVideos?.length > 0,
-        structureVideosCount: shotStructureVideos?.length ?? 0,
-        hasStructureGuidance: !!shotStructureGuidance,
-        structureGuidanceTarget: shotStructureGuidance?.target,
+    // Build unified structure_guidance from structure_videos array
+    if (shotStructureVideos?.length > 0) {
+      const firstVideo = shotStructureVideos[0];
+      const isUni3cTarget = firstVideo.structure_type === 'uni3c';
+      
+      // Transform videos to the new format (strip structure_type, motion_strength, uni3c_* from each video)
+      const cleanedVideos = shotStructureVideos.map((v: Record<string, unknown>) => ({
+        path: v.path,
+        start_frame: v.start_frame ?? 0,
+        end_frame: v.end_frame ?? null,
+        treatment: v.treatment ?? 'adjust',
+        ...(v.metadata ? { metadata: v.metadata } : {}),
+        ...(v.resource_id ? { resource_id: v.resource_id } : {}),
+      }));
+      
+      shotStructureGuidance = {
+        target: isUni3cTarget ? 'uni3c' : 'vace',
+        videos: cleanedVideos,
+        strength: firstVideo.motion_strength ?? 1.0,
+      };
+      
+      if (isUni3cTarget) {
+        // Uni3C specific params
+        shotStructureGuidance.step_window = [
+          firstVideo.uni3c_start_percent ?? 0,
+          firstVideo.uni3c_end_percent ?? 1.0,
+        ];
+        shotStructureGuidance.frame_policy = 'fit';
+        shotStructureGuidance.zero_empty_frames = true;
+      } else {
+        // VACE specific params
+        const preprocessingMap: Record<string, string> = {
+          'flow': 'flow',
+          'canny': 'canny',
+          'depth': 'depth',
+          'raw': 'none',
+        };
+        shotStructureGuidance.preprocessing = preprocessingMap[firstVideo.structure_type ?? 'flow'] ?? 'flow';
+        // Include optional VACE params if present
+        if (firstVideo.canny_intensity != null) {
+          shotStructureGuidance.canny_intensity = firstVideo.canny_intensity;
+        }
+        if (firstVideo.depth_contrast != null) {
+          shotStructureGuidance.depth_contrast = firstVideo.depth_contrast;
+        }
+      }
+      
+      console.log('[StructureVideoFix] 🔧 [MediaLightbox] BUILT unified structure_guidance:', {
+        target: shotStructureGuidance.target,
+        videosCount: cleanedVideos.length,
+        strength: shotStructureGuidance.strength,
+        stepWindow: shotStructureGuidance.step_window,
+        preprocessing: shotStructureGuidance.preprocessing,
+        firstVideoPath: cleanedVideos[0]?.path?.substring(0, 50),
       });
+    }
+    
+    // DEBUG: Always log the state of shotDataForRegen
+    console.log('[StructureVideoFix] 🎯 [MediaLightbox] regenerateForm - shotDataForRegen state:', {
+      shotId: shotId?.substring(0, 8),
+      isLoadingShotAspectRatio,
+      hasShotDataForRegen: !!shotDataForRegen,
+      shotStructureVideosCount: shotStructureVideos?.length ?? 0,
+      shotStructureGuidanceTarget: shotStructureGuidance?.target ?? '(none)',
+      willInject: !!shotStructureGuidance,
+    });
+    
+    if (shotStructureGuidance) {
+      console.log('[StructureVideoFix] ✅ [MediaLightbox] INJECTING unified structure_guidance:', {
+        target: shotStructureGuidance.target,
+        videosCount: (shotStructureGuidance.videos as unknown[])?.length ?? 0,
+        strength: shotStructureGuidance.strength,
+      });
+      
+      // CLEANUP: Remove legacy structure params from orchestrator_details before injecting new unified format
+      const cleanedOrchestratorDetails = { ...(taskParams.orchestrator_details || {}) };
+      const legacyStructureParams = [
+        'structure_type', 'structure_videos', 'structure_video_path', 'structure_video_treatment',
+        'structure_video_motion_strength', 'structure_video_type', 'structure_canny_intensity',
+        'structure_depth_contrast', 'structure_guidance_video_url', 'structure_guidance_frame_offset',
+        'use_uni3c', 'uni3c_guide_video', 'uni3c_strength', 'uni3c_start_percent', 
+        'uni3c_end_percent', 'uni3c_guidance_frame_offset',
+      ];
+      for (const param of legacyStructureParams) {
+        delete cleanedOrchestratorDetails[param];
+      }
       
       taskParams = {
         ...taskParams,
         // Include structure_guidance at top level for standalone segments
-        ...(shotStructureGuidance ? { structure_guidance: shotStructureGuidance } : {}),
+        structure_guidance: shotStructureGuidance,
         orchestrator_details: {
-          ...(taskParams.orchestrator_details || {}),
-          ...(shotStructureVideos?.length > 0 ? { structure_videos: shotStructureVideos } : {}),
-          ...(shotStructureGuidance ? { structure_guidance: shotStructureGuidance } : {}),
+          ...cleanedOrchestratorDetails,
+          // Also include in orchestrator_details for orchestrator tasks
+          structure_guidance: shotStructureGuidance,
         },
       };
+    } else {
+      console.log('[StructureVideoFix] ⚠️ [MediaLightbox] NOT injecting - no structure videos from shot query');
     }
 
     const orchestratorDetails = taskParams.orchestrator_details || {};
@@ -1510,6 +1617,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     });
 
     // If viewing a child segment, pass its ID so regeneration creates a variant instead of new child
+    console.log('[StructureVideoFix] 🎯 [MediaLightbox] Creating form with shotId:', shotId?.substring(0, 8) ?? 'null');
     const isChildSegment = parentGenerationId !== actualGenerationId;
     const childGenerationId = isChildSegment ? actualGenerationId : undefined;
 
@@ -1518,6 +1626,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         params={taskParams}
         projectId={selectedProjectId || null}
         generationId={parentGenerationId}
+        shotId={shotId}
         childGenerationId={childGenerationId}
         segmentIndex={taskParams.segment_index ?? 0}
         startImageUrl={startImageUrl}
@@ -1527,7 +1636,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         projectResolution={effectiveRegenerateResolution}
       />
     );
-  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen]);
+  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId]);
 
   // Handle entering video edit mode (unified) - restores last used sub-mode
   const handleEnterVideoEditMode = useCallback(() => {
@@ -2278,13 +2387,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               position: 'fixed',
               top: 0,
               left: 0,
-              // Adjust for tasks pane on desktop
-              right: effectiveTasksPaneOpen && !isMobile ? `${effectiveTasksPaneWidth}px` : 0,
+              // Adjust for tasks pane on tablet/desktop (use isTabletOrLarger, not !isMobile, for iPad support)
+              right: effectiveTasksPaneOpen && isTabletOrLarger ? `${effectiveTasksPaneWidth}px` : 0,
               bottom: 0,
               // Smooth transition when tasks pane opens/closes
               transition: 'right 300ms ease, width 300ms ease',
-              // Adjust width for tasks pane on desktop
-              ...(effectiveTasksPaneOpen && !isMobile ? {
+              // Adjust width for tasks pane on tablet/desktop
+              ...(effectiveTasksPaneOpen && isTabletOrLarger ? {
                 width: `calc(100vw - ${effectiveTasksPaneWidth}px)`
               } : {})
             }}

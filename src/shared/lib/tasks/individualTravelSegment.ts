@@ -163,16 +163,21 @@ function buildIndividualTravelSegmentParams(
   // - VACE (target === 'vace'): use VACE model
   // - No structure guidance: use I2V model (default)
   
-  // Check for structure videos (array format or legacy single-video format)
+  // Get structure_guidance from new unified format (preferred)
+  // NEW UNIFIED FORMAT: structure_guidance contains videos array inside:
+  // { target, videos: [...], strength, ... }
+  const structureGuidance = orig.structure_guidance || orchDetails.structure_guidance;
+  
+  // Check for structure videos:
+  // 1. NEW: Inside structure_guidance.videos array (preferred)
+  // 2. LEGACY: Separate structure_videos array or single structure_video_path
   const hasStructureVideos = !!(
+    (structureGuidance?.videos as unknown[] | undefined)?.length > 0 ||
     orchDetails.structure_videos?.length > 0 || 
     orig.structure_videos?.length > 0 ||
     orchDetails.structure_video_path ||
     orig.structure_video_path
   );
-  
-  // Get structure_guidance from new unified format (preferred) or infer from legacy params
-  const structureGuidance = orig.structure_guidance || orchDetails.structure_guidance;
   
   // Determine if using uni3c mode:
   // 1. NEW: Check structure_guidance.target === 'uni3c'
@@ -180,12 +185,12 @@ function buildIndividualTravelSegmentParams(
   let isUni3c = false;
   if (structureGuidance?.target === 'uni3c') {
     isUni3c = hasStructureVideos;
-  } else {
+  } else if (hasStructureVideos && !structureGuidance) {
     // Legacy fallback: check structure_type
     const structureType = orig.structure_type || orchDetails.structure_type || 
       orchDetails.structure_videos?.[0]?.structure_type || orig.structure_videos?.[0]?.structure_type ||
       orchDetails.structure_video_type || orig.structure_video_type;
-    isUni3c = structureType === 'uni3c' && hasStructureVideos;
+    isUni3c = structureType === 'uni3c';
   }
   
   const useVaceModel = hasStructureVideos && !isUni3c;
@@ -253,20 +258,64 @@ function buildIndividualTravelSegmentParams(
     ...orchDetailsWithoutOrchestratorRefs 
   } = orchDetails;
   
-  // MULTI-STRUCTURE VIDEO SUPPORT: Explicitly preserve critical orchestrator fields
+  // Explicitly preserve critical orchestrator fields
   // These are REQUIRED for the GPU worker to handle individual segment generation correctly
   const fpsHelpers = orig.fps_helpers ?? orchDetails.fps_helpers ?? 16;
   const segmentFramesExpanded = orchDetails.segment_frames_expanded;
   const frameOverlapExpanded = orchDetails.frame_overlap_expanded;
-  // Prefer orchestrator_details (canonical), but also support callers that store structure_videos at top-level.
-  const structureVideos = orchDetails.structure_videos ?? orig.structure_videos;
   
-  // Log the multi-structure video data being preserved
-  console.log('[IndividualTravelSegment] [MultiStructure] Preserving orchestrator data:', {
-    hasStructureVideos: !!structureVideos && structureVideos.length > 0,
-    structureVideosCount: structureVideos?.length ?? 0,
-    hasStructureGuidance: !!structureGuidance,
-    structureGuidanceTarget: structureGuidance?.target,
+  // UNIFIED STRUCTURE GUIDANCE FORMAT: Ensure we use the new format
+  // If we have structure_guidance (new unified format), use it
+  // If we have separate structure_videos (legacy), build unified format
+  let finalStructureGuidance = structureGuidance;
+  
+  if (!finalStructureGuidance) {
+    // Check for legacy separate structure_videos array
+    const legacyStructureVideos = orchDetails.structure_videos ?? orig.structure_videos;
+    if (legacyStructureVideos?.length > 0) {
+      // Build unified format from legacy structure_videos
+      const firstVideo = legacyStructureVideos[0];
+      const isUni3cLegacy = firstVideo.structure_type === 'uni3c';
+      
+      const cleanedVideos = legacyStructureVideos.map((v: Record<string, unknown>) => ({
+        path: v.path,
+        start_frame: v.start_frame ?? 0,
+        end_frame: v.end_frame ?? null,
+        treatment: v.treatment ?? 'adjust',
+      }));
+      
+      finalStructureGuidance = {
+        target: isUni3cLegacy ? 'uni3c' : 'vace',
+        videos: cleanedVideos,
+        strength: firstVideo.motion_strength ?? 1.0,
+      } as Record<string, unknown>;
+      
+      if (isUni3cLegacy) {
+        finalStructureGuidance.step_window = [
+          firstVideo.uni3c_start_percent ?? 0,
+          firstVideo.uni3c_end_percent ?? 1.0,
+        ];
+        finalStructureGuidance.frame_policy = 'fit';
+        finalStructureGuidance.zero_empty_frames = true;
+      } else {
+        const preprocessingMap: Record<string, string> = {
+          'flow': 'flow', 'canny': 'canny', 'depth': 'depth', 'raw': 'none',
+        };
+        finalStructureGuidance.preprocessing = preprocessingMap[firstVideo.structure_type ?? 'flow'] ?? 'flow';
+      }
+      
+      console.log('[IndividualTravelSegment] Converted legacy structure_videos to unified format:', {
+        target: finalStructureGuidance.target,
+        videosCount: cleanedVideos.length,
+      });
+    }
+  }
+  
+  // Log the structure guidance data being preserved
+  console.log('[IndividualTravelSegment] Preserving orchestrator data:', {
+    hasStructureGuidance: !!finalStructureGuidance,
+    structureGuidanceTarget: finalStructureGuidance?.target,
+    structureGuidanceVideosCount: (finalStructureGuidance?.videos as unknown[] | undefined)?.length ?? 0,
     hasSegmentFramesExpanded: !!segmentFramesExpanded,
     segmentFramesExpandedLength: segmentFramesExpanded?.length ?? 0,
     hasFrameOverlapExpanded: !!frameOverlapExpanded,
@@ -298,16 +347,14 @@ function buildIndividualTravelSegmentParams(
     // Add parent_generation_id for variant creation
     parent_generation_id: params.parent_generation_id,
     
-    // MULTI-STRUCTURE VIDEO SUPPORT: Explicitly preserve these critical fields
-    // These are REQUIRED for position calculation and video creation
+    // Explicitly preserve critical fields for position calculation
     fps_helpers: fpsHelpers,
     // Preserve segment frame counts and overlaps for position calculation
     ...(segmentFramesExpanded ? { segment_frames_expanded: segmentFramesExpanded } : {}),
     ...(frameOverlapExpanded ? { frame_overlap_expanded: frameOverlapExpanded } : {}),
-    // Preserve structure_videos array for multi-structure video support
-    ...(structureVideos && structureVideos.length > 0 ? { structure_videos: structureVideos } : {}),
-    // NEW: Preserve structure_guidance config (unified format)
-    ...(structureGuidance ? { structure_guidance: structureGuidance } : {}),
+    // UNIFIED FORMAT: Only inject structure_guidance (contains videos inside)
+    // NO separate structure_videos array - everything is in structure_guidance.videos
+    ...(finalStructureGuidance ? { structure_guidance: finalStructureGuidance } : {}),
   };
 
   // HARDCODED: SVI (smooth continuations) feature has been removed from UX
@@ -316,6 +363,30 @@ function buildIndividualTravelSegmentParams(
   delete orchestratorDetails.svi_predecessor_video_url;
   delete orchestratorDetails.svi_strength_1;
   delete orchestratorDetails.svi_strength_2;
+  
+  // CLEANUP: Remove legacy structure video params that are now replaced by unified structure_guidance
+  // These may be inherited from parent orchestrator_details and are no longer needed
+  const legacyStructureParams = [
+    'structure_type',
+    'structure_videos',
+    'structure_video_path',
+    'structure_video_treatment',
+    'structure_video_motion_strength',
+    'structure_video_type',
+    'structure_canny_intensity',
+    'structure_depth_contrast',
+    'structure_guidance_video_url',
+    'structure_guidance_frame_offset',
+    'use_uni3c',
+    'uni3c_guide_video',
+    'uni3c_strength',
+    'uni3c_start_percent',
+    'uni3c_end_percent',
+    'uni3c_guidance_frame_offset',
+  ];
+  for (const param of legacyStructureParams) {
+    delete orchestratorDetails[param];
+  }
 
   if (phaseConfig) {
     orchestratorDetails.phase_config = phaseConfig;
@@ -343,13 +414,9 @@ function buildIndividualTravelSegmentParams(
     sample_solver: sampleSolver,
     segment_index: params.segment_index,
     guidance_scale: guidanceScale,
-    // NEW: Include structure_guidance at top level for standalone segments
-    ...(structureGuidance ? { structure_guidance: structureGuidance } : {}),
-    // LEGACY: Derive structure_type from structure_guidance for backward compatibility
-    // If structure_guidance exists, use its target/preprocessing; otherwise fall back to legacy values
-    structure_type: structureGuidance 
-      ? (structureGuidance.target === 'uni3c' ? 'raw' : (structureGuidance.preprocessing || 'flow'))
-      : (orig.structure_type || orchDetails.structure_type || "flow"),
+    // UNIFIED FORMAT: Include structure_guidance at top level (contains videos inside)
+    // NO separate structure_type - worker reads from structure_guidance.target + preprocessing
+    ...(finalStructureGuidance ? { structure_guidance: finalStructureGuidance } : {}),
     cfg_star_switch: orig.cfg_star_switch ?? 0,
     guidance2_scale: guidance2Scale,
     guidance_phases: guidancePhases,

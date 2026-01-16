@@ -54,6 +54,7 @@
   - Filter by tag: `debug.py logs --latest --tag ShotNav`
   - List sessions: `debug.py logs --sessions`
   - Add `VITE_DEBUG_LOGS=true` to also see logs in browser console
+- **Use consistent tags**: When adding debug logs for an issue, use a common tag prefix (e.g., `[StructureVideoFix]`) on ALL related logs so they can be filtered together: `console.log('[MyTag] message', data)`.
 - Debug logs are dev-only (production builds strip `console.log`), so temporary instrumentation is OK.
 - After debugging, suggest what extra diagnostics/logging would have made it easier.
 - See `debugging.md` for full details on CLI, frontend logging, and SQL queries.

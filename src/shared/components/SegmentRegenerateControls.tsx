@@ -9,6 +9,8 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
@@ -156,6 +158,67 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     isRegeneration,
     showMakePrimaryToggle: isRegeneration,
   });
+
+  // Fetch shot's structure video settings directly using shotId
+  // This ensures we have the latest settings even if initialParams are stale
+  // NOTE: Structure videos are stored under 'travel-structure-video' key (via useStructureVideo hook)
+  const { data: shotStructureData, isLoading: isLoadingShotStructure } = useQuery({
+    queryKey: ['shot-structure-settings', shotId],
+    queryFn: async () => {
+      if (!shotId) return null;
+      console.log('[StructureVideoFix] 🔍 [SegmentRegenerateControls] Fetching shot structure settings for:', shotId?.substring(0, 8));
+      const { data, error } = await supabase
+        .from('shots')
+        .select('settings')
+        .eq('id', shotId)
+        .single();
+      if (error) {
+        console.error('[StructureVideoFix] ❌ [SegmentRegenerateControls] Shot settings query FAILED:', error);
+        return null;
+      }
+      // DEBUG: Log all keys in settings to see where data is stored
+      const allSettings = data?.settings as Record<string, any>;
+      const settingsKeys = allSettings ? Object.keys(allSettings) : [];
+      console.log('[StructureVideoFix] 🗃️ [SegmentRegenerateControls] All settings keys:', settingsKeys);
+      
+      // Structure videos are stored under 'travel-structure-video' key (via useStructureVideo hook)
+      const structureVideoSettings = allSettings?.['travel-structure-video'] ?? {};
+      // Also check the old/wrong key for debugging
+      const wrongKeySettings = allSettings?.['travel-between-images'] ?? {};
+      
+      console.log('[StructureVideoFix] 📦 [SegmentRegenerateControls] Shot structure settings loaded:', {
+        shotId: shotId?.substring(0, 8),
+        hasStructureVideos: !!(structureVideoSettings.structure_videos?.length > 0),
+        structureVideosCount: structureVideoSettings.structure_videos?.length ?? 0,
+        hasStructureGuidance: !!structureVideoSettings.structure_guidance,
+        firstVideoPath: structureVideoSettings.structure_videos?.[0]?.path?.substring(0, 50) ?? '(none)',
+        structureGuidanceTarget: structureVideoSettings.structure_guidance?.target ?? '(none)',
+        // Debug: Check if data is under wrong key
+        wrongKeyHasStructureVideos: !!(wrongKeySettings.structure_videos?.length > 0),
+        wrongKeyStructureVideosCount: wrongKeySettings.structure_videos?.length ?? 0,
+      });
+      return {
+        structure_videos: structureVideoSettings.structure_videos ?? null,
+        structure_guidance: structureVideoSettings.structure_guidance ?? null,
+      };
+    },
+    enabled: !!shotId,
+    staleTime: 30000, // Cache for 30 seconds
+    retry: 1,
+    retryDelay: 1000,
+  });
+
+  // Log loading state changes
+  React.useEffect(() => {
+    if (shotId) {
+      console.log('[StructureVideoFix] ⏳ [SegmentRegenerateControls] Shot structure loading state:', {
+        shotId: shotId?.substring(0, 8),
+        isLoading: isLoadingShotStructure,
+        hasData: !!shotStructureData,
+        structureVideosCount: shotStructureData?.structure_videos?.length ?? 0,
+      });
+    }
+  }, [shotId, isLoadingShotStructure, shotStructureData]);
 
   const { toast } = useToast();
 
@@ -551,6 +614,23 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
   // Handle segment regeneration
   const handleRegenerateSegment = useCallback(async () => {
+    // Log state at start of regeneration
+    // Check both old format (structure_videos separate) and new unified format (videos inside structure_guidance)
+    const orchGuidance = initialParams?.orchestrator_details?.structure_guidance;
+    const topGuidance = initialParams?.structure_guidance;
+    console.log('[StructureVideoFix] 🚀 [SegmentRegenerateControls] Regenerate clicked:', {
+      shotId: shotId?.substring(0, 8),
+      isLoadingShotStructure,
+      hasShotStructureData: !!shotStructureData,
+      // Raw DB format (structure_videos may be separate or inside structure_guidance)
+      shotStructureVideosCount: shotStructureData?.structure_videos?.length ?? 0,
+      // NEW UNIFIED FORMAT: Check for videos inside structure_guidance
+      orchGuidanceTarget: orchGuidance?.target ?? '(none)',
+      orchGuidanceVideosCount: orchGuidance?.videos?.length ?? 0,
+      topGuidanceTarget: topGuidance?.target ?? '(none)',
+      topGuidanceVideosCount: topGuidance?.videos?.length ?? 0,
+    });
+
     if (!projectId) {
       toast({
         title: "Error",
@@ -668,36 +748,108 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         };
       })();
 
-      // CRITICAL: Always use structure_videos and structure_guidance from initialParams (the prop) rather than local state.
-      // This ensures that any changes to structure video settings made while the modal is open
-      // are reflected in the task, avoiding race conditions between useEffect and button clicks.
-      const freshStructureVideos = initialParams?.orchestrator_details?.structure_videos || initialParams?.structure_videos;
-      const freshStructureGuidance = initialParams?.orchestrator_details?.structure_guidance || initialParams?.structure_guidance;
+      // CRITICAL: Use the NEW UNIFIED FORMAT for structure guidance.
+      // The unified format puts videos INSIDE structure_guidance:
+      // { structure_guidance: { target, videos: [...], strength, ... } }
+      //
+      // Priority: initialParams (from MediaLightbox) > shotStructureData (fallback query)
+      // MediaLightbox already builds the unified format, so prefer that.
+      let unifiedStructureGuidance = 
+        initialParams?.orchestrator_details?.structure_guidance || 
+        initialParams?.structure_guidance;
       
-      // Forward both structure_videos and structure_guidance to the task
-      const paramsForTaskWithFreshStructureVideos = (freshStructureVideos?.length > 0 || freshStructureGuidance)
-        ? {
-            ...paramsForTask,
-            // Include structure_guidance at top level for standalone segment tasks
-            ...(freshStructureGuidance ? { structure_guidance: freshStructureGuidance } : {}),
-            orchestrator_details: {
-              ...(paramsForTask.orchestrator_details || {}),
-              ...(freshStructureVideos?.length > 0 ? { structure_videos: freshStructureVideos } : {}),
-              ...(freshStructureGuidance ? { structure_guidance: freshStructureGuidance } : {}),
-            },
-          }
+      // If initialParams doesn't have it, check if we need to build from shotStructureData
+      if (!unifiedStructureGuidance && shotStructureData?.structure_videos?.length > 0) {
+        // Build unified format from the raw shot structure data (old format)
+        const rawVideos = shotStructureData.structure_videos;
+        const firstVideo = rawVideos[0];
+        const isUni3cTarget = firstVideo.structure_type === 'uni3c';
+        
+        // Transform videos to clean format
+        const cleanedVideos = rawVideos.map((v: Record<string, unknown>) => ({
+          path: v.path,
+          start_frame: v.start_frame ?? 0,
+          end_frame: v.end_frame ?? null,
+          treatment: v.treatment ?? 'adjust',
+          ...(v.metadata ? { metadata: v.metadata } : {}),
+          ...(v.resource_id ? { resource_id: v.resource_id } : {}),
+        }));
+        
+        unifiedStructureGuidance = {
+          target: isUni3cTarget ? 'uni3c' : 'vace',
+          videos: cleanedVideos,
+          strength: firstVideo.motion_strength ?? 1.0,
+        } as Record<string, unknown>;
+        
+        if (isUni3cTarget) {
+          unifiedStructureGuidance.step_window = [
+            firstVideo.uni3c_start_percent ?? 0,
+            firstVideo.uni3c_end_percent ?? 1.0,
+          ];
+          unifiedStructureGuidance.frame_policy = 'fit';
+          unifiedStructureGuidance.zero_empty_frames = true;
+        } else {
+          const preprocessingMap: Record<string, string> = {
+            'flow': 'flow', 'canny': 'canny', 'depth': 'depth', 'raw': 'none',
+          };
+          unifiedStructureGuidance.preprocessing = preprocessingMap[firstVideo.structure_type ?? 'flow'] ?? 'flow';
+          if (firstVideo.canny_intensity != null) unifiedStructureGuidance.canny_intensity = firstVideo.canny_intensity;
+          if (firstVideo.depth_contrast != null) unifiedStructureGuidance.depth_contrast = firstVideo.depth_contrast;
+        }
+        
+        console.log('[StructureVideoFix] 🔧 [SegmentRegenerateControls] BUILT unified structure_guidance from shotStructureData:', {
+          target: unifiedStructureGuidance.target,
+          videosCount: cleanedVideos.length,
+        });
+      }
+      
+      // Log where structure data came from
+      const structureDataSource = (initialParams?.orchestrator_details?.structure_guidance || initialParams?.structure_guidance) 
+        ? 'initialParams' 
+        : (unifiedStructureGuidance ? 'shotQuery-built' : 'none');
+      console.log('[StructureVideoFix] 🔧 [SegmentRegenerateControls] Structure data source:', structureDataSource, { 
+        hasUnifiedGuidance: !!unifiedStructureGuidance,
+        target: (unifiedStructureGuidance as any)?.target ?? null,
+        videosCount: (unifiedStructureGuidance as any)?.videos?.length ?? 0,
+      });
+      
+      // Inject the unified structure_guidance (no more separate structure_videos)
+      // Also clean legacy params from orchestrator_details
+      const legacyStructureParams = [
+        'structure_type', 'structure_videos', 'structure_video_path', 'structure_video_treatment',
+        'structure_video_motion_strength', 'structure_video_type', 'structure_canny_intensity',
+        'structure_depth_contrast', 'structure_guidance_video_url', 'structure_guidance_frame_offset',
+        'use_uni3c', 'uni3c_guide_video', 'uni3c_strength', 'uni3c_start_percent', 
+        'uni3c_end_percent', 'uni3c_guidance_frame_offset',
+      ];
+      
+      const paramsForTaskWithFreshStructureVideos = unifiedStructureGuidance
+        ? (() => {
+            // Clean legacy params from orchestrator_details
+            const cleanedOrchestratorDetails = { ...(paramsForTask.orchestrator_details || {}) };
+            for (const param of legacyStructureParams) {
+              delete cleanedOrchestratorDetails[param];
+            }
+            return {
+              ...paramsForTask,
+              // Include at top level for standalone segment tasks
+              structure_guidance: unifiedStructureGuidance,
+              orchestrator_details: {
+                ...cleanedOrchestratorDetails,
+                // Also include in orchestrator_details for orchestrator tasks
+                structure_guidance: unifiedStructureGuidance,
+              },
+            };
+          })()
         : paramsForTask;
 
-      // [MultiStructureDebug] Log the orchestrator_details being passed for multi-structure video support
+      // [MultiStructureDebug] Log the orchestrator_details being passed
       const orchDetails = paramsForTaskWithFreshStructureVideos.orchestrator_details || {};
-      console.log('[SegmentRegenerateControls] [MultiStructureDebug] Orchestrator details being passed:', {
+      console.log('[StructureVideoFix] [MultiStructureDebug] Orchestrator details being passed:', {
         hasOrchestratorDetails: !!paramsForTaskWithFreshStructureVideos.orchestrator_details,
-        hasStructureVideos: !!orchDetails.structure_videos && orchDetails.structure_videos.length > 0,
-        structureVideosCount: orchDetails.structure_videos?.length ?? 0,
-        freshStructureVideosFromProps: freshStructureVideos?.length ?? 0,
-        hasStructureGuidance: !!orchDetails.structure_guidance,
+        hasUnifiedStructureGuidance: !!orchDetails.structure_guidance,
         structureGuidanceTarget: orchDetails.structure_guidance?.target ?? '(not set)',
-        freshStructureGuidanceFromProps: freshStructureGuidance?.target ?? '(not set)',
+        structureGuidanceVideosCount: orchDetails.structure_guidance?.videos?.length ?? 0,
         topLevelStructureGuidance: !!paramsForTaskWithFreshStructureVideos.structure_guidance,
         hasSegmentFramesExpanded: !!orchDetails.segment_frames_expanded,
         segmentFramesExpandedLength: orchDetails.segment_frames_expanded?.length ?? 0,
@@ -761,6 +913,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     projectId,
     generationId,
     shotId,
+    shotStructureData,
     childGenerationId,
     isRegeneration,
     segmentIndex,
@@ -1212,11 +1365,16 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       <Button
         size="sm"
         onClick={handleRegenerateSegment}
-        disabled={isRegenerating || !startImageUrl || !endImageUrl || (!generationId && !shotId)}
+        disabled={isRegenerating || !startImageUrl || !endImageUrl || (!generationId && !shotId) || (shotId && isLoadingShotStructure)}
         className="w-full gap-2"
         variant={regenerateSuccess ? "outline" : "default"}
       >
-        {isRegenerating ? (
+        {(shotId && isLoadingShotStructure) ? (
+          <>
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Loading settings...
+          </>
+        ) : isRegenerating ? (
           <>
             <Loader2 className="w-3 h-3 animate-spin" />
             Starting...

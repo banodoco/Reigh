@@ -638,57 +638,103 @@ function buildTravelBetweenImagesPayload(
   // The new format separates guidance config (target, preprocessing, strength)
   // from video source info (path, frame range, treatment).
   
-  // Forward structure_guidance if provided (new unified format)
-  if (params.structure_guidance) {
-    orchestratorPayload.structure_guidance = params.structure_guidance;
-    console.log("[createTravelBetweenImagesTask] Using NEW structure_guidance format:", params.structure_guidance);
-  }
+  // ============================================================================
+  // STRUCTURE GUIDANCE - NEW UNIFIED FORMAT (videos INSIDE structure_guidance)
+  // ============================================================================
+  // The unified format nests videos inside structure_guidance:
+  // {
+  //   "structure_guidance": {
+  //     "target": "uni3c" | "vace",
+  //     "videos": [{ path, start_frame, end_frame, treatment }],
+  //     "strength": 1.0,
+  //     // Uni3C: step_window, frame_policy, zero_empty_frames
+  //     // VACE: preprocessing, canny_intensity, depth_contrast
+  //   }
+  // }
+  // NO SEPARATE structure_videos array - everything is in structure_guidance.
   
-  // Forward structure_videos array (cleaned of UI-only fields)
-  if (params.structure_videos && params.structure_videos.length > 0) {
-    // Clean the array to only include backend-relevant fields (no metadata/resource_id)
-    const cleanedStructureVideos = params.structure_videos.map(video => ({
+  if (params.structure_guidance) {
+    // New unified format - structure_guidance contains videos inside
+    orchestratorPayload.structure_guidance = params.structure_guidance;
+    console.log("[createTravelBetweenImagesTask] Using UNIFIED structure_guidance format:", {
+      target: params.structure_guidance.target,
+      videosCount: (params.structure_guidance.videos as unknown[] | undefined)?.length ?? 0,
+      strength: params.structure_guidance.strength,
+    });
+  } else if (params.structure_videos && params.structure_videos.length > 0) {
+    // LEGACY: Separate structure_videos array - convert to unified format
+    // Clean the array to only include backend-relevant fields
+    const cleanedVideos = params.structure_videos.map(video => ({
       path: video.path,
-      start_frame: video.start_frame,
-      end_frame: video.end_frame,
+      start_frame: video.start_frame ?? 0,
+      end_frame: video.end_frame ?? null,
       treatment: video.treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
-      // Only include source range if explicitly set
-      ...(video.source_start_frame !== undefined ? { source_start_frame: video.source_start_frame } : {}),
-      ...(video.source_end_frame !== undefined && video.source_end_frame !== null ? { source_end_frame: video.source_end_frame } : {}),
     }));
     
-    orchestratorPayload.structure_videos = cleanedStructureVideos;
+    // Build unified structure_guidance from the first video's settings
+    const firstVideo = params.structure_videos[0];
+    const isUni3cTarget = (firstVideo as Record<string, unknown>).structure_type === 'uni3c';
     
-    console.log("[createTravelBetweenImagesTask] Using structure_videos array format:", {
-      count: cleanedStructureVideos.length,
-      has_structure_guidance: !!params.structure_guidance,
-      videos: cleanedStructureVideos.map(v => ({
-        path: v.path.substring(0, 50) + '...',
-        start_frame: v.start_frame,
-        end_frame: v.end_frame,
-        treatment: v.treatment,
-      }))
+    const unifiedGuidance: Record<string, unknown> = {
+      target: isUni3cTarget ? 'uni3c' : 'vace',
+      videos: cleanedVideos,
+      strength: (firstVideo as Record<string, unknown>).motion_strength ?? 1.0,
+    };
+    
+    if (isUni3cTarget) {
+      unifiedGuidance.step_window = [
+        (firstVideo as Record<string, unknown>).uni3c_start_percent ?? 0,
+        (firstVideo as Record<string, unknown>).uni3c_end_percent ?? 1.0,
+      ];
+      unifiedGuidance.frame_policy = 'fit';
+      unifiedGuidance.zero_empty_frames = true;
+    } else {
+      const preprocessingMap: Record<string, string> = {
+        'flow': 'flow', 'canny': 'canny', 'depth': 'depth', 'raw': 'none',
+      };
+      unifiedGuidance.preprocessing = preprocessingMap[(firstVideo as Record<string, unknown>).structure_type as string ?? 'flow'] ?? 'flow';
+    }
+    
+    orchestratorPayload.structure_guidance = unifiedGuidance;
+    
+    console.log("[createTravelBetweenImagesTask] Converted LEGACY structure_videos to UNIFIED format:", {
+      target: unifiedGuidance.target,
+      videosCount: cleanedVideos.length,
     });
   } else if (params.structure_video_path) {
-    // LEGACY: Single video format (for backward compatibility only)
-    // This path should rarely be used now - generateVideoService converts to new format
-    orchestratorPayload.structure_video_path = params.structure_video_path;
-    orchestratorPayload.structure_video_treatment = params.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment;
-    orchestratorPayload.structure_video_motion_strength = params.structure_video_motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength;
-    orchestratorPayload.structure_video_type = params.structure_video_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type;
+    // LEGACY: Single video path - convert to unified format
+    const isUni3cTarget = params.structure_video_type === 'uni3c' || params.use_uni3c;
     
-    // Legacy uni3c parameters
-    if (params.uni3c_start_percent !== undefined || params.uni3c_end_percent !== undefined) {
-      orchestratorPayload.uni3c_start_percent = params.uni3c_start_percent ?? 0;
-      orchestratorPayload.uni3c_end_percent = params.uni3c_end_percent ?? 0.1;
+    const unifiedGuidance: Record<string, unknown> = {
+      target: isUni3cTarget ? 'uni3c' : 'vace',
+      videos: [{
+        path: params.structure_video_path,
+        start_frame: 0,
+        end_frame: null,
+        treatment: params.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+      }],
+      strength: params.structure_video_motion_strength ?? 1.0,
+    };
+    
+    if (isUni3cTarget) {
+      unifiedGuidance.step_window = [
+        params.uni3c_start_percent ?? 0,
+        params.uni3c_end_percent ?? 0.1,
+      ];
+      unifiedGuidance.frame_policy = 'fit';
+      unifiedGuidance.zero_empty_frames = true;
+    } else {
+      const preprocessingMap: Record<string, string> = {
+        'flow': 'flow', 'canny': 'canny', 'depth': 'depth', 'raw': 'none',
+      };
+      unifiedGuidance.preprocessing = preprocessingMap[params.structure_video_type ?? 'flow'] ?? 'flow';
     }
     
-    // Legacy use_uni3c flag
-    if (params.use_uni3c) {
-      orchestratorPayload.use_uni3c = true;
-    }
+    orchestratorPayload.structure_guidance = unifiedGuidance;
     
-    console.log("[createTravelBetweenImagesTask] Using LEGACY single structure_video_path format");
+    console.log("[createTravelBetweenImagesTask] Converted LEGACY single video to UNIFIED format:", {
+      target: unifiedGuidance.target,
+    });
   }
 
   // Attach additional_loras mapping if provided (matching original logic)
@@ -710,6 +756,30 @@ function buildTravelBetweenImagesPayload(
   if (params.selected_phase_preset_id) {
     orchestratorPayload.selected_phase_preset_id = params.selected_phase_preset_id;
     console.log("[createTravelBetweenImagesTask] Including selected_phase_preset_id in orchestrator payload:", params.selected_phase_preset_id);
+  }
+
+  // CLEANUP: Remove legacy structure video params that are now replaced by unified structure_guidance
+  // These may have been passed in params and are no longer needed in the output
+  const legacyStructureParams = [
+    'structure_type',
+    'structure_videos',
+    'structure_video_path',
+    'structure_video_treatment',
+    'structure_video_motion_strength',
+    'structure_video_type',
+    'structure_canny_intensity',
+    'structure_depth_contrast',
+    'structure_guidance_video_url',
+    'structure_guidance_frame_offset',
+    'use_uni3c',
+    'uni3c_guide_video',
+    'uni3c_strength',
+    'uni3c_start_percent',
+    'uni3c_end_percent',
+    'uni3c_guidance_frame_offset',
+  ];
+  for (const param of legacyStructureParams) {
+    delete (orchestratorPayload as Record<string, unknown>)[param];
   }
 
   return orchestratorPayload;

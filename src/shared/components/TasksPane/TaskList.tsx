@@ -276,6 +276,38 @@ const TaskList: React.FC<TaskListProps> = ({
     return visible;
   }, [tasks, activeFilter]);
 
+  // Filter incoming tasks to hide those whose real task has arrived
+  // This ensures the placeholder disappears in the SAME render cycle as the real task appears,
+  // preventing the brief coexistence flicker
+  const visibleIncomingTasks = useMemo(() => {
+    if (activeFilter !== 'Processing' || incomingTasks.length === 0) return [];
+
+    const now = Date.now();
+    const REPLACEMENT_WINDOW_MS = 60000; // 60 seconds - match the stale task timeout
+
+    return incomingTasks.filter(incoming => {
+      // Check if any real task could be the "replacement" for this incoming task
+      const hasMatchingRealTask = filteredTasks.some(task => {
+        // Must be same task type
+        if (task.taskType !== incoming.taskType) return false;
+
+        // Get task creation time
+        const taskCreatedAt = new Date(task.createdAt || (task as any).created_at).getTime();
+
+        // Must be created after the incoming task started (or within 2 seconds before, for clock skew)
+        if (taskCreatedAt < incoming.startedAt.getTime() - 2000) return false;
+
+        // Must be recent (within window)
+        if (now - taskCreatedAt > REPLACEMENT_WINDOW_MS) return false;
+
+        return true;
+      });
+
+      // Show incoming task only if no matching real task exists yet
+      return !hasMatchingRealTask;
+    });
+  }, [activeFilter, incomingTasks, filteredTasks]);
+
   const summaryMessage = useMemo(() => {
     if (!statusCounts) return null;
     
@@ -337,11 +369,11 @@ const TaskList: React.FC<TaskListProps> = ({
         <TaskListSkeleton activeFilter={activeFilter} count={activeFilter === 'Processing' ? statusCounts?.processing : undefined} />
       )}
       
-      {!showSkeleton && filteredTasks.length === 0 && !summaryMessage && !(activeFilter === 'Processing' && incomingTasks.length > 0) && (
+      {!showSkeleton && filteredTasks.length === 0 && !summaryMessage && !(activeFilter === 'Processing' && visibleIncomingTasks.length > 0) && (
         <p className="text-zinc-400 text-center">{getEmptyMessage()}</p>
       )}
 
-      {!showSkeleton && (filteredTasks.length > 0 || (activeFilter === 'Processing' && incomingTasks.length > 0)) && (
+      {!showSkeleton && (filteredTasks.length > 0 || (activeFilter === 'Processing' && visibleIncomingTasks.length > 0)) && (
         <div className="flex-grow -mr-4">
           <ScrollArea className="h-full pr-4">
               {/* Real tasks */}
@@ -358,16 +390,16 @@ const TaskList: React.FC<TaskListProps> = ({
                       showProjectIndicator={showProjectIndicator}
                       projectName={projectNameMap[task.projectId]}
                     />
-                    {(idx < filteredTasks.length - 1 || (activeFilter === 'Processing' && incomingTasks.length > 0)) && (
+                    {(idx < filteredTasks.length - 1 || (activeFilter === 'Processing' && visibleIncomingTasks.length > 0)) && (
                       <div className="h-0 border-b border-zinc-700/40 my-1" />
                     )}
                   </React.Fragment>
               ))}
-              {/* Incoming/placeholder tasks at bottom - only show on Processing filter */}
-              {activeFilter === 'Processing' && incomingTasks.map((incoming, idx) => (
+              {/* Incoming/placeholder tasks at bottom - only show if not yet replaced by real task */}
+              {visibleIncomingTasks.map((incoming, idx) => (
                 <React.Fragment key={incoming.id}>
                   <IncomingTaskItem task={incoming} />
-                  {idx < incomingTasks.length - 1 && (
+                  {idx < visibleIncomingTasks.length - 1 && (
                     <div className="h-0 border-b border-zinc-700/40 my-1" />
                   )}
                 </React.Fragment>

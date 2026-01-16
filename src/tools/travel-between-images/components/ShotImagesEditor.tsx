@@ -1946,8 +1946,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               ...(v.source_end_frame !== undefined && v.source_end_frame !== null ? { source_end_frame: v.source_end_frame } : {}),
             }));
 
-          // Build structure_guidance config (NEW unified format) from the first video's settings
-          // This is needed for individual segment generation to know target (vace/uni3c) and strength
+          // Build UNIFIED structure_guidance config with videos INSIDE
+          // The new format puts videos inside structure_guidance:
+          // { target, videos: [...], strength, step_window/preprocessing, ... }
           let structureGuidance: Record<string, unknown> | undefined;
           if (cleanedStructureVideos.length > 0 && propStructureVideos?.[0]) {
             const firstVideo = propStructureVideos[0];
@@ -1955,11 +1956,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             
             structureGuidance = {
               target: isUni3cTarget ? 'uni3c' : 'vace',
+              videos: cleanedStructureVideos, // Videos INSIDE structure_guidance
+              strength: firstVideo.motion_strength ?? 1.0,
             };
             
             if (isUni3cTarget) {
               // Uni3C specific params
-              structureGuidance.strength = firstVideo.motion_strength ?? 1.0;
               structureGuidance.step_window = [
                 firstVideo.uni3c_start_percent ?? 0,
                 firstVideo.uni3c_end_percent ?? 1.0,
@@ -1975,16 +1977,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 'raw': 'none',
               };
               structureGuidance.preprocessing = preprocessingMap[firstVideo.structure_type ?? 'flow'] ?? 'flow';
-              structureGuidance.strength = firstVideo.motion_strength ?? 1.0;
             }
           }
 
-          if (cleanedStructureVideos.length > 0) {
-            console.log('[SegmentSettingsModal] [MultiStructureDebug] Injecting structure guidance into regeneration params:', {
+          if (structureGuidance) {
+            console.log('[SegmentSettingsModal] [MultiStructureDebug] Injecting UNIFIED structure_guidance:', {
               shotId: selectedShotId?.substring(0, 8),
-              structure_guidance: structureGuidance,
-              structure_videos_count: cleanedStructureVideos.length,
-              ranges: cleanedStructureVideos.map(v => ({ start_frame: v.start_frame, end_frame: v.end_frame })),
+              target: structureGuidance.target,
+              videosCount: (structureGuidance.videos as unknown[]).length,
+              strength: structureGuidance.strength,
             });
           }
 
@@ -2007,20 +2008,33 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             console.log(`[PerPairData]   INDEX MAP (SegmentSettingsModal): ${indexMap}`);
           }
 
+          // CLEANUP: Remove legacy structure params from orchestrator_details before injecting new unified format
+          const cleanedOrchestratorDetails = { ...(parentParams.orchestrator_details || {}) };
+          const legacyStructureParams = [
+            'structure_type', 'structure_videos', 'structure_video_path', 'structure_video_treatment',
+            'structure_video_motion_strength', 'structure_video_type', 'structure_canny_intensity',
+            'structure_depth_contrast', 'structure_guidance_video_url', 'structure_guidance_frame_offset',
+            'use_uni3c', 'uni3c_guide_video', 'uni3c_strength', 'uni3c_start_percent', 
+            'uni3c_end_percent', 'uni3c_guidance_frame_offset',
+          ];
+          for (const param of legacyStructureParams) {
+            delete cleanedOrchestratorDetails[param];
+          }
+          
           return {
             ...parentParams,
-            // Include structure_guidance at top level for individual segments
+            // UNIFIED FORMAT: Include structure_guidance at top level (contains videos inside)
             ...(structureGuidance ? { structure_guidance: structureGuidance } : {}),
             orchestrator_details: {
-              ...(parentParams.orchestrator_details || {}),
+              ...cleanedOrchestratorDetails,
               ...(timelineFrameGaps.length > 0 ? {
                 // These MUST match the current timeline spacing for correct segment positioning.
                 segment_frames_expanded: timelineFrameGaps,
                 frame_overlap_expanded: timelineOverlaps,
                 num_new_segments_to_generate: timelineFrameGaps.length,
               } : {}),
-              ...(cleanedStructureVideos.length > 0 ? { structure_videos: cleanedStructureVideos } : {}),
-              // Include structure_guidance in orchestrator_details too (worker checks both)
+              // UNIFIED FORMAT: Only inject structure_guidance (videos are inside it)
+              // NO separate structure_videos array
               ...(structureGuidance ? { structure_guidance: structureGuidance } : {}),
             },
             // Include user_overrides so SegmentRegenerateControls can apply them on top

@@ -1434,11 +1434,19 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   }
 
   // ============================================================================
-  // STRUCTURE GUIDANCE - NEW UNIFIED FORMAT
+  // STRUCTURE GUIDANCE - NEW UNIFIED FORMAT (videos INSIDE structure_guidance)
   // ============================================================================
-  // Build structure_guidance config + structure_videos array using the new unified format.
-  // The structure_guidance object contains target (vace/uni3c), preprocessing, strength, etc.
-  // The structure_videos array contains just the video source and frame mapping info.
+  // The unified format nests videos inside structure_guidance:
+  // {
+  //   "structure_guidance": {
+  //     "target": "uni3c" | "vace",
+  //     "videos": [{ path, start_frame, end_frame, treatment }],
+  //     "strength": 1.0,
+  //     // Uni3C: step_window, frame_policy, zero_empty_frames
+  //     // VACE: preprocessing, canny_intensity, depth_contrast
+  //   }
+  // }
+  // NO SEPARATE structure_videos array - everything is in structure_guidance.
   
   const structureVideos = params.structureVideos;
   
@@ -1450,20 +1458,29 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   });
 
   if (structureVideos && structureVideos.length > 0) {
-    // Use NEW unified format with structure_guidance + structure_videos
-    // Determine target and preprocessing from the first video's structure_type
-    // (assuming all videos in the array use the same guidance mode)
+    // Use NEW unified format with videos INSIDE structure_guidance
     const firstVideo = structureVideos[0];
     const isUni3cTarget = firstVideo.structure_type === 'uni3c';
     
-    // Build structure_guidance config object
+    // Transform videos to clean format (strip structure_type, motion_strength, uni3c_* from each video)
+    const cleanedVideos = structureVideos.map(video => ({
+      path: video.path,
+      start_frame: video.start_frame ?? 0,
+      end_frame: video.end_frame ?? null,
+      treatment: video.treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+      ...(video.metadata ? { metadata: video.metadata } : {}),
+      ...(video.resource_id ? { resource_id: video.resource_id } : {}),
+    }));
+    
+    // Build unified structure_guidance object with videos inside
     const structureGuidance: Record<string, unknown> = {
       target: isUni3cTarget ? 'uni3c' : 'vace',
+      videos: cleanedVideos,
+      strength: firstVideo.motion_strength ?? 1.0,
     };
     
     if (isUni3cTarget) {
       // Uni3C specific params
-      structureGuidance.strength = firstVideo.motion_strength ?? 1.0;
       structureGuidance.step_window = [
         firstVideo.uni3c_start_percent ?? 0,
         firstVideo.uni3c_end_percent ?? (params.uni3cEndPercent ?? 1.0),
@@ -1472,41 +1489,24 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       structureGuidance.zero_empty_frames = true;
     } else {
       // VACE specific params
-      // Map structure_type to preprocessing: flow->flow, canny->canny, depth->depth, raw->none
       const preprocessingMap: Record<string, string> = {
-        'flow': 'flow',
-        'canny': 'canny',
-        'depth': 'depth',
-        'raw': 'none',
+        'flow': 'flow', 'canny': 'canny', 'depth': 'depth', 'raw': 'none',
       };
       structureGuidance.preprocessing = preprocessingMap[firstVideo.structure_type ?? 'flow'] ?? 'flow';
-      structureGuidance.strength = firstVideo.motion_strength ?? 1.0;
+      // Include optional VACE params if present
+      if (firstVideo.canny_intensity != null) structureGuidance.canny_intensity = firstVideo.canny_intensity;
+      if (firstVideo.depth_contrast != null) structureGuidance.depth_contrast = firstVideo.depth_contrast;
     }
     
     requestBody.structure_guidance = structureGuidance;
     
-    // Build structure_videos array - now only contains video source info (no structure_type, motion_strength)
-    const apiStructureVideos = structureVideos.map(video => ({
-      path: video.path,
-      start_frame: video.start_frame,
-      end_frame: video.end_frame,
-      treatment: video.treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
-      // Only include source range if explicitly set
-      ...(video.source_start_frame !== undefined ? { source_start_frame: video.source_start_frame } : {}),
-      ...(video.source_end_frame !== undefined && video.source_end_frame !== null ? { source_end_frame: video.source_end_frame } : {}),
-    }));
-    
-    requestBody.structure_videos = apiStructureVideos;
-    
-    console.log('[Generation] 🎬 Using NEW unified structure_guidance format:', {
-      structure_guidance: structureGuidance,
-      structure_videos_count: apiStructureVideos.length,
-      videos: apiStructureVideos.map(v => ({
-        path: v.path.substring(0, 50) + '...',
-        start_frame: v.start_frame,
-        end_frame: v.end_frame,
-        treatment: v.treatment,
-      }))
+    console.log('[Generation] 🎬 Using UNIFIED structure_guidance format (videos inside):', {
+      target: structureGuidance.target,
+      videosCount: cleanedVideos.length,
+      strength: structureGuidance.strength,
+      stepWindow: structureGuidance.step_window,
+      preprocessing: structureGuidance.preprocessing,
+      firstVideoPath: cleanedVideos[0]?.path?.substring(0, 50) + '...',
     });
   } else if (structureVideoConfig.structure_video_path) {
     // LEGACY single-video path - convert to new unified format
@@ -1516,44 +1516,40 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       params.uni3cEndPercent ??
       1.0;
     
-    // Build structure_guidance config object
+    // Compute end_frame from the total frames being generated
+    const totalFrames = segmentFrames.reduce((a, b) => a + b, 0);
+    
+    // Build unified structure_guidance object with videos inside
     const structureGuidance: Record<string, unknown> = {
       target: isUni3cTarget ? 'uni3c' : 'vace',
+      videos: [{
+        path: structureVideoConfig.structure_video_path,
+        start_frame: 0,
+        end_frame: totalFrames,
+        treatment: structureVideoConfig.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
+      }],
+      strength: structureVideoConfig.structure_video_motion_strength ?? 1.0,
     };
     
     if (isUni3cTarget) {
       // Uni3C specific params
-      structureGuidance.strength = structureVideoConfig.structure_video_motion_strength ?? 1.0;
       structureGuidance.step_window = [0, legacyUni3cEndPercent];
       structureGuidance.frame_policy = 'fit';
       structureGuidance.zero_empty_frames = true;
     } else {
       // VACE specific params
       const preprocessingMap: Record<string, string> = {
-        'flow': 'flow',
-        'canny': 'canny',
-        'depth': 'depth',
-        'raw': 'none',
+        'flow': 'flow', 'canny': 'canny', 'depth': 'depth', 'raw': 'none',
       };
       structureGuidance.preprocessing = preprocessingMap[structureVideoConfig.structure_video_type ?? 'flow'] ?? 'flow';
-      structureGuidance.strength = structureVideoConfig.structure_video_motion_strength ?? 1.0;
     }
     
     requestBody.structure_guidance = structureGuidance;
     
-    // Create a single-item structure_videos array from legacy config
-    // We need to compute end_frame from the total frames being generated
-    const totalFrames = segmentFrames.reduce((a, b) => a + b, 0);
-    requestBody.structure_videos = [{
-      path: structureVideoConfig.structure_video_path,
-      start_frame: 0,
-      end_frame: totalFrames,
-      treatment: structureVideoConfig.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
-    }];
-    
-    console.log('[Generation] 🎬 Converted LEGACY single-video to unified format:', {
-      structure_guidance: structureGuidance,
-      structure_videos: requestBody.structure_videos,
+    console.log('[Generation] 🎬 Converted LEGACY single-video to UNIFIED format:', {
+      target: structureGuidance.target,
+      videosCount: (structureGuidance.videos as unknown[]).length,
+      strength: structureGuidance.strength,
     });
   }
   

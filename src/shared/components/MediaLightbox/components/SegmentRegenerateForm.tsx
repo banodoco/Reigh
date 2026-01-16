@@ -15,6 +15,8 @@ export interface SegmentRegenerateFormProps {
   projectId: string | null;
   /** Generation ID to use as parent for the variant */
   generationId: string;
+  /** Shot ID for fetching structure video settings */
+  shotId?: string;
   /** Optional existing child generation ID (for Replace mode - creates variant instead of new child) */
   childGenerationId?: string;
   /** Optional segment index (defaults to 0 for single-segment videos) */
@@ -39,6 +41,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   params: initialParams,
   projectId,
   generationId,
+  shotId,
   childGenerationId,
   segmentIndex = 0,
   startImageUrl,
@@ -49,12 +52,32 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   projectResolution,
   onOverridesChange,
 }) => {
+  // Debug log to verify shotId and structure guidance are being passed (UNIFIED FORMAT)
+  // In the unified format, videos are INSIDE structure_guidance.videos, not a separate array
+  const orchGuidance = initialParams?.orchestrator_details?.structure_guidance;
+  const topLevelGuidance = initialParams?.structure_guidance;
+  console.log('[StructureVideoFix] 📋 [SegmentRegenerateForm] Props received:', {
+    projectId: projectId?.substring(0, 8),
+    generationId: generationId?.substring(0, 8),
+    shotId: shotId?.substring(0, 8) ?? 'null',
+    segmentIndex,
+    // NEW UNIFIED FORMAT: Check structure_guidance with videos inside
+    hasOrchStructureGuidance: !!orchGuidance,
+    orchStructureGuidanceTarget: orchGuidance?.target ?? '(none)',
+    orchStructureGuidanceVideosCount: orchGuidance?.videos?.length ?? 0,
+    // Top-level check (for individual segment tasks)
+    hasTopLevelStructureGuidance: !!topLevelGuidance,
+    topLevelStructureGuidanceTarget: topLevelGuidance?.target ?? '(none)',
+    topLevelStructureGuidanceVideosCount: topLevelGuidance?.videos?.length ?? 0,
+  });
+
   return (
     <div className="p-4">
       <SegmentRegenerateControls
         initialParams={initialParams}
         projectId={projectId}
         generationId={generationId}
+        shotId={shotId}
         childGenerationId={childGenerationId}
         segmentIndex={segmentIndex}
         startImageUrl={startImageUrl}
