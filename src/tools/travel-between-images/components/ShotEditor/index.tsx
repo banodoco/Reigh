@@ -2049,18 +2049,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           projectAspectRatio={effectiveAspectRatio}
           onApplySettingsFromTask={applySettingsFromTask}
           onJoinSegmentsClick={() => {
-            const alreadyInJoinMode = generateMode === 'join';
             setGenerateMode('join');
 
-            // Scroll to join section - use RAF to ensure DOM is updated
+            // Scroll to the generate card - use double RAF to ensure DOM is fully updated after mode switch
             requestAnimationFrame(() => {
-              const target = alreadyInJoinMode
-                ? joinSegmentsSectionRef.current
-                : (joinSegmentsSectionRef.current || generateVideosCardRef.current);
-              if (target) {
-                // Use 'center' to avoid scrolling too far
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
+              requestAnimationFrame(() => {
+                const target = generateVideosCardRef.current;
+                if (target) {
+                  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              });
             });
           }}
           selectedParentId={selectedOutputId}
