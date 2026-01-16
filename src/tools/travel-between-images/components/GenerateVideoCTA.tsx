@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
+import { Film, Loader2, Check } from 'lucide-react';
 
 interface GenerateVideoCTAProps {
   variantName: string;
@@ -38,18 +39,26 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
         />
       </div>
       
-      <Button 
-        size="retro-default" 
-        className="w-full max-w-md" 
-        variant={justQueued ? "success" : "retro"}
+      <Button
+        size="lg"
+        className={`w-full max-w-md shadow-lg gap-2 h-12 ${justQueued ? 'bg-green-500 hover:bg-green-600' : ''}`}
         onClick={onGenerate}
         disabled={disabled}
       >
-        {justQueued
-          ? "Added to queue!"
-          : isGenerating 
-            ? 'Creating Tasks...' 
-            : 'Generate Video'}
+        {isGenerating ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : justQueued ? (
+          <Check className="w-5 h-5" />
+        ) : (
+          <Film className="w-5 h-5" />
+        )}
+        <span className="font-medium text-lg">
+          {justQueued
+            ? 'Added to queue!'
+            : isGenerating
+              ? 'Creating Tasks...'
+              : 'Generate Video'}
+        </span>
       </Button>
     </div>
   );

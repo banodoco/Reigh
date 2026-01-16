@@ -2109,7 +2109,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         </div>
 
         {/* Generation Settings */}
-        <div className="w-full" ref={generateVideosCardRef}>
+        <div className="w-full" ref={generateVideosCardRef} style={{ overflowAnchor: 'none' }}>
           <Card>
             <CardHeader className="pb-4">
                 {/* Toggle header - selected option on left, swap icon, other option on right */}
@@ -2372,9 +2372,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                   <button
                     onClick={() => {
                       setGenerateMode('join');
-                      requestAnimationFrame(() => {
-                        generateVideosCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      });
                     }}
                     className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
                   >
@@ -2387,13 +2384,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 /* Join Segments Mode */
                 <div ref={joinSegmentsSectionRef}>
                   <JoinClipsSettingsForm
-                    headerContent={
-                      <div className="mb-2">
-                        <p className="text-sm text-muted-foreground">
-                          Join {joinValidationData.videoCount} positioned videos from your timeline into a seamless video with smooth transitions.
-                        </p>
-                      </div>
-                    }
                     gapFrames={joinGapFrames}
                     setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
                     contextFrames={joinContextFrames}
@@ -2442,10 +2432,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                   <button
                     onClick={() => {
                       setGenerateMode('batch');
-                      // Scroll to keep the card in view after content shrinks
-                      requestAnimationFrame(() => {
-                        generateVideosCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      });
                     }}
                     className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
                   >

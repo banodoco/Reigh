@@ -18,6 +18,7 @@ import {
 } from "@/shared/components/ui/tooltip";
 import { PhaseConfig } from '@/tools/travel-between-images/settings';
 import { MotionPresetSelector } from '@/shared/components/MotionPresetSelector';
+import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 import { 
   DEFAULT_VACE_PHASE_CONFIG, 
   BUILTIN_VACE_PRESET, 
@@ -829,354 +830,85 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
 
     return (
         <div className={cn("space-y-8", className)}>
-            {/* Global Settings & Visualization */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Controls Column */}
-            <div className="space-y-6">
-                    {headerContent && (
-                        <div className="mb-6">
-                            {headerContent}
-                        </div>
-                    )}
-                    
-                    {/* Settings header with restore defaults button */}
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-base font-semibold">Join Clips Settings</h3>
-                        {onRestoreDefaults && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={onRestoreDefaults}
-                                className="text-muted-foreground hover:text-foreground"
-                            >
-                                <RotateCcw className="w-4 h-4 mr-2" />
-                                Restore Defaults
-                            </Button>
-                        )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-8">
-                        {/* Row 1: Gap Frames | Context Frames */}
-                        
-                    {/* Gap Frames */}
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                                <Label htmlFor="join-gap-frames" className="text-sm font-medium">Gap Frames:</Label>
-                                <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{gapFrames}</span>
-                        </div>
-                        <Slider
-                            id="join-gap-frames"
-                                min={1}
-                                max={maxGapFrames}
-                            step={1}
-                                value={[Math.min(Math.max(1, gapFrames), maxGapFrames)]}
-                            onValueChange={(values) => {
-                                setGapFrames(Math.min(values[0], maxGapFrames));
-                            }}
-                                className="py-2"
-                        />
-                    </div>
-
-                    {/* Context Frames */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="join-context-frames" className="text-sm font-medium">Context Frames:</Label>
-                                <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{contextFrames}</span>
-                            </div>
-                            <Slider
-                            id="join-context-frames"
-                                min={4}
-                            max={maxContextFrames}
-                                step={1}
-                                value={[Math.min(contextFrames, maxContextFrames)]}
-                                onValueChange={(values) => handleContextFramesChange(Math.min(values[0], maxContextFrames))}
-                                className="py-2"
-                            />
-                    </div>
-
-                        {/* Row 2: Replace Mode | Keep Bridge Images */}
-
-                    {/* Replace Mode */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between h-5">
-                                <Label className="text-sm font-medium">Transition Mode:</Label>
-                            </div>
-                            <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
-                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Insert</span>
-                            <Switch
-                                id="join-replace-mode"
-                                    checked={replaceMode}
-                                    onCheckedChange={setReplaceMode}
-                                />
-                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Replace</span>
-                            </div>
-                        </div>
-
-                        {/* Keep Bridge Images */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between h-5">
-                                <Label className={cn("text-sm font-medium", gapFrames <= 8 && "text-muted-foreground")}>Bridge Anchors:</Label>
-                            </div>
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className={cn(
-                                            "flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50",
-                                            gapFrames <= 8 && "opacity-50 cursor-not-allowed"
-                                        )}>
-                                            <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !keepBridgingImagesValue ? "font-medium text-foreground" : "text-muted-foreground")}>Off</span>
-                                            <Switch
-                                                id="join-keep-bridge"
-                                                checked={gapFrames <= 8 ? false : keepBridgingImagesValue}
-                                                disabled={gapFrames <= 8}
-                                                onCheckedChange={(val) => {
-                                                    console.log('[JoinClips] Toggle keepBridgingImages:', val);
-                                                    setKeepBridgingImages?.(val);
-                                                }}
-                                            />
-                                            <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", keepBridgingImagesValue && gapFrames > 8 ? "font-medium text-foreground" : "text-muted-foreground")}>On</span>
-                                        </div>
-                                    </TooltipTrigger>
-                                    {gapFrames <= 8 && (
-                                        <TooltipContent>
-                                            <p className="max-w-xs text-xs">
-                                                Bridge anchors require more than 8 gap frames to have enough space for anchor placement.
-                                            </p>
-                                        </TooltipContent>
-                                    )}
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-
-                        {/* Advanced Settings (Resolution, FPS, Noised Input) */}
-                        {(showResolutionToggle || showFpsToggle || setNoisedInputVideo) && (
-                            <Collapsible 
-                                open={isAdvancedOpen} 
-                                onOpenChange={setIsAdvancedOpen}
-                                className="col-span-2"
-                            >
-                                <CollapsibleTrigger asChild>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        className={cn(
-                                            "w-full justify-between px-3 py-2 h-auto border-primary/30 text-primary hover:bg-primary/10 hover:text-primary",
-                                            isAdvancedOpen && "rounded-b-none"
-                                        )}
-                                    >
-                                        <span className="text-xs font-medium">Advanced</span>
-                                        <ChevronDown className={cn(
-                                            "h-4 w-4 transition-transform duration-200",
-                                            !isAdvancedOpen && "rotate-90"
-                                        )} />
-                                    </Button>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent className="">
-                                    <div className="border border-t-0 rounded-b-lg p-4 bg-muted/30">
-                                        <div className="grid grid-cols-2 gap-x-6">
-                                            {/* Resolution Source */}
-                                            {showResolutionToggle && (
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center justify-between h-5">
-                                                        <Label className="text-sm font-medium">Output Resolution:</Label>
-                                                    </div>
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
-                                                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
-                                                                    <Switch
-                                                                        id="join-resolution-source"
-                                                                        checked={useInputVideoResolution ?? false}
-                                                                        onCheckedChange={(val) => {
-                                                                            console.log('[JoinClips] Toggle useInputVideoResolution:', val);
-                                                                            setUseInputVideoResolution?.(val);
-                                                                        }}
-                                                                    />
-                                                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
-                                                                </div>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p className="max-w-xs text-xs">
-                                                                    Choose whether to use the project's aspect ratio or match the first input video's resolution.
-                                                                </p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-                                                </div>
-                                            )}
-                                            
-                                            {/* FPS Source */}
-                                            {showFpsToggle && (
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center justify-between h-5">
-                                                        <Label className="text-sm font-medium">Output FPS:</Label>
-                                                    </div>
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
-                                                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
-                                                                    <Switch
-                                                                        id="join-fps-source"
-                                                                        checked={useInputVideoFps ?? false}
-                                                                        onCheckedChange={(val) => {
-                                                                            console.log('[JoinClips] Toggle useInputVideoFps:', val);
-                                                                            setUseInputVideoFps?.(val);
-                                                                        }}
-                                                                    />
-                                                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
-                                                                </div>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p className="max-w-xs text-xs">
-                                                                    Choose whether to use the project's FPS (16 FPS) or keep the input video's original frame rate.
-                                                                </p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-                                                </div>
-                                            )}
-                                            
-                                            {/* Noised Input Video */}
-                                            {setNoisedInputVideo && (
-                                                <div className="space-y-3 col-span-2 mt-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <TooltipProvider>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <Label className="text-sm font-medium flex items-center gap-1 cursor-help">
-                                                                        Noised Input Video:
-                                                                        <Info className="w-3 h-3 text-muted-foreground" />
-                                                                    </Label>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p className="max-w-xs text-xs">
-                                                                        Controls how much the original gap frames influence generation. Lower values preserve more of the original motion/structure; higher values allow more creative regeneration.
-                                                                    </p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </TooltipProvider>
-                                                        <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{noisedInputVideo.toFixed(2)}</span>
-                                                    </div>
-                                                    <Slider
-                                                        id="join-noised-input"
-                                                        min={0}
-                                                        max={1}
-                                                        step={0.05}
-                                                        value={[noisedInputVideo]}
-                                                        onValueChange={(values) => setNoisedInputVideo(values[0])}
-                                                        className="py-2"
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CollapsibleContent>
-                            </Collapsible>
-                        )}
-                    </div>
+            {headerContent && (
+                <div className="mb-6">
+                    {headerContent}
                 </div>
+            )}
 
-                {/* Visualization Column */}
-                <div className="h-full flex flex-col">
-                    <Visualization
-                        gapFrames={gapFrames}
-                        contextFrames={contextFrames}
-                        replaceMode={replaceMode}
-                        keepBridgingImages={keepBridgingImages}
-                        clipPairs={clipPairs}
-                        infoContent={
-                            <div className="text-xs text-muted-foreground">
-                                <span className="font-medium">Total generation:</span>{' '}
-                                <span className="font-mono font-medium">{actualTotal}</span> frames
-                                {quantizedTotal !== actualTotal && (
-                                    <span className="text-muted-foreground/70"> → {quantizedTotal} (4N+1)</span>
-                                )}
-                                {shortestClipFrames && shortestClipFrames > 0 && (
-                                    <>
-                                        <span className="mx-2">•</span>
-                                        {shortestClipFrames > 81 ? (
-                                            <>
-                                                <span className="font-medium">Constrained by max generation:</span>{' '}
-                                                <span className="font-mono">81</span> frames
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="font-medium">Constrained by shortest clip:</span>{' '}
-                                                <span className="font-mono">{shortestClipFrames}</span> frames
-                                            </>
-                                        )}
-                                        <span className="mx-2">•</span>
-                                        <span className="font-medium">Using:</span>{' '}
-                                        <span className={cn(
-                                            "font-mono",
-                                            framesUsedPerClip > shortestClipFrames * 0.9 && "text-yellow-600 dark:text-yellow-400"
-                                        )}>
-                                            {framesUsedPerClip}
-                                        </span>
-                                        {' '}frames per clip
-                                        {replaceMode && (
-                                            <span className="text-muted-foreground/70 ml-1">
-                                                ({contextFrames} context + {Math.ceil(gapFrames / 2)} half-gap)
-                                            </span>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        }
-                    />
-                </div>
-            </div>
-
-            <div className="h-px bg-border/50" />
-
-            {/* Prompts & LoRA */}
+            {/* ==================== SETTINGS & MOTION (Side by Side) ==================== */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* SETTINGS (Prompts) */}
                 <div className="space-y-4">
-                    {/* Global Prompt */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="join-prompt">Global Prompt:</Label>
-                            {/* Only show "Set individually" when there are more than 2 clips */}
-                            {setUseIndividualPrompts && clipCount > 2 && (
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="useIndividualPrompts" className="text-xs text-muted-foreground cursor-pointer">
-                                        Set individually
-                                    </Label>
-                                    <Switch
-                                        id="useIndividualPrompts"
-                                        checked={useIndividualPrompts}
-                                        onCheckedChange={setUseIndividualPrompts}
-                                    />
-                                </div>
+                    <SectionHeader title="Settings" theme="blue" />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Global Prompt */}
+                        <div className="space-y-2 flex flex-col">
+                            <div className="flex items-center justify-between h-5">
+                                <Label htmlFor="join-prompt">Global Prompt:</Label>
+                                {/* Only show "Set individually" when there are more than 2 clips */}
+                                {setUseIndividualPrompts && clipCount > 2 && (
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="useIndividualPrompts" className="text-xs text-muted-foreground cursor-pointer">
+                                            Set individually
+                                        </Label>
+                                        <Switch
+                                            id="useIndividualPrompts"
+                                            checked={useIndividualPrompts}
+                                            onCheckedChange={setUseIndividualPrompts}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <Textarea
+                                id="join-prompt"
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                placeholder={useIndividualPrompts
+                                    ? "Appended to each individual transition prompt"
+                                    : "Describe what you want for all transitions"
+                                }
+                                rows={5}
+                                className="resize-none bg-background/50 flex-1 min-h-[120px]"
+                                clearable
+                                onClear={() => setPrompt('')}
+                                voiceInput
+                                voiceContext="This is a global prompt for video clip transitions. Describe the motion, style, or visual effect you want for joining video clips together. Focus on transition dynamics like camera movement, morphing effects, or smooth blending between scenes."
+                                onVoiceResult={(result) => {
+                                    setPrompt(result.prompt || result.transcription);
+                                }}
+                            />
+                            {useIndividualPrompts && (
+                                <p className="text-xs text-muted-foreground">
+                                    💡 This will be inserted after each individual prompt
+                                </p>
                             )}
                         </div>
-                        <Textarea
-                            id="join-prompt"
-                            value={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
-                            placeholder={useIndividualPrompts 
-                                ? "Appended to each individual transition prompt" 
-                                : "Describe what you want for all transitions"
-                            }
-                            rows={3}
-                            className="resize-none bg-background/50"
-                            clearable
-                            onClear={() => setPrompt('')}
-                            voiceInput
-                            voiceContext="This is a global prompt for video clip transitions. Describe the motion, style, or visual effect you want for joining video clips together. Focus on transition dynamics like camera movement, morphing effects, or smooth blending between scenes."
-                            onVoiceResult={(result) => {
-                                setPrompt(result.prompt || result.transcription);
-                            }}
-                        />
-                        {useIndividualPrompts && (
-                            <p className="text-xs text-muted-foreground">
-                                💡 This will be inserted after each individual prompt
-                            </p>
-                        )}
+
+                        {/* Negative Prompt */}
+                        <div className="space-y-2 flex flex-col">
+                            <div className="flex items-center justify-between h-5">
+                                <Label htmlFor="join-negative-prompt">Negative Prompt:</Label>
+                            </div>
+                            <Textarea
+                                id="join-negative-prompt"
+                                value={negativePrompt}
+                                onChange={(e) => setNegativePrompt(e.target.value)}
+                                placeholder="What to avoid in all transitions (optional)"
+                                rows={5}
+                                className="resize-none bg-background/50 flex-1 min-h-[120px]"
+                                clearable
+                                onClear={() => setNegativePrompt('')}
+                                voiceInput
+                                voiceContext="This is a negative prompt - things to AVOID in video transitions. List unwanted qualities like 'jerky, flickering, blurry, distorted, unnatural motion'. Keep it as a comma-separated list of terms to avoid."
+                                onVoiceResult={(result) => {
+                                    setNegativePrompt(result.prompt || result.transcription);
+                                }}
+                            />
+                        </div>
                     </div>
-                    
+
                     {/* Enhance Prompt Toggle */}
                     <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
                         <Switch
@@ -1202,30 +934,12 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                             </Label>
                         </div>
                     </div>
-
-                    {/* Negative Prompt */}
-                    <div className="space-y-2">
-                        <Label htmlFor="join-negative-prompt">Negative Prompt:</Label>
-                        <Textarea
-                            id="join-negative-prompt"
-                            value={negativePrompt}
-                            onChange={(e) => setNegativePrompt(e.target.value)}
-                            placeholder="What to avoid in all transitions (optional)"
-                            rows={3}
-                            className="resize-none bg-background/50"
-                            clearable
-                            onClear={() => setNegativePrompt('')}
-                            voiceInput
-                            voiceContext="This is a negative prompt - things to AVOID in video transitions. List unwanted qualities like 'jerky, flickering, blurry, distorted, unnatural motion'. Keep it as a comma-separated list of terms to avoid."
-                            onVoiceResult={(result) => {
-                                setNegativePrompt(result.prompt || result.transcription);
-                            }}
-                        />
-                    </div>
                 </div>
 
-                {/* Motion Settings - Using shared MotionPresetSelector */}
-                <MotionPresetSelector
+                {/* MOTION (Presets & LoRA) */}
+                <div className="space-y-4">
+                    <SectionHeader title="Motion" theme="orange" />
+                    <MotionPresetSelector
                     builtinPreset={BUILTIN_JOIN_CLIPS_PRESET}
                     featuredPresetIds={featuredPresetIds}
                     generationTypeMode="vace"
@@ -1253,7 +967,302 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                         />
                     )}
                 />
+                </div>
             </div>
+
+            <div className="h-px bg-border/50" />
+
+            {/* ==================== STRUCTURE (Gap/Context/Visualization) ==================== */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <SectionHeader title="Structure" theme="green" />
+                    {onRestoreDefaults && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={onRestoreDefaults}
+                            className="text-muted-foreground hover:text-foreground"
+                        >
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Restore Defaults
+                        </Button>
+                    )}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Controls Column */}
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-8">
+                            {/* Gap Frames */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="join-gap-frames" className="text-sm font-medium">Gap Frames:</Label>
+                                    <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{gapFrames}</span>
+                                </div>
+                                <Slider
+                                    id="join-gap-frames"
+                                    min={1}
+                                    max={maxGapFrames}
+                                    step={1}
+                                    value={[Math.min(Math.max(1, gapFrames), maxGapFrames)]}
+                                    onValueChange={(values) => {
+                                        setGapFrames(Math.min(values[0], maxGapFrames));
+                                    }}
+                                    className="py-2"
+                                />
+                            </div>
+
+                            {/* Context Frames */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="join-context-frames" className="text-sm font-medium">Context Frames:</Label>
+                                    <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{contextFrames}</span>
+                                </div>
+                                <Slider
+                                    id="join-context-frames"
+                                    min={4}
+                                    max={maxContextFrames}
+                                    step={1}
+                                    value={[Math.min(contextFrames, maxContextFrames)]}
+                                    onValueChange={(values) => handleContextFramesChange(Math.min(values[0], maxContextFrames))}
+                                    className="py-2"
+                                />
+                            </div>
+
+                            {/* Replace Mode */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between h-5">
+                                    <Label className="text-sm font-medium">Transition Mode:</Label>
+                                </div>
+                                <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
+                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Insert</span>
+                                    <Switch
+                                        id="join-replace-mode"
+                                        checked={replaceMode}
+                                        onCheckedChange={setReplaceMode}
+                                    />
+                                    <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Replace</span>
+                                </div>
+                            </div>
+
+                            {/* Keep Bridge Images */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between h-5">
+                                    <Label className={cn("text-sm font-medium", gapFrames <= 8 && "text-muted-foreground")}>Bridge Anchors:</Label>
+                                </div>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className={cn(
+                                                "flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50",
+                                                gapFrames <= 8 && "opacity-50 cursor-not-allowed"
+                                            )}>
+                                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !keepBridgingImagesValue ? "font-medium text-foreground" : "text-muted-foreground")}>Off</span>
+                                                <Switch
+                                                    id="join-keep-bridge"
+                                                    checked={gapFrames <= 8 ? false : keepBridgingImagesValue}
+                                                    disabled={gapFrames <= 8}
+                                                    onCheckedChange={(val) => {
+                                                        console.log('[JoinClips] Toggle keepBridgingImages:', val);
+                                                        setKeepBridgingImages?.(val);
+                                                    }}
+                                                />
+                                                <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", keepBridgingImagesValue && gapFrames > 8 ? "font-medium text-foreground" : "text-muted-foreground")}>On</span>
+                                            </div>
+                                        </TooltipTrigger>
+                                        {gapFrames <= 8 && (
+                                            <TooltipContent>
+                                                <p className="max-w-xs text-xs">
+                                                    Bridge anchors require more than 8 gap frames to have enough space for anchor placement.
+                                                </p>
+                                            </TooltipContent>
+                                        )}
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+
+                            {/* Advanced Settings (Resolution, FPS, Noised Input) */}
+                            {(showResolutionToggle || showFpsToggle || setNoisedInputVideo) && (
+                                <Collapsible
+                                    open={isAdvancedOpen}
+                                    onOpenChange={setIsAdvancedOpen}
+                                    className="col-span-2"
+                                >
+                                    <CollapsibleTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className={cn(
+                                                "w-full justify-between px-3 py-2 h-auto border-primary/30 text-primary hover:bg-primary/10 hover:text-primary",
+                                                isAdvancedOpen && "rounded-b-none"
+                                            )}
+                                        >
+                                            <span className="text-xs font-medium">Advanced</span>
+                                            <ChevronDown className={cn(
+                                                "h-4 w-4 transition-transform duration-200",
+                                                !isAdvancedOpen && "rotate-90"
+                                            )} />
+                                        </Button>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent className="">
+                                        <div className="border border-t-0 rounded-b-lg p-4 bg-muted/30">
+                                            <div className="grid grid-cols-2 gap-x-6">
+                                                {/* Resolution Source */}
+                                                {showResolutionToggle && (
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center justify-between h-5">
+                                                            <Label className="text-sm font-medium">Output Resolution:</Label>
+                                                        </div>
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
+                                                                        <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
+                                                                        <Switch
+                                                                            id="join-resolution-source"
+                                                                            checked={useInputVideoResolution ?? false}
+                                                                            onCheckedChange={(val) => {
+                                                                                console.log('[JoinClips] Toggle useInputVideoResolution:', val);
+                                                                                setUseInputVideoResolution?.(val);
+                                                                            }}
+                                                                        />
+                                                                        <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoResolution ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
+                                                                    </div>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p className="max-w-xs text-xs">
+                                                                        Choose whether to use the project's aspect ratio or match the first input video's resolution.
+                                                                    </p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    </div>
+                                                )}
+
+                                                {/* FPS Source */}
+                                                {showFpsToggle && (
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center justify-between h-5">
+                                                            <Label className="text-sm font-medium">Output FPS:</Label>
+                                                        </div>
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <div className="flex items-center justify-center gap-2 border rounded-lg p-2 bg-background/50">
+                                                                        <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", !useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Project</span>
+                                                                        <Switch
+                                                                            id="join-fps-source"
+                                                                            checked={useInputVideoFps ?? false}
+                                                                            onCheckedChange={(val) => {
+                                                                                console.log('[JoinClips] Toggle useInputVideoFps:', val);
+                                                                                setUseInputVideoFps?.(val);
+                                                                            }}
+                                                                        />
+                                                                        <span className={cn("text-[10px] sm:text-xs transition-colors whitespace-nowrap", useInputVideoFps ? "font-medium text-foreground" : "text-muted-foreground")}>Input</span>
+                                                                    </div>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p className="max-w-xs text-xs">
+                                                                        Choose whether to use the project's FPS (16 FPS) or keep the input video's original frame rate.
+                                                                    </p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    </div>
+                                                )}
+
+                                                {/* Noised Input Video */}
+                                                {setNoisedInputVideo && (
+                                                    <div className="space-y-3 col-span-2 mt-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Label className="text-sm font-medium flex items-center gap-1 cursor-help">
+                                                                            Noised Input Video:
+                                                                            <Info className="w-3 h-3 text-muted-foreground" />
+                                                                        </Label>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <p className="max-w-xs text-xs">
+                                                                            Controls how much the original gap frames influence generation. Lower values preserve more of the original motion/structure; higher values allow more creative regeneration.
+                                                                        </p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                            <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{noisedInputVideo.toFixed(2)}</span>
+                                                        </div>
+                                                        <Slider
+                                                            id="join-noised-input"
+                                                            min={0}
+                                                            max={1}
+                                                            step={0.05}
+                                                            value={[noisedInputVideo]}
+                                                            onValueChange={(values) => setNoisedInputVideo(values[0])}
+                                                            className="py-2"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CollapsibleContent>
+                                </Collapsible>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Visualization Column */}
+                    <div className="h-full flex flex-col">
+                        <Visualization
+                            gapFrames={gapFrames}
+                            contextFrames={contextFrames}
+                            replaceMode={replaceMode}
+                            keepBridgingImages={keepBridgingImages}
+                            clipPairs={clipPairs}
+                            infoContent={
+                                <div className="text-xs text-muted-foreground">
+                                    <span className="font-medium">Total generation:</span>{' '}
+                                    <span className="font-mono font-medium">{actualTotal}</span> frames
+                                    {quantizedTotal !== actualTotal && (
+                                        <span className="text-muted-foreground/70"> → {quantizedTotal} (4N+1)</span>
+                                    )}
+                                    {shortestClipFrames && shortestClipFrames > 0 && (
+                                        <>
+                                            <span className="mx-2">•</span>
+                                            {shortestClipFrames > 81 ? (
+                                                <>
+                                                    <span className="font-medium">Constrained by max generation:</span>{' '}
+                                                    <span className="font-mono">81</span> frames
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="font-medium">Constrained by shortest clip:</span>{' '}
+                                                    <span className="font-mono">{shortestClipFrames}</span> frames
+                                                </>
+                                            )}
+                                            <span className="mx-2">•</span>
+                                            <span className="font-medium">Using:</span>{' '}
+                                            <span className={cn(
+                                                "font-mono",
+                                                framesUsedPerClip > shortestClipFrames * 0.9 && "text-yellow-600 dark:text-yellow-400"
+                                            )}>
+                                                {framesUsedPerClip}
+                                            </span>
+                                            {' '}frames per clip
+                                            {replaceMode && (
+                                                <span className="text-muted-foreground/70 ml-1">
+                                                    ({contextFrames} context + {Math.ceil(gapFrames / 2)} half-gap)
+                                                </span>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            }
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div className="h-px bg-border/50" />
 
             {/* Generate Button */}
             <div className="flex flex-col items-center gap-3 pt-4">

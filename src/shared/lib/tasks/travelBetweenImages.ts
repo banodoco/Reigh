@@ -273,7 +273,7 @@ export interface VideoPromptApiParams {
  */
 export const DEFAULT_VIDEO_STRUCTURE_PARAMS: Required<Pick<VideoStructureApiParams, 'structure_video_treatment' | 'structure_video_motion_strength' | 'structure_video_type'>> = {
   structure_video_treatment: 'adjust',
-  structure_video_motion_strength: 1.0,
+  structure_video_motion_strength: 1.2,
   structure_video_type: 'flow',
 };
 
