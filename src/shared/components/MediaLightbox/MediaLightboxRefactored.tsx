@@ -213,6 +213,8 @@ interface MediaLightboxProps {
     endGenerationId?: string;
     /** Shot generation ID for looking up per-pair metadata (prompt overrides, etc.) */
     startShotGenerationId?: string;
+    /** Active child generation ID for this slot (use for regeneration to create variant on correct child) */
+    activeChildGenerationId?: string;
   };
 }
 
@@ -1650,8 +1652,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     });
 
     // If viewing a child segment, pass its ID so regeneration creates a variant instead of new child
+    // Priority: activeChildGenerationId from slot (always correct) > actualGenerationId (may be stale/wrong)
     const isChildSegment = parentGenerationId !== actualGenerationId;
-    const childGenerationId = isChildSegment ? actualGenerationId : undefined;
+    const childGenerationId = currentSegmentImages?.activeChildGenerationId ||
+                              (isChildSegment ? actualGenerationId : undefined);
+
+    console.log('[MediaLightbox] childGenerationId resolution:', {
+      activeChildFromSlot: currentSegmentImages?.activeChildGenerationId?.substring(0, 8) ?? 'null',
+      actualGenerationId: actualGenerationId?.substring(0, 8) ?? 'null',
+      isChildSegment,
+      final: childGenerationId?.substring(0, 8) ?? 'null (will create new child)',
+    });
 
     // Extract pair_shot_generation_id for reading/writing per-pair metadata
     // This links regeneration to the specific timeline pair's settings

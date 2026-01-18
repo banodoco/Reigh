@@ -435,6 +435,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
           fetchVariantsForSelf={true}
           currentSegmentImages={{
             startShotGenerationId: currentLightboxSlot?.pairShotGenerationId,
+            // Pass the active child from the slot so regeneration creates variant on correct child
+            activeChildGenerationId: currentLightboxMedia?.id,
           }}
         />
       )}
