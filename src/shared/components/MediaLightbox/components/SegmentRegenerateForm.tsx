@@ -76,6 +76,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         generationId={generationId}
         shotId={shotId}
         childGenerationId={childGenerationId}
+        isRegeneration={true}
         segmentIndex={segmentIndex}
         startImageUrl={startImageUrl}
         endImageUrl={endImageUrl}

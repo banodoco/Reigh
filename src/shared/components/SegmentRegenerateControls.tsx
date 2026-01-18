@@ -583,7 +583,8 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
   // Make primary variant - whether the new regeneration should replace the current video
   // Persisted at project level via usePersistentToolState
-  const [makePrimaryVariant, setMakePrimaryVariant] = useState(true);
+  // Defaults to false - user must explicitly choose to replace the current video
+  const [makePrimaryVariant, setMakePrimaryVariant] = useState(false);
 
   // Bind to project settings for persistence
   usePersistentToolState(
