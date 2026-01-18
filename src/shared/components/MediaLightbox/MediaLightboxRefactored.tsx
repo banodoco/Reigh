@@ -1659,14 +1659,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   taskParams.individual_segment_params?.pair_shot_generation_id ||
                                   currentSegmentImages?.startShotGenerationId;
 
-    console.log('[MediaLightbox] [ChildGenDebug] 🎯 Regenerate form IDs:', {
-      shotId: shotId?.substring(0, 8) ?? 'null',
-      actualGenerationId: actualGenerationId?.substring(0, 8),
-      parentGenerationId: parentGenerationId?.substring(0, 8),
-      mediaParentGenerationId: (media as any).parent_generation_id?.substring(0, 8),
-      isChildSegment,
-      childGenerationId: childGenerationId?.substring(0, 8) ?? 'undefined (will create new child)',
-      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) ?? 'none',
+    console.log('[PairMetadata] 🔗 MediaLightbox pairShotGenerationId sources:', {
+      fromTaskParams: taskParams.pair_shot_generation_id?.substring(0, 8) ?? 'null',
+      fromIndividualSegmentParams: taskParams.individual_segment_params?.pair_shot_generation_id?.substring(0, 8) ?? 'null',
+      fromCurrentSegmentImages: currentSegmentImages?.startShotGenerationId?.substring(0, 8) ?? 'null',
+      final: pairShotGenerationId?.substring(0, 8) ?? 'NULL',
     });
 
     return (
