@@ -31,7 +31,7 @@ export interface LastUsedEditSettings {
 
 export const DEFAULT_LAST_USED: LastUsedEditSettings = {
   editMode: 'text',
-  loraMode: 'in-scene',
+  loraMode: 'none', // Default to no preset LoRA - use Add LoRA button instead
   customLoraUrl: '',
   numGenerations: 1,
   // Img2Img defaults

@@ -104,7 +104,7 @@ export interface GenerationEditSettings {
 
 export const DEFAULT_EDIT_SETTINGS: GenerationEditSettings = {
   editMode: 'text',
-  loraMode: 'in-scene',
+  loraMode: 'none', // Default to no preset LoRA - use Add LoRA button instead
   customLoraUrl: '',
   numGenerations: 1,
   prompt: '',

@@ -1214,14 +1214,15 @@ export async function createGenerationFromTask(
       action: finalIsChild ? "create_child_generation" : "create_standalone_generation"
     });
 
-    const generationRecord = {
+    // Don't set location/thumbnail on the generation record - we create variants explicitly below.
+    // The sync trigger (trg_sync_generation_from_variant) will populate the generation's location
+    // when we insert the primary variant.
+    const generationRecord: Record<string, any> = {
       id: newGenerationId,
       tasks: [taskId],
       params: generationParams,
-      location: publicUrl,
       type: generationType,
       project_id: taskData.project_id,
-      thumbnail_url: thumbnailUrl,
       name: generationName,
       based_on: basedOnGenerationId,
       parent_generation_id: finalParentGenerationId,
@@ -1271,34 +1272,36 @@ export async function createGenerationFromTask(
     // in the variant selector when viewing the parent, which is incorrect behavior.
     // The ChildGenerationsView component fetches children correctly using the parent_generation_id relationship.
 
-    // For ALL child generations, create an "original" variant as the primary variant.
-    // For single-segment cases, also mark it as viewed (since there's nothing to "drill down" into).
+    // Create "original" variant for ALL generations (edge function owns all variant creation).
+    // For child single-segment cases, also mark it as viewed (since there's nothing to "drill down" into).
+    let autoViewedAt: string | null = null;
+    let createdFrom = 'generation_original';
+
     if (finalIsChild) {
       // Use centralized helper for single-segment detection
-      // Note: We only check the flag here (not sibling count) since we just created this generation
-      const autoViewedAt = await getChildVariantViewedAt(supabase, {
+      autoViewedAt = await getChildVariantViewedAt(supabase, {
         taskParams: taskData.params,
       });
-      const isSingleSegment = autoViewedAt !== null;
-
-      console.log(`[ChildGeneration] Creating original variant for child ${newGeneration.id}${isSingleSegment ? ' (auto-viewed)' : ''}`);
-      await createVariant(
-        supabase,
-        newGeneration.id,
-        publicUrl,
-        thumbnailUrl || null,
-        {
-          ...generationParams,
-          source_task_id: taskId,
-          created_from: isSingleSegment ? 'single_segment_child_original' : 'child_generation_original',
-        },
-        true, // is_primary
-        'original',
-        null, // name
-        autoViewedAt // viewedAt - only set for single-segment cases
-      );
-      console.log(`[ChildGeneration] Created original variant for child generation`);
+      createdFrom = autoViewedAt ? 'single_segment_child_original' : 'child_generation_original';
     }
+
+    console.log(`[GenMigration] Creating original variant for generation ${newGeneration.id}${finalIsChild ? ' (child)' : ''}${autoViewedAt ? ' (auto-viewed)' : ''}`);
+    await createVariant(
+      supabase,
+      newGeneration.id,
+      publicUrl,
+      thumbnailUrl || null,
+      {
+        ...generationParams,
+        source_task_id: taskId,
+        created_from: createdFrom,
+      },
+      true, // is_primary
+      'original',
+      null, // name
+      autoViewedAt // viewedAt - only set for single-segment child cases
+    );
+    console.log(`[GenMigration] Created original variant for generation`);
 
     // Link to shot if applicable (not for child generations)
     if (shotId && !finalIsChild) {

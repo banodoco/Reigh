@@ -25,7 +25,7 @@ interface UseEditModeLoRAsReturn {
  * Used by both inpainting and magic edit modes
  */
 export const useEditModeLoRAs = (): UseEditModeLoRAsReturn => {
-  const [loraMode, setLoraMode] = useState<LoraMode>('in-scene');
+  const [loraMode, setLoraMode] = useState<LoraMode>('none'); // Default to no preset LoRA
   const [customLoraUrl, setCustomLoraUrl] = useState<string>('');
 
   // Legacy boolean support - map to new lora mode
