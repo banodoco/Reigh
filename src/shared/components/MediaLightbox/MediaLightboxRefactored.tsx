@@ -202,6 +202,18 @@ interface MediaLightboxProps {
    * (e.g., travel-between-images segments) rather than the parent (e.g., edit-video).
    */
   fetchVariantsForSelf?: boolean;
+  /**
+   * Current segment images from the timeline (overrides stored task params).
+   * Use this when the timeline images may have changed since the video was generated.
+   */
+  currentSegmentImages?: {
+    startUrl?: string;
+    endUrl?: string;
+    startGenerationId?: string;
+    endGenerationId?: string;
+    /** Shot generation ID for looking up per-pair metadata (prompt overrides, etc.) */
+    startShotGenerationId?: string;
+  };
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -270,6 +282,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   initialVariantId,
   // Fetch variants for self instead of parent
   fetchVariantsForSelf = false,
+  // Current segment images from timeline (overrides stored params)
+  currentSegmentImages,
 }) => {
   // ========================================
   // REFACTORED: All logic extracted to hooks
@@ -1569,10 +1583,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     const segmentIndex = taskParams.segment_index ?? 0;
     let segmentImageInfo = extractSegmentImages(taskParams, segmentIndex);
 
-    // Fall back to passed inputImages if task params don't have them
+    // Priority 1: Use currentSegmentImages prop if provided (fresh timeline data)
+    // This ensures regeneration uses the CURRENT timeline images, not stale stored params
+    if (currentSegmentImages && (currentSegmentImages.startUrl || currentSegmentImages.endUrl)) {
+        console.log('[MediaLightbox] [RegenerateImages] Using currentSegmentImages from timeline (overriding stored params):', {
+          startUrl: currentSegmentImages.startUrl?.substring(0, 50),
+          endUrl: currentSegmentImages.endUrl?.substring(0, 50),
+        });
+        segmentImageInfo = {
+            startUrl: currentSegmentImages.startUrl,
+            endUrl: currentSegmentImages.endUrl,
+            startGenId: currentSegmentImages.startGenerationId,
+            endGenId: currentSegmentImages.endGenerationId,
+            hasImages: !!(currentSegmentImages.startUrl || currentSegmentImages.endUrl),
+        };
+    }
+    // Priority 2: Fall back to passed inputImages if task params don't have them
     // This is critical for parent videos after "Join Segments" - the join task
     // doesn't have original input images, but the caller derives them from generation params
-    if (!segmentImageInfo.hasImages && adjustedTaskDetailsData?.inputImages?.length > 0) {
+    else if (!segmentImageInfo.hasImages && adjustedTaskDetailsData?.inputImages?.length > 0) {
         console.log('[MediaLightbox] [RegenerateImages] Using passed inputImages as fallback:', adjustedTaskDetailsData.inputImages.length);
         const passedImages = adjustedTaskDetailsData.inputImages;
         segmentImageInfo = {
@@ -1621,9 +1650,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     });
 
     // If viewing a child segment, pass its ID so regeneration creates a variant instead of new child
-    console.log('[StructureVideoFix] 🎯 [MediaLightbox] Creating form with shotId:', shotId?.substring(0, 8) ?? 'null');
     const isChildSegment = parentGenerationId !== actualGenerationId;
     const childGenerationId = isChildSegment ? actualGenerationId : undefined;
+
+    // Extract pair_shot_generation_id for reading/writing per-pair metadata
+    // This links regeneration to the specific timeline pair's settings
+    const pairShotGenerationId = taskParams.pair_shot_generation_id ||
+                                  taskParams.individual_segment_params?.pair_shot_generation_id ||
+                                  currentSegmentImages?.startShotGenerationId;
+
+    console.log('[MediaLightbox] [ChildGenDebug] 🎯 Regenerate form IDs:', {
+      shotId: shotId?.substring(0, 8) ?? 'null',
+      actualGenerationId: actualGenerationId?.substring(0, 8),
+      parentGenerationId: parentGenerationId?.substring(0, 8),
+      mediaParentGenerationId: (media as any).parent_generation_id?.substring(0, 8),
+      isChildSegment,
+      childGenerationId: childGenerationId?.substring(0, 8) ?? 'undefined (will create new child)',
+      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) ?? 'none',
+    });
 
     return (
       <SegmentRegenerateForm
@@ -1638,9 +1682,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         startImageGenerationId={startImageGenId}
         endImageGenerationId={endImageGenId}
         projectResolution={effectiveRegenerateResolution}
+        pairShotGenerationId={pairShotGenerationId}
       />
     );
-  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId]);
+  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId, currentSegmentImages]);
 
   // Handle entering video edit mode (unified) - restores last used sub-mode
   const handleEnterVideoEditMode = useCallback(() => {

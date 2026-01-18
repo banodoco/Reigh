@@ -119,6 +119,15 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   const variantsPadding = isMobile ? 'px-3 pb-2' : 'p-4 pt-2';
   const hasVariants = variants && variants.length >= 1;
 
+  // Debug: Log variants received by VideoEditPanel
+  console.log('[VideoEditPanel] Variants debug:', {
+    variantsCount: variants?.length ?? 0,
+    hasVariants,
+    variantIds: variants?.map(v => v.id?.substring(0, 8)),
+    variantTypes: variants?.map(v => v.variant_type),
+    activeVariantId: activeVariantId?.substring(0, 8),
+  });
+
   return (
     <div className="h-full flex flex-col">
       {/* Header with Info/Edit toggle and close button */}

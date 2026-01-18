@@ -220,6 +220,36 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     }
   }, [shotId, isLoadingShotStructure, shotStructureData]);
 
+  // Fetch per-pair metadata from shot_generations (prompt overrides, etc.)
+  // This is the source of truth for pair-specific settings, shared with SegmentSettingsModal
+  const { data: pairMetadata, refetch: refetchPairMetadata } = useQuery({
+    queryKey: ['pair-metadata', pairShotGenerationId],
+    queryFn: async () => {
+      if (!pairShotGenerationId) return null;
+      console.log('[PairMetadata] 🔍 Fetching pair metadata for shot_generation:', pairShotGenerationId?.substring(0, 8));
+      const { data, error } = await supabase
+        .from('shot_generations')
+        .select('metadata')
+        .eq('id', pairShotGenerationId)
+        .single();
+      if (error) {
+        console.error('[PairMetadata] ❌ Error fetching pair metadata:', error);
+        return null;
+      }
+      const metadata = (data?.metadata as Record<string, any>) || {};
+      console.log('[PairMetadata] ✅ Loaded pair metadata:', {
+        pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
+        hasPairPrompt: !!metadata.pair_prompt,
+        pairPrompt: metadata.pair_prompt?.substring(0, 40) ?? '(none)',
+        hasPairNegative: !!metadata.pair_negative_prompt,
+        hasUserOverrides: !!metadata.user_overrides,
+      });
+      return metadata;
+    },
+    enabled: !!pairShotGenerationId,
+    staleTime: 10000, // Cache for 10 seconds
+  });
+
   const { toast } = useToast();
 
   // File input refs for image uploads
@@ -271,6 +301,46 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   });
   const [isDirty, setIsDirty] = useState(false);
 
+  // Track if we've already applied pairMetadata (to avoid re-applying on every render)
+  const pairMetadataAppliedRef = React.useRef<string | null>(null);
+
+  // When pairMetadata loads, merge it into params
+  // Priority: pairMetadata > initialParams (pairMetadata is the source of truth)
+  useEffect(() => {
+    if (!pairMetadata || !pairShotGenerationId) return;
+
+    // Only apply once per pairShotGenerationId (avoid infinite loops)
+    if (pairMetadataAppliedRef.current === pairShotGenerationId) return;
+    pairMetadataAppliedRef.current = pairShotGenerationId;
+
+    const pairPrompt = pairMetadata.pair_prompt;
+    const pairNegative = pairMetadata.pair_negative_prompt;
+    const pairUserOverrides = pairMetadata.user_overrides || {};
+
+    console.log('[PairMetadata] 🔄 Merging pair metadata into params:', {
+      pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
+      pairPrompt: pairPrompt?.substring(0, 40) ?? '(none)',
+      pairNegative: pairNegative?.substring(0, 20) ?? '(none)',
+      userOverrideKeys: Object.keys(pairUserOverrides),
+    });
+
+    // Merge into params - pair_prompt takes priority over task params
+    setParams((prev: any) => ({
+      ...prev,
+      ...(pairPrompt !== undefined && { base_prompt: pairPrompt }),
+      ...(pairNegative !== undefined && { negative_prompt: pairNegative }),
+      ...pairUserOverrides,
+    }));
+
+    // Also update userOverrides state to track what came from pair metadata
+    if (Object.keys(pairUserOverrides).length > 0) {
+      setUserOverrides((prev) => ({
+        ...prev,
+        ...pairUserOverrides,
+      }));
+    }
+  }, [pairMetadata, pairShotGenerationId]);
+
   // Debounce timer ref for saving overrides
   const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   // Track pending overrides so we can flush on unmount
@@ -278,12 +348,103 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   // Stable ref for the callback so unmount can access it
   const onOverridesChangeRef = React.useRef(onOverridesChange);
   onOverridesChangeRef.current = onOverridesChange;
+  // Stable ref for pairShotGenerationId
+  const pairShotGenerationIdRef = React.useRef(pairShotGenerationId);
+  pairShotGenerationIdRef.current = pairShotGenerationId;
 
-  // Debounced save function
+  // Save directly to shot_generations.metadata (used when onOverridesChange is not provided)
+  // This mirrors the logic in SegmentSettingsModal.handleOverridesChange
+  const saveToPairMetadata = useCallback(async (overrides: Record<string, any> | null) => {
+    const shotGenId = pairShotGenerationIdRef.current;
+    if (!shotGenId) {
+      console.warn('[PairMetadata] Cannot save - no pairShotGenerationId');
+      return;
+    }
+
+    // Split overrides into prompts vs technical settings
+    const promptFields = ['base_prompt', 'prompt', 'negative_prompt'];
+    const technicalOverrides: Record<string, any> = {};
+    let newPairPrompt: string | undefined;
+    let newNegativePrompt: string | undefined;
+
+    if (overrides) {
+      for (const [key, value] of Object.entries(overrides)) {
+        if (key === 'base_prompt' || key === 'prompt') {
+          newPairPrompt = value as string;
+        } else if (key === 'negative_prompt') {
+          newNegativePrompt = value as string;
+        } else if (!promptFields.includes(key)) {
+          technicalOverrides[key] = value;
+        }
+      }
+    }
+
+    console.log('[PairMetadata] 💾 Saving to shot_generations.metadata:', {
+      shotGenId: shotGenId.substring(0, 8),
+      pairPrompt: newPairPrompt?.substring(0, 30) ?? '(unchanged)',
+      negativePrompt: newNegativePrompt?.substring(0, 20) ?? '(unchanged)',
+      technicalOverrideKeys: Object.keys(technicalOverrides),
+    });
+
+    try {
+      // Fetch current metadata
+      const { data: current, error: fetchError } = await supabase
+        .from('shot_generations')
+        .select('metadata')
+        .eq('id', shotGenId)
+        .single();
+
+      if (fetchError) {
+        console.error('[PairMetadata] Error fetching current metadata:', fetchError);
+        return;
+      }
+
+      const currentMetadata = (current?.metadata as Record<string, any>) || {};
+
+      // Build new metadata
+      const newMetadata: Record<string, any> = { ...currentMetadata };
+
+      // Update prompts
+      if (newPairPrompt !== undefined) {
+        newMetadata.pair_prompt = newPairPrompt;
+      }
+      if (newNegativePrompt !== undefined) {
+        newMetadata.pair_negative_prompt = newNegativePrompt;
+      }
+
+      // Update technical overrides
+      if (Object.keys(technicalOverrides).length > 0) {
+        newMetadata.user_overrides = {
+          ...(currentMetadata.user_overrides || {}),
+          ...technicalOverrides,
+        };
+      } else if (overrides === null) {
+        delete newMetadata.user_overrides;
+      }
+
+      // Save
+      const { error: updateError } = await supabase
+        .from('shot_generations')
+        .update({ metadata: newMetadata })
+        .eq('id', shotGenId);
+
+      if (updateError) {
+        console.error('[PairMetadata] Error saving metadata:', updateError);
+      } else {
+        console.log('[PairMetadata] ✅ Saved to shot_generations.metadata');
+        // Refetch to keep UI in sync
+        refetchPairMetadata();
+      }
+    } catch (error) {
+      console.error('[PairMetadata] Exception saving metadata:', error);
+    }
+  }, [refetchPairMetadata]);
+
+  // Debounced save function - uses onOverridesChange if provided, otherwise saves directly to DB
   const debouncedSaveOverrides = useCallback((overrides: Record<string, any>) => {
     // Track pending overrides for flush-on-unmount
     pendingOverridesRef.current = overrides;
-    
+
     // Clear any pending save
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -293,10 +454,16 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       const oKeys = Object.keys(overrides);
       const hasPrompt = 'base_prompt' in overrides || 'prompt' in overrides;
       console.log(`[PerPairData] 💾 TRIGGER SAVE (SegmentRegenerate) | segment=${segmentIndex} | keys=${oKeys.join(',') || 'none'} | hasPrompt=${hasPrompt}`);
-      onOverridesChangeRef.current?.(Object.keys(overrides).length > 0 ? overrides : null);
+
+      // Use callback if provided, otherwise save directly to DB
+      if (onOverridesChangeRef.current) {
+        onOverridesChangeRef.current(Object.keys(overrides).length > 0 ? overrides : null);
+      } else if (pairShotGenerationIdRef.current) {
+        saveToPairMetadata(Object.keys(overrides).length > 0 ? overrides : null);
+      }
       pendingOverridesRef.current = null; // Clear after save
     }, 1000);
-  }, [segmentIndex]);
+  }, [segmentIndex, saveToPairMetadata]);
 
   // Flush pending save on unmount (don't lose user's changes)
   useEffect(() => {
@@ -309,11 +476,15 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         const oKeys = Object.keys(pendingOverridesRef.current);
         console.log(`[PerPairData] 💾 FLUSH ON UNMOUNT | segment=${segmentIndex} | keys=${oKeys.join(',') || 'none'}`);
         const pending = pendingOverridesRef.current;
-        onOverridesChangeRef.current?.(Object.keys(pending).length > 0 ? pending : null);
+        if (onOverridesChangeRef.current) {
+          onOverridesChangeRef.current(Object.keys(pending).length > 0 ? pending : null);
+        } else if (pairShotGenerationIdRef.current) {
+          saveToPairMetadata(Object.keys(pending).length > 0 ? pending : null);
+        }
         pendingOverridesRef.current = null;
       }
     };
-  }, [segmentIndex]);
+  }, [segmentIndex, saveToPairMetadata]);
 
   // Helper to update a field and track it as a user override
   const updateOverride = useCallback((field: string, value: any) => {
