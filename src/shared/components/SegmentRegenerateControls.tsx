@@ -1112,12 +1112,32 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   ]);
 
   // Update local state when params prop changes, preserving user overrides
+  // IMPORTANT: Skip prompt fields if we have pairShotGenerationId - those come from pair metadata
   useEffect(() => {
     const normalized = getNormalizedParams(initialParams, { segmentIndex });
     const overrides = initialParams.user_overrides || {};
 
+    // If we have pairShotGenerationId, don't overwrite prompts from initialParams
+    // The pair metadata effect handles those
+    const finalParams = { ...normalized, ...overrides };
+    if (pairShotGenerationId) {
+      delete finalParams.base_prompt;
+      delete finalParams.prompt;
+      // Don't delete negative_prompt - that can come from pair metadata too
+      delete finalParams.negative_prompt;
+      console.log('[PairMetadata] 🛡️ initialParams effect skipping prompt fields (pairShotGenerationId exists)');
+    }
+
     // Apply user overrides on top of normalized defaults
-    setParams({ ...normalized, ...overrides });
+    setParams((prev: any) => ({
+      ...finalParams,
+      // Preserve existing prompt values if we have pairShotGenerationId
+      ...(pairShotGenerationId && {
+        base_prompt: prev.base_prompt,
+        prompt: prev.prompt,
+        negative_prompt: prev.negative_prompt,
+      }),
+    }));
     setUserOverrides(overrides);
     setIsDirty(false);
 
@@ -1151,7 +1171,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       });
       setSelectedLoras(restored);
     }
-  }, [initialParams, segmentIndex]);
+  }, [initialParams, segmentIndex, pairShotGenerationId]);
 
   return (
     <div className="space-y-4">

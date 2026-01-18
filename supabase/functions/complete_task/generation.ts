@@ -812,8 +812,12 @@ export async function createGenerationFromTask(
       if (!fetchError && childGen) {
         // Extract pair_shot_generation_id from nested locations if not at top level
         // This ensures the variant can be matched to the correct timeline slot
+        // Check: top level → individual_segment_params → orchestrator_details array (by segment_index)
+        const segmentIndex = taskData.params?.segment_index ?? 0;
+        const orchPairIds = taskData.params?.orchestrator_details?.pair_shot_generation_ids;
         const pairShotGenerationId = taskData.params?.pair_shot_generation_id ||
-                                      taskData.params?.individual_segment_params?.pair_shot_generation_id;
+                                      taskData.params?.individual_segment_params?.pair_shot_generation_id ||
+                                      (Array.isArray(orchPairIds) && orchPairIds[segmentIndex]);
 
         const variantParams = {
           ...taskData.params,

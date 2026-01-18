@@ -1655,14 +1655,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     // Extract pair_shot_generation_id for reading/writing per-pair metadata
     // This links regeneration to the specific timeline pair's settings
+    // Check: top level → individual_segment_params → currentSegmentImages → orchestrator_details array
+    const orchPairIds = taskParams.orchestrator_details?.pair_shot_generation_ids;
     const pairShotGenerationId = taskParams.pair_shot_generation_id ||
                                   taskParams.individual_segment_params?.pair_shot_generation_id ||
-                                  currentSegmentImages?.startShotGenerationId;
+                                  currentSegmentImages?.startShotGenerationId ||
+                                  (Array.isArray(orchPairIds) && orchPairIds[segmentIndex]);
 
     console.log('[PairMetadata] 🔗 MediaLightbox pairShotGenerationId sources:', {
       fromTaskParams: taskParams.pair_shot_generation_id?.substring(0, 8) ?? 'null',
       fromIndividualSegmentParams: taskParams.individual_segment_params?.pair_shot_generation_id?.substring(0, 8) ?? 'null',
       fromCurrentSegmentImages: currentSegmentImages?.startShotGenerationId?.substring(0, 8) ?? 'null',
+      fromOrchestratorDetails: (Array.isArray(orchPairIds) ? orchPairIds[segmentIndex]?.substring(0, 8) : null) ?? 'null',
       final: pairShotGenerationId?.substring(0, 8) ?? 'NULL',
     });
 
