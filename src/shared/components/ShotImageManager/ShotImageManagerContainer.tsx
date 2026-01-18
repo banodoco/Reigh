@@ -262,12 +262,15 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
             showTaskDetails={true}
             showVideoTrimEditor={true}
             fetchVariantsForSelf={true}
+            currentSegmentImages={{
+              startShotGenerationId: currentSegmentSlot?.pairShotGenerationId,
+            }}
           />
         )}
       </>
     );
   }
-  
+
   // Desktop rendering
   return (
     <>
@@ -308,6 +311,9 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
           showTaskDetails={true}
           showVideoTrimEditor={true}
           fetchVariantsForSelf={true}
+          currentSegmentImages={{
+            startShotGenerationId: currentSegmentSlot?.pairShotGenerationId,
+          }}
         />
       )}
     </>

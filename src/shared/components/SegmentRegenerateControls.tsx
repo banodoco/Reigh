@@ -146,17 +146,6 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   onFrameCountChange,
   onGenerateStarted,
 }) => {
-  // [PairMetadata] Log props received by SegmentRegenerateControls
-  console.log('[PairMetadata] 🎬 SegmentRegenerateControls MOUNTED:', {
-    projectId: projectId?.substring(0, 8) || null,
-    generationId: generationId?.substring(0, 8) || null,
-    shotId: shotId?.substring(0, 8) || null,
-    pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || null,
-    segmentIndex,
-    isRegeneration,
-    initialPrompt: initialParams?.base_prompt?.substring(0, 30) || initialParams?.prompt?.substring(0, 30) || '(none)',
-  });
-
   // Fetch shot's structure video settings directly using shotId
   // This ensures we have the latest settings even if initialParams are stale
   // NOTE: Structure videos are stored under 'travel-structure-video' key (via useStructureVideo hook)
@@ -224,25 +213,16 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     queryKey: ['pair-metadata', pairShotGenerationId],
     queryFn: async () => {
       if (!pairShotGenerationId) return null;
-      console.log('[PairMetadata] 🔍 Fetching pair metadata for shot_generation:', pairShotGenerationId?.substring(0, 8));
       const { data, error } = await supabase
         .from('shot_generations')
         .select('metadata')
         .eq('id', pairShotGenerationId)
         .single();
       if (error) {
-        console.error('[PairMetadata] ❌ Error fetching pair metadata:', error);
+        console.error('[PairMetadata] Error fetching:', error);
         return null;
       }
-      const metadata = (data?.metadata as Record<string, any>) || {};
-      console.log('[PairMetadata] ✅ Loaded pair metadata:', {
-        pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
-        hasPairPrompt: !!metadata.pair_prompt,
-        pairPrompt: metadata.pair_prompt?.substring(0, 40) ?? '(none)',
-        hasPairNegative: !!metadata.pair_negative_prompt,
-        hasUserOverrides: !!metadata.user_overrides,
-      });
-      return metadata;
+      return (data?.metadata as Record<string, any>) || {};
     },
     enabled: !!pairShotGenerationId,
     staleTime: 10000, // Cache for 10 seconds
