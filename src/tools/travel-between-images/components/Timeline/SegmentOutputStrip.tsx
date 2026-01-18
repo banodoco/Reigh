@@ -433,6 +433,9 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
           showTaskDetails={true}
           showVideoTrimEditor={true}
           fetchVariantsForSelf={true}
+          currentSegmentImages={{
+            startShotGenerationId: currentLightboxSlot?.pairShotGenerationId,
+          }}
         />
       )}
       
