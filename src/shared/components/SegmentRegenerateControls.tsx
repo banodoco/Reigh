@@ -146,6 +146,11 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   onFrameCountChange,
   onGenerateStarted,
 }) => {
+  // Log on mount to debug pairShotGenerationId flow
+  useEffect(() => {
+    console.log('[PairMetadata] 🎬 Component mounted with pairShotGenerationId:', pairShotGenerationId?.substring(0, 8) ?? 'NULL');
+  }, []);
+
   // Fetch shot's structure video settings directly using shotId
   // This ensures we have the latest settings even if initialParams are stale
   // NOTE: Structure videos are stored under 'travel-structure-video' key (via useStructureVideo hook)
