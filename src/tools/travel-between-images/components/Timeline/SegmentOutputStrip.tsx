@@ -367,17 +367,6 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
           overflow: 'visible',
         }}
       >
-        {/* Final output play button - if there's a final joined video, show play icon on right */}
-        {hasFinalOutput && parentVideoRow && (
-          <button
-            className="absolute top-1 right-2 z-30 h-6 px-2 flex items-center gap-1 text-[10px] bg-background/95 hover:bg-background border border-border/50 rounded-md transition-colors"
-            onClick={() => setIsParentLightboxOpen(true)}
-          >
-            <Play className="w-3 h-3" fill="currentColor" />
-            <span>Play Full</span>
-          </button>
-        )}
-
         {/* Segment thumbnails - positioned to align with timeline pairs */}
         <div className="absolute left-0 right-0 top-5 bottom-1 overflow-hidden">
           {displaySlots.length > 0 && segmentPositions.length > 0 ? (
@@ -426,7 +415,10 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
         <MediaLightbox
           media={{
             ...currentLightboxMedia,
-            parent_generation_id: selectedParentId,
+            // Only override parent_generation_id if selectedParentId is set
+            // Otherwise keep the existing parent_generation_id from the child generation row
+            // This is critical for childGenerationId calculation in MediaLightbox regenerate mode
+            ...(selectedParentId ? { parent_generation_id: selectedParentId } : {}),
           } as GenerationRow}
           onClose={handleLightboxClose}
           onNext={handleLightboxNext}

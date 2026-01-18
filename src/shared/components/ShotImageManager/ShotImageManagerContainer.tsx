@@ -246,7 +246,8 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
           <MediaLightbox
             media={{
               ...currentSegmentMedia,
-              parent_generation_id: selectedParentId,
+              // Only override parent_generation_id if selectedParentId is set
+              ...(selectedParentId ? { parent_generation_id: selectedParentId } : {}),
             } as GenerationRow}
             onClose={() => setSegmentLightboxIndex(null)}
             onNext={handleSegmentLightboxNext}
@@ -291,7 +292,8 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
         <MediaLightbox
           media={{
             ...currentSegmentMedia,
-            parent_generation_id: selectedParentId,
+            // Only override parent_generation_id if selectedParentId is set
+            ...(selectedParentId ? { parent_generation_id: selectedParentId } : {}),
           } as GenerationRow}
           onClose={() => setSegmentLightboxIndex(null)}
           onNext={handleSegmentLightboxNext}
