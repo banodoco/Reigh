@@ -55,8 +55,8 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   const [duration, setDuration] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   
-  // Frame rate for frame number calculation (standard video fps)
-  const FPS = 24;
+  // Frame rate for frame number calculation (Wan model outputs 16fps)
+  const FPS = 16;
   
   // Get variant badge data for child slots
   const generationId = slot.type === 'child' ? slot.child.id : null;

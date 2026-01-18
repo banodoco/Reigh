@@ -467,6 +467,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   const [previewIsPlaying, setPreviewIsPlaying] = useState(true);
   const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
   const [previewDuration, setPreviewDuration] = useState(0);
+  const [isPreviewVideoLoading, setIsPreviewVideoLoading] = useState(true);
   
   // Audio sync state for preview
   const [segmentDurations, setSegmentDurations] = useState<number[]>([]);
@@ -531,6 +532,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // Preview video effects - handles video segments
   React.useEffect(() => {
     if (isPreviewTogetherOpen && previewVideoRef.current) {
+      setIsPreviewVideoLoading(true);
       previewVideoRef.current.load();
       previewVideoRef.current.play().catch(() => {});
     }
@@ -552,6 +554,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       setPreviewCurrentTime(0);
       setPreviewDuration(0);
       setPreviewIsPlaying(false); // Reset to false when closed
+      setIsPreviewVideoLoading(true); // Reset for next open
       // Reset audio state
       setSegmentDurations([]);
       setSegmentOffsets([]);
@@ -716,7 +719,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     });
     
     // FPS for calculating duration from frames
-    const FPS = 24;
+    const FPS = 16;
     
     // Build segments from ALL image pairs, enriching with video data from slots if available
     const segments = [];
@@ -2299,9 +2302,26 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 crossfadeProgress,
               });
               
+              // Calculate aspect ratio for consistent container sizing
+              const previewAspectStyle = (() => {
+                if (!projectAspectRatio) return { aspectRatio: '16/9' };
+                const [w, h] = projectAspectRatio.split(':').map(Number);
+                if (w && h) return { aspectRatio: `${w}/${h}` };
+                return { aspectRatio: '16/9' };
+              })();
+
               return (
                 <div className="space-y-4">
-                  <div className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center" style={{ minHeight: '300px' }}>
+                  <div
+                    className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center"
+                    style={{ minHeight: '300px', maxHeight: '60vh', ...previewAspectStyle }}
+                  >
+                    {/* Loading skeleton - shown while video is loading */}
+                    {currentSegment.hasVideo && isPreviewVideoLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Skeleton className="w-full h-full bg-muted/20" />
+                      </div>
+                    )}
                     {currentSegment.hasVideo ? (
                       // Video segment
                       <video
@@ -2350,7 +2370,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           if (video) {
                             const actualDuration = video.duration;
                             const expectedDuration = currentSegment.durationFromFrames || actualDuration;
-                            
+
                             // Adjust playback rate so video matches segment duration
                             if (expectedDuration > 0 && actualDuration > 0) {
                               const playbackRate = actualDuration / expectedDuration;
@@ -2362,10 +2382,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                                 rate: video.playbackRate.toFixed(2),
                               });
                             }
-                            
+
                             // Show expected duration in UI (what the segment should last)
                             setPreviewDuration(expectedDuration);
                             setPreviewCurrentTime(0);
+                            setIsPreviewVideoLoading(false);
                             syncAudioToVideo();
                           }
                         }}

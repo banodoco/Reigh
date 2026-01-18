@@ -1,6 +1,7 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { CollapsibleSection } from '@/shared/components/ui/collapsible-section';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
+import { Switch } from '@/shared/components/ui/switch';
 import { RotateCcw } from 'lucide-react';
 import { HiresFixConfig, DEFAULT_HIRES_FIX_CONFIG, ResolutionMode } from '../types';
 import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
@@ -46,12 +47,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
     });
   };
 
-  // Auto-enable when this section is shown
-  useEffect(() => {
-    if (hiresFixConfig && !hiresFixConfig.enabled) {
-      onHiresFixConfigChange({ ...hiresFixConfig, enabled: true });
-    }
-  }, [hiresFixConfig, onHiresFixConfigChange]);
+  const isEnabled = hiresFixConfig?.enabled ?? true;
 
   // Reset to defaults
   const handleResetDefaults = useCallback(() => {
@@ -63,7 +59,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
     return null;
   }
 
-  const resetButton = (
+  const headerAction = (
     <div
       role="button"
       tabIndex={0}
@@ -109,7 +105,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
   }, [hiresFixConfig.resolution_mode, hiresFixConfig.custom_aspect_ratio, hiresFixConfig.resolution_scale, projectResolution]);
 
   return (
-    <CollapsibleSection title="Advanced generation settings" headerAction={resetButton}>
+    <CollapsibleSection title="Advanced generation settings" headerAction={headerAction}>
       <div className="space-y-4">
         {/* Resolution Configuration - single row on desktop */}
         <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
@@ -212,11 +208,19 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
 
             {/* Phase 2: Hires Refinement */}
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide">Phase 2</span>
-                <span className="text-xs text-muted-foreground">Hires Refinement</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide">Phase 2</span>
+                  <span className="text-xs text-muted-foreground">Hires Refinement</span>
+                </div>
+                <Switch
+                  size="sm"
+                  checked={isEnabled}
+                  onCheckedChange={(checked) => updateField('enabled', checked)}
+                  disabled={disabled}
+                />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${!isEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
                 <SliderWithValue
                   label="Steps"
                   value={hiresFixConfig.hires_steps ?? 8}
@@ -224,7 +228,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
                   min={1}
                   max={16}
                   step={1}
-                  disabled={disabled}
+                  disabled={disabled || !isEnabled}
                   numberInputClassName="w-20"
                 />
                 <SliderWithValue
@@ -234,7 +238,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
                   min={1.0}
                   max={4.0}
                   step={0.1}
-                  disabled={disabled}
+                  disabled={disabled || !isEnabled}
                   numberInputClassName="w-20"
                 />
                 <SliderWithValue
@@ -244,7 +248,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
                   min={0.1}
                   max={1.0}
                   step={0.05}
-                  disabled={disabled}
+                  disabled={disabled || !isEnabled}
                   numberInputClassName="w-20"
                 />
                 <SliderWithValue
@@ -254,7 +258,7 @@ export const GenerationSettingsSection: React.FC<GenerationSettingsSectionProps>
                   min={0}
                   max={1.0}
                   step={0.01}
-                  disabled={disabled}
+                  disabled={disabled || !isEnabled}
                   numberInputClassName="w-20"
                 />
               </div>
