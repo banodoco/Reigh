@@ -179,12 +179,15 @@ function buildBatchTaskParams(input: BuildBatchTaskParamsInput): BatchImageGener
     resolution_scale: input.hiresFixConfig.resolution_scale,
     resolution_mode: input.hiresFixConfig.resolution_mode,
     custom_aspect_ratio: input.hiresFixConfig.custom_aspect_ratio,
-    // Hires fix params - only for local generation
+    // Phase 1 params - only for local generation
     ...(input.isLocalGenerationEnabled && {
+      lightning_lora_strength_phase_1: input.hiresFixConfig.lightning_lora_strength_phase_1,
+    }),
+    // Phase 2 / Hires fix params - only for local generation AND when enabled
+    ...(input.isLocalGenerationEnabled && input.hiresFixConfig.enabled && {
       hires_scale: input.hiresFixConfig.hires_scale,
       hires_steps: input.hiresFixConfig.hires_steps,
       hires_denoise: input.hiresFixConfig.hires_denoise,
-      lightning_lora_strength_phase_1: input.hiresFixConfig.lightning_lora_strength_phase_1,
       lightning_lora_strength_phase_2: input.hiresFixConfig.lightning_lora_strength_phase_2,
       // phaseLoraStrengths is UI structure, transform to API format
       additional_loras: Object.fromEntries(
@@ -289,6 +292,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Generation source toggle: by-reference or just-text
   const [generationSource, setGenerationSource] = useState<GenerationSource>('by-reference');
   const [selectedTextModel, setSelectedTextModel] = useState<TextToImageModel>('qwen-image');
+  // Refs to track current values - prevents stale closure issues in callbacks
+  const generationSourceRef = useRef<GenerationSource>(generationSource);
+  const selectedTextModelRef = useRef<TextToImageModel>(selectedTextModel);
+  useEffect(() => { generationSourceRef.current = generationSource; }, [generationSource]);
+  useEffect(() => { selectedTextModelRef.current = selectedTextModel; }, [selectedTextModel]);
   const [isUploadingStyleReference, setIsUploadingStyleReference] = useState<boolean>(false);
   // Optimistic local override for style reference image so UI updates immediately
   // undefined => no override, use settings; string|null => explicit override
@@ -1189,6 +1197,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Also swap LORAs when changing categories (e.g., by-reference → just-text z-image)
   const handleGenerationSourceChange = useCallback(async (source: GenerationSource) => {
     const previousSource = generationSource;
+    console.log('[GenerationSourceDebug] handleGenerationSourceChange called:', { previousSource, newSource: source, selectedTextModel });
     setGenerationSource(source);
     markAsInteracted();
 
@@ -1239,9 +1248,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Swap LORAs only when changing categories (qwen ↔ z-image), not between Qwen variants
   const handleTextModelChange = useCallback(async (model: TextToImageModel) => {
     const previousModel = selectedTextModel;
+    console.log('[GenerationSourceDebug] handleTextModelChange called:', { previousModel, newModel: model, generationSource });
     const previousCategory = getLoraCategoryForModel(previousModel);
     const newCategory = getLoraCategoryForModel(model);
-    
+
     setSelectedTextModel(model);
     markAsInteracted();
 
@@ -2504,14 +2514,26 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return null;
     }
 
+    // Use refs to ensure we always get the latest value (prevents stale closure bugs)
+    const currentGenerationSource = generationSourceRef.current;
+    const currentTextModel = selectedTextModelRef.current;
+
     // Validate: require style reference for by-reference mode
-    if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
+    if (currentGenerationSource === 'by-reference' && !styleReferenceImageGeneration) {
       toast.error("Please upload a style reference image for by-reference mode.");
       return null;
     }
 
     // Only include reference params for by-reference mode
-    const referenceParams: ReferenceApiParams = generationSource === 'by-reference' ? {
+    console.log('[GenerationSourceDebug] getTaskParams building params:', {
+      generationSource,
+      generationSourceRef: currentGenerationSource,
+      selectedTextModel,
+      selectedTextModelRef: currentTextModel,
+      styleReferenceImageGeneration,
+      willIncludeReferenceParams: currentGenerationSource === 'by-reference'
+    });
+    const referenceParams: ReferenceApiParams = currentGenerationSource === 'by-reference' ? {
       style_reference_image: styleReferenceImageGeneration ?? undefined,
       style_reference_strength: currentStyleStrength,
       subject_strength: currentSubjectStrength,
@@ -2531,7 +2553,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       styleBoostTerms: currentStyleBoostTerms,
       isLocalGenerationEnabled,
       hiresFixConfig,
-      modelName: generationSource === 'just-text' ? selectedTextModel : 'qwen-image',
+      modelName: currentGenerationSource === 'just-text' ? currentTextModel : 'qwen-image',
       referenceParams,
     });
   }, [
@@ -2593,8 +2615,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return;
     }
 
-    // Validate early before AI call
-    if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
+    // Validate early before AI call (use ref to ensure latest value)
+    if (generationSourceRef.current === 'by-reference' && !styleReferenceImageGeneration) {
       toast.error("Please upload a style reference image for by-reference mode.");
       return;
     }
@@ -2671,19 +2693,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         return;
       }
 
+      // Capture current values for the background operation (necessary because async runs in background)
+      // Use refs to ensure we always get the latest value (prevents stale closure bugs)
+      const currentGenerationSource = generationSourceRef.current;
+      const currentTextModel = selectedTextModelRef.current;
+
       // Validate early before starting background operation
-      if (generationSource === 'by-reference' && !styleReferenceImageGeneration) {
+      if (currentGenerationSource === 'by-reference' && !styleReferenceImageGeneration) {
         toast.error("Please upload a style reference image for by-reference mode.");
         return;
       }
-
-      // Capture current values for the background operation (necessary because async runs in background)
+      console.log('[GenerationSourceDebug] Automated mode capturing values:', {
+        generationSource,
+        generationSourceRef: currentGenerationSource,
+        selectedTextModel,
+        selectedTextModelRef: currentTextModel,
+        styleReferenceImageGeneration,
+        computedModelName: currentGenerationSource === 'just-text' ? currentTextModel : 'qwen-image'
+      });
       const capturedMasterPrompt = masterPromptText;
       const capturedImagesPerPrompt = imagesPerPrompt;
       const capturedPromptMultiplier = promptMultiplier;
       const capturedProjectId = selectedProjectId!;
       const capturedAssociatedShotId = associatedShotId;
-      const capturedGenerationSource = generationSource;
+      const capturedGenerationSource = currentGenerationSource;
       const capturedStyleRef = styleReferenceImageGeneration;
       const capturedStyleStrength = currentStyleStrength;
       const capturedSubjectStrength = currentSubjectStrength;
@@ -2696,7 +2729,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const capturedStyleBoostTerms = currentStyleBoostTerms;
       const capturedIsLocalGenerationEnabled = isLocalGenerationEnabled;
       const capturedHiresFixConfig = hiresFixConfig;
-      const capturedModelName = generationSource === 'just-text' ? selectedTextModel : 'qwen-image';
+      const capturedModelName = currentGenerationSource === 'just-text' ? currentTextModel : 'qwen-image';
 
       // Trigger button state: submitting (1s) → success (2s) → idle
       automatedSubmitButton.trigger();

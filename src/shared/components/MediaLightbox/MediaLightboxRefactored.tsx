@@ -1051,7 +1051,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     onNext,
     onPrevious,
     onClose,
-    isInpaintMode,
   });
   const { safeClose, activateClickShield } = navigationHook;
 

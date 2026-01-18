@@ -4,7 +4,6 @@ export interface UseLightboxNavigationProps {
   onNext?: () => void;
   onPrevious?: () => void;
   onClose: () => void;
-  isInpaintMode?: boolean;
 }
 
 export interface UseLightboxNavigationReturn {
@@ -20,7 +19,6 @@ export const useLightboxNavigation = ({
   onNext,
   onPrevious,
   onClose,
-  isInpaintMode = false,
 }: UseLightboxNavigationProps): UseLightboxNavigationReturn => {
   
   // Short-lived global click shield to absorb iOS synthetic clicks after touchend
@@ -114,16 +112,13 @@ export const useLightboxNavigation = ({
         onNext();
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        // Prevent closing when in inpaint mode to avoid accidental data loss
-        if (!isInpaintMode) {
-          onClose();
-        }
+        onClose();
       }
     };
 
     window.addEventListener('keydown', handleWindowKeyDown);
     return () => window.removeEventListener('keydown', handleWindowKeyDown);
-  }, [onNext, onPrevious, onClose, isInpaintMode]);
+  }, [onNext, onPrevious, onClose]);
 
   return {
     safeClose,
