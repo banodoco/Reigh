@@ -146,10 +146,16 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   onFrameCountChange,
   onGenerateStarted,
 }) => {
+  // Unique instance ID to track component recreation
+  const instanceId = useMemo(() => Math.random().toString(36).substring(2, 6), []);
+
   // Log on mount to debug pairShotGenerationId flow
   useEffect(() => {
-    console.log('[PairMetadata] 🎬 Component mounted with pairShotGenerationId:', pairShotGenerationId?.substring(0, 8) ?? 'NULL');
-  }, []);
+    console.log(`[PairMetadata] 🎬 MOUNT instance=${instanceId} pairShotGenerationId=${pairShotGenerationId?.substring(0, 8) ?? 'NULL'}`);
+    return () => {
+      console.log(`[PairMetadata] 💀 UNMOUNT instance=${instanceId}`);
+    };
+  }, [instanceId, pairShotGenerationId]);
 
   // Fetch shot's structure video settings directly using shotId
   // This ensures we have the latest settings even if initialParams are stale
