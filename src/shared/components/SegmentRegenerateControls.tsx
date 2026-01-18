@@ -289,7 +289,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   // Use shared normalization utility, then apply user overrides on top
   // IMPORTANT: If pairShotGenerationId exists, we'll load prompt from pair metadata instead
   // so don't use the stale prompt from initialParams
-  const [params, setParams] = useState<any>(() => {
+  const [params, setParamsInternal] = useState<any>(() => {
     const normalized = getNormalizedParams(initialParams, { segmentIndex });
     const overrides = initialParams.user_overrides || {};
     const final = { ...normalized, ...overrides };
@@ -300,9 +300,28 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       delete final.prompt;
     }
 
+    console.log('[PairMetadata] 🏗️ useState INIT:', {
+      hasPairShotGenId: !!pairShotGenerationId,
+      promptCleared: !!pairShotGenerationId,
+      initialPrompt: final.base_prompt ?? '(cleared)',
+    });
+
     return final;
   });
   const [isDirty, setIsDirty] = useState(false);
+
+  // Wrapper to log all setParams calls
+  const setParams = useCallback((updater: any) => {
+    setParamsInternal((prev: any) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      console.log('[PairMetadata] 📝 setParams called:', {
+        prevPrompt: prev?.base_prompt?.substring(0, 30) ?? '(none)',
+        nextPrompt: next?.base_prompt?.substring(0, 30) ?? '(none)',
+        stack: new Error().stack?.split('\n')[2]?.trim(),
+      });
+      return next;
+    });
+  }, []);
 
   // When pairMetadata loads, apply it to params
   // This is the source of truth for prompts when pairShotGenerationId exists
@@ -313,11 +332,9 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     const pairNegative = pairMetadata.pair_negative_prompt;
     const pairUserOverrides = pairMetadata.user_overrides || {};
 
-    console.log('[PairMetadata] ✅ Loaded from DB:', {
+    console.log('[PairMetadata] ✅ Loaded from DB, applying:', {
       pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
       pairPrompt: pairPrompt ?? '(none)',
-      hasNegative: !!pairNegative,
-      overrideKeys: Object.keys(pairUserOverrides),
     });
 
     // Apply pair metadata to params
@@ -332,7 +349,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     if (Object.keys(pairUserOverrides).length > 0) {
       setUserOverrides((prev) => ({ ...prev, ...pairUserOverrides }));
     }
-  }, [pairMetadata, pairShotGenerationId]);
+  }, [pairMetadata, pairShotGenerationId, setParams]);
 
   // Debounce timer ref for saving overrides
   const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);

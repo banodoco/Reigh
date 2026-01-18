@@ -810,11 +810,18 @@ export async function createGenerationFromTask(
         .single();
 
       if (!fetchError && childGen) {
+        // Extract pair_shot_generation_id from nested locations if not at top level
+        // This ensures the variant can be matched to the correct timeline slot
+        const pairShotGenerationId = taskData.params?.pair_shot_generation_id ||
+                                      taskData.params?.individual_segment_params?.pair_shot_generation_id;
+
         const variantParams = {
           ...taskData.params,
           tool_type: TOOL_TYPES.TRAVEL_BETWEEN_IMAGES,
           source_task_id: taskId,
           created_from: 'individual_segment_regeneration',
+          // Ensure pair_shot_generation_id is at top level for slot matching
+          ...(pairShotGenerationId && { pair_shot_generation_id: pairShotGenerationId }),
         };
 
         // Respect make_primary_variant flag from UI (defaults to true for backward compatibility)
