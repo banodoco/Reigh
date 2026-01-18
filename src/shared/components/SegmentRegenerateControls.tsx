@@ -272,77 +272,50 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   );
 
   // Use shared normalization utility, then apply user overrides on top
+  // IMPORTANT: If pairShotGenerationId exists, we'll load prompt from pair metadata instead
+  // so don't use the stale prompt from initialParams
   const [params, setParams] = useState<any>(() => {
     const normalized = getNormalizedParams(initialParams, { segmentIndex });
     const overrides = initialParams.user_overrides || {};
     const final = { ...normalized, ...overrides };
-    const initP = initialParams.base_prompt || initialParams.prompt;
-    const normP = normalized.base_prompt;
-    const finalP = final.base_prompt;
-    console.log(`[PerPairData]   PROMPT CHAIN | initial=${initP ? `"${initP.substring(0, 25)}..."` : 'null'} → normalized=${normP ? `"${normP.substring(0, 25)}..."` : 'null'} → final=${finalP ? `"${finalP.substring(0, 25)}..."` : 'null'}`);
+
+    // If we have pairShotGenerationId, clear the prompt - it will come from pair metadata
+    if (pairShotGenerationId) {
+      delete final.base_prompt;
+      delete final.prompt;
+    }
+
     return final;
   });
   const [isDirty, setIsDirty] = useState(false);
 
-  // Track if we've already applied pairMetadata (to avoid re-applying on every render)
-  const pairMetadataAppliedRef = React.useRef<string | null>(null);
-
-  // When pairMetadata loads, merge it into params
-  // Priority: pairMetadata > initialParams (pairMetadata is the source of truth)
+  // When pairMetadata loads, apply it to params
+  // This is the source of truth for prompts when pairShotGenerationId exists
   useEffect(() => {
-    console.log('[PairMetadata] 📥 Effect triggered:', {
-      hasPairMetadata: !!pairMetadata,
-      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) ?? 'none',
-      alreadyApplied: pairMetadataAppliedRef.current === pairShotGenerationId,
-      currentPromptInParams: params?.base_prompt?.substring(0, 30) ?? '(none)',
-    });
-
-    if (!pairMetadata || !pairShotGenerationId) {
-      console.log('[PairMetadata] ⏭️ Skipping merge - missing data');
-      return;
-    }
-
-    // Only apply once per pairShotGenerationId (avoid infinite loops)
-    if (pairMetadataAppliedRef.current === pairShotGenerationId) {
-      console.log('[PairMetadata] ⏭️ Skipping merge - already applied for this ID');
-      return;
-    }
-    pairMetadataAppliedRef.current = pairShotGenerationId;
+    if (!pairMetadata || !pairShotGenerationId) return;
 
     const pairPrompt = pairMetadata.pair_prompt;
     const pairNegative = pairMetadata.pair_negative_prompt;
     const pairUserOverrides = pairMetadata.user_overrides || {};
 
-    console.log('[PairMetadata] 🔄 Merging pair metadata into params:', {
+    console.log('[PairMetadata] ✅ Loaded from DB:', {
       pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
-      pairPrompt: pairPrompt?.substring(0, 40) ?? '(none)',
-      pairNegative: pairNegative?.substring(0, 20) ?? '(none)',
-      userOverrideKeys: Object.keys(pairUserOverrides),
-      willSetBasePrompt: pairPrompt !== undefined,
-      willSetNegativePrompt: pairNegative !== undefined,
+      pairPrompt: pairPrompt ?? '(none)',
+      hasNegative: !!pairNegative,
+      overrideKeys: Object.keys(pairUserOverrides),
     });
 
-    // Merge into params - pair_prompt takes priority over task params
-    setParams((prev: any) => {
-      const newParams = {
-        ...prev,
-        ...(pairPrompt !== undefined && { base_prompt: pairPrompt }),
-        ...(pairNegative !== undefined && { negative_prompt: pairNegative }),
-        ...pairUserOverrides,
-      };
-      console.log('[PairMetadata] ✅ Params updated:', {
-        oldPrompt: prev?.base_prompt?.substring(0, 30) ?? '(none)',
-        newPrompt: newParams?.base_prompt?.substring(0, 30) ?? '(none)',
-      });
-      return newParams;
-    });
+    // Apply pair metadata to params
+    setParams((prev: any) => ({
+      ...prev,
+      ...(pairPrompt !== undefined && { base_prompt: pairPrompt, prompt: pairPrompt }),
+      ...(pairNegative !== undefined && { negative_prompt: pairNegative }),
+      ...pairUserOverrides,
+    }));
 
-    // Also update userOverrides state to track what came from pair metadata
+    // Track overrides from pair metadata
     if (Object.keys(pairUserOverrides).length > 0) {
-      setUserOverrides((prev) => ({
-        ...prev,
-        ...pairUserOverrides,
-      }));
+      setUserOverrides((prev) => ({ ...prev, ...pairUserOverrides }));
     }
   }, [pairMetadata, pairShotGenerationId]);
 
@@ -383,7 +356,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
     console.log('[PairMetadata] 💾 Saving to shot_generations.metadata:', {
       shotGenId: shotGenId.substring(0, 8),
-      pairPrompt: newPairPrompt?.substring(0, 30) ?? '(unchanged)',
+      pairPromptFull: newPairPrompt ?? '(unchanged)',
       negativePrompt: newNegativePrompt?.substring(0, 20) ?? '(unchanged)',
       technicalOverrideKeys: Object.keys(technicalOverrides),
     });
