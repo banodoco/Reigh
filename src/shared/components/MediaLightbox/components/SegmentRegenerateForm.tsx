@@ -33,8 +33,6 @@ export interface SegmentRegenerateFormProps {
   pairShotGenerationId?: string;
   /** Project resolution for output */
   projectResolution?: string;
-  /** Callback when user overrides change - for persisting to database */
-  onOverridesChange?: (overrides: Record<string, any> | null) => void;
 }
 
 export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
@@ -50,7 +48,6 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   endImageGenerationId,
   pairShotGenerationId,
   projectResolution,
-  onOverridesChange,
 }) => {
   // Debug log to verify shotId and structure guidance are being passed (UNIFIED FORMAT)
   // In the unified format, videos are INSIDE structure_guidance.videos, not a separate array
@@ -89,7 +86,6 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         queryKeyPrefix="lightbox-segment-presets"
         buttonLabel="Regenerate Video"
         showHeader={false}
-        onOverridesChange={onOverridesChange}
       />
     </div>
   );

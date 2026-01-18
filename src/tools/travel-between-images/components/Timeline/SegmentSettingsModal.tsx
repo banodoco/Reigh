@@ -1,11 +1,10 @@
-import React, { useCallback } from "react";
+import React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMediumModal } from '@/shared/hooks/useModal';
 import { framesToSeconds } from "./utils/time-utils";
 import { SegmentRegenerateControls } from "@/shared/components/SegmentRegenerateControls";
-import { supabase } from "@/integrations/supabase/client";
 
 interface SegmentSettingsModalProps {
   isOpen: boolean;
@@ -134,102 +133,6 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
     }
   }, [isOpen, hasNext, hasPrevious, handleNavigateNext, handleNavigatePrevious]);
 
-  // Save overrides to shot_generations.metadata when they change
-  // PROMPTS: Save directly to pair_prompt/pair_negative_prompt (affects overall generation)
-  // TECHNICAL SETTINGS: Save to user_overrides (regen-only, doesn't affect overall generation)
-  const handleOverridesChange = useCallback(async (overrides: Record<string, any> | null) => {
-    const shotGenId = pairData?.startImage?.id;
-    if (!shotGenId) {
-      console.warn('[SegmentSettingsModal] Cannot save overrides - no startImage.id');
-      return;
-    }
-
-    // Split overrides into prompts (affect overall gen) vs technical (regen-only)
-    const promptFields = ['base_prompt', 'prompt', 'negative_prompt'];
-    const technicalOverrides: Record<string, any> = {};
-    let newPairPrompt: string | undefined;
-    let newNegativePrompt: string | undefined;
-
-    if (overrides) {
-      for (const [key, value] of Object.entries(overrides)) {
-        if (key === 'base_prompt' || key === 'prompt') {
-          // base_prompt and prompt are synonymous - save to pair_prompt
-          newPairPrompt = value as string;
-        } else if (key === 'negative_prompt') {
-          newNegativePrompt = value as string;
-        } else if (!promptFields.includes(key)) {
-          // Everything else goes to user_overrides (LoRAs, motion, phase_config, etc.)
-          technicalOverrides[key] = value;
-        }
-      }
-    }
-
-    const pairIdx = pairData?.index;
-    const ppSave = newPairPrompt !== undefined ? `"${newPairPrompt?.substring(0, 35)}..."` : '(unchanged)';
-    const npSave = newNegativePrompt !== undefined ? `"${newNegativePrompt?.substring(0, 20)}..."` : '(unchanged)';
-    const uoSave = Object.keys(technicalOverrides).length > 0 ? Object.keys(technicalOverrides).join(',') : '(none)';
-    console.log(`[PerPairData] 💾 SAVE (SegmentSettingsModal) | pair=${pairIdx} → ${shotGenId.substring(0, 8)} | pair_prompt=${ppSave} | negative=${npSave} | overrides=${uoSave}`);
-
-    try {
-      // First fetch current metadata
-      const { data: current, error: fetchError } = await supabase
-        .from('shot_generations')
-        .select('metadata')
-        .eq('id', shotGenId)
-        .single();
-
-      if (fetchError) {
-        console.error('[SegmentSettingsModal] Error fetching current metadata:', fetchError);
-        return;
-      }
-
-      const currentMetadata = (current?.metadata as Record<string, any>) || {};
-      
-      // Build new metadata:
-      // - Prompts go directly to pair_prompt/pair_negative_prompt (affects overall generation)
-      // - Technical settings go to user_overrides (regen-only)
-      const newMetadata: Record<string, any> = {
-        ...currentMetadata,
-      };
-
-      // Update prompts directly (these affect overall generation)
-      // Priority: pair_prompt > enhanced_prompt > global base_prompt
-      // Keep enhanced_prompt as AI backup - user can "restore to AI version" later
-      if (newPairPrompt !== undefined) {
-        newMetadata.pair_prompt = newPairPrompt;
-        // Don't delete enhanced_prompt! It's the AI backup for "restore to AI version"
-      }
-      if (newNegativePrompt !== undefined) {
-        newMetadata.pair_negative_prompt = newNegativePrompt;
-      }
-
-      // Update technical overrides (regen-only)
-      if (Object.keys(technicalOverrides).length > 0) {
-        newMetadata.user_overrides = {
-          ...(currentMetadata.user_overrides || {}),
-          ...technicalOverrides,
-        };
-      } else if (overrides === null) {
-        // If overrides is null, clear everything
-        delete newMetadata.user_overrides;
-      }
-
-      // Update with merged metadata
-      const { error: updateError } = await supabase
-        .from('shot_generations')
-        .update({ metadata: newMetadata })
-        .eq('id', shotGenId);
-
-      if (updateError) {
-        console.error('[SegmentSettingsModal] Error saving overrides:', updateError);
-      } else {
-        console.log(`[PerPairData] ✅ SAVED (SegmentSettingsModal) | ${shotGenId.substring(0, 8)} | pair_prompt=${newPairPrompt !== undefined} | negative=${newNegativePrompt !== undefined} | overrides=${Object.keys(technicalOverrides).length > 0 ? Object.keys(technicalOverrides).join(',') : 'none'}`);
-      }
-    } catch (err) {
-      console.error('[SegmentSettingsModal] Unexpected error saving overrides:', err);
-    }
-  }, [pairData?.startImage?.id]);
-
   if (!pairData) return null;
 
   // Build initial params for SegmentRegenerateControls
@@ -303,7 +206,6 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
             queryKeyPrefix={`pair-${pairData.index}-modal`}
             buttonLabel={isRegeneration ? "Regenerate Segment" : "Generate Segment"}
             onFrameCountChange={onFrameCountChange}
-            onOverridesChange={handleOverridesChange}
             onGenerateStarted={onGenerateStarted}
           />
           {!generationId && !shotId && (

@@ -111,8 +111,6 @@ export interface SegmentRegenerateControlsProps {
   predecessorVideoUrl?: string;
   /** Whether to show the smooth continuations toggle (only shown when predecessorVideoUrl is available) */
   showSmoothContinuation?: boolean;
-  /** Callback when user overrides change - for persisting to database */
-  onOverridesChange?: (overrides: Record<string, any> | null) => void;
   /** Callback when frame count changes - for updating timeline */
   onFrameCountChange?: (frameCount: number) => void;
   /** Callback when generate is initiated (for optimistic UI updates) */
@@ -145,11 +143,10 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   headerTitle = 'Regenerate Video',
   predecessorVideoUrl,
   showSmoothContinuation = false,
-  onOverridesChange,
   onFrameCountChange,
   onGenerateStarted,
 }) => {
-  // [PairModalDebug] Log props received by SegmentRegenerateControls
+  // [PairMetadata] Log props received by SegmentRegenerateControls
   console.log('[PairMetadata] 🎬 SegmentRegenerateControls MOUNTED:', {
     projectId: projectId?.substring(0, 8) || null,
     generationId: generationId?.substring(0, 8) || null,
@@ -157,7 +154,6 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || null,
     segmentIndex,
     isRegeneration,
-    hasOnOverridesChange: !!onOverridesChange,
     initialPrompt: initialParams?.base_prompt?.substring(0, 30) || initialParams?.prompt?.substring(0, 30) || '(none)',
   });
 
@@ -369,15 +365,12 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   const saveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   // Track pending overrides so we can flush on unmount
   const pendingOverridesRef = React.useRef<Record<string, any> | null>(null);
-  // Stable ref for the callback so unmount can access it
-  const onOverridesChangeRef = React.useRef(onOverridesChange);
-  onOverridesChangeRef.current = onOverridesChange;
   // Stable ref for pairShotGenerationId
   const pairShotGenerationIdRef = React.useRef(pairShotGenerationId);
   pairShotGenerationIdRef.current = pairShotGenerationId;
 
-  // Save directly to shot_generations.metadata (used when onOverridesChange is not provided)
-  // This mirrors the logic in SegmentSettingsModal.handleOverridesChange
+  // Save directly to shot_generations.metadata
+  // This is the single source of truth for pair prompts and overrides
   const saveToPairMetadata = useCallback(async (overrides: Record<string, any> | null) => {
     const shotGenId = pairShotGenerationIdRef.current;
     if (!shotGenId) {
@@ -464,20 +457,10 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     }
   }, [refetchPairMetadata]);
 
-  // Debounced save function
-  // Priority: pairShotGenerationId (direct DB) > onOverridesChange (callback)
-  // This ensures MediaLightbox always saves to the correct place
+  // Debounced save function - saves directly to shot_generations.metadata
   const debouncedSaveOverrides = useCallback((overrides: Record<string, any>) => {
     // Track pending overrides for flush-on-unmount
     pendingOverridesRef.current = overrides;
-
-    console.log('[PairMetadata] ⏳ Debounced save queued:', {
-      overrideKeys: Object.keys(overrides),
-      hasCallback: !!onOverridesChangeRef.current,
-      hasPairShotGenId: !!pairShotGenerationIdRef.current,
-      pairShotGenId: pairShotGenerationIdRef.current?.substring(0, 8) ?? 'none',
-      promptValue: overrides.base_prompt?.substring(0, 30) ?? overrides.prompt?.substring(0, 30) ?? '(none)',
-    });
 
     // Clear any pending save
     if (saveTimeoutRef.current) {
@@ -485,32 +468,14 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     }
     // Schedule save after 1 second of no changes
     saveTimeoutRef.current = setTimeout(() => {
-      const oKeys = Object.keys(overrides);
-      const hasPrompt = 'base_prompt' in overrides || 'prompt' in overrides;
-
-      // Determine which save path will be used
-      // PRIORITY: Direct DB save if pairShotGenerationId is available (ensures MediaLightbox saves correctly)
-      const savePath = pairShotGenerationIdRef.current
-        ? 'direct DB (saveToPairMetadata)'
-        : onOverridesChangeRef.current
-          ? 'callback (onOverridesChange)'
-          : 'NONE - will not save!';
-
-      console.log(`[PairMetadata] 💾 EXECUTING SAVE | segment=${segmentIndex} | path=${savePath} | keys=${oKeys.join(',') || 'none'} | hasPrompt=${hasPrompt}`);
-
-      // PRIORITY: Direct DB save when pairShotGenerationId is available
       if (pairShotGenerationIdRef.current) {
-        console.log('[PairMetadata] 📤 Saving directly to DB (pairShotGenerationId available)');
         saveToPairMetadata(Object.keys(overrides).length > 0 ? overrides : null);
-      } else if (onOverridesChangeRef.current) {
-        console.log('[PairMetadata] 📤 Calling onOverridesChange callback (fallback)');
-        onOverridesChangeRef.current(Object.keys(overrides).length > 0 ? overrides : null);
       } else {
-        console.warn('[PairMetadata] ⚠️ NO SAVE PATH AVAILABLE - changes will be lost!');
+        console.warn('[PairMetadata] ⚠️ Cannot save - no pairShotGenerationId');
       }
-      pendingOverridesRef.current = null; // Clear after save
+      pendingOverridesRef.current = null;
     }, 1000);
-  }, [segmentIndex, saveToPairMetadata]);
+  }, [saveToPairMetadata]);
 
   // Flush pending save on unmount (don't lose user's changes)
   useEffect(() => {
@@ -519,20 +484,12 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         clearTimeout(saveTimeoutRef.current);
       }
       // If there are pending changes, save them immediately on unmount
-      if (pendingOverridesRef.current) {
-        const oKeys = Object.keys(pendingOverridesRef.current);
-        console.log(`[PairMetadata] 💾 FLUSH ON UNMOUNT | segment=${segmentIndex} | keys=${oKeys.join(',') || 'none'}`);
-        const pending = pendingOverridesRef.current;
-        // Same priority as debouncedSaveOverrides: direct DB > callback
-        if (pairShotGenerationIdRef.current) {
-          saveToPairMetadata(Object.keys(pending).length > 0 ? pending : null);
-        } else if (onOverridesChangeRef.current) {
-          onOverridesChangeRef.current(Object.keys(pending).length > 0 ? pending : null);
-        }
+      if (pendingOverridesRef.current && pairShotGenerationIdRef.current) {
+        saveToPairMetadata(Object.keys(pendingOverridesRef.current).length > 0 ? pendingOverridesRef.current : null);
         pendingOverridesRef.current = null;
       }
     };
-  }, [segmentIndex, saveToPairMetadata]);
+  }, [saveToPairMetadata]);
 
   // Helper to update a field and track it as a user override
   const updateOverride = useCallback((field: string, value: any) => {
@@ -821,15 +778,14 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     });
     setSelectedLoras(restoredLoras);
 
-    // Clear the pending save timeout
+    // Clear any pending save and save the reset to DB
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-
-    // Save the cleared overrides to DB immediately
-    onOverridesChange?.(null);
-  }, [initialParams, segmentIndex, onOverridesChange]);
+    pendingOverridesRef.current = null;
+    saveToPairMetadata(null);
+  }, [initialParams, segmentIndex, saveToPairMetadata]);
 
   // Handle segment regeneration
   const handleRegenerateSegment = useCallback(async () => {
