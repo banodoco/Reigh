@@ -33,6 +33,8 @@ interface SegmentSettingsModalProps {
   shotId?: string;
   /** Parent generation ID (if regenerating an existing segment) */
   generationId?: string;
+  /** Active child generation ID for this slot (for creating variants on existing child) */
+  childGenerationId?: string;
   /** Whether this is regenerating an existing segment (shows "Make primary variant" toggle) */
   isRegeneration?: boolean;
   /** Initial params from the existing generation (for regeneration) */
@@ -64,6 +66,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
   projectId,
   shotId,
   generationId,
+  childGenerationId,
   isRegeneration = false,
   initialParams,
   projectResolution,
@@ -86,6 +89,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
     projectId: projectId?.substring(0, 8) || null,
     shotId: shotId?.substring(0, 8) || null,
     generationId: generationId?.substring(0, 8) || null,
+    childGenerationId: childGenerationId?.substring(0, 8) || null,
     isRegeneration,
     hasInitialParams: !!initialParams,
     hasOnFrameCountChange: !!onFrameCountChange,
@@ -196,7 +200,8 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
             initialParams={mergedParams}
             projectId={projectId}
             shotId={shotId}
-            generationId={generationId} 
+            generationId={generationId}
+            childGenerationId={childGenerationId}
             isRegeneration={isRegeneration}
             segmentIndex={pairData.index}
             startImageUrl={pairData.startImage?.url || pairData.startImage?.thumbUrl}

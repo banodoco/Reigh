@@ -1901,6 +1901,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           console.log('[PairModalDebug] Checking pair child:', { pairIndex, hasChildForPair, pairSlotType: pairSlot?.type });
           return hasChildForPair;
         })()}
+        childGenerationId={(() => {
+          // Get the active child generation ID for this slot (for creating variants)
+          const pairIndex = segmentSettingsModalData.pairData?.index;
+          if (pairIndex === undefined) return undefined;
+          const pairSlot = segmentSlots.find(slot => slot.index === pairIndex);
+          const childId = pairSlot?.type === 'child' ? pairSlot.child.id : undefined;
+          console.log('[PairModalDebug] Active child for pair:', { pairIndex, childId: childId?.substring(0, 8) });
+          return childId;
+        })()}
         initialParams={(() => {
           const parentParams = selectedParent?.params as Record<string, any> | undefined;
           if (!parentParams) return undefined;
