@@ -214,9 +214,10 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
   // Fetch per-pair metadata from shot_generations (prompt overrides, etc.)
   // This is the source of truth for pair-specific settings, shared with SegmentSettingsModal
-  const { data: pairMetadata, refetch: refetchPairMetadata } = useQuery({
+  const { data: pairMetadata, refetch: refetchPairMetadata, isLoading: isLoadingPairMetadata } = useQuery({
     queryKey: ['pair-metadata', pairShotGenerationId],
     queryFn: async () => {
+      console.log('[PairMetadata] 🔍 Query running for:', pairShotGenerationId?.substring(0, 8));
       if (!pairShotGenerationId) return null;
       const { data, error } = await supabase
         .from('shot_generations')
@@ -224,14 +225,28 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         .eq('id', pairShotGenerationId)
         .single();
       if (error) {
-        console.error('[PairMetadata] Error fetching:', error);
+        console.error('[PairMetadata] ❌ Query error:', error);
         return null;
       }
+      console.log('[PairMetadata] ✅ Query returned:', {
+        hasMetadata: !!data?.metadata,
+        pairPrompt: (data?.metadata as any)?.pair_prompt ?? '(none)',
+      });
       return (data?.metadata as Record<string, any>) || {};
     },
     enabled: !!pairShotGenerationId,
     staleTime: 10000, // Cache for 10 seconds
   });
+
+  // Log when pairMetadata changes
+  useEffect(() => {
+    console.log('[PairMetadata] 📊 State:', {
+      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) ?? 'null',
+      isLoading: isLoadingPairMetadata,
+      hasPairMetadata: !!pairMetadata,
+      pairPrompt: pairMetadata?.pair_prompt ?? '(not loaded)',
+    });
+  }, [pairShotGenerationId, isLoadingPairMetadata, pairMetadata]);
 
   const { toast } = useToast();
 
