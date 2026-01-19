@@ -30,6 +30,13 @@ import { quantizeFrameCount, framesToSeconds } from '@/tools/travel-between-imag
 import { getNormalizedParams } from '@/shared/lib/normalizeSegmentParams';
 import type { LoraModel, ActiveLora } from '@/shared/hooks/useLoraManager';
 
+// Safe substring helper for debug logging (handles non-strings)
+const safeSubstr = (val: unknown): string => {
+  if (typeof val === 'string') return val.substring(0, 8);
+  if (val === null || val === undefined) return 'null';
+  return `[${typeof val}]`;
+};
+
 // Built-in presets for segment regeneration
 const BUILTIN_I2V_PRESET_ID = '__builtin_segment_i2v_default__';
 const BUILTIN_VACE_PRESET_ID = '__builtin_segment_vace_default__';
@@ -151,7 +158,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
 
   // Log on mount to debug pairShotGenerationId flow
   useEffect(() => {
-    console.log(`[PairMetadata] 🎬 MOUNT instance=${instanceId} pairShotGenerationId=${pairShotGenerationId?.substring(0, 8) ?? 'NULL'}`);
+    console.log(`[PairMetadata] 🎬 MOUNT instance=${instanceId} pairShotGenerationId=${safeSubstr(pairShotGenerationId)}`);
     return () => {
       console.log(`[PairMetadata] 💀 UNMOUNT instance=${instanceId}`);
     };
@@ -223,7 +230,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   const { data: pairMetadata, refetch: refetchPairMetadata, isLoading: isLoadingPairMetadata } = useQuery({
     queryKey: ['pair-metadata', pairShotGenerationId],
     queryFn: async () => {
-      console.log('[PairMetadata] 🔍 Query running for:', pairShotGenerationId?.substring(0, 8));
+      console.log('[PairMetadata] 🔍 Query running for:', safeSubstr(pairShotGenerationId));
       if (!pairShotGenerationId) return null;
       const { data, error } = await supabase
         .from('shot_generations')
@@ -248,7 +255,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   // Log when pairMetadata changes
   useEffect(() => {
     console.log('[PairMetadata] 📊 State:', {
-      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) ?? 'null',
+      pairShotGenerationId: safeSubstr(pairShotGenerationId) ?? 'null',
       isLoading: isLoadingPairMetadata,
       hasPairMetadata: !!pairMetadata,
       enhancedPrompt: pairMetadata?.enhanced_prompt ?? '(none)',
@@ -344,7 +351,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     const pairUserOverrides = pairMetadata.user_overrides || {};
 
     console.log('[PairMetadata] ✅ Loaded from DB, applying:', {
-      pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
+      pairShotGenerationId: safeSubstr(pairShotGenerationId),
       enhancedPrompt: enhancedPrompt ?? '(none)',
       basePrompt: basePrompt ?? '(none)',
       usingPrompt: pairPrompt ?? '(none)',
@@ -516,7 +523,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     projectResolutionProp: projectResolution,
     initialParamsResolution: initialParams?.parsed_resolution_wh,
     initialOrchestratorResolution: initialParams?.orchestrator_details?.parsed_resolution_wh,
-    generationId: generationId?.substring(0, 8),
+    generationId: safeSubstr(generationId),
     childGenerationId: childGenerationId?.substring(0, 8),
     segmentIndex,
     queryKeyPrefix,
@@ -1036,7 +1043,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         frameOverlapExpandedLength: orchDetails.frame_overlap_expanded?.length ?? 0,
         fpsHelpers: orchDetails.fps_helpers ?? '(not set)',
         segmentIndex,
-        generationId: generationId?.substring(0, 8),
+        generationId: safeSubstr(generationId),
         shotId: shotId?.substring(0, 8),
       });
 

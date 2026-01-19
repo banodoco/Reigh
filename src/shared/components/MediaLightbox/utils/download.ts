@@ -42,25 +42,60 @@ const getFileExtension = (url: string, isVideo: boolean, contentType?: string): 
 };
 
 /**
+ * Sanitize a string for use as a filename
+ * Removes/replaces characters that are invalid in most filesystems
+ */
+const sanitizeFilename = (str: string, maxLength: number = 50): string => {
+  // Remove or replace invalid filename characters
+  let sanitized = str
+    .replace(/[<>:"/\\|?*]/g, '') // Remove invalid chars
+    .replace(/\s+/g, '_') // Replace spaces with underscores
+    .replace(/_+/g, '_') // Collapse multiple underscores
+    .replace(/^_|_$/g, '') // Trim leading/trailing underscores
+    .trim();
+
+  // Truncate to maxLength
+  if (sanitized.length > maxLength) {
+    sanitized = sanitized.substring(0, maxLength).replace(/_$/, '');
+  }
+
+  return sanitized || 'media';
+};
+
+/**
  * Download media (image or video) from a URL
  * Handles timeouts, fallbacks, and error cases
  * Special handling for iOS PWA where download attribute doesn't work
- * 
+ *
  * @param url - The URL to download from
- * @param mediaId - Media ID for filename
+ * @param mediaId - Media ID for filename (UUID)
  * @param isVideo - Whether the media is a video
  * @param contentType - Optional MIME type for proper file extension (e.g., 'video/mp4')
+ * @param prompt - Optional prompt text to use in filename for better readability
  */
-export const downloadMedia = async (url: string, mediaId: string, isVideo: boolean, contentType?: string): Promise<void> => {
+export const downloadMedia = async (url: string, mediaId: string, isVideo: boolean, contentType?: string, prompt?: string): Promise<void> => {
   const downloadStartTime = Date.now();
   const fileExt = getFileExtension(url, isVideo, contentType);
-  
+
+  // Generate a user-friendly filename:
+  // - If prompt is available: use sanitized prompt + short ID suffix for uniqueness
+  // - Otherwise: use media_<short_id> format
+  const shortId = typeof mediaId === 'string' && mediaId.length > 8 ? mediaId.substring(0, 8) : mediaId;
+  let filename: string;
+  if (prompt && typeof prompt === 'string' && prompt.trim()) {
+    const sanitizedPrompt = sanitizeFilename(prompt, 40);
+    filename = `${sanitizedPrompt}_${shortId}.${fileExt}`;
+  } else {
+    filename = `media_${shortId}.${fileExt}`;
+  }
+
   console.log('[PollingBreakageIssue] [MediaLightbox] Download started', {
     mediaId,
     displayUrl: url,
     isVideo,
     contentType,
     fileExt,
+    filename,
     isIOSPwa: isIOSPwa(),
     timestamp: downloadStartTime
   });
@@ -78,7 +113,6 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
         if (!response.ok) throw new Error('Failed to fetch');
         
         const blob = await response.blob();
-        const filename = `media_${mediaId}.${fileExt}`;
         const file = new File([blob], filename, { type: contentType || blob.type });
         
         if (navigator.canShare({ files: [file] })) {
@@ -140,8 +174,7 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
     });
 
     const objectUrl = URL.createObjectURL(blob);
-    const filename = `media_${mediaId}.${fileExt}`;
-    
+
     const link = document.createElement('a');
     link.href = objectUrl;
     link.download = filename;
@@ -193,7 +226,7 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
     try {
       const link = document.createElement('a');
       link.href = url;
-      link.download = `media_${mediaId}.${fileExt}`;
+      link.download = filename;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();

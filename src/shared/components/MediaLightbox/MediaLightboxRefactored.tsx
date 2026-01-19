@@ -1524,6 +1524,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       return null;
     }
 
+    // Don't show regenerate for join-clips outputs - they don't have segments to regenerate
+    const toolType = (media.metadata as any)?.tool_type || mediaParams?.tool_type;
+    if (toolType === 'join-clips') {
+      console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (join-clips output)');
+      return null;
+    }
+
     if (!isVideo || (!taskDataParams && !mediaParams)) {
       console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (not video or no params)', {
         isVideo,
@@ -2003,7 +2010,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const handleDownload = async () => {
     // Use the effective media URL (may be a variant)
     const urlToDownload = isVideo ? effectiveVideoUrl : effectiveMediaUrl;
-    await downloadMedia(urlToDownload, media.id, isVideo, media.contentType);
+    // Extract prompt from various possible sources for a better filename
+    const prompt = (media.params as any)?.prompt ||
+                   (media.metadata as any)?.enhanced_prompt ||
+                   (media.metadata as any)?.pair_prompt ||
+                   (media.metadata as any)?.prompt;
+    await downloadMedia(urlToDownload, media.id, isVideo, media.contentType, prompt);
   };
 
   const handleDelete = () => {

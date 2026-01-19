@@ -1614,9 +1614,26 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
                       onClick={(e) => {
                           e.stopPropagation();
+                          // Generate a sanitized filename from prompt + short ID
+                          const shortId = image.id && image.id.length > 8 ? image.id.substring(0, 8) : (image.id || 'media');
+                          let downloadFilename = `media_${shortId}`;
+                          if (image.prompt && typeof image.prompt === 'string' && image.prompt.trim()) {
+                            // Sanitize prompt for filesystem: remove invalid chars, replace spaces with underscores, truncate
+                            const sanitized = image.prompt
+                              .replace(/[<>:"/\\|?*]/g, '')
+                              .replace(/\s+/g, '_')
+                              .replace(/_+/g, '_')
+                              .replace(/^_|_$/g, '')
+                              .trim()
+                              .substring(0, 40)
+                              .replace(/_$/, '');
+                            if (sanitized) {
+                              downloadFilename = `${sanitized}_${shortId}`;
+                            }
+                          }
                           onDownloadImage(
                             image.url || '',
-                            image.prompt || 'generation',
+                            downloadFilename,
                             image.id,
                             image.isVideo,
                             image.contentType // Pass stored MIME type for proper file extension
