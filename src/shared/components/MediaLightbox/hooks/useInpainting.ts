@@ -109,9 +109,13 @@ export const useInpainting = ({
   
   // Storage key uses variant ID if available, otherwise falls back to generation ID
   // This allows different strokes per variant
-  const storageKey = activeVariantId 
+  const storageKey = activeVariantId
     ? `inpaint-data-${media.id}-variant-${activeVariantId}`
     : `inpaint-data-${media.id}`;
+
+  // IMPORTANT: media.id may be shot_generations.id (junction table) when viewing from shots.
+  // For database operations on the generations table, we need the actual generations.id.
+  const actualGenerationId = (media as any).generation_id || media.id;
   
   // Track previous storage key to detect variant changes
   const prevStorageKeyRef = useRef<string>(storageKey);
@@ -288,16 +292,17 @@ export const useInpainting = ({
       const newValue = typeof value === 'function' ? value(prev) : value;
       const currentState = mediaStateRef.current.get(media.id) || { editMode: 'text', annotationMode: null };
       mediaStateRef.current.set(media.id, { ...currentState, editMode: newValue });
-      
+
       // Update global last-used mode (for inheritance)
       lastUsedEditModeRef.current = newValue;
-      
+
       // Save to database (async, non-blocking)
-      saveEditModeToDB(media.id, newValue);
-      
+      // Use actualGenerationId (generations.id) not media.id (may be shot_generations.id)
+      saveEditModeToDB(actualGenerationId, newValue);
+
       return newValue;
     });
-  }, [media.id, saveEditModeToDB]);
+  }, [media.id, actualGenerationId, saveEditModeToDB]);
 
   const setAnnotationMode = useCallback((value: 'rectangle' | null | ((prev: 'rectangle' | null) => 'rectangle' | null)) => {
     setAnnotationModeInternal(prev => {
@@ -326,10 +331,13 @@ export const useInpainting = ({
     
     const oldMediaId = prevMediaIdRef.current;
     const newMediaId = media.id;
-    
-    console.log('[Media] 🔄 Media switching (synchronous)', { 
-      from: oldMediaId.substring(0, 8), 
-      to: newMediaId.substring(0, 8) 
+    // For database operations, use the actual generations.id (not shot_generations.id)
+    const newActualGenerationId = (media as any).generation_id || media.id;
+
+    console.log('[Media] 🔄 Media switching (synchronous)', {
+      from: oldMediaId.substring(0, 8),
+      to: newMediaId.substring(0, 8),
+      actualGenId: newActualGenerationId.substring(0, 8)
     });
     
     // Cancel any pending transition completion callback from previous switch
@@ -439,10 +447,11 @@ export const useInpainting = ({
       lastUsedEditModeRef.current = savedState.editMode; // Update last used
     } else {
       // Not in cache - try loading from database
-      console.log('[Media] No cached UI state, loading from database', { mediaId: newMediaId.substring(0, 8) });
-      
+      // Use newActualGenerationId for DB operations (generations.id, not shot_generations.id)
+      console.log('[Media] No cached UI state, loading from database', { mediaId: newMediaId.substring(0, 8), actualGenId: newActualGenerationId.substring(0, 8) });
+
       // Load asynchronously to avoid blocking UI
-      loadEditModeFromDB(newMediaId).then(dbMode => {
+      loadEditModeFromDB(newActualGenerationId).then(dbMode => {
         // Only apply if we're still on the same media (prevent race conditions)
         if (prevMediaIdRef.current === newMediaId) {
           if (dbMode) {
@@ -454,15 +463,15 @@ export const useInpainting = ({
           } else {
             // Not in database - inherit from last used or default to 'text'
             const inheritedMode = lastUsedEditModeRef.current;
-            console.log('[Media] 🔄 Inheriting edit mode', { 
-              mediaId: newMediaId.substring(0, 8), 
+            console.log('[Media] 🔄 Inheriting edit mode', {
+              mediaId: newMediaId.substring(0, 8),
               mode: inheritedMode,
               source: 'last-used'
             });
             setEditModeInternal(inheritedMode);
             mediaStateRef.current.set(newMediaId, { editMode: inheritedMode, annotationMode: null });
-            // Save to DB for next time
-            saveEditModeToDB(newMediaId, inheritedMode);
+            // Save to DB for next time (use actualGenerationId)
+            saveEditModeToDB(newActualGenerationId, inheritedMode);
           }
         }
       }).catch(err => {
