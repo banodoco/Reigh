@@ -164,10 +164,24 @@ class PreloadQueue {
       
       // Check if this is a video file - handle differently
       const isVideo = item.url.match(/\.(mp4|webm|mov|avi)$/i);
-      
+
       if (isVideo) {
-        // For videos, preload first frame as image to check availability
-        const frameUrl = item.url.replace(/\.(mp4|webm|mov|avi)$/i, '_frame.jpg');
+        // For videos, use the provided thumbnail URL if available
+        // Don't construct predicted _frame.jpg URLs as they often don't exist (e.g., join-clips outputs)
+        const frameUrl = (item as any).thumbUrl && (item as any).thumbUrl !== item.url
+          ? (item as any).thumbUrl
+          : null;
+
+        if (!frameUrl) {
+          // No thumbnail available - just mark as loaded without preloading
+          performanceMonitor.recordPreloadTime(1);
+          item.onLoad();
+          this.active--;
+          this.activeRequests.delete(item.abortController);
+          performanceMonitoredTimeout(() => this.processQueue(), 0, 'PreloadQueue video skip');
+          continue;
+        }
+
         this.preloadImageWithFetch(frameUrl, item)
           .then(() => {
             performanceMonitor.recordPreloadTime(1); // Minimal time for videos
