@@ -1997,6 +1997,7 @@ export const useInpainting = ({
         tool_type: toolTypeOverride, // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
         create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
+        source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
         hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
       });
 
@@ -2017,7 +2018,7 @@ export const useInpainting = ({
     } finally {
       setIsGeneratingInpaint(false);
     }
-  }, [selectedProjectId, isVideo, inpaintStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, imageDimensions, displayCanvasRef, maskCanvasRef, activeVariantLocation]);
+  }, [selectedProjectId, isVideo, inpaintStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, imageDimensions, displayCanvasRef, maskCanvasRef, activeVariantLocation, activeVariantId]);
 
   // Generate annotated edit
   const handleGenerateAnnotatedEdit = useCallback(async () => {
@@ -2155,6 +2156,7 @@ export const useInpainting = ({
         tool_type: toolTypeOverride, // Override tool_type if provided
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
         create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
+        source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
         hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
       });
 
@@ -2175,7 +2177,7 @@ export const useInpainting = ({
     } finally {
       setIsGeneratingInpaint(false);
     }
-  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, displayCanvasRef, maskCanvasRef, activeVariantLocation, imageDimensions, createAsGeneration, advancedSettings]);
+  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, displayCanvasRef, maskCanvasRef, activeVariantLocation, activeVariantId, imageDimensions, createAsGeneration, advancedSettings]);
 
   // Get delete button position for selected shape
   const getDeleteButtonPosition = useCallback((): { x: number; y: number } | null => {

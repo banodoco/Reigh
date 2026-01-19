@@ -910,9 +910,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     toolTypeOverride,
     isInSceneBoostEnabled,
     setIsInSceneBoostEnabled,
-    // Pass variant info for tracking source_variant_id
-    activeVariantId: isViewingNonPrimaryVariant ? activeVariant?.id : null,
-    activeVariantLocation: isViewingNonPrimaryVariant ? activeVariant?.location : null,
+    // Pass variant info for tracking source_variant_id (always track for complete lineage)
+    activeVariantId: activeVariant?.id,
+    activeVariantLocation: activeVariant?.location,
     createAsGeneration, // If true, create a new generation instead of a variant
     advancedSettings, // Pass advanced settings for hires fix
     qwenEditModel, // Pass model selection for cloud mode
@@ -961,6 +961,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     createAsGeneration, // If true, create a new generation instead of a variant
     advancedSettings, // Pass advanced settings for hires fix
     activeVariantLocation: activeVariant?.location, // Use variant's image URL when editing a variant
+    activeVariantId: activeVariant?.id, // Track source variant for lineage
   });
   const {
     transform: repositionTransform,
@@ -1010,6 +1011,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     numGenerations: persistedNumGenerations,
     // Use variant's image URL when editing a variant
     activeVariantLocation: activeVariant?.location,
+    activeVariantId: activeVariant?.id, // Track source variant for lineage
   });
   const {
     img2imgPrompt,

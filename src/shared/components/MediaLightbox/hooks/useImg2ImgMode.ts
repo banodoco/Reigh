@@ -25,6 +25,8 @@ export interface UseImg2ImgModeProps {
   numGenerations: number;
   // Active variant's image URL - use this instead of sourceUrlForTasks when editing a variant
   activeVariantLocation?: string | null;
+  // Active variant ID - for tracking source_variant_id in task params
+  activeVariantId?: string | null;
 }
 
 export interface UseImg2ImgModeReturn {
@@ -75,6 +77,8 @@ export const useImg2ImgMode = ({
   numGenerations,
   // Active variant location
   activeVariantLocation,
+  // Active variant ID for tracking source
+  activeVariantId,
 }: UseImg2ImgModeProps): UseImg2ImgModeReturn => {
   
   console.log('[EDIT_DEBUG] ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
@@ -182,6 +186,7 @@ export const useImg2ImgMode = ({
         numImages: numGenerations,
         loras: loras.length > 0 ? loras : undefined,
         based_on: actualGenerationId,
+        source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
         create_as_generation: createAsGeneration,
         tool_type: toolTypeOverride,
       });
@@ -208,6 +213,7 @@ export const useImg2ImgMode = ({
     isVideo,
     sourceUrlForTasks,
     activeVariantLocation,
+    activeVariantId,
     media,
     img2imgPrompt,
     img2imgStrength,

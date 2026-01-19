@@ -39,6 +39,8 @@ export interface UseRepositionModeProps {
   advancedSettings?: EditAdvancedSettings;
   // Active variant's image URL - use this instead of media.url when editing a variant
   activeVariantLocation?: string | null;
+  // Active variant ID - for tracking source_variant_id in task params
+  activeVariantId?: string | null;
 }
 
 export interface UseRepositionModeReturn {
@@ -95,6 +97,7 @@ export const useRepositionMode = ({
   createAsGeneration,
   advancedSettings,
   activeVariantLocation,
+  activeVariantId,
 }: UseRepositionModeProps): UseRepositionModeReturn => {
   const queryClient = useQueryClient();
   const [transform, setTransform] = useState<ImageTransform>(DEFAULT_TRANSFORM);
@@ -489,6 +492,7 @@ export const useRepositionMode = ({
           saved_at: new Date().toISOString(),
           tool_type: toolTypeOverride || 'edit-images',
           repositioned_from: actualGenerationId,
+          ...(activeVariantId ? { source_variant_id: activeVariantId } : {}), // Track source variant if editing from a variant
         };
 
         const { data: insertedGeneration, error: genError } = await supabase
@@ -536,6 +540,7 @@ export const useRepositionMode = ({
               transform: transform as any,
               saved_at: new Date().toISOString(),
               tool_type: toolTypeOverride || 'edit-images',
+              ...(activeVariantId ? { source_variant_id: activeVariantId } : {}), // Track source variant if editing from a variant
             }
           })
           .select('id')

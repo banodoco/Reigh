@@ -12,6 +12,7 @@ export interface CreateAnnotatedImageEditTaskParams {
   tool_type?: string;
   loras?: Array<{ url: string; strength: number }>;
   create_as_generation?: boolean; // If true, create a new generation instead of a variant
+  source_variant_id?: string; // Track which variant was the source if editing from a variant
   // Advanced hires fix settings
   hires_fix?: HiresFixApiParams;
 }
@@ -36,6 +37,7 @@ export async function createAnnotatedImageEditTask(params: CreateAnnotatedImageE
     tool_type,
     loras,
     create_as_generation,
+    source_variant_id,
     hires_fix,
   } = params;
 
@@ -85,6 +87,7 @@ export async function createAnnotatedImageEditTask(params: CreateAnnotatedImageE
       ...(tool_type ? { tool_type } : {}), // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
       ...(loras && loras.length > 0 ? { loras } : {}), // Include loras if provided
       ...(create_as_generation ? { create_as_generation: true } : {}), // If true, create a new generation instead of a variant
+      ...(source_variant_id ? { source_variant_id } : {}), // Track source variant if editing from a variant
       ...hiresFixParams, // Include hires fix settings if provided
     },
   }));
