@@ -2572,7 +2572,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               right: effectiveTasksPaneOpen && isTabletOrLarger ? `${effectiveTasksPaneWidth}px` : 0,
               bottom: 0,
               // Smooth transition when tasks pane opens/closes
-              transition: 'right 300ms ease, width 300ms ease',
+              transition: 'right 300ms cubic-bezier(0.22, 1, 0.36, 1), width 300ms cubic-bezier(0.22, 1, 0.36, 1)',
               // Adjust width for tasks pane on tablet/desktop
               ...(effectiveTasksPaneOpen && isTabletOrLarger ? {
                 width: `calc(100vw - ${effectiveTasksPaneWidth}px)`
@@ -2588,7 +2588,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 zIndex: 100001, 
                 pointerEvents: 'auto',
                 right: effectiveTasksPaneOpen ? `${effectiveTasksPaneWidth}px` : 0,
-                transition: 'right 300ms ease',
+                transition: 'right 300ms cubic-bezier(0.22, 1, 0.36, 1)',
               }}
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
               onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
@@ -2760,7 +2760,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             )}
             style={{
               // Smooth transition when tasks pane opens/closes
-              transition: 'width 300ms ease',
+              transition: 'width 300ms cubic-bezier(0.22, 1, 0.36, 1)',
               ...(shouldShowSidePanel && effectiveTasksPaneOpen && !isPortraitMode && isTabletOrLarger ? {
                 width: `calc(100vw - ${effectiveTasksPaneWidth}px)`
               } : shouldShowSidePanelWithTrim ? {
