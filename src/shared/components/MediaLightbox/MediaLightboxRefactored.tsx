@@ -2295,8 +2295,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       <DialogPrimitive.Root
         open={true}
         // Modal mode blocks body scroll and traps focus
-        // Disable modal when tasks pane is open so it can scroll
-        modal={!(effectiveTasksPaneOpen && isTabletOrLarger)}
+        // On tablet/desktop, always disable modal to allow TasksPane scrolling
+        // (changing modal dynamically causes the dialog to flash/remount)
+        // On mobile, keep modal=true for proper scroll locking
+        modal={isMobile}
         onOpenChange={() => {
           // Prevent automatic closing - we handle all closing manually
         }}
