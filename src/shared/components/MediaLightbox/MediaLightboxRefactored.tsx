@@ -2971,57 +2971,59 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                     {/* Top Left Controls Container - stacked vertically */}
                     <div className="absolute top-4 left-4 z-[70] flex flex-col gap-2 items-start">
-                      {/* Main Variant Badge/Button - shows first */}
-                      {!readOnly && activeVariant && variants && (variants.length > 1 || !activeVariant.is_primary) && (
-                        <>
-                          <div className="flex items-center gap-2">
-                            {activeVariant.is_primary ? (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
-                                <Check className="w-4 h-4" />
-                                <span>Main variant</span>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={handleMakeMainVariant}
-                                disabled={isMakingMainVariant || !canMakeMainVariant}
-                                className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
-                              >
-                                {isMakingMainVariant ? (
-                                  <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                                ) : (
-                                  <Star className="w-4 h-4 mr-1.5" />
-                                )}
-                                Make main
-                              </Button>
-                            )}
-                            {!isVideo && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => handlePromoteToGeneration(activeVariant.id)}
-                                disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
-                                className={cn(
-                                  "border-none shadow-lg text-white",
-                                  promoteSuccess
-                                    ? "bg-green-500/90 hover:bg-green-500/90"
-                                    : "bg-blue-500/90 hover:bg-blue-600"
-                                )}
-                                title="Create a standalone image from this variant"
-                              >
-                                {promoteVariantMutation.isPending ? (
-                                  <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                                ) : promoteSuccess ? (
-                                  <Check className="w-4 h-4 mr-1.5" />
-                                ) : (
-                                  <Plus className="w-4 h-4 mr-1.5" />
-                                )}
-                                {promoteSuccess ? 'Created' : 'New image'}
-                              </Button>
-                            )}
-                          </div>
-                        </>
+                      {/* Main Variant Badge/Button and New Image button */}
+                      {!readOnly && activeVariant && variants && (
+                        <div className="flex items-center gap-2">
+                          {/* Main variant badge - only show when multiple variants exist */}
+                          {variants.length > 1 && activeVariant.is_primary && (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
+                              <Check className="w-4 h-4" />
+                              <span>Main variant</span>
+                            </div>
+                          )}
+                          {/* Make main button - only show for non-primary variants */}
+                          {!activeVariant.is_primary && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleMakeMainVariant}
+                              disabled={isMakingMainVariant || !canMakeMainVariant}
+                              className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
+                            >
+                              {isMakingMainVariant ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                              ) : (
+                                <Star className="w-4 h-4 mr-1.5" />
+                              )}
+                              Make main
+                            </Button>
+                          )}
+                          {/* New image button - always show for images */}
+                          {!isVideo && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handlePromoteToGeneration(activeVariant.id)}
+                              disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
+                              className={cn(
+                                "border-none shadow-lg text-white",
+                                promoteSuccess
+                                  ? "bg-green-500/90 hover:bg-green-500/90"
+                                  : "bg-blue-500/90 hover:bg-blue-600"
+                              )}
+                              title="Create a standalone image from this variant"
+                            >
+                              {promoteVariantMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                              ) : promoteSuccess ? (
+                                <Check className="w-4 h-4 mr-1.5" />
+                              ) : (
+                                <Plus className="w-4 h-4 mr-1.5" />
+                              )}
+                              {promoteSuccess ? 'Created' : 'New image'}
+                            </Button>
+                          )}
+                        </div>
                       )}
                       {/* Edit button - below main variant when both show */}
                       {!buttonGroupProps.topLeft.isVideo && !buttonGroupProps.topLeft.readOnly && !buttonGroupProps.topLeft.isSpecialEditMode && buttonGroupProps.topLeft.selectedProjectId && buttonGroupProps.topLeft.isCloudMode && buttonGroupProps.topLeft.handleEnterMagicEditMode && (
@@ -3334,15 +3336,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     )}
 
                     {/* Top Left - Main Variant Badge/Button (Mobile Stacked) */}
-                    {!readOnly && activeVariant && variants && (variants.length > 1 || !activeVariant.is_primary) && (
+                    {!readOnly && activeVariant && variants && (
                       <div className="absolute top-4 left-4 z-[70]">
                         <div className="flex items-center gap-2">
-                          {activeVariant.is_primary ? (
+                          {/* Main variant badge - only show when multiple variants exist */}
+                          {variants.length > 1 && activeVariant.is_primary && (
                             <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
                               <Check className="w-4 h-4" />
                               <span>Main variant</span>
                             </div>
-                          ) : (
+                          )}
+                          {/* Make main button - only show for non-primary variants */}
+                          {!activeVariant.is_primary && (
                             <Button
                               variant="secondary"
                               size="sm"
@@ -3358,6 +3363,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               Make main
                             </Button>
                           )}
+                          {/* New image button - always show for images */}
                           {!isVideo && (
                             <Button
                               variant="secondary"
@@ -3715,16 +3721,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 )}
 
                   {/* Top Left - Main Variant Badge/Button */}
-                  {/* Show when: not readOnly, have variants loaded, and either multiple variants OR viewing non-primary */}
-                  {!readOnly && activeVariant && variants && (variants.length > 1 || !activeVariant.is_primary) && (
+                  {!readOnly && activeVariant && variants && (
                     <div className="absolute top-4 left-4 z-[70]">
                       <div className="flex items-center gap-2">
-                        {activeVariant.is_primary ? (
+                        {/* Main variant badge - only show when multiple variants exist */}
+                        {variants.length > 1 && activeVariant.is_primary && (
                           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
                             <Check className="w-4 h-4" />
                             <span>Main variant</span>
                           </div>
-                        ) : (
+                        )}
+                        {/* Make main button - only show for non-primary variants */}
+                        {!activeVariant.is_primary && (
                           <Button
                             variant="secondary"
                             size="sm"
@@ -3740,6 +3748,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             Make main
                           </Button>
                         )}
+                        {/* New image button - always show for images */}
                         {!isVideo && (
                           <Button
                             variant="secondary"

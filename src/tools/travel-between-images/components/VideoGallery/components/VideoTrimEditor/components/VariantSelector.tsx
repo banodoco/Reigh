@@ -305,8 +305,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
             )}
           </div>
           <div className="flex items-center gap-1">
-            {/* Make new image button - only for non-primary variants when promote handler provided */}
-            {isViewingNonPrimary && onPromoteToGeneration && (
+            {/* Make new image button - for any variant when promote handler provided */}
+            {onPromoteToGeneration && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
