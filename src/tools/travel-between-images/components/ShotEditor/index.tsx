@@ -936,13 +936,29 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Auto-select first parent generation when controlled mode is ready but no selection exists
   useEffect(() => {
-    if (!outputSelectionReady) return;
-    if (parentGenerations.length === 0) return;
+    console.log('[ParentReuseDebug] Auto-select effect running:', {
+      outputSelectionReady,
+      parentGenerationsCount: parentGenerations.length,
+      parentGenerationIds: parentGenerations.slice(0, 3).map(p => p.id.substring(0, 8)),
+      selectedOutputId: selectedOutputId?.substring(0, 8) || 'null'
+    });
+
+    if (!outputSelectionReady) {
+      console.log('[ParentReuseDebug] Auto-select: skipping - not ready');
+      return;
+    }
+    if (parentGenerations.length === 0) {
+      console.log('[ParentReuseDebug] Auto-select: skipping - no parents');
+      return;
+    }
 
     // Select first if nothing selected or current selection doesn't exist
     const selectionExists = selectedOutputId && parentGenerations.some(p => p.id === selectedOutputId);
     if (!selectionExists) {
+      console.log('[ParentReuseDebug] Auto-select: ✅ Setting selectedOutputId to:', parentGenerations[0].id.substring(0, 8));
       setSelectedOutputId(parentGenerations[0].id);
+    } else {
+      console.log('[ParentReuseDebug] Auto-select: already have valid selection');
     }
   }, [outputSelectionReady, parentGenerations, selectedOutputId, setSelectedOutputId]);
 
@@ -1911,7 +1927,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           newParentCreated: result.parentGenerationId && result.parentGenerationId !== effectiveParentId
         });
 
-        // If a new parent was created (no prior selection), store it for rapid consecutive submissions
+        // If a new parent was created (no prior selection), store it and invalidate the query
         if (result.success && result.parentGenerationId && !selectedOutputId && selectedShotId) {
           console.log('[ParentReuseDebug] ✅ STORING pending parent for future reuse:', {
             parentId: result.parentGenerationId.substring(0, 8),
@@ -1923,6 +1939,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             parentId: result.parentGenerationId,
             timestamp: Date.now(),
           };
+
+          // Invalidate segment-parent-generations so the auto-select effect picks up the new parent
+          // This is the proper fix - the pendingMainParentRef is just a fallback for rapid submissions
+          console.log('[ParentReuseDebug] Invalidating segment-parent-generations query');
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === 'segment-parent-generations'
+          });
         } else {
           console.log('[ParentReuseDebug] NOT storing pending parent:', {
             success: result.success,
