@@ -57,20 +57,9 @@ export async function calculateDerivedCounts(
     return { derivedCounts, hasUnviewedVariants, unviewedVariantCounts };
   }
 
-  // Count from generations table (based_on relationships)
-  const { data: genCountsData, error: genCountsError } = await supabase
-    .from('generations')
-    .select('based_on')
-    .in('based_on', generationIds);
-
-  if (!genCountsError && genCountsData) {
-    genCountsData.forEach((item: any) => {
-      const basedOnId = item.based_on;
-      derivedCounts[basedOnId] = (derivedCounts[basedOnId] || 0) + 1;
-    });
-  }
-
-  // Count from generation_variants table (edit variants) + check viewed_at
+  // Only count from generation_variants table (actual variants)
+  // Note: We intentionally don't count based_on generations here - those are
+  // separate images in the gallery, not variants of this image
   const { data: variantCountsData, error: variantCountsError } = await supabase
     .from('generation_variants')
     .select('generation_id, viewed_at')

@@ -1972,16 +1972,17 @@ export const useDuplicateAsNewGeneration = () => {
       const isVideo = sourceLocation?.match(/\.(mp4|webm|mov)$/i);
       const mediaType = isVideo ? 'video' : 'image';
 
-      // 3. Create new generation record (completely independent - no based_on lineage)
+      // 3. Create new generation record with lineage tracking
       const newGenerationData = {
         location: sourceLocation,
         thumbnail_url: sourceThumbnail,
         project_id: project_id,
         type: mediaType,
-        // No based_on - duplicate is an independent copy
+        based_on: generation_id, // Track lineage for history/provenance
         params: {
           ...sourceParams,
           source: 'timeline_duplicate',
+          source_generation_id: generation_id,
           duplicated_at: new Date().toISOString(),
         },
       };
@@ -1996,8 +1997,9 @@ export const useDuplicateAsNewGeneration = () => {
         throw new Error(`Failed to create generation: ${insertError?.message || 'Unknown error'}`);
       }
 
-      console.log('[DuplicateAsNew] Created new independent generation:', {
+      console.log('[DuplicateAsNew] Created new generation:', {
         id: newGeneration.id.substring(0, 8),
+        based_on: generation_id.substring(0, 8),
       });
 
       // 4. Create variant for the new generation
@@ -2089,6 +2091,10 @@ export const useDuplicateAsNewGeneration = () => {
       invalidateGenerationsSync(queryClient, data.shot_id, {
         reason: 'duplicate-as-new-generation',
         scope: 'all'
+      });
+      // Invalidate derived generations for the source (for lineage display)
+      queryClient.invalidateQueries({
+        queryKey: ['derived-generations', data.original_generation_id],
       });
     },
     onError: (error: Error) => {
