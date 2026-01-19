@@ -1695,6 +1695,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         queryClient.invalidateQueries({ queryKey: ['segment-parent-generations', selectedShot?.id, projectId] });
         // Also invalidate generations query
         queryClient.invalidateQueries({ queryKey: ['generations'] });
+        // Invalidate the video counts cache to clear skeleton state
+        queryClient.invalidateQueries({ queryKey: ['project-video-counts', projectId] });
         // Clear the selection if we deleted the selected one
         if (selectedOutputId === generationId) {
           console.log('[FinalVideoDelete] Clearing selected output (deleted the selected one)');

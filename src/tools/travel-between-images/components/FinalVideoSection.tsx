@@ -255,9 +255,11 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
 
   // Show skeleton when we know there will be a final video (from cache) but don't have it yet
   // The cache now accurately counts only videos with orchestrator_details OR children
+  // IMPORTANT: Also check parentGenerations.length to handle post-delete state where cache
+  // might still have old count but the actual generations list is empty
   const cachedFinalVideoCount = getFinalVideoCount?.(shotId) ?? null;
   const willHaveFinalVideo = cachedFinalVideoCount !== null && cachedFinalVideoCount > 0;
-  const shouldShowSkeleton = willHaveFinalVideo && !hasFinalOutput;
+  const shouldShowSkeleton = willHaveFinalVideo && !hasFinalOutput && parentGenerations.length > 0;
 
   // [FinalVideoDelete] Debug logging for delete state
   console.log('[FinalVideoDelete] Render state', {
