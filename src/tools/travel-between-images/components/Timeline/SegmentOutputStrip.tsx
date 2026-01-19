@@ -25,6 +25,13 @@ interface PairInfo {
   frames: number;
 }
 
+interface PairImageInfo {
+  startUrl?: string;
+  endUrl?: string;
+  startGenerationId?: string;
+  endGenerationId?: string;
+}
+
 interface SegmentOutputStripProps {
   shotId: string;
   projectId: string;
@@ -43,6 +50,8 @@ interface SegmentOutputStripProps {
   selectedParentId?: string | null;
   /** Optional callback when selected parent changes (for controlled mode) */
   onSelectedParentChange?: (id: string | null) => void;
+  /** Current pair image URLs by index (for fresh data in MediaLightbox regenerate form) */
+  pairImageUrls?: Map<number, PairImageInfo>;
 }
 
 export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
@@ -59,6 +68,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   onOpenPairSettings,
   selectedParentId: controlledSelectedParentId,
   onSelectedParentChange,
+  pairImageUrls,
 }) => {
   // ===== ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP =====
   const isMobile = useIsMobile();
@@ -437,6 +447,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
             startShotGenerationId: currentLightboxSlot?.pairShotGenerationId,
             // Pass the active child from the slot so regeneration creates variant on correct child
             activeChildGenerationId: currentLightboxMedia?.id,
+            // Pass current pair image URLs for fresh regeneration data
+            ...(currentLightboxSlot && pairImageUrls?.get(currentLightboxSlot.index)),
           }}
         />
       )}

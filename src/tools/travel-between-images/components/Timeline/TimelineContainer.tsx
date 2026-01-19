@@ -961,6 +961,29 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     return posMap;
   })();
 
+  // Compute pair image URLs for each pair index (for MediaLightbox fresh regeneration data)
+  // This ensures regeneration uses current timeline images, not stale stored params
+  const pairImageUrls = (() => {
+    const urlMap = new Map<number, { startUrl?: string; endUrl?: string; startGenerationId?: string; endGenerationId?: string }>();
+    const sortedEntries = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
+
+    for (let pairIndex = 0; pairIndex < sortedEntries.length - 1; pairIndex++) {
+      const [startId] = sortedEntries[pairIndex];
+      const [endId] = sortedEntries[pairIndex + 1];
+
+      const startImage = images.find(img => img.id === startId);
+      const endImage = images.find(img => img.id === endId);
+
+      urlMap.set(pairIndex, {
+        startUrl: startImage?.imageUrl || startImage?.thumbUrl,
+        endUrl: endImage?.imageUrl || endImage?.thumbUrl,
+        startGenerationId: startImage?.generation_id,
+        endGenerationId: endImage?.generation_id,
+      });
+    }
+    return urlMap;
+  })();
+
   // Calculate whether to show pair labels globally
   // Check if the average pair has enough space for labels
   const calculateShowPairLabels = () => {
@@ -1227,6 +1250,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             containerWidth={containerWidth}
             zoomLevel={zoomLevel}
             localShotGenPositions={localShotGenPositions}
+            pairImageUrls={pairImageUrls}
             onOpenPairSettings={onPairClick ? (pairIndex: number) => {
               // Construct pair data for the modal (same logic as PairRegion onPairClick)
               const sortedPositions = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
