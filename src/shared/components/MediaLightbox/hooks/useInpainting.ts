@@ -882,12 +882,22 @@ export const useInpainting = ({
     let resizeObserver: ResizeObserver | null = null;
 
     if (imageContainerRef.current) {
+      const container = imageContainerRef.current;
+      const img = container.querySelector('img');
+
       resizeObserver = new ResizeObserver(() => {
         // Debounce with requestAnimationFrame for smooth resizing
         requestAnimationFrame(handleResize);
       });
 
-      resizeObserver.observe(imageContainerRef.current);
+      // Observe the container
+      resizeObserver.observe(container);
+
+      // Also observe the image directly - its size can change independently
+      // (e.g., when TasksPane opens and maxWidth CSS changes)
+      if (img) {
+        resizeObserver.observe(img);
+      }
     }
 
     // Fallback to window resize event
