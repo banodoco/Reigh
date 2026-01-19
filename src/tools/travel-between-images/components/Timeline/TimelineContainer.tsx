@@ -93,6 +93,28 @@ import { useGlobalEvents } from './hooks/useGlobalEvents';
 import { useTapToMove } from './hooks/useTapToMove';
 import { applyFluidTimeline } from './utils/timeline-utils';
 
+/** Shared pair data structure for SegmentSettingsModal and MediaLightbox */
+export interface PairData {
+  index: number;
+  frames: number;
+  startFrame: number;
+  endFrame: number;
+  startImage: {
+    id: string;           // shot_generation.id (used as startShotGenerationId)
+    generationId?: string; // generation_id (used as startGenerationId)
+    url?: string;
+    thumbUrl?: string;
+    position: number;
+  } | null;
+  endImage: {
+    id: string;           // shot_generation.id
+    generationId?: string; // generation_id (used as endGenerationId)
+    url?: string;
+    thumbUrl?: string;
+    position: number;
+  } | null;
+}
+
 interface TimelineContainerProps {
   shotId: string;
   projectId?: string;
@@ -106,7 +128,7 @@ interface TimelineContainerProps {
   // Control props
   onResetFrames: (gap: number) => Promise<void>;
   // Pair-specific props
-  onPairClick?: (pairIndex: number, pairData: any) => void;
+  onPairClick?: (pairIndex: number, pairData: PairData) => void;
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
@@ -961,27 +983,41 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     return posMap;
   })();
 
-  // Compute pair image URLs for each pair index (for MediaLightbox fresh regeneration data)
-  // This ensures regeneration uses current timeline images, not stale stored params
-  const pairImageUrls = (() => {
-    const urlMap = new Map<number, { startUrl?: string; endUrl?: string; startGenerationId?: string; endGenerationId?: string }>();
+  // Compute full pair data for each pair index (shared by SegmentSettingsModal and MediaLightbox)
+  // This ensures both use the same fresh timeline data for regeneration
+  const pairDataByIndex = (() => {
+    const dataMap = new Map<number, PairData>();
     const sortedEntries = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
 
     for (let pairIndex = 0; pairIndex < sortedEntries.length - 1; pairIndex++) {
-      const [startId] = sortedEntries[pairIndex];
-      const [endId] = sortedEntries[pairIndex + 1];
+      const [startId, startFrame] = sortedEntries[pairIndex];
+      const [endId, endFrame] = sortedEntries[pairIndex + 1];
 
       const startImage = images.find(img => img.id === startId);
       const endImage = images.find(img => img.id === endId);
 
-      urlMap.set(pairIndex, {
-        startUrl: startImage?.imageUrl || startImage?.thumbUrl,
-        endUrl: endImage?.imageUrl || endImage?.thumbUrl,
-        startGenerationId: startImage?.generation_id,
-        endGenerationId: endImage?.generation_id,
+      dataMap.set(pairIndex, {
+        index: pairIndex,
+        frames: endFrame - startFrame,
+        startFrame,
+        endFrame,
+        startImage: startImage ? {
+          id: startImage.id,
+          generationId: startImage.generation_id,
+          url: startImage.imageUrl || startImage.thumbUrl,
+          thumbUrl: startImage.thumbUrl,
+          position: pairIndex + 1,
+        } : null,
+        endImage: endImage ? {
+          id: endImage.id,
+          generationId: endImage.generation_id,
+          url: endImage.imageUrl || endImage.thumbUrl,
+          thumbUrl: endImage.thumbUrl,
+          position: pairIndex + 2,
+        } : null,
       });
     }
-    return urlMap;
+    return dataMap;
   })();
 
   // Calculate whether to show pair labels globally
@@ -1250,41 +1286,13 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             containerWidth={containerWidth}
             zoomLevel={zoomLevel}
             localShotGenPositions={localShotGenPositions}
-            pairImageUrls={pairImageUrls}
+            pairDataByIndex={pairDataByIndex}
             onOpenPairSettings={onPairClick ? (pairIndex: number) => {
-              // Construct pair data for the modal (same logic as PairRegion onPairClick)
-              const sortedPositions = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
-              const startEntry = sortedPositions[pairIndex];
-              const endEntry = sortedPositions[pairIndex + 1];
-              
-              if (!startEntry || !endEntry) return;
-              
-              const startImage = images.find(img => img.id === startEntry[0]);
-              const endImage = images.find(img => img.id === endEntry[0]);
-              
-              const startPosition = pairIndex + 1;
-              const endPosition = pairIndex + 2;
-              
-              onPairClick(pairIndex, {
-                index: pairIndex,
-                frames: endEntry[1] - startEntry[1],
-                startFrame: startEntry[1],
-                endFrame: endEntry[1],
-                startImage: startImage ? {
-                  id: startImage.id,
-                  url: startImage.imageUrl || startImage.thumbUrl,
-                  thumbUrl: startImage.thumbUrl,
-                  timeline_frame: (startImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
-                  position: startPosition
-                } : null,
-                endImage: endImage ? {
-                  id: endImage.id,
-                  url: endImage.imageUrl || endImage.thumbUrl,
-                  thumbUrl: endImage.thumbUrl,
-                  timeline_frame: (endImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
-                  position: endPosition
-                } : null
-              });
+              // Use precomputed pair data (same source of truth for modal and lightbox)
+              const pairData = pairDataByIndex.get(pairIndex);
+              if (pairData) {
+                onPairClick(pairIndex, pairData);
+              }
             } : undefined}
             selectedParentId={selectedOutputId}
             onSelectedParentChange={onSelectedOutputChange}

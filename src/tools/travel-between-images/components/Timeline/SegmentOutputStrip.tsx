@@ -18,18 +18,13 @@ import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constant
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
+import type { PairData } from './TimelineContainer';
+
 interface PairInfo {
   index: number;
   startFrame: number;
   endFrame: number;
   frames: number;
-}
-
-interface PairImageInfo {
-  startUrl?: string;
-  endUrl?: string;
-  startGenerationId?: string;
-  endGenerationId?: string;
 }
 
 interface SegmentOutputStripProps {
@@ -50,8 +45,8 @@ interface SegmentOutputStripProps {
   selectedParentId?: string | null;
   /** Optional callback when selected parent changes (for controlled mode) */
   onSelectedParentChange?: (id: string | null) => void;
-  /** Current pair image URLs by index (for fresh data in MediaLightbox regenerate form) */
-  pairImageUrls?: Map<number, PairImageInfo>;
+  /** Current pair data by index (shared with SegmentSettingsModal for fresh regeneration data) */
+  pairDataByIndex?: Map<number, PairData>;
 }
 
 export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
@@ -68,7 +63,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   onOpenPairSettings,
   selectedParentId: controlledSelectedParentId,
   onSelectedParentChange,
-  pairImageUrls,
+  pairDataByIndex,
 }) => {
   // ===== ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP =====
   const isMobile = useIsMobile();
@@ -443,13 +438,18 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
           showTaskDetails={true}
           showVideoTrimEditor={true}
           fetchVariantsForSelf={true}
-          currentSegmentImages={{
-            startShotGenerationId: currentLightboxSlot?.pairShotGenerationId,
-            // Pass the active child from the slot so regeneration creates variant on correct child
-            activeChildGenerationId: currentLightboxMedia?.id,
-            // Pass current pair image URLs for fresh regeneration data
-            ...(currentLightboxSlot && pairImageUrls?.get(currentLightboxSlot.index)),
-          }}
+          currentSegmentImages={(() => {
+            // Derive currentSegmentImages from shared pairDataByIndex (same source as SegmentSettingsModal)
+            const pairData = currentLightboxSlot ? pairDataByIndex?.get(currentLightboxSlot.index) : undefined;
+            return {
+              startShotGenerationId: pairData?.startImage?.id || currentLightboxSlot?.pairShotGenerationId,
+              activeChildGenerationId: currentLightboxMedia?.id,
+              startUrl: pairData?.startImage?.url,
+              endUrl: pairData?.endImage?.url,
+              startGenerationId: pairData?.startImage?.generationId,
+              endGenerationId: pairData?.endImage?.generationId,
+            };
+          })()}
         />
       )}
       
