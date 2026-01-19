@@ -186,10 +186,15 @@ export function useGenerationEditSettings({
         .from('generations')
         .select('params')
         .eq('id', genId)
-        .single();
-      
+        .maybeSingle();
+
       if (error) {
         console.warn('[EDIT_DEBUG] ❌ LOAD FAILED:', error.message);
+        return null;
+      }
+
+      if (!data) {
+        console.log('[EDIT_DEBUG] ⚠️ LOAD: Generation not found (may have been deleted)');
         return null;
       }
       
@@ -237,10 +242,15 @@ export function useGenerationEditSettings({
         .from('generations')
         .select('params')
         .eq('id', genId)
-        .single();
-      
+        .maybeSingle();
+
       if (fetchError) {
         console.warn('[EDIT_DEBUG] ❌ SAVE: Failed to fetch current params:', fetchError.message);
+        return;
+      }
+
+      if (!current) {
+        console.warn('[EDIT_DEBUG] ⚠️ SAVE: Generation not found (may have been deleted), skipping save');
         return;
       }
       

@@ -163,10 +163,15 @@ export const useInpainting = ({
         .from('generations')
         .select('params')
         .eq('id', generationId)
-        .single();
-      
+        .maybeSingle();
+
       if (error) {
         console.warn('[EditMode] Failed to load edit mode from DB:', error);
+        return null;
+      }
+
+      if (!data) {
+        console.log('[EditMode] Generation not found (may have been deleted)');
         return null;
       }
       
@@ -191,10 +196,15 @@ export const useInpainting = ({
         .from('generations')
         .select('params')
         .eq('id', generationId)
-        .single();
-      
+        .maybeSingle();
+
       if (fetchError) {
         console.warn('[EditMode] Failed to fetch current params:', fetchError);
+        return;
+      }
+
+      if (!current) {
+        console.log('[EditMode] Generation not found (may have been deleted), skipping save');
         return;
       }
       

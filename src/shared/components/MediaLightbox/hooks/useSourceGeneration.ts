@@ -91,10 +91,10 @@ export const useSourceGeneration = ({
             )
           `)
           .eq('id', effectiveBasedOnId)
-          .single();
-        
+          .maybeSingle();
+
         if (error) throw error;
-        
+
         if (data) {
           // Extract shot associations from joined data
           const shotAssociations = (data as any).shot_generations || [];
