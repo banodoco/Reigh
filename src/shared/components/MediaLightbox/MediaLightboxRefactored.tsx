@@ -937,13 +937,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     isSpecialEditMode
   } = magicEditHook;
 
-  // Persist panel mode for images when isSpecialEditMode changes
+  // Persist panel mode for images when entering edit mode
+  // Only auto-switch TO edit mode, not back to info (let user control that)
   useEffect(() => {
     // Only persist for images (videos have separate handling)
-    if (!isVideo) {
-      const newPanelMode = isSpecialEditMode ? 'edit' : 'info';
-      console.log('[EDIT_DEBUG] 🖼️ Image edit mode changed:', isSpecialEditMode, '→ panelMode:', newPanelMode);
-      setPersistedPanelMode(newPanelMode);
+    if (!isVideo && isSpecialEditMode) {
+      console.log('[EDIT_DEBUG] 🖼️ Entering edit mode → panelMode: edit');
+      setPersistedPanelMode('edit');
     }
   }, [isSpecialEditMode, isVideo, setPersistedPanelMode]);
 
