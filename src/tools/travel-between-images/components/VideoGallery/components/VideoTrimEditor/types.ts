@@ -133,6 +133,10 @@ export interface VariantSelectorProps {
   onMakePrimary?: (variantId: string) => Promise<void>;
   /** Whether component is loading */
   isLoading?: boolean;
+  /** Handler to promote variant to a standalone generation */
+  onPromoteToGeneration?: (variantId: string) => Promise<void>;
+  /** Whether a promotion is currently in progress */
+  isPromoting?: boolean;
 }
 
 /**

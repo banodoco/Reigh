@@ -61,6 +61,9 @@ export interface InfoPanelProps {
   onMakePrimary: (variantId: string) => Promise<void>;
   isLoadingVariants: boolean;
   variantsSectionRef?: React.RefObject<HTMLDivElement>;
+  // Variant promotion
+  onPromoteToGeneration?: (variantId: string) => Promise<void>;
+  isPromoting?: boolean;
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -102,6 +105,9 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   onMakePrimary,
   isLoadingVariants,
   variantsSectionRef,
+  // Variant promotion
+  onPromoteToGeneration,
+  isPromoting,
 }) => {
   const isMobile = variant === 'mobile';
   const hasVariants = variants && variants.length >= 1;
@@ -254,6 +260,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
             onVariantSelect={onVariantSelect}
             onMakePrimary={onMakePrimary}
             isLoading={isLoadingVariants}
+            onPromoteToGeneration={onPromoteToGeneration}
+            isPromoting={isPromoting}
           />
         </div>
       );
@@ -271,6 +279,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
             onVariantSelect={onVariantSelect}
             onMakePrimary={onMakePrimary}
             isLoading={isLoadingVariants}
+            onPromoteToGeneration={onPromoteToGeneration}
+            isPromoting={isPromoting}
           />
         </div>
       </div>

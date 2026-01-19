@@ -830,6 +830,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const hasInitializedOutputSelection = useRef<string | null>(null);
   // Track if we're currently persisting to avoid re-loading our own writes
   const isPersistingRef = useRef(false);
+
+  // Track pending parent ID for rapid consecutive main generations
+  // When a main generation is submitted without a parent, the newly created parent ID is stored here
+  // Subsequent rapid submissions within 10 seconds will reuse this parent instead of creating a new one
+  const pendingMainParentRef = useRef<{ shotId: string; parentId: string; timestamp: number } | null>(null);
   
   // Load persisted selection when shot loads (one-time init per shot)
   useEffect(() => {
@@ -1769,6 +1774,23 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Fire-and-forget: run task creation in background
     (async () => {
       try {
+        // Determine the parent generation ID to use:
+        // 1. If user has selected an output, use that (selectedOutputId)
+        // 2. If there's a recent pending parent for this shot (within 10s), reuse it
+        // 3. Otherwise, let the service create a new parent
+        let effectiveParentId = selectedOutputId ?? undefined;
+
+        if (!effectiveParentId && selectedShotId) {
+          const pending = pendingMainParentRef.current;
+          const now = Date.now();
+          const PENDING_PARENT_TTL = 10000; // 10 seconds
+
+          if (pending && pending.shotId === selectedShotId && (now - pending.timestamp) < PENDING_PARENT_TTL) {
+            console.log('[handleGenerateBatch] Reusing pending parent from recent main generation:', pending.parentId.substring(0, 8));
+            effectiveParentId = pending.parentId;
+          }
+        }
+
         // Call the service with all required parameters
         const result = await generateVideo({
           projectId,
@@ -1816,10 +1838,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           clearAllEnhancedPrompts,
           // Uni3C end percent (from structure video config)
           uni3cEndPercent: structureVideoConfig.uni3c_end_percent,
-          // Pass selected output ID so new segments become children of the selected parent
-          // instead of creating a new parent generation
-          parentGenerationId: selectedOutputId ?? undefined,
+          // Pass the effective parent ID (either selected, pending, or undefined for new)
+          parentGenerationId: effectiveParentId,
         });
+
+        // If a new parent was created (no prior selection), store it for rapid consecutive submissions
+        if (result.success && result.parentGenerationId && !selectedOutputId && selectedShotId) {
+          console.log('[handleGenerateBatch] Storing pending parent for rapid reuse:', result.parentGenerationId.substring(0, 8));
+          pendingMainParentRef.current = {
+            shotId: selectedShotId,
+            parentId: result.parentGenerationId,
+            timestamp: Date.now(),
+          };
+        }
 
       } catch (error) {
         console.error('[handleGenerateBatch] Error creating task:', error);

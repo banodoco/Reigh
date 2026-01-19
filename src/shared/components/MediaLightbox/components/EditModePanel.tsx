@@ -92,7 +92,10 @@ export interface EditModePanelProps {
   onVariantSelect?: (variantId: string) => void;
   onMakePrimary?: (variantId: string) => Promise<void>;
   isLoadingVariants?: boolean;
-  
+  // Variant promotion
+  onPromoteToGeneration?: (variantId: string) => Promise<void>;
+  isPromoting?: boolean;
+
   // Variant
   variant: 'desktop' | 'mobile';
   hideInfoEditToggle?: boolean;
@@ -178,6 +181,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   onVariantSelect,
   onMakePrimary,
   isLoadingVariants,
+  onPromoteToGeneration,
+  isPromoting,
   onClose,
   variant,
   hideInfoEditToggle = false,
@@ -856,6 +861,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             onVariantSelect={onVariantSelect}
             onMakePrimary={onMakePrimary}
             isLoading={isLoadingVariants}
+            onPromoteToGeneration={onPromoteToGeneration}
+            isPromoting={isPromoting}
           />
         </div>
       )}

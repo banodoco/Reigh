@@ -146,6 +146,9 @@ export interface ControlsPanelProps extends ModeProps {
   onVariantSelect: (variantId: string) => void;
   onMakePrimary: (variantId: string) => Promise<void>;
   isLoadingVariants: boolean;
+  // Variant promotion
+  onPromoteToGeneration?: (variantId: string) => Promise<void>;
+  isPromoting?: boolean;
 }
 
 export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
@@ -264,6 +267,9 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     onVariantSelect,
     onMakePrimary,
     isLoadingVariants,
+    // Variant promotion
+    onPromoteToGeneration,
+    isPromoting,
   } = props;
 
   // Route to VideoEditPanel
@@ -303,6 +309,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         onVariantSelect={onVariantSelect}
         onMakePrimary={onMakePrimary}
         isLoadingVariants={isLoadingVariants}
+        onPromoteToGeneration={onPromoteToGeneration}
+        isPromoting={isPromoting}
       />
     );
   }
@@ -357,6 +365,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         onVariantSelect={onVariantSelect}
         onMakePrimary={onMakePrimary}
         isLoadingVariants={isLoadingVariants}
+        onPromoteToGeneration={onPromoteToGeneration}
+        isPromoting={isPromoting}
         onClose={onClose}
         variant={variant}
         createAsGeneration={createAsGeneration}
@@ -424,6 +434,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
       onMakePrimary={onMakePrimary}
       isLoadingVariants={isLoadingVariants}
       variantsSectionRef={variantsSectionRef}
+      onPromoteToGeneration={onPromoteToGeneration}
+      isPromoting={isPromoting}
     />
   );
 };

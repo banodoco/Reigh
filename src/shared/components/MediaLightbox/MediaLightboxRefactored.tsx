@@ -41,6 +41,7 @@ import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePromoteVariantToGeneration } from '@/shared/hooks/usePromoteVariantToGeneration';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
@@ -620,6 +621,86 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     console.log('[VariantRelationship] - activeVariantIsPrimary:', activeVariant?.is_primary);
     console.log('[VariantRelationship] - willPassSourceVariantId:', isViewingNonPrimaryVariant ? activeVariant?.id : null);
   }, [activeVariant, isViewingNonPrimaryVariant]);
+
+  // Variant promotion - create standalone generation from a variant
+  const promoteVariantMutation = usePromoteVariantToGeneration();
+  const [promoteSuccess, setPromoteSuccess] = useState(false);
+
+  // Handler for "Make new image" button in VariantSelector
+  const handlePromoteToGeneration = useCallback(async (variantId: string) => {
+    if (!selectedProjectId) {
+      toast.error('No project selected');
+      return;
+    }
+
+    console.log('[PromoteVariant] handlePromoteToGeneration called:', {
+      variantId: variantId.substring(0, 8),
+      projectId: selectedProjectId.substring(0, 8),
+      sourceGenerationId: actualGenerationId.substring(0, 8),
+    });
+
+    setPromoteSuccess(false);
+
+    try {
+      const result = await promoteVariantMutation.mutateAsync({
+        variantId,
+        projectId: selectedProjectId,
+        sourceGenerationId: actualGenerationId,
+      });
+
+      console.log('[PromoteVariant] Successfully created generation:', result.id.substring(0, 8));
+      setPromoteSuccess(true);
+      // Reset success state after delay
+      setTimeout(() => setPromoteSuccess(false), 2000);
+      // Stay on current item - don't navigate away
+    } catch (error) {
+      console.error('[PromoteVariant] Error promoting variant:', error);
+      // Error toast is handled in the hook
+    }
+  }, [promoteVariantMutation, selectedProjectId, actualGenerationId]);
+
+  // Handler for "Add as new image to shot" button in ShotSelectorControls
+  const handleAddVariantAsNewGenerationToShot = useCallback(async (
+    shotId: string,
+    variantId: string
+  ): Promise<boolean> => {
+    if (!selectedProjectId) {
+      toast.error('No project selected');
+      return false;
+    }
+
+    console.log('[PromoteVariantToShot] Starting:', {
+      shotId: shotId.substring(0, 8),
+      variantId: variantId.substring(0, 8),
+      projectId: selectedProjectId.substring(0, 8),
+      sourceGenerationId: actualGenerationId.substring(0, 8),
+    });
+
+    try {
+      // 1. Create the generation from the variant
+      const newGen = await promoteVariantMutation.mutateAsync({
+        variantId,
+        projectId: selectedProjectId,
+        sourceGenerationId: actualGenerationId,
+      });
+
+      console.log('[PromoteVariantToShot] Created generation:', newGen.id.substring(0, 8));
+
+      // 2. Add to shot using existing onAddToShot callback
+      if (onAddToShot && newGen) {
+        const success = await onAddToShot(shotId, newGen.id, newGen.location, newGen.thumbnail_url || undefined);
+        if (success) {
+          console.log('[PromoteVariantToShot] Successfully added to shot');
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('[PromoteVariantToShot] Error:', error);
+      // Error toast is handled in the hook for the mutation part
+      return false;
+    }
+  }, [promoteVariantMutation, selectedProjectId, actualGenerationId, onAddToShot]);
 
   // Fetch available LoRAs - needed by edit modes and img2img
   const { data: publicLorasData } = useListPublicResources('lora');
@@ -2871,20 +2952,44 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               <span>Main variant</span>
                             </div>
                           ) : (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleMakeMainVariant}
-                              disabled={isMakingMainVariant || !canMakeMainVariant}
-                              className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
-                            >
-                              {isMakingMainVariant ? (
-                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                              ) : (
-                                <Star className="w-4 h-4 mr-1.5" />
-                              )}
-                              Make main
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleMakeMainVariant}
+                                disabled={isMakingMainVariant || !canMakeMainVariant}
+                                className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
+                              >
+                                {isMakingMainVariant ? (
+                                  <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                                ) : (
+                                  <Star className="w-4 h-4 mr-1.5" />
+                                )}
+                                Make main
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handlePromoteToGeneration(activeVariant.id)}
+                                disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
+                                className={cn(
+                                  "border-none shadow-lg text-white",
+                                  promoteSuccess
+                                    ? "bg-green-500/90 hover:bg-green-500/90"
+                                    : "bg-blue-500/90 hover:bg-blue-600"
+                                )}
+                                title="Create a standalone image from this variant"
+                              >
+                                {promoteVariantMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                                ) : promoteSuccess ? (
+                                  <Check className="w-4 h-4 mr-1.5" />
+                                ) : (
+                                  <Plus className="w-4 h-4 mr-1.5" />
+                                )}
+                                {promoteSuccess ? 'Created' : 'New image'}
+                              </Button>
+                            </div>
                           )}
                         </>
                       )}
@@ -2967,6 +3072,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handleApplySettings={handleApplySettings}
                       onNavigateToShot={handleNavigateToShotFromSelector}
                       onClose={onClose}
+                      onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
+                      isViewingVariant={!!isViewingNonPrimaryVariant}
+                      activeVariantId={activeVariant?.id}
                     />
                   </div>
 
@@ -3100,6 +3208,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     onVariantSelect={setActiveVariantId}
                     onMakePrimary={setPrimaryVariant}
                     isLoadingVariants={isLoadingVariants}
+                    onPromoteToGeneration={handlePromoteToGeneration}
+                    isPromoting={promoteVariantMutation.isPending}
                   />
                 </div>
               </div>
@@ -3202,20 +3312,44 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             <span>Main variant</span>
                           </div>
                         ) : (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleMakeMainVariant}
-                            disabled={isMakingMainVariant || !canMakeMainVariant}
-                            className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
-                          >
-                            {isMakingMainVariant ? (
-                              <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                            ) : (
-                              <Star className="w-4 h-4 mr-1.5" />
-                            )}
-                            Make main
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleMakeMainVariant}
+                              disabled={isMakingMainVariant || !canMakeMainVariant}
+                              className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
+                            >
+                              {isMakingMainVariant ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                              ) : (
+                                <Star className="w-4 h-4 mr-1.5" />
+                              )}
+                              Make main
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handlePromoteToGeneration(activeVariant.id)}
+                              disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
+                              className={cn(
+                                "border-none shadow-lg text-white",
+                                promoteSuccess
+                                  ? "bg-green-500/90 hover:bg-green-500/90"
+                                  : "bg-blue-500/90 hover:bg-blue-600"
+                              )}
+                              title="Create a standalone image from this variant"
+                            >
+                              {promoteVariantMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                              ) : promoteSuccess ? (
+                                <Check className="w-4 h-4 mr-1.5" />
+                              ) : (
+                                <Plus className="w-4 h-4 mr-1.5" />
+                              )}
+                              {promoteSuccess ? 'Created' : 'New image'}
+                            </Button>
+                          </div>
                         )}
                       </div>
                     )}
@@ -3289,6 +3423,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handleApplySettings={handleApplySettings}
                       onNavigateToShot={handleNavigateToShotFromSelector}
                       onClose={onClose}
+                      onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
+                      isViewingVariant={!!isViewingNonPrimaryVariant}
+                      activeVariantId={activeVariant?.id}
                     />
 
                     {/* Navigation Arrows */}
@@ -3432,6 +3569,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     onVariantSelect={setActiveVariantId}
                     onMakePrimary={setPrimaryVariant}
                     isLoadingVariants={isLoadingVariants}
+                    onPromoteToGeneration={handlePromoteToGeneration}
+                    isPromoting={promoteVariantMutation.isPending}
                   />
                 </div>
               </div>
@@ -3553,20 +3692,44 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <span>Main variant</span>
                         </div>
                       ) : (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleMakeMainVariant}
-                          disabled={isMakingMainVariant || !canMakeMainVariant}
-                          className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
-                        >
-                          {isMakingMainVariant ? (
-                            <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                          ) : (
-                            <Star className="w-4 h-4 mr-1.5" />
-                          )}
-                          Make main
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleMakeMainVariant}
+                            disabled={isMakingMainVariant || !canMakeMainVariant}
+                            className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
+                          >
+                            {isMakingMainVariant ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                            ) : (
+                              <Star className="w-4 h-4 mr-1.5" />
+                            )}
+                            Make main
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handlePromoteToGeneration(activeVariant.id)}
+                            disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
+                            className={cn(
+                              "border-none shadow-lg text-white",
+                              promoteSuccess
+                                ? "bg-green-500/90 hover:bg-green-500/90"
+                                : "bg-blue-500/90 hover:bg-blue-600"
+                            )}
+                            title="Create a standalone image from this variant"
+                          >
+                            {promoteVariantMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                            ) : promoteSuccess ? (
+                              <Check className="w-4 h-4 mr-1.5" />
+                            ) : (
+                              <Plus className="w-4 h-4 mr-1.5" />
+                            )}
+                            {promoteSuccess ? 'Created' : 'New image'}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -3722,6 +3885,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     handleApplySettings={handleApplySettings}
                     onNavigateToShot={handleNavigateToShotFromSelector}
                     onClose={onClose}
+                    onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
+                    isViewingVariant={!!isViewingNonPrimaryVariant}
+                    activeVariantId={activeVariant?.id}
                   />
 
                   {/* Navigation Arrows */}

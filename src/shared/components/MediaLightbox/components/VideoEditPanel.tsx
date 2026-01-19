@@ -75,6 +75,9 @@ export interface VideoEditPanelProps {
   onVariantSelect: (variantId: string) => void;
   onMakePrimary: (variantId: string) => Promise<void>;
   isLoadingVariants: boolean;
+  // Variant promotion
+  onPromoteToGeneration?: (variantId: string) => Promise<void>;
+  isPromoting?: boolean;
 }
 
 export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
@@ -111,6 +114,8 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   onVariantSelect,
   onMakePrimary,
   isLoadingVariants,
+  onPromoteToGeneration,
+  isPromoting,
 }) => {
   const isMobile = variant === 'mobile';
 
@@ -306,6 +311,8 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
                 onVariantSelect={onVariantSelect}
                 onMakePrimary={onMakePrimary}
                 isLoading={isLoadingVariants}
+                onPromoteToGeneration={onPromoteToGeneration}
+                isPromoting={isPromoting}
               />
             </div>
           ) : (
@@ -315,6 +322,8 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
               onVariantSelect={onVariantSelect}
               onMakePrimary={onMakePrimary}
               isLoading={isLoadingVariants}
+              onPromoteToGeneration={onPromoteToGeneration}
+              isPromoting={isPromoting}
             />
           )}
         </div>

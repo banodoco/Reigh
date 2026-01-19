@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { CheckCircle, PlusCircle } from 'lucide-react';
+import { CheckCircle, PlusCircle, ImagePlus, Loader2 } from 'lucide-react';
 import ShotSelectorWithAdd from '@/shared/components/ShotSelectorWithAdd';
 
 interface ShotOption {
@@ -14,40 +14,45 @@ export interface ShotSelectorControlsProps {
   mediaId: string;
   imageUrl?: string;
   thumbUrl?: string;
-  
+
   // Shot selection
   allShots: ShotOption[];
   selectedShotId: string | undefined;
   onShotChange?: (shotId: string) => void;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
-  
+
   // Shot positioning
   isAlreadyPositionedInSelectedShot: boolean;
   isAlreadyAssociatedWithoutPosition: boolean;
   showTickForImageId?: string | null;
   showTickForSecondaryImageId?: string | null;
-  
+
   // Shot actions
   // CRITICAL: targetShotId is the shot selected in the DROPDOWN, not the shot being viewed
   onAddToShot: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
-  
+
+  // Variant promotion - for adding a variant as a new generation to a shot
+  onAddVariantAsNewGeneration?: (shotId: string, variantId: string) => Promise<boolean>;
+  isViewingVariant?: boolean;
+  activeVariantId?: string | null;
+
   // Optimistic updates
   onShowTick?: (imageId: string) => void;
   onOptimisticPositioned?: (imageId: string, shotId: string) => void;
   onShowSecondaryTick?: (imageId: string) => void;
   onOptimisticUnpositioned?: (imageId: string, shotId: string) => void;
-  
+
   // UI state
   setIsSelectOpen?: (isOpen: boolean) => void;
   contentRef: React.RefObject<HTMLDivElement>;
-  
+
   // Navigation
   onNavigateToShot?: (shot: ShotOption) => void;
-  
+
   // Close lightbox
   onClose?: () => void;
-  
+
   // Loading states
   isAdding?: boolean;
   isAddingWithoutPosition?: boolean;
@@ -73,6 +78,9 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
   showTickForSecondaryImageId,
   onAddToShot,
   onAddToShotWithoutPosition,
+  onAddVariantAsNewGeneration,
+  isViewingVariant = false,
+  activeVariantId,
   onShowTick,
   onOptimisticPositioned,
   onShowSecondaryTick,
@@ -84,6 +92,8 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
   isAdding = false,
   isAddingWithoutPosition = false,
 }) => {
+  const [isAddingVariantAsNew, setIsAddingVariantAsNew] = useState(false);
+  const [addedVariantAsNewSuccess, setAddedVariantAsNewSuccess] = useState(false);
   // Handle add without position
   // CRITICAL: Pass selectedShotId (the dropdown value) as targetShotId
   const handleAddWithoutPosition = async () => {
@@ -141,28 +151,71 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
     }
   };
 
+  // Handle adding variant as a new generation to shot
+  const handleAddVariantAsNewGeneration = async () => {
+    console.log('[AddVariantAsNew] Starting with:', {
+      selectedShotId: selectedShotId?.substring(0, 8),
+      activeVariantId: activeVariantId?.substring(0, 8),
+      hasCallback: !!onAddVariantAsNewGeneration,
+    });
+
+    if (!selectedShotId || !activeVariantId || !onAddVariantAsNewGeneration) {
+      console.log('[AddVariantAsNew] Missing required params, returning');
+      return;
+    }
+
+    setIsAddingVariantAsNew(true);
+    setAddedVariantAsNewSuccess(false);
+
+    try {
+      const success = await onAddVariantAsNewGeneration(selectedShotId, activeVariantId);
+      console.log('[AddVariantAsNew] Result:', success);
+      if (success) {
+        setAddedVariantAsNewSuccess(true);
+        // Reset success state after delay
+        setTimeout(() => setAddedVariantAsNewSuccess(false), 2000);
+      }
+    } catch (error) {
+      console.error('[AddVariantAsNew] Error:', error);
+    } finally {
+      setIsAddingVariantAsNew(false);
+    }
+  };
+
+  // Get selected shot for jump link
+  const selectedShot = selectedShotId ? allShots.find(s => s.id === selectedShotId) : null;
+
+  const handleJumpToShot = () => {
+    if (selectedShot && onNavigateToShot && onClose) {
+      onNavigateToShot(selectedShot);
+      onClose();
+    }
+  };
+
   return (
-    <>
-      <ShotSelectorWithAdd
-        imageId={mediaId}
-        imageUrl={imageUrl}
-        thumbUrl={thumbUrl}
-        shots={allShots}
-        selectedShotId={selectedShotId || ''}
-        onShotChange={onShotChange || (() => {})}
-        onAddToShot={onAddToShot}
-        onCreateShot={onCreateShot ? async () => {} : undefined}
-        isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
-        showTick={showTickForImageId === mediaId}
-        isAdding={isAdding}
-        onShowTick={onShowTick}
-        onOptimisticPositioned={onOptimisticPositioned}
-        onClose={onClose}
-        layout="horizontal"
-        container={contentRef.current}
-        selectorClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
-        buttonClassName="h-8 w-8"
-      />
+    <div className="flex flex-col items-center gap-1">
+      {/* Top row: selector and buttons */}
+      <div className="flex items-center gap-2">
+        <ShotSelectorWithAdd
+          imageId={mediaId}
+          imageUrl={imageUrl}
+          thumbUrl={thumbUrl}
+          shots={allShots}
+          selectedShotId={selectedShotId || ''}
+          onShotChange={onShotChange || (() => {})}
+          onAddToShot={onAddToShot}
+          onCreateShot={onCreateShot ? async () => {} : undefined}
+          isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
+          showTick={showTickForImageId === mediaId}
+          isAdding={isAdding}
+          onShowTick={onShowTick}
+          onOptimisticPositioned={onOptimisticPositioned}
+          onClose={onClose}
+          layout="horizontal"
+          container={contentRef.current}
+          selectorClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
+          buttonClassName="h-8 w-8"
+        />
 
       {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (() => {
         const isShowingTick = isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === mediaId;
@@ -207,6 +260,49 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
           </Tooltip>
         );
       })()}
-    </>
+
+        {/* Add variant as new generation to shot button */}
+        {onAddVariantAsNewGeneration && isViewingVariant && activeVariantId && selectedShotId && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleAddVariantAsNewGeneration}
+                disabled={isAddingVariantAsNew}
+                className={`h-8 px-3 text-white ${
+                  addedVariantAsNewSuccess
+                    ? 'bg-green-600/80 hover:bg-green-600'
+                    : 'bg-blue-600/80 hover:bg-blue-600'
+                }`}
+              >
+                {isAddingVariantAsNew ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : addedVariantAsNewSuccess ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : (
+                  <ImagePlus className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="z-[100001]">
+              {addedVariantAsNewSuccess
+                ? 'Added variant as new image to shot!'
+                : 'Add variant as new image to shot'}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+
+      {/* Jump to shot link - below the buttons */}
+      {selectedShot && onNavigateToShot && onClose && (
+        <button
+          onClick={handleJumpToShot}
+          className="text-xs text-white/70 hover:text-white underline underline-offset-2 whitespace-nowrap"
+        >
+          Jump to {selectedShot.name}
+        </button>
+      )}
+    </div>
   );
 };

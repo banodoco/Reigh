@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Check, Scissors, Sparkles, Film, Star, Loader2, ArrowDown, ArrowUp, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, Scissors, Sparkles, Film, Star, Loader2, ArrowDown, ArrowUp, X, ChevronLeft, ChevronRight, ImagePlus } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -89,8 +89,12 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   onVariantSelect,
   onMakePrimary,
   isLoading = false,
+  onPromoteToGeneration,
+  isPromoting = false,
 }) => {
   const [isMakingPrimary, setIsMakingPrimary] = useState(false);
+  const [localIsPromoting, setLocalIsPromoting] = useState(false);
+  const [promoteSuccess, setPromoteSuccess] = useState(false);
   const [relationshipFilter, setRelationshipFilter] = useState<RelationshipFilter>('all');
   const [currentPage, setCurrentPage] = useState(0);
   const isMobile = useIsMobile();
@@ -212,6 +216,20 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
     }
   };
 
+  const handlePromoteToGeneration = async () => {
+    if (!activeVariantId || !onPromoteToGeneration) return;
+    setLocalIsPromoting(true);
+    setPromoteSuccess(false);
+    try {
+      await onPromoteToGeneration(activeVariantId);
+      setPromoteSuccess(true);
+      // Reset success state after a short delay
+      setTimeout(() => setPromoteSuccess(false), 2000);
+    } finally {
+      setLocalIsPromoting(false);
+    }
+  };
+
   if (isLoading) {
     // Show single skeleton when loading since we don't know variant count yet
     return (
@@ -286,27 +304,59 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
               </div>
             )}
           </div>
-          {isViewingNonPrimary && onMakePrimary ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleMakePrimary}
-              disabled={isMakingPrimary}
-              className="h-6 text-xs px-2 gap-1"
-            >
-              {isMakingPrimary ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <Star className="w-3 h-3" />
-              )}
-              Make current main
-            </Button>
-          ) : activeVariant?.is_primary ? (
-            <div className="flex items-center gap-1 h-6 text-xs px-2 text-green-500">
-              <Star className="w-3 h-3 fill-current" />
-              <span>Main variant</span>
-            </div>
-          ) : null}
+          <div className="flex items-center gap-1">
+            {/* Make new image button - only for non-primary variants when promote handler provided */}
+            {isViewingNonPrimary && onPromoteToGeneration && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePromoteToGeneration}
+                    disabled={localIsPromoting || isPromoting}
+                    className={cn(
+                      "h-6 text-xs px-2 gap-1",
+                      promoteSuccess && "bg-green-500/20 border-green-500/50 text-green-400"
+                    )}
+                  >
+                    {localIsPromoting || isPromoting ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : promoteSuccess ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <ImagePlus className="w-3 h-3" />
+                    )}
+                    {promoteSuccess ? 'Created!' : 'Make new image'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="z-[100001]">
+                  <p>Create a standalone image from this variant</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {/* Make current main button */}
+            {isViewingNonPrimary && onMakePrimary ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleMakePrimary}
+                disabled={isMakingPrimary}
+                className="h-6 text-xs px-2 gap-1"
+              >
+                {isMakingPrimary ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Star className="w-3 h-3" />
+                )}
+                Make current main
+              </Button>
+            ) : activeVariant?.is_primary ? (
+              <div className="flex items-center gap-1 h-6 text-xs px-2 text-green-500">
+                <Star className="w-3 h-3 fill-current" />
+                <span>Main variant</span>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Pagination info - at top */}

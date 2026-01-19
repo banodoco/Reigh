@@ -402,6 +402,8 @@ export interface GenerateVideoParams {
 export interface GenerateVideoResult {
   success: boolean;
   error?: string;
+  /** The parent generation ID (either provided or newly created) */
+  parentGenerationId?: string;
 }
 
 /**
@@ -1583,9 +1585,12 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       }
     }
     // Use the new client-side travel between images task creation instead of calling the edge function
-    await createTravelBetweenImagesTask(requestBody as TravelBetweenImagesTaskParams);
-    
-    return { success: true };
+    const result = await createTravelBetweenImagesTask(requestBody as TravelBetweenImagesTaskParams);
+
+    return {
+      success: true,
+      parentGenerationId: result.parentGenerationId,
+    };
   } catch (error) {
     console.error('Error creating video generation task:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

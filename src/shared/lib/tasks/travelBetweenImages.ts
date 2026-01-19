@@ -786,13 +786,23 @@ function buildTravelBetweenImagesPayload(
 }
 
 /**
+ * Result of creating a travel between images task
+ */
+export interface TravelBetweenImagesTaskResult {
+  /** The created task data */
+  task: any;
+  /** The parent generation ID (either provided or newly created) */
+  parentGenerationId: string | undefined;
+}
+
+/**
  * Creates a travel between images task using the unified approach
  * This replaces the direct call to the steerable-motion edge function
- * 
+ *
  * @param params - Travel between images task parameters
- * @returns Promise resolving to the created task
+ * @returns Promise resolving to the created task and parent generation ID
  */
-export async function createTravelBetweenImagesTask(params: TravelBetweenImagesTaskParams): Promise<any> {
+export async function createTravelBetweenImagesTask(params: TravelBetweenImagesTaskParams): Promise<TravelBetweenImagesTaskResult> {
   console.log("[EnhancePromptDebug] Creating task with params:", params);
   console.log("[EnhancePromptDebug] enhance_prompt parameter received:", {
     enhance_prompt: params.enhance_prompt,
@@ -914,7 +924,10 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
     });
 
     console.log("[createTravelBetweenImagesTask] Task created successfully:", result);
-    return result;
+    return {
+      task: result,
+      parentGenerationId: effectiveParentGenerationId,
+    };
 
   } catch (error) {
     console.error("[createTravelBetweenImagesTask] Error creating task:", error);

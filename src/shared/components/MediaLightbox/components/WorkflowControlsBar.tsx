@@ -48,19 +48,24 @@ export interface WorkflowControlsBarProps {
   // Loading states
   isAdding?: boolean;
   isAddingWithoutPosition?: boolean;
-  
+
   // UI state
   setIsSelectOpen?: (isOpen: boolean) => void;
   contentRef: React.RefObject<HTMLDivElement>;
-  
+
   // Apply settings
   handleApplySettings: () => void;
-  
+
   // Navigation
   onNavigateToShot?: (shot: ShotOption) => void;
-  
+
   // Close lightbox
   onClose?: () => void;
+
+  // Variant promotion - for adding a variant as a new generation to a shot
+  onAddVariantAsNewGeneration?: (shotId: string, variantId: string) => Promise<boolean>;
+  isViewingVariant?: boolean;
+  activeVariantId?: string | null;
 }
 
 /**
@@ -97,6 +102,9 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
   handleApplySettings,
   onNavigateToShot,
   onClose,
+  onAddVariantAsNewGeneration,
+  isViewingVariant = false,
+  activeVariantId,
 }) => {
   // Track if shots loaded after initial render (race condition detection)
   const prevShotsLengthRef = React.useRef(allShots?.length || 0);
@@ -160,6 +168,9 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
             showTickForSecondaryImageId={showTickForSecondaryImageId}
             onAddToShot={onAddToShot}
             onAddToShotWithoutPosition={onAddToShotWithoutPosition}
+            onAddVariantAsNewGeneration={onAddVariantAsNewGeneration}
+            isViewingVariant={isViewingVariant}
+            activeVariantId={activeVariantId}
             onShowTick={onShowTick}
             onOptimisticPositioned={onOptimisticPositioned}
             onShowSecondaryTick={onShowSecondaryTick}

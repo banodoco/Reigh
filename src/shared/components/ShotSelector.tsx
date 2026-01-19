@@ -89,6 +89,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   // Use controlled state if provided, otherwise use internal state
   const isOpen = open !== undefined ? open : internalOpen;
   const setIsOpen = useCallback((newOpen: boolean) => {
+    console.log('[ShotDropdownDebug] setIsOpen called:', { newOpen, wasOpen: open !== undefined ? open : internalOpen });
     if (open === undefined) {
       setInternalOpen(newOpen);
     }
@@ -97,7 +98,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
     if (!newOpen) {
       setSearchQuery('');
     }
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, internalOpen]);
   
   // Auto-focus search input when popover opens
   useEffect(() => {
@@ -166,8 +167,18 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
     }
   }, [variant]);
 
+  console.log('[ShotDropdownDebug] ShotSelector render:', {
+    isOpen,
+    shotsCount: shots.length,
+    showAddShot,
+    hasOnCreateShot: !!onCreateShot,
+    hasOnNavigateToShot: !!onNavigateToShot,
+    value,
+    isMobile
+  });
+
   return (
-    <div 
+    <div
       className={`flex items-center gap-1 ${className || ''}`}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
@@ -206,9 +217,10 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
           collisionPadding={8}
           container={container}
           onKeyDown={handleKeyDown}
-          // Stop all pointer/touch events from bubbling to parent (prevents lightbox opens, etc.)
-          onPointerDownCapture={(e) => e.stopPropagation()}
-          onClickCapture={(e) => e.stopPropagation()}
+          // Stop events from bubbling to parent (prevents lightbox closes, etc.)
+          // Use bubble phase so events reach child buttons first
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Add Shot Header */}
           {showAddShot && onCreateShot && (
@@ -247,6 +259,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
                   size="sm"
                   className="w-full h-8 text-xs justify-center bg-zinc-600 hover:bg-zinc-500 text-white border-zinc-500"
                   onClick={(e) => {
+                    console.log('[ShotDropdownDebug] Add Shot button clicked');
                     e.preventDefault();
                     e.stopPropagation();
                     onCreateShot();
@@ -316,6 +329,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
                       <button
                         className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/shot:opacity-100 transition-opacity p-1 rounded bg-zinc-800/90 hover:bg-zinc-700 border border-zinc-600/50"
                         onClick={(e) => {
+                          console.log('[ShotDropdownDebug] Jump arrow clicked for shot:', shot.name);
                           e.preventDefault();
                           e.stopPropagation();
                           setIsOpen(false);
