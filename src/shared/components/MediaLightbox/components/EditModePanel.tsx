@@ -5,21 +5,20 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Switch } from '@/shared/components/ui/switch';
 import { Label } from '@/shared/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
-import { CheckCircle, Loader2, Move, Paintbrush, Pencil, Save, Sparkles, Type, X, XCircle, Layers, Wand2, Plus } from 'lucide-react';
+import { CheckCircle, Loader2, Move, Paintbrush, Pencil, Save, Sparkles, Type, XCircle, Layers, Wand2, Plus } from 'lucide-react';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { GenerationRow } from '@/types/shots';
 import type { LoraMode, QwenEditModel } from '../hooks';
 import type { SourceVariantData } from '../hooks/useSourceGeneration';
-import { VariantSelector } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/components/VariantSelector';
 import type { GenerationVariant } from '@/shared/hooks/useVariants';
 import { ActiveLoRAsDisplay, ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { LoraSelectorModal, LoraModel } from '@/shared/components/LoraSelectorModal';
 import type { UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { EditAdvancedSettings } from './EditAdvancedSettings';
 import type { EditAdvancedSettings as EditAdvancedSettingsType } from '../hooks/useGenerationEditSettings';
+import { EditPanelLayout } from './EditPanelLayout';
 
 export interface EditModePanelProps {
   // Source generation
@@ -32,44 +31,44 @@ export interface EditModePanelProps {
   sourcePrimaryVariant?: SourceVariantData | null;
   onMakeMainVariant?: () => Promise<void>;
   canMakeMainVariant?: boolean;
-  
+
   // Edit mode state
   editMode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
   setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img') => void;
   setIsInpaintMode: (value: boolean) => void;
-  
+
   // Prompt state
   inpaintPrompt: string;
   setInpaintPrompt: (value: string) => void;
-  
+
   // Generations state
   inpaintNumGenerations: number;
   setInpaintNumGenerations: (value: number) => void;
-  
+
   // LoRA Mode
   loraMode: LoraMode;
   setLoraMode: (mode: LoraMode) => void;
   customLoraUrl: string;
   setCustomLoraUrl: (url: string) => void;
-  
+
   // Generation status
   isGeneratingInpaint: boolean;
   inpaintGenerateSuccess: boolean;
   isCreatingMagicEditTasks: boolean;
-  
+
   // Close lightbox
   onClose: () => void;
   magicEditTasksCreated: boolean;
-  
+
   // Brush strokes
   brushStrokes: any[];
-  
+
   // Handlers
   handleExitMagicEditMode: () => void;
   handleUnifiedGenerate: () => void;
   handleGenerateAnnotatedEdit: () => void;
   handleGenerateReposition?: () => void;
-  
+
   // Reposition state
   isGeneratingReposition?: boolean;
   repositionGenerateSuccess?: boolean;
@@ -77,7 +76,7 @@ export interface EditModePanelProps {
   handleSaveAsVariant?: () => void;
   isSavingAsVariant?: boolean;
   saveAsVariantSuccess?: boolean;
-  
+
   // Derived generations (legacy - kept for compatibility)
   derivedGenerations?: GenerationRow[] | null;
   paginatedDerived?: GenerationRow[];
@@ -85,7 +84,7 @@ export interface EditModePanelProps {
   derivedTotalPages?: number;
   setDerivedPage?: (page: number | ((prev: number) => number)) => void;
   currentMediaId: string;
-  
+
   // Variants - for VariantSelector
   variants?: GenerationVariant[];
   activeVariantId?: string | null;
@@ -99,11 +98,11 @@ export interface EditModePanelProps {
   // Variant
   variant: 'desktop' | 'mobile';
   hideInfoEditToggle?: boolean;
-  
+
   // Create as generation toggle
   createAsGeneration?: boolean;
   onCreateAsGenerationChange?: (value: boolean) => void;
-  
+
   // Img2Img mode props
   img2imgPrompt?: string;
   setImg2imgPrompt?: (prompt: string) => void;
@@ -132,7 +131,7 @@ export interface EditModePanelProps {
 /**
  * EditModePanel Component
  * The panel shown when in edit mode (inpaint/magic-edit/annotate)
- * Consolidates desktop and mobile variants
+ * Uses shared EditPanelLayout for consistent header and variants handling.
  */
 export const EditModePanel: React.FC<EditModePanelProps> = ({
   sourceGenerationData,
@@ -208,33 +207,32 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   setQwenEditModel,
 }) => {
   const isMobile = variant === 'mobile';
-  
+
   // Track previous edit mode to detect changes
   const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>(editMode);
-  
+
   // Auto-reset LoRA mode to "none" when switching to inpaint or annotate
   useEffect(() => {
     const prevMode = prevEditModeRef.current;
-    
+
     // If switching TO inpaint or annotate mode (from any other mode), reset LoRA to none
     if (prevMode !== editMode && (editMode === 'inpaint' || editMode === 'annotate')) {
       console.log('[LoraReset] Switching to', editMode, 'mode - resetting LoRA to none');
       setLoraMode('none');
     }
-    
+
     prevEditModeRef.current = editMode;
   }, [editMode, setLoraMode]);
-  
+
   // Handle clearing LoRA mode
   const handleClearLora = (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoraMode('none');
   };
-  
+
   // Responsive styles
   const padding = isMobile ? 'p-3' : 'p-6';
   const spacing = isMobile ? 'space-y-2' : 'space-y-4';
-  const headerSize = isMobile ? 'text-lg' : 'text-2xl';
   const labelSize = isMobile ? 'text-[10px] uppercase tracking-wide text-muted-foreground' : 'text-sm';
   const textareaMinHeight = isMobile ? 'min-h-[50px]' : 'min-h-[100px]';
   const textareaRows = isMobile ? 2 : 4;
@@ -245,10 +243,9 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   const togglePadding = isMobile ? 'px-1.5 py-1' : 'px-3 py-1.5';
   const toggleTextSize = isMobile ? 'text-[10px]' : 'text-sm';
   const toggleIconSize = isMobile ? 'h-3 w-3' : 'h-3.5 w-3.5';
-  const closeButtonSize = isMobile ? 'text-xs px-2 py-1' : 'text-sm px-3 py-1';
   const generationsSpacing = isMobile ? 'space-y-0.5' : 'space-y-2';
   const sliderTextSize = isMobile ? 'text-xs' : 'text-sm';
-  
+
   // Section label component for mobile
   const SectionLabel = ({ children }: { children: React.ReactNode }) => (
     isMobile ? (
@@ -258,615 +255,568 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
     ) : null
   );
 
+  // Mode selector for image editing
+  const modeSelector = (
+    <div className={cn(
+      "flex gap-0.5 border border-border rounded-lg overflow-hidden bg-muted/30",
+      isMobile ? "p-0.5" : "p-1 gap-1"
+    )}>
+      <button
+        onClick={() => {
+          setIsInpaintMode(true);
+          setEditMode('text');
+        }}
+        className={cn(
+          `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+          isMobile && "gap-0.5",
+          !isMobile && "flex-row gap-1",
+          editMode === 'text'
+            ? "bg-background text-foreground font-medium shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        )}
+      >
+        <Type className={`${toggleIconSize} flex-shrink-0`} />
+        <span className={cn("truncate", isMobile && "leading-tight")}>Text</span>
+      </button>
+      <button
+        onClick={() => {
+          setIsInpaintMode(true);
+          setEditMode('inpaint');
+        }}
+        className={cn(
+          `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+          isMobile && "gap-0.5",
+          !isMobile && "flex-row gap-1",
+          editMode === 'inpaint'
+            ? "bg-background text-foreground font-medium shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        )}
+      >
+        <Paintbrush className={`${toggleIconSize} flex-shrink-0`} />
+        <span className={cn("truncate", isMobile && "leading-tight")}>Paint</span>
+      </button>
+      <button
+        onClick={() => {
+          setIsInpaintMode(true);
+          setEditMode('annotate');
+        }}
+        className={cn(
+          `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+          isMobile && "gap-0.5",
+          !isMobile && "flex-row gap-1",
+          editMode === 'annotate'
+            ? "bg-background text-foreground font-medium shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        )}
+      >
+        <Pencil className={`${toggleIconSize} flex-shrink-0`} />
+        <span className={cn("truncate", isMobile && "leading-tight")}>{isMobile ? 'Draw' : 'Annotate'}</span>
+      </button>
+      <button
+        onClick={() => {
+          setIsInpaintMode(true);
+          setEditMode('reposition');
+        }}
+        className={cn(
+          `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+          isMobile && "gap-0.5",
+          !isMobile && "flex-row gap-1",
+          editMode === 'reposition'
+            ? "bg-background text-foreground font-medium shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        )}
+        title="Move, scale, or rotate the image to fill edges with AI"
+      >
+        <Move className={`${toggleIconSize} flex-shrink-0`} />
+        <span className={cn("truncate", isMobile && "leading-tight")}>Move</span>
+      </button>
+      <button
+        onClick={() => {
+          setIsInpaintMode(true);
+          setEditMode('img2img');
+        }}
+        className={cn(
+          `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
+          isMobile && "gap-0.5",
+          !isMobile && "flex-row gap-1",
+          editMode === 'img2img'
+            ? "bg-background text-foreground font-medium shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        )}
+        title="Transform the entire image with a prompt and strength control"
+      >
+        <Wand2 className={`${toggleIconSize} flex-shrink-0`} />
+        <span className={cn("truncate", isMobile && "leading-tight")}>Img2Img</span>
+      </button>
+    </div>
+  );
+
   return (
-    <div className={cn("w-full", !isMobile && "h-full flex flex-col")}>
-      {/* Top bar with Edit Image title (left) and Info/Edit Toggle + Close (right) */}
-      <div className={cn(
-        "flex items-center justify-between border-b border-border bg-background flex-shrink-0",
-        isMobile ? "px-3 py-2" : "p-4"
-      )}>
-        {/* Left side - Edit Image title */}
-        <div className="flex items-center gap-2">
-          <h2 className={cn("font-light", isMobile ? "text-sm" : "text-lg")}>Edit</h2>
-        </div>
-        
-        {/* Info | Edit Toggle and Close Button */}
-        <div className="flex items-center gap-2">
-          {!hideInfoEditToggle && (
-          <SegmentedControl
-            value="edit"
-            onValueChange={(value) => {
-              if (value === 'info') {
-                handleExitMagicEditMode();
-              }
-            }}
-          >
-            <SegmentedControlItem value="info">Info</SegmentedControlItem>
-            <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
-          </SegmentedControl>
-          )}
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className={cn("p-0 hover:bg-muted", isMobile ? "h-7 w-7" : "h-8 w-8")}
-          >
-            <X className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
-          </Button>
-        </div>
-      </div>
-      
-      {/* Scrollable content wrapper for desktop */}
-      <div className={cn(!isMobile && "flex-1 overflow-y-auto min-h-0")}>
-      <div className={`${padding} ${spacing}`}>
-      {/* Edit Mode Section */}
-      <div className={isMobile ? 'mb-1' : 'mb-4'}>
-        <SectionLabel>Edit Mode</SectionLabel>
-        {/* Five-way toggle: Text | Inpaint | Annotate | Reposition | Img2Img - single row */}
-        <div className={cn(
-          "flex gap-0.5 border border-border rounded-lg overflow-hidden bg-muted/30",
-          isMobile ? "p-0.5" : "p-1 gap-1"
-        )}>
-          <button
-            onClick={() => {
-              setIsInpaintMode(true);
-              setEditMode('text');
-            }}
-            className={cn(
-              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
-              isMobile && "gap-0.5",
-              !isMobile && "flex-row gap-1",
-              editMode === 'text'
-                ? "bg-background text-foreground font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-          >
-            <Type className={`${toggleIconSize} flex-shrink-0`} />
-            <span className={cn("truncate", isMobile && "leading-tight")}>Text</span>
-          </button>
-          <button
-            onClick={() => {
-              setIsInpaintMode(true);
-              setEditMode('inpaint');
-            }}
-            className={cn(
-              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
-              isMobile && "gap-0.5",
-              !isMobile && "flex-row gap-1",
-              editMode === 'inpaint'
-                ? "bg-background text-foreground font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-          >
-            <Paintbrush className={`${toggleIconSize} flex-shrink-0`} />
-            <span className={cn("truncate", isMobile && "leading-tight")}>Paint</span>
-          </button>
-          <button
-            onClick={() => {
-              setIsInpaintMode(true);
-              setEditMode('annotate');
-            }}
-            className={cn(
-              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
-              isMobile && "gap-0.5",
-              !isMobile && "flex-row gap-1",
-              editMode === 'annotate'
-                ? "bg-background text-foreground font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-          >
-            <Pencil className={`${toggleIconSize} flex-shrink-0`} />
-            <span className={cn("truncate", isMobile && "leading-tight")}>{isMobile ? 'Draw' : 'Annotate'}</span>
-          </button>
-          <button
-            onClick={() => {
-              setIsInpaintMode(true);
-              setEditMode('reposition');
-            }}
-            className={cn(
-              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
-              isMobile && "gap-0.5",
-              !isMobile && "flex-row gap-1",
-              editMode === 'reposition'
-                ? "bg-background text-foreground font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-            title="Move, scale, or rotate the image to fill edges with AI"
-          >
-            <Move className={`${toggleIconSize} flex-shrink-0`} />
-            <span className={cn("truncate", isMobile && "leading-tight")}>Move</span>
-          </button>
-          <button
-            onClick={() => {
-              setIsInpaintMode(true);
-              setEditMode('img2img');
-            }}
-            className={cn(
-              `flex-1 min-w-0 flex flex-col items-center justify-center ${togglePadding} ${toggleTextSize} transition-all rounded overflow-hidden`,
-              isMobile && "gap-0.5",
-              !isMobile && "flex-row gap-1",
-              editMode === 'img2img'
-                ? "bg-background text-foreground font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-            title="Transform the entire image with a prompt and strength control"
-          >
-            <Wand2 className={`${toggleIconSize} flex-shrink-0`} />
-            <span className={cn("truncate", isMobile && "leading-tight")}>Img2Img</span>
-          </button>
-        </div>
-      </div>
-        
-        {/* Prompt Field - Hidden for img2img mode (has its own prompt field) */}
-        {editMode !== 'img2img' && (
-        <div className={generationsSpacing}>
-          <SectionLabel>Prompt</SectionLabel>
-          {!isMobile && <label className={`${labelSize} font-medium`}>Prompt:</label>}
-          <Textarea
-            value={inpaintPrompt}
-            onChange={(e) => setInpaintPrompt(e.target.value)}
-            placeholder={
-              editMode === 'text' 
-                ? (isMobile ? "Describe changes..." : "Describe the text-based edit to make...")
-                : editMode === 'annotate'
-                  ? (isMobile ? "What to generate..." : "Describe what to generate in the annotated regions...")
-                  : editMode === 'reposition'
-                    ? (isMobile ? "How to fill edges (optional)..." : "Optional: describe how to fill the exposed edges (default: match existing content)")
-                    : (isMobile ? "What to generate..." : "Describe what to generate in the masked area...")
-            }
-            className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
-            rows={textareaRows}
-            clearable
-            onClear={() => setInpaintPrompt('')}
-            voiceInput
-            voiceContext="This is an image editing prompt. Describe what changes to make to the image - what to add, remove, or modify in the selected/masked area. Be specific about the visual result you want."
-            onVoiceResult={(result) => {
-              setInpaintPrompt(result.prompt || result.transcription);
-            }}
-          />
-        </div>
-        )}
-        
-        {/* Img2Img Mode Controls */}
-        {editMode === 'img2img' && setImg2imgPrompt && setImg2imgStrength && setEnablePromptExpansion && (
-          <div className={spacing}>
-            {/* Prompt (optional for img2img) */}
-            <div className={generationsSpacing}>
-              <SectionLabel>Prompt</SectionLabel>
-              {!isMobile && <label className={`${labelSize} font-medium`}>Prompt (optional):</label>}
-              <Textarea
-                value={img2imgPrompt}
-                onChange={(e) => setImg2imgPrompt(e.target.value)}
-                placeholder={isMobile ? "Describe image..." : "Optional: describe what the transformed image should look like..."}
-                className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
-                rows={textareaRows}
-                clearable
-                onClear={() => setImg2imgPrompt('')}
-                voiceInput
-                voiceContext="This is an image-to-image prompt. Describe the desired style or transformation for the image. Be specific about the visual result you want."
-                onVoiceResult={(result) => {
-                  setImg2imgPrompt(result.prompt || result.transcription);
-                }}
-              />
-            </div>
-            
-            {/* Strength Slider */}
-            <div>
-              <SectionLabel>Strength</SectionLabel>
-              <div className="flex items-center gap-2">
-                {!isMobile && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <label className={`${labelSize} font-medium cursor-help`}>Strength:</label>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      <p className="text-xs">
-                        Lower = closer to original, Higher = more transformed
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                <div className={cn("flex items-center gap-2", isMobile ? "w-full" : "w-[70%]")}>
-                  <span className={cn(sliderTextSize, "text-muted-foreground", isMobile && "text-[10px]")}>Keep</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={img2imgStrength}
-                    onChange={(e) => setImg2imgStrength(parseFloat(e.target.value))}
-                    className="flex-1 h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
-                  <span className={cn(sliderTextSize, "text-muted-foreground", isMobile && "text-[10px]")}>Change</span>
-                  <span className={cn(sliderTextSize, "text-foreground font-medium w-8 text-right", isMobile && "text-xs")}>{Math.round(img2imgStrength * 100)}%</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* LoRA Selector */}
-            {img2imgLoraManager && (
-              <div className={generationsSpacing}>
-                <SectionLabel>Style LoRAs</SectionLabel>
-                <div className={cn("flex items-center gap-2", isMobile ? "mb-1" : "mb-2")}>
-                  {!isMobile && <label className={`${labelSize} font-medium`}>LoRAs:</label>}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => img2imgLoraManager.setIsLoraModalOpen(true)}
-                    className={cn("h-10 px-2 text-xs flex flex-col items-center justify-center leading-tight", isMobile && "h-6 text-[10px]")}
-                  >
-                    <Plus className={cn(isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
-                    <span className="text-[10px]">LoRA</span>
-                  </Button>
-                </div>
-                
-                {/* Display selected LoRAs */}
-                {img2imgLoraManager.selectedLoras.length > 0 && (
-                  <ActiveLoRAsDisplay
-                    selectedLoras={img2imgLoraManager.selectedLoras}
-                    onRemoveLora={img2imgLoraManager.handleRemoveLora}
-                    onLoraStrengthChange={img2imgLoraManager.handleLoraStrengthChange}
-                    isGenerating={isGeneratingImg2Img}
-                    availableLoras={availableLoras}
-                    className={isMobile ? "mt-1" : "mt-2"}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Model Selector + LoRA Selector - Shown for non-img2img edit modes */}
-        {editMode !== 'img2img' && editLoraManager && (
+    <>
+      <EditPanelLayout
+        variant={variant}
+        onClose={onClose}
+        onExitEditMode={handleExitMagicEditMode}
+        hideInfoEditToggle={hideInfoEditToggle}
+        modeSelector={modeSelector}
+        variants={variants}
+        activeVariantId={activeVariantId}
+        onVariantSelect={onVariantSelect}
+        onMakePrimary={onMakePrimary}
+        isLoadingVariants={isLoadingVariants}
+        onPromoteToGeneration={onPromoteToGeneration}
+        isPromoting={isPromoting}
+      >
+          {/* Prompt Field - Hidden for img2img mode (has its own prompt field) */}
+          {editMode !== 'img2img' && (
           <div className={generationsSpacing}>
-            <SectionLabel>Model & LoRAs</SectionLabel>
-            <div className={cn("flex items-center gap-2", isMobile ? "mb-1" : "mb-2")}>
-              {/* Model Selector - Only shown in cloud mode (40% width) */}
-              {!isLocalGeneration && setQwenEditModel && (
-                <Select value={qwenEditModel} onValueChange={setQwenEditModel}>
-                  <SelectTrigger variant="retro" className={cn("w-[40%]", isMobile ? "h-7 text-xs" : "h-10")}>
+            <SectionLabel>Prompt</SectionLabel>
+            {!isMobile && <label className={`${labelSize} font-medium`}>Prompt:</label>}
+            <Textarea
+              value={inpaintPrompt}
+              onChange={(e) => setInpaintPrompt(e.target.value)}
+              placeholder={
+                editMode === 'text'
+                  ? (isMobile ? "Describe changes..." : "Describe the text-based edit to make...")
+                  : editMode === 'annotate'
+                    ? (isMobile ? "What to generate..." : "Describe what to generate in the annotated regions...")
+                    : editMode === 'reposition'
+                      ? (isMobile ? "How to fill edges (optional)..." : "Optional: describe how to fill the exposed edges (default: match existing content)")
+                      : (isMobile ? "What to generate..." : "Describe what to generate in the masked area...")
+              }
+              className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
+              rows={textareaRows}
+              clearable
+              onClear={() => setInpaintPrompt('')}
+              voiceInput
+              voiceContext="This is an image editing prompt. Describe what changes to make to the image - what to add, remove, or modify in the selected/masked area. Be specific about the visual result you want."
+              onVoiceResult={(result) => {
+                setInpaintPrompt(result.prompt || result.transcription);
+              }}
+            />
+          </div>
+          )}
+
+          {/* Img2Img Mode Controls */}
+          {editMode === 'img2img' && setImg2imgPrompt && setImg2imgStrength && setEnablePromptExpansion && (
+            <div className={spacing}>
+              {/* Prompt (optional for img2img) */}
+              <div className={generationsSpacing}>
+                <SectionLabel>Prompt</SectionLabel>
+                {!isMobile && <label className={`${labelSize} font-medium`}>Prompt (optional):</label>}
+                <Textarea
+                  value={img2imgPrompt}
+                  onChange={(e) => setImg2imgPrompt(e.target.value)}
+                  placeholder={isMobile ? "Describe image..." : "Optional: describe what the transformed image should look like..."}
+                  className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
+                  rows={textareaRows}
+                  clearable
+                  onClear={() => setImg2imgPrompt('')}
+                  voiceInput
+                  voiceContext="This is an image-to-image prompt. Describe the desired style or transformation for the image. Be specific about the visual result you want."
+                  onVoiceResult={(result) => {
+                    setImg2imgPrompt(result.prompt || result.transcription);
+                  }}
+                />
+              </div>
+
+              {/* Strength Slider */}
+              <div>
+                <SectionLabel>Strength</SectionLabel>
+                <div className="flex items-center gap-2">
+                  {!isMobile && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <label className={`${labelSize} font-medium cursor-help`}>Strength:</label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="text-xs">
+                          Lower = closer to original, Higher = more transformed
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  <div className={cn("flex items-center gap-2", isMobile ? "w-full" : "w-[70%]")}>
+                    <span className={cn(sliderTextSize, "text-muted-foreground", isMobile && "text-[10px]")}>Keep</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={img2imgStrength}
+                      onChange={(e) => setImg2imgStrength(parseFloat(e.target.value))}
+                      className="flex-1 h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                    <span className={cn(sliderTextSize, "text-muted-foreground", isMobile && "text-[10px]")}>Change</span>
+                    <span className={cn(sliderTextSize, "text-foreground font-medium w-8 text-right", isMobile && "text-xs")}>{Math.round(img2imgStrength * 100)}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* LoRA Selector */}
+              {img2imgLoraManager && (
+                <div className={generationsSpacing}>
+                  <SectionLabel>Style LoRAs</SectionLabel>
+                  <div className={cn("flex items-center gap-2", isMobile ? "mb-1" : "mb-2")}>
+                    {!isMobile && <label className={`${labelSize} font-medium`}>LoRAs:</label>}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => img2imgLoraManager.setIsLoraModalOpen(true)}
+                      className={cn("h-10 px-2 text-xs flex flex-col items-center justify-center leading-tight", isMobile && "h-6 text-[10px]")}
+                    >
+                      <Plus className={cn(isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
+                      <span className="text-[10px]">LoRA</span>
+                    </Button>
+                  </div>
+
+                  {/* Display selected LoRAs */}
+                  {img2imgLoraManager.selectedLoras.length > 0 && (
+                    <ActiveLoRAsDisplay
+                      selectedLoras={img2imgLoraManager.selectedLoras}
+                      onRemoveLora={img2imgLoraManager.handleRemoveLora}
+                      onLoraStrengthChange={img2imgLoraManager.handleLoraStrengthChange}
+                      isGenerating={isGeneratingImg2Img}
+                      availableLoras={availableLoras}
+                      className={isMobile ? "mt-1" : "mt-2"}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Model Selector + LoRA Selector - Shown for non-img2img edit modes */}
+          {editMode !== 'img2img' && editLoraManager && (
+            <div className={generationsSpacing}>
+              <SectionLabel>Model & LoRAs</SectionLabel>
+              <div className={cn("flex items-center gap-2", isMobile ? "mb-1" : "mb-2")}>
+                {/* Model Selector - Only shown in cloud mode (40% width) */}
+                {!isLocalGeneration && setQwenEditModel && (
+                  <Select value={qwenEditModel} onValueChange={setQwenEditModel}>
+                    <SelectTrigger variant="retro" className={cn("w-[40%]", isMobile ? "h-7 text-xs" : "h-10")}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent variant="retro" className="z-[100001]">
+                      <SelectItem variant="retro" value="qwen-edit">Qwen-Edit</SelectItem>
+                      <SelectItem variant="retro" value="qwen-edit-2509">Qwen-Edit-2509</SelectItem>
+                      <SelectItem variant="retro" value="qwen-edit-2511">Qwen-Edit-2511</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                {/* LoRA button (40% width) */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => editLoraManager.setIsLoraModalOpen(true)}
+                  className={cn("w-[40%] h-10 px-2 text-xs flex items-center justify-center gap-1", isMobile && "h-6 text-[10px]")}
+                >
+                  <Plus className={cn(isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
+                  <span>LoRA</span>
+                </Button>
+                {/* 20% empty space is implicit from the remaining width */}
+              </div>
+
+              {/* Display selected LoRAs */}
+              {editLoraManager.selectedLoras.length > 0 && (
+                <ActiveLoRAsDisplay
+                  selectedLoras={editLoraManager.selectedLoras}
+                  onRemoveLora={editLoraManager.handleRemoveLora}
+                  onLoraStrengthChange={editLoraManager.handleLoraStrengthChange}
+                  isGenerating={isGeneratingInpaint || isCreatingMagicEditTasks}
+                  availableLoras={availableLoras}
+                  className={isMobile ? "mt-1" : "mt-2"}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Legacy LoRA Selector - Fallback for when editLoraManager is not provided */}
+          {editMode !== 'img2img' && !editLoraManager && (
+          <div>
+            <SectionLabel>Style LoRA</SectionLabel>
+            <div className="flex items-center gap-2">
+              {!isMobile && <label className={`text-sm font-medium whitespace-nowrap`}>LoRA:</label>}
+              <div className="flex items-center gap-1 flex-1">
+                <Select value={loraMode} onValueChange={setLoraMode}>
+                  <SelectTrigger variant="retro" className={cn("flex-1", isMobile ? "h-7 text-xs" : "h-10")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent variant="retro" className="z-[100001]">
-                    <SelectItem variant="retro" value="qwen-edit">Qwen-Edit</SelectItem>
-                    <SelectItem variant="retro" value="qwen-edit-2509">Qwen-Edit-2509</SelectItem>
-                    <SelectItem variant="retro" value="qwen-edit-2511">Qwen-Edit-2511</SelectItem>
+                    <SelectItem variant="retro" value="none">None</SelectItem>
+                    <SelectItem variant="retro" value="in-scene">InScene</SelectItem>
+                    <SelectItem variant="retro" value="next-scene">Next Scene</SelectItem>
+                    <SelectItem variant="retro" value="custom">Custom</SelectItem>
                   </SelectContent>
                 </Select>
-              )}
-              {/* LoRA button (40% width) */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => editLoraManager.setIsLoraModalOpen(true)}
-                className={cn("w-[40%] h-10 px-2 text-xs flex items-center justify-center gap-1", isMobile && "h-6 text-[10px]")}
-              >
-                <Plus className={cn(isMobile ? "h-2.5 w-2.5" : "h-3 w-3")} />
-                <span>LoRA</span>
-              </Button>
-              {/* 20% empty space is implicit from the remaining width */}
+                {loraMode !== 'none' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearLora}
+                    className={cn(
+                      "h-9 w-9 p-0 hover:bg-muted shrink-0",
+                      isMobile && "h-7 w-7"
+                    )}
+                    title="Clear LoRA selection"
+                  >
+                    <XCircle className={cn("h-4 w-4 text-muted-foreground", isMobile && "h-3 w-3")} />
+                  </Button>
+                )}
+              </div>
             </div>
 
-            {/* Display selected LoRAs */}
-            {editLoraManager.selectedLoras.length > 0 && (
-              <ActiveLoRAsDisplay
-                selectedLoras={editLoraManager.selectedLoras}
-                onRemoveLora={editLoraManager.handleRemoveLora}
-                onLoraStrengthChange={editLoraManager.handleLoraStrengthChange}
-                isGenerating={isGeneratingInpaint || isCreatingMagicEditTasks}
-                availableLoras={availableLoras}
-                className={isMobile ? "mt-1" : "mt-2"}
+            {/* Custom URL Input - Show when Custom is selected */}
+            {loraMode === 'custom' && (
+              <input
+                type="text"
+                value={customLoraUrl}
+                onChange={(e) => setCustomLoraUrl(e.target.value)}
+                placeholder="https://huggingface.co/.../lora.safetensors"
+                className={cn(
+                  "w-full mt-1.5 bg-background border border-input rounded-md text-sm",
+                  "focus:outline-none focus:ring-2 focus:ring-ring",
+                  isMobile ? "px-2 py-1.5 text-xs" : "px-3 py-2"
+                )}
               />
             )}
           </div>
-        )}
-        
-        {/* Legacy LoRA Selector - Fallback for when editLoraManager is not provided */}
-        {editMode !== 'img2img' && !editLoraManager && (
-        <div>
-          <SectionLabel>Style LoRA</SectionLabel>
-          <div className="flex items-center gap-2">
-            {!isMobile && <label className={`text-sm font-medium whitespace-nowrap`}>LoRA:</label>}
-            <div className="flex items-center gap-1 flex-1">
-              <Select value={loraMode} onValueChange={setLoraMode}>
-                <SelectTrigger variant="retro" className={cn("flex-1", isMobile ? "h-7 text-xs" : "h-10")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent variant="retro" className="z-[100001]">
-                  <SelectItem variant="retro" value="none">None</SelectItem>
-                  <SelectItem variant="retro" value="in-scene">InScene</SelectItem>
-                  <SelectItem variant="retro" value="next-scene">Next Scene</SelectItem>
-                  <SelectItem variant="retro" value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
-              {loraMode !== 'none' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClearLora}
-                  className={cn(
-                    "h-9 w-9 p-0 hover:bg-muted shrink-0",
-                    isMobile && "h-7 w-7"
-                  )}
-                  title="Clear LoRA selection"
-                >
-                  <XCircle className={cn("h-4 w-4 text-muted-foreground", isMobile && "h-3 w-3")} />
-                </Button>
-              )}
-            </div>
-          </div>
-          
-          {/* Custom URL Input - Show when Custom is selected */}
-          {loraMode === 'custom' && (
-            <input
-              type="text"
-              value={customLoraUrl}
-              onChange={(e) => setCustomLoraUrl(e.target.value)}
-              placeholder="https://huggingface.co/.../lora.safetensors"
-              className={cn(
-                "w-full mt-1.5 bg-background border border-input rounded-md text-sm",
-                "focus:outline-none focus:ring-2 focus:ring-ring",
-                isMobile ? "px-2 py-1.5 text-xs" : "px-3 py-2"
-              )}
+          )}
+
+          {/* Advanced Settings - shown for edit modes that support hires fix (not img2img) */}
+          {advancedSettings && setAdvancedSettings && editMode !== 'img2img' && !isMobile && (
+            <EditAdvancedSettings
+              settings={advancedSettings}
+              onSettingsChange={setAdvancedSettings}
+              isLocalGeneration={isLocalGeneration}
             />
           )}
-        </div>
-        )}
-        
-        {/* Advanced Settings - shown for edit modes that support hires fix (not img2img) */}
-        {advancedSettings && setAdvancedSettings && editMode !== 'img2img' && !isMobile && (
-          <EditAdvancedSettings
-            settings={advancedSettings}
-            onSettingsChange={setAdvancedSettings}
-            isLocalGeneration={isLocalGeneration}
-          />
-        )}
-        
-        {/* Number of Generations + Create as Variant - shown for all image edit modes */}
-        {onCreateAsGenerationChange && (
-          <div className={cn(
-            "py-1.5 px-1 rounded-md flex items-center gap-2 overflow-hidden",
-            isMobile && "bg-muted/30"
-          )}>
-            <SectionLabel>Options</SectionLabel>
-            {/* Number of Generations */}
-            <div className={cn("flex items-center gap-2 min-w-0", isMobile ? "flex-1" : "flex-shrink")}>
-              <label className={cn(
-                "font-medium whitespace-nowrap flex-shrink-0",
-                isMobile ? "text-[10px] text-muted-foreground" : "text-sm"
-              )}>
-                {isMobile ? '#' : 'Generations:'}
-              </label>
-              <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                <input
-                  type="range"
-                  min={1}
-                  max={16}
-                  value={inpaintNumGenerations}
-                  onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
-                  className={cn(
-                    "bg-muted rounded-lg appearance-none cursor-pointer accent-primary min-w-[60px] w-full",
-                    isMobile ? "h-1.5 flex-1" : "h-2 max-w-[120px]"
-                  )}
+
+          {/* Number of Generations + Create as Variant - shown for all image edit modes */}
+          {onCreateAsGenerationChange && (
+            <div className={cn(
+              "py-1.5 px-1 rounded-md flex items-center gap-2 overflow-hidden",
+              isMobile && "bg-muted/30"
+            )}>
+              <SectionLabel>Options</SectionLabel>
+              {/* Number of Generations */}
+              <div className={cn("flex items-center gap-2 min-w-0", isMobile ? "flex-1" : "flex-shrink")}>
+                <label className={cn(
+                  "font-medium whitespace-nowrap flex-shrink-0",
+                  isMobile ? "text-[10px] text-muted-foreground" : "text-sm"
+                )}>
+                  {isMobile ? '#' : 'Generations:'}
+                </label>
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <input
+                    type="range"
+                    min={1}
+                    max={16}
+                    value={inpaintNumGenerations}
+                    onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
+                    className={cn(
+                      "bg-muted rounded-lg appearance-none cursor-pointer accent-primary min-w-[60px] w-full",
+                      isMobile ? "h-1.5 flex-1" : "h-2 max-w-[120px]"
+                    )}
+                  />
+                  <span className={cn(
+                    "text-foreground font-medium text-center flex-shrink-0",
+                    isMobile ? "text-xs w-4" : "text-sm w-5"
+                  )}>{inpaintNumGenerations}</span>
+                </div>
+              </div>
+
+              {/* Create as Variant toggle */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 cursor-help">
+                      <Layers className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-muted-foreground")} />
+                      <Label htmlFor="create-as-variant" className={cn(
+                        "font-medium cursor-pointer whitespace-nowrap",
+                        isMobile ? "text-[10px] text-muted-foreground" : "text-sm"
+                      )}>
+                        {isMobile ? 'Variant' : 'Variant'}
+                      </Label>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[250px]">
+                    <p className="text-xs">
+                      <strong>On:</strong> Result appears as a variant of this image.
+                      <br />
+                      <strong>Off:</strong> Result appears as its own image in the gallery.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+                <Switch
+                  id="create-as-variant"
+                  checked={!createAsGeneration}
+                  onCheckedChange={(checked) => onCreateAsGenerationChange(!checked)}
+                  className={cn(isMobile && "scale-90")}
                 />
-                <span className={cn(
-                  "text-foreground font-medium text-center flex-shrink-0",
-                  isMobile ? "text-xs w-4" : "text-sm w-5"
-                )}>{inpaintNumGenerations}</span>
               </div>
             </div>
-            
-            {/* Create as Variant toggle */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1 cursor-help">
-                    <Layers className={cn(isMobile ? "h-3 w-3" : "h-4 w-4", "text-muted-foreground")} />
-                    <Label htmlFor="create-as-variant" className={cn(
-                      "font-medium cursor-pointer whitespace-nowrap",
-                      isMobile ? "text-[10px] text-muted-foreground" : "text-sm"
-                    )}>
-                      {isMobile ? 'Variant' : 'Variant'}
-                    </Label>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[250px]">
-                  <p className="text-xs">
-                    <strong>On:</strong> Result appears as a variant of this image.
-                    <br />
-                    <strong>Off:</strong> Result appears as its own image in the gallery.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-              <Switch
-                id="create-as-variant"
-                checked={!createAsGeneration}
-                onCheckedChange={(checked) => onCreateAsGenerationChange(!checked)}
-                className={cn(isMobile && "scale-90")}
-              />
+          )}
+
+          {/* Reposition Mode Buttons - Two options: Save or Generate with AI */}
+          {editMode === 'reposition' ? (
+            <div className={cn("flex gap-2", isMobile && "flex-row")}>
+              {/* Save as Variant Button */}
+              <Button
+                variant="secondary"
+                size={buttonSize}
+                onClick={handleSaveAsVariant}
+                disabled={
+                  !hasTransformChanges ||
+                  isSavingAsVariant ||
+                  saveAsVariantSuccess ||
+                  isGeneratingReposition ||
+                  repositionGenerateSuccess
+                }
+                className={cn(
+                  "flex-1",
+                  isMobile && "h-9 text-xs",
+                  saveAsVariantSuccess && "bg-green-600 hover:bg-green-600 text-white"
+                )}
+              >
+                {isSavingAsVariant ? (
+                  <>
+                    <Loader2 className={`${iconSize} mr-1 animate-spin`} />
+                    {isMobile ? '...' : 'Saving...'}
+                  </>
+                ) : saveAsVariantSuccess ? (
+                  <>
+                    <CheckCircle className={`${iconSize} mr-1`} />
+                    {isMobile ? '✓' : 'Saved!'}
+                  </>
+                ) : (
+                  <>
+                    <Save className={`${iconSize} mr-1`} />
+                    Save
+                  </>
+                )}
+              </Button>
+
+              {/* Fill Edges with AI Button */}
+              <Button
+                variant="default"
+                size={buttonSize}
+                onClick={handleGenerateReposition}
+                disabled={
+                  !hasTransformChanges ||
+                  isGeneratingReposition ||
+                  repositionGenerateSuccess ||
+                  isSavingAsVariant ||
+                  saveAsVariantSuccess
+                }
+                className={cn(
+                  "flex-1",
+                  isMobile && "h-9 text-xs",
+                  repositionGenerateSuccess && "bg-green-600 hover:bg-green-600"
+                )}
+              >
+                {isGeneratingReposition ? (
+                  <>
+                    <Loader2 className={`${iconSize} mr-1 animate-spin`} />
+                    {isMobile ? '...' : 'Generating...'}
+                  </>
+                ) : repositionGenerateSuccess ? (
+                  <>
+                    <CheckCircle className={`${iconSize} mr-1`} />
+                    {isMobile ? '✓' : 'Success!'}
+                  </>
+                ) : (
+                  <>
+                    <Move className={`${iconSize} mr-1`} />
+                    {isMobile ? 'Fill AI' : 'Fill edges with AI'}
+                  </>
+                )}
+              </Button>
             </div>
-          </div>
-        )}
-        
-        {/* Reposition Mode Buttons - Two options: Save or Generate with AI */}
-        {editMode === 'reposition' ? (
-          <div className={cn("flex gap-2", isMobile && "flex-row")}>
-            {/* Save as Variant Button */}
-            <Button
-              variant="secondary"
-              size={buttonSize}
-              onClick={handleSaveAsVariant}
-              disabled={
-                !hasTransformChanges ||
-                isSavingAsVariant ||
-                saveAsVariantSuccess ||
-                isGeneratingReposition ||
-                repositionGenerateSuccess
-              }
-              className={cn(
-                "flex-1",
-                isMobile && "h-9 text-xs",
-                saveAsVariantSuccess && "bg-green-600 hover:bg-green-600 text-white"
-              )}
-            >
-              {isSavingAsVariant ? (
-                <>
-                  <Loader2 className={`${iconSize} mr-1 animate-spin`} />
-                  {isMobile ? '...' : 'Saving...'}
-                </>
-              ) : saveAsVariantSuccess ? (
-                <>
-                  <CheckCircle className={`${iconSize} mr-1`} />
-                  {isMobile ? '✓' : 'Saved!'}
-                </>
-              ) : (
-                <>
-                  <Save className={`${iconSize} mr-1`} />
-                  Save
-                </>
-              )}
-            </Button>
-            
-            {/* Fill Edges with AI Button */}
+          ) : editMode === 'img2img' && handleGenerateImg2Img ? (
+            /* Img2Img Generate Button */
             <Button
               variant="default"
               size={buttonSize}
-              onClick={handleGenerateReposition}
-              disabled={
-                !hasTransformChanges ||
-                isGeneratingReposition ||
-                repositionGenerateSuccess ||
-                isSavingAsVariant ||
-                saveAsVariantSuccess
-              }
+              onClick={handleGenerateImg2Img}
+              disabled={isGeneratingImg2Img || img2imgGenerateSuccess}
               className={cn(
-                "flex-1",
+                "w-full",
                 isMobile && "h-9 text-xs",
-                repositionGenerateSuccess && "bg-green-600 hover:bg-green-600"
+                img2imgGenerateSuccess && "bg-green-600 hover:bg-green-600"
               )}
             >
-              {isGeneratingReposition ? (
+              {isGeneratingImg2Img ? (
                 <>
-                  <Loader2 className={`${iconSize} mr-1 animate-spin`} />
-                  {isMobile ? '...' : 'Generating...'}
+                  <Loader2 className={`${iconSize} mr-1.5 animate-spin`} />
+                  {isMobile ? 'Creating...' : 'Generating...'}
                 </>
-              ) : repositionGenerateSuccess ? (
+              ) : img2imgGenerateSuccess ? (
                 <>
-                  <CheckCircle className={`${iconSize} mr-1`} />
-                  {isMobile ? '✓' : 'Success!'}
+                  <CheckCircle className={`${iconSize} mr-1.5`} />
+                  {isMobile ? 'Submitted ✓' : 'Submitted, results will appear below'}
                 </>
               ) : (
                 <>
-                  <Move className={`${iconSize} mr-1`} />
-                  {isMobile ? 'Fill AI' : 'Fill edges with AI'}
+                  <Wand2 className={`${iconSize} mr-1.5`} />
+                  {isMobile ? 'Transform' : 'Transform Image'}
                 </>
               )}
             </Button>
-          </div>
-        ) : editMode === 'img2img' && handleGenerateImg2Img ? (
-          /* Img2Img Generate Button */
-          <Button
-            variant="default"
-            size={buttonSize}
-            onClick={handleGenerateImg2Img}
-            disabled={isGeneratingImg2Img || img2imgGenerateSuccess}
-            className={cn(
-              "w-full",
-              isMobile && "h-9 text-xs",
-              img2imgGenerateSuccess && "bg-green-600 hover:bg-green-600"
-            )}
-          >
-            {isGeneratingImg2Img ? (
-              <>
-                <Loader2 className={`${iconSize} mr-1.5 animate-spin`} />
-                {isMobile ? 'Creating...' : 'Generating...'}
-              </>
-            ) : img2imgGenerateSuccess ? (
-              <>
-                <CheckCircle className={`${iconSize} mr-1.5`} />
-                {isMobile ? 'Submitted ✓' : 'Submitted, results will appear below'}
-              </>
-            ) : (
-              <>
-                <Wand2 className={`${iconSize} mr-1.5`} />
-                {isMobile ? 'Transform' : 'Transform Image'}
-              </>
-            )}
-          </Button>
-        ) : (
-          /* Generate Button - For other modes */
-          <Button
-            variant="default"
-            size={buttonSize}
-            onClick={
-              editMode === 'annotate' 
-                ? handleGenerateAnnotatedEdit 
-                : handleUnifiedGenerate
-            }
-            disabled={
-              (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
-              (editMode !== 'annotate' && !inpaintPrompt.trim()) || 
-              (editMode === 'inpaint' && brushStrokes.length === 0) ||
-              isGeneratingInpaint || 
-              inpaintGenerateSuccess || 
-              isCreatingMagicEditTasks || 
-              magicEditTasksCreated
-            }
-            className={cn(
-              "w-full",
-              isMobile && "h-9 text-xs",
-              (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
-            )}
-          >
-            {(isGeneratingInpaint || isCreatingMagicEditTasks) ? (
-              <>
-                <Loader2 className={`${iconSize} mr-1.5 animate-spin`} />
-                {isMobile ? 'Creating...' : 'Generating...'}
-              </>
-            ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
-              <>
-                <CheckCircle className={`${iconSize} mr-1.5`} />
-                {isMobile ? 'Submitted ✓' : (editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below')}
-              </>
-            ) : editMode === 'inpaint' ? (
-              <>
-                <Paintbrush className={`${iconSize} mr-1.5`} />
-                {isMobile ? 'Generate' : 'Generate inpainted image'}
-              </>
-            ) : editMode === 'annotate' ? (
-              <>
-                <Pencil className={`${iconSize} mr-1.5`} />
-                {isMobile ? 'Generate' : 'Generate based on annotations'}
-              </>
-            ) : (
-              <>
-                <Sparkles className={`${iconSize} mr-1.5`} />
-                {isMobile ? 'Generate' : 'Generate text edit'}
-              </>
-            )}
-          </Button>
-        )}
-      
-      {/* Variants Section */}
-      {variants && variants.length >= 1 && onVariantSelect && (
-        <div className={cn("border-t border-border", isMobile ? "pt-2 mt-2" : "pt-4 mt-4")}>
-          <SectionLabel>Variants</SectionLabel>
-          <VariantSelector
-            variants={variants}
-            activeVariantId={activeVariantId || null}
-            onVariantSelect={onVariantSelect}
-            onMakePrimary={onMakePrimary}
-            isLoading={isLoadingVariants}
-            onPromoteToGeneration={onPromoteToGeneration}
-            isPromoting={isPromoting}
-          />
-        </div>
-      )}
-      </div>
+          ) : (
+            /* Generate Button - For other modes */
+            <Button
+              variant="default"
+              size={buttonSize}
+              onClick={
+                editMode === 'annotate'
+                  ? handleGenerateAnnotatedEdit
+                  : handleUnifiedGenerate
+              }
+              disabled={
+                (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
+                (editMode !== 'annotate' && !inpaintPrompt.trim()) ||
+                (editMode === 'inpaint' && brushStrokes.length === 0) ||
+                isGeneratingInpaint ||
+                inpaintGenerateSuccess ||
+                isCreatingMagicEditTasks ||
+                magicEditTasksCreated
+              }
+              className={cn(
+                "w-full",
+                isMobile && "h-9 text-xs",
+                (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
+              )}
+            >
+              {(isGeneratingInpaint || isCreatingMagicEditTasks) ? (
+                <>
+                  <Loader2 className={`${iconSize} mr-1.5 animate-spin`} />
+                  {isMobile ? 'Creating...' : 'Generating...'}
+                </>
+              ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
+                <>
+                  <CheckCircle className={`${iconSize} mr-1.5`} />
+                  {isMobile ? 'Submitted ✓' : (editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below')}
+                </>
+              ) : editMode === 'inpaint' ? (
+                <>
+                  <Paintbrush className={`${iconSize} mr-1.5`} />
+                  {isMobile ? 'Generate' : 'Generate inpainted image'}
+                </>
+              ) : editMode === 'annotate' ? (
+                <>
+                  <Pencil className={`${iconSize} mr-1.5`} />
+                  {isMobile ? 'Generate' : 'Generate based on annotations'}
+                </>
+              ) : (
+                <>
+                  <Sparkles className={`${iconSize} mr-1.5`} />
+                  {isMobile ? 'Generate' : 'Generate text edit'}
+                </>
+              )}
+            </Button>
+          )}
+      </EditPanelLayout>
 
       {/* Img2Img LoRA Selector Modal */}
       {img2imgLoraManager && (
@@ -891,7 +841,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           />
         </Suspense>
       )}
-      
+
       {/* Edit Mode LoRA Selector Modal (for text, inpaint, annotate, reposition modes) */}
       {editLoraManager && (
         <Suspense fallback={null}>
@@ -915,8 +865,6 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           />
         </Suspense>
       )}
-    </div>
-    </div>
+    </>
   );
 };
-

@@ -4,25 +4,23 @@
  * Unified video editing panel for both desktop and mobile layouts.
  * Handles Trim, Replace Portion, and Regenerate sub-modes with variant display.
  *
- * Follows the same pattern as EditModePanel with variant prop for responsive behavior.
+ * Uses shared EditPanelLayout for consistent header and variants handling.
  */
 
 import React from 'react';
-import { Button } from '@/shared/components/ui/button';
-import { X, Scissors, RefreshCw, RotateCcw } from 'lucide-react';
+import { Scissors, RefreshCw, RotateCcw } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
 
 // Import video editing components
 import {
   TrimControlsPanel,
-  VariantSelector,
 } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor';
 import type { TrimState } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/types';
 import type { GenerationVariant } from '@/shared/hooks/useVariants';
 import { VideoPortionEditor } from '@/tools/edit-video/components/VideoPortionEditor';
 import { DEFAULT_VACE_PHASE_CONFIG } from '@/shared/lib/vaceDefaults';
 import type { UseVideoEditingReturn } from '../hooks/useVideoEditing';
+import { EditPanelLayout } from './EditPanelLayout';
 
 export interface VideoEditPanelProps {
   /** Layout variant */
@@ -75,9 +73,6 @@ export interface VideoEditPanelProps {
   onVariantSelect: (variantId: string) => void;
   onMakePrimary: (variantId: string) => Promise<void>;
   isLoadingVariants: boolean;
-  // Variant promotion
-  onPromoteToGeneration?: (variantId: string) => Promise<void>;
-  isPromoting?: boolean;
 }
 
 export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
@@ -114,221 +109,144 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   onVariantSelect,
   onMakePrimary,
   isLoadingVariants,
-  onPromoteToGeneration,
-  isPromoting,
 }) => {
-  const isMobile = variant === 'mobile';
-
-  // Responsive styling
-  const variantsMaxHeight = isMobile ? 'max-h-[120px]' : 'max-h-[200px]';
-  const variantsPadding = isMobile ? 'px-3 pb-2' : 'p-4 pt-2';
-  const hasVariants = variants && variants.length >= 1;
-
-  // Debug: Log variants received by VideoEditPanel
-  console.log('[VideoEditPanel] Variants debug:', {
-    variantsCount: variants?.length ?? 0,
-    hasVariants,
-    variantIds: variants?.map(v => v.id?.substring(0, 8)),
-    variantTypes: variants?.map(v => v.variant_type),
-    activeVariantId: activeVariantId?.substring(0, 8),
-  });
-
-  return (
-    <div className="h-full flex flex-col">
-      {/* Header with Info/Edit toggle and close button */}
-      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <h2 className={cn("font-light", isMobile ? "text-base" : "text-lg")}>Edit Video</h2>
-        </div>
-        <div className="flex items-center gap-3">
-          <SegmentedControl
-            value="edit"
-            onValueChange={(value) => {
-              if (value === 'info') {
-                onExitVideoEditMode();
-              }
-            }}
-          >
-            <SegmentedControlItem value="info">Info</SegmentedControlItem>
-            <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
-          </SegmentedControl>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="h-8 w-8 p-0 hover:bg-muted"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Sub-mode selector: Trim | Replace | Regenerate */}
-      <div className={cn(
-        "px-4 pt-4 pb-2 flex-shrink-0",
-        isMobile && "border-b border-border"
-      )}>
-        <div className={cn(
-          "grid gap-1 border border-border rounded-lg overflow-hidden bg-muted/30",
-          regenerateForm ? "grid-cols-3" : "grid-cols-2"
-        )}>
-          <button
-            onClick={onEnterTrimMode}
-            className={cn(
-              "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
-              videoEditSubMode === 'trim'
-                ? "bg-background text-foreground font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-          >
-            <Scissors className="h-3.5 w-3.5" />
-            <span className="truncate">Trim Video</span>
-          </button>
-          <button
-            onClick={onEnterReplaceMode}
-            className={cn(
-              "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
-              videoEditSubMode === 'replace'
-                ? "bg-background text-foreground font-medium shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-            )}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span className="truncate">Replace Portion</span>
-          </button>
-          {/* Only show Regenerate button if regenerateForm is provided (not for root parent videos) */}
-          {regenerateForm && (
-            <button
-              onClick={onEnterRegenerateMode}
-              className={cn(
-                "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
-                videoEditSubMode === 'regenerate'
-                  ? "bg-background text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              )}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span className="truncate">Regenerate Video</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Sub-mode content */}
-      <div className="flex-1 overflow-y-auto">
-        {videoEditSubMode === 'trim' && (
-          <TrimControlsPanel
-            trimState={trimState}
-            onStartTrimChange={onStartTrimChange}
-            onEndTrimChange={onEndTrimChange}
-            onResetTrim={onResetTrim}
-            trimmedDuration={trimmedDuration}
-            hasTrimChanges={hasTrimChanges}
-            onSave={onSaveTrim}
-            isSaving={isSavingTrim}
-            saveProgress={trimSaveProgress}
-            saveError={trimSaveError}
-            saveSuccess={trimSaveSuccess}
-            onClose={onClose}
-            variant={variant}
-            videoUrl={videoUrl}
-            currentTime={trimCurrentTime}
-            videoRef={trimVideoRef}
-            hideHeader
-          />
+  // Mode selector for video editing
+  const modeSelector = (
+    <div className={cn(
+      "grid gap-1 border border-border rounded-lg overflow-hidden bg-muted/30",
+      regenerateForm ? "grid-cols-3" : "grid-cols-2"
+    )}>
+      <button
+        onClick={onEnterTrimMode}
+        className={cn(
+          "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
+          videoEditSubMode === 'trim'
+            ? "bg-background text-foreground font-medium shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         )}
-        {videoEditSubMode === 'replace' && (
-          <VideoPortionEditor
-            gapFrames={videoEditing.editSettings.settings.gapFrameCount || 12}
-            setGapFrames={(val) => videoEditing.editSettings.updateField('gapFrameCount', val)}
-            contextFrames={videoEditing.editSettings.settings.contextFrameCount || 8}
-            setContextFrames={(val) => {
-              const maxGap = Math.max(1, 81 - (val * 2));
-              const gapFrames = videoEditing.editSettings.settings.gapFrameCount || 12;
-              const newGapFrames = gapFrames > maxGap ? maxGap : gapFrames;
-              videoEditing.editSettings.updateFields({
-                contextFrameCount: val,
-                gapFrameCount: newGapFrames
-              });
-            }}
-            maxContextFrames={videoEditing.maxContextFrames}
-            negativePrompt={videoEditing.editSettings.settings.negativePrompt || ''}
-            setNegativePrompt={(val) => videoEditing.editSettings.updateField('negativePrompt', val)}
-            enhancePrompt={videoEditing.editSettings.settings.enhancePrompt}
-            setEnhancePrompt={(val) => videoEditing.editSettings.updateField('enhancePrompt', val)}
-            selections={videoEditing.selections}
-            onUpdateSelectionSettings={videoEditing.handleUpdateSelectionSettings}
-            onAddSelection={videoEditing.handleAddSelection}
-            onRemoveSelection={videoEditing.handleRemoveSelection}
-            videoUrl={videoUrl}
-            fps={16}
-            availableLoras={videoEditing.availableLoras}
-            projectId={projectId}
-            loraManager={videoEditing.loraManager}
-            // Motion settings
-            motionMode={(videoEditing.editSettings.settings.motionMode || 'basic') as 'basic' | 'advanced'}
-            onMotionModeChange={(mode) => videoEditing.editSettings.updateField('motionMode', mode)}
-            phaseConfig={videoEditing.editSettings.settings.phaseConfig ?? DEFAULT_VACE_PHASE_CONFIG}
-            onPhaseConfigChange={(config) => videoEditing.editSettings.updateField('phaseConfig', config)}
-            randomSeed={videoEditing.editSettings.settings.randomSeed ?? true}
-            onRandomSeedChange={(val) => videoEditing.editSettings.updateField('randomSeed', val)}
-            selectedPhasePresetId={videoEditing.editSettings.settings.selectedPhasePresetId ?? null}
-            onPhasePresetSelect={(presetId, config) => {
-              videoEditing.editSettings.updateFields({
-                selectedPhasePresetId: presetId,
-                phaseConfig: config,
-              });
-            }}
-            onPhasePresetRemove={() => {
-              videoEditing.editSettings.updateField('selectedPhasePresetId', null);
-            }}
-            // Actions
-            onGenerate={videoEditing.handleGenerate}
-            isGenerating={videoEditing.isGenerating}
-            generateSuccess={videoEditing.generateSuccess}
-            isGenerateDisabled={!videoEditing.isValid}
-            validationErrors={videoEditing.validationErrors}
-            hideHeader
-          />
+      >
+        <Scissors className="h-3.5 w-3.5" />
+        <span className="truncate">Trim Video</span>
+      </button>
+      <button
+        onClick={onEnterReplaceMode}
+        className={cn(
+          "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
+          videoEditSubMode === 'replace'
+            ? "bg-background text-foreground font-medium shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         )}
-        {videoEditSubMode === 'regenerate' && regenerateForm}
-      </div>
-
-      {/* Variants section */}
-      {hasVariants && (
-        <div className={cn(
-          "flex-shrink-0 overflow-y-auto border-t border-border",
-          variantsMaxHeight,
-          variantsPadding,
-          // Desktop has inner div wrapper for padding
-          !isMobile && "p-0"
-        )}>
-          {!isMobile ? (
-            <div className="p-4 pt-2">
-              <VariantSelector
-                variants={variants}
-                activeVariantId={activeVariantId}
-                onVariantSelect={onVariantSelect}
-                onMakePrimary={onMakePrimary}
-                isLoading={isLoadingVariants}
-                onPromoteToGeneration={onPromoteToGeneration}
-                isPromoting={isPromoting}
-              />
-            </div>
-          ) : (
-            <VariantSelector
-              variants={variants}
-              activeVariantId={activeVariantId}
-              onVariantSelect={onVariantSelect}
-              onMakePrimary={onMakePrimary}
-              isLoading={isLoadingVariants}
-              onPromoteToGeneration={onPromoteToGeneration}
-              isPromoting={isPromoting}
-            />
+      >
+        <RefreshCw className="h-3.5 w-3.5" />
+        <span className="truncate">Replace Portion</span>
+      </button>
+      {regenerateForm && (
+        <button
+          onClick={onEnterRegenerateMode}
+          className={cn(
+            "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
+            videoEditSubMode === 'regenerate'
+              ? "bg-background text-foreground font-medium shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
           )}
-        </div>
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          <span className="truncate">Regenerate Video</span>
+        </button>
       )}
     </div>
+  );
+
+  return (
+    <EditPanelLayout
+      variant={variant}
+      onClose={onClose}
+      onExitEditMode={onExitVideoEditMode}
+      modeSelector={modeSelector}
+      variants={variants}
+      activeVariantId={activeVariantId}
+      onVariantSelect={onVariantSelect}
+      onMakePrimary={onMakePrimary}
+      isLoadingVariants={isLoadingVariants}
+    >
+      {/* Sub-mode content */}
+      {videoEditSubMode === 'trim' && (
+        <TrimControlsPanel
+          trimState={trimState}
+          onStartTrimChange={onStartTrimChange}
+          onEndTrimChange={onEndTrimChange}
+          onResetTrim={onResetTrim}
+          trimmedDuration={trimmedDuration}
+          hasTrimChanges={hasTrimChanges}
+          onSave={onSaveTrim}
+          isSaving={isSavingTrim}
+          saveProgress={trimSaveProgress}
+          saveError={trimSaveError}
+          saveSuccess={trimSaveSuccess}
+          onClose={onClose}
+          variant={variant}
+          videoUrl={videoUrl}
+          currentTime={trimCurrentTime}
+          videoRef={trimVideoRef}
+          hideHeader
+        />
+      )}
+      {videoEditSubMode === 'replace' && (
+        <VideoPortionEditor
+          gapFrames={videoEditing.editSettings.settings.gapFrameCount || 12}
+          setGapFrames={(val) => videoEditing.editSettings.updateField('gapFrameCount', val)}
+          contextFrames={videoEditing.editSettings.settings.contextFrameCount || 8}
+          setContextFrames={(val) => {
+            const maxGap = Math.max(1, 81 - (val * 2));
+            const gapFrames = videoEditing.editSettings.settings.gapFrameCount || 12;
+            const newGapFrames = gapFrames > maxGap ? maxGap : gapFrames;
+            videoEditing.editSettings.updateFields({
+              contextFrameCount: val,
+              gapFrameCount: newGapFrames
+            });
+          }}
+          maxContextFrames={videoEditing.maxContextFrames}
+          negativePrompt={videoEditing.editSettings.settings.negativePrompt || ''}
+          setNegativePrompt={(val) => videoEditing.editSettings.updateField('negativePrompt', val)}
+          enhancePrompt={videoEditing.editSettings.settings.enhancePrompt}
+          setEnhancePrompt={(val) => videoEditing.editSettings.updateField('enhancePrompt', val)}
+          selections={videoEditing.selections}
+          onUpdateSelectionSettings={videoEditing.handleUpdateSelectionSettings}
+          onAddSelection={videoEditing.handleAddSelection}
+          onRemoveSelection={videoEditing.handleRemoveSelection}
+          videoUrl={videoUrl}
+          fps={16}
+          availableLoras={videoEditing.availableLoras}
+          projectId={projectId}
+          loraManager={videoEditing.loraManager}
+          // Motion settings
+          motionMode={(videoEditing.editSettings.settings.motionMode || 'basic') as 'basic' | 'advanced'}
+          onMotionModeChange={(mode) => videoEditing.editSettings.updateField('motionMode', mode)}
+          phaseConfig={videoEditing.editSettings.settings.phaseConfig ?? DEFAULT_VACE_PHASE_CONFIG}
+          onPhaseConfigChange={(config) => videoEditing.editSettings.updateField('phaseConfig', config)}
+          randomSeed={videoEditing.editSettings.settings.randomSeed ?? true}
+          onRandomSeedChange={(val) => videoEditing.editSettings.updateField('randomSeed', val)}
+          selectedPhasePresetId={videoEditing.editSettings.settings.selectedPhasePresetId ?? null}
+          onPhasePresetSelect={(presetId, config) => {
+            videoEditing.editSettings.updateFields({
+              selectedPhasePresetId: presetId,
+              phaseConfig: config,
+            });
+          }}
+          onPhasePresetRemove={() => {
+            videoEditing.editSettings.updateField('selectedPhasePresetId', null);
+          }}
+          // Actions
+          onGenerate={videoEditing.handleGenerate}
+          isGenerating={videoEditing.isGenerating}
+          generateSuccess={videoEditing.generateSuccess}
+          isGenerateDisabled={!videoEditing.isValid}
+          validationErrors={videoEditing.validationErrors}
+          hideHeader
+        />
+      )}
+      {videoEditSubMode === 'regenerate' && regenerateForm}
+    </EditPanelLayout>
   );
 };
 

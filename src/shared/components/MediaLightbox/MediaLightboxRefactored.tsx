@@ -2986,28 +2986,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                 )}
                                 Make main
                               </Button>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => handlePromoteToGeneration(activeVariant.id)}
-                                disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
-                                className={cn(
-                                  "border-none shadow-lg text-white",
-                                  promoteSuccess
-                                    ? "bg-green-500/90 hover:bg-green-500/90"
-                                    : "bg-blue-500/90 hover:bg-blue-600"
-                                )}
-                                title="Create a standalone image from this variant"
-                              >
-                                {promoteVariantMutation.isPending ? (
-                                  <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                                ) : promoteSuccess ? (
-                                  <Check className="w-4 h-4 mr-1.5" />
-                                ) : (
-                                  <Plus className="w-4 h-4 mr-1.5" />
-                                )}
-                                {promoteSuccess ? 'Created' : 'New image'}
-                              </Button>
+                              {!isVideo && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handlePromoteToGeneration(activeVariant.id)}
+                                  disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
+                                  className={cn(
+                                    "border-none shadow-lg text-white",
+                                    promoteSuccess
+                                      ? "bg-green-500/90 hover:bg-green-500/90"
+                                      : "bg-blue-500/90 hover:bg-blue-600"
+                                  )}
+                                  title="Create a standalone image from this variant"
+                                >
+                                  {promoteVariantMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                                  ) : promoteSuccess ? (
+                                    <Check className="w-4 h-4 mr-1.5" />
+                                  ) : (
+                                    <Plus className="w-4 h-4 mr-1.5" />
+                                  )}
+                                  {promoteSuccess ? 'Created' : 'New image'}
+                                </Button>
+                              )}
                             </div>
                           )}
                         </>
@@ -3346,28 +3348,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               )}
                               Make main
                             </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handlePromoteToGeneration(activeVariant.id)}
-                              disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
-                              className={cn(
-                                "border-none shadow-lg text-white",
-                                promoteSuccess
-                                  ? "bg-green-500/90 hover:bg-green-500/90"
-                                  : "bg-blue-500/90 hover:bg-blue-600"
-                              )}
-                              title="Create a standalone image from this variant"
-                            >
-                              {promoteVariantMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                              ) : promoteSuccess ? (
-                                <Check className="w-4 h-4 mr-1.5" />
-                              ) : (
-                                <Plus className="w-4 h-4 mr-1.5" />
-                              )}
-                              {promoteSuccess ? 'Created' : 'New image'}
-                            </Button>
+                            {!isVideo && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handlePromoteToGeneration(activeVariant.id)}
+                                disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
+                                className={cn(
+                                  "border-none shadow-lg text-white",
+                                  promoteSuccess
+                                    ? "bg-green-500/90 hover:bg-green-500/90"
+                                    : "bg-blue-500/90 hover:bg-blue-600"
+                                )}
+                                title="Create a standalone image from this variant"
+                              >
+                                {promoteVariantMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                                ) : promoteSuccess ? (
+                                  <Check className="w-4 h-4 mr-1.5" />
+                                ) : (
+                                  <Plus className="w-4 h-4 mr-1.5" />
+                                )}
+                                {promoteSuccess ? 'Created' : 'New image'}
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -3726,28 +3730,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             )}
                             Make main
                           </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handlePromoteToGeneration(activeVariant.id)}
-                            disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
-                            className={cn(
-                              "border-none shadow-lg text-white",
-                              promoteSuccess
-                                ? "bg-green-500/90 hover:bg-green-500/90"
-                                : "bg-blue-500/90 hover:bg-blue-600"
-                            )}
-                            title="Create a standalone image from this variant"
-                          >
-                            {promoteVariantMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                            ) : promoteSuccess ? (
-                              <Check className="w-4 h-4 mr-1.5" />
-                            ) : (
-                              <Plus className="w-4 h-4 mr-1.5" />
-                            )}
-                            {promoteSuccess ? 'Created' : 'New image'}
-                          </Button>
+                          {!isVideo && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handlePromoteToGeneration(activeVariant.id)}
+                              disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
+                              className={cn(
+                                "border-none shadow-lg text-white",
+                                promoteSuccess
+                                  ? "bg-green-500/90 hover:bg-green-500/90"
+                                  : "bg-blue-500/90 hover:bg-blue-600"
+                              )}
+                              title="Create a standalone image from this variant"
+                            >
+                              {promoteVariantMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                              ) : promoteSuccess ? (
+                                <Check className="w-4 h-4 mr-1.5" />
+                              ) : (
+                                <Plus className="w-4 h-4 mr-1.5" />
+                              )}
+                              {promoteSuccess ? 'Created' : 'New image'}
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>

@@ -313,9 +313,9 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
                 <p className={`${config.textSize} font-medium`}>Phase {phase.phase}</p>
                 <div className="space-y-1 ml-2">
                   {phase.loras.map((lora: any, idx: number) => (
-                    <div key={idx} className={`flex justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
-                      <span className={`${config.fontWeight} truncate`}>{getDisplayNameFromUrl(lora.url, availableLoras)}</span>
-                      <span className="text-muted-foreground ml-1">{lora.multiplier}</span>
+                    <div key={idx} className={`flex justify-between items-center gap-2 p-1.5 bg-background/50 rounded border ${config.textSize} min-w-0`}>
+                      <span className={`${config.fontWeight} truncate min-w-0 flex-1`}>{getDisplayNameFromUrl(lora.url, availableLoras)}</span>
+                      <span className="text-muted-foreground shrink-0">{lora.multiplier}</span>
                     </div>
                   ))}
                 </div>
@@ -329,9 +329,9 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
           <div className="pt-2 border-t border-muted-foreground/20 space-y-2">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs</p>
             {Object.entries(additionalLoras).slice(0, config.maxLoras).map(([url, strength]) => (
-              <div key={url} className={`flex justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
-                <span className={`${config.fontWeight} truncate`}>{getDisplayNameFromUrl(url, availableLoras)}</span>
-                <span className="text-muted-foreground ml-1">{strength as number}</span>
+              <div key={url} className={`flex justify-between items-center gap-2 p-1.5 bg-background/50 rounded border ${config.textSize} min-w-0`}>
+                <span className={`${config.fontWeight} truncate min-w-0 flex-1`}>{getDisplayNameFromUrl(url, availableLoras)}</span>
+                <span className="text-muted-foreground shrink-0">{strength as number}</span>
               </div>
             ))}
           </div>
@@ -361,9 +361,9 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
                   <p className={`${config.textSize} font-medium`}>Phase {phase.phase}</p>
                   <div className="space-y-1 ml-2">
                     {phase.loras.map((lora: any, idx: number) => (
-                      <div key={idx} className={`flex justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
-                        <span className={`${config.fontWeight} truncate`}>{getDisplayNameFromUrl(lora.url, availableLoras)}</span>
-                        <span className="text-muted-foreground ml-1">{lora.multiplier}</span>
+                      <div key={idx} className={`flex justify-between items-center gap-2 p-1.5 bg-background/50 rounded border ${config.textSize} min-w-0`}>
+                        <span className={`${config.fontWeight} truncate min-w-0 flex-1`}>{getDisplayNameFromUrl(lora.url, availableLoras)}</span>
+                        <span className="text-muted-foreground shrink-0">{lora.multiplier}</span>
                       </div>
                     ))}
                   </div>
