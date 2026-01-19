@@ -371,12 +371,12 @@ export const useRepositionMode = ({
       
       // Show success state
       setRepositionGenerateSuccess(true);
-      
-      // Wait 1 second to show success, then reset transform and exit
+
+      // Wait 1 second to show success, then reset transform (stay in edit mode)
       setTimeout(() => {
         setRepositionGenerateSuccess(false);
         resetTransform();
-        handleExitInpaintMode();
+        // Don't exit edit mode - let user stay and make more edits if needed
       }, 1000);
       
     } catch (error) {
