@@ -57,8 +57,12 @@ export function usePendingSegmentTasks(
   shotId: string | null,
   projectId: string | null
 ): UsePendingSegmentTasksReturn {
-  // Track optimistic pending IDs (for immediate UI feedback before task is detected)
-  const [optimisticPendingIds, setOptimisticPendingIds] = useState<Set<string>>(new Set());
+  // Track optimistic pending IDs with timestamps (for immediate UI feedback before task is detected)
+  // Map of pairShotGenerationId -> timestamp when added
+  const [optimisticPending, setOptimisticPending] = useState<Map<string, number>>(new Map());
+
+  // How long to wait for a task to appear in real pending before clearing optimistic
+  const OPTIMISTIC_TIMEOUT_MS = 8000; // 8 seconds (covers ~2-3 query cycles)
 
   // Query pending segment tasks for this shot
   const { data: pendingTasks, isLoading } = useQuery({
@@ -120,36 +124,53 @@ export function usePendingSegmentTasks(
     return { pendingPairIds: ids, statusMap: map };
   }, [pendingTasks]);
 
-  // Auto-clear optimistic IDs when they appear in real pending tasks
+  // Clear optimistic IDs that are either:
+  // 1. Confirmed (appear in real pending tasks)
+  // 2. Expired (older than timeout and not in real pending - task was cancelled/failed)
   useEffect(() => {
-    if (pendingPairIds.size > 0 && optimisticPendingIds.size > 0) {
-      setOptimisticPendingIds(prev => {
-        const next = new Set(prev);
-        let changed = false;
-        pendingPairIds.forEach(id => {
-          if (next.has(id)) {
-            next.delete(id);
-            changed = true;
-          }
-        });
-        return changed ? next : prev;
+    if (optimisticPending.size === 0 || isLoading) return;
+
+    const now = Date.now();
+
+    setOptimisticPending(prev => {
+      const next = new Map<string, number>();
+      let changed = false;
+
+      prev.forEach((addedAt, id) => {
+        const isInRealPending = pendingPairIds.has(id);
+        const isExpired = now - addedAt > OPTIMISTIC_TIMEOUT_MS;
+
+        if (isInRealPending) {
+          // Confirmed by real query - clear from optimistic (real will show it)
+          changed = true;
+          console.log('[usePendingSegmentTasks] Optimistic ID confirmed:', id.substring(0, 8));
+        } else if (isExpired) {
+          // Not in real pending after timeout - was cancelled or failed
+          changed = true;
+          console.log('[usePendingSegmentTasks] Optimistic ID expired:', id.substring(0, 8));
+        } else {
+          // Keep it - still within timeout window
+          next.set(id, addedAt);
+        }
       });
-    }
-  }, [pendingPairIds, optimisticPendingIds.size]);
+
+      return changed ? next : prev;
+    });
+  }, [pendingPairIds, optimisticPending.size, isLoading, OPTIMISTIC_TIMEOUT_MS]);
 
   // Add an optimistic pending ID for immediate UI feedback
   const addOptimisticPending = useCallback((pairShotGenerationId: string | null | undefined) => {
     if (pairShotGenerationId) {
       console.log('[usePendingSegmentTasks] Adding optimistic pending:', pairShotGenerationId.substring(0, 8));
-      setOptimisticPendingIds(prev => new Set(prev).add(pairShotGenerationId));
+      setOptimisticPending(prev => new Map(prev).set(pairShotGenerationId, Date.now()));
     }
   }, []);
 
   // Helper to check if a pair has a pending task (real or optimistic)
   const hasPendingTask = useCallback((pairShotGenerationId: string | null | undefined): boolean => {
     if (!pairShotGenerationId) return false;
-    return pendingPairIds.has(pairShotGenerationId) || optimisticPendingIds.has(pairShotGenerationId);
-  }, [pendingPairIds, optimisticPendingIds]);
+    return pendingPairIds.has(pairShotGenerationId) || optimisticPending.has(pairShotGenerationId);
+  }, [pendingPairIds, optimisticPending]);
 
   // Helper to get task status for a pair
   const getTaskStatus = useCallback((pairShotGenerationId: string | null | undefined): string | null => {
