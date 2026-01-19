@@ -489,6 +489,14 @@ async function createGeneration(params: {
   prompt: string;
   thumbnailUrl?: string;
 }): Promise<any> {
+  const generationParams = {
+    prompt: params.prompt,
+    source: 'external_upload',
+    original_filename: params.fileName,
+    file_type: params.fileType,
+    file_size: params.fileSize,
+  };
+
   const { data, error } = await supabase
     .from('generations')
     .insert({
@@ -496,19 +504,30 @@ async function createGeneration(params: {
       thumbnail_url: params.thumbnailUrl || params.imageUrl, // Use thumbnail URL if provided, fallback to main image
       type: params.fileType || 'image',
       project_id: params.projectId,
-      params: {
-        prompt: params.prompt,
-        source: 'external_upload',
-        original_filename: params.fileName,
-        file_type: params.fileType,
-        file_size: params.fileSize,
-      },
+      params: generationParams,
     })
     .select()
     .single();
 
   if (error || !data) {
     throw new Error(`Failed to create generation: ${error?.message || 'Unknown error'}`);
+  }
+
+  // Create the original variant for this generation
+  const { error: variantError } = await supabase
+    .from('generation_variants')
+    .insert({
+      generation_id: data.id,
+      location: params.imageUrl,
+      thumbnail_url: params.thumbnailUrl || params.imageUrl,
+      is_primary: true,
+      variant_type: 'original',
+      name: 'Original',
+      params: generationParams,
+    });
+
+  if (variantError) {
+    console.error('[useGenerations] Failed to create variant:', variantError);
   }
 
   return data;

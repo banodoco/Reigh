@@ -480,6 +480,13 @@ export const useRepositionMode = ({
       if (createAsGeneration) {
         // Create a new generation with based_on pointing to the source
         console.log('[Reposition] Creating as new generation (not variant)');
+        const generationParams = {
+          transform: transform as any,
+          saved_at: new Date().toISOString(),
+          tool_type: toolTypeOverride || 'edit-images',
+          repositioned_from: actualGenerationId,
+        };
+
         const { data: insertedGeneration, error: genError } = await supabase
           .from('generations')
           .insert({
@@ -488,21 +495,27 @@ export const useRepositionMode = ({
             thumbnail_url: thumbnailUrl,
             type: 'image',
             based_on: actualGenerationId, // Track lineage
-            params: {
-              transform: transform as any,
-              saved_at: new Date().toISOString(),
-              tool_type: toolTypeOverride || 'edit-images',
-              repositioned_from: actualGenerationId,
-            }
+            params: generationParams
           })
           .select('id')
           .single();
-        
+
         if (genError) {
           console.error('[Reposition] Failed to create generation:', genError);
           throw genError;
         }
-        
+
+        // Create the original variant
+        await supabase.from('generation_variants').insert({
+          generation_id: insertedGeneration.id,
+          location: transformedUrl,
+          thumbnail_url: thumbnailUrl,
+          is_primary: true,
+          variant_type: 'original',
+          name: 'Original',
+          params: generationParams,
+        });
+
         console.log('[Reposition] ✅ Saved as new generation:', insertedGeneration?.id);
       } else {
         // Create a new variant and make it primary (displayed by default)

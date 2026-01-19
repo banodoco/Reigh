@@ -182,6 +182,15 @@ export default function EditImagesPage() {
         thumbnailUrl = publicUrl; // Use main image as fallback
       }
 
+      const generationParams = {
+        prompt: 'Uploaded image',
+        status: 'completed',
+        is_uploaded: true,
+        width: 1024,
+        height: 1024,
+        model: 'upload'
+      };
+
       const { data: generation, error: dbError } = await supabase
         .from('generations')
         .insert({
@@ -189,19 +198,23 @@ export default function EditImagesPage() {
           location: publicUrl,
           thumbnail_url: thumbnailUrl,
           type: 'image',
-          params: {
-            prompt: 'Uploaded image',
-            status: 'completed',
-            is_uploaded: true,
-            width: 1024,
-            height: 1024,
-            model: 'upload'
-          }
+          params: generationParams
         })
         .select()
         .single();
 
       if (dbError) throw dbError;
+
+      // Create the original variant
+      await supabase.from('generation_variants').insert({
+        generation_id: generation.id,
+        location: publicUrl,
+        thumbnail_url: thumbnailUrl,
+        is_primary: true,
+        variant_type: 'original',
+        name: 'Original',
+        params: generationParams,
+      });
 
       setSelectedMedia(generation as any);
       // Toast removed as per user request
@@ -288,6 +301,15 @@ export default function EditImagesPage() {
         thumbnailUrl = publicUrl;
       }
 
+      const generationParams = {
+        prompt: 'Uploaded image',
+        status: 'completed',
+        is_uploaded: true,
+        width: 1024,
+        height: 1024,
+        model: 'upload'
+      };
+
       const { data: generation, error: dbError } = await supabase
         .from('generations')
         .insert({
@@ -295,19 +317,23 @@ export default function EditImagesPage() {
           location: publicUrl,
           thumbnail_url: thumbnailUrl,
           type: 'image',
-          params: {
-            prompt: 'Uploaded image',
-            status: 'completed',
-            is_uploaded: true,
-            width: 1024,
-            height: 1024,
-            model: 'upload'
-          }
+          params: generationParams
         })
         .select()
         .single();
 
       if (dbError) throw dbError;
+
+      // Create the original variant
+      await supabase.from('generation_variants').insert({
+        generation_id: generation.id,
+        location: publicUrl,
+        thumbnail_url: thumbnailUrl,
+        is_primary: true,
+        variant_type: 'original',
+        name: 'Original',
+        params: generationParams,
+      });
 
       setSelectedMedia(generation as any);
 

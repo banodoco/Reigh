@@ -156,6 +156,24 @@ export async function uploadImageWithGeneration(
     throw new Error(`Failed to create generation record: ${dbError?.message || 'Unknown error'}`);
   }
 
+  // Create the original variant for this generation
+  const { error: variantError } = await supabase
+    .from('generation_variants')
+    .insert({
+      generation_id: generation.id,
+      location: imageUrl,
+      thumbnail_url: thumbnailUrl,
+      is_primary: true,
+      variant_type: 'original',
+      name: 'Original',
+      params: generationData.params,
+    });
+
+  if (variantError) {
+    console.error('[ImageUploadHelper] Failed to create variant:', variantError);
+    // Don't throw - generation was created, variant is secondary
+  }
+
   console.log('[ImageUploadHelper] Generation record created:', {
     generationId: generation.id,
     projectId,

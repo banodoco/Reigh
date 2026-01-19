@@ -258,6 +258,13 @@ export default function EditVideoPage() {
         .from(MEDIA_BUCKET)
         .getPublicUrl(fileName);
 
+      const generationParams = {
+        prompt: 'Uploaded video',
+        status: 'completed',
+        is_uploaded: true,
+        model: 'upload'
+      };
+
       const { data: generation, error: dbError } = await supabase
         .from('generations')
         .insert({
@@ -265,17 +272,23 @@ export default function EditVideoPage() {
           location: videoUrl,
           thumbnail_url: posterUrl || videoUrl,
           type: 'video',
-          params: {
-            prompt: 'Uploaded video',
-            status: 'completed',
-            is_uploaded: true,
-            model: 'upload'
-          }
+          params: generationParams
         })
         .select()
         .single();
 
       if (dbError) throw dbError;
+
+      // Create the original variant
+      await supabase.from('generation_variants').insert({
+        generation_id: generation.id,
+        location: videoUrl,
+        thumbnail_url: posterUrl || videoUrl,
+        is_primary: true,
+        variant_type: 'original',
+        name: 'Original',
+        params: generationParams,
+      });
 
       setSelectedMedia(generation as any);
 
@@ -383,6 +396,13 @@ export default function EditVideoPage() {
         .from(MEDIA_BUCKET)
         .getPublicUrl(fileName);
 
+      const generationParams = {
+        prompt: 'Uploaded video',
+        status: 'completed',
+        is_uploaded: true,
+        model: 'upload'
+      };
+
       const { data: generation, error: dbError } = await supabase
         .from('generations')
         .insert({
@@ -390,17 +410,23 @@ export default function EditVideoPage() {
           location: videoUrl,
           thumbnail_url: posterUrl || videoUrl,
           type: 'video',
-          params: {
-            prompt: 'Uploaded video',
-            status: 'completed',
-            is_uploaded: true,
-            model: 'upload'
-          }
+          params: generationParams
         })
         .select()
         .single();
 
       if (dbError) throw dbError;
+
+      // Create the original variant
+      await supabase.from('generation_variants').insert({
+        generation_id: generation.id,
+        location: videoUrl,
+        thumbnail_url: posterUrl || videoUrl,
+        is_primary: true,
+        variant_type: 'original',
+        name: 'Original',
+        params: generationParams,
+      });
 
       setSelectedMedia(generation as any);
 

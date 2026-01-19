@@ -1349,7 +1349,7 @@ export async function handleVariantCreation(
   thumbnailUrl: string | null
 ): Promise<boolean> {
   console.log(`[ImageEdit] Task ${taskId} has based_on=${basedOnGenerationId} - creating variant`);
-  
+
   try {
     const { data: sourceGen, error: fetchError } = await supabase
       .from('generations')

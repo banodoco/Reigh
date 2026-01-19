@@ -38,10 +38,30 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
   // Phase config
   const phaseConfig = useMemo(() => (
     individualSegmentParams?.phase_config ||
-    orchestratorPayload?.phase_config || 
-    orchestratorDetails?.phase_config || 
+    orchestratorPayload?.phase_config ||
+    orchestratorDetails?.phase_config ||
     parsedParams?.phase_config
   ), [individualSegmentParams, orchestratorPayload, orchestratorDetails, parsedParams]);
+
+  // Check if in advanced mode - if not, we show additional_loras instead of phase config
+  const isAdvancedMode = useMemo(() => {
+    const advancedMode = individualSegmentParams?.advanced_mode ??
+      orchestratorDetails?.advanced_mode ??
+      orchestratorPayload?.advanced_mode ??
+      parsedParams?.advanced_mode;
+    const motionMode = individualSegmentParams?.motion_mode ??
+      orchestratorDetails?.motion_mode ??
+      orchestratorPayload?.motion_mode ??
+      parsedParams?.motion_mode;
+
+    // advanced_mode explicitly false means basic mode
+    // motion_mode === 'basic' means basic mode
+    // Otherwise, if we have phase config with phases, assume advanced mode for backward compatibility
+    if (advancedMode === false || motionMode === 'basic') {
+      return false;
+    }
+    return advancedMode === true || motionMode === 'advanced' || motionMode === 'presets';
+  }, [individualSegmentParams, orchestratorDetails, orchestratorPayload, parsedParams]);
 
   const phaseStepsDisplay = useMemo(() => {
     if (!phaseConfig?.steps_per_phase || !Array.isArray(phaseConfig.steps_per_phase)) return null;
@@ -68,8 +88,9 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
   const isFirstSegment = parsedParams?.is_first_segment;
   const isLastSegment = parsedParams?.is_last_segment;
 
-  // Layout for two-column on large screens when phases present
-  const showPhaseContentInRightColumn = phaseConfig?.phases && variant === 'panel';
+  // Layout for two-column on large screens when phases present AND in advanced mode
+  // In basic mode, we don't show phase config details even if they exist internally
+  const showPhaseContentInRightColumn = isAdvancedMode && phaseConfig?.phases && variant === 'panel';
 
   // Get prompts
   const prompt = individualSegmentParams?.base_prompt ||
@@ -266,7 +287,8 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
               <p className={`${config.textSize} ${config.fontWeight}`}>{formatModelName(modelName)}</p>
             </div>
           )}
-          {!phaseConfig?.phases && (
+          {/* Show steps in basic mode, or when no phase config */}
+          {(!isAdvancedMode || !phaseConfig?.phases) && (
             <div className="space-y-1">
               <p className={`${config.textSize} font-medium text-muted-foreground`}>Steps</p>
               <p className={`${config.textSize} ${config.fontWeight}`}>{steps || 'N/A'}</p>
@@ -287,7 +309,8 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
         </div>
 
         {/* LoRAs (when not in right column) */}
-        {!showPhaseContentInRightColumn && phasesWithLoras.length > 0 && (
+        {/* In advanced mode: show "LoRAs by Phase" if we have phases with loras */}
+        {!showPhaseContentInRightColumn && isAdvancedMode && phasesWithLoras.length > 0 && (
           <div className="pt-2 border-t border-muted-foreground/20 space-y-2">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs by Phase</p>
             {phasesWithLoras.map((phase: any) => (
@@ -305,13 +328,14 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
             ))}
           </div>
         )}
-        
-        {!showPhaseContentInRightColumn && !phasesWithLoras.length && additionalLoras && Object.keys(additionalLoras).length > 0 && (
+
+        {/* In basic mode OR no phases with loras: show "LoRAs" from additional_loras */}
+        {!showPhaseContentInRightColumn && (!isAdvancedMode || !phasesWithLoras.length) && additionalLoras && Object.keys(additionalLoras).length > 0 && (
           <div className="pt-2 border-t border-muted-foreground/20 space-y-2">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs Used</p>
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs</p>
             {Object.entries(additionalLoras).slice(0, config.maxLoras).map(([url, strength]) => (
               <div key={url} className={`flex justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
-                <span className={`${config.fontWeight} truncate`}>{url.split('/').pop()?.replace(/\.(safetensors|ckpt|pt)$/, '')}</span>
+                <span className={`${config.fontWeight} truncate`}>{getDisplayNameFromUrl(url, availableLoras)}</span>
                 <span className="text-muted-foreground ml-1">{strength as number}</span>
               </div>
             ))}
