@@ -1121,12 +1121,11 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
               handleDragStart('move', e);
             }}
           >
-            {/* Loading indicator in bottom right - shows on top of existing content */}
-            {(isExtractingFrames || isExtractingMetadata) && !isDragging && (
-              <div className="absolute bottom-1 right-1 z-20 flex items-center gap-1.5 bg-background/95 px-2 py-1 rounded-md border shadow-sm">
-                <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                <span className="text-[10px] font-medium text-muted-foreground">
-                  {isExtractingMetadata ? 'Loading...' : 'Updating...'}
+            {/* Blur overlay when extracting new frames - only show if strip is wide enough and NOT dragging */}
+            {isExtractingFrames && !isDragging && videoCoverageRatio > 0.3 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/20 backdrop-blur-sm z-10">
+                <span className="text-xs font-medium text-foreground bg-background/90 px-3 py-1.5 rounded-md border shadow-sm">
+                  Loading updated timeline...
                 </span>
               </div>
             )}
