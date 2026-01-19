@@ -141,9 +141,9 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
   };
 
   return (
-    <div className={`p-3 bg-muted/30 rounded-lg border ${showPhaseContentInRightColumn ? 'w-full grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3'} ${!showPhaseContentInRightColumn && variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : !showPhaseContentInRightColumn ? 'w-[360px]' : ''}`}>
+    <div className={`p-3 bg-muted/30 rounded-lg border ${showPhaseContentInRightColumn ? 'w-full grid grid-cols-1 lg:grid-cols-2 gap-4' : ''} ${!showPhaseContentInRightColumn && variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : !showPhaseContentInRightColumn ? 'w-[360px]' : ''}`}>
       {/* Main Content Column */}
-      <div className={showPhaseContentInRightColumn ? 'space-y-3 min-w-0' : 'contents'}>
+      <div className={showPhaseContentInRightColumn ? 'space-y-4 min-w-0' : 'space-y-4'}>
         
         {/* Segment Indicator */}
         {isSegmentTask && (
@@ -189,7 +189,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
 
         {/* Guidance Images */}
         {effectiveInputImages.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>
               Image Guidance ({effectiveInputImages.length})
             </p>
@@ -208,7 +208,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
 
         {/* Video/Structure Guidance */}
         {videoPath && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>
               {structureGuidance?.target ? 'Structure Guidance' : 'Video Guidance'}
             </p>
@@ -242,7 +242,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
 
         {/* Style Reference */}
         {styleImage && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>Style Reference</p>
             <div className="flex items-center gap-3">
               <img src={styleImage} alt="Style" className="w-[80px] object-cover rounded border" />
@@ -252,7 +252,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
         )}
 
         {/* Prompts */}
-        <div className="space-y-3">
+        <div className="space-y-3 pt-1">
           <div className="space-y-1">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt{enhancePrompt ? ' (enhanced)' : ''}</p>
             <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap`}>
@@ -340,7 +340,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
 
       {/* Right Column: Phase Settings and LoRAs (only when showPhaseContentInRightColumn) */}
       {showPhaseContentInRightColumn && (
-        <div className="space-y-3 lg:border-l lg:border-muted-foreground/20 lg:pl-4 min-w-0">
+        <div className="space-y-4 lg:border-l lg:border-muted-foreground/20 lg:pl-4 min-w-0">
           {phaseConfig?.phases && (
             <div className="space-y-2">
               <p className={`${config.textSize} font-medium text-muted-foreground`}>Phase Settings</p>
