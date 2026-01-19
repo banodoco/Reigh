@@ -236,6 +236,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       }
       console.log('[PairMetadata] ✅ Query returned:', {
         hasMetadata: !!data?.metadata,
+        enhancedPrompt: (data?.metadata as any)?.enhanced_prompt ?? '(none)',
         pairPrompt: (data?.metadata as any)?.pair_prompt ?? '(none)',
       });
       return (data?.metadata as Record<string, any>) || {};
@@ -250,6 +251,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       pairShotGenerationId: pairShotGenerationId?.substring(0, 8) ?? 'null',
       isLoading: isLoadingPairMetadata,
       hasPairMetadata: !!pairMetadata,
+      enhancedPrompt: pairMetadata?.enhanced_prompt ?? '(none)',
       pairPrompt: pairMetadata?.pair_prompt ?? '(not loaded)',
     });
   }, [pairShotGenerationId, isLoadingPairMetadata, pairMetadata]);
@@ -334,13 +336,18 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   useEffect(() => {
     if (!pairMetadata || !pairShotGenerationId) return;
 
-    const pairPrompt = pairMetadata.pair_prompt;
+    // Prefer enhanced_prompt if it exists, otherwise fall back to pair_prompt
+    const enhancedPrompt = pairMetadata.enhanced_prompt;
+    const basePrompt = pairMetadata.pair_prompt;
+    const pairPrompt = enhancedPrompt || basePrompt;
     const pairNegative = pairMetadata.pair_negative_prompt;
     const pairUserOverrides = pairMetadata.user_overrides || {};
 
     console.log('[PairMetadata] ✅ Loaded from DB, applying:', {
       pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
-      pairPrompt: pairPrompt ?? '(none)',
+      enhancedPrompt: enhancedPrompt ?? '(none)',
+      basePrompt: basePrompt ?? '(none)',
+      usingPrompt: pairPrompt ?? '(none)',
     });
 
     // Apply pair metadata to params
