@@ -827,9 +827,14 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
     // 4. Ensure we have a parent_generation_id (create placeholder if needed)
     // This ensures the parent generation exists BEFORE segments start completing
     let effectiveParentGenerationId = params.parent_generation_id;
-    
+
+    // [ParentReuseDebug] Log parent ID handling
+    console.log('[ParentReuseDebug] === createTravelBetweenImagesTask ===');
+    console.log('[ParentReuseDebug] params.parent_generation_id:', params.parent_generation_id?.substring(0, 8) || 'undefined');
+    console.log('[ParentReuseDebug] params.shot_id:', params.shot_id?.substring(0, 8) || 'undefined');
+
     if (!effectiveParentGenerationId && params.shot_id) {
-      console.log("[createTravelBetweenImagesTask] No parent_generation_id provided, creating placeholder parent");
+      console.log("[ParentReuseDebug] ⚠️ No parent_generation_id provided, WILL CREATE NEW placeholder parent");
       
       // Create a placeholder parent generation
       const newParentId = crypto.randomUUID();
@@ -866,7 +871,7 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
         throw new Error(`Failed to create placeholder parent generation: ${parentError.message}`);
       }
       
-      console.log("[createTravelBetweenImagesTask] Created placeholder parent:", newParentId);
+      console.log("[ParentReuseDebug] ✅ Created NEW placeholder parent:", newParentId.substring(0, 8));
       effectiveParentGenerationId = newParentId;
       
       // Link the parent to the shot using the RPC
@@ -887,7 +892,14 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
         console.error("[createTravelBetweenImagesTask] Exception linking parent to shot:", linkErr);
         // Don't throw - the generation was created, just not linked
       }
+    } else if (effectiveParentGenerationId) {
+      console.log("[ParentReuseDebug] ✅ REUSING existing parent_generation_id:", effectiveParentGenerationId.substring(0, 8));
+    } else {
+      console.log("[ParentReuseDebug] ⚠️ No parent_generation_id and no shot_id - segments will not have parent");
     }
+
+    // [ParentReuseDebug] Summary
+    console.log('[ParentReuseDebug] FINAL effectiveParentGenerationId:', effectiveParentGenerationId?.substring(0, 8) || 'undefined');
 
     // 5. Build orchestrator payload (now includes parent_generation_id)
     const orchestratorPayload = buildTravelBetweenImagesPayload(
@@ -924,6 +936,8 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
     });
 
     console.log("[createTravelBetweenImagesTask] Task created successfully:", result);
+    console.log('[ParentReuseDebug] === createTravelBetweenImagesTask RETURN ===');
+    console.log('[ParentReuseDebug] Returning parentGenerationId:', effectiveParentGenerationId?.substring(0, 8) || 'undefined');
     return {
       task: result,
       parentGenerationId: effectiveParentGenerationId,

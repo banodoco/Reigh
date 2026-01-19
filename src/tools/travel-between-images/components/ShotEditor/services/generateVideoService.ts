@@ -419,6 +419,10 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   console.log('[BasePromptsDebug] Batch video prompt:', params.promptConfig.base_prompt);
   console.log('[BasePromptsDebug] ========================================');
 
+  // [ParentReuseDebug] Log the parentGenerationId received by generateVideo
+  console.log('[ParentReuseDebug] === generateVideo SERVICE ===');
+  console.log('[ParentReuseDebug] params.parentGenerationId:', params.parentGenerationId?.substring(0, 8) || 'undefined');
+
   const {
     projectId,
     selectedShotId,
@@ -1585,7 +1589,13 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       }
     }
     // Use the new client-side travel between images task creation instead of calling the edge function
+    // [ParentReuseDebug] Log what we're passing to createTravelBetweenImagesTask
+    console.log('[ParentReuseDebug] Calling createTravelBetweenImagesTask with parent_generation_id:', requestBody.parent_generation_id?.substring(0, 8) || 'undefined');
+
     const result = await createTravelBetweenImagesTask(requestBody as TravelBetweenImagesTaskParams);
+
+    // [ParentReuseDebug] Log the result
+    console.log('[ParentReuseDebug] createTravelBetweenImagesTask returned parentGenerationId:', result.parentGenerationId?.substring(0, 8) || 'undefined');
 
     return {
       success: true,

@@ -832,9 +832,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Track if we're currently persisting to avoid re-loading our own writes
   const isPersistingRef = useRef(false);
 
-  // Track pending parent ID for rapid consecutive main generations
+  // Track pending parent ID for main generations within the same shot
   // When a main generation is submitted without a parent, the newly created parent ID is stored here
-  // Subsequent rapid submissions within 10 seconds will reuse this parent instead of creating a new one
+  // Subsequent submissions for the same shot will reuse this parent instead of creating a new one
   const pendingMainParentRef = useRef<{ shotId: string; parentId: string; timestamp: number } | null>(null);
   
   // Load persisted selection when shot loads (one-time init per shot)
@@ -1810,15 +1810,45 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         // 3. Otherwise, let the service create a new parent
         let effectiveParentId = selectedOutputId ?? undefined;
 
+        // [ParentReuseDebug] Log initial state
+        console.log('[ParentReuseDebug] === handleGenerateBatch START ===');
+        console.log('[ParentReuseDebug] selectedOutputId:', selectedOutputId?.substring(0, 8) || 'null');
+        console.log('[ParentReuseDebug] selectedShotId:', selectedShotId?.substring(0, 8) || 'null');
+        console.log('[ParentReuseDebug] pendingMainParentRef.current:', pendingMainParentRef.current ? {
+          shotId: pendingMainParentRef.current.shotId.substring(0, 8),
+          parentId: pendingMainParentRef.current.parentId.substring(0, 8),
+          timestamp: pendingMainParentRef.current.timestamp,
+          age: Date.now() - pendingMainParentRef.current.timestamp + 'ms'
+        } : 'null');
+
         if (!effectiveParentId && selectedShotId) {
           const pending = pendingMainParentRef.current;
-          const now = Date.now();
-          const PENDING_PARENT_TTL = 10000; // 10 seconds
 
-          if (pending && pending.shotId === selectedShotId && (now - pending.timestamp) < PENDING_PARENT_TTL) {
-            console.log('[handleGenerateBatch] Reusing pending parent from recent main generation:', pending.parentId.substring(0, 8));
-            effectiveParentId = pending.parentId;
+          // [ParentReuseDebug] Log the reuse check
+          if (pending) {
+            const age = Date.now() - pending.timestamp;
+            const shotIdMatches = pending.shotId === selectedShotId;
+            console.log('[ParentReuseDebug] Checking pending parent:', {
+              pendingParentId: pending.parentId.substring(0, 8),
+              pendingShotId: pending.shotId.substring(0, 8),
+              currentShotId: selectedShotId.substring(0, 8),
+              shotIdMatches,
+              age: age + 'ms',
+              willReuse: shotIdMatches
+            });
+          } else {
+            console.log('[ParentReuseDebug] No pending parent to check');
           }
+
+          // Always reuse pending parent for the same shot (no TTL - parent is valid indefinitely)
+          if (pending && pending.shotId === selectedShotId) {
+            console.log('[ParentReuseDebug] ✅ REUSING pending parent:', pending.parentId.substring(0, 8));
+            effectiveParentId = pending.parentId;
+          } else {
+            console.log('[ParentReuseDebug] ❌ NOT reusing - will create new parent');
+          }
+        } else {
+          console.log('[ParentReuseDebug] Using selectedOutputId or no shotId:', effectiveParentId?.substring(0, 8) || 'none');
         }
 
         // Call the service with all required parameters
@@ -1872,15 +1902,40 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           parentGenerationId: effectiveParentId,
         });
 
+        // [ParentReuseDebug] Log the result
+        console.log('[ParentReuseDebug] generateVideo result:', {
+          success: result.success,
+          parentGenerationId: result.parentGenerationId?.substring(0, 8) || 'undefined',
+          effectiveParentIdUsed: effectiveParentId?.substring(0, 8) || 'undefined',
+          parentWasProvided: !!effectiveParentId,
+          newParentCreated: result.parentGenerationId && result.parentGenerationId !== effectiveParentId
+        });
+
         // If a new parent was created (no prior selection), store it for rapid consecutive submissions
         if (result.success && result.parentGenerationId && !selectedOutputId && selectedShotId) {
-          console.log('[handleGenerateBatch] Storing pending parent for rapid reuse:', result.parentGenerationId.substring(0, 8));
+          console.log('[ParentReuseDebug] ✅ STORING pending parent for future reuse:', {
+            parentId: result.parentGenerationId.substring(0, 8),
+            shotId: selectedShotId.substring(0, 8),
+            timestamp: Date.now()
+          });
           pendingMainParentRef.current = {
             shotId: selectedShotId,
             parentId: result.parentGenerationId,
             timestamp: Date.now(),
           };
+        } else {
+          console.log('[ParentReuseDebug] NOT storing pending parent:', {
+            success: result.success,
+            hasParentGenerationId: !!result.parentGenerationId,
+            hasSelectedOutputId: !!selectedOutputId,
+            hasSelectedShotId: !!selectedShotId,
+            reason: !result.success ? 'not successful' :
+                    !result.parentGenerationId ? 'no parent ID returned' :
+                    selectedOutputId ? 'user had selected output' :
+                    !selectedShotId ? 'no shot ID' : 'unknown'
+          });
         }
+        console.log('[ParentReuseDebug] === handleGenerateBatch END ===');
 
       } catch (error) {
         console.error('[handleGenerateBatch] Error creating task:', error);
