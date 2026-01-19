@@ -505,14 +505,14 @@ export const useRepositionMode = ({
         
         console.log('[Reposition] ✅ Saved as new generation:', insertedGeneration?.id);
       } else {
-        // Create a new variant (non-primary so it doesn't replace the current view)
+        // Create a new variant and make it primary (displayed by default)
         const { data: insertedVariant, error: insertError } = await supabase
           .from('generation_variants')
           .insert({
             generation_id: actualGenerationId,
             location: transformedUrl,
             thumbnail_url: thumbnailUrl,
-            is_primary: false,
+            is_primary: true,
             variant_type: 'repositioned',
             name: 'Repositioned',
             params: {
