@@ -45,7 +45,7 @@ import { filterAndSortShotImages, getNonVideoImages, getVideoOutputs } from './u
 import { isVideoGeneration, isPositioned, sortByTimelineFrame } from '@/shared/lib/typeGuards';
 import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 import { useAddImageToShot, useRemoveImageFromShot } from '@/shared/hooks/useShots';
-import { useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
+import { useUpdateGenerationLocation, useDeleteGeneration } from '@/shared/hooks/useGenerations';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 import * as ApplySettingsService from './services/applySettingsService';
 import { generateVideo } from './services/generateVideoService';
@@ -154,7 +154,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const { data: taskStatusCounts } = useTaskStatusCounts(selectedProjectId);
   const { getApiKey } = useApiKeys();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
-  
+  const deleteGenerationMutation = useDeleteGeneration();
+
   // Load complete shot data and images
   const { shots } = useShots(); // Get shots from context for shot metadata
   
@@ -1679,6 +1680,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     loadPositions,
   });
 
+  // Handler for deleting the final video
+  const handleDeleteFinalVideo = useCallback((generationId: string) => {
+    deleteGenerationMutation.mutate(generationId);
+  }, [deleteGenerationMutation]);
+
   // Early return check moved to end of component
 
 
@@ -2100,6 +2106,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           segmentProgress={segmentProgress}
           isParentLoading={isSegmentOutputsLoading}
           getFinalVideoCount={getFinalVideoCount}
+          onDelete={handleDeleteFinalVideo}
+          isDeleting={deleteGenerationMutation.isPending}
         />
       </div>
 

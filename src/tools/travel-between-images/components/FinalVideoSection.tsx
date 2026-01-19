@@ -7,11 +7,12 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Check, Film, Loader2 } from 'lucide-react';
+import { Check, Film, Loader2, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Separator } from '@/shared/components/ui/separator';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import {
   Select,
   SelectContent,
@@ -53,6 +54,10 @@ interface FinalVideoSectionProps {
   isParentLoading?: boolean;
   /** Cached final video count for showing skeleton during load */
   getFinalVideoCount?: (shotId: string | null) => number | null;
+  /** Delete handler for the final video generation */
+  onDelete?: (generationId: string) => void;
+  /** Whether a delete is in progress */
+  isDeleting?: boolean;
 }
 
 export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
@@ -67,6 +72,8 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   segmentProgress: segmentProgressFromProps,
   isParentLoading = false,
   getFinalVideoCount,
+  onDelete,
+  isDeleting = false,
 }) => {
   const isMobile = useIsMobile();
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -227,6 +234,13 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   const handleMobileTap = useCallback(() => {
     handleLightboxOpen();
   }, [handleLightboxOpen]);
+
+  // Handle delete
+  const handleDelete = useCallback(() => {
+    if (selectedParentId && onDelete) {
+      onDelete(selectedParentId);
+    }
+  }, [selectedParentId, onDelete]);
   
   // Determine if currently loading
   const isCurrentlyLoading = isLoading || isParentLoading;
@@ -352,6 +366,7 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
             <div className="flex justify-center mt-4">
               {/* Constrain video size based on aspect ratio */}
               <div
+                className="relative group"
                 style={(() => {
                   if (!projectAspectRatio) {
                     return { width: '50%' };
@@ -391,6 +406,32 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
                   onApplySettingsFromTask={onApplySettingsFromTask || noop}
                   hideActions={true}
                 />
+                {/* Delete button overlay */}
+                {onDelete && (
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="h-8 w-8 bg-red-600/80 hover:bg-red-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete();
+                          }}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete final video</TooltipContent>
+                    </Tooltip>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
