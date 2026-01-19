@@ -1446,6 +1446,20 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         </CollapsibleTrigger>
         <CollapsibleContent className="-mx-4">
           <div className="space-y-3 p-3 bg-muted/30 border-y border-border/50">
+            {/* Make Primary Variant Toggle - only show when regenerating existing video */}
+            {isRegeneration && (
+              <div className="flex items-center justify-between">
+                <Label htmlFor="make-primary" className="text-sm cursor-pointer">
+                  Make primary variant
+                </Label>
+                <Switch
+                  id="make-primary"
+                  checked={makePrimaryVariant}
+                  onCheckedChange={setMakePrimaryVariant}
+                />
+              </div>
+            )}
+
             {/* Negative Prompt */}
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Negative Prompt:</Label>
@@ -1523,20 +1537,6 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                   </div>
                 )}
               />
-            )}
-
-            {/* Make Primary Variant Toggle - only show when regenerating existing video */}
-            {isRegeneration && (
-              <div className="flex items-center justify-between">
-                <Label htmlFor="make-primary" className="text-sm cursor-pointer">
-                  Make primary variant
-                </Label>
-                <Switch
-                  id="make-primary"
-                  checked={makePrimaryVariant}
-                  onCheckedChange={setMakePrimaryVariant}
-                />
-              </div>
             )}
           </div>
 
