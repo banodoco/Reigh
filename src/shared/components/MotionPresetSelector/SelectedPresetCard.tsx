@@ -6,6 +6,11 @@ import { Settings, X } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import type { SelectedPresetCardProps, PresetMetadata } from './types';
 
+// Helper to check if an ID is a built-in preset (not in database)
+const isBuiltinPresetId = (id: string | null | undefined): boolean => {
+  return !!id && id.startsWith('__builtin');
+};
+
 /**
  * Card shown when a non-known preset is selected (from Browse modal).
  * Shows preset info with Change and Edit buttons.
@@ -17,6 +22,9 @@ export const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
   onRemove,
   queryKeyPrefix = 'motion-presets',
 }) => {
+  // Don't query database for built-in presets (they have __builtin prefix)
+  const shouldFetch = !!presetId && !isBuiltinPresetId(presetId);
+
   // Fetch preset details from database
   const { data: preset, isLoading } = useQuery({
     queryKey: [queryKeyPrefix, 'preset', presetId],
@@ -26,12 +34,35 @@ export const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
         .select('*')
         .eq('id', presetId)
         .single();
-      
+
       if (error) throw error;
       return data as { id: string; metadata: PresetMetadata };
     },
-    enabled: !!presetId,
+    enabled: shouldFetch,
   });
+
+  // If it's a builtin preset that somehow got here, just show a simple card
+  // (This can happen during mode transitions between I2V and VACE)
+  if (isBuiltinPresetId(presetId)) {
+    return (
+      <div className="relative p-3 border rounded-lg bg-muted/30 border-border">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Default Preset</p>
+            <p className="text-xs text-muted-foreground">Switch modes or select a different preset</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onChangePreset}
+            className="h-7 text-xs"
+          >
+            Change
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
