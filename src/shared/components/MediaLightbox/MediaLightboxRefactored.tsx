@@ -1755,11 +1755,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     const childGenerationId = currentSegmentImages?.activeChildGenerationId ||
                               (isChildSegment ? actualGenerationId : undefined);
 
+    // Safe substring helper for debug logging (handles non-strings)
+    const safeSubstr = (val: unknown): string => {
+      if (typeof val === 'string') return val.substring(0, 8);
+      if (val === null || val === undefined) return 'null';
+      return `[${typeof val}]`;
+    };
+
     console.log('[MediaLightbox] childGenerationId resolution:', {
-      activeChildFromSlot: currentSegmentImages?.activeChildGenerationId?.substring(0, 8) ?? 'null',
-      actualGenerationId: actualGenerationId?.substring(0, 8) ?? 'null',
+      activeChildFromSlot: safeSubstr(currentSegmentImages?.activeChildGenerationId),
+      actualGenerationId: safeSubstr(actualGenerationId),
       isChildSegment,
-      final: childGenerationId?.substring(0, 8) ?? 'null (will create new child)',
+      final: safeSubstr(childGenerationId) || 'null (will create new child)',
     });
 
     // Extract pair_shot_generation_id for reading/writing per-pair metadata
@@ -1772,11 +1779,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   (Array.isArray(orchPairIds) && orchPairIds[segmentIndex]);
 
     console.log('[PairMetadata] 🔗 MediaLightbox pairShotGenerationId sources:', {
-      fromTaskParams: taskParams.pair_shot_generation_id?.substring(0, 8) ?? 'null',
-      fromIndividualSegmentParams: taskParams.individual_segment_params?.pair_shot_generation_id?.substring(0, 8) ?? 'null',
-      fromCurrentSegmentImages: currentSegmentImages?.startShotGenerationId?.substring(0, 8) ?? 'null',
-      fromOrchestratorDetails: (Array.isArray(orchPairIds) ? orchPairIds[segmentIndex]?.substring(0, 8) : null) ?? 'null',
-      final: pairShotGenerationId?.substring(0, 8) ?? 'NULL',
+      fromTaskParams: safeSubstr(taskParams.pair_shot_generation_id),
+      fromIndividualSegmentParams: safeSubstr(taskParams.individual_segment_params?.pair_shot_generation_id),
+      fromCurrentSegmentImages: safeSubstr(currentSegmentImages?.startShotGenerationId),
+      fromOrchestratorDetails: Array.isArray(orchPairIds) ? safeSubstr(orchPairIds[segmentIndex]) : 'null',
+      final: safeSubstr(pairShotGenerationId),
     });
 
     return (
