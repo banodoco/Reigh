@@ -1524,6 +1524,20 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
                 )}
               />
             )}
+
+            {/* Make Primary Variant Toggle - only show when regenerating existing video */}
+            {isRegeneration && (
+              <div className="flex items-center justify-between">
+                <Label htmlFor="make-primary" className="text-sm cursor-pointer">
+                  Make primary variant
+                </Label>
+                <Switch
+                  id="make-primary"
+                  checked={makePrimaryVariant}
+                  onCheckedChange={setMakePrimaryVariant}
+                />
+              </div>
+            )}
           </div>
 
           {/* LoRA Selector Modal - only needed for regeneration */}
@@ -1538,20 +1552,6 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
           )}
         </CollapsibleContent>
       </Collapsible>
-
-      {/* Make Primary Variant Toggle - only show when regenerating existing video */}
-      {isRegeneration && (
-        <div className="flex items-center justify-between py-2">
-          <Label htmlFor="make-primary" className="text-sm cursor-pointer">
-            Make primary variant
-          </Label>
-          <Switch
-            id="make-primary"
-            checked={makePrimaryVariant}
-            onCheckedChange={setMakePrimaryVariant}
-          />
-        </div>
-      )}
 
       {/* Regenerate Button */}
       <Button
