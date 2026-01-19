@@ -372,9 +372,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       >
         <div
           {...paneProps}
+          data-scroll-lock-scrollable="true"
           className={cn(
             'absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-300 ease-smooth flex flex-col',
-            !isMobile 
+            !isMobile
               ? (effectiveIsOpen ? 'translate-x-0' : 'translate-x-full')
               : transformClass,
             'pointer-events-auto'
@@ -539,7 +540,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
             <TasksPaneProcessingWarning onOpenSettings={onOpenSettings} />
             
-            <div className="flex-grow overflow-y-auto">
+            <div
+              className="flex-grow overflow-y-auto"
+              data-scroll-lock-scrollable="true"
+            >
               <TaskList
                 filterStatuses={STATUS_GROUPS[selectedFilter]}
                 activeFilter={selectedFilter}

@@ -99,8 +99,8 @@ export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
 
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {/* Mode selector section */}
-        <div className={cn("border-b border-border", isMobile ? "p-2" : "px-6 py-3")}>
+        {/* Mode selector section - uses @container query to hide text when narrow */}
+        <div className={cn("border-b border-border @container", isMobile ? "p-2" : "px-6 py-3")}>
           {modeSelector}
         </div>
 

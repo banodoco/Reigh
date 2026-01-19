@@ -255,28 +255,24 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
     ) : null
   );
 
-  // Mode selector for image editing
+  // Mode selector for image editing - text hidden when container < 280px
   const modeSelector = (
-    <div className={cn(
-      "flex gap-0.5 border border-border rounded-lg overflow-hidden bg-muted/30",
-      isMobile ? "p-0.5" : "p-1 gap-1"
-    )}>
+    <div className="flex gap-0.5 border border-border rounded-lg overflow-hidden bg-muted/30 p-0.5 @[280px]:p-1 @[280px]:gap-1">
       <button
         onClick={() => {
           setIsInpaintMode(true);
           setEditMode('text');
         }}
         className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden",
-          isMobile ? "p-2" : "flex-row gap-1 px-3 py-1.5 text-sm",
+          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
           editMode === 'text'
             ? "bg-background text-foreground font-medium shadow-sm"
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         )}
         title="Text"
       >
-        <Type className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5 flex-shrink-0")} />
-        {!isMobile && <span className="truncate">Text</span>}
+        <Type className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
+        <span className="hidden @[280px]:inline truncate">Text</span>
       </button>
       <button
         onClick={() => {
@@ -284,16 +280,15 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           setEditMode('inpaint');
         }}
         className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden",
-          isMobile ? "p-2" : "flex-row gap-1 px-3 py-1.5 text-sm",
+          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
           editMode === 'inpaint'
             ? "bg-background text-foreground font-medium shadow-sm"
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         )}
         title="Paint"
       >
-        <Paintbrush className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5 flex-shrink-0")} />
-        {!isMobile && <span className="truncate">Paint</span>}
+        <Paintbrush className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
+        <span className="hidden @[280px]:inline truncate">Paint</span>
       </button>
       <button
         onClick={() => {
@@ -301,16 +296,15 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           setEditMode('annotate');
         }}
         className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden",
-          isMobile ? "p-2" : "flex-row gap-1 px-3 py-1.5 text-sm",
+          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
           editMode === 'annotate'
             ? "bg-background text-foreground font-medium shadow-sm"
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         )}
         title="Annotate"
       >
-        <Pencil className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5 flex-shrink-0")} />
-        {!isMobile && <span className="truncate">Annotate</span>}
+        <Pencil className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
+        <span className="hidden @[280px]:inline truncate">Annotate</span>
       </button>
       <button
         onClick={() => {
@@ -318,16 +312,15 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           setEditMode('reposition');
         }}
         className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden",
-          isMobile ? "p-2" : "flex-row gap-1 px-3 py-1.5 text-sm",
+          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
           editMode === 'reposition'
             ? "bg-background text-foreground font-medium shadow-sm"
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         )}
         title="Move"
       >
-        <Move className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5 flex-shrink-0")} />
-        {!isMobile && <span className="truncate">Move</span>}
+        <Move className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
+        <span className="hidden @[280px]:inline truncate">Move</span>
       </button>
       <button
         onClick={() => {
@@ -335,16 +328,15 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           setEditMode('img2img');
         }}
         className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden",
-          isMobile ? "p-2" : "flex-row gap-1 px-3 py-1.5 text-sm",
+          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
           editMode === 'img2img'
             ? "bg-background text-foreground font-medium shadow-sm"
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         )}
         title="Img2Img"
       >
-        <Wand2 className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5 flex-shrink-0")} />
-        {!isMobile && <span className="truncate">Img2Img</span>}
+        <Wand2 className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
+        <span className="hidden @[280px]:inline truncate">Img2Img</span>
       </button>
     </div>
   );
