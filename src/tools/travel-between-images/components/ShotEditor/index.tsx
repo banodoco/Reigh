@@ -1682,8 +1682,30 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Handler for deleting the final video
   const handleDeleteFinalVideo = useCallback((generationId: string) => {
-    deleteGenerationMutation.mutate(generationId);
-  }, [deleteGenerationMutation]);
+    console.log('[FinalVideoDelete] handleDeleteFinalVideo called', {
+      generationId: generationId?.substring(0, 8),
+      isPending: deleteGenerationMutation.isPending,
+      selectedShotId: selectedShot?.id?.substring(0, 8),
+      projectId: projectId?.substring(0, 8),
+    });
+    deleteGenerationMutation.mutate(generationId, {
+      onSuccess: () => {
+        console.log('[FinalVideoDelete] Delete mutation SUCCESS - invalidating queries');
+        // Invalidate the segment parent generations query to refresh the list
+        queryClient.invalidateQueries({ queryKey: ['segment-parent-generations', selectedShot?.id, projectId] });
+        // Also invalidate generations query
+        queryClient.invalidateQueries({ queryKey: ['generations'] });
+        // Clear the selection if we deleted the selected one
+        if (selectedOutputId === generationId) {
+          console.log('[FinalVideoDelete] Clearing selected output (deleted the selected one)');
+          setSelectedOutputId?.(null);
+        }
+      },
+      onError: (error) => {
+        console.error('[FinalVideoDelete] Delete mutation ERROR:', error);
+      },
+    });
+  }, [deleteGenerationMutation, queryClient, selectedShot?.id, projectId, selectedOutputId, setSelectedOutputId]);
 
   // Early return check moved to end of component
 

@@ -237,10 +237,18 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
 
   // Handle delete
   const handleDelete = useCallback(() => {
+    console.log('[FinalVideoDelete] handleDelete called', {
+      selectedParentId: selectedParentId?.substring(0, 8),
+      hasOnDelete: !!onDelete,
+      isDeleting,
+    });
     if (selectedParentId && onDelete) {
+      console.log('[FinalVideoDelete] Calling onDelete with:', selectedParentId.substring(0, 8));
       onDelete(selectedParentId);
+    } else {
+      console.log('[FinalVideoDelete] Missing selectedParentId or onDelete');
     }
-  }, [selectedParentId, onDelete]);
+  }, [selectedParentId, onDelete, isDeleting]);
   
   // Determine if currently loading
   const isCurrentlyLoading = isLoading || isParentLoading;
@@ -250,6 +258,16 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   const cachedFinalVideoCount = getFinalVideoCount?.(shotId) ?? null;
   const willHaveFinalVideo = cachedFinalVideoCount !== null && cachedFinalVideoCount > 0;
   const shouldShowSkeleton = willHaveFinalVideo && !hasFinalOutput;
+
+  // [FinalVideoDelete] Debug logging for delete state
+  console.log('[FinalVideoDelete] Render state', {
+    selectedParentId: selectedParentId?.substring(0, 8),
+    hasFinalOutput,
+    parentGenerationsCount: parentGenerations.length,
+    parentGenerationIds: parentGenerations.map((p: any) => p.id?.substring(0, 8)),
+    isDeleting,
+    hasOnDelete: !!onDelete,
+  });
 
   // [FinalVideoSkeleton] Debug logging
   console.log('[FinalVideoSkeleton]', {
