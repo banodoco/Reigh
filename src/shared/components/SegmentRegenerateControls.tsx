@@ -534,20 +534,11 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   const [regenerateSuccess, setRegenerateSuccess] = useState(false);
 
   // Fetch available LoRAs
-  const { data: publicResources } = useListPublicResources();
+  const { data: publicLoras } = useListPublicResources('lora');
   const availableLoras: LoraModel[] = useMemo(() => {
-    if (!publicResources) return [];
-    return publicResources
-      .filter((r: any) => r.type === 'lora')
-      .map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        path: r.url || r.location,
-        category: r.category,
-        tags: r.tags || [],
-        default_strength: r.default_strength || 1.0,
-      }));
-  }, [publicResources]);
+    if (!publicLoras || !Array.isArray(publicLoras)) return [];
+    return publicLoras.map((resource: any) => resource.metadata || {}) as LoraModel[];
+  }, [publicLoras]);
 
   // Detect generation mode from model name (I2V vs VACE)
   const generationMode = useMemo(() => {
@@ -1559,9 +1550,20 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
             <LoraSelectorModal
               isOpen={isLoraModalOpen}
               onClose={() => setIsLoraModalOpen(false)}
-              onSelect={handleLoraSelect}
-              availableLoras={availableLoras}
-              selectedLoras={selectedLoras.map(l => l.id)}
+              loras={availableLoras}
+              onAddLora={handleLoraSelect}
+              onRemoveLora={handleRemoveLora}
+              onUpdateLoraStrength={handleLoraStrengthChange}
+              selectedLoras={selectedLoras.map(lora => {
+                const fullLora = availableLoras.find(l => l.id === lora.id || l.path === lora.path);
+                return {
+                  ...fullLora,
+                  "Model ID": lora.id,
+                  Name: lora.name,
+                  strength: lora.strength,
+                } as LoraModel & { strength: number };
+              })}
+              lora_type="Wan I2V"
             />
           )}
         </CollapsibleContent>

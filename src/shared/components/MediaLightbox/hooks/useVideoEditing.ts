@@ -94,14 +94,8 @@ export const useVideoEditing = ({
   // LoRA resources
   const { data: publicLoras } = useListPublicResources('lora');
   const availableLoras: LoraModel[] = useMemo(() => {
-    if (!publicLoras) return [];
-    return publicLoras.map((lora: any) => ({
-      id: lora.id,
-      name: lora.name || lora.id,
-      path: lora.url || lora.path || '',
-      strength: 1.0,
-      thumbnail_url: lora.thumbnail_url,
-    }));
+    if (!publicLoras || !Array.isArray(publicLoras)) return [];
+    return publicLoras.map((resource: any) => resource.metadata || {}) as LoraModel[];
   }, [publicLoras]);
   
   // LoRA manager - using current hook API with options object

@@ -792,10 +792,10 @@ export const useInpainting = ({
         }
         
         // Update canvas dimensions
+        // Canvas is inside a wrapper div that exactly wraps the image,
+        // so it should be at 0,0 relative to that wrapper (CSS class already sets this)
         canvas.width = newWidth;
         canvas.height = newHeight;
-        canvas.style.left = `${rect.left - containerRect.left}px`;
-        canvas.style.top = `${rect.top - containerRect.top}px`;
         canvas.style.width = `${newWidth}px`;
         canvas.style.height = `${newHeight}px`;
         
@@ -859,10 +859,10 @@ export const useInpainting = ({
             scaleAndSet(setAnnotationStrokes);
           }
 
+          // Canvas is inside a wrapper div that exactly wraps the image,
+          // so it should be at 0,0 relative to that wrapper (CSS class already sets this)
           canvas.width = newWidth;
           canvas.height = newHeight;
-          canvas.style.left = `${rect.left - containerRect.left}px`;
-          canvas.style.top = `${rect.top - containerRect.top}px`;
           canvas.style.width = `${newWidth}px`;
           canvas.style.height = `${newHeight}px`;
 
