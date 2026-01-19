@@ -5,12 +5,12 @@ import { GenerationRow, Shot } from "@/types/shots";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
 import { generateClientThumbnail, uploadImageWithThumbnail } from "@/shared/lib/clientThumbnailGenerator";
-import { 
-  useAddImageToShot, 
-  useRemoveImageFromShot, 
-  useUpdateShotImageOrder, 
-  useHandleExternalImageDrop, 
-  useDuplicateImageInShot 
+import {
+  useAddImageToShot,
+  useRemoveImageFromShot,
+  useUpdateShotImageOrder,
+  useHandleExternalImageDrop,
+  useDuplicateAsNewGeneration
 } from "@/shared/hooks/useShots";
 import { useDeleteGeneration, useCreateGeneration, useUpdateGenerationLocation } from "@/shared/hooks/useGenerations";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
@@ -70,7 +70,7 @@ export const useGenerationActions = ({
   const deleteGenerationMutation = useDeleteGeneration();
   const createGenerationMutation = useCreateGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
-  const duplicateImageInShotMutation = useDuplicateImageInShot();
+  const duplicateAsNewGenerationMutation = useDuplicateAsNewGeneration();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
 
   // REMOVED: useTaskQueueNotifier was interfering with RealtimeProvider
@@ -121,8 +121,8 @@ export const useGenerationActions = ({
   const createGenerationMutationRef = useRef(createGenerationMutation);
   createGenerationMutationRef.current = createGenerationMutation;
   
-  const duplicateImageInShotMutationRef = useRef(duplicateImageInShotMutation);
-  duplicateImageInShotMutationRef.current = duplicateImageInShotMutation;
+  const duplicateAsNewGenerationMutationRef = useRef(duplicateAsNewGenerationMutation);
+  duplicateAsNewGenerationMutationRef.current = duplicateAsNewGenerationMutation;
   
   const handleExternalImageDropMutationRef = useRef(handleExternalImageDropMutation);
   handleExternalImageDropMutationRef.current = handleExternalImageDropMutation;
@@ -664,23 +664,22 @@ export const useGenerationActions = ({
       : null;
     const nextTimelineFrame = nextImage ? (nextImage as any).timeline_frame : undefined;
     
-    console.log('[DUPLICATE] Calling duplicateImageInShotMutation', {
+    console.log('[DUPLICATE] Calling duplicateAsNewGenerationMutation (creates NEW generation from primary variant)', {
       originalTimelineFrame: timeline_frame,
       nextTimelineFrame,
       currentIndex,
       totalSortedImages: sortedImages.length
     });
 
-    duplicateImageInShotMutationRef.current.mutate({
+    duplicateAsNewGenerationMutationRef.current.mutate({
       shot_id: currentShot.id,
       generation_id: generationId,
       project_id: currentProjectId,
-      shot_generation_id: shotImageEntryId, // Use the unique shot_generation ID for precise lookup
-      timeline_frame: timeline_frame, // Pass the timeline_frame directly to avoid query
-      next_timeline_frame: nextTimelineFrame, // Pass the next frame from UI for accurate midpoint
+      timeline_frame: timeline_frame,
+      next_timeline_frame: nextTimelineFrame,
     }, {
       onSuccess: (result) => {
-        console.log('[DUPLICATE] Duplicate mutation successful', result);
+        console.log('[DUPLICATE] Created new generation from primary variant:', result);
         
         // Add the new item to pending positions immediately to prevent flicker
         // The new item will be in the positions map before the refetch completes
