@@ -305,9 +305,11 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
 
         {/* Pending indicator - shows on top when a new task is queued/in progress */}
         {isPending && (
-          <div className="absolute bottom-1 right-1 z-20 flex items-center gap-1.5 bg-background/95 px-2 py-1 rounded-md border shadow-sm">
-            <Loader2 className="w-3 h-3 animate-spin text-primary" />
-            <span className="text-[10px] font-medium text-muted-foreground">Pending</span>
+          <div
+            className="absolute bottom-1 right-1 z-20 flex items-center justify-center bg-background/95 p-1.5 rounded-md border shadow-sm cursor-default"
+            title="A generation is pending"
+          >
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
           </div>
         )}
         
