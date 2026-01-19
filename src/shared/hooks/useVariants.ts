@@ -128,14 +128,14 @@ export const useVariants = ({
     return variants.find((v) => v.is_primary) || null;
   }, [variants]);
 
-  // Get the active variant (selected or primary)
+  // Get the active variant (selected or primary, fallback to first variant)
   const activeVariant = useMemo(() => {
     console.log('[VariantClickDebug] useVariants.activeVariant computing:', {
       activeVariantId: activeVariantId?.substring(0, 8),
       variantsCount: variants?.length,
       primaryVariantId: primaryVariant?.id?.substring(0, 8),
     });
-    
+
     if (activeVariantId) {
       const found = variants.find((v) => v.id === activeVariantId);
       if (found) {
@@ -144,17 +144,22 @@ export const useVariants = ({
     }
       console.log('[VariantClickDebug] useVariants.activeVariant NOT FOUND in variants list!');
     }
-    console.log('[VariantClickDebug] useVariants.activeVariant using primaryVariant');
-    return primaryVariant;
+    // Fall back to primary, then first variant if no primary exists
+    const fallback = primaryVariant || variants[0] || null;
+    console.log('[VariantClickDebug] useVariants.activeVariant using fallback:', fallback?.id?.substring(0, 8));
+    return fallback;
   }, [variants, activeVariantId, primaryVariant]);
 
-  // Initialize active variant to primary when variants load
+  // Initialize active variant to primary (or first variant) when variants load
   // (only if no active variant is set)
   useMemo(() => {
-    if (!activeVariantId && primaryVariant) {
-      setActiveVariantId(primaryVariant.id);
+    if (!activeVariantId) {
+      const variantToSelect = primaryVariant || variants[0];
+      if (variantToSelect) {
+        setActiveVariantId(variantToSelect.id);
+      }
     }
-  }, [primaryVariant, activeVariantId]);
+  }, [primaryVariant, variants, activeVariantId]);
 
   // Mutation to set a variant as primary
   const setPrimaryMutation = useMutation({
