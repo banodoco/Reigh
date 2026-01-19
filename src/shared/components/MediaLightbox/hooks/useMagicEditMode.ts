@@ -128,6 +128,7 @@ export const useMagicEditMode = ({
 
   const handleExitMagicEditMode = useCallback(() => {
     console.log('[MediaLightbox] ✨ Exiting unified edit mode');
+    console.log('[MediaLightbox] Exit called from:', new Error().stack);
     hasManuallyExitedRef.current = true;
     setIsMagicEditMode(false);
     setIsInpaintMode(false);

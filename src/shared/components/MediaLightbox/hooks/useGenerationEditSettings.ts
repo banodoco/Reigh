@@ -109,7 +109,7 @@ export const DEFAULT_EDIT_SETTINGS: GenerationEditSettings = {
   numGenerations: 1,
   prompt: '',
   // Model selection for cloud mode
-  qwenEditModel: 'qwen-edit',
+  qwenEditModel: 'qwen-edit-2511',
   // Img2Img defaults
   img2imgPrompt: '',
   img2imgPromptHasBeenSet: false,

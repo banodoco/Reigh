@@ -75,6 +75,8 @@ export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
           <SegmentedControl
             value="edit"
             onValueChange={(value) => {
+              console.log('[EditPanelLayout] SegmentedControl onValueChange:', value);
+              console.log('[EditPanelLayout] SegmentedControl stack:', new Error().stack);
               if (value === 'info') {
                 onExitEditMode();
               }

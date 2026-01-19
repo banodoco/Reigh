@@ -886,6 +886,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   // Handle exiting inpaint mode from UI buttons
   const handleExitInpaintMode = () => {
+    console.log('[MediaLightbox] handleExitInpaintMode called');
+    console.log('[MediaLightbox] handleExitInpaintMode stack:', new Error().stack);
     setIsInpaintMode(false);
   };
 

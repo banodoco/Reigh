@@ -611,7 +611,10 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               <Button
                 variant="secondary"
                 size={buttonSize}
-                onClick={handleSaveAsVariant}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSaveAsVariant();
+                }}
                 disabled={
                   !hasTransformChanges ||
                   isSavingAsVariant ||
@@ -647,7 +650,10 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               <Button
                 variant="default"
                 size={buttonSize}
-                onClick={handleGenerateReposition}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleGenerateReposition();
+                }}
                 disabled={
                   !hasTransformChanges ||
                   isGeneratingReposition ||

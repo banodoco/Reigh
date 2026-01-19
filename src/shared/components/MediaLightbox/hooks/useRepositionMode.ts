@@ -379,11 +379,10 @@ export const useRepositionMode = ({
       // Show success state
       setRepositionGenerateSuccess(true);
 
-      // Wait 1 second to show success, then reset transform (stay in edit mode)
+      // Wait 1 second to show success, then clear success state (keep transform for further edits)
       setTimeout(() => {
         setRepositionGenerateSuccess(false);
-        resetTransform();
-        // Don't exit edit mode - let user stay and make more edits if needed
+        // Don't reset transform - let user keep their positioning for further edits or regeneration
       }, 1000);
       
     } catch (error) {
@@ -403,10 +402,9 @@ export const useRepositionMode = ({
     shotId,
     toolTypeOverride,
     loras,
-    resetTransform,
-    handleExitInpaintMode,
     createTransformedCanvas,
-    createAsGeneration
+    createAsGeneration,
+    advancedSettings,
   ]);
   
   // Save transformed image as a variant (without AI generation)
