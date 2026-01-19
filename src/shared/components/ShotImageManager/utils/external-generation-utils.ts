@@ -22,6 +22,7 @@ export const transformExternalGeneration = (
   
   const transformedData: GenerationRow = {
     id: data.id,
+    generation_id: data.id, // For external generations, id IS the generations.id
     shotImageEntryId: data.id,
     imageUrl: data.location,
     thumbUrl: data.thumbnail_url || data.location,
@@ -33,6 +34,7 @@ export const transformExternalGeneration = (
       ? data.params as Record<string, unknown> 
       : {},
     starred: data.starred ?? false,
+    params: data.params || {},
     all_shot_associations: allAssociations,
     ...(shotGenerations.length > 0 ? {
       shot_id: shotGenerations[0].shot_id,

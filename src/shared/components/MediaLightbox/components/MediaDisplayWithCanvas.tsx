@@ -232,26 +232,27 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
         />
       ) : (
         // Image with Canvas Overlays - Progressive loading: thumbnail first, then full image
-        <>
+        // Wrapper div shrinks to fit the image so overlays match image bounds, not container
+        <div className="relative inline-flex max-w-full max-h-full">
           {/* Use thumbnail or full image based on loading state */}
-          <img 
-            src={thumbUrl && thumbUrl !== effectiveImageUrl && !fullImageLoaded ? thumbUrl : effectiveImageUrl} 
+          <img
+            src={thumbUrl && thumbUrl !== effectiveImageUrl && !fullImageLoaded ? thumbUrl : effectiveImageUrl}
             alt="Media content"
             draggable={false}
             className={`
-              w-full h-full object-contain select-none
-              ${variant === 'regular-centered' ? 'max-w-full max-h-full rounded' : ''}
+              max-w-full max-h-full object-contain select-none
+              ${variant === 'regular-centered' ? 'rounded' : ''}
               ${isFlippedHorizontally ? 'scale-x-[-1]' : ''}
               ${isSaving ? 'opacity-30' : 'opacity-100'}
               ${isInpaintMode ? 'pointer-events-none' : ''}
               ${editMode === 'reposition' ? 'transition-transform duration-75' : 'transition-opacity duration-300'}
               ${className}
             `.trim()}
-            style={{ 
+            style={{
               ...mediaStyle,
               ...(editMode === 'reposition' && repositionTransformStyle ? repositionTransformStyle : {}),
-              transform: editMode === 'reposition' && repositionTransformStyle?.transform 
-                ? repositionTransformStyle.transform 
+              transform: editMode === 'reposition' && repositionTransformStyle?.transform
+                ? repositionTransformStyle.transform
                 : (isFlippedHorizontally ? 'scaleX(-1)' : 'none'),
               transformOrigin: editMode === 'reposition' ? 'center center' : undefined,
               pointerEvents: isInpaintMode ? 'none' : 'auto',
@@ -285,10 +286,10 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
               setImageLoadError(true);
             }}
           />
-          
+
           {/* Preload full image in background when showing thumbnail */}
           {thumbUrl && thumbUrl !== effectiveImageUrl && !fullImageLoaded && (
-            <img 
+            <img
               src={effectiveImageUrl}
               alt=""
               className="hidden"
@@ -310,10 +311,10 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
 
           {/* Original Image Bounds Outline - Shows the canvas boundary in reposition mode */}
           {isRepositionMode && (
-            <div 
+            <div
               className="absolute pointer-events-none z-[45]"
               style={{
-                // This overlay shows the original image boundary
+                // This overlay shows the original image boundary - inset:0 now matches the wrapper which fits the image
                 inset: 0,
                 border: '2px dashed rgba(59, 130, 246, 0.7)',
                 borderRadius: variant === 'regular-centered' ? '4px' : undefined,
@@ -325,7 +326,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
               <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-blue-500" />
               <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-blue-500" />
               <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-blue-500" />
-              
+
               {/* Center crosshair */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
                 <div className="w-6 h-0.5 bg-blue-500/50 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
@@ -411,7 +412,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
               />
             </>
           )}
-        </>
+        </div>
       )}
     </div>
   );

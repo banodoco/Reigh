@@ -398,9 +398,26 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const isVideo = isVideoAny(media as any);
   
   // CRITICAL: When viewing from ShotImagesEditor, media.id is the shot_generations.id (join table ID)
-  // We need to use media.generation_id (actual generations table ID) for shot operations
-  const actualGenerationId = (media as any).generation_id || media.id;
-  
+  // We need to use media.generation_id (actual generations table ID) for DB operations
+  //
+  // ID logic:
+  // - If generation_id exists, use it (this is the correct generations.id)
+  // - Only fall back to media.id if this is NOT a shot_generation record
+  //   (shot_generation records have shotImageEntryId or shot_generation_id set to media.id)
+  const isShotGenerationRecord = (media as any).shotImageEntryId === media.id ||
+                                  (media as any).shot_generation_id === media.id;
+  const actualGenerationId = (media as any).generation_id ||
+                              (!isShotGenerationRecord ? media.id : null);
+
+  // Warn if shot_generation record is missing generation_id - indicates data pipeline bug
+  if (isShotGenerationRecord && !(media as any).generation_id) {
+    console.warn('[MediaLightbox] ⚠️ Shot generation record missing generation_id - edit settings will be disabled', {
+      mediaId: media.id?.substring(0, 8),
+      shotImageEntryId: (media as any).shotImageEntryId?.substring(0, 8),
+      hasGenerationId: !!(media as any).generation_id,
+    });
+  }
+
   // For variant fetching: determine which generation's variants to show.
   // - fetchVariantsForSelf=true: fetch variants for this generation (used by travel-between-images children)
   // - fetchVariantsForSelf=false: fetch from parent if available (used by edit-video children)
