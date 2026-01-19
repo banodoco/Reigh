@@ -30,8 +30,8 @@ interface ImageGridProps {
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
   readOnly?: boolean;
-  // Pair prompt props
-  onPairClick?: (pairIndex: number, pairData: any) => void;
+  // Pair prompt props - only pass index, parent handles lookup from pairDataByIndex
+  onPairClick?: (pairIndex: number) => void;
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
@@ -169,24 +169,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                   slot={prevSegmentSlot}
                   pairIndex={index - 1}
                   onClick={() => onSegmentClick?.(index - 1)}
-                  onOpenPairSettings={onPairClick ? (pairIdx) => onPairClick(pairIdx, {
-                    index: pairIdx,
-                    frames: batchVideoFrames,
-                    startFrame: pairIdx * batchVideoFrames,
-                    endFrame: (pairIdx + 1) * batchVideoFrames,
-                    startImage: images[pairIdx] ? {
-                      id: images[pairIdx].id,
-                      url: images[pairIdx].imageUrl || images[pairIdx].location,
-                      thumbUrl: images[pairIdx].thumbUrl,
-                      position: pairIdx + 1
-                    } : null,
-                    endImage: images[pairIdx + 1] ? {
-                      id: images[pairIdx + 1].id,
-                      url: images[pairIdx + 1].imageUrl || images[pairIdx + 1].location,
-                      thumbUrl: images[pairIdx + 1].thumbUrl,
-                      position: pairIdx + 2
-                    } : null
-                  }) : undefined}
+                  onOpenPairSettings={onPairClick}
                   projectAspectRatio={projectAspectRatio}
                   isMobile={isMobile}
                   compact={true}
@@ -209,24 +192,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                   onClearEnhancedPrompt={onClearEnhancedPrompt}
                   onPairClick={() => {
                     console.log('[PairIndicatorDebug] Cross-row pair indicator clicked (left)', { pairIndex: index - 1 });
-                    onPairClick(index - 1, {
-                      index: index - 1,
-                      frames: batchVideoFrames,
-                      startFrame: (index - 1) * batchVideoFrames,
-                      endFrame: index * batchVideoFrames,
-                      startImage: prevStartImage ? {
-                        id: prevStartImage.id,
-                        url: prevStartImage.imageUrl || prevStartImage.location,
-                        thumbUrl: prevStartImage.thumbUrl,
-                        position: index
-                      } : null,
-                      endImage: prevEndImage ? {
-                        id: prevEndImage.id,
-                        url: prevEndImage.imageUrl || prevEndImage.location,
-                        thumbUrl: prevEndImage.thumbUrl,
-                        position: index + 1
-                      } : null
-                    });
+                    onPairClick(index - 1);
                   }}
                   pairPrompt={prevPairPrompt?.prompt}
                   pairNegativePrompt={prevPairPrompt?.negativePrompt}
@@ -244,24 +210,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                   slot={segmentSlot}
                   pairIndex={index}
                   onClick={() => onSegmentClick?.(index)}
-                  onOpenPairSettings={onPairClick ? (pairIdx) => onPairClick(pairIdx, {
-                    index: pairIdx,
-                    frames: batchVideoFrames,
-                    startFrame: pairIdx * batchVideoFrames,
-                    endFrame: (pairIdx + 1) * batchVideoFrames,
-                    startImage: images[pairIdx] ? {
-                      id: images[pairIdx].id,
-                      url: images[pairIdx].imageUrl || images[pairIdx].location,
-                      thumbUrl: images[pairIdx].thumbUrl,
-                      position: pairIdx + 1
-                    } : null,
-                    endImage: images[pairIdx + 1] ? {
-                      id: images[pairIdx + 1].id,
-                      url: images[pairIdx + 1].imageUrl || images[pairIdx + 1].location,
-                      thumbUrl: images[pairIdx + 1].thumbUrl,
-                      position: pairIdx + 2
-                    } : null
-                  }) : undefined}
+                  onOpenPairSettings={onPairClick}
                   projectAspectRatio={projectAspectRatio}
                   isMobile={isMobile}
                   compact={true}
@@ -284,24 +233,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                   onClearEnhancedPrompt={onClearEnhancedPrompt}
                   onPairClick={() => {
                     console.log('[PairIndicatorDebug] Pair indicator clicked', { index });
-                    onPairClick(index, {
-                      index,
-                      frames: batchVideoFrames,
-                      startFrame: index * batchVideoFrames,
-                      endFrame: (index + 1) * batchVideoFrames,
-                      startImage: startImage ? {
-                        id: startImage.id, // shot_generations.id
-                        url: startImage.imageUrl || startImage.location,
-                        thumbUrl: startImage.thumbUrl,
-                        position: index + 1
-                      } : null,
-                      endImage: endImage ? {
-                        id: endImage.id, // shot_generations.id
-                        url: endImage.imageUrl || endImage.location,
-                        thumbUrl: endImage.thumbUrl,
-                        position: index + 2
-                      } : null
-                    });
+                    onPairClick(index);
                   }}
                   pairPrompt={pairPrompt?.prompt}
                   pairNegativePrompt={pairPrompt?.negativePrompt}

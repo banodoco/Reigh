@@ -141,15 +141,18 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
 
   // Build initial params for SegmentRegenerateControls
   // Merge any existing params with the pair-specific prompts
-  // Include user_overrides from initialParams if present
+  // IMPORTANT: Exclude num_frames from user_overrides - frame count is determined by the generation mode
+  // (batch mode uses uniform batchVideoFrames, timeline mode uses actual timeline_frame differences)
+  // If we let a stale num_frames from user_overrides through, it would override the correct value
+  const { num_frames: _excludedNumFrames, ...cleanedUserOverrides } = initialParams?.user_overrides || {};
   const mergedParams = {
     ...initialParams,
     base_prompt: enhancedPrompt || pairPrompt || defaultPrompt || '',
     prompt: enhancedPrompt || pairPrompt || defaultPrompt || '',
     negative_prompt: pairNegativePrompt || defaultNegativePrompt || '',
     num_frames: pairData.frames || 25,
-    // Preserve user_overrides so they're applied on top
-    user_overrides: initialParams?.user_overrides,
+    // Preserve user_overrides (except num_frames which is mode-dependent)
+    user_overrides: cleanedUserOverrides,
   };
 
   return (

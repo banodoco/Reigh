@@ -460,24 +460,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                     slot={pair.segmentSlot}
                     pairIndex={pair.index}
                     onClick={() => onSegmentClick?.(pair.index)}
-                    onOpenPairSettings={onPairClick ? () => onPairClick(pair.index, {
-                      index: pair.index,
-                      frames: batchVideoFrames,
-                      startFrame: pair.index * batchVideoFrames,
-                      endFrame: (pair.index + 1) * batchVideoFrames,
-                      startImage: {
-                        id: pair.leftImage.id,
-                        url: pair.leftImage.imageUrl || pair.leftImage.location,
-                        thumbUrl: pair.leftImage.thumbUrl,
-                        position: pair.index + 1
-                      },
-                      endImage: {
-                        id: pair.rightImage.id,
-                        url: pair.rightImage.imageUrl || pair.rightImage.location,
-                        thumbUrl: pair.rightImage.thumbUrl,
-                        position: pair.index + 2
-                      }
-                    }) : undefined}
+                    onOpenPairSettings={onPairClick ? () => onPairClick(pair.index) : undefined}
                     projectAspectRatio={projectAspectRatio}
                     isMobile={true}
                     compact={false}
@@ -492,24 +475,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                     endFrame={(pair.index + 1) * batchVideoFrames}
                     isMobile={true}
                     onClearEnhancedPrompt={onClearEnhancedPrompt}
-                    onPairClick={() => onPairClick(pair.index, {
-                      index: pair.index,
-                      frames: batchVideoFrames,
-                      startFrame: pair.index * batchVideoFrames,
-                      endFrame: (pair.index + 1) * batchVideoFrames,
-                      startImage: {
-                        id: pair.leftImage.id,
-                        url: pair.leftImage.imageUrl || pair.leftImage.location,
-                        thumbUrl: pair.leftImage.thumbUrl,
-                        position: pair.index + 1
-                      },
-                      endImage: {
-                        id: pair.rightImage.id,
-                        url: pair.rightImage.imageUrl || pair.rightImage.location,
-                        thumbUrl: pair.rightImage.thumbUrl,
-                        position: pair.index + 2
-                      }
-                    })}
+                    onPairClick={() => onPairClick(pair.index)}
                     hasCustomPrompt={!!(pairPrompts?.[pair.index]?.prompt || pairPrompts?.[pair.index]?.negativePrompt)}
                     hasEnhancedPrompt={!!enhancedPrompts?.[pair.index]}
                     defaultPrompt={defaultPrompt}
@@ -595,24 +561,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       slot={prevSegmentSlot}
                       pairIndex={index - 1}
                       onClick={() => onSegmentClick?.(index - 1)}
-                      onOpenPairSettings={onPairClick ? (pairIdx) => onPairClick(pairIdx, {
-                        index: pairIdx,
-                        frames: batchVideoFrames,
-                        startFrame: pairIdx * batchVideoFrames,
-                        endFrame: (pairIdx + 1) * batchVideoFrames,
-                        startImage: currentImages[pairIdx] ? {
-                          id: currentImages[pairIdx].id,
-                          url: currentImages[pairIdx].imageUrl || currentImages[pairIdx].location,
-                          thumbUrl: currentImages[pairIdx].thumbUrl,
-                          position: pairIdx + 1
-                        } : null,
-                        endImage: currentImages[pairIdx + 1] ? {
-                          id: currentImages[pairIdx + 1].id,
-                          url: currentImages[pairIdx + 1].imageUrl || currentImages[pairIdx + 1].location,
-                          thumbUrl: currentImages[pairIdx + 1].thumbUrl,
-                          position: pairIdx + 2
-                        } : null
-                      }) : undefined}
+                      onOpenPairSettings={onPairClick}
                       projectAspectRatio={projectAspectRatio}
                       isMobile={true}
                       compact={true}
@@ -636,24 +585,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       onClearEnhancedPrompt={onClearEnhancedPrompt}
                       onPairClick={() => {
                         console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (left)', { pairIndex: index - 1 });
-                        onPairClick(index - 1, {
-                          index: index - 1,
-                          frames: batchVideoFrames,
-                          startFrame: (index - 1) * batchVideoFrames,
-                          endFrame: index * batchVideoFrames,
-                          startImage: prevStartImage ? {
-                            id: prevStartImage.id, // shot_generations.id
-                            url: prevStartImage.imageUrl || prevStartImage.location,
-                            thumbUrl: prevStartImage.thumbUrl,
-                            position: index
-                          } : null,
-                          endImage: prevEndImage ? {
-                            id: prevEndImage.id, // shot_generations.id
-                            url: prevEndImage.imageUrl || prevEndImage.location,
-                            thumbUrl: prevEndImage.thumbUrl,
-                            position: index + 1
-                          } : null
-                        });
+                        onPairClick(index - 1);
                       }}
                       pairPrompt={prevPairPrompt?.prompt}
                       pairNegativePrompt={prevPairPrompt?.negativePrompt}
@@ -725,24 +657,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       slot={segmentSlot}
                       pairIndex={index}
                       onClick={() => onSegmentClick?.(index)}
-                      onOpenPairSettings={onPairClick ? (pairIdx) => onPairClick(pairIdx, {
-                        index: pairIdx,
-                        frames: batchVideoFrames,
-                        startFrame: pairIdx * batchVideoFrames,
-                        endFrame: (pairIdx + 1) * batchVideoFrames,
-                        startImage: currentImages[pairIdx] ? {
-                          id: currentImages[pairIdx].id,
-                          url: currentImages[pairIdx].imageUrl || currentImages[pairIdx].location,
-                          thumbUrl: currentImages[pairIdx].thumbUrl,
-                          position: pairIdx + 1
-                        } : null,
-                        endImage: currentImages[pairIdx + 1] ? {
-                          id: currentImages[pairIdx + 1].id,
-                          url: currentImages[pairIdx + 1].imageUrl || currentImages[pairIdx + 1].location,
-                          thumbUrl: currentImages[pairIdx + 1].thumbUrl,
-                          position: pairIdx + 2
-                        } : null
-                      }) : undefined}
+                      onOpenPairSettings={onPairClick}
                       projectAspectRatio={projectAspectRatio}
                       isMobile={true}
                       compact={true}
@@ -766,24 +681,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       onClearEnhancedPrompt={onClearEnhancedPrompt}
                       onPairClick={() => {
                         console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (right)', { index });
-                        onPairClick(index, {
-                          index,
-                          frames: batchVideoFrames,
-                          startFrame: index * batchVideoFrames,
-                          endFrame: (index + 1) * batchVideoFrames,
-                          startImage: startImage ? {
-                            id: startImage.id, // shot_generations.id
-                            url: startImage.imageUrl || startImage.location,
-                            thumbUrl: startImage.thumbUrl,
-                            position: index + 1
-                          } : null,
-                          endImage: endImage ? {
-                            id: endImage.id, // shot_generations.id
-                            url: endImage.imageUrl || endImage.location,
-                            thumbUrl: endImage.thumbUrl,
-                            position: index + 2
-                          } : null
-                        });
+                        onPairClick(index);
                       }}
                       pairPrompt={pairPrompt?.prompt}
                       pairNegativePrompt={pairPrompt?.negativePrompt}

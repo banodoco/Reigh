@@ -10,6 +10,7 @@ import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPosition
 import { useEnhancedShotImageReorder } from "@/shared/hooks/useEnhancedShotImageReorder";
 import { useTimelinePositionUtils } from "@/shared/hooks/useTimelinePositionUtils";
 import SegmentSettingsModal from "./Timeline/SegmentSettingsModal";
+import type { PairData } from "./Timeline/TimelineContainer";
 import { Download, Loader2, Play, Pause, ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { useSegmentOutputsForShot } from '../hooks/useSegmentOutputsForShot';
@@ -577,26 +578,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   
   const [segmentSettingsModalData, setSegmentSettingsModalData] = useState<{
     isOpen: boolean;
-    pairData: { 
-      index: number; 
-      frames: number; 
-      startFrame: number; 
-      endFrame: number;
-      startImage?: {
-        id: string;
-        url?: string;
-        thumbUrl?: string;
-        timeline_frame: number;
-        position: number;
-      } | null;
-      endImage?: {
-        id: string;
-        url?: string;
-        thumbUrl?: string;
-        timeline_frame: number;
-        position: number;
-      } | null;
-    } | null;
+    pairData: PairData | null;
   }>({
     isOpen: false,
     pairData: null,
@@ -691,7 +673,56 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     unpositioned: shotGenerations.filter((img: any) => img.timeline_frame == null || img.timeline_frame === -1).length,
     hookDataShotGensCount: hookData.shotGenerations.length,
   });
-  
+
+  // Compute pair data for SegmentSettingsModal (shared source of truth with TimelineContainer)
+  // IMPORTANT: In batch mode, use uniform batchVideoFrames; in timeline mode, use actual timeline_frame differences
+  const pairDataByIndex = React.useMemo(() => {
+    const dataMap = new Map<number, PairData>();
+    const sortedImages = [...(shotGenerations || [])]
+      .filter((img: any) => img.timeline_frame != null && img.timeline_frame >= 0)
+      .sort((a: any, b: any) => a.timeline_frame - b.timeline_frame);
+
+    for (let pairIndex = 0; pairIndex < sortedImages.length - 1; pairIndex++) {
+      const startImage = sortedImages[pairIndex];
+      const endImage = sortedImages[pairIndex + 1];
+
+      // In batch mode: use uniform batchVideoFrames for all pairs
+      // In timeline mode: use actual timeline_frame differences
+      const isBatchMode = effectiveGenerationMode === 'batch';
+      const frames = isBatchMode
+        ? batchVideoFrames
+        : (endImage.timeline_frame ?? 0) - (startImage.timeline_frame ?? 0);
+      const startFrame = isBatchMode
+        ? pairIndex * batchVideoFrames
+        : (startImage.timeline_frame ?? 0);
+      const endFrame = isBatchMode
+        ? (pairIndex + 1) * batchVideoFrames
+        : (endImage.timeline_frame ?? 0);
+
+      dataMap.set(pairIndex, {
+        index: pairIndex,
+        frames,
+        startFrame,
+        endFrame,
+        startImage: {
+          id: startImage.id,
+          generationId: startImage.generation_id,
+          url: startImage.imageUrl || startImage.location,
+          thumbUrl: startImage.thumbUrl || startImage.location,
+          position: pairIndex + 1,
+        },
+        endImage: {
+          id: endImage.id,
+          generationId: endImage.generation_id,
+          url: endImage.imageUrl || endImage.location,
+          thumbUrl: endImage.thumbUrl || endImage.location,
+          position: pairIndex + 2,
+        },
+      });
+    }
+    return dataMap;
+  }, [shotGenerations, effectiveGenerationMode, batchVideoFrames]);
+
   // Get ALL segments for preview (both with videos and image-only)
   // NOTE: This must be after shotGenerations is defined
   // IMPORTANT: Build from IMAGE PAIRS, not segmentSlots - otherwise we miss image-only segments
@@ -1514,11 +1545,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // BUT: Only pass if not using preloaded images (to avoid filtering conflict)
                 hookData={preloadedImages ? undefined : hookData}
                 onDragStateChange={handleDragStateChange}
-                onPairClick={(pairIndex, pairData) => {
-                  setSegmentSettingsModalData({
-                    isOpen: true,
-                    pairData,
-                  });
+                onPairClick={(pairIndex) => {
+                  const pairData = pairDataByIndex.get(pairIndex);
+                  if (pairData) {
+                    setSegmentSettingsModalData({ isOpen: true, pairData });
+                  }
                 }}
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
@@ -1690,13 +1721,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     const shotId = await onCreateShot(shotName);
                     return { shotId, shotName };
                   } : undefined}
-                  // Pair prompt props
-                  onPairClick={(pairIndex, pairData) => {
+                  // Pair prompt props - lookup from pairDataByIndex (single source of truth)
+                  onPairClick={(pairIndex) => {
+                    const pairData = pairDataByIndex.get(pairIndex);
                     console.log('[PairIndicatorDebug] ShotImagesEditor onPairClick called', { pairIndex, pairData });
-                    setSegmentSettingsModalData({
-                      isOpen: true,
-                      pairData,
-                    });
+                    if (pairData) {
+                      setSegmentSettingsModalData({ isOpen: true, pairData });
+                    }
                   }}
                   pairPrompts={(() => {
                     // Convert pairPrompts from useEnhancedShotPositions to the format expected by ShotImageManager
@@ -1915,16 +1946,19 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           if (!parentParams) return undefined;
 
           // Recompute segment frame gaps from the CURRENT timeline, matching full generation behavior.
-          // In timeline mode, full generation sets:
-          // - segment_frames = diffs between successive timeline_frame positions
-          // - frame_overlap = 10 for each segment (today; may be configurable later)
+          // IMPORTANT: In batch mode, use uniform batchVideoFrames; in timeline mode, use actual timeline_frame differences
           const sortedTimelineImages = [...(shotGenerations || [])]
             .filter((sg: any) => sg?.timeline_frame != null && sg.timeline_frame >= 0)
             .sort((a: any, b: any) => a.timeline_frame - b.timeline_frame);
 
+          const isBatchMode = effectiveGenerationMode === 'batch';
           const timelineFrameGaps: number[] = [];
           for (let i = 0; i < sortedTimelineImages.length - 1; i++) {
-            const gap = (sortedTimelineImages[i + 1].timeline_frame as number) - (sortedTimelineImages[i].timeline_frame as number);
+            // In batch mode: uniform batchVideoFrames for all pairs
+            // In timeline mode: actual timeline_frame differences
+            const gap = isBatchMode
+              ? batchVideoFrames
+              : (sortedTimelineImages[i + 1].timeline_frame as number) - (sortedTimelineImages[i].timeline_frame as number);
             if (Number.isFinite(gap) && gap >= 0) timelineFrameGaps.push(gap);
           }
 
@@ -1936,6 +1970,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
           console.log('[SegmentSettingsModal] [TimelineGaps] Using current timeline gaps for regeneration params:', {
             shotId: selectedShotId?.substring(0, 8),
+            mode: effectiveGenerationMode,
+            isBatchMode,
+            batchVideoFrames: isBatchMode ? batchVideoFrames : 'N/A',
             gapsCount: timelineFrameGaps.length,
             firstGaps: timelineFrameGaps.slice(0, 5),
             overlap: existingOverlap,
@@ -2075,120 +2112,53 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           if (!segmentSettingsModalData.pairData) return undefined;
           const currentIndex = segmentSettingsModalData.pairData.index;
           if (currentIndex <= 0) return undefined;
-          
-          // Calculate previous pair data
+
+          // Use pairDataByIndex for navigation (single source of truth)
           return () => {
-            const sortedImages = [...shotGenerations]
-              .filter(sg => sg.timeline_frame != null && sg.timeline_frame >= 0)
-              .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
-            
-            if (sortedImages.length < 2) return;
-            
-            const prevIndex = currentIndex - 1;
-            if (prevIndex < 0 || prevIndex >= sortedImages.length - 1) return;
-            
-            const startImage = sortedImages[prevIndex];
-            const endImage = sortedImages[prevIndex + 1];
-            
-            // Access location from flattened GenerationRow structure
-            const startLocation = startImage.imageUrl || startImage.location;
-            const endLocation = endImage.imageUrl || endImage.location;
-            
-            setSegmentSettingsModalData({
-              isOpen: true,
-              pairData: {
-                index: prevIndex,
-                frames: endImage.timeline_frame! - startImage.timeline_frame!,
-                startFrame: startImage.timeline_frame!,
-                endFrame: endImage.timeline_frame!,
-                startImage: {
-                  id: startImage.id, // shot_generations.id
-                  url: startLocation,
-                  thumbUrl: startLocation,
-                  timeline_frame: startImage.timeline_frame!,
-                  position: prevIndex + 1,
-                },
-                endImage: {
-                  id: endImage.id, // shot_generations.id
-                  url: endLocation,
-                  thumbUrl: endLocation,
-                  timeline_frame: endImage.timeline_frame!,
-                  position: prevIndex + 2,
-                },
-              },
-            });
+            const prevPairData = pairDataByIndex.get(currentIndex - 1);
+            if (prevPairData) {
+              setSegmentSettingsModalData({ isOpen: true, pairData: prevPairData });
+            }
           };
         })()}
         onNavigateNext={(() => {
           if (!segmentSettingsModalData.pairData) return undefined;
           const currentIndex = segmentSettingsModalData.pairData.index;
-          
-          // Calculate if there's a next pair
-          const sortedImages = [...shotGenerations]
-            .filter(sg => sg.timeline_frame != null && sg.timeline_frame >= 0)
-            .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
-          
-          if (currentIndex >= sortedImages.length - 2) return undefined;
-          
-          // Calculate next pair data
+          const nextPairData = pairDataByIndex.get(currentIndex + 1);
+          if (!nextPairData) return undefined;
+
+          // Use pairDataByIndex for navigation (single source of truth)
           return () => {
-            const nextIndex = currentIndex + 1;
-            if (nextIndex < 0 || nextIndex >= sortedImages.length - 1) return;
-            
-            const startImage = sortedImages[nextIndex];
-            const endImage = sortedImages[nextIndex + 1];
-            
-            // Access location from flattened GenerationRow structure
-            const startLocation = startImage.imageUrl || startImage.location;
-            const endLocation = endImage.imageUrl || endImage.location;
-            
-            setSegmentSettingsModalData({
-              isOpen: true,
-              pairData: {
-                index: nextIndex,
-                frames: endImage.timeline_frame! - startImage.timeline_frame!,
-                startFrame: startImage.timeline_frame!,
-                endFrame: endImage.timeline_frame!,
-                startImage: {
-                  id: startImage.id, // shot_generations.id
-                  url: startLocation,
-                  thumbUrl: startLocation,
-                  timeline_frame: startImage.timeline_frame!,
-                  position: nextIndex + 1,
-                },
-                endImage: {
-                  id: endImage.id, // shot_generations.id
-                  url: endLocation,
-                  thumbUrl: endLocation,
-                  timeline_frame: endImage.timeline_frame!,
-                  position: nextIndex + 2,
-                },
-              },
-            });
+            setSegmentSettingsModalData({ isOpen: true, pairData: nextPairData });
           };
         })()}
         hasPrevious={(() => {
           if (!segmentSettingsModalData.pairData) return false;
-          return segmentSettingsModalData.pairData.index > 0;
+          return pairDataByIndex.has(segmentSettingsModalData.pairData.index - 1);
         })()}
         hasNext={(() => {
           if (!segmentSettingsModalData.pairData) return false;
-          const sortedImages = [...shotGenerations]
-            .filter(sg => sg.timeline_frame != null && sg.timeline_frame >= 0)
-            .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
-          
-          console.log('[PairPromptFlow] 📊 hasNext calculation:', {
-            currentPairIndex: segmentSettingsModalData.pairData.index,
-            totalSortedImages: sortedImages.length,
-            totalPairs: sortedImages.length - 1,
-            hasNext: segmentSettingsModalData.pairData.index < sortedImages.length - 2,
-          });
-          
-          return segmentSettingsModalData.pairData.index < sortedImages.length - 2;
+          return pairDataByIndex.has(segmentSettingsModalData.pairData.index + 1);
         })()}
         onFrameCountChange={(frameCount: number) => {
-          console.log('[FrameCountDebug] onFrameCountChange CALLED with:', frameCount);
-          // Update the end image's timeline_frame when frame count changes
+          console.log('[FrameCountDebug] onFrameCountChange CALLED with:', frameCount, 'mode:', effectiveGenerationMode);
+
+          // In batch mode, don't update timeline_frame values - batch mode uses uniform batchVideoFrames
+          // The slider change only affects params.num_frames for the current generation
+          if (effectiveGenerationMode === 'batch') {
+            console.log('[FrameCountDebug] Skipping timeline_frame update in batch mode');
+            // Still update local modal state so display stays in sync during this session
+            setSegmentSettingsModalData(prev => ({
+              ...prev,
+              pairData: prev.pairData ? {
+                ...prev.pairData,
+                frames: frameCount,
+              } : null,
+            }));
+            return;
+          }
+
+          // Timeline mode: Update the end image's timeline_frame when frame count changes
           // AND shift all subsequent images by the delta
           const pairData = segmentSettingsModalData.pairData;
           if (!pairData?.endImage?.id || pairData.startFrame === undefined) {

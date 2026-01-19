@@ -32,8 +32,8 @@ export interface ShotImageManagerProps {
   onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
-  // Pair prompt props
-  onPairClick?: (pairIndex: number, pairData: any) => void;
+  // Pair prompt props - only pass index, parent handles lookup from pairDataByIndex
+  onPairClick?: (pairIndex: number) => void;
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
@@ -81,8 +81,8 @@ export interface BaseShotImageManagerProps {
   isUploadingImage?: boolean;
   onSelectionChange?: (hasSelection: boolean) => void;
   readOnly?: boolean;
-  // Pair prompt props
-  onPairClick?: (pairIndex: number, pairData: any) => void;
+  // Pair prompt props - only pass index, parent handles lookup from pairDataByIndex
+  onPairClick?: (pairIndex: number) => void;
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
