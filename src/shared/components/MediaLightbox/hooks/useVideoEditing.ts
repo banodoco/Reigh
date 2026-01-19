@@ -7,7 +7,7 @@ import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { formatTime, PortionSelection } from '@/shared/components/VideoPortionTimeline';
 import { useEditVideoSettings } from '@/tools/edit-video/hooks/useEditVideoSettings';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
 
 export interface UseVideoEditingProps {
@@ -92,11 +92,7 @@ export const useVideoEditing = ({
   const editSettings = useEditVideoSettings(selectedProjectId);
   
   // LoRA resources
-  const { data: publicLoras } = useListPublicResources('lora');
-  const availableLoras: LoraModel[] = useMemo(() => {
-    if (!publicLoras || !Array.isArray(publicLoras)) return [];
-    return publicLoras.map((resource: any) => resource.metadata || {}) as LoraModel[];
-  }, [publicLoras]);
+  const { data: availableLoras } = usePublicLoras();
   
   // LoRA manager - using current hook API with options object
   const loraManager = useLoraManager(availableLoras, {

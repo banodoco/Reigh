@@ -15,7 +15,7 @@ import { useAutoSaveSettings } from "@/shared/hooks/useAutoSaveSettings";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { ImageGenerationSettings } from "../../settings";
 import { VideoTravelSettings } from "@/tools/travel-between-images/settings";
-import { useListPublicResources, useCreateResource, useUpdateResource, useDeleteResource, StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
+import { usePublicLoras, useCreateResource, useUpdateResource, useDeleteResource, StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
 import { useListShots } from "@/shared/hooks/useShots";
 import { useShotCreation } from "@/shared/hooks/useShotCreation";
 import CreateShotModal from "@/shared/components/CreateShotModal";
@@ -1075,8 +1075,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [selectedProjectId, associatedShotId, imagesPerPrompt]);
 
   // Fetch public LoRAs from all users
-  const { data: publicLorasData } = useListPublicResources('lora');
-  const availableLoras: LoraModel[] = (Array.isArray(publicLorasData) ? publicLorasData.map(resource => resource.metadata) : []) || [];
+  const { data: availableLoras } = usePublicLoras();
 
   // Fetch project-level settings for travel tool defaults
   const { settings: travelProjectSettings } = useToolSettings<VideoTravelSettings>(

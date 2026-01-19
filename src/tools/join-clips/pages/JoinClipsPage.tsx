@@ -28,7 +28,7 @@ import { SKELETON_COLUMNS } from '@/shared/components/ImageGallery/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { LoraManager } from '@/shared/components/LoraManager';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
@@ -579,8 +579,7 @@ const JoinClipsPage: React.FC = () => {
   const projectAspectRatio = currentProject?.aspectRatio;
   
   // Fetch available LoRAs
-  const publicLorasResult = useListPublicResources('lora');
-  const availableLoras = ((publicLorasResult.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[];
+  const { data: availableLoras } = usePublicLoras();
   
   // Initialize LoRA manager
   const loraManager = useLoraManager(availableLoras, {

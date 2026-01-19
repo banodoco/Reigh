@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
@@ -371,13 +372,13 @@ export const useDeleteResource = () => {
         mutationFn: async ({ id }) => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Not authenticated');
-            
+
             const { error } = await supabase
                 .from('resources')
                 .delete()
                 .eq('id', id)
                 .eq('user_id', user.id);
-            
+
             if (error) throw error;
         },
         onSuccess: (data, variables) => {
@@ -391,4 +392,89 @@ export const useDeleteResource = () => {
             toast.error(error.message);
         },
     });
+};
+
+// =============================================================================
+// Convenience hooks that extract metadata directly
+// These eliminate the need for consumers to manually map resource.metadata
+// =============================================================================
+
+/** Fetch all public LoRAs with metadata extracted */
+export const usePublicLoras = () => {
+    const query = useListPublicResources('lora');
+    const data = useMemo(
+        () => (query.data || []).map(r => r.metadata || {}) as LoraModel[],
+        [query.data]
+    );
+    return { ...query, data };
+};
+
+/** Fetch current user's LoRAs with metadata extracted */
+export const useMyLoras = () => {
+    const query = useListResources('lora');
+    const data = useMemo(
+        () => (query.data || []).map(r => r.metadata || {}) as LoraModel[],
+        [query.data]
+    );
+    return { ...query, data };
+};
+
+/** Fetch all public phase configs with metadata extracted */
+export const usePublicPhaseConfigs = () => {
+    const query = useListPublicResources('phase-config');
+    const data = useMemo(
+        () => (query.data || []).map(r => r.metadata || {}) as PhaseConfigMetadata[],
+        [query.data]
+    );
+    return { ...query, data };
+};
+
+/** Fetch current user's phase configs with metadata extracted */
+export const useMyPhaseConfigs = () => {
+    const query = useListResources('phase-config');
+    const data = useMemo(
+        () => (query.data || []).map(r => r.metadata || {}) as PhaseConfigMetadata[],
+        [query.data]
+    );
+    return { ...query, data };
+};
+
+/** Fetch all public style references with metadata extracted */
+export const usePublicStyleReferences = () => {
+    const query = useListPublicResources('style-reference');
+    const data = useMemo(
+        () => (query.data || []).map(r => r.metadata || {}) as StyleReferenceMetadata[],
+        [query.data]
+    );
+    return { ...query, data };
+};
+
+/** Fetch current user's style references with metadata extracted */
+export const useMyStyleReferences = () => {
+    const query = useListResources('style-reference');
+    const data = useMemo(
+        () => (query.data || []).map(r => r.metadata || {}) as StyleReferenceMetadata[],
+        [query.data]
+    );
+    return { ...query, data };
+};
+
+/** Fetch all public structure videos with metadata extracted */
+export const usePublicStructureVideos = () => {
+    const query = useListPublicResources('structure-video');
+    const data = useMemo(
+        () => (query.data || []).map(r => r.metadata || {}) as StructureVideoMetadata[],
+        [query.data]
+    );
+    return { ...query, data };
+};
+
+/** Fetch current user's structure videos with metadata extracted */
+export const useMyStructureVideos = () => {
+    const query = useListResources('structure-video');
+    const data = useMemo(
+        () => (query.data || []).map(r => r.metadata || {}) as StructureVideoMetadata[],
+        [query.data]
+    );
+    return { ...query, data };
 }; 

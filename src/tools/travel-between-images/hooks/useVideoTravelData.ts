@@ -12,10 +12,9 @@
  */
 
 import { useShots } from '@/shared/contexts/ShotsContext';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings } from '../settings';
-import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { Shot } from '@/types/shots';
 
 export interface ProjectUISettings {
@@ -74,7 +73,7 @@ export const useVideoTravelData = (
   // Note: Removed limitedShots - ShotListDisplay now uses ShotsContext directly for consistency
   
   // Fetch public LoRAs data - always call this hook
-  const publicLorasQuery = useListPublicResources('lora');
+  const publicLorasQuery = usePublicLoras();
   
   // Always call these hooks but disable them when parameters are missing
   // This ensures consistent hook order between renders
@@ -126,7 +125,7 @@ export const useVideoTravelData = (
     refetchShots,
     
     // LoRAs data
-    availableLoras: ((publicLorasQuery.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[],
+    availableLoras: publicLorasQuery.data,
     lorasLoading: publicLorasQuery.isLoading,
     
     // Settings data

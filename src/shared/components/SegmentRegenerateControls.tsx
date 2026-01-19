@@ -21,7 +21,7 @@ import { ChevronDown, ChevronUp, ChevronLeft, Loader2, Check, RotateCcw, Upload 
 import { useToast } from '@/shared/hooks/use-toast';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import { MotionPresetSelector, type BuiltinPreset } from '@/shared/components/MotionPresetSelector';
 import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
@@ -534,11 +534,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
   const [regenerateSuccess, setRegenerateSuccess] = useState(false);
 
   // Fetch available LoRAs
-  const { data: publicLoras } = useListPublicResources('lora');
-  const availableLoras: LoraModel[] = useMemo(() => {
-    if (!publicLoras || !Array.isArray(publicLoras)) return [];
-    return publicLoras.map((resource: any) => resource.metadata || {}) as LoraModel[];
-  }, [publicLoras]);
+  const { data: availableLoras } = usePublicLoras();
 
   // Detect generation mode from model name (I2V vs VACE)
   const generationMode = useMemo(() => {

@@ -12,7 +12,7 @@ import { Check, Copy, CornerDownLeft, ImageIcon } from 'lucide-react';
 import { SharedTaskDetails } from './SharedTaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useTaskType } from '@/shared/hooks/useTaskType';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { isVideoTaskType } from '@/shared/lib/taskTypeUtils';
 
@@ -70,8 +70,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   const { data: taskTypeInfo } = useTaskType(task?.taskType || null);
   
   // Fetch public LoRAs for proper name display
-  const publicLorasQuery = useListPublicResources('lora');
-  const availableLoras = ((publicLorasQuery.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[];
+  const { data: availableLoras } = usePublicLoras();
 
   const handleApplySettingsFromTask = () => {
     if (taskId && onApplySettingsFromTask && task) {

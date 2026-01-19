@@ -21,7 +21,7 @@ import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, useCr
 
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
-import { useListPublicResources, useListResources } from '@/shared/hooks/useResources';
+import { usePublicLoras, usePublicStyleReferences, useMyStyleReferences } from '@/shared/hooks/useResources';
 
 // Removed useListTasks import - was causing performance issues with 1000+ tasks
 import { PageFadeIn } from '@/shared/components/transitions';
@@ -124,13 +124,13 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   } = usePanes();
   
   // Early prefetch of public LoRAs to reduce loading time
-  const publicLorasResult = useListPublicResources('lora');
-  
+  const publicLorasResult = usePublicLoras();
+
   // Early prefetch of style references to reduce loading time in browser modal
-  const publicStyleRefsResult = useListPublicResources('style-reference');
-  const myStyleRefsResult = useListResources('style-reference');
-  
-  console.log(`${DEBUG_TAG} Render #${renderCount.current} - useListPublicResources states:`, {
+  const publicStyleRefsResult = usePublicStyleReferences();
+  const myStyleRefsResult = useMyStyleReferences();
+
+  console.log(`${DEBUG_TAG} Render #${renderCount.current} - usePublicLoras/StyleReferences states:`, {
     loras: {
       isLoading: publicLorasResult.isLoading,
       hasData: !!publicLorasResult.data,

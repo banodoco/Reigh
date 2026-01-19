@@ -37,6 +37,8 @@ export interface UseRepositionModeProps {
   createAsGeneration?: boolean;
   // Advanced settings for hires fix
   advancedSettings?: EditAdvancedSettings;
+  // Active variant's image URL - use this instead of media.url when editing a variant
+  activeVariantLocation?: string | null;
 }
 
 export interface UseRepositionModeReturn {
@@ -92,6 +94,7 @@ export const useRepositionMode = ({
   refetchVariants,
   createAsGeneration,
   advancedSettings,
+  activeVariantLocation,
 }: UseRepositionModeProps): UseRepositionModeReturn => {
   const queryClient = useQueryClient();
   const [transform, setTransform] = useState<ImageTransform>(DEFAULT_TRANSFORM);
@@ -184,8 +187,9 @@ export const useRepositionMode = ({
       throw new Error('Missing image dimensions');
     }
     
-    // Get the source image
-    const sourceUrl = (media as any).url || media.location || media.imageUrl;
+    // Get the source image - use variant URL if editing a variant
+    const mediaUrl = (media as any).url || media.location || media.imageUrl;
+    const sourceUrl = activeVariantLocation || mediaUrl;
     
     // Load the source image
     const img = new Image();
@@ -246,7 +250,7 @@ export const useRepositionMode = ({
     transformedCtx.restore();
     
     return transformedCanvas;
-  }, [imageDimensions, media, transform]);
+  }, [imageDimensions, media, transform, activeVariantLocation]);
   
   // Generate transformed image and mask, then create inpaint task
   const handleGenerateReposition = useCallback(async () => {

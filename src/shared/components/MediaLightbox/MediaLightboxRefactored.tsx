@@ -40,7 +40,7 @@ import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import { usePromoteVariantToGeneration } from '@/shared/hooks/usePromoteVariantToGeneration';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import type { LoraModel } from '@/shared/components/LoraSelectorModal';
@@ -703,10 +703,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [promoteVariantMutation, selectedProjectId, actualGenerationId, onAddToShot]);
 
   // Fetch available LoRAs - needed by edit modes and img2img
-  const { data: publicLorasData } = useListPublicResources('lora');
-  const availableLoras: LoraModel[] = useMemo(() => {
-    return (Array.isArray(publicLorasData) ? publicLorasData.map(resource => resource.metadata) : []) || [];
-  }, [publicLorasData]);
+  const { data: availableLoras } = usePublicLoras();
 
   // LoRA manager for edit modes (text, inpaint, annotate, reposition)
   // Uses "Qwen Edit" type LoRAs from the resources table
@@ -963,6 +960,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     refetchVariants,
     createAsGeneration, // If true, create a new generation instead of a variant
     advancedSettings, // Pass advanced settings for hires fix
+    activeVariantLocation: activeVariant?.location, // Use variant's image URL when editing a variant
   });
   const {
     transform: repositionTransform,

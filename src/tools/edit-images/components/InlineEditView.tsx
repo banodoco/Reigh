@@ -4,7 +4,7 @@ import { isVideoAny } from '@/shared/lib/typeGuards';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 import {
@@ -238,10 +238,7 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
   } = repositionHook;
 
   // Fetch available LoRAs for img2img mode
-  const { data: publicLorasData } = useListPublicResources('lora');
-  const availableLoras: LoraModel[] = useMemo(() => {
-    return (Array.isArray(publicLorasData) ? publicLorasData.map(resource => resource.metadata) : []) || [];
-  }, [publicLorasData]);
+  const { data: availableLoras } = usePublicLoras();
 
   // Img2Img mode hook - uses persisted settings
   console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');

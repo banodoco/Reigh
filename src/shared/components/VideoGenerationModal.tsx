@@ -28,7 +28,7 @@ import {
   type StructureVideoConfig,
   DEFAULT_STRUCTURE_VIDEO_CONFIG,
 } from '@/tools/travel-between-images/components/ShotEditor/services/generateVideoService';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { isPositioned, isVideoGeneration } from '@/shared/lib/typeGuards';
@@ -92,11 +92,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
   } = useShotSettings(isOpen ? shot.id : null, selectedProjectId);
   
   // Available LoRAs
-  const publicLorasQuery = useListPublicResources('lora');
-  const availableLoras = useMemo(() => 
-    ((publicLorasQuery.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[],
-    [publicLorasQuery.data]
-  );
+  const { data: availableLoras } = usePublicLoras();
   
   // Shot generations for positioned images
   const { data: shotGenerations, isLoading: generationsLoading } = useAllShotGenerations(

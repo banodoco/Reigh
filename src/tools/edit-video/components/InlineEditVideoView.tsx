@@ -9,7 +9,7 @@ import { TooltipProvider } from '@/shared/components/ui/tooltip';
 import { VideoPortionEditor } from './VideoPortionEditor';
 import { useEditVideoSettings } from '../hooks/useEditVideoSettings';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -202,8 +202,7 @@ export function InlineEditVideoView({
   const projectAspectRatio = currentProject?.aspectRatio;
   
   // LoRA management
-  const publicLorasResult = useListPublicResources('lora');
-  const availableLoras = ((publicLorasResult.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[];
+  const { data: availableLoras } = usePublicLoras();
   
   const loraManager = useLoraManager(availableLoras, {
     projectId: selectedProjectId || undefined,
