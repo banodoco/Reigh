@@ -128,22 +128,37 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
       }
 
       // Add to shot images
-      const { error } = await supabase
+      const generationParams = {
+        source: 'character_upload',
+        original_filename: file.name,
+        file_size: file.size,
+        file_type: file.type,
+      };
+
+      const { data: generation, error } = await supabase
         .from('generations')
         .insert({
-          shot_id: shot.id,
           project_id: projectId,
-          url: url,
+          location: url,
           thumbnail_url: thumbnailUrl,
-          type: 'upload',
-          metadata: {
-            filename: file.name,
-            size: file.size,
-            mimeType: file.type,
-          },
-        });
+          type: 'image',
+          params: generationParams,
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Create the original variant
+      await supabase.from('generation_variants').insert({
+        generation_id: generation.id,
+        location: url,
+        thumbnail_url: thumbnailUrl,
+        is_primary: true,
+        variant_type: 'original',
+        name: 'Original',
+        params: generationParams,
+      });
 
       // Invalidate queries to refresh
       queryClient.invalidateQueries({ queryKey: ['shots', projectId] });

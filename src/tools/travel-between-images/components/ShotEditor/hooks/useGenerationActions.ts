@@ -258,25 +258,39 @@ export const useGenerationActions = ({
 
         if (currentEnv === 'web') {
           // Directly insert into Supabase instead of hitting the API server
+          const generationParams = {
+            prompt: promptForGeneration,
+            source: 'external_upload',
+            original_filename: file.name,
+            file_type: file.type,
+            file_size: file.size,
+          };
+
           const { data: inserted, error } = await supabase
             .from('generations')
             .insert({
               location: finalImageUrl,
-              thumbnail_url: thumbnailUrl, // Add thumbnail URL
+              thumbnail_url: thumbnailUrl,
               type: file.type || 'image',
               project_id: projectId,
-              params: {
-                prompt: promptForGeneration,
-                source: 'external_upload',
-                original_filename: file.name,
-                file_type: file.type,
-                file_size: file.size,
-              },
+              params: generationParams,
             })
             .select()
             .single();
 
           if (error || !inserted) throw error || new Error('Failed to create generation');
+
+          // Create the original variant
+          await supabase.from('generation_variants').insert({
+            generation_id: inserted.id,
+            location: finalImageUrl,
+            thumbnail_url: thumbnailUrl,
+            is_primary: true,
+            variant_type: 'original',
+            name: 'Original',
+            params: generationParams,
+          });
+
           newGeneration = inserted;
         } else {
           // Use the new Supabase-based hook for all environments

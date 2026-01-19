@@ -108,6 +108,17 @@ export const usePromoteVariantToGeneration = () => {
         throw new Error(`Failed to create generation: ${insertError?.message || 'Unknown error'}`);
       }
 
+      // Create the original variant
+      await supabase.from('generation_variants').insert({
+        generation_id: newGeneration.id,
+        location: newGenerationData.location,
+        thumbnail_url: newGenerationData.thumbnail_url,
+        is_primary: true,
+        variant_type: 'original',
+        name: 'Original',
+        params: newGenerationData.params,
+      });
+
       console.log('[PromoteVariant] Successfully created generation:', {
         id: newGeneration.id.substring(0, 8),
         type: newGeneration.type,

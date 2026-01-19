@@ -279,34 +279,29 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
           )}
         </div>
 
-        {/* Technical Settings */}
-        <div className="grid grid-cols-2 gap-3">
-          {modelName && (
+        {/* Technical Settings - only show in advanced mode */}
+        {isAdvancedMode && (
+          <div className="grid grid-cols-2 gap-3">
+            {modelName && (
+              <div className="space-y-1">
+                <p className={`${config.textSize} font-medium text-muted-foreground`}>Model</p>
+                <p className={`${config.textSize} ${config.fontWeight}`}>{formatModelName(modelName)}</p>
+              </div>
+            )}
             <div className="space-y-1">
-              <p className={`${config.textSize} font-medium text-muted-foreground`}>Model</p>
-              <p className={`${config.textSize} ${config.fontWeight}`}>{formatModelName(modelName)}</p>
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Resolution</p>
+              <p className={`${config.textSize} ${config.fontWeight}`}>{resolution || 'N/A'}</p>
             </div>
-          )}
-          {/* Show steps in basic mode, or when no phase config */}
-          {(!isAdvancedMode || !phaseConfig?.phases) && (
             <div className="space-y-1">
-              <p className={`${config.textSize} font-medium text-muted-foreground`}>Steps</p>
-              <p className={`${config.textSize} ${config.fontWeight}`}>{steps || 'N/A'}</p>
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>{isSegmentTask ? 'Frames' : 'Frames / Segment'}</p>
+              <p className={`${config.textSize} ${config.fontWeight}`}>{frames || 'N/A'}</p>
             </div>
-          )}
-          <div className="space-y-1">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>Resolution</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>{resolution || 'N/A'}</p>
+            <div className="space-y-1">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Amount of Motion</p>
+              <p className={`${config.textSize} ${config.fontWeight}`}>{amountOfMotion != null ? `${Math.round(amountOfMotion * 100)}%` : 'N/A'}</p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>{isSegmentTask ? 'Frames' : 'Frames / Segment'}</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>{frames || 'N/A'}</p>
-          </div>
-          <div className="space-y-1">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>Amount of Motion</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>{amountOfMotion != null ? `${Math.round(amountOfMotion * 100)}%` : 'N/A'}</p>
-          </div>
-        </div>
+        )}
 
         {/* LoRAs (when not in right column) */}
         {/* In advanced mode: show "LoRAs by Phase" if we have phases with loras */}

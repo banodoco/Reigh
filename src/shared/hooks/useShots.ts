@@ -1906,24 +1906,38 @@ export const createGenerationForUploadedImage = async (
   projectId: string,
   thumbnailUrl?: string
 ) => {
-      const { data, error } = await supabase
+  const generationParams = {
+    source: 'upload',
+    original_filename: fileName,
+    file_type: fileType,
+    file_size: fileSize
+  };
+
+  const { data, error } = await supabase
     .from('generations')
     .insert({
       project_id: projectId,
       type: 'image',
       location: imageUrl,
-      thumbnail_url: thumbnailUrl || imageUrl, // Use separate thumbnail if available
-      params: {
-        source: 'upload',
-        original_filename: fileName,
-        file_type: fileType,
-        file_size: fileSize
-      }
+      thumbnail_url: thumbnailUrl || imageUrl,
+      params: generationParams
     })
-        .select()
-        .single();
-      
-      if (error) throw error;
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Create the original variant
+  await supabase.from('generation_variants').insert({
+    generation_id: data.id,
+    location: imageUrl,
+    thumbnail_url: thumbnailUrl || imageUrl,
+    is_primary: true,
+    variant_type: 'original',
+    name: 'Original',
+    params: generationParams,
+  });
+
   return data;
 };
 

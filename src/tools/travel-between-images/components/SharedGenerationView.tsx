@@ -301,6 +301,19 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
         return;
       }
 
+      // Create the original variant for the copied generation
+      if (generationData.location) {
+        await supabase.from('generation_variants').insert({
+          generation_id: newGeneration.id,
+          location: generationData.location,
+          thumbnail_url: generationData.thumbnail_url || generationData.location,
+          is_primary: true,
+          variant_type: 'original',
+          name: 'Original',
+          params: generationData.params || {},
+        });
+      }
+
       console.log('[SharedGenerationView] Successfully copied:', {
         newTaskId: newTask.id,
         newGenerationId: newGeneration.id,
