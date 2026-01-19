@@ -290,16 +290,26 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
           </button>
         )}
         
-        {/* Play icon overlay - center */}
-        <div className={cn(
-          "absolute inset-0 flex items-center justify-center",
-          "transition-opacity duration-150",
-          isHovering ? "opacity-0" : "opacity-100"
-        )}>
-          <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center">
-            <Play className="w-6 h-6 text-white ml-0.5" fill="white" />
+        {/* Play icon overlay - center (hidden when pending) */}
+        {!isPending && (
+          <div className={cn(
+            "absolute inset-0 flex items-center justify-center",
+            "transition-opacity duration-150",
+            isHovering ? "opacity-0" : "opacity-100"
+          )}>
+            <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center">
+              <Play className="w-6 h-6 text-white ml-0.5" fill="white" />
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Pending indicator - shows on top when a new task is queued/in progress */}
+        {isPending && (
+          <div className="absolute bottom-1 right-1 z-20 flex items-center gap-1.5 bg-background/95 px-2 py-1 rounded-md border shadow-sm">
+            <Loader2 className="w-3 h-3 animate-spin text-primary" />
+            <span className="text-[10px] font-medium text-muted-foreground">Pending</span>
+          </div>
+        )}
         
         {/* Hover highlight border */}
         {isHovering && (
