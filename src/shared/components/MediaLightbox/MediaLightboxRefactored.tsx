@@ -2767,13 +2767,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             }}
             onPointerDownOutside={(event) => {
               const target = event.target as Element;
-              
+
+              // Don't close if clicking inside the TasksPane (when modal={false} for scroll support)
+              if (target.closest('[data-tasks-pane]')) {
+                event.preventDefault();
+                return;
+              }
+
               // Don't close if clicking inside Radix portals (Select, Popover, DropdownMenu)
               // This check is BEFORE the inpaint mode check because we always want to protect these
-              if (target.closest('[data-radix-select-content]') || 
+              if (target.closest('[data-radix-select-content]') ||
                   target.closest('[data-radix-select-viewport]') ||
                   target.closest('[data-radix-select-item]') ||
-                  target.closest('[data-radix-popover-content]') || 
+                  target.closest('[data-radix-popover-content]') ||
                   target.closest('[data-radix-dropdown-menu-content]') ||
                   target.closest('[data-shot-selector-header]') ||
                   target.closest('[data-radix-select-trigger]')) {
