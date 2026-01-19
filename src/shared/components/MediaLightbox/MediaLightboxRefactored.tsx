@@ -2301,13 +2301,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         }}
       >
         <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay 
+          <DialogPrimitive.Overlay
             className={cn(
-              "fixed inset-0 z-[100000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+              "fixed z-[100000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
               // Disable animations on mobile to prevent blink during zoom/fade
               isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
               "p-0 border-none shadow-none"
             )}
+            style={{
+              top: 0,
+              left: 0,
+              bottom: 0,
+              // Leave space for tasks pane on tablet/desktop
+              right: effectiveTasksPaneOpen && isTabletOrLarger ? `${effectiveTasksPaneWidth}px` : 0,
+              transition: 'right 300ms ease',
+            }}
             onPointerDown={(e) => {
               // Track where the pointer down started
               pointerDownTargetRef.current = e.target;

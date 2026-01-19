@@ -110,48 +110,56 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   onMakePrimary,
   isLoadingVariants,
 }) => {
+  const isMobile = variant === 'mobile';
+
   // Mode selector for video editing
   const modeSelector = (
     <div className={cn(
-      "grid gap-1 border border-border rounded-lg overflow-hidden bg-muted/30",
-      regenerateForm ? "grid-cols-3" : "grid-cols-2"
+      "flex gap-0.5 border border-border rounded-lg overflow-hidden bg-muted/30",
+      isMobile ? "p-0.5" : "p-1 gap-1"
     )}>
       <button
         onClick={onEnterTrimMode}
         className={cn(
-          "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
+          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden",
+          isMobile ? "p-2" : "flex-row gap-1 px-3 py-1.5 text-sm",
           videoEditSubMode === 'trim'
             ? "bg-background text-foreground font-medium shadow-sm"
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         )}
+        title="Trim Video"
       >
-        <Scissors className="h-3.5 w-3.5" />
-        <span className="truncate">Trim Video</span>
+        <Scissors className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5 flex-shrink-0")} />
+        {!isMobile && <span className="truncate">Trim</span>}
       </button>
       <button
         onClick={onEnterReplaceMode}
         className={cn(
-          "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
+          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden",
+          isMobile ? "p-2" : "flex-row gap-1 px-3 py-1.5 text-sm",
           videoEditSubMode === 'replace'
             ? "bg-background text-foreground font-medium shadow-sm"
             : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
         )}
+        title="Replace Portion"
       >
-        <RefreshCw className="h-3.5 w-3.5" />
-        <span className="truncate">Replace Portion</span>
+        <RefreshCw className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5 flex-shrink-0")} />
+        {!isMobile && <span className="truncate">Replace</span>}
       </button>
       {regenerateForm && (
         <button
           onClick={onEnterRegenerateMode}
           className={cn(
-            "flex items-center justify-center gap-1.5 px-2 py-2 text-sm transition-all",
+            "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden",
+            isMobile ? "p-2" : "flex-row gap-1 px-3 py-1.5 text-sm",
             videoEditSubMode === 'regenerate'
               ? "bg-background text-foreground font-medium shadow-sm"
               : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
           )}
+          title="Regenerate Video"
         >
-          <RotateCcw className="h-3.5 w-3.5" />
-          <span className="truncate">Regenerate Video</span>
+          <RotateCcw className={cn(isMobile ? "h-4 w-4" : "h-3.5 w-3.5 flex-shrink-0")} />
+          {!isMobile && <span className="truncate">Regenerate</span>}
         </button>
       )}
     </div>
