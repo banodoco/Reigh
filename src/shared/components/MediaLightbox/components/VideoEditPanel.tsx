@@ -21,6 +21,7 @@ import { VideoPortionEditor } from '@/tools/edit-video/components/VideoPortionEd
 import { DEFAULT_VACE_PHASE_CONFIG } from '@/shared/lib/vaceDefaults';
 import type { UseVideoEditingReturn } from '../hooks/useVideoEditing';
 import { EditPanelLayout } from './EditPanelLayout';
+import { ModeSelector } from './ModeSelector';
 
 export interface VideoEditPanelProps {
   /** Layout variant */
@@ -110,51 +111,33 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   onMakePrimary,
   isLoadingVariants,
 }) => {
-  // Mode selector for video editing - text hidden when container < 200px
+  // Mode selector items for video editing
+  const modeSelectorItems = [
+    {
+      id: 'trim',
+      label: 'Trim',
+      icon: <Scissors />,
+      onClick: onEnterTrimMode,
+    },
+    {
+      id: 'replace',
+      label: 'Replace',
+      icon: <RefreshCw />,
+      onClick: onEnterReplaceMode,
+    },
+    ...(regenerateForm ? [{
+      id: 'regenerate',
+      label: 'Regenerate',
+      icon: <RotateCcw />,
+      onClick: onEnterRegenerateMode,
+    }] : []),
+  ];
+
   const modeSelector = (
-    <div className="flex gap-0.5 border border-border rounded-lg overflow-hidden bg-muted/30 p-0.5 @[200px]:p-1 @[200px]:gap-1">
-      <button
-        onClick={onEnterTrimMode}
-        className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[200px]:gap-1 @[200px]:px-3 @[200px]:py-1.5 @[200px]:text-sm",
-          videoEditSubMode === 'trim'
-            ? "bg-background text-foreground font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-        title="Trim Video"
-      >
-        <Scissors className="h-4 w-4 @[200px]:h-3.5 @[200px]:w-3.5 flex-shrink-0" />
-        <span className="hidden @[200px]:inline truncate">Trim</span>
-      </button>
-      <button
-        onClick={onEnterReplaceMode}
-        className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[200px]:gap-1 @[200px]:px-3 @[200px]:py-1.5 @[200px]:text-sm",
-          videoEditSubMode === 'replace'
-            ? "bg-background text-foreground font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-        title="Replace Portion"
-      >
-        <RefreshCw className="h-4 w-4 @[200px]:h-3.5 @[200px]:w-3.5 flex-shrink-0" />
-        <span className="hidden @[200px]:inline truncate">Replace</span>
-      </button>
-      {regenerateForm && (
-        <button
-          onClick={onEnterRegenerateMode}
-          className={cn(
-            "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[200px]:gap-1 @[200px]:px-3 @[200px]:py-1.5 @[200px]:text-sm",
-            videoEditSubMode === 'regenerate'
-              ? "bg-background text-foreground font-medium shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-          )}
-          title="Regenerate Video"
-        >
-          <RotateCcw className="h-4 w-4 @[200px]:h-3.5 @[200px]:w-3.5 flex-shrink-0" />
-          <span className="hidden @[200px]:inline truncate">Regenerate</span>
-        </button>
-      )}
-    </div>
+    <ModeSelector
+      items={modeSelectorItems}
+      activeId={videoEditSubMode}
+    />
   );
 
   return (

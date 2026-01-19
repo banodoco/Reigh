@@ -19,6 +19,7 @@ import type { UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { EditAdvancedSettings } from './EditAdvancedSettings';
 import type { EditAdvancedSettings as EditAdvancedSettingsType } from '../hooks/useGenerationEditSettings';
 import { EditPanelLayout } from './EditPanelLayout';
+import { ModeSelector } from './ModeSelector';
 
 export interface EditModePanelProps {
   // Source generation
@@ -255,90 +256,45 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
     ) : null
   );
 
-  // Mode selector for image editing - text hidden when container < 280px
+  // Mode selector items for image editing
+  const modeSelectorItems = [
+    {
+      id: 'text',
+      label: 'Text',
+      icon: <Type />,
+      onClick: () => { setIsInpaintMode(true); setEditMode('text'); },
+    },
+    {
+      id: 'inpaint',
+      label: 'Paint',
+      icon: <Paintbrush />,
+      onClick: () => { setIsInpaintMode(true); setEditMode('inpaint'); },
+    },
+    {
+      id: 'annotate',
+      label: 'Annotate',
+      icon: <Pencil />,
+      onClick: () => { setIsInpaintMode(true); setEditMode('annotate'); },
+    },
+    {
+      id: 'reposition',
+      label: 'Move',
+      icon: <Move />,
+      onClick: () => { setIsInpaintMode(true); setEditMode('reposition'); },
+    },
+    {
+      id: 'img2img',
+      label: 'Img2Img',
+      icon: <Wand2 />,
+      onClick: () => { setIsInpaintMode(true); setEditMode('img2img'); },
+    },
+  ];
+
   const modeSelector = (
-    <div className="flex gap-0.5 border border-border rounded-lg overflow-hidden bg-muted/30 p-0.5 @[280px]:p-1 @[280px]:gap-1">
-      <button
-        onClick={() => {
-          setIsInpaintMode(true);
-          setEditMode('text');
-        }}
-        className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
-          editMode === 'text'
-            ? "bg-background text-foreground font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-        title="Text"
-      >
-        <Type className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
-        <span className="hidden @[280px]:inline truncate">Text</span>
-      </button>
-      <button
-        onClick={() => {
-          setIsInpaintMode(true);
-          setEditMode('inpaint');
-        }}
-        className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
-          editMode === 'inpaint'
-            ? "bg-background text-foreground font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-        title="Paint"
-      >
-        <Paintbrush className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
-        <span className="hidden @[280px]:inline truncate">Paint</span>
-      </button>
-      <button
-        onClick={() => {
-          setIsInpaintMode(true);
-          setEditMode('annotate');
-        }}
-        className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
-          editMode === 'annotate'
-            ? "bg-background text-foreground font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-        title="Annotate"
-      >
-        <Pencil className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
-        <span className="hidden @[280px]:inline truncate">Annotate</span>
-      </button>
-      <button
-        onClick={() => {
-          setIsInpaintMode(true);
-          setEditMode('reposition');
-        }}
-        className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
-          editMode === 'reposition'
-            ? "bg-background text-foreground font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-        title="Move"
-      >
-        <Move className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
-        <span className="hidden @[280px]:inline truncate">Move</span>
-      </button>
-      <button
-        onClick={() => {
-          setIsInpaintMode(true);
-          setEditMode('img2img');
-        }}
-        className={cn(
-          "flex-1 min-w-0 flex items-center justify-center transition-all rounded overflow-hidden p-2 @[280px]:gap-1 @[280px]:px-3 @[280px]:py-1.5 @[280px]:text-sm",
-          editMode === 'img2img'
-            ? "bg-background text-foreground font-medium shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-        title="Img2Img"
-      >
-        <Wand2 className="h-4 w-4 @[280px]:h-3.5 @[280px]:w-3.5 flex-shrink-0" />
-        <span className="hidden @[280px]:inline truncate">Img2Img</span>
-      </button>
-    </div>
+    <ModeSelector
+      items={modeSelectorItems}
+      activeId={editMode}
+    />
   );
 
   return (

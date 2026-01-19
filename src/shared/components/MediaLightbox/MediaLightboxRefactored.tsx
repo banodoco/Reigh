@@ -2292,10 +2292,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   return (
     <TooltipProvider delayDuration={500}>
-      <DialogPrimitive.Root 
-        open={true} 
-        // Always modal to block body scroll and trap focus
-        modal={true}
+      <DialogPrimitive.Root
+        open={true}
+        // Modal mode blocks body scroll and traps focus
+        // Disable modal when tasks pane is open so it can scroll
+        modal={!(effectiveTasksPaneOpen && isTabletOrLarger)}
         onOpenChange={() => {
           // Prevent automatic closing - we handle all closing manually
         }}
@@ -2308,14 +2309,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
               "p-0 border-none shadow-none"
             )}
-            style={{
-              top: 0,
-              left: 0,
-              bottom: 0,
-              // Leave space for tasks pane on tablet/desktop
-              right: effectiveTasksPaneOpen && isTabletOrLarger ? `${effectiveTasksPaneWidth}px` : 0,
-              transition: 'right 300ms ease',
-            }}
             onPointerDown={(e) => {
               // Track where the pointer down started
               pointerDownTargetRef.current = e.target;
