@@ -1346,7 +1346,10 @@ const JoinClipsPage: React.FC = () => {
         replace_mode: replaceMode,
         keep_bridging_images: keepBridgingImages ?? false,
         enhance_prompt: enhancePrompt,
-        model: joinSettings.settings.model || 'wan_2_2_vace_lightning_baseline_2_2_2',
+        // Validate model name - fix old settings that have truncated model names
+        model: (joinSettings.settings.model?.startsWith('wan_2_2_')
+          ? joinSettings.settings.model
+          : 'wan_2_2_vace_lightning_baseline_2_2_2'),
         num_inference_steps: joinSettings.settings.numInferenceSteps || 6,
         guidance_scale: joinSettings.settings.guidanceScale || 3.0,
         seed: joinSettings.settings.seed || -1,

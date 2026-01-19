@@ -603,7 +603,10 @@ export function InlineEditVideoView({
         portions_to_regenerate: portionFrameRanges,
         
         // Model settings
-        model: editSettings.settings.model || 'wan_2_2_vace_lightning_baseline_2_2_2',
+        // Validate model name - fix old settings that have truncated model names
+        model: (editSettings.settings.model?.startsWith('wan_2_2_')
+          ? editSettings.settings.model
+          : 'wan_2_2_vace_lightning_baseline_2_2_2'),
         resolution: resolutionTuple || [902, 508],
         seed: editSettings.settings.seed ?? -1,
         
