@@ -627,10 +627,16 @@ export const smartPreloadImages = (
       return;
     }
     
-    const imageUrl = config.thumbnailOnlyPreload ? 
-      getDisplayUrl(img.thumbUrl || img.url) : 
+    const imageUrl = config.thumbnailOnlyPreload ?
+      getDisplayUrl(img.thumbUrl || img.url) :
       getDisplayUrl(img.url);
-    
+
+    // Skip known-invalid thumbnail URLs (join-clips outputs store non-existent _joined_frame.jpg paths)
+    if (imageUrl.includes('_joined_frame.jpg')) {
+      console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Skipping invalid thumbnail URL:`, img.id);
+      return;
+    }
+
     // Progressive delay: first 3 images immediate, then 60ms delays for adjacent page preloading
     // Use slightly slower timing than current page (25ms) to avoid resource conflicts
     const progressiveDelay = idx < 3 ? 0 : (idx - 2) * 60;
@@ -733,10 +739,15 @@ export const preloadClientSidePages = (
       // Check if this preload is still valid
       if (operations.currentPageId !== pageId) return;
       
-      const imageUrl = config.thumbnailOnlyPreload ? 
-        getDisplayUrl(image.thumbUrl || image.url) : 
+      const imageUrl = config.thumbnailOnlyPreload ?
+        getDisplayUrl(image.thumbUrl || image.url) :
         getDisplayUrl(image.url);
-      
+
+      // Skip known-invalid thumbnail URLs (join-clips outputs store non-existent _joined_frame.jpg paths)
+      if (imageUrl.includes('_joined_frame.jpg')) {
+        return;
+      }
+
       // Progressive delay for client-side preloading too: first 3 immediate, then 60ms delays
       // Use slightly slower timing than current page (25ms) to avoid resource conflicts
       const progressiveDelay = idx < 3 ? 0 : (idx - 2) * 60;
