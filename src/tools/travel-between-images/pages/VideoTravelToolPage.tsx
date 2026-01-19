@@ -36,7 +36,7 @@ import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidati
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
-import { useGenerations } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
@@ -288,6 +288,7 @@ const VideoTravelToolPage: React.FC = () => {
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const updateShotNameMutation = useUpdateShotName();
   const addImageToShotMutation = useAddImageToShot();
+  const deleteGenerationMutation = useDeleteGeneration();
 
   // =============================================================================
   // SETTINGS HANDLERS (extracted to useVideoTravelSettingsHandlers hook)
@@ -1273,6 +1274,13 @@ const VideoTravelToolPage: React.FC = () => {
   });
 
   // ============================================================================
+  // DELETE GENERATION HANDLER
+  // ============================================================================
+  const handleDeleteGeneration = useCallback(async (id: string) => {
+    deleteGenerationMutation.mutate(id);
+  }, [deleteGenerationMutation]);
+
+  // ============================================================================
   // DROP HANDLERS FOR GENERATIONS FROM GENERATIONSPANE
   // (extracted to useVideoTravelDropHandlers hook)
   // ============================================================================
@@ -1576,6 +1584,10 @@ const VideoTravelToolPage: React.FC = () => {
                 targetShotNameForButtonTooltip: targetShotInfo.targetShotNameForButtonTooltip,
                 handleAddVideoToTargetShot,
                 handleAddVideoToTargetShotWithoutPosition,
+              }}
+              deletion={{
+                onDelete: handleDeleteGeneration,
+                isDeleting: deleteGenerationMutation.isPending,
               }}
               videosViewJustEnabled={videosViewJustEnabled}
             />

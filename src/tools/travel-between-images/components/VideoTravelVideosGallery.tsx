@@ -51,10 +51,16 @@ export interface AddToShotProps {
   handleAddVideoToTargetShotWithoutPosition: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
 }
 
+export interface DeleteProps {
+  onDelete?: (id: string) => void;
+  isDeleting?: boolean;
+}
+
 export interface VideoTravelVideosGalleryProps {
   query: VideosQueryProps;
   filters: VideosFiltersProps;
   addToShot: AddToShotProps;
+  deletion?: DeleteProps;
   /** Flag to show skeleton during view transition */
   videosViewJustEnabled: boolean;
 }
@@ -67,6 +73,7 @@ export const VideoTravelVideosGallery: React.FC<VideoTravelVideosGalleryProps> =
   query,
   filters,
   addToShot,
+  deletion,
   videosViewJustEnabled,
 }) => {
   const {
@@ -187,6 +194,8 @@ export const VideoTravelVideosGallery: React.FC<VideoTravelVideosGalleryProps> =
           onStarredFilterChange={(val) => { setVideoStarredOnly(val); setVideoPage(1); }}
           columnsPerRow={3}
           showShare={false}
+          onDelete={deletion?.onDelete}
+          isDeleting={deletion?.isDeleting}
         />
       </div>
     </div>
