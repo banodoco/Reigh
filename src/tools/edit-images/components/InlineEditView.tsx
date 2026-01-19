@@ -85,7 +85,11 @@ export function InlineEditView({ media, onClose, onNavigateToGeneration }: Inlin
   const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, loraMode, setLoraMode, customLoraUrl, setCustomLoraUrl, editModeLoRAs } = useEditModeLoRAs();
 
   // Variants hook - moved early so activeVariantId is available for other hooks
-  const actualGenerationId = (media as any).generation_id || media.id;
+  // Detect if this is a shot_generation record (has shotImageEntryId or shot_generation_id matching media.id)
+  const isShotGenerationRecord = (media as any).shotImageEntryId === media.id ||
+                                  (media as any).shot_generation_id === media.id;
+  const actualGenerationId = (media as any).generation_id ||
+                              (!isShotGenerationRecord ? media.id : null);
 
   // Edit settings persistence - for img2img strength, enablePromptExpansion, and editMode
   const editSettingsPersistence = useEditSettingsPersistence({
