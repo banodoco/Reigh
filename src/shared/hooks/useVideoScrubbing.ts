@@ -255,7 +255,18 @@ export function useVideoScrubbing(
         const currentVideo = getVideo();
         if (currentVideo && isHoveringRef.current) {
           setScrubberVisible(false);
-          currentVideo.play().catch(() => {});
+          console.log('[useVideoScrubbing] 🎬 Calling play()', {
+            paused: currentVideo.paused,
+            readyState: currentVideo.readyState,
+            src: currentVideo.src?.substring(currentVideo.src.lastIndexOf('/') + 1)
+          });
+          currentVideo.play()
+            .then(() => {
+              console.log('[useVideoScrubbing] ✅ play() resolved, paused:', currentVideo.paused);
+            })
+            .catch((err) => {
+              console.log('[useVideoScrubbing] ❌ play() rejected:', err);
+            });
           setIsPlaying(true);
           onPlayStart?.();
         }
