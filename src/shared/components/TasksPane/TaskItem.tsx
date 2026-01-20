@@ -341,10 +341,12 @@ const TaskItem: React.FC<TaskItemProps> = ({
     "border-zinc-600 hover:border-zinc-400"
   );
 
-  // Get variant name for display
-  const variantName = taskInfo.isVideoTask 
-    ? videoOutputs?.[0]?.name 
-    : generationData?.name;
+  // Get variant name for display (hide for edit tasks since "Edit: ..." is redundant with task type)
+  const variantName = IMAGE_EDIT_TASK_TYPES.includes(task.taskType as any)
+    ? undefined
+    : taskInfo.isVideoTask
+      ? videoOutputs?.[0]?.name
+      : generationData?.name;
 
   const taskItemContent = (
     <div 

@@ -18,6 +18,7 @@ export const KNOWN_IMAGE_TASK_TYPES = [
   'qwen_image',
   'qwen_image_2512',
   'z_image_turbo',
+  'z_image_turbo_i2i',
   'qwen_image_edit',
   'image_generation',
   'magic_edit',
@@ -30,6 +31,7 @@ export const KNOWN_IMAGE_TASK_TYPES = [
 // Image edit task types - these don't show prompt in task list
 // (the edit instruction is less useful to display than generation prompts)
 export const IMAGE_EDIT_TASK_TYPES = [
+  'z_image_turbo_i2i',
   'image_inpaint',
   'qwen_image_edit',
   'magic_edit',
