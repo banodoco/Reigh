@@ -413,7 +413,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     const handlePause = () => {
       if (process.env.NODE_ENV === 'development') {
         const autoplayContext = getAutoplayContext(isMobile);
-        
+
         console.log('[AutoplayDebugger:GALLERY] ⏸️ Video paused', {
           videoSrc: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
           pauseTrigger: isHoveringRef.current ? 'hover-end' : 'programmatic',
@@ -428,6 +428,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
           },
           timestamp: Date.now()
         });
+        console.trace('[AutoplayDebugger] Pause stack trace');
       }
       // Reset user-initiated flag on pause so future autoplays are blocked again
       userInitiatedPlayRef.current = false;
