@@ -40,6 +40,7 @@ const HARDCODED_TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
   animate_character: { isVisible: true, displayName: 'Animate Character', category: 'generation' },
   individual_travel_segment: { isVisible: true, displayName: 'Travel Segment', category: 'generation' },
   image_inpaint: { isVisible: true, displayName: 'Image Inpaint', category: 'generation' },
+  annotated_image_edit: { isVisible: true, displayName: 'Annotated Edit', category: 'generation' },
   qwen_image: { isVisible: true, displayName: 'Qwen Image', category: 'generation' },
   qwen_image_2512: { isVisible: true, displayName: 'Qwen Image 2512', category: 'generation' },
   z_image_turbo: { isVisible: true, displayName: 'Z Image Turbo', category: 'generation' },
