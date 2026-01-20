@@ -80,21 +80,27 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   
   // Determine if we're in controlled mode (props provided from parent)
   const isControlled = controlledSelectedParentId !== undefined && onSelectedParentChange !== undefined;
-  
-  // Fetch segment outputs data - only needed if not in controlled mode
+
+  // Always fetch segment outputs data - needed for realtime updates when tasks complete
+  // Even in controlled mode, we need fresh data; controlled mode only affects selectedParentId state
   const hookResult = useSegmentOutputsForShot(
-    isControlled ? null : shotId, // Don't fetch if controlled
-    isControlled ? null : projectId,
+    shotId,
+    projectId,
     undefined,
     controlledSelectedParentId,
     onSelectedParentChange
   );
-  
-  // Use props if controlled, otherwise use hook result
-  const parentGenerations = parentGenerationsFromProps || hookResult.parentGenerations;
+
+  // Use hook result for parentGenerations (always fresh from cache/realtime)
+  // Only use props as fallback if hook hasn't loaded yet
+  const parentGenerations = hookResult.parentGenerations.length > 0
+    ? hookResult.parentGenerations
+    : (parentGenerationsFromProps || []);
   const selectedParentId = isControlled ? controlledSelectedParentId : hookResult.selectedParentId;
   const setSelectedParentId = isControlled ? onSelectedParentChange! : hookResult.setSelectedParentId;
-  const segmentProgress = segmentProgressFromProps || hookResult.segmentProgress;
+  const segmentProgress = hookResult.segmentProgress.total > 0
+    ? hookResult.segmentProgress
+    : (segmentProgressFromProps || hookResult.segmentProgress);
   const isLoading = hookResult.isLoading;
   
   // Derive selectedParent from parentGenerations (works in both controlled and uncontrolled mode)
