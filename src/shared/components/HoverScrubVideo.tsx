@@ -130,19 +130,22 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const [hasLoadedOnDemand, setHasLoadedOnDemand] = useState(false);
 
   // Use hook's refs/state or fall back to local
-  const videoRef = localVideoRef;
   const containerRef = scrubbing.containerRef;
   const duration = scrubbing.duration;
   const scrubberPosition = scrubbing.scrubberPosition;
   const scrubberVisible = scrubbing.scrubberVisible;
   const isHoveringRef = useRef(false); // Keep for mobile autoplay prevention logic
 
-  // Connect video element to scrubbing hook
-  useEffect(() => {
-    if (videoRef.current && scrubbingEnabled) {
-      scrubbing.setVideoElement(videoRef.current);
+  // Ref callback to connect video element to scrubbing hook immediately when mounted
+  const videoRefCallback = useCallback((video: HTMLVideoElement | null) => {
+    localVideoRef.current = video;
+    if (video && scrubbingEnabled) {
+      scrubbing.setVideoElement(video);
     }
   }, [scrubbingEnabled, scrubbing.setVideoElement]);
+
+  // Also alias for easier access
+  const videoRef = localVideoRef;
 
   // When posterOnlyUntilClick is enabled, defer activation until interaction
   const [isActivated, setIsActivated] = useState<boolean>(() => !posterOnlyUntilClick);
@@ -521,7 +524,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       {...rest}
     >
       <video
-        ref={videoRef}
+        ref={videoRefCallback}
         src={hasValidVideoSrc ? displaySrc : undefined}
         poster={poster ? getDisplayUrl(poster) : undefined}
         preload={thumbnailMode ? 'none' : (isMobile ? 'metadata' : preloadProp)}
