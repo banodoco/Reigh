@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { getDisplayUrl, stripQueryParameters } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useVideoScrubbing } from '@/shared/hooks/useVideoScrubbing';
 import { getAutoplayContext, logAutoplayAttempt, trackVideoStates } from '@/shared/utils/autoplayDebugger';
 
 interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onTouchEnd'> {
@@ -108,24 +109,44 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   onLoadedData,
   ...rest
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isHoveringRef = useRef(false);
+  const isMobile = useIsMobile();
+
+  // Determine if scrubbing should be enabled
+  const scrubbingEnabled = !isMobile && !disableScrubbing && !thumbnailMode && !autoplayOnHover;
+
+  // Use the shared scrubbing hook for core scrubbing behavior
+  const scrubbing = useVideoScrubbing({
+    enabled: scrubbingEnabled,
+    playOnStopScrubbing: true,
+    playDelay: 400,
+    resetOnLeave: true,
+  });
+
+  // Additional refs for features not covered by the hook
+  const localVideoRef = useRef<HTMLVideoElement>(null);
   // Track whether a play was explicitly initiated by the user
   const userInitiatedPlayRef = useRef(false);
-  // Track the last mouse X position for re-calculating scrubber when metadata loads
-  const lastMouseXRef = useRef<number | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [duration, setDuration] = useState(0);
-  const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
-  const [scrubberVisible, setScrubberVisible] = useState(true);
   const [hasLoadedOnDemand, setHasLoadedOnDemand] = useState(false);
+
+  // Use hook's refs/state or fall back to local
+  const videoRef = localVideoRef;
+  const containerRef = scrubbing.containerRef;
+  const duration = scrubbing.duration;
+  const scrubberPosition = scrubbing.scrubberPosition;
+  const scrubberVisible = scrubbing.scrubberVisible;
+  const isHoveringRef = useRef(false); // Keep for mobile autoplay prevention logic
+
+  // Connect video element to scrubbing hook
+  useEffect(() => {
+    if (videoRef.current && scrubbingEnabled) {
+      scrubbing.setVideoElement(videoRef.current);
+    }
+  }, [scrubbingEnabled, scrubbing.setVideoElement]);
 
   // When posterOnlyUntilClick is enabled, defer activation until interaction
   const [isActivated, setIsActivated] = useState<boolean>(() => !posterOnlyUntilClick);
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
-  const isMobile = useIsMobile();
   
   // Safely handle potentially missing or placeholder sources
   const displaySrc = getDisplayUrl(src);
@@ -160,22 +181,16 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     // Skip hover interactions on mobile devices or when scrubbing is disabled
-    if (isMobile || thumbnailMode || disableScrubbing || autoplayOnHover) {
+    if (!scrubbingEnabled) {
       return;
     }
 
     if (loadOnDemand && !hasLoadedOnDemand) {
       setHasLoadedOnDemand(true);
-      // Fall through to allow scrubbing on the very first interaction
-      // effectively treating the first hover as the "load trigger" AND the "scrub trigger"
     }
 
-    if (!videoRef.current || !containerRef.current) {
-      return;
-    }
-
-    // Additional fallback: Prime video loading on mouse move if it still hasn't loaded
-    if (preloadProp === 'none' && videoRef.current.readyState < 2) {
+    // Prime video loading if needed
+    if (videoRef.current && preloadProp === 'none' && videoRef.current.readyState < 2) {
       if (process.env.NODE_ENV === 'development') {
         console.log('[VideoStallFix] Fallback priming video load on mouse move', {
           src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
@@ -192,131 +207,72 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
     }
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-
-    // Store the mouse X position for re-calculating when metadata loads
-    lastMouseXRef.current = mouseX;
-
-    const progress = Math.max(0, Math.min(1, mouseX / rect.width));
-
-    // Always show scrubber position (percentage-based) even if duration isn't ready yet
-    setScrubberPosition(progress * 100);
-    setScrubberVisible(true);
-
-    if (!Number.isFinite(duration) || duration <= 0) {
-      // Force load if video is stuck in HAVE_NOTHING state, even if preload is metadata
-      // This fixes cases where the browser suspended loading or network is slow
-      if (videoRef.current && videoRef.current.readyState === 0) {
-        videoRef.current.load();
-      }
-      // Scrubber is shown but we can't seek yet - will seek when metadata loads
-      return;
-    }
-
-    const targetTime = progress * duration;
-
-    // Validate targetTime before setting currentTime
-    if (!Number.isFinite(targetTime)) {
-      return;
-    }
-
-    // Pause the video and seek to the position
-    videoRef.current.pause();
-    videoRef.current.currentTime = targetTime;
-
-    // Clear existing timeout
-    if (mouseMoveTimeoutRef.current) {
-      clearTimeout(mouseMoveTimeoutRef.current);
-      mouseMoveTimeoutRef.current = null;
-    }
-
-    // Start playing from current position after user stops scrubbing (but stays hovering)
-    mouseMoveTimeoutRef.current = setTimeout(() => {
-      if (videoRef.current && isHoveringRef.current) {
-        // Hide scrubber when playing
-        setScrubberVisible(false);
-        videoRef.current.play().catch(() => {
-          // Ignore autoplay errors
-        });
-      }
-    }, 400); // 400ms delay before auto-play starts
-  }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover, preloadProp, src]);
+    // Delegate to the hook's handler for actual scrubbing
+    scrubbing.containerProps.onMouseMove(e);
+  }, [scrubbingEnabled, loadOnDemand, hasLoadedOnDemand, preloadProp, src, scrubbing.containerProps]);
 
   const handleMouseEnter = useCallback(() => {
-    // Skip hover interactions on mobile devices or when scrubbing is disabled
-    if (isMobile || disableScrubbing) {
-      return;
-    }
-
-    if (autoplayOnHover) {
+    // Handle autoplayOnHover mode separately
+    if (autoplayOnHover && !isMobile && !disableScrubbing) {
       videoRef.current?.play();
       return;
     }
 
+    // Skip if scrubbing not enabled
+    if (!scrubbingEnabled) {
+      return;
+    }
+
     isHoveringRef.current = true;
-    if (videoRef.current) {
-      // Fix for video stalling: Prime video loading on first hover
-      // This ensures the video starts loading from a user interaction if it hasn't started yet
-      // Removed check for preloadProp === 'none' to handle stalled metadata loads too
-      if (videoRef.current.readyState === 0) {
+
+    // Prime video loading if needed
+    if (videoRef.current && videoRef.current.readyState === 0) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[VideoStallFix] Priming video load on hover (readyState=0)', {
+          src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
+          preloadProp,
+          timestamp: Date.now()
+        });
+      }
+      try {
+        videoRef.current.load();
+      } catch (e) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[VideoStallFix] Priming video load on hover (readyState=0)', {
-            src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
-            preloadProp,
-            timestamp: Date.now()
-          });
-        }
-        try {
-          videoRef.current.load();
-        } catch (e) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[VideoStallFix] Failed to prime video load on hover', e);
-          }
+          console.warn('[VideoStallFix] Failed to prime video load on hover', e);
         }
       }
-      
-      // Don't start playing immediately, wait for mouse movement or timeout
-      videoRef.current.pause();
     }
-  }, [isMobile, disableScrubbing, autoplayOnHover, preloadProp, src]);
+
+    // Delegate to the hook's handler
+    scrubbing.containerProps.onMouseEnter();
+  }, [scrubbingEnabled, autoplayOnHover, isMobile, disableScrubbing, preloadProp, src, scrubbing.containerProps]);
 
   const handleMouseLeave = useCallback(() => {
-    // Skip hover interactions on mobile devices or when scrubbing is disabled
-    if (isMobile || disableScrubbing) {
-      if (isMobile) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[MobileVideoAutoplay] Mouse leave detected on mobile (should be ignored)', {
-            src,
-            timestamp: Date.now()
-          });
-        }
+    // Handle autoplayOnHover mode separately
+    if (autoplayOnHover && !isMobile && !disableScrubbing) {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
       }
       return;
     }
 
-    if (autoplayOnHover) {
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.currentTime = 0; // Reset to beginning
+    // Skip if scrubbing not enabled
+    if (!scrubbingEnabled) {
+      if (isMobile && process.env.NODE_ENV === 'development') {
+        console.log('[MobileVideoAutoplay] Mouse leave detected on mobile (should be ignored)', {
+          src,
+          timestamp: Date.now()
+        });
       }
       return;
     }
-    
+
     isHoveringRef.current = false;
-    lastMouseXRef.current = null; // Clear stored mouse position
-    setScrubberPosition(null); // Hide scrubber
-    setScrubberVisible(true); // Reset visibility for next hover
-    if (mouseMoveTimeoutRef.current) {
-      clearTimeout(mouseMoveTimeoutRef.current);
-      mouseMoveTimeoutRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.pause();
-      // Reset to beginning when mouse leaves
-      videoRef.current.currentTime = 0;
-    }
-  }, [isMobile, disableScrubbing, autoplayOnHover]);
+
+    // Delegate to the hook's handler
+    scrubbing.containerProps.onMouseLeave();
+  }, [scrubbingEnabled, autoplayOnHover, isMobile, disableScrubbing, src, scrubbing.containerProps]);
 
   const handleSpeedChange = (speed: number) => {
     if (videoRef.current) {
@@ -326,76 +282,47 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   };
 
   const handleLoadedMetadata = useCallback(() => {
-    if (videoRef.current) {
-      const newDuration = videoRef.current.duration;
+    // Let the hook handle duration and scrubber recalculation
+    scrubbing.videoProps.onLoadedMetadata();
 
-      // Only set duration if valid
-      if (!Number.isFinite(newDuration) || newDuration <= 0) {
-        return;
+    if (!videoRef.current) return;
+
+    // Ensure video is paused first to prevent autoplay
+    if (!videoRef.current.paused) {
+      if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
+        console.warn('[MobileVideoAutoplay] Video was playing during metadata load, pausing it', {
+          isMobile,
+          videoSrc: videoRef.current.src,
+          timestamp: Date.now()
+        });
       }
+      videoRef.current.pause();
+    }
 
-      setDuration(newDuration);
-      
-      // FIX: Recalculate scrubber position if user was hovering while metadata was loading
-      // This fixes the issue where the scrubber doesn't appear on first hover of the first video
-      if (!isMobile && !disableScrubbing && !thumbnailMode && isHoveringRef.current && lastMouseXRef.current !== null && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const progress = Math.max(0, Math.min(1, lastMouseXRef.current / rect.width));
-        const targetTime = progress * newDuration;
-
-        // Validate targetTime
-        if (!Number.isFinite(targetTime)) {
-          return;
-        }
-
-        setScrubberPosition(progress * 100);
-        setScrubberVisible(true);
-
-        // Also seek to the position
-        if (videoRef.current) {
-          videoRef.current.pause();
-          videoRef.current.currentTime = targetTime;
-        }
+    // Set to first frame to show as poster - but only for gallery thumbnails, not lightbox
+    // IMPORTANT: Skip this if we already have a poster to avoid "weird reset" flashes
+    if (!disableScrubbing && videoRef.current.currentTime === 0 && !poster) {
+      videoRef.current.currentTime = 0.001;
+      if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
+        console.log('[MobileVideoAutoplay] Set currentTime to show first frame (no poster present)', {
+          isMobile,
+          disableScrubbing,
+          newCurrentTime: videoRef.current.currentTime,
+          timestamp: Date.now()
+        });
       }
-      
-      // Ensure video is paused first to prevent autoplay
-      if (!videoRef.current.paused) {
-        if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
-          console.warn('[MobileVideoAutoplay] Video was playing during metadata load, pausing it', {
-            isMobile,
-            videoSrc: videoRef.current.src,
-            timestamp: Date.now()
-          });
-        }
-        videoRef.current.pause();
-      }
-      
-      // Set to first frame to show as poster - but only for gallery thumbnails, not lightbox
-      // IMPORTANT: Skip this if we already have a poster to avoid "weird reset" flashes
-      if (!disableScrubbing && videoRef.current.currentTime === 0 && !poster) {
-        // Very small seek to ensure first frame is visible
-        videoRef.current.currentTime = 0.001;
-        if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
-          console.log('[MobileVideoAutoplay] Set currentTime to show first frame (no poster present)', {
-            isMobile,
-            disableScrubbing,
-            newCurrentTime: videoRef.current.currentTime,
-            timestamp: Date.now()
-          });
-        }
-      } else if (disableScrubbing || poster) {
-        if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
-          console.log(`[MobileVideoAutoplay] Skipping currentTime manipulation (${disableScrubbing ? 'lightbox mode' : 'poster present'})`, {
-            isMobile,
-            disableScrubbing,
-            hasPoster: !!poster,
-            currentTime: videoRef.current.currentTime,
-            timestamp: Date.now()
-          });
-        }
+    } else if (disableScrubbing || poster) {
+      if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
+        console.log(`[MobileVideoAutoplay] Skipping currentTime manipulation (${disableScrubbing ? 'lightbox mode' : 'poster present'})`, {
+          isMobile,
+          disableScrubbing,
+          hasPoster: !!poster,
+          currentTime: videoRef.current.currentTime,
+          timestamp: Date.now()
+        });
       }
     }
-  }, [isMobile, disableScrubbing]);
+  }, [isMobile, disableScrubbing, thumbnailMode, poster, scrubbing.videoProps]);
 
   useEffect(() => {
     if (thumbnailMode) {
@@ -432,7 +359,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         // Only reset currentTime for gallery thumbnails
         video.currentTime = 0;
       }
-      setDuration(0);
+      // Reset scrubbing state for new source
+      scrubbing.reset();
     }
 
     // Add event listeners to track unexpected play events
@@ -536,12 +464,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         video.removeEventListener('seeked', handleSeeked);
         video.pause();
       }
-      if (mouseMoveTimeoutRef.current) {
-        clearTimeout(mouseMoveTimeoutRef.current);
-        mouseMoveTimeoutRef.current = null;
-      }
     };
-  }, [src, isMobile, disableScrubbing, thumbnailMode]);
+  }, [src, isMobile, disableScrubbing, thumbnailMode, scrubbing]);
 
   // Additional mobile protection - use Intersection Observer to detect when video becomes visible
   // Only for gallery thumbnails, not lightbox
