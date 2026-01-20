@@ -470,7 +470,10 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         video.pause();
       }
     };
-  }, [src, isMobile, disableScrubbing, thumbnailMode, scrubbing]);
+  // NOTE: scrubbing.reset is a stable callback, no need to include the entire scrubbing object
+  // Including scrubbing would cause cleanup to run on every state change (e.g., isPlaying),
+  // which would pause the video immediately after play() is called
+  }, [src, isMobile, disableScrubbing, thumbnailMode]);
 
   // Additional mobile protection - use Intersection Observer to detect when video becomes visible
   // Only for gallery thumbnails, not lightbox
@@ -672,7 +675,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
       {/* Scrubber Line - Desktop only and when scrubbing is enabled */}
       {!isMobile && !disableScrubbing && !thumbnailMode && isActivated && scrubberPosition !== null && (
-        <div 
+        <div
           className={cn(
             "absolute top-0 bottom-0 w-0.5 bg-white shadow-lg z-30 pointer-events-none transition-opacity duration-300",
             scrubberVisible ? "opacity-100" : "opacity-0"
@@ -681,13 +684,23 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         >
           {/* Scrubber handle/dot */}
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg border-2 border-black/20" />
-          
+
           {/* Time indicator */}
           <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
             {Number.isFinite(duration) && duration > 0 && (
               `${Math.floor((scrubberPosition / 100) * duration)}s / ${Math.floor(duration)}s`
             )}
           </div>
+        </div>
+      )}
+
+      {/* Progress bar at bottom - shows playback position during hover */}
+      {!isMobile && !disableScrubbing && !thumbnailMode && isActivated && scrubberPosition !== null && (
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30 z-20 pointer-events-none">
+          <div
+            className="h-full bg-primary transition-all duration-75"
+            style={{ width: `${scrubberPosition}%` }}
+          />
         </div>
       )}
 

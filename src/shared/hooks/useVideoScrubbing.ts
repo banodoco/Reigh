@@ -255,18 +255,9 @@ export function useVideoScrubbing(
         const currentVideo = getVideo();
         if (currentVideo && isHoveringRef.current) {
           setScrubberVisible(false);
-          console.log('[useVideoScrubbing] 🎬 Calling play()', {
-            paused: currentVideo.paused,
-            readyState: currentVideo.readyState,
-            src: currentVideo.src?.substring(currentVideo.src.lastIndexOf('/') + 1)
+          currentVideo.play().catch(() => {
+            // Ignore autoplay errors
           });
-          currentVideo.play()
-            .then(() => {
-              console.log('[useVideoScrubbing] ✅ play() resolved, paused:', currentVideo.paused);
-            })
-            .catch((err) => {
-              console.log('[useVideoScrubbing] ❌ play() rejected:', err);
-            });
           setIsPlaying(true);
           onPlayStart?.();
         }
@@ -383,7 +374,13 @@ export function useVideoScrubbing(
 
       setCurrentTime(time);
       setProgress(prog);
-      setScrubberPosition(prog * 100);
+
+      // Only update scrubber position if still hovering
+      // (avoids resetting it after mouse leave triggers currentTime = 0)
+      if (isHoveringRef.current) {
+        setScrubberPosition(prog * 100);
+      }
+
       onProgressChange?.(prog, time);
     };
 
