@@ -225,6 +225,36 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     }
   }, [shotId, isLoadingShotStructure, shotStructureData]);
 
+  // Fetch shot's batch generation settings to use as defaults
+  // This ensures the modal uses batch settings, not the selected video's params
+  const { data: shotBatchSettings } = useQuery({
+    queryKey: ['shot-batch-settings', shotId],
+    queryFn: async () => {
+      if (!shotId) return null;
+      const { data, error } = await supabase
+        .from('shots')
+        .select('settings')
+        .eq('id', shotId)
+        .single();
+      if (error) {
+        console.error('[BatchSettingsFix] Shot batch settings query failed:', error);
+        return null;
+      }
+      const allSettings = data?.settings as Record<string, any>;
+      const batchSettings = allSettings?.['travel-between-images'] ?? {};
+      console.log('[BatchSettingsFix] Shot batch settings loaded:', {
+        shotId: shotId?.substring(0, 8),
+        amountOfMotion: batchSettings.amountOfMotion,
+        motionMode: batchSettings.motionMode,
+        hasLoras: !!(batchSettings.selectedLoras?.length > 0),
+        hasPhaseConfig: !!batchSettings.phaseConfig,
+      });
+      return batchSettings;
+    },
+    enabled: !!shotId,
+    staleTime: 30000,
+  });
+
   // Fetch per-pair metadata from shot_generations (prompt overrides, etc.)
   // This is the source of truth for pair-specific settings, shared with SegmentSettingsModal
   const { data: pairMetadata, refetch: refetchPairMetadata, isLoading: isLoadingPairMetadata } = useQuery({
@@ -262,6 +292,14 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
       pairPrompt: pairMetadata?.pair_prompt ?? '(not loaded)',
     });
   }, [pairShotGenerationId, isLoadingPairMetadata, pairMetadata]);
+
+  // Track whether batch settings have been applied (to avoid re-applying on every render)
+  const batchSettingsAppliedRef = React.useRef(false);
+
+  // Reset batch settings flag when shot/pair changes (so batch settings are re-applied)
+  useEffect(() => {
+    batchSettingsAppliedRef.current = false;
+  }, [shotId, pairShotGenerationId]);
 
   const { toast } = useToast();
 
@@ -368,6 +406,34 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     // Track overrides from pair metadata
     if (Object.keys(pairUserOverrides).length > 0) {
       setUserOverrides((prev) => ({ ...prev, ...pairUserOverrides }));
+
+      // Also restore motion/LoRA/phase state variables from user overrides
+      // (These should override batch settings if user has previously customized them)
+      if (pairUserOverrides.motion_mode !== undefined) {
+        setMotionMode(pairUserOverrides.motion_mode);
+      }
+      if (pairUserOverrides.amount_of_motion !== undefined) {
+        setAmountOfMotion(pairUserOverrides.amount_of_motion);
+      }
+      if (pairUserOverrides.phase_config !== undefined) {
+        setPhaseConfig(pairUserOverrides.phase_config);
+      }
+      if (pairUserOverrides.selected_phase_preset_id !== undefined) {
+        setSelectedPhasePresetId(pairUserOverrides.selected_phase_preset_id);
+      }
+      if (pairUserOverrides.additional_loras !== undefined) {
+        const lorasObj = pairUserOverrides.additional_loras;
+        const restored: ActiveLora[] = Object.entries(lorasObj).map(([url, strength]) => {
+          const filename = url.split('/').pop()?.replace('.safetensors', '') || url;
+          return {
+            id: url,
+            name: filename,
+            path: url,
+            strength: typeof strength === 'number' ? strength : 1.0,
+          };
+        });
+        setSelectedLoras(restored);
+      }
     }
   }, [pairMetadata, pairShotGenerationId, setParams]);
 
@@ -633,6 +699,69 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     });
   });
 
+  // Apply batch settings as defaults when they load (instead of using parent video's params)
+  // This ensures modal/lightbox always uses shot's batch settings, not the selected video's params
+  // NOTE: Skip fields that already have user overrides from pair metadata
+  useEffect(() => {
+    if (!shotBatchSettings || batchSettingsAppliedRef.current) return;
+
+    // Mark as applied so we don't re-apply on subsequent renders
+    batchSettingsAppliedRef.current = true;
+
+    // Check for existing user overrides from pair metadata (should take precedence)
+    const existingOverrides = pairMetadata?.user_overrides || {};
+
+    console.log('[BatchSettingsFix] Applying batch settings as defaults:', {
+      amountOfMotion: shotBatchSettings.amountOfMotion,
+      motionMode: shotBatchSettings.motionMode,
+      hasLoras: !!(shotBatchSettings.selectedLoras?.length > 0),
+      lorasCount: shotBatchSettings.selectedLoras?.length ?? 0,
+      hasPhaseConfig: !!shotBatchSettings.phaseConfig,
+      existingOverrideKeys: Object.keys(existingOverrides),
+    });
+
+    // Apply motion mode from batch settings (unless user has override)
+    if (shotBatchSettings.motionMode !== undefined && !existingOverrides.motion_mode) {
+      setMotionMode(shotBatchSettings.motionMode);
+    }
+
+    // Apply amount of motion from batch settings (batch stores as 0-100, state is also 0-100)
+    if (shotBatchSettings.amountOfMotion !== undefined && !existingOverrides.amount_of_motion) {
+      setAmountOfMotion(shotBatchSettings.amountOfMotion);
+    }
+
+    // Apply phase config from batch settings (unless user has override)
+    if (shotBatchSettings.phaseConfig !== undefined && !existingOverrides.phase_config) {
+      setPhaseConfig(shotBatchSettings.phaseConfig);
+    }
+
+    // Apply selected phase preset from batch settings (unless user has override)
+    if (shotBatchSettings.selectedPhasePresetId !== undefined && !existingOverrides.selected_phase_preset_id) {
+      setSelectedPhasePresetId(shotBatchSettings.selectedPhasePresetId);
+    }
+
+    // Apply LoRAs from batch settings (unless user has override)
+    if (Array.isArray(shotBatchSettings.selectedLoras) && shotBatchSettings.selectedLoras.length > 0 && !existingOverrides.additional_loras) {
+      const batchLoras: ActiveLora[] = shotBatchSettings.selectedLoras.map((lora: any) => {
+        const filename = (lora.path || lora.id || '').split('/').pop()?.replace('.safetensors', '') || lora.name || 'Unknown';
+        return {
+          id: lora.id || lora.path,
+          name: lora.name || filename,
+          path: lora.path,
+          strength: lora.strength ?? 1.0,
+        };
+      });
+      setSelectedLoras(batchLoras);
+
+      // Also update params.additional_loras for task submission
+      const loraObj: Record<string, number> = {};
+      batchLoras.forEach(l => {
+        loraObj[l.path || l.id] = l.strength;
+      });
+      setParams((prev: any) => ({ ...prev, additional_loras: loraObj }));
+    }
+  }, [shotBatchSettings, pairMetadata]);
+
   // Handle field changes (legacy - use updateOverride for new code)
   const handleChange = useCallback((field: string, value: any) => {
     setParams((prev: any) => ({ ...prev, [field]: value }));
@@ -728,53 +857,64 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     });
   }, [updateOverride, lorasToOverrideFormat]);
 
-  // Reset to defaults - clears all user overrides and restores variant/default settings
+  // Reset to defaults - clears all user overrides and restores BATCH settings (not video params)
   const handleResetToDefaults = useCallback(() => {
-    // Get normalized params WITHOUT user overrides (this is the "default" state)
-    const paramsWithoutOverrides = { ...initialParams };
-    delete paramsWithoutOverrides.user_overrides;
-    const normalized = getNormalizedParams(paramsWithoutOverrides, { segmentIndex });
-
-    // Reset params state
-    setParams(normalized);
+    // Clear user overrides
     setUserOverrides({});
     setIsDirty(false);
 
-    // Reset motion control state to defaults from normalized params
-    const orchestrator = normalized.orchestrator_details || {};
+    // Get normalized params for prompts/frames (keep video-specific values like num_frames, prompts)
+    const paramsWithoutOverrides = { ...initialParams };
+    delete paramsWithoutOverrides.user_overrides;
+    const normalized = getNormalizedParams(paramsWithoutOverrides, { segmentIndex });
+    setParams(normalized);
 
-    // Motion mode
-    if (orchestrator.advanced_mode || normalized.advanced_mode) {
-      setMotionMode('advanced');
+    // Reset motion/LoRA/phase to BATCH SETTINGS (not video params)
+    if (shotBatchSettings) {
+      console.log('[BatchSettingsFix] Resetting to batch settings:', {
+        motionMode: shotBatchSettings.motionMode,
+        amountOfMotion: shotBatchSettings.amountOfMotion,
+        hasLoras: !!(shotBatchSettings.selectedLoras?.length > 0),
+        hasPhaseConfig: !!shotBatchSettings.phaseConfig,
+      });
+
+      // Motion mode from batch
+      setMotionMode(shotBatchSettings.motionMode ?? 'basic');
+
+      // Amount of motion from batch (stored as 0-100)
+      setAmountOfMotion(shotBatchSettings.amountOfMotion ?? 50);
+
+      // Phase config from batch
+      setPhaseConfig(shotBatchSettings.phaseConfig ?? undefined);
+      setSelectedPhasePresetId(shotBatchSettings.selectedPhasePresetId ?? null);
+
+      // Random seed - default to true
+      setRandomSeed(shotBatchSettings.randomSeed ?? true);
+
+      // LoRAs from batch settings
+      if (Array.isArray(shotBatchSettings.selectedLoras) && shotBatchSettings.selectedLoras.length > 0) {
+        const batchLoras: ActiveLora[] = shotBatchSettings.selectedLoras.map((lora: any) => {
+          const filename = (lora.path || lora.id || '').split('/').pop()?.replace('.safetensors', '') || lora.name || 'Unknown';
+          return {
+            id: lora.id || lora.path,
+            name: lora.name || filename,
+            path: lora.path,
+            strength: lora.strength ?? 1.0,
+          };
+        });
+        setSelectedLoras(batchLoras);
+      } else {
+        setSelectedLoras([]);
+      }
     } else {
-      const savedMotionMode = orchestrator.motion_mode || normalized.motion_mode;
-      setMotionMode(savedMotionMode === 'advanced' ? 'advanced' : 'basic');
+      // Fallback if batch settings not loaded - use sensible defaults
+      setMotionMode('basic');
+      setAmountOfMotion(50);
+      setPhaseConfig(undefined);
+      setSelectedPhasePresetId(null);
+      setRandomSeed(true);
+      setSelectedLoras([]);
     }
-
-    // Amount of motion
-    const rawMotion = normalized.amount_of_motion ?? orchestrator.amount_of_motion ?? 0.5;
-    setAmountOfMotion(Math.round(rawMotion * 100));
-
-    // Phase config
-    setPhaseConfig(orchestrator.phase_config || normalized.phase_config || undefined);
-    setSelectedPhasePresetId(orchestrator.selected_phase_preset_id || normalized.selected_phase_preset_id || null);
-
-    // Random seed
-    const savedRandomSeed = orchestrator.random_seed ?? normalized.random_seed;
-    setRandomSeed(savedRandomSeed !== undefined ? savedRandomSeed : true);
-
-    // LoRAs
-    const lorasObj = normalized.additional_loras || orchestrator.additional_loras || {};
-    const restoredLoras: ActiveLora[] = Object.entries(lorasObj).map(([url, strength]) => {
-      const filename = url.split('/').pop()?.replace('.safetensors', '') || url;
-      return {
-        id: url,
-        name: filename,
-        path: url,
-        strength: typeof strength === 'number' ? strength : 1.0,
-      };
-    });
-    setSelectedLoras(restoredLoras);
 
     // Clear any pending save and save the reset to DB
     if (saveTimeoutRef.current) {
@@ -783,7 +923,7 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
     }
     pendingOverridesRef.current = null;
     saveToPairMetadata(null);
-  }, [initialParams, segmentIndex, saveToPairMetadata]);
+  }, [initialParams, segmentIndex, shotBatchSettings, saveToPairMetadata]);
 
   // Handle segment regeneration
   const handleRegenerateSegment = useCallback(async () => {
@@ -1596,13 +1736,13 @@ export const SegmentRegenerateControls: React.FC<SegmentRegenerateControlsProps>
         )}
       </Button>
 
-      {/* Reset to variant defaults */}
+      {/* Reset to batch defaults */}
       <button
         type="button"
         onClick={handleResetToDefaults}
         className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
-        Reset to variant defaults
+        Reset to batch defaults
       </button>
 
       {/* Warning if missing images */}
