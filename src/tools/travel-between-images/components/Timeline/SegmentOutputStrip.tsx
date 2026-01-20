@@ -409,23 +409,22 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
 
   return (
     <div className="w-full relative">
-      {/* Scrubbing Preview Area - shows above the strip when scrubbing a segment */}
-      <div
-        className={cn(
-          "flex justify-center mb-2 transition-all duration-200",
-          activeScrubbingIndex !== null && activeSegmentVideoUrl
-            ? "opacity-100 h-auto"
-            : "opacity-0 h-0 overflow-hidden pointer-events-none"
-        )}
-      >
+      {/* Scrubbing Preview Area - absolutely positioned above the strip to avoid layout shifts */}
+      {activeScrubbingIndex !== null && activeSegmentVideoUrl && (
         <div
-          className="relative bg-black rounded-lg overflow-hidden shadow-xl border-2 border-primary/50"
+          className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none"
           style={{
-            width: previewDimensions.width,
-            height: previewDimensions.height,
+            bottom: '100%',
+            marginBottom: '8px',
           }}
         >
-          {activeSegmentVideoUrl && (
+          <div
+            className="relative bg-black rounded-lg overflow-hidden shadow-xl border-2 border-primary/50"
+            style={{
+              width: previewDimensions.width,
+              height: previewDimensions.height,
+            }}
+          >
             <video
               ref={previewVideoRef}
               src={getDisplayUrl(activeSegmentVideoUrl)}
@@ -435,23 +434,21 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
               preload="auto"
               {...scrubbing.videoProps}
             />
-          )}
 
-          {/* Scrubber progress bar */}
-          {scrubbing.scrubberPosition !== null && (
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
-              <div
-                className={cn(
-                  "h-full bg-primary transition-opacity duration-200",
-                  scrubbing.scrubberVisible ? "opacity-100" : "opacity-50"
-                )}
-                style={{ width: `${scrubbing.scrubberPosition}%` }}
-              />
-            </div>
-          )}
+            {/* Scrubber progress bar */}
+            {scrubbing.scrubberPosition !== null && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+                <div
+                  className={cn(
+                    "h-full bg-primary transition-opacity duration-200",
+                    scrubbing.scrubberVisible ? "opacity-100" : "opacity-50"
+                  )}
+                  style={{ width: `${scrubbing.scrubberPosition}%` }}
+                />
+              </div>
+            )}
 
-          {/* Segment label */}
-          {activeScrubbingIndex !== null && (
+            {/* Segment label */}
             <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
               Segment {(activeSegmentSlot?.index ?? 0) + 1}
               {scrubbing.duration > 0 && (
@@ -460,9 +457,9 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
                 </span>
               )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Segment output strip - compact height for segment thumbnails */}
       <div
