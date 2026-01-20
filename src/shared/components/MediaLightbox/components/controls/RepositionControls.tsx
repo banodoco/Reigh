@@ -30,7 +30,7 @@ interface RepositionControlsProps {
  * Provides sliders for image repositioning:
  * - Horizontal position (translateX)
  * - Vertical position (translateY)  
- * - Scale (0.25x to 2x)
+ * - Zoom (0.25x to 2x)
  * - Rotation (-180° to 180°)
  * - Flip Horizontal / Vertical
  * - Reset button to restore defaults
@@ -52,9 +52,8 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
   const iconSize = variant === 'tablet' ? 'h-3 w-3' : 'h-2.5 w-2.5';
   const sliderIconSize = variant === 'tablet' ? 'h-3.5 w-3.5' : 'h-3 w-3';
   
-  // Max translate as percentage - allows ±80% for wider repositioning range
-  // Slightly scales with scale factor but capped to prevent extreme values
-  const maxTranslatePercent = Math.round(80 * Math.min(transform.scale, 1.25));
+  // Max translate as percentage - fixed at ±100% for full repositioning range
+  const maxTranslatePercent = 100;
   
   // Check if any transform has been applied
   const hasChanges = 
@@ -101,50 +100,12 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
         </button>
       </div>
       
-      {/* Horizontal Position */}
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-1.5">
-          <MoveHorizontal className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
-          <div className="flex-1 flex items-center justify-between">
-            <label className={cn("font-medium text-foreground", textSize)}>X:</label>
-            <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.translateX.toFixed(0)}%</span>
-          </div>
-        </div>
-        <input
-          type="range"
-          min={-maxTranslatePercent}
-          max={maxTranslatePercent}
-          value={transform.translateX}
-          onChange={(e) => onTranslateXChange(parseFloat(e.target.value))}
-          className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-        />
-      </div>
-      
-      {/* Vertical Position */}
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-1.5">
-          <MoveVertical className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
-          <div className="flex-1 flex items-center justify-between">
-            <label className={cn("font-medium text-foreground", textSize)}>Y:</label>
-            <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.translateY.toFixed(0)}%</span>
-          </div>
-        </div>
-        <input
-          type="range"
-          min={-maxTranslatePercent}
-          max={maxTranslatePercent}
-          value={transform.translateY}
-          onChange={(e) => onTranslateYChange(parseFloat(e.target.value))}
-          className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-        />
-      </div>
-      
-      {/* Scale */}
+      {/* Zoom */}
       <div className="space-y-0.5">
         <div className="flex items-center gap-1.5">
           <Maximize2 className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
           <div className="flex-1 flex items-center justify-between">
-            <label className={cn("font-medium text-foreground", textSize)}>Scale:</label>
+            <label className={cn("font-medium text-foreground", textSize)}>Zoom:</label>
             <span className={cn("text-muted-foreground tabular-nums", textSize)}>{(transform.scale * 100).toFixed(0)}%</span>
           </div>
         </div>
@@ -157,7 +118,7 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
           className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
         />
       </div>
-      
+
       {/* Rotation */}
       <div className="space-y-0.5">
         <div className="flex items-center gap-1.5">
@@ -175,6 +136,43 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
           onChange={(e) => onRotationChange(parseInt(e.target.value))}
           className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
         />
+      </div>
+
+      {/* X and Y Position - side by side */}
+      <div className="flex gap-2">
+        {/* Horizontal Position */}
+        <div className="flex-1 space-y-0.5">
+          <div className="flex items-center gap-1">
+            <MoveHorizontal className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
+            <label className={cn("font-medium text-foreground", textSize)}>X:</label>
+            <span className={cn("text-muted-foreground tabular-nums ml-auto", textSize)}>{transform.translateX.toFixed(0)}%</span>
+          </div>
+          <input
+            type="range"
+            min={-maxTranslatePercent}
+            max={maxTranslatePercent}
+            value={transform.translateX}
+            onChange={(e) => onTranslateXChange(parseFloat(e.target.value))}
+            className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
+          />
+        </div>
+
+        {/* Vertical Position */}
+        <div className="flex-1 space-y-0.5">
+          <div className="flex items-center gap-1">
+            <MoveVertical className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
+            <label className={cn("font-medium text-foreground", textSize)}>Y:</label>
+            <span className={cn("text-muted-foreground tabular-nums ml-auto", textSize)}>{transform.translateY.toFixed(0)}%</span>
+          </div>
+          <input
+            type="range"
+            min={-maxTranslatePercent}
+            max={maxTranslatePercent}
+            value={transform.translateY}
+            onChange={(e) => onTranslateYChange(parseFloat(e.target.value))}
+            className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
+          />
+        </div>
       </div>
       
       {/* Reset Button */}

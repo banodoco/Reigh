@@ -224,8 +224,8 @@ export const useRepositionMode = ({
     const deltaXPercent = (deltaX / displayedWidth) * 100 / effectiveScale;
     const deltaYPercent = (deltaY / displayedHeight) * 100 / effectiveScale;
 
-    // Apply new translate values (clamped by the slider max values)
-    const maxTranslate = Math.round(80 * Math.min(transform.scale, 1.25));
+    // Apply new translate values (clamped to ±100%)
+    const maxTranslate = 100;
     const newTranslateX = Math.max(-maxTranslate, Math.min(maxTranslate, dragStartRef.current.translateX + deltaXPercent));
     const newTranslateY = Math.max(-maxTranslate, Math.min(maxTranslate, dragStartRef.current.translateY + deltaYPercent));
 
