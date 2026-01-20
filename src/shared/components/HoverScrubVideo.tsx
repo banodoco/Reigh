@@ -137,12 +137,13 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const isHoveringRef = useRef(false); // Keep for mobile autoplay prevention logic
 
   // Ref callback to connect video element to scrubbing hook immediately when mounted
+  // Always connect regardless of scrubbingEnabled - the hook handles its own enabled state
   const videoRefCallback = useCallback((video: HTMLVideoElement | null) => {
     localVideoRef.current = video;
-    if (video && scrubbingEnabled) {
+    if (video) {
       scrubbing.setVideoElement(video);
     }
-  }, [scrubbingEnabled, scrubbing.setVideoElement]);
+  }, [scrubbing.setVideoElement]);
 
   // Also alias for easier access
   const videoRef = localVideoRef;
