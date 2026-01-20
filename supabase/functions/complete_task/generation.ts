@@ -1381,7 +1381,7 @@ export async function handleVariantCreation(
       variantParams,
       false,
       variantType,
-      taskData.params?.prompt ? `Edit: ${taskData.params.prompt.substring(0, 40)}...` : 'Edit'
+      null // Don't auto-generate variant name - let user name it if desired
     );
 
     console.log(`[ImageEdit] Successfully created ${variantType} variant on generation ${basedOnGenerationId}`);
