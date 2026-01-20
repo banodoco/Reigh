@@ -198,6 +198,7 @@ export const IMAGE_EDIT_TASK_TYPES = [
   'magic_edit',
   'kontext_image_edit',
   'flux_image_edit',
+  'annotated_image_edit',
 ];
 
 export function isImageEditTaskType(taskType: string | undefined): boolean {

@@ -35,6 +35,7 @@ export const IMAGE_EDIT_TASK_TYPES = [
   'magic_edit',
   'kontext_image_edit',
   'flux_image_edit',
+  'annotated_image_edit',
 ] as const;
 
 // Task name abbreviations for tight spaces
