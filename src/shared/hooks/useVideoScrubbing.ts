@@ -206,13 +206,6 @@ export function useVideoScrubbing(
     const container = containerRef.current;
     if (!container) return;
 
-    // If video is playing (autoplay started), don't interrupt it with scrubbing
-    // User needs to leave and re-enter to scrub again
-    const video = getVideo();
-    if (video && !video.paused) {
-      return;
-    }
-
     const rect = container.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     lastMouseXRef.current = mouseX;
@@ -224,6 +217,7 @@ export function useVideoScrubbing(
     setScrubberVisible(true);
     setProgress(prog);
 
+    const video = getVideo();
     const dur = duration || (video?.duration ?? 0);
 
     if (!Number.isFinite(dur) || dur <= 0) {
