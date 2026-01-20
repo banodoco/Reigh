@@ -164,12 +164,6 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       return;
     }
 
-    // Store the mouse X position even if duration is 0, so we can calculate scrubber when metadata loads
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      lastMouseXRef.current = e.clientX - rect.left;
-    }
-
     if (loadOnDemand && !hasLoadedOnDemand) {
       setHasLoadedOnDemand(true);
       // Fall through to allow scrubbing on the very first interaction
@@ -198,32 +192,34 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
     }
 
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+
+    // Store the mouse X position for re-calculating when metadata loads
+    lastMouseXRef.current = mouseX;
+
+    const progress = Math.max(0, Math.min(1, mouseX / rect.width));
+
+    // Always show scrubber position (percentage-based) even if duration isn't ready yet
+    setScrubberPosition(progress * 100);
+    setScrubberVisible(true);
+
     if (!Number.isFinite(duration) || duration <= 0) {
       // Force load if video is stuck in HAVE_NOTHING state, even if preload is metadata
       // This fixes cases where the browser suspended loading or network is slow
       if (videoRef.current && videoRef.current.readyState === 0) {
         videoRef.current.load();
       }
+      // Scrubber is shown but we can't seek yet - will seek when metadata loads
       return;
     }
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    
-    // Store the mouse X position for re-calculating when metadata loads
-    lastMouseXRef.current = mouseX;
-    
-    const progress = Math.max(0, Math.min(1, mouseX / rect.width));
     const targetTime = progress * duration;
 
     // Validate targetTime before setting currentTime
     if (!Number.isFinite(targetTime)) {
       return;
     }
-
-    // Update scrubber position (percentage) and make it visible
-    setScrubberPosition(progress * 100);
-    setScrubberVisible(true);
 
     // Pause the video and seek to the position
     videoRef.current.pause();
@@ -235,8 +231,16 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       mouseMoveTimeoutRef.current = null;
     }
 
-    // Removed auto-play on stop hover as per user request
-    // The video will only scrub, not play automatically
+    // Start playing from current position after user stops scrubbing (but stays hovering)
+    mouseMoveTimeoutRef.current = setTimeout(() => {
+      if (videoRef.current && isHoveringRef.current) {
+        // Hide scrubber when playing
+        setScrubberVisible(false);
+        videoRef.current.play().catch(() => {
+          // Ignore autoplay errors
+        });
+      }
+    }, 400); // 400ms delay before auto-play starts
   }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover, preloadProp, src]);
 
   const handleMouseEnter = useCallback(() => {
