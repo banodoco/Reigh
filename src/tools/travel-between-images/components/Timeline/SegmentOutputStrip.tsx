@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Play, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import MediaLightbox from '@/shared/components/MediaLightbox';
@@ -80,9 +81,11 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   const queryClient = useQueryClient();
 
   // ===== SCRUBBING PREVIEW STATE =====
-  // Track which segment is being scrubbed (by slot index)
+  // Track which segment is being scrubbed (by slot index) and mouse position for portal
   const [activeScrubbingIndex, setActiveScrubbingIndex] = useState<number | null>(null);
+  const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const stripContainerRef = useRef<HTMLDivElement>(null);
 
   // Video scrubbing hook - controls the preview video
   const scrubbing = useVideoScrubbing({
@@ -92,6 +95,20 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     resetOnLeave: true,
     onHoverEnd: () => setActiveScrubbingIndex(null),
   });
+
+  // When active scrubbing index changes, manually trigger onMouseEnter
+  // This is needed because the state update happens after the original onMouseEnter fires
+  useEffect(() => {
+    if (activeScrubbingIndex !== null) {
+      // Simulate mouse enter to initialize the scrubbing state
+      scrubbing.containerProps.onMouseEnter();
+    }
+  }, [activeScrubbingIndex]); // Don't include scrubbing.containerProps to avoid loops
+
+  // Track mouse position for portal placement
+  const handlePreviewMouseMove = useCallback((e: React.MouseEvent) => {
+    setPreviewPosition({ x: e.clientX, y: e.clientY });
+  }, []);
 
   // Fetch segment outputs data - uses controlled state if provided
   const {
@@ -115,19 +132,12 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   const activeSegmentSlot = activeScrubbingIndex !== null ? segmentSlots[activeScrubbingIndex] : null;
   const activeSegmentVideoUrl = activeSegmentSlot?.type === 'child' ? activeSegmentSlot.child.location : null;
 
-  // Connect preview video to scrubbing hook when it changes
+  // Connect preview video to scrubbing hook when active segment changes
   useEffect(() => {
-    if (previewVideoRef.current) {
+    if (previewVideoRef.current && activeScrubbingIndex !== null) {
       scrubbing.setVideoElement(previewVideoRef.current);
     }
-  }, [activeScrubbingIndex, scrubbing.setVideoElement]);
-
-  // Reset scrubbing state when video URL changes
-  useEffect(() => {
-    if (activeSegmentVideoUrl) {
-      scrubbing.reset();
-    }
-  }, [activeSegmentVideoUrl]);
+  }, [activeScrubbingIndex, activeSegmentVideoUrl, scrubbing.setVideoElement]);
 
   // Check for pending segment tasks (Queued/In Progress)
   const { hasPendingTask } = usePendingSegmentTasks(shotId, projectId);
@@ -402,20 +412,32 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     return { width: Math.round(maxHeight * 16 / 9), height: maxHeight };
   }, [projectAspectRatio]);
 
+  // Get strip container position for portal placement
+  const getPreviewPosition = useCallback(() => {
+    if (!stripContainerRef.current) return null;
+    const rect = stripContainerRef.current.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    };
+  }, []);
+
   // Don't render if no pairs (need at least 2 images for a pair)
   if (pairInfo.length === 0) {
     return null;
   }
 
   return (
-    <div className="w-full relative">
-      {/* Scrubbing Preview Area - absolutely positioned above the strip to avoid layout shifts */}
-      {activeScrubbingIndex !== null && activeSegmentVideoUrl && (
+    <div className="w-full relative" ref={stripContainerRef}>
+      {/* Scrubbing Preview Area - rendered via portal to escape container */}
+      {activeScrubbingIndex !== null && activeSegmentVideoUrl && createPortal(
         <div
-          className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+          className="fixed pointer-events-none"
           style={{
-            bottom: '100%',
-            marginBottom: '8px',
+            left: `${getPreviewPosition()?.x ?? 0}px`,
+            top: `${(getPreviewPosition()?.y ?? 0) - previewDimensions.height - 16}px`,
+            transform: 'translateX(-50%)',
+            zIndex: 999999,
           }}
         >
           <div
@@ -432,6 +454,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
               muted
               playsInline
               preload="auto"
+              loop
               {...scrubbing.videoProps}
             />
 
@@ -458,7 +481,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Segment output strip - compact height for segment thumbnails */}

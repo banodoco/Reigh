@@ -121,6 +121,8 @@ export function useVideoScrubbing(
   const [scrubberVisible, setScrubberVisible] = useState(true);
   const [isHovering, setIsHovering] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  // Track when video element changes to re-run effects
+  const [videoElementVersion, setVideoElementVersion] = useState(0);
 
   // Get the active video element (external or internal ref)
   const getVideo = useCallback(() => {
@@ -130,6 +132,8 @@ export function useVideoScrubbing(
   // Set external video element
   const setVideoElement = useCallback((video: HTMLVideoElement | null) => {
     externalVideoRef.current = video;
+    // Increment version to trigger re-run of event listener effects
+    setVideoElementVersion(v => v + 1);
     if (video && video.duration && Number.isFinite(video.duration)) {
       setDurationState(video.duration);
     }
@@ -337,7 +341,7 @@ export function useVideoScrubbing(
     }
   }, [getVideo, onProgressChange]);
 
-  // Track video play/pause state
+  // Track video play/pause state and time updates during playback
   useEffect(() => {
     const video = getVideo();
     if (!video) return;
@@ -358,16 +362,32 @@ export function useVideoScrubbing(
       }
     };
 
+    // Update progress/currentTime during playback
+    const handleTimeUpdate = () => {
+      const dur = video.duration;
+      if (!Number.isFinite(dur) || dur <= 0) return;
+
+      const time = video.currentTime;
+      const prog = time / dur;
+
+      setCurrentTime(time);
+      setProgress(prog);
+      setScrubberPosition(prog * 100);
+      onProgressChange?.(prog, time);
+    };
+
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
     video.addEventListener('durationchange', handleDurationChange);
+    video.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('durationchange', handleDurationChange);
+      video.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [getVideo, onPlayStart, onPlayPause]);
+  }, [getVideo, onPlayStart, onPlayPause, onProgressChange, videoElementVersion]);
 
   // Cleanup on unmount
   useEffect(() => {
