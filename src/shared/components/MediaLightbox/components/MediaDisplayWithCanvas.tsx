@@ -6,15 +6,24 @@ interface MediaDisplayWithCanvasProps {
   effectiveImageUrl: string;
   thumbUrl?: string;
   isVideo: boolean;
-  
+
   // States
   isFlippedHorizontally: boolean;
   isSaving: boolean;
   isInpaintMode: boolean;
   editMode?: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
-  
+
   // Reposition mode transform style
   repositionTransformStyle?: React.CSSProperties;
+
+  // Reposition drag-to-move handlers
+  repositionDragHandlers?: {
+    onPointerDown: (e: React.PointerEvent) => void;
+    onPointerMove: (e: React.PointerEvent) => void;
+    onPointerUp: (e: React.PointerEvent) => void;
+    onPointerCancel: (e: React.PointerEvent) => void;
+  };
+  isRepositionDragging?: boolean;
   
   // Refs
   imageContainerRef: React.RefObject<HTMLDivElement>;
@@ -54,6 +63,8 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   isInpaintMode,
   editMode = 'text',
   repositionTransformStyle,
+  repositionDragHandlers,
+  isRepositionDragging = false,
   imageContainerRef,
   canvasRef,
   displayCanvasRef,
@@ -234,7 +245,26 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
         // Image with Canvas Overlays - Progressive loading: thumbnail first, then full image
         // Wrapper div shrinks to fit the image so overlays match image bounds, not container
         // Using inline-block (not inline-flex) ensures wrapper sizes exactly to image content
-        <div className="relative inline-block max-w-full max-h-full">
+        <div
+          className="relative inline-block max-w-full max-h-full"
+          style={{
+            // Enable drag-to-move cursor in reposition mode
+            cursor: isRepositionMode
+              ? (isRepositionDragging ? 'grabbing' : 'grab')
+              : undefined,
+            // Prevent text selection during drag
+            userSelect: isRepositionMode ? 'none' : undefined,
+            WebkitUserSelect: isRepositionMode ? 'none' : undefined,
+            touchAction: isRepositionMode ? 'none' : undefined,
+          }}
+          // Apply drag handlers in reposition mode
+          {...(isRepositionMode && repositionDragHandlers ? {
+            onPointerDown: repositionDragHandlers.onPointerDown,
+            onPointerMove: repositionDragHandlers.onPointerMove,
+            onPointerUp: repositionDragHandlers.onPointerUp,
+            onPointerCancel: repositionDragHandlers.onPointerCancel,
+          } : {})}
+        >
           {/* Use thumbnail or full image based on loading state */}
           <img
             src={thumbUrl && thumbUrl !== effectiveImageUrl && !fullImageLoaded ? thumbUrl : effectiveImageUrl}
@@ -353,21 +383,24 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
             className="hidden"
           />
 
-          {/* Canvas Overlay for Inpainting */}
+          {/* Canvas Overlay for Inpainting/Annotate - only show for modes that need drawing */}
           {(() => {
+            // Only show canvas for inpaint and annotate modes, not for reposition/img2img/text
+            const shouldRenderCanvas = isInpaintMode && (editMode === 'inpaint' || editMode === 'annotate');
             console.log(`[${debugContext}] 🖼️ Canvas render check`, {
               isInpaintMode,
+              editMode,
               hasDisplayCanvasRef: !!displayCanvasRef,
               hasDisplayCanvas: !!displayCanvasRef?.current,
-              shouldRenderCanvas: isInpaintMode
+              shouldRenderCanvas
             });
-            return isInpaintMode;
+            return shouldRenderCanvas;
           })() && (
             <>
               {/* Display Canvas - User draws here */}
               <canvas
                 ref={displayCanvasRef}
-                className={`absolute top-0 left-0 ${editMode === 'text' ? 'pointer-events-none' : 'pointer-events-auto cursor-crosshair'}`}
+                className={`absolute top-0 left-0 ${editMode === 'text' || editMode === 'reposition' ? 'pointer-events-none' : 'pointer-events-auto cursor-crosshair'}`}
                 style={{
                   touchAction: editMode === 'text' ? 'auto' : variant === 'mobile-stacked' ? 'pan-y pinch-zoom' : 'none',
                   zIndex: 50,

@@ -982,6 +982,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleGenerateReposition,
     handleSaveAsVariant,
     getTransformStyle,
+    isDragging: isRepositionDragging,
+    dragHandlers: repositionDragHandlers,
   } = repositionHook;
 
   // Img2Img mode hook - uses persisted settings for strength and enablePromptExpansion
@@ -2907,6 +2909,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isInpaintMode={isInpaintMode}
                       editMode={editMode}
                       repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
+                      repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers : undefined}
+                      isRepositionDragging={isRepositionDragging}
                       imageContainerRef={imageContainerRef}
                       canvasRef={canvasRef}
                       displayCanvasRef={displayCanvasRef}
@@ -3323,6 +3327,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isInpaintMode={isInpaintMode}
                       editMode={editMode}
                       repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
+                      repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers : undefined}
+                      isRepositionDragging={isRepositionDragging}
                       imageContainerRef={imageContainerRef}
                       canvasRef={canvasRef}
                       displayCanvasRef={displayCanvasRef}
@@ -3708,6 +3714,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isInpaintMode={isInpaintMode}
                     editMode={editMode}
                     repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
+                    repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers : undefined}
+                    isRepositionDragging={isRepositionDragging}
                     imageContainerRef={imageContainerRef}
                     canvasRef={canvasRef}
                     displayCanvasRef={displayCanvasRef}

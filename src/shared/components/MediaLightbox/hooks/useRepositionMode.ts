@@ -50,7 +50,7 @@ export interface UseRepositionModeReturn {
   repositionGenerateSuccess: boolean;
   isSavingAsVariant: boolean;
   saveAsVariantSuccess: boolean;
-  
+
   // Setters
   setTranslateX: (value: number) => void;
   setTranslateY: (value: number) => void;
@@ -58,14 +58,23 @@ export interface UseRepositionModeReturn {
   setRotation: (value: number) => void;
   toggleFlipH: () => void;
   toggleFlipV: () => void;
-  
+
   // Actions
   resetTransform: () => void;
   handleGenerateReposition: () => Promise<void>;
   handleSaveAsVariant: () => Promise<void>;
-  
+
   // For rendering
   getTransformStyle: () => React.CSSProperties;
+
+  // Drag-to-move handlers (for touch/mouse dragging)
+  isDragging: boolean;
+  dragHandlers: {
+    onPointerDown: (e: React.PointerEvent) => void;
+    onPointerMove: (e: React.PointerEvent) => void;
+    onPointerUp: (e: React.PointerEvent) => void;
+    onPointerCancel: (e: React.PointerEvent) => void;
+  };
 }
 
 const DEFAULT_TRANSFORM: ImageTransform = {
@@ -163,11 +172,84 @@ export const useRepositionMode = ({
   const toggleFlipV = useCallback(() => {
     setTransform(prev => ({ ...prev, flipV: !prev.flipV }));
   }, []);
-  
+
   // Reset transform to default
   const resetTransform = useCallback(() => {
     setTransform(DEFAULT_TRANSFORM);
   }, []);
+
+  // Drag-to-move state
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ x: number; y: number; translateX: number; translateY: number } | null>(null);
+
+  // Drag handlers for pointer events (works for both mouse and touch)
+  const handleDragPointerDown = useCallback((e: React.PointerEvent) => {
+    // Only handle primary pointer (left mouse button or first touch)
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+    // Capture pointer for tracking outside element bounds
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      translateX: transform.translateX,
+      translateY: transform.translateY,
+    };
+
+    e.preventDefault();
+    e.stopPropagation();
+  }, [transform.translateX, transform.translateY]);
+
+  const handleDragPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging || !dragStartRef.current || !imageDimensions) return;
+
+    const deltaX = e.clientX - dragStartRef.current.x;
+    const deltaY = e.clientY - dragStartRef.current.y;
+
+    // Get the displayed image size from the container
+    // We need to convert pixel movement to percentage of image dimensions
+    const containerEl = imageContainerRef.current;
+    if (!containerEl) return;
+
+    // Find the actual displayed image element to get its rendered size
+    const imgEl = containerEl.querySelector('img');
+    const displayedWidth = imgEl?.clientWidth || imageDimensions.width;
+    const displayedHeight = imgEl?.clientHeight || imageDimensions.height;
+
+    // Convert pixel delta to percentage
+    // Account for current scale - dragging should feel consistent regardless of zoom
+    const effectiveScale = transform.scale || 1;
+    const deltaXPercent = (deltaX / displayedWidth) * 100 / effectiveScale;
+    const deltaYPercent = (deltaY / displayedHeight) * 100 / effectiveScale;
+
+    // Apply new translate values (clamped by the slider max values)
+    const maxTranslate = Math.round(80 * Math.min(transform.scale, 1.25));
+    const newTranslateX = Math.max(-maxTranslate, Math.min(maxTranslate, dragStartRef.current.translateX + deltaXPercent));
+    const newTranslateY = Math.max(-maxTranslate, Math.min(maxTranslate, dragStartRef.current.translateY + deltaYPercent));
+
+    setTransform(prev => ({
+      ...prev,
+      translateX: newTranslateX,
+      translateY: newTranslateY,
+    }));
+  }, [isDragging, imageDimensions, imageContainerRef, transform.scale]);
+
+  const handleDragPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!isDragging) return;
+
+    // Release pointer capture
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+
+    setIsDragging(false);
+    dragStartRef.current = null;
+  }, [isDragging]);
+
+  const handleDragPointerCancel = useCallback((e: React.PointerEvent) => {
+    // Same as pointer up - end the drag
+    handleDragPointerUp(e);
+  }, [handleDragPointerUp]);
   
   // Get CSS transform style for rendering
   const getTransformStyle = useCallback((): React.CSSProperties => {
@@ -625,5 +707,13 @@ export const useRepositionMode = ({
     handleGenerateReposition,
     handleSaveAsVariant,
     getTransformStyle,
+    // Drag-to-move
+    isDragging,
+    dragHandlers: {
+      onPointerDown: handleDragPointerDown,
+      onPointerMove: handleDragPointerMove,
+      onPointerUp: handleDragPointerUp,
+      onPointerCancel: handleDragPointerCancel,
+    },
   };
 };
