@@ -93,24 +93,6 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     onHoverEnd: () => setActiveScrubbingIndex(null),
   });
 
-  // Get the active segment's video URL
-  const activeSegmentSlot = activeScrubbingIndex !== null ? segmentSlots[activeScrubbingIndex] : null;
-  const activeSegmentVideoUrl = activeSegmentSlot?.type === 'child' ? activeSegmentSlot.child.location : null;
-
-  // Connect preview video to scrubbing hook when it changes
-  useEffect(() => {
-    if (previewVideoRef.current) {
-      scrubbing.setVideoElement(previewVideoRef.current);
-    }
-  }, [activeScrubbingIndex, scrubbing.setVideoElement]);
-
-  // Reset scrubbing state when video URL changes
-  useEffect(() => {
-    if (activeSegmentVideoUrl) {
-      scrubbing.reset();
-    }
-  }, [activeSegmentVideoUrl]);
-  
   // Fetch segment outputs data - uses controlled state if provided
   const {
     parentGenerations,
@@ -128,6 +110,24 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     controlledSelectedParentId,
     onSelectedParentChange
   );
+
+  // Get the active segment's video URL (must be after segmentSlots is defined)
+  const activeSegmentSlot = activeScrubbingIndex !== null ? segmentSlots[activeScrubbingIndex] : null;
+  const activeSegmentVideoUrl = activeSegmentSlot?.type === 'child' ? activeSegmentSlot.child.location : null;
+
+  // Connect preview video to scrubbing hook when it changes
+  useEffect(() => {
+    if (previewVideoRef.current) {
+      scrubbing.setVideoElement(previewVideoRef.current);
+    }
+  }, [activeScrubbingIndex, scrubbing.setVideoElement]);
+
+  // Reset scrubbing state when video URL changes
+  useEffect(() => {
+    if (activeSegmentVideoUrl) {
+      scrubbing.reset();
+    }
+  }, [activeSegmentVideoUrl]);
 
   // Check for pending segment tasks (Queued/In Progress)
   const { hasPendingTask } = usePendingSegmentTasks(shotId, projectId);
