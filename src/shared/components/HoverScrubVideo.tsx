@@ -141,9 +141,13 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const videoRefCallback = useCallback((video: HTMLVideoElement | null) => {
     localVideoRef.current = video;
     if (video) {
+      console.log('[HoverScrubVideo] 🎬 Connecting video to hook', {
+        src: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+        scrubbingEnabled,
+      });
       scrubbing.setVideoElement(video);
     }
-  }, [scrubbing.setVideoElement]);
+  }, [scrubbing.setVideoElement, scrubbingEnabled]);
 
   // Also alias for easier access
   const videoRef = localVideoRef;
@@ -211,9 +215,15 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
     }
 
+    console.log('[HoverScrubVideo] 🖱️ Mouse move, delegating to hook', {
+      scrubbingEnabled,
+      hookEnabled: scrubbing.isHovering,
+      duration: scrubbing.duration,
+    });
+
     // Delegate to the hook's handler for actual scrubbing
     scrubbing.containerProps.onMouseMove(e);
-  }, [scrubbingEnabled, loadOnDemand, hasLoadedOnDemand, preloadProp, src, scrubbing.containerProps]);
+  }, [scrubbingEnabled, loadOnDemand, hasLoadedOnDemand, preloadProp, src, scrubbing.containerProps, scrubbing.isHovering, scrubbing.duration]);
 
   const handleMouseEnter = useCallback(() => {
     // Handle autoplayOnHover mode separately
@@ -226,6 +236,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     if (!scrubbingEnabled) {
       return;
     }
+
+    console.log('[HoverScrubVideo] ➡️ Mouse enter', { scrubbingEnabled });
 
     isHoveringRef.current = true;
 

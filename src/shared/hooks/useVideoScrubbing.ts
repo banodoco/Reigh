@@ -201,6 +201,7 @@ export function useVideoScrubbing(
 
   // Handle mouse move (scrubbing)
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    console.log('[useVideoScrubbing] 🖱️ handleMouseMove called', { enabled, hasContainer: !!containerRef.current });
     if (!enabled) return;
 
     const container = containerRef.current;
@@ -251,11 +252,19 @@ export function useVideoScrubbing(
 
     // Start playing after delay if enabled
     if (playOnStopScrubbing) {
+      console.log('[useVideoScrubbing] ⏱️ Setting autoplay timeout', { playDelay, isHovering: isHoveringRef.current });
       mouseMoveTimeoutRef.current = setTimeout(() => {
         const currentVideo = getVideo();
+        console.log('[useVideoScrubbing] ⏱️ Autoplay timeout fired', {
+          hasVideo: !!currentVideo,
+          isHovering: isHoveringRef.current,
+          videoSrc: currentVideo?.src?.substring(currentVideo.src.lastIndexOf('/') + 1) || 'no-src',
+        });
         if (currentVideo && isHoveringRef.current) {
           setScrubberVisible(false);
-          currentVideo.play().catch(() => {});
+          currentVideo.play().catch((err) => {
+            console.log('[useVideoScrubbing] ❌ Autoplay failed', err);
+          });
           setIsPlaying(true);
           onPlayStart?.();
         }
