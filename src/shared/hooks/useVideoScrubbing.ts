@@ -1,212 +1,408 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+/**
+ * useVideoScrubbing - Reusable hook for video scrubbing behavior
+ *
+ * Extracts the core scrubbing logic so it can be used in different UI patterns:
+ * - Traditional: scrub container and video are the same element (HoverScrubVideo)
+ * - Separated: scrub on thumbnails, preview plays in a different container (SegmentOutputStrip)
+ *
+ * Mouse position directly controls video seek position (timeline-style scrubbing).
+ */
 
-export const useVideoScrubbing = () => {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const lastFrameTimeRef = useRef<number>(0);
-  const playbackRateRef = useRef<number>(0);
-  const isVisibleRef = useRef<boolean>(true);
+import { useRef, useState, useCallback, useEffect } from 'react';
 
-  const [playbackRate, setPlaybackRate] = useState<number | null>(null);
-  const [progress, setProgress] = useState<number>(0);
+export interface UseVideoScrubbingOptions {
+  /** Whether scrubbing is enabled */
+  enabled?: boolean;
+  /** Start playing after user stops scrubbing (but stays hovering) */
+  playOnStopScrubbing?: boolean;
+  /** Delay in ms before auto-play starts (default: 400) */
+  playDelay?: number;
+  /** Reset video to beginning on mouse leave (default: true) */
+  resetOnLeave?: boolean;
+  /** Callback when scrub progress changes */
+  onProgressChange?: (progress: number, currentTime: number) => void;
+  /** Callback when hover starts */
+  onHoverStart?: () => void;
+  /** Callback when hover ends */
+  onHoverEnd?: () => void;
+  /** Callback when playback starts */
+  onPlayStart?: () => void;
+  /** Callback when playback pauses */
+  onPlayPause?: () => void;
+}
 
-  const stopScrubbing = useCallback(() => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    lastFrameTimeRef.current = 0;
-    
-    // When scrubbing stops, we no longer automatically resume playback.
-    // Doing so caused a conflict where moving the mouse again would pause,
-    // leading to a stuttering effect. Now, the video remains paused at the
-    // current frame, awaiting further mouse movement to scrub again.
-    const video = videoRef.current;
-    if (video) {
-        // It's already paused by startScrubbing, we just need to make sure
-        // our animation loop is cancelled, which is done above.
+export interface UseVideoScrubbingReturn {
+  /** Ref to attach to the scrub trigger container */
+  containerRef: React.RefObject<HTMLDivElement>;
+
+  /** Props to spread on the trigger container */
+  containerProps: {
+    onMouseMove: (e: React.MouseEvent) => void;
+    onMouseEnter: () => void;
+    onMouseLeave: () => void;
+  };
+
+  /** Ref to attach to the video element (can be anywhere in DOM) */
+  videoRef: React.RefObject<HTMLVideoElement>;
+
+  /** Props to spread on the video element */
+  videoProps: {
+    onLoadedMetadata: () => void;
+  };
+
+  /** Current scrub progress (0-1) */
+  progress: number;
+
+  /** Current time in seconds */
+  currentTime: number;
+
+  /** Video duration in seconds */
+  duration: number;
+
+  /** Scrubber position as percentage (0-100), null when not scrubbing */
+  scrubberPosition: number | null;
+
+  /** Whether scrubber should be visible */
+  scrubberVisible: boolean;
+
+  /** Whether mouse is over the trigger container */
+  isHovering: boolean;
+
+  /** Whether video is currently playing */
+  isPlaying: boolean;
+
+  /** Manually set the video to control (for external video refs) */
+  setVideoElement: (video: HTMLVideoElement | null) => void;
+
+  /** Manually set the duration (useful when video metadata isn't loaded yet) */
+  setDuration: (duration: number) => void;
+
+  /** Manually seek to a progress value (0-1) */
+  seekToProgress: (progress: number) => void;
+
+  /** Start playback */
+  play: () => void;
+
+  /** Pause playback */
+  pause: () => void;
+
+  /** Reset state (useful when switching videos) */
+  reset: () => void;
+}
+
+export function useVideoScrubbing(
+  options: UseVideoScrubbingOptions = {}
+): UseVideoScrubbingReturn {
+  const {
+    enabled = true,
+    playOnStopScrubbing = true,
+    playDelay = 400,
+    resetOnLeave = true,
+    onProgressChange,
+    onHoverStart,
+    onHoverEnd,
+    onPlayStart,
+    onPlayPause,
+  } = options;
+
+  // Refs
+  const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const externalVideoRef = useRef<HTMLVideoElement | null>(null);
+  const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isHoveringRef = useRef(false);
+  const lastMouseXRef = useRef<number | null>(null);
+
+  // State
+  const [duration, setDurationState] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
+  const [scrubberVisible, setScrubberVisible] = useState(true);
+  const [isHovering, setIsHovering] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Get the active video element (external or internal ref)
+  const getVideo = useCallback(() => {
+    return externalVideoRef.current || videoRef.current;
+  }, []);
+
+  // Set external video element
+  const setVideoElement = useCallback((video: HTMLVideoElement | null) => {
+    externalVideoRef.current = video;
+    if (video && video.duration && Number.isFinite(video.duration)) {
+      setDurationState(video.duration);
     }
   }, []);
 
-  const scrub = useCallback((timestamp: number) => {
-    const video = videoRef.current;
-    // If the video element is gone or not visible, stop the loop.
-    if (!video || !isVisibleRef.current) {
-        stopScrubbing();
-        return;
-    };
-
-    const rate = playbackRateRef.current;
-    
-    if (!lastFrameTimeRef.current) {
-        lastFrameTimeRef.current = timestamp;
-    }
-    const delta = (timestamp - lastFrameTimeRef.current) / 1000; // time in seconds
-    lastFrameTimeRef.current = timestamp;
-
-    let newTime = video.currentTime + rate * delta;
-
-    // Looping logic
-    if (newTime < 0) {
-      newTime = video.duration + newTime;
-    } else if (newTime > video.duration) {
-      newTime = newTime - video.duration;
-    }
-    
-    // Additional safety check before setting currentTime
-    if (isFinite(newTime) && video && videoRef.current) {
-        video.currentTime = newTime;
-    }
-    
-    // Also update progress bar during scrub
-    if(video && video.duration > 0 && isFinite(video.duration) && videoRef.current){
-        setProgress((video.currentTime / video.duration) * 100);
-    } else {
-        setProgress(0);
-    }
-
-    // Continue the loop
-    animationFrameRef.current = requestAnimationFrame(scrub);
-  }, [stopScrubbing]);
-
-  const startScrubbing = useCallback(() => {
-    // Ensure no other loops are running before starting a new one
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-    
-    const video = videoRef.current;
-    if (video) {
-        video.pause(); // We take control of playback
-    }
-    lastFrameTimeRef.current = 0; // Reset timer for smooth start
-    animationFrameRef.current = requestAnimationFrame((timestamp) => {
-      lastFrameTimeRef.current = timestamp; // Initialize frame time
-      scrub(timestamp);
-    });
-  }, [scrub]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-      // If scrubbing isn't active, start it.
-      if (animationFrameRef.current === null) {
-        startScrubbing();
-      }
-
-      const { offsetX } = e.nativeEvent;
-      const width = e.currentTarget.offsetWidth;
-      const normalizedPosition = offsetX / width; // Value from 0.0 to 1.0
-
-      // Optimized max speed for better performance
-      const MAX_SPEED = 1.5;
-      let newRate;
-
-      // The new logic is simpler:
-      // - Cursor at 0% width -> -2x speed (max reverse)
-      // - Cursor at 50% width -> 0x speed (paused)
-      // - Cursor at 100% width -> +2x speed (max forward)
-      // The rate is linearly interpolated between these points.
-      
-      newRate = (normalizedPosition - 0.5) * 2 * MAX_SPEED;
-
-      playbackRateRef.current = newRate;
-      setPlaybackRate(newRate);
-
-      // The timeout that stopped scrubbing on mouse inactivity has been removed.
-      // Scrubbing now continues at the current rate until the mouse leaves the element.
-
-  }, [startScrubbing]);
-  
-  const handleMouseEnter = useCallback(() => {
-    const video = videoRef.current;
-    if (video && video.paused) {
-      video.play().catch(() => {/* ignore */});
+  // Set duration manually
+  const setDuration = useCallback((dur: number) => {
+    if (Number.isFinite(dur) && dur > 0) {
+      setDurationState(dur);
     }
   }, []);
 
-  const handleMouseLeave = useCallback(() => {
-      // Stop the animation frame loop directly.
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      lastFrameTimeRef.current = 0;
+  // Reset state
+  const reset = useCallback(() => {
+    setProgress(0);
+    setCurrentTime(0);
+    setScrubberPosition(null);
+    setScrubberVisible(true);
+    setIsPlaying(false);
+    lastMouseXRef.current = null;
 
-      const video = videoRef.current;
+    if (mouseMoveTimeoutRef.current) {
+      clearTimeout(mouseMoveTimeoutRef.current);
+      mouseMoveTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Seek to progress
+  const seekToProgress = useCallback((prog: number) => {
+    const video = getVideo();
+    const dur = duration || (video?.duration ?? 0);
+
+    if (!Number.isFinite(dur) || dur <= 0) return;
+
+    const clampedProgress = Math.max(0, Math.min(1, prog));
+    const targetTime = clampedProgress * dur;
+
+    if (Number.isFinite(targetTime)) {
       if (video) {
-          video.pause();
-          video.currentTime = 0;
+        video.currentTime = targetTime;
       }
-      playbackRateRef.current = 0;
-      setPlaybackRate(null);
-      setProgress(0);
-  }, []);
+      setProgress(clampedProgress);
+      setCurrentTime(targetTime);
+      onProgressChange?.(clampedProgress, targetTime);
+    }
+  }, [duration, getVideo, onProgressChange]);
 
-  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const video = videoRef.current;
-    if (!video || !isFinite(video.duration)) return;
+  // Play
+  const play = useCallback(() => {
+    const video = getVideo();
+    if (video) {
+      video.play().catch(() => {
+        // Ignore autoplay errors
+      });
+    }
+  }, [getVideo]);
 
-    const { offsetX } = e.nativeEvent;
-    const width = e.currentTarget.offsetWidth;
-    const newTime = (offsetX / width) * video.duration;
-    video.currentTime = newTime;
-    setProgress((newTime / video.duration) * 100);
-  }, []);
+  // Pause
+  const pause = useCallback(() => {
+    const video = getVideo();
+    if (video) {
+      video.pause();
+    }
+  }, [getVideo]);
 
-  // Set up intersection observer to pause when off-screen
-  useEffect(() => {
-    const video = videoRef.current;
+  // Handle mouse move (scrubbing)
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!enabled) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    lastMouseXRef.current = mouseX;
+
+    const prog = Math.max(0, Math.min(1, mouseX / rect.width));
+
+    // Always show scrubber position (percentage-based) even if duration isn't ready
+    setScrubberPosition(prog * 100);
+    setScrubberVisible(true);
+    setProgress(prog);
+
+    const video = getVideo();
+    const dur = duration || (video?.duration ?? 0);
+
+    if (!Number.isFinite(dur) || dur <= 0) {
+      // Duration not ready - try to load video
+      if (video && video.readyState === 0) {
+        video.load();
+      }
+      // Still fire callback with progress (useful for UI that doesn't need actual seek)
+      onProgressChange?.(prog, 0);
+      return;
+    }
+
+    const targetTime = prog * dur;
+    if (!Number.isFinite(targetTime)) return;
+
+    // Pause and seek
+    if (video) {
+      video.pause();
+      video.currentTime = targetTime;
+      setIsPlaying(false);
+    }
+    setCurrentTime(targetTime);
+
+    onProgressChange?.(prog, targetTime);
+
+    // Clear existing timeout
+    if (mouseMoveTimeoutRef.current) {
+      clearTimeout(mouseMoveTimeoutRef.current);
+      mouseMoveTimeoutRef.current = null;
+    }
+
+    // Start playing after delay if enabled
+    if (playOnStopScrubbing) {
+      mouseMoveTimeoutRef.current = setTimeout(() => {
+        const currentVideo = getVideo();
+        if (currentVideo && isHoveringRef.current) {
+          setScrubberVisible(false);
+          currentVideo.play().catch(() => {});
+          setIsPlaying(true);
+          onPlayStart?.();
+        }
+      }, playDelay);
+    }
+  }, [enabled, duration, getVideo, playOnStopScrubbing, playDelay, onProgressChange, onPlayStart]);
+
+  // Handle mouse enter
+  const handleMouseEnter = useCallback(() => {
+    if (!enabled) return;
+
+    isHoveringRef.current = true;
+    setIsHovering(true);
+    onHoverStart?.();
+
+    const video = getVideo();
+    if (video) {
+      // Prime video loading if needed
+      if (video.readyState === 0) {
+        video.load();
+      }
+      video.pause();
+      setIsPlaying(false);
+    }
+  }, [enabled, getVideo, onHoverStart]);
+
+  // Handle mouse leave
+  const handleMouseLeave = useCallback(() => {
+    if (!enabled) return;
+
+    isHoveringRef.current = false;
+    setIsHovering(false);
+    lastMouseXRef.current = null;
+    setScrubberPosition(null);
+    setScrubberVisible(true);
+
+    if (mouseMoveTimeoutRef.current) {
+      clearTimeout(mouseMoveTimeoutRef.current);
+      mouseMoveTimeoutRef.current = null;
+    }
+
+    const video = getVideo();
+    if (video) {
+      video.pause();
+      if (resetOnLeave) {
+        video.currentTime = 0;
+        setProgress(0);
+        setCurrentTime(0);
+      }
+      setIsPlaying(false);
+    }
+
+    onHoverEnd?.();
+    onPlayPause?.();
+  }, [enabled, resetOnLeave, getVideo, onHoverEnd, onPlayPause]);
+
+  // Handle video metadata loaded
+  const handleLoadedMetadata = useCallback(() => {
+    const video = getVideo();
     if (!video) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          isVisibleRef.current = entry.isIntersecting;
-          if (!entry.isIntersecting && animationFrameRef.current) {
-            // Stop scrubbing when video goes off-screen
-            stopScrubbing();
-          }
-        });
-      },
-      { threshold: 0.1 } // Trigger when at least 10% visible
-    );
+    const newDuration = video.duration;
+    if (!Number.isFinite(newDuration) || newDuration <= 0) return;
 
-    observer.observe(video);
+    setDurationState(newDuration);
 
-    return () => {
-      observer.disconnect();
-    };
-  }, [stopScrubbing]);
+    // Recalculate scrubber if user was hovering while metadata loaded
+    if (isHoveringRef.current && lastMouseXRef.current !== null && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const prog = Math.max(0, Math.min(1, lastMouseXRef.current / rect.width));
+      const targetTime = prog * newDuration;
 
+      if (Number.isFinite(targetTime)) {
+        setScrubberPosition(prog * 100);
+        setScrubberVisible(true);
+        setProgress(prog);
+        setCurrentTime(targetTime);
+
+        video.pause();
+        video.currentTime = targetTime;
+        onProgressChange?.(prog, targetTime);
+      }
+    }
+  }, [getVideo, onProgressChange]);
+
+  // Track video play/pause state
   useEffect(() => {
-    const video = videoRef.current;
-    
-    // This listener updates the progress bar during normal playback.
-    const handleProgress = () => {
-        if (video && video.duration > 0 && animationFrameRef.current === null && videoRef.current) {
-            setProgress((video.currentTime / video.duration) * 100);
-        }
+    const video = getVideo();
+    if (!video) return;
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+      onPlayStart?.();
     };
 
-    video?.addEventListener('timeupdate', handleProgress);
+    const handlePause = () => {
+      setIsPlaying(false);
+      onPlayPause?.();
+    };
 
-    // Cleanup on unmount
+    const handleDurationChange = () => {
+      if (video.duration && Number.isFinite(video.duration)) {
+        setDurationState(video.duration);
+      }
+    };
+
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('durationchange', handleDurationChange);
+
     return () => {
-        video?.removeEventListener('timeupdate', handleProgress);
-        // Bypassing stopScrubbing() on unmount to avoid auto-playing a video that is no longer visible.
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-          animationFrameRef.current = null;
-        }
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('durationchange', handleDurationChange);
+    };
+  }, [getVideo, onPlayStart, onPlayPause]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (mouseMoveTimeoutRef.current) {
+        clearTimeout(mouseMoveTimeoutRef.current);
+      }
     };
   }, []);
 
   return {
+    containerRef,
+    containerProps: {
+      onMouseMove: handleMouseMove,
+      onMouseEnter: handleMouseEnter,
+      onMouseLeave: handleMouseLeave,
+    },
     videoRef,
-    playbackRate,
+    videoProps: {
+      onLoadedMetadata: handleLoadedMetadata,
+    },
     progress,
-    handleMouseEnter,
-    handleMouseMove,
-    handleMouseLeave,
-    handleSeek,
+    currentTime,
+    duration,
+    scrubberPosition,
+    scrubberVisible,
+    isHovering,
+    isPlaying,
+    setVideoElement,
+    setDuration,
+    seekToProgress,
+    play,
+    pause,
+    reset,
   };
-}; 
+}
+
+export default useVideoScrubbing;
