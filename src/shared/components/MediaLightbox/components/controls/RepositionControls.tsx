@@ -30,7 +30,7 @@ interface RepositionControlsProps {
  * Provides sliders for image repositioning:
  * - Horizontal position (translateX)
  * - Vertical position (translateY)  
- * - Scale (0.5x to 1.5x)
+ * - Scale (0.25x to 2x)
  * - Rotation (-180° to 180°)
  * - Flip Horizontal / Vertical
  * - Reset button to restore defaults
@@ -52,10 +52,9 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
   const iconSize = variant === 'tablet' ? 'h-3 w-3' : 'h-2.5 w-2.5';
   const sliderIconSize = variant === 'tablet' ? 'h-3.5 w-3.5' : 'h-3 w-3';
   
-  // Max translate as percentage - limited to ±40% to keep image mostly on screen
-  // At 40%, image center moves 40% of its width, keeping 60%+ visible
-  // Slightly scales with scale factor but capped to prevent image from going off-screen
-  const maxTranslatePercent = Math.round(40 * Math.min(transform.scale, 1.25));
+  // Max translate as percentage - allows ±80% for wider repositioning range
+  // Slightly scales with scale factor but capped to prevent extreme values
+  const maxTranslatePercent = Math.round(80 * Math.min(transform.scale, 1.25));
   
   // Check if any transform has been applied
   const hasChanges = 
@@ -151,8 +150,8 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
         </div>
         <input
           type="range"
-          min={50}
-          max={150}
+          min={25}
+          max={200}
           value={transform.scale * 100}
           onChange={(e) => onScaleChange(parseInt(e.target.value) / 100)}
           className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
