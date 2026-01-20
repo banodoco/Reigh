@@ -389,12 +389,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     }));
   }, [segmentSlots, pairInfo]);
 
-  // Don't render if no pairs (need at least 2 images for a pair)
-  if (pairInfo.length === 0) {
-    return null;
-  }
-
   // Calculate preview dimensions based on aspect ratio
+  // NOTE: This must be before the early return to follow React's rules of hooks
   const previewDimensions = useMemo(() => {
     const maxHeight = 200;
     if (!projectAspectRatio) return { width: Math.round(maxHeight * 16 / 9), height: maxHeight };
@@ -405,6 +401,11 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     }
     return { width: Math.round(maxHeight * 16 / 9), height: maxHeight };
   }, [projectAspectRatio]);
+
+  // Don't render if no pairs (need at least 2 images for a pair)
+  if (pairInfo.length === 0) {
+    return null;
+  }
 
   return (
     <div className="w-full relative">
