@@ -32,6 +32,21 @@ interface InlineSegmentVideoProps {
   isDeleting?: boolean;
   /** Whether a task is pending (Queued/In Progress) for this segment */
   isPending?: boolean;
+  // Scrubbing props - for external preview control
+  /** Whether this segment is actively being scrubbed */
+  isScrubbingActive?: boolean;
+  /** Callback when scrubbing should start (mouse enters this segment) */
+  onScrubbingStart?: () => void;
+  /** Ref to attach to container for scrubbing (from useVideoScrubbing) */
+  scrubbingContainerRef?: React.RefObject<HTMLDivElement>;
+  /** Props to spread on container for scrubbing (from useVideoScrubbing) */
+  scrubbingContainerProps?: {
+    onMouseMove: (e: React.MouseEvent) => void;
+    onMouseEnter: () => void;
+    onMouseLeave: () => void;
+  };
+  /** Current scrubbing progress (0-1) for visual feedback */
+  scrubbingProgress?: number;
 }
 
 export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
@@ -46,6 +61,12 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   onDelete,
   isDeleting = false,
   isPending = false,
+  // Scrubbing props
+  isScrubbingActive = false,
+  onScrubbingStart,
+  scrubbingContainerRef,
+  scrubbingContainerProps,
+  scrubbingProgress,
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
@@ -54,6 +75,7 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const localContainerRef = useRef<HTMLDivElement>(null);
   
   // Frame rate for frame number calculation (Wan model outputs 16fps)
   const FPS = 16;
@@ -98,26 +120,46 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
     bottom: 0,
   };
   
-  // Handle mouse events
-  const handleMouseEnter = useCallback(() => {
+  // Handle mouse events - integrates with external scrubbing system
+  const handleMouseEnter = useCallback((e: React.MouseEvent) => {
     if (isMobile) return;
     setIsHovering(true);
-  }, [isMobile]);
-  
+
+    // Notify parent that scrubbing should start on this segment
+    onScrubbingStart?.();
+
+    // If we have external scrubbing props, call their handler
+    if (scrubbingContainerProps?.onMouseEnter) {
+      scrubbingContainerProps.onMouseEnter();
+    }
+  }, [isMobile, onScrubbingStart, scrubbingContainerProps]);
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isMobile) return;
     setHoverPosition({ x: e.clientX, y: e.clientY });
-  }, [isMobile]);
-  
-  const handleMouseLeave = useCallback(() => {
+
+    // If we have external scrubbing props, call their handler
+    if (scrubbingContainerProps?.onMouseMove) {
+      scrubbingContainerProps.onMouseMove(e);
+    }
+  }, [isMobile, scrubbingContainerProps]);
+
+  const handleMouseLeave = useCallback((e: React.MouseEvent) => {
     if (isMobile) return;
     setIsHovering(false);
     setCurrentTime(0);
-    if (videoRef.current) {
+
+    // If we have external scrubbing props, call their handler
+    if (scrubbingContainerProps?.onMouseLeave) {
+      scrubbingContainerProps.onMouseLeave();
+    }
+
+    // Also reset local video if not using external scrubbing
+    if (videoRef.current && !isScrubbingActive) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
     }
-  }, [isMobile]);
+  }, [isMobile, scrubbingContainerProps, isScrubbingActive]);
   
   // Start video and track time when hovering
   useEffect(() => {
@@ -216,13 +258,18 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
     );
   }
   
+  // Use scrubbing ref when active, otherwise use local ref
+  const containerRefToUse = isScrubbingActive && scrubbingContainerRef ? scrubbingContainerRef : localContainerRef;
+
   return (
     <>
       <div
+        ref={containerRefToUse}
         className={cn(
           "cursor-pointer overflow-hidden rounded-lg border-2 border-primary/30 shadow-md bg-muted/20",
           "transition-all duration-150",
-          isHovering && "z-10 border-primary"
+          isHovering && "z-10 border-primary",
+          isScrubbingActive && "ring-2 ring-primary ring-offset-1"
         )}
         style={adjustedPositionStyle}
         onClick={onClick}
@@ -319,18 +366,20 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
         )}
         
         {/* Progress bar / scrubber when hovering */}
-        {isHovering && duration > 0 && (
+        {isHovering && (scrubbingProgress !== undefined || duration > 0) && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30 pointer-events-none">
-            <div 
+            <div
               className="h-full bg-primary transition-all duration-75"
-              style={{ width: `${progressPercent}%` }}
+              style={{
+                width: `${scrubbingProgress !== undefined ? scrubbingProgress * 100 : progressPercent}%`
+              }}
             />
           </div>
         )}
       </div>
-      
-      {/* Floating preview - portal to body */}
-      {isHovering && !isMobile && videoUrl && createPortal(
+
+      {/* Floating preview - portal to body (hidden when using external scrubbing preview) */}
+      {isHovering && !isMobile && videoUrl && !isScrubbingActive && createPortal(
         <div 
           className="fixed pointer-events-none"
           style={{

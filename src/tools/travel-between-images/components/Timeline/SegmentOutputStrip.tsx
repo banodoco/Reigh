@@ -5,7 +5,7 @@
  * Each segment is positioned to match the timeline pair below it.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Play, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import MediaLightbox from '@/shared/components/MediaLightbox';
@@ -13,10 +13,13 @@ import { useSegmentOutputsForShot } from '../../hooks/useSegmentOutputsForShot';
 import { InlineSegmentVideo } from './InlineSegmentVideo';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePendingSegmentTasks } from '@/shared/hooks/usePendingSegmentTasks';
+import { useVideoScrubbing } from '@/shared/hooks/useVideoScrubbing';
 import { GenerationRow } from '@/types/shots';
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { getDisplayUrl } from '@/shared/lib/utils';
+import { cn } from '@/lib/utils';
 
 import type { PairData } from './TimelineContainer';
 
@@ -67,14 +70,46 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
 }) => {
   // ===== ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP =====
   const isMobile = useIsMobile();
-  
+
   // Lightbox state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
-  
+
   // Deletion state
   const [deletingSegmentId, setDeletingSegmentId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // ===== SCRUBBING PREVIEW STATE =====
+  // Track which segment is being scrubbed (by slot index)
+  const [activeScrubbingIndex, setActiveScrubbingIndex] = useState<number | null>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Video scrubbing hook - controls the preview video
+  const scrubbing = useVideoScrubbing({
+    enabled: !isMobile && activeScrubbingIndex !== null,
+    playOnStopScrubbing: true,
+    playDelay: 400,
+    resetOnLeave: true,
+    onHoverEnd: () => setActiveScrubbingIndex(null),
+  });
+
+  // Get the active segment's video URL
+  const activeSegmentSlot = activeScrubbingIndex !== null ? segmentSlots[activeScrubbingIndex] : null;
+  const activeSegmentVideoUrl = activeSegmentSlot?.type === 'child' ? activeSegmentSlot.child.location : null;
+
+  // Connect preview video to scrubbing hook when it changes
+  useEffect(() => {
+    if (previewVideoRef.current) {
+      scrubbing.setVideoElement(previewVideoRef.current);
+    }
+  }, [activeScrubbingIndex, scrubbing.setVideoElement]);
+
+  // Reset scrubbing state when video URL changes
+  useEffect(() => {
+    if (activeSegmentVideoUrl) {
+      scrubbing.reset();
+    }
+  }, [activeSegmentVideoUrl]);
   
   // Fetch segment outputs data - uses controlled state if provided
   const {
@@ -359,8 +394,75 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     return null;
   }
 
+  // Calculate preview dimensions based on aspect ratio
+  const previewDimensions = useMemo(() => {
+    const maxHeight = 200;
+    if (!projectAspectRatio) return { width: Math.round(maxHeight * 16 / 9), height: maxHeight };
+    const [w, h] = projectAspectRatio.split(':').map(Number);
+    if (w && h) {
+      const aspectRatio = w / h;
+      return { width: Math.round(maxHeight * aspectRatio), height: maxHeight };
+    }
+    return { width: Math.round(maxHeight * 16 / 9), height: maxHeight };
+  }, [projectAspectRatio]);
+
   return (
     <div className="w-full relative">
+      {/* Scrubbing Preview Area - shows above the strip when scrubbing a segment */}
+      <div
+        className={cn(
+          "flex justify-center mb-2 transition-all duration-200",
+          activeScrubbingIndex !== null && activeSegmentVideoUrl
+            ? "opacity-100 h-auto"
+            : "opacity-0 h-0 overflow-hidden pointer-events-none"
+        )}
+      >
+        <div
+          className="relative bg-black rounded-lg overflow-hidden shadow-xl border-2 border-primary/50"
+          style={{
+            width: previewDimensions.width,
+            height: previewDimensions.height,
+          }}
+        >
+          {activeSegmentVideoUrl && (
+            <video
+              ref={previewVideoRef}
+              src={getDisplayUrl(activeSegmentVideoUrl)}
+              className="w-full h-full object-contain"
+              muted
+              playsInline
+              preload="auto"
+              {...scrubbing.videoProps}
+            />
+          )}
+
+          {/* Scrubber progress bar */}
+          {scrubbing.scrubberPosition !== null && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+              <div
+                className={cn(
+                  "h-full bg-primary transition-opacity duration-200",
+                  scrubbing.scrubberVisible ? "opacity-100" : "opacity-50"
+                )}
+                style={{ width: `${scrubbing.scrubberPosition}%` }}
+              />
+            </div>
+          )}
+
+          {/* Segment label */}
+          {activeScrubbingIndex !== null && (
+            <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              Segment {(activeSegmentSlot?.index ?? 0) + 1}
+              {scrubbing.duration > 0 && (
+                <span className="ml-2 text-white/70">
+                  {scrubbing.currentTime.toFixed(1)}s / {scrubbing.duration.toFixed(1)}s
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Segment output strip - compact height for segment thumbnails */}
       <div
         className="relative h-32 mt-3 mb-1"
@@ -382,6 +484,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
 
                 if (!position) return null;
 
+                const isActiveScrubbing = activeScrubbingIndex === index;
+
                 return (
                   <InlineSegmentVideo
                     key={slot.type === 'child' ? slot.child.id : `placeholder-${index}`}
@@ -396,6 +500,12 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
                     onDelete={handleDeleteSegment}
                     isDeleting={slot.type === 'child' && slot.child.id === deletingSegmentId}
                     isPending={hasPendingTask(slot.pairShotGenerationId)}
+                    // Scrubbing props - when active, this segment controls the preview
+                    isScrubbingActive={isActiveScrubbing}
+                    onScrubbingStart={() => setActiveScrubbingIndex(index)}
+                    scrubbingContainerRef={isActiveScrubbing ? scrubbing.containerRef : undefined}
+                    scrubbingContainerProps={isActiveScrubbing ? scrubbing.containerProps : undefined}
+                    scrubbingProgress={isActiveScrubbing ? scrubbing.progress : undefined}
                   />
                 );
               })}
