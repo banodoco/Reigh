@@ -1440,7 +1440,7 @@ export async function handleUpscaleVariant(
       upscaleParams,
       true,
       'upscaled',
-      'Upscaled'
+      null // Don't auto-generate variant name
     );
     
     console.log(`[ImageUpscale] Successfully created upscaled variant for generation ${generationId}`);
