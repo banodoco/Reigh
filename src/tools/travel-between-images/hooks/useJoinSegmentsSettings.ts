@@ -15,6 +15,8 @@ export interface JoinSegmentsSettings extends JoinClipsSettings {
   generateMode: 'batch' | 'join';
   /** Full LoRA objects with names for display (extends the base loras array which only has id/strength) */
   selectedLoras: ActiveLora[];
+  /** Whether to automatically stitch generated clips using Join Segments settings after batch generation */
+  stitchAfterGenerate: boolean;
 }
 
 /**
@@ -61,6 +63,8 @@ const DEFAULT_JOIN_SEGMENTS_SETTINGS: JoinSegmentsSettings = {
   generateMode: 'batch',
   // Full LoRA objects for Join Segments (persisted per shot)
   selectedLoras: [],
+  // Stitch after generate toggle
+  stitchAfterGenerate: false,
 };
 
 export interface UseJoinSegmentsSettingsReturn {

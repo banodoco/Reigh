@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Sparkles, ArrowLeftRight } from "lucide-react";
+import { Sparkles, ArrowLeftRight, ChevronDown, Settings } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { Label } from "@/shared/components/ui/label";
+import { Switch } from "@/shared/components/ui/switch";
 import { Slider } from "@/shared/components/ui/slider";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { toast } from "sonner";
@@ -764,14 +766,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     replaceMode: joinReplaceMode = true,
     keepBridgingImages: joinKeepBridgingImages = false,
     enhancePrompt: joinEnhancePrompt = true,
+    // Model settings (for stitch config)
+    model: joinModel = 'wan_2_2_vace_lightning_baseline_2_2_2',
+    numInferenceSteps: joinNumInferenceSteps = 6,
+    guidanceScale: joinGuidanceScale = 3.0,
+    seed: joinSeed = -1,
     // Motion preset settings
     motionMode: joinMotionMode = 'basic',
     phaseConfig: joinPhaseConfig,
     selectedPhasePresetId: joinSelectedPhasePresetId,
     randomSeed: joinRandomSeed = true,
+    // Optional settings with defaults
+    priority: joinPriority = 0,
+    useInputVideoResolution: joinUseInputVideoResolution = false,
+    useInputVideoFps: joinUseInputVideoFps = false,
+    noisedInputVideo: joinNoisedInputVideo = 0,
+    loopFirstClip: joinLoopFirstClip = false,
     // NEW: Persisted generate mode and LoRAs
     generateMode = 'batch',
     selectedLoras: joinSelectedLoras = [],
+    stitchAfterGenerate = false,
   } = joinSettings.settings;
   
   // Setter for generate mode (persisted)
@@ -1970,6 +1984,36 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           uni3cEndPercent: structureVideoConfig.uni3c_end_percent,
           // Pass the effective parent ID (either selected, pending, or undefined for new)
           parentGenerationId: effectiveParentId,
+          // Stitch config - if enabled, orchestrator will create join task after segments complete
+          // Contains ALL settings needed independently from travel generation
+          stitchConfig: stitchAfterGenerate ? {
+            // Frame settings
+            context_frame_count: joinContextFrames,
+            gap_frame_count: joinGapFrames,
+            replace_mode: joinReplaceMode,
+            keep_bridging_images: joinKeepBridgingImages,
+            // Prompt settings
+            prompt: joinPrompt,
+            negative_prompt: joinNegativePrompt,
+            enhance_prompt: joinEnhancePrompt,
+            // Model settings (independent from travel generation)
+            model: joinModel,
+            num_inference_steps: joinNumInferenceSteps,
+            guidance_scale: joinGuidanceScale,
+            seed: joinSeed,
+            random_seed: joinRandomSeed,
+            // Motion settings
+            motion_mode: joinMotionMode,
+            phase_config: joinPhaseConfig,
+            selected_phase_preset_id: joinSelectedPhasePresetId,
+            loras: joinSelectedLoras.map(l => ({ path: l.path, strength: l.strength })),
+            // Optional settings
+            priority: joinPriority,
+            use_input_video_resolution: joinUseInputVideoResolution,
+            use_input_video_fps: joinUseInputVideoFps,
+            vid2vid_init_strength: joinNoisedInputVideo,
+            loop_first_clip: joinLoopFirstClip,
+          } : undefined,
         });
 
         // [ParentReuseDebug] Log the result
@@ -2057,6 +2101,29 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     structureVideoConfig,
     clearAllEnhancedPrompts,
     selectedOutputId,
+    // Stitch config deps (all settings for independent join generation)
+    stitchAfterGenerate,
+    joinContextFrames,
+    joinGapFrames,
+    joinReplaceMode,
+    joinKeepBridgingImages,
+    joinPrompt,
+    joinNegativePrompt,
+    joinEnhancePrompt,
+    joinModel,
+    joinNumInferenceSteps,
+    joinGuidanceScale,
+    joinSeed,
+    joinRandomSeed,
+    joinMotionMode,
+    joinPhaseConfig,
+    joinSelectedPhasePresetId,
+    joinSelectedLoras,
+    joinPriority,
+    joinUseInputVideoResolution,
+    joinUseInputVideoFps,
+    joinNoisedInputVideo,
+    joinLoopFirstClip,
     // IncomingTasks deps
     addIncomingTask,
     removeIncomingTask,
@@ -2367,58 +2434,65 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           <Card>
             <CardHeader className="pb-4">
                 {/* Toggle header - selected option on left, swap icon, other option on right */}
-                <div className="flex items-center gap-2">
-                  {/* Left position: active option */}
+                {/* Hidden when stitchAfterGenerate is enabled (stitch settings shown inline instead) */}
+                {stitchAfterGenerate ? (
                   <span className="text-base sm:text-lg font-light text-foreground">
-                    {generateMode === 'batch' ? 'Batch Generate' : 'Join Segments'}
+                    Batch Generate
                   </span>
-                  
-                  {/* Swap button with arrows */}
-                  <button
-                    onClick={() => {
-                      console.log('[JoinSegmentsDebug] Toggle clicked (swap button):', {
-                        shotId: selectedShotId?.substring(0, 8),
-                        from: generateMode,
-                        to: generateMode === 'batch' ? 'join' : 'batch',
-                        joinValidationData,
-                        videoOutputsCount: videoOutputs.length,
-                      });
-                      setGenerateMode(generateMode === 'batch' ? 'join' : 'batch');
-                    }}
-                    className={`p-1 rounded-full transition-colors ${
-                      (generateMode === 'batch' && joinValidationData.videoCount < 2)
-                        ? 'text-muted-foreground/30 cursor-not-allowed'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer'
-                    }`}
-                    title={generateMode === 'batch' ? 'Switch to Join Segments' : 'Switch to Batch Generate'}
-                  >
-                    <ArrowLeftRight className="w-4 h-4" />
-                  </button>
-                  
-                  {/* Right position: inactive option (clickable) */}
-                  <button
-                    onClick={() => {
-                      console.log('[JoinSegmentsDebug] Toggle clicked (label button):', {
-                        shotId: selectedShotId?.substring(0, 8),
-                        from: generateMode,
-                        to: generateMode === 'batch' ? 'join' : 'batch',
-                        joinValidationData,
-                        videoOutputsCount: videoOutputs.length,
-                      });
-                      setGenerateMode(generateMode === 'batch' ? 'join' : 'batch');
-                    }}
-                    className={`text-sm transition-colors ${
-                      (generateMode === 'batch' && joinValidationData.videoCount < 2)
-                        ? 'text-muted-foreground/30 cursor-not-allowed'
-                        : 'text-muted-foreground hover:text-foreground cursor-pointer'
-                    }`}
-                  >
-                    {generateMode === 'batch'
-                      ? 'Join Segments'
-                      : 'Batch Generate'
-                    }
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {/* Left position: active option */}
+                    <span className="text-base sm:text-lg font-light text-foreground">
+                      {generateMode === 'batch' ? 'Batch Generate' : 'Join Segments'}
+                    </span>
+
+                    {/* Swap button with arrows */}
+                    <button
+                      onClick={() => {
+                        console.log('[JoinSegmentsDebug] Toggle clicked (swap button):', {
+                          shotId: selectedShotId?.substring(0, 8),
+                          from: generateMode,
+                          to: generateMode === 'batch' ? 'join' : 'batch',
+                          joinValidationData,
+                          videoOutputsCount: videoOutputs.length,
+                        });
+                        setGenerateMode(generateMode === 'batch' ? 'join' : 'batch');
+                      }}
+                      className={`p-1 rounded-full transition-colors ${
+                        (generateMode === 'batch' && joinValidationData.videoCount < 2)
+                          ? 'text-muted-foreground/30 cursor-not-allowed'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer'
+                      }`}
+                      title={generateMode === 'batch' ? 'Switch to Join Segments' : 'Switch to Batch Generate'}
+                    >
+                      <ArrowLeftRight className="w-4 h-4" />
+                    </button>
+
+                    {/* Right position: inactive option (clickable) */}
+                    <button
+                      onClick={() => {
+                        console.log('[JoinSegmentsDebug] Toggle clicked (label button):', {
+                          shotId: selectedShotId?.substring(0, 8),
+                          from: generateMode,
+                          to: generateMode === 'batch' ? 'join' : 'batch',
+                          joinValidationData,
+                          videoOutputsCount: videoOutputs.length,
+                        });
+                        setGenerateMode(generateMode === 'batch' ? 'join' : 'batch');
+                      }}
+                      className={`text-sm transition-colors ${
+                        (generateMode === 'batch' && joinValidationData.videoCount < 2)
+                          ? 'text-muted-foreground/30 cursor-not-allowed'
+                          : 'text-muted-foreground hover:text-foreground cursor-pointer'
+                      }`}
+                    >
+                      {generateMode === 'batch'
+                        ? 'Join Segments'
+                        : 'Batch Generate'
+                      }
+                    </button>
+                  </div>
+                )}
             </CardHeader>
             <CardContent>
               {generateMode === 'batch' ? (
@@ -2621,17 +2695,106 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     disabled={isGenerationDisabled}
                     inputId="variant-name"
                     videoCount={Math.max(0, simpleFilteredImages.length - 1)}
+                    middleContent={
+                      stitchAfterGenerate ? (
+                        <Collapsible className="mb-4 w-full">
+                          {/* Stitch toggle + settings trigger on same row */}
+                          <div className="flex items-center justify-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                id="stitch-after-generate"
+                                checked={stitchAfterGenerate}
+                                onCheckedChange={(checked) => joinSettings.updateField('stitchAfterGenerate', checked)}
+                              />
+                              <Label
+                                htmlFor="stitch-after-generate"
+                                className="text-sm font-normal cursor-pointer"
+                              >
+                                Stitch together generated clips
+                              </Label>
+                            </div>
+                            <CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group">
+                              <Settings className="w-4 h-4" />
+                              <span>Settings</span>
+                              <ChevronDown className="w-3 h-3 transition-transform group-data-[state=open]:rotate-180" />
+                            </CollapsibleTrigger>
+                          </div>
+                          <CollapsibleContent className="mt-4 pt-4 border-t">
+                              <JoinClipsSettingsForm
+                                gapFrames={joinGapFrames}
+                                setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
+                                contextFrames={joinContextFrames}
+                                setContextFrames={(val) => joinSettings.updateField('contextFrameCount', val)}
+                                replaceMode={joinReplaceMode}
+                                setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
+                                keepBridgingImages={joinKeepBridgingImages}
+                                setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
+                                prompt={joinPrompt}
+                                setPrompt={(val) => joinSettings.updateField('prompt', val)}
+                                negativePrompt={joinNegativePrompt}
+                                setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
+                                enhancePrompt={joinEnhancePrompt}
+                                setEnhancePrompt={(val) => joinSettings.updateField('enhancePrompt', val)}
+                                availableLoras={availableLoras}
+                                projectId={projectId}
+                                loraPersistenceKey="join-clips-shot-editor-stitch"
+                                loraManager={joinLoraManager}
+                                onGenerate={() => {}} // No-op since generate is handled by main button
+                                isGenerating={false}
+                                generateSuccess={false}
+                                generateButtonText=""
+                                showGenerateButton={false}
+                                onRestoreDefaults={handleRestoreJoinDefaults}
+                                shortestClipFrames={joinValidationData.shortestClipFrames}
+                                motionMode={joinMotionMode}
+                                onMotionModeChange={(mode) => joinSettings.updateField('motionMode', mode)}
+                                phaseConfig={joinPhaseConfig ?? DEFAULT_JOIN_CLIPS_PHASE_CONFIG}
+                                onPhaseConfigChange={(config) => joinSettings.updateField('phaseConfig', config)}
+                                randomSeed={joinRandomSeed}
+                                onRandomSeedChange={(val) => joinSettings.updateField('randomSeed', val)}
+                                selectedPhasePresetId={joinSelectedPhasePresetId ?? BUILTIN_JOIN_CLIPS_DEFAULT_ID}
+                                onPhasePresetSelect={(presetId, config) => {
+                                  joinSettings.updateFields({
+                                    selectedPhasePresetId: presetId,
+                                    phaseConfig: config,
+                                  });
+                                }}
+                                onPhasePresetRemove={() => {
+                                  joinSettings.updateField('selectedPhasePresetId', null);
+                                }}
+                              />
+                            </CollapsibleContent>
+                        </Collapsible>
+                      ) : (
+                        /* Just the toggle when stitch is disabled */
+                        <div className="mb-4 flex items-center justify-center gap-2">
+                          <Switch
+                            id="stitch-after-generate"
+                            checked={stitchAfterGenerate}
+                            onCheckedChange={(checked) => joinSettings.updateField('stitchAfterGenerate', checked)}
+                          />
+                          <Label
+                            htmlFor="stitch-after-generate"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Stitch together generated clips
+                          </Label>
+                        </div>
+                      )
+                    }
                   />
 
-                  {/* Swap to Join Segments */}
-                  <button
-                    ref={swapButtonRef}
-                    onClick={() => toggleGenerateModePreserveScroll('join')}
-                    className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-                  >
-                    <ArrowLeftRight className="w-4 h-4" />
-                    <span>Swap to Join Segments</span>
-                  </button>
+                  {/* Swap to Join Segments - hidden when stitch is enabled */}
+                  {!stitchAfterGenerate && (
+                    <button
+                      ref={swapButtonRef}
+                      onClick={() => toggleGenerateModePreserveScroll('join')}
+                      className="mt-3 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                    >
+                      <ArrowLeftRight className="w-4 h-4" />
+                      <span>Swap to Join Segments</span>
+                    </button>
+                  )}
                 </div>
                 </>
               ) : (

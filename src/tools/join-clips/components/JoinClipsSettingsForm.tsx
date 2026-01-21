@@ -175,6 +175,9 @@ export interface JoinClipsSettingsFormProps {
     
     // Featured preset IDs for quick-select chips (provided by parent, or uses default)
     featuredPresetIds?: string[];
+
+    /** Whether to show the generate button (default: true). Set to false when embedding in another form. */
+    showGenerateButton?: boolean;
 }
 
 const Visualization: React.FC<{
@@ -719,6 +722,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     onPhasePresetSelect,
     onPhasePresetRemove,
     featuredPresetIds = JOIN_CLIPS_FEATURED_PRESET_IDS,
+    showGenerateButton = true,
 }) => {
     // Handle undefined values (defensive fallback)
     const keepBridgingImagesValue = keepBridgingImages ?? false;
@@ -1271,30 +1275,34 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                 </div>
             </div>
 
-            <div className="h-px bg-border/50" />
+            {showGenerateButton && (
+                <>
+                    <div className="h-px bg-border/50" />
 
-            {/* Generate Button */}
-            <div className="flex flex-col items-center gap-3 pt-4">
-                <Button
-                    onClick={onGenerate}
-                    disabled={isGenerateDisabled || isGenerating || generateSuccess}
-                    className={cn("w-full max-w-md shadow-lg gap-2 h-12", 
-                        generateSuccess && "bg-green-500 hover:bg-green-600"
-                    )}
-                    size="lg"
-                >
-                    {isGenerating ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : generateSuccess ? (
-                        <Check className="w-5 h-5" />
-                    ) : (
-                        <Film className="w-5 h-5" />
-                    )}
-                    <span className="font-medium text-lg">
-                        {generateSuccess ? 'Task Created' : generateButtonText}
-                    </span>
-                </Button>
-            </div>
+                    {/* Generate Button */}
+                    <div className="flex flex-col items-center gap-3 pt-4">
+                        <Button
+                            onClick={onGenerate}
+                            disabled={isGenerateDisabled || isGenerating || generateSuccess}
+                            className={cn("w-full max-w-md shadow-lg gap-2 h-12",
+                                generateSuccess && "bg-green-500 hover:bg-green-600"
+                            )}
+                            size="lg"
+                        >
+                            {isGenerating ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : generateSuccess ? (
+                                <Check className="w-5 h-5" />
+                            ) : (
+                                <Film className="w-5 h-5" />
+                            )}
+                            <span className="font-medium text-lg">
+                                {generateSuccess ? 'Task Created' : generateButtonText}
+                            </span>
+                        </Button>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

@@ -469,6 +469,78 @@ export interface TravelBetweenImagesTaskParams extends
   uni3c_end_percent?: number;
   /** @deprecated Use structure_guidance.target === 'uni3c' instead */
   use_uni3c?: boolean;
+
+  // ============================================================================
+  // STITCH CONFIG (for automatic join after generation)
+  // ============================================================================
+
+  /**
+   * When provided, the orchestrator will create a join_final_stitch task
+   * after all travel segments complete. This task will stitch the generated
+   * clips together using the provided join settings.
+   */
+  stitch_config?: StitchConfig;
+}
+
+/**
+ * Configuration for automatic stitching after travel generation.
+ * Contains ALL settings needed by the worker to create join tasks independently.
+ * This is a self-contained config - does not inherit from travel generation params.
+ *
+ * Fields match JoinClipsTaskParams to ensure worker has everything needed.
+ */
+export interface StitchConfig {
+  // === Frame settings ===
+  /** Number of context frames to use from each clip end */
+  context_frame_count: number;
+  /** Number of gap frames to generate between clips */
+  gap_frame_count: number;
+  /** Replace frames (true) or generate new frames (false) */
+  replace_mode: boolean;
+  /** Keep the bridging/anchor images in output */
+  keep_bridging_images: boolean;
+
+  // === Prompt settings ===
+  /** Prompt for join generation */
+  prompt: string;
+  /** Negative prompt */
+  negative_prompt: string;
+  /** Whether to enhance prompts with AI */
+  enhance_prompt: boolean;
+
+  // === Model settings (independent from travel generation) ===
+  /** Model to use for join generation */
+  model: string;
+  /** Number of inference steps */
+  num_inference_steps: number;
+  /** Guidance scale */
+  guidance_scale: number;
+  /** Seed value (-1 for random) */
+  seed: number;
+  /** Whether to use random seed */
+  random_seed: boolean;
+
+  // === Motion settings ===
+  /** Motion mode: 'basic' (LoRAs) or 'advanced' (phase config) */
+  motion_mode: 'basic' | 'advanced';
+  /** Phase config for motion control */
+  phase_config?: PhaseConfig;
+  /** Selected phase preset ID for UI state restoration */
+  selected_phase_preset_id?: string | null;
+  /** LoRAs for join generation */
+  loras?: Array<{ path: string; strength: number }>;
+
+  // === Optional settings with defaults ===
+  /** Task priority (default 0) */
+  priority?: number;
+  /** Use first input video's resolution instead of project resolution */
+  use_input_video_resolution?: boolean;
+  /** Use first input video's FPS instead of downsampling */
+  use_input_video_fps?: boolean;
+  /** Vid2vid init strength - adds noise to input video (0 = disabled) */
+  vid2vid_init_strength?: number;
+  /** Loop first clip - use first clip as both start and end */
+  loop_first_clip?: boolean;
 }
 
 /**

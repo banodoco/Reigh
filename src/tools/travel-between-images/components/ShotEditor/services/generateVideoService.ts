@@ -15,6 +15,7 @@ import {
   type ModelConfig,
   type StructureVideoConfig as ApiStructureVideoConfig,
   type StructureVideoConfigWithMetadata,
+  type StitchConfig,
   DEFAULT_VIDEO_STRUCTURE_PARAMS,
   DEFAULT_VIDEO_MOTION_PARAMS,
   DEFAULT_PROMPT_CONFIG,
@@ -49,6 +50,7 @@ export type {
   MotionConfig,
   ModelConfig,
   StructureVideoConfig,
+  StitchConfig,
 };
 export {
   DEFAULT_VIDEO_STRUCTURE_PARAMS,
@@ -325,6 +327,9 @@ export interface GenerateVideoParams {
   // Parent generation ID - if provided, new segments will be children of this generation
   // instead of creating a new parent. Used when regenerating under a selected output.
   parentGenerationId?: string;
+
+  // Stitch config - if provided, orchestrator will create a join task after segments complete
+  stitchConfig?: StitchConfig;
 }
 
 export interface GenerateVideoResult {
@@ -368,6 +373,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     variantNameParam,
     clearAllEnhancedPrompts,
     parentGenerationId,
+    stitchConfig,
   } = params;
 
   // Destructure prompt config for convenience (snake_case matches API)
@@ -1609,6 +1615,17 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
 
   if (resolution) {
     requestBody.resolution = resolution;
+  }
+
+  // Add stitch config if provided (for automatic join after generation)
+  if (stitchConfig) {
+    requestBody.stitch_config = stitchConfig;
+    console.log('[Generation] Adding stitch_config for automatic join after generation:', {
+      context_frame_count: stitchConfig.context_frame_count,
+      gap_frame_count: stitchConfig.gap_frame_count,
+      replace_mode: stitchConfig.replace_mode,
+      motion_mode: stitchConfig.motion_mode,
+    });
   }
 
   // ============================================================================

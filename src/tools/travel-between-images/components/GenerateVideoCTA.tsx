@@ -12,6 +12,8 @@ interface GenerateVideoCTAProps {
   inputId?: string;
   /** Number of videos that will be generated (for plural text). Defaults to 1. */
   videoCount?: number;
+  /** Optional content to render between variant name input and generate button */
+  middleContent?: React.ReactNode;
 }
 
 /**
@@ -27,12 +29,13 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
   disabled,
   inputId = 'variant-name',
   videoCount = 1,
+  middleContent,
 }) => {
   const isPlural = videoCount >= 2;
   return (
     <div className="flex flex-col items-center">
-      {/* Variant Name Input */}
-      <div className="w-full max-w-md mb-4">
+      {/* Variant Name Input - commented out for now */}
+      {/* <div className="w-full max-w-md mb-4">
         <input
           id={inputId}
           type="text"
@@ -41,8 +44,11 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
           placeholder="Variant name"
           className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent preserve-case"
         />
-      </div>
-      
+      </div> */}
+
+      {/* Optional middle content (e.g., stitch toggle) */}
+      {middleContent}
+
       <Button
         size="lg"
         className={`w-full max-w-md shadow-lg gap-2 h-12 ${justQueued ? 'bg-green-500 hover:bg-green-600' : ''}`}

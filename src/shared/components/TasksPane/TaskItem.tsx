@@ -206,19 +206,36 @@ const TaskItem: React.FC<TaskItemProps> = ({
 
     const params = parseTaskParams(task.params);
     const orchestratorDetails = params.orchestrator_details || {};
-    const orchestratorId = orchestratorDetails.orchestrator_task_id || params.orchestrator_task_id || params.task_id || task.id;
+    // For orchestrator tasks, use task.id directly - that's the UUID subtasks reference
+    // (orchestrator_details.orchestrator_task_id is a string like "join_clips_orchestrator_..." not a UUID)
+    const orchestratorId = task.id;
+    // Get run_id from orchestrator's params - subtasks have this in orchestrator_run_id
+    const runId = orchestratorDetails.run_id || params.run_id || params.orchestrator_run_id;
 
     try {
+      // Build query filters - match the backend's findSiblingSegments logic
+      const filters: string[] = [
+        // orchestrator_task_id patterns
+        `params->>orchestrator_task_id_ref.eq.${orchestratorId}`,
+        `params->>orchestrator_task_id.eq.${orchestratorId}`,
+        `params->orchestrator_details->>orchestrator_task_id.eq.${orchestratorId}`,
+      ];
+
+      // Add run_id patterns if we have a run_id (this is the primary lookup method on backend)
+      if (runId) {
+        filters.push(
+          `params->>run_id.eq.${runId}`,
+          `params->>orchestrator_run_id.eq.${runId}`,
+          `params->orchestrator_details->>run_id.eq.${runId}`
+        );
+      }
+
       const { data: subtasks, error } = await supabase
         .from('tasks')
         .select('id, status')
         .eq('project_id', selectedProjectId)
         .neq('id', task.id)
-        .or([
-          `params->>orchestrator_task_id_ref.eq.${orchestratorId}`,
-          `params->>orchestrator_task_id.eq.${orchestratorId}`,
-          `params->orchestrator_details->>orchestrator_task_id.eq.${orchestratorId}`,
-        ].join(','));
+        .or(filters.join(','));
 
       if (error) throw error;
 
