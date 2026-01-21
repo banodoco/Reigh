@@ -42,6 +42,7 @@ import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidatio
 import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 import { usePublicLoras } from '@/shared/hooks/useResources';
 import { usePromoteVariantToGeneration } from '@/shared/hooks/usePromoteVariantToGeneration';
+import { useAddImageToShot } from '@/shared/hooks/useShots';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
@@ -217,6 +218,16 @@ interface MediaLightboxProps {
     /** Active child generation ID for this slot (use for regeneration to create variant on correct child) */
     activeChildGenerationId?: string;
   };
+  /**
+   * Callback when segment frame count changes in the regenerate form.
+   * Used for instant/optimistic timeline updates.
+   */
+  onSegmentFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
+  /**
+   * Current frame count from timeline positions (source of truth).
+   * Used to initialize the frame count slider in regenerate form.
+   */
+  currentFrameCount?: number;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -287,6 +298,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   fetchVariantsForSelf = false,
   // Current segment images from timeline (overrides stored params)
   currentSegmentImages,
+  // Callback for instant timeline updates when frame count changes
+  onSegmentFrameCountChange,
+  // Current frame count from timeline positions (source of truth)
+  currentFrameCount,
 }) => {
   // ========================================
   // REFACTORED: All logic extracted to hooks
@@ -624,6 +639,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Variant promotion - create standalone generation from a variant
   const promoteVariantMutation = usePromoteVariantToGeneration();
+  const addImageToShotMutation = useAddImageToShot(); // For adding with position support
   const [promoteSuccess, setPromoteSuccess] = useState(false);
 
   // Handler for "Make new image" button in VariantSelector
@@ -660,9 +676,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [promoteVariantMutation, selectedProjectId, actualGenerationId]);
 
   // Handler for "Add as new image to shot" button in ShotSelectorControls
+  // Now supports positioning: places the new image between current and next item (like duplicate)
   const handleAddVariantAsNewGenerationToShot = useCallback(async (
     shotId: string,
-    variantId: string
+    variantId: string,
+    currentTimelineFrame?: number,
+    nextTimelineFrame?: number
   ): Promise<boolean> => {
     if (!selectedProjectId) {
       toast.error('No project selected');
@@ -674,6 +693,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       variantId: variantId.substring(0, 8),
       projectId: selectedProjectId.substring(0, 8),
       sourceGenerationId: actualGenerationId.substring(0, 8),
+      currentTimelineFrame,
+      nextTimelineFrame,
     });
 
     try {
@@ -686,13 +707,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
       console.log('[PromoteVariantToShot] Created generation:', newGen.id.substring(0, 8));
 
-      // 2. Add to shot using existing onAddToShot callback
-      if (onAddToShot && newGen) {
-        const success = await onAddToShot(shotId, newGen.id, newGen.location, newGen.thumbnail_url || undefined);
-        if (success) {
-          console.log('[PromoteVariantToShot] Successfully added to shot');
-          return true;
+      // 2. Calculate target timeline frame (like duplicate: place between current and next)
+      let targetTimelineFrame: number | undefined;
+      if (currentTimelineFrame !== undefined) {
+        if (nextTimelineFrame !== undefined && nextTimelineFrame > currentTimelineFrame) {
+          // Place in the middle between current and next
+          targetTimelineFrame = Math.floor((currentTimelineFrame + nextTimelineFrame) / 2);
+          // If middle would be same as current, use current + 1
+          if (targetTimelineFrame === currentTimelineFrame) {
+            targetTimelineFrame = currentTimelineFrame + 1;
+          }
+        } else {
+          // No next item, just place at current + 1
+          targetTimelineFrame = currentTimelineFrame + 1;
         }
+        console.log('[PromoteVariantToShot] Calculated target frame:', targetTimelineFrame);
+      }
+
+      // 3. Add to shot using mutation directly for position support
+      if (newGen) {
+        await addImageToShotMutation.mutateAsync({
+          shot_id: shotId,
+          generation_id: newGen.id,
+          project_id: selectedProjectId,
+          imageUrl: newGen.location,
+          thumbUrl: newGen.thumbnail_url || undefined,
+          timelineFrame: targetTimelineFrame, // Position between current and next
+        });
+        console.log('[PromoteVariantToShot] Successfully added to shot at frame:', targetTimelineFrame);
+        return true;
       }
       return false;
     } catch (error) {
@@ -700,7 +743,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       // Error toast is handled in the hook for the mutation part
       return false;
     }
-  }, [promoteVariantMutation, selectedProjectId, actualGenerationId, onAddToShot]);
+  }, [promoteVariantMutation, addImageToShotMutation, selectedProjectId, actualGenerationId]);
 
   // Fetch available LoRAs - needed by edit modes and img2img
   const { data: availableLoras } = usePublicLoras();
@@ -964,6 +1007,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     advancedSettings, // Pass advanced settings for hires fix
     activeVariantLocation: activeVariant?.location, // Use variant's image URL when editing a variant
     activeVariantId: activeVariant?.id, // Track source variant for lineage
+    activeVariantParams: activeVariant?.params as Record<string, any> | null, // For loading saved transform data
   });
   const {
     transform: repositionTransform,
@@ -1811,9 +1855,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         endImageGenerationId={endImageGenId}
         projectResolution={effectiveRegenerateResolution}
         pairShotGenerationId={pairShotGenerationId}
+        onFrameCountChange={onSegmentFrameCountChange}
+        currentFrameCount={currentFrameCount}
       />
     );
-  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId, currentSegmentImages]);
+  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId, currentSegmentImages, onSegmentFrameCountChange, currentFrameCount]);
 
   // Handle entering video edit mode (unified) - restores last used sub-mode
   const handleEnterVideoEditMode = useCallback(() => {
@@ -3111,8 +3157,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onNavigateToShot={handleNavigateToShotFromSelector}
                       onClose={onClose}
                       onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
-                      isViewingVariant={!!isViewingNonPrimaryVariant}
                       activeVariantId={activeVariant?.id}
+                      currentTimelineFrame={media.timeline_frame}
                     />
                   </div>
 
@@ -3470,8 +3516,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onNavigateToShot={handleNavigateToShotFromSelector}
                       onClose={onClose}
                       onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
-                      isViewingVariant={!!isViewingNonPrimaryVariant}
                       activeVariantId={activeVariant?.id}
+                      currentTimelineFrame={media.timeline_frame}
                     />
 
                     {/* Navigation Arrows */}
@@ -3939,8 +3985,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     onNavigateToShot={handleNavigateToShotFromSelector}
                     onClose={onClose}
                     onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
-                    isViewingVariant={!!isViewingNonPrimaryVariant}
                     activeVariantId={activeVariant?.id}
+                    currentTimelineFrame={media.timeline_frame}
                   />
 
                   {/* Navigation Arrows */}

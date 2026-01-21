@@ -1,4 +1,26 @@
 /**
+ * Per-pair LoRA override configuration
+ * Stored in GenerationMetadata for per-segment LoRA overrides
+ */
+export interface PairLoraConfig {
+  id: string;
+  path: string;
+  strength: number;
+  name?: string;
+  lowNoisePath?: string;
+  isMultiStage?: boolean;
+}
+
+/**
+ * Per-pair motion settings override
+ * Stored in GenerationMetadata for per-segment motion overrides
+ */
+export interface PairMotionSettings {
+  amount_of_motion?: number;
+  motion_mode?: 'basic' | 'presets' | 'advanced';
+}
+
+/**
  * Metadata stored on shot_generations for timeline and prompt management
  * This is the single source of truth for pair prompts, enhanced prompts, and position metadata
  */
@@ -18,6 +40,12 @@ export interface GenerationMetadata {
   pair_prompt?: string;
   pair_negative_prompt?: string;
   enhanced_prompt?: string;
+
+  // NEW: Per-pair parameter overrides (following the same pattern as prompts)
+  // null/undefined = use shot defaults, explicit value = use override
+  pair_phase_config?: import('@/tools/travel-between-images/settings').PhaseConfig;
+  pair_loras?: PairLoraConfig[];
+  pair_motion_settings?: PairMotionSettings;
 
   // Allow additional metadata fields without losing type safety on known keys
   [key: string]: any;

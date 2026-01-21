@@ -2,12 +2,13 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { GenerationRow } from '@/types/shots';
+import { GenerationRow, PairLoraConfig, PairMotionSettings } from '@/types/shots';
 import { transformForTimeline, type RawShotGeneration, calculateDerivedCounts } from '@/shared/lib/generationTransformers';
 import { timelineDebugger } from '@/tools/travel-between-images/components/Timeline/utils/timeline-debug';
 import { isVideoGeneration, isVideoShotGeneration, isPositioned, type ShotGenerationLike } from '@/shared/lib/typeGuards';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 import { calculateNextAvailableFrame, extractExistingFrames, DEFAULT_FRAME_SPACING } from '@/shared/utils/timelinePositionCalculator';
+import type { PhaseConfig } from '@/tools/travel-between-images/settings';
 
 
 export interface ShotGeneration {
@@ -39,6 +40,10 @@ export interface PositionMetadata {
   pair_prompt?: string;
   pair_negative_prompt?: string;
   enhanced_prompt?: string;
+  // NEW: Per-pair parameter overrides (following the same pattern as prompts)
+  pair_phase_config?: PhaseConfig;
+  pair_loras?: PairLoraConfig[];
+  pair_motion_settings?: PairMotionSettings;
 }
 
 // Helper: Batch execute promises with concurrency limit to prevent connection exhaustion
@@ -1379,7 +1384,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         return { id: gen.id, success: !updateError };
       }, 5); // Limit to 5 concurrent requests
       const successCount = results.filter(r => r.success).length;
-      
+
       console.log(`[PromptClearLog] ✅ CLEAR ALL - Successfully cleared all enhanced prompts`, {
         trigger: 'clear_all_enhanced_prompts',
         successCount,
@@ -1389,7 +1394,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
       // Refresh local state directly - invalidation alone doesn't trigger immediate UI update
       await loadPositions({ silent: true, reason: 'invalidation' });
-      
+
       // Also invalidate cache for other components
       invalidateGenerations(shotId, { reason: 'clear-all-enhanced-prompts', scope: 'all' });
     } catch (err) {
@@ -1397,6 +1402,267 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       throw err;
     }
   }, [shotId, queryClient, loadPositions]);
+
+  // ============================================================================
+  // PER-PAIR PARAMETER OVERRIDES (Phase Config, LoRAs, Motion Settings)
+  // Following the same pattern as pair prompts
+  // ============================================================================
+
+  // Get per-pair overrides as a reactive value (similar to pairPrompts)
+  const pairOverrides = useMemo((): Record<number, {
+    phaseConfig?: PhaseConfig;
+    loras?: PairLoraConfig[];
+    motionSettings?: PairMotionSettings;
+  }> => {
+    // Filter out videos AND unpositioned images to match the timeline display
+    const filteredGenerations = shotGenerations.filter(sg =>
+      sg.generation && sg.timeline_frame != null && !isVideoShotGeneration(sg)
+    );
+
+    if (filteredGenerations.length === 0) {
+      return {};
+    }
+
+    const sortedGenerations = [...filteredGenerations]
+      .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+
+    const overridesData: Record<number, {
+      phaseConfig?: PhaseConfig;
+      loras?: PairLoraConfig[];
+      motionSettings?: PairMotionSettings;
+    }> = {};
+
+    // Each pair is represented by its first item (index in the sorted array)
+    for (let i = 0; i < sortedGenerations.length - 1; i++) {
+      const firstItem = sortedGenerations[i];
+      const metadata = firstItem.metadata;
+
+      if (metadata?.pair_phase_config || metadata?.pair_loras || metadata?.pair_motion_settings) {
+        overridesData[i] = {
+          phaseConfig: metadata.pair_phase_config,
+          loras: metadata.pair_loras,
+          motionSettings: metadata.pair_motion_settings,
+        };
+      }
+    }
+
+    return overridesData;
+  }, [shotGenerations]);
+
+  // Helper to get the shot_generations.id for a pair index
+  const getShotGenerationIdForPair = useCallback(async (pairIndex: number): Promise<string | null> => {
+    if (!shotId) return null;
+
+    const { data: freshShotGens, error: fetchError } = await supabase
+      .from('shot_generations')
+      .select(`
+        id,
+        timeline_frame,
+        metadata,
+        generation:generations(id, type, location)
+      `)
+      .eq('shot_id', shotId)
+      .not('timeline_frame', 'is', null);
+
+    if (fetchError || !freshShotGens) {
+      console.error('[PairOverrides] Error fetching shot generations:', fetchError);
+      return null;
+    }
+
+    // Filter out videos to match timeline display
+    const filteredGenerations = freshShotGens.filter(sg =>
+      sg.generation && !isVideoShotGeneration(sg)
+    );
+
+    const sortedGenerations = [...filteredGenerations]
+      .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+
+    if (pairIndex >= sortedGenerations.length - 1) {
+      console.error('[PairOverrides] Invalid pair index:', pairIndex);
+      return null;
+    }
+
+    return sortedGenerations[pairIndex].id;
+  }, [shotId]);
+
+  // Update phase config for a specific pair
+  const updatePairPhaseConfig = useCallback(async (pairIndex: number, phaseConfig: PhaseConfig | null) => {
+    console.log(`[PairOverrides] 💾 Updating phase config for pair ${pairIndex}`);
+
+    const shotGenId = await getShotGenerationIdForPair(pairIndex);
+    if (!shotGenId || !shotId) {
+      console.error('[PairOverrides] Could not find shot generation for pair:', pairIndex);
+      return;
+    }
+
+    try {
+      const generation = shotGenerations.find(sg => sg.id === shotGenId);
+      if (!generation) {
+        throw new Error(`Generation ${shotGenId} not found`);
+      }
+
+      const updatedMetadata: PositionMetadata = {
+        ...generation.metadata,
+        pair_phase_config: phaseConfig || undefined,
+      };
+
+      const { error } = await supabase
+        .from('shot_generations')
+        .update({ metadata: updatedMetadata as any })
+        .eq('id', shotGenId);
+
+      if (error) {
+        console.error('[PairOverrides] Error updating phase config:', error);
+        throw error;
+      }
+
+      console.log(`[PairOverrides] ✅ Phase config updated for pair ${pairIndex}`);
+
+      // Update local state
+      setShotGenerations(prev => prev.map(sg =>
+        sg.id === shotGenId ? { ...sg, metadata: updatedMetadata } : sg
+      ));
+
+      invalidateGenerations(shotId, { reason: 'update-pair-phase-config', scope: 'all' });
+    } catch (err) {
+      console.error('[PairOverrides] Error:', err);
+      throw err;
+    }
+  }, [shotId, shotGenerations, getShotGenerationIdForPair, invalidateGenerations]);
+
+  // Update LoRAs for a specific pair
+  const updatePairLoras = useCallback(async (pairIndex: number, loras: PairLoraConfig[] | null) => {
+    console.log(`[PairOverrides] 💾 Updating LoRAs for pair ${pairIndex}`);
+
+    const shotGenId = await getShotGenerationIdForPair(pairIndex);
+    if (!shotGenId || !shotId) {
+      console.error('[PairOverrides] Could not find shot generation for pair:', pairIndex);
+      return;
+    }
+
+    try {
+      const generation = shotGenerations.find(sg => sg.id === shotGenId);
+      if (!generation) {
+        throw new Error(`Generation ${shotGenId} not found`);
+      }
+
+      const updatedMetadata: PositionMetadata = {
+        ...generation.metadata,
+        pair_loras: loras && loras.length > 0 ? loras : undefined,
+      };
+
+      const { error } = await supabase
+        .from('shot_generations')
+        .update({ metadata: updatedMetadata as any })
+        .eq('id', shotGenId);
+
+      if (error) {
+        console.error('[PairOverrides] Error updating LoRAs:', error);
+        throw error;
+      }
+
+      console.log(`[PairOverrides] ✅ LoRAs updated for pair ${pairIndex}`);
+
+      // Update local state
+      setShotGenerations(prev => prev.map(sg =>
+        sg.id === shotGenId ? { ...sg, metadata: updatedMetadata } : sg
+      ));
+
+      invalidateGenerations(shotId, { reason: 'update-pair-loras', scope: 'all' });
+    } catch (err) {
+      console.error('[PairOverrides] Error:', err);
+      throw err;
+    }
+  }, [shotId, shotGenerations, getShotGenerationIdForPair, invalidateGenerations]);
+
+  // Update motion settings for a specific pair
+  const updatePairMotionSettings = useCallback(async (pairIndex: number, settings: PairMotionSettings | null) => {
+    console.log(`[PairOverrides] 💾 Updating motion settings for pair ${pairIndex}`);
+
+    const shotGenId = await getShotGenerationIdForPair(pairIndex);
+    if (!shotGenId || !shotId) {
+      console.error('[PairOverrides] Could not find shot generation for pair:', pairIndex);
+      return;
+    }
+
+    try {
+      const generation = shotGenerations.find(sg => sg.id === shotGenId);
+      if (!generation) {
+        throw new Error(`Generation ${shotGenId} not found`);
+      }
+
+      const updatedMetadata: PositionMetadata = {
+        ...generation.metadata,
+        pair_motion_settings: settings || undefined,
+      };
+
+      const { error } = await supabase
+        .from('shot_generations')
+        .update({ metadata: updatedMetadata as any })
+        .eq('id', shotGenId);
+
+      if (error) {
+        console.error('[PairOverrides] Error updating motion settings:', error);
+        throw error;
+      }
+
+      console.log(`[PairOverrides] ✅ Motion settings updated for pair ${pairIndex}`);
+
+      // Update local state
+      setShotGenerations(prev => prev.map(sg =>
+        sg.id === shotGenId ? { ...sg, metadata: updatedMetadata } : sg
+      ));
+
+      invalidateGenerations(shotId, { reason: 'update-pair-motion-settings', scope: 'all' });
+    } catch (err) {
+      console.error('[PairOverrides] Error:', err);
+      throw err;
+    }
+  }, [shotId, shotGenerations, getShotGenerationIdForPair, invalidateGenerations]);
+
+  // Clear all per-pair overrides for a specific pair (reset to shot defaults)
+  const clearPairOverrides = useCallback(async (pairIndex: number) => {
+    console.log(`[PairOverrides] 🧹 Clearing all overrides for pair ${pairIndex}`);
+
+    const shotGenId = await getShotGenerationIdForPair(pairIndex);
+    if (!shotGenId || !shotId) {
+      console.error('[PairOverrides] Could not find shot generation for pair:', pairIndex);
+      return;
+    }
+
+    try {
+      const generation = shotGenerations.find(sg => sg.id === shotGenId);
+      if (!generation) {
+        throw new Error(`Generation ${shotGenId} not found`);
+      }
+
+      // Remove all per-pair override fields
+      const { pair_phase_config, pair_loras, pair_motion_settings, ...restMetadata } = generation.metadata || {};
+      const updatedMetadata: PositionMetadata = restMetadata;
+
+      const { error } = await supabase
+        .from('shot_generations')
+        .update({ metadata: updatedMetadata as any })
+        .eq('id', shotGenId);
+
+      if (error) {
+        console.error('[PairOverrides] Error clearing overrides:', error);
+        throw error;
+      }
+
+      console.log(`[PairOverrides] ✅ All overrides cleared for pair ${pairIndex}`);
+
+      // Update local state
+      setShotGenerations(prev => prev.map(sg =>
+        sg.id === shotGenId ? { ...sg, metadata: updatedMetadata } : sg
+      ));
+
+      invalidateGenerations(shotId, { reason: 'clear-pair-overrides', scope: 'all' });
+    } catch (err) {
+      console.error('[PairOverrides] Error:', err);
+      throw err;
+    }
+  }, [shotId, shotGenerations, getShotGenerationIdForPair, invalidateGenerations]);
 
   return {
     shotGenerations,
@@ -1420,7 +1686,13 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     pairPrompts, // Export reactive pairPrompts value
     updatePairPromptsByIndex,
     clearEnhancedPrompt,
-    clearAllEnhancedPrompts
+    clearAllEnhancedPrompts,
+    // NEW: Per-pair parameter overrides
+    pairOverrides, // Export reactive pairOverrides value
+    updatePairPhaseConfig,
+    updatePairLoras,
+    updatePairMotionSettings,
+    clearPairOverrides,
   };
 };
 

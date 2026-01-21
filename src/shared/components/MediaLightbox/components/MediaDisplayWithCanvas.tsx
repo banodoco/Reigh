@@ -209,7 +209,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
     <div 
       ref={imageContainerRef} 
       className={`relative flex items-center justify-center w-full h-full ${containerClassName}`}
-      style={{ 
+      style={{
         touchAction: 'none',
         // Checkered pattern background for reposition mode
         ...(isRepositionMode ? {
@@ -222,6 +222,8 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
           backgroundSize: '20px 20px',
           backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
           backgroundColor: '#252540',
+          // Clip transformed image to prevent it from appearing over other UI elements
+          overflow: 'hidden',
         } : {})
       }}
     >

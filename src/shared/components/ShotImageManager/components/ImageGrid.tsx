@@ -1,5 +1,5 @@
 import React from 'react';
-import { GenerationRow } from '@/types/shots';
+import { GenerationRow, PairLoraConfig, PairMotionSettings } from '@/types/shots';
 import { SortableImageItem } from '@/tools/travel-between-images/components/SortableImageItem';
 import { cn } from '@/shared/lib/utils';
 import { DEFAULT_BATCH_VIDEO_FRAMES } from '../constants';
@@ -7,6 +7,7 @@ import { AddImagesCard } from './AddImagesCard';
 import { PairPromptIndicator } from './PairPromptIndicator';
 import { BatchSegmentVideo } from './BatchSegmentVideo';
 import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
+import type { PhaseConfig } from '@/tools/travel-between-images/settings';
 
 const FPS = 16;
 
@@ -37,6 +38,12 @@ interface ImageGridProps {
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
   onClearEnhancedPrompt?: (pairIndex: number) => void;
+  // NEW: Per-pair parameter overrides for showing override icons
+  pairOverrides?: Record<number, {
+    phaseConfig?: PhaseConfig;
+    loras?: PairLoraConfig[];
+    motionSettings?: PairMotionSettings;
+  }>;
   isDragging?: boolean;
   activeDragId?: string | null;
   dropTargetIndex?: number | null;
@@ -72,6 +79,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   defaultPrompt,
   defaultNegativePrompt,
   onClearEnhancedPrompt,
+  pairOverrides,
   isDragging = false,
   activeDragId = null,
   dropTargetIndex = null,
@@ -199,6 +207,9 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                   enhancedPrompt={prevEnhancedPrompt}
                   defaultPrompt={defaultPrompt}
                   defaultNegativePrompt={defaultNegativePrompt}
+                  pairPhaseConfig={pairOverrides?.[index - 1]?.phaseConfig}
+                  pairLoras={pairOverrides?.[index - 1]?.loras}
+                  pairMotionSettings={pairOverrides?.[index - 1]?.motionSettings}
                 />
               </div>
             )}
@@ -240,6 +251,9 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                   enhancedPrompt={enhancedPrompt}
                   defaultPrompt={defaultPrompt}
                   defaultNegativePrompt={defaultNegativePrompt}
+                  pairPhaseConfig={pairOverrides?.[index]?.phaseConfig}
+                  pairLoras={pairOverrides?.[index]?.loras}
+                  pairMotionSettings={pairOverrides?.[index]?.motionSettings}
                 />
               </div>
             )}

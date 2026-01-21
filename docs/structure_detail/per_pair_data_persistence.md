@@ -368,7 +368,10 @@ There are *three* conceptually different actions:
 |------|---------|
 | `src/tools/travel-between-images/components/Timeline/SegmentSettingsModal.tsx` | Timeline segment settings editing UI |
 | `src/shared/components/MediaLightbox/MediaLightboxRefactored.tsx` | Lightbox regenerate tab; derives segment from `start_image_generation_id` |
-| `src/shared/components/SegmentRegenerateControls.tsx` | Shared regenerate form component |
+| `src/shared/components/SegmentSettingsForm.tsx` | Controlled form component for segment settings |
+| `src/shared/components/MediaLightbox/components/SegmentRegenerateForm.tsx` | Lightbox-specific wrapper using SegmentSettingsForm |
+| `src/shared/hooks/useSegmentSettings.ts` | Hook for fetching/merging/persisting segment settings |
+| `src/shared/components/segmentSettingsUtils.ts` | Utilities, interfaces, and presets for segment settings |
 | `src/shared/lib/tasks/individualTravelSegment.ts` | Task creation for segment regen |
 | `src/tools/travel-between-images/components/ShotEditor/services/generateVideoService.ts` | Overall generation logic |
 | `src/tools/travel-between-images/components/VideoGallery/components/ChildGenerationsView.tsx` | Video gallery slots; derives slot from `start_image_generation_id` |

@@ -1,10 +1,14 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMediumModal } from '@/shared/hooks/useModal';
+import { useToast } from "@/shared/hooks/use-toast";
 import { framesToSeconds } from "./utils/time-utils";
-import { SegmentRegenerateControls } from "@/shared/components/SegmentRegenerateControls";
+import { useSegmentSettings } from "@/shared/hooks/useSegmentSettings";
+import { SegmentSettingsForm } from "@/shared/components/SegmentSettingsForm";
+import { buildTaskParams } from "@/shared/components/segmentSettingsUtils";
+import { createIndividualTravelSegmentTask } from "@/shared/lib/tasks/individualTravelSegment";
 
 interface SegmentSettingsModalProps {
   isOpen: boolean;
@@ -82,33 +86,35 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
   onFrameCountChange,
   onGenerateStarted,
 }) => {
-  // [SegmentSettingsModal] Log props received
-  console.log('[SegmentSettingsModal] props:', {
-    isOpen,
-    pairIndex: pairData?.index,
-    projectId: projectId?.substring(0, 8) || null,
-    shotId: shotId?.substring(0, 8) || null,
-    generationId: generationId?.substring(0, 8) || null,
-    childGenerationId: childGenerationId?.substring(0, 8) || null,
-    isRegeneration,
-    hasInitialParams: !!initialParams,
-    hasOnFrameCountChange: !!onFrameCountChange,
+  const { toast } = useToast();
+  const modal = useMediumModal();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Use the segment settings hook for data management
+  // Settings are merged from: pair metadata > shot batch settings > defaults
+  const pairShotGenerationId = pairData?.startImage?.id;
+  const { settings, updateSettings, saveSettings, isLoading } = useSegmentSettings({
+    pairShotGenerationId,
+    shotId,
+    defaults: {
+      prompt: '',
+      negativePrompt: '',
+      numFrames: pairData?.frames || 25,
+    },
   });
 
-  // Modal styling
-  const modal = useMediumModal();
-
-  const handleNavigatePrevious = () => {
+  // Navigation handlers
+  const handleNavigatePrevious = useCallback(() => {
     if (pairData && onNavigatePrevious) {
       onNavigatePrevious();
     }
-  };
+  }, [pairData, onNavigatePrevious]);
 
-  const handleNavigateNext = () => {
+  const handleNavigateNext = useCallback(() => {
     if (pairData && onNavigateNext) {
       onNavigateNext();
     }
-  };
+  }, [pairData, onNavigateNext]);
 
   // Handle keyboard navigation
   React.useEffect(() => {
@@ -137,29 +143,106 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
     }
   }, [isOpen, hasNext, hasPrevious, handleNavigateNext, handleNavigatePrevious]);
 
+  // Handle form submission (save + create task)
+  const handleSubmit = useCallback(async () => {
+    console.log('[useSegmentSettings] 🚀 Submit called:', {
+      hasProjectId: !!projectId,
+      hasPairData: !!pairData,
+      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || null,
+      settingsPrompt: settings.prompt?.substring(0, 30) + '...',
+    });
+
+    if (!projectId || !pairData) {
+      toast({
+        title: "Error",
+        description: "Missing project or pair data",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const startImageUrl = pairData.startImage?.url || pairData.startImage?.thumbUrl;
+    const endImageUrl = pairData.endImage?.url || pairData.endImage?.thumbUrl;
+
+    if (!startImageUrl || !endImageUrl) {
+      toast({
+        title: "Error",
+        description: "Missing start or end image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Save settings first
+      if (pairShotGenerationId) {
+        await saveSettings();
+      }
+
+      // Notify parent for optimistic UI
+      onGenerateStarted?.(pairShotGenerationId);
+
+      // Build task params
+      const taskParams = buildTaskParams(settings, {
+        projectId,
+        shotId,
+        generationId,
+        childGenerationId,
+        segmentIndex: pairData.index,
+        startImageUrl,
+        endImageUrl,
+        pairShotGenerationId,
+        projectResolution,
+      });
+
+      // Create task
+      const result = await createIndividualTravelSegmentTask(taskParams);
+
+      if (result.success) {
+        toast({
+          title: "Task Created",
+          description: "Video generation started",
+        });
+      } else {
+        throw new Error(result.error || 'Failed to create task');
+      }
+    } catch (error) {
+      console.error('[SegmentSettingsModal] Error creating task:', error);
+      toast({
+        title: "Error",
+        description: (error as Error).message || "Failed to create task",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    projectId,
+    pairData,
+    pairShotGenerationId,
+    settings,
+    saveSettings,
+    shotId,
+    generationId,
+    childGenerationId,
+    projectResolution,
+    onGenerateStarted,
+    toast,
+  ]);
+
   if (!pairData) return null;
 
-  // Build initial params for SegmentRegenerateControls
-  // Merge any existing params with the pair-specific prompts
-  // IMPORTANT: Exclude num_frames from user_overrides - frame count is determined by the generation mode
-  // (batch mode uses uniform batchVideoFrames, timeline mode uses actual timeline_frame differences)
-  // If we let a stale num_frames from user_overrides through, it would override the correct value
-  const { num_frames: _excludedNumFrames, ...cleanedUserOverrides } = initialParams?.user_overrides || {};
-  const mergedParams = {
-    ...initialParams,
-    base_prompt: enhancedPrompt || pairPrompt || defaultPrompt || '',
-    prompt: enhancedPrompt || pairPrompt || defaultPrompt || '',
-    negative_prompt: pairNegativePrompt || defaultNegativePrompt || '',
-    num_frames: pairData.frames || 25,
-    // Preserve user_overrides (except num_frames which is mode-dependent)
-    user_overrides: cleanedUserOverrides,
-  };
+  const startImageUrl = pairData.startImage?.url || pairData.startImage?.thumbUrl;
+  const endImageUrl = pairData.endImage?.url || pairData.endImage?.thumbUrl;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         className={`${modal.className} p-0 gap-0`}
         style={modal.style}
+        onOpenAutoFocus={(e) => e.preventDefault()}
         {...{...modal.props}}
       >
         <div className={modal.headerClass}>
@@ -174,6 +257,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
                   disabled={!hasPrevious}
                   className="h-8 w-8 p-0"
                   title="Previous pair"
+                  tabIndex={-1}
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
@@ -187,6 +271,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
                   disabled={!hasNext}
                   className="h-8 w-8 p-0"
                   title="Next pair"
+                  tabIndex={-1}
                 >
                   <ChevronRight className="h-5 w-5" />
                 </Button>
@@ -197,24 +282,23 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
             </div>
           </DialogHeader>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          <SegmentRegenerateControls
-            initialParams={mergedParams}
-            projectId={projectId}
-            shotId={shotId}
-            generationId={generationId}
-            childGenerationId={childGenerationId}
-            isRegeneration={isRegeneration}
+          <SegmentSettingsForm
+            settings={settings}
+            onChange={updateSettings}
+            onSubmit={handleSubmit}
             segmentIndex={pairData.index}
-            startImageUrl={pairData.startImage?.url || pairData.startImage?.thumbUrl}
-            endImageUrl={pairData.endImage?.url || pairData.endImage?.thumbUrl}
-            pairShotGenerationId={pairData.startImage?.id}
-            projectResolution={projectResolution}
-            queryKeyPrefix={`pair-${pairData.index}-modal`}
+            startImageUrl={startImageUrl}
+            endImageUrl={endImageUrl}
+            modelName={initialParams?.model_name || initialParams?.orchestrator_details?.model_name}
+            resolution={projectResolution || initialParams?.parsed_resolution_wh}
+            isRegeneration={isRegeneration}
+            isSubmitting={isSubmitting}
             buttonLabel={isRegeneration ? "Regenerate Segment" : "Generate Segment"}
+            showHeader={false}
+            queryKeyPrefix={`pair-${pairData.index}-modal`}
             onFrameCountChange={onFrameCountChange}
-            onGenerateStarted={onGenerateStarted}
           />
           {!generationId && !shotId && (
             <p className="text-xs text-muted-foreground text-center mt-2">
@@ -228,6 +312,3 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
 };
 
 export default SegmentSettingsModal;
-
-
-

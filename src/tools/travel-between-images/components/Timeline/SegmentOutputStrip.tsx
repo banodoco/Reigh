@@ -51,6 +51,8 @@ interface SegmentOutputStripProps {
   onSelectedParentChange?: (id: string | null) => void;
   /** Current pair data by index (shared with SegmentSettingsModal for fresh regeneration data) */
   pairDataByIndex?: Map<number, PairData>;
+  /** Callback when segment frame count changes (for instant timeline updates) */
+  onSegmentFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
 }
 
 export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
@@ -68,6 +70,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   selectedParentId: controlledSelectedParentId,
   onSelectedParentChange,
   pairDataByIndex,
+  onSegmentFrameCountChange,
 }) => {
   // ===== ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP =====
   const isMobile = useIsMobile();
@@ -581,6 +584,12 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
               startGenerationId: pairData?.startImage?.generationId,
               endGenerationId: pairData?.endImage?.generationId,
             };
+          })()}
+          onSegmentFrameCountChange={onSegmentFrameCountChange}
+          currentFrameCount={(() => {
+            // Get frame count from timeline positions (source of truth)
+            const pairData = currentLightboxSlot ? pairDataByIndex?.get(currentLightboxSlot.index) : undefined;
+            return pairData?.frames;
           })()}
         />
       )}

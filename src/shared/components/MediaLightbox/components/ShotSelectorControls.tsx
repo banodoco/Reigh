@@ -33,9 +33,12 @@ export interface ShotSelectorControlsProps {
   onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
 
   // Variant promotion - for adding a variant as a new generation to a shot
-  onAddVariantAsNewGeneration?: (shotId: string, variantId: string) => Promise<boolean>;
-  isViewingVariant?: boolean;
+  // Now accepts optional positioning info for placing between current and next item
+  onAddVariantAsNewGeneration?: (shotId: string, variantId: string, currentTimelineFrame?: number, nextTimelineFrame?: number) => Promise<boolean>;
   activeVariantId?: string | null;
+  // Current generation's timeline position in the selected shot (for positioning new items)
+  currentTimelineFrame?: number;
+  nextTimelineFrame?: number;
 
   // Optimistic updates
   onShowTick?: (imageId: string) => void;
@@ -79,8 +82,9 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
   onAddToShot,
   onAddToShotWithoutPosition,
   onAddVariantAsNewGeneration,
-  isViewingVariant = false,
   activeVariantId,
+  currentTimelineFrame,
+  nextTimelineFrame,
   onShowTick,
   onOptimisticPositioned,
   onShowSecondaryTick,
@@ -157,6 +161,8 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
       selectedShotId: selectedShotId?.substring(0, 8),
       activeVariantId: activeVariantId?.substring(0, 8),
       hasCallback: !!onAddVariantAsNewGeneration,
+      currentTimelineFrame,
+      nextTimelineFrame,
     });
 
     if (!selectedShotId || !activeVariantId || !onAddVariantAsNewGeneration) {
@@ -168,7 +174,13 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
     setAddedVariantAsNewSuccess(false);
 
     try {
-      const success = await onAddVariantAsNewGeneration(selectedShotId, activeVariantId);
+      // Pass positioning info so new item is placed between current and next
+      const success = await onAddVariantAsNewGeneration(
+        selectedShotId,
+        activeVariantId,
+        currentTimelineFrame,
+        nextTimelineFrame
+      );
       console.log('[AddVariantAsNew] Result:', success);
       if (success) {
         setAddedVariantAsNewSuccess(true);
@@ -261,8 +273,8 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
         );
       })()}
 
-        {/* Add variant as new generation to shot button */}
-        {onAddVariantAsNewGeneration && isViewingVariant && activeVariantId && selectedShotId && (
+        {/* Add variant as new generation to shot button - always show when variant exists */}
+        {onAddVariantAsNewGeneration && activeVariantId && selectedShotId && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

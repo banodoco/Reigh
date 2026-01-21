@@ -1,5 +1,13 @@
-import { GenerationRow } from '@/types/shots';
+import { GenerationRow, PairLoraConfig, PairMotionSettings } from '@/types/shots';
 import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
+import type { PhaseConfig } from '@/tools/travel-between-images/settings';
+
+/** Per-pair parameter overrides for showing override icons */
+export type PairOverridesMap = Record<number, {
+  phaseConfig?: PhaseConfig;
+  loras?: PairLoraConfig[];
+  motionSettings?: PairMotionSettings;
+}>;
 
 export interface ShotImageManagerProps {
   images: GenerationRow[];
@@ -42,6 +50,8 @@ export interface ShotImageManagerProps {
   onDragStateChange?: (isDragging: boolean) => void;
   /** Callback to clear enhanced prompt for a pair */
   onClearEnhancedPrompt?: (pairIndex: number) => void;
+  /** Per-pair parameter overrides for showing override icons */
+  pairOverrides?: PairOverridesMap;
 }
 
 /** Props for segment video outputs in batch view */
@@ -88,6 +98,8 @@ export interface BaseShotImageManagerProps {
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
   onClearEnhancedPrompt?: (pairIndex: number) => void;
+  /** Per-pair parameter overrides for showing override icons */
+  pairOverrides?: PairOverridesMap;
   // Segment video output props
   segmentSlots?: SegmentSlot[];
   onSegmentClick?: (slotIndex: number) => void;

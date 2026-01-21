@@ -2,11 +2,15 @@
  * SegmentRegenerateForm Component
  *
  * A form for regenerating a video segment from within the MediaLightbox.
- * Uses the shared SegmentRegenerateControls component.
+ * Uses the controlled SegmentSettingsForm pattern.
  */
 
-import React from 'react';
-import { SegmentRegenerateControls } from '@/shared/components/SegmentRegenerateControls';
+import React, { useState, useCallback } from 'react';
+import { useToast } from '@/shared/hooks/use-toast';
+import { useSegmentSettings } from '@/shared/hooks/useSegmentSettings';
+import { SegmentSettingsForm } from '@/shared/components/SegmentSettingsForm';
+import { buildTaskParams } from '@/shared/components/segmentSettingsUtils';
+import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
 
 export interface SegmentRegenerateFormProps {
   /** Generation params from the current video */
@@ -33,6 +37,10 @@ export interface SegmentRegenerateFormProps {
   pairShotGenerationId?: string;
   /** Project resolution for output */
   projectResolution?: string;
+  /** Callback when frame count changes - for instant timeline updates */
+  onFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
+  /** Current frame count from timeline positions (source of truth) */
+  currentFrameCount?: number;
 }
 
 export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
@@ -48,45 +56,131 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   endImageGenerationId,
   pairShotGenerationId,
   projectResolution,
+  onFrameCountChange,
+  currentFrameCount,
 }) => {
-  // Debug log to verify shotId and structure guidance are being passed (UNIFIED FORMAT)
-  // In the unified format, videos are INSIDE structure_guidance.videos, not a separate array
-  const orchGuidance = initialParams?.orchestrator_details?.structure_guidance;
-  const topLevelGuidance = initialParams?.structure_guidance;
-  console.log('[StructureVideoFix] 📋 [SegmentRegenerateForm] Props received:', {
-    projectId: projectId?.substring(0, 8),
-    generationId: generationId?.substring(0, 8),
-    shotId: shotId?.substring(0, 8) ?? 'null',
-    segmentIndex,
-    // NEW UNIFIED FORMAT: Check structure_guidance with videos inside
-    hasOrchStructureGuidance: !!orchGuidance,
-    orchStructureGuidanceTarget: orchGuidance?.target ?? '(none)',
-    orchStructureGuidanceVideosCount: orchGuidance?.videos?.length ?? 0,
-    // Top-level check (for individual segment tasks)
-    hasTopLevelStructureGuidance: !!topLevelGuidance,
-    topLevelStructureGuidanceTarget: topLevelGuidance?.target ?? '(none)',
-    topLevelStructureGuidanceVideosCount: topLevelGuidance?.videos?.length ?? 0,
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Use the segment settings hook for data management
+  // Settings are merged from: pair metadata > shot batch settings > defaults
+  // numFrames: prefer currentFrameCount (from timeline positions - source of truth),
+  // fall back to initialParams (from video) if not provided
+  const { settings, updateSettings, saveSettings } = useSegmentSettings({
+    pairShotGenerationId,
+    shotId,
+    defaults: {
+      prompt: '',
+      negativePrompt: '',
+      numFrames: currentFrameCount ?? initialParams?.num_frames ?? 25,
+    },
   });
+
+  // Handle frame count change - wrap to include pairShotGenerationId
+  const handleFrameCountChange = useCallback((frameCount: number) => {
+    if (pairShotGenerationId && onFrameCountChange) {
+      onFrameCountChange(pairShotGenerationId, frameCount);
+    }
+  }, [pairShotGenerationId, onFrameCountChange]);
+
+  // Handle form submission
+  const handleSubmit = useCallback(async () => {
+    if (!projectId) {
+      toast({
+        title: "Error",
+        description: "No project selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!startImageUrl || !endImageUrl) {
+      toast({
+        title: "Error",
+        description: "Missing input images",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Save settings first
+      if (pairShotGenerationId) {
+        await saveSettings();
+      }
+
+      // Build task params
+      const taskParams = buildTaskParams(settings, {
+        projectId,
+        shotId,
+        generationId,
+        childGenerationId,
+        segmentIndex,
+        startImageUrl,
+        endImageUrl,
+        startImageGenerationId,
+        endImageGenerationId,
+        pairShotGenerationId,
+        projectResolution,
+      });
+
+      // Create task
+      const result = await createIndividualTravelSegmentTask(taskParams);
+
+      if (result.success) {
+        toast({
+          title: "Task Created",
+          description: "Video regeneration started",
+        });
+      } else {
+        throw new Error(result.error || 'Failed to create task');
+      }
+    } catch (error) {
+      console.error('[SegmentRegenerateForm] Error creating task:', error);
+      toast({
+        title: "Error",
+        description: (error as Error).message || "Failed to create task",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    projectId,
+    settings,
+    saveSettings,
+    shotId,
+    generationId,
+    childGenerationId,
+    segmentIndex,
+    startImageUrl,
+    endImageUrl,
+    startImageGenerationId,
+    endImageGenerationId,
+    pairShotGenerationId,
+    projectResolution,
+    toast,
+  ]);
 
   return (
     <div className="p-4">
-      <SegmentRegenerateControls
-        initialParams={initialParams}
-        projectId={projectId}
-        generationId={generationId}
-        shotId={shotId}
-        childGenerationId={childGenerationId}
-        isRegeneration={true}
+      <SegmentSettingsForm
+        settings={settings}
+        onChange={updateSettings}
+        onSubmit={handleSubmit}
         segmentIndex={segmentIndex}
         startImageUrl={startImageUrl}
         endImageUrl={endImageUrl}
-        startImageGenerationId={startImageGenerationId}
-        endImageGenerationId={endImageGenerationId}
-        pairShotGenerationId={pairShotGenerationId}
-        projectResolution={projectResolution}
-        queryKeyPrefix="lightbox-segment-presets"
+        modelName={initialParams?.model_name || initialParams?.orchestrator_details?.model_name}
+        resolution={projectResolution || initialParams?.parsed_resolution_wh}
+        isRegeneration={true}
+        isSubmitting={isSubmitting}
         buttonLabel="Regenerate Video"
         showHeader={false}
+        queryKeyPrefix="lightbox-segment-presets"
+        onFrameCountChange={handleFrameCountChange}
       />
     </div>
   );

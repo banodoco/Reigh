@@ -31,6 +31,13 @@ import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../state/types';
 import { PhaseConfig, PhaseLoraConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '../../../settings';
 import { isVideoShotGenerations, type ShotGenerationsLike } from '@/shared/lib/typeGuards';
 
+// Strip 'mode' field from phaseConfig before sending to backend
+// The backend should determine mode from the actual model, not a potentially stale field
+const stripModeFromPhaseConfig = (config: PhaseConfig): PhaseConfig => {
+  const { mode, ...rest } = config as PhaseConfig & { mode?: string };
+  return rest as PhaseConfig;
+};
+
 // Re-export API types for UI code to use
 export type {
   TravelBetweenImagesTaskParams,
@@ -451,6 +458,11 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     default_negative_prompt: defaultNegativePrompt,
   } = promptConfig;
 
+  console.log('[NegPromptDebug] 📋 promptConfig values:', {
+    defaultNegativePrompt: defaultNegativePrompt ?? '(undefined)',
+    'promptConfig.default_negative_prompt': promptConfig.default_negative_prompt ?? '(undefined)',
+  });
+
   // Destructure motion config
   const {
     amount_of_motion: rawAmountOfMotion,
@@ -625,6 +637,11 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   let frameOverlap: number[];
   let negativePrompts: string[];
   let enhancedPromptsArray: string[] = [];
+  // NEW: Per-pair parameter override arrays
+  // null = use shot default, explicit value = use per-pair override
+  let pairPhaseConfigsArray: (PhaseConfig | null)[] = [];
+  let pairLorasArray: (Array<{ path: string; strength: number }> | null)[] = [];
+  let pairMotionSettingsArray: (Record<string, any> | null)[] = [];
 
   if (generationMode === 'timeline') {
     console.log('[BasePromptsDebug] ✅ Entered TIMELINE mode branch');
@@ -637,6 +654,11 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     let pairPrompts: Record<number, { prompt: string; negativePrompt: string }> = {};
     let enhancedPrompts: Record<number, string> = {};
     let sortedPositions: Array<{id: string, pos: number}> = [];
+    // NEW: Per-pair parameter override records (indexed by pair index)
+    let pairPhaseConfigsOverrides: Record<number, PhaseConfig> = {};
+    let pairLorasOverrides: Record<number, Array<{ path: string; strength: number }>> = {};
+    let pairMotionSettingsOverrides: Record<number, Record<string, any>> = {};
+    let pairNumFramesOverrides: Record<number, number> = {};
     
     try {
       console.log('[BasePromptsDebug] 🔍 Querying shot_generations table for shot:', selectedShotId.substring(0, 8));
@@ -730,17 +752,23 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
           });
         });
         
+        // [PhaseConfigDebug] Log the mapping of pair indices to shot generation IDs
+        console.log('[PhaseConfigDebug] 📋 Pair-to-ShotGenId mapping (timeline mode):');
+        for (let j = 0; j < filteredShotGenerations.length - 1; j++) {
+          console.log(`[PhaseConfigDebug]   Pair ${j} -> shotGenId: ${filteredShotGenerations[j].id.substring(0, 8)} (timeline_frame: ${filteredShotGenerations[j].timeline_frame})`);
+        }
+
         for (let i = 0; i < filteredShotGenerations.length - 1; i++) {
           const firstItem = filteredShotGenerations[i];
           const metadata = firstItem.metadata as any;
-          
+
           console.log(`[BasePromptsDebug] 🔍 Pair ${i} (Image ${i} -> Image ${i+1})`);
           console.log(`[BasePromptsDebug]   shotGenId: ${firstItem.id.substring(0, 8)}`);
           console.log(`[BasePromptsDebug]   timeline_frame: ${firstItem.timeline_frame}`);
           console.log(`[BasePromptsDebug]   has_pair_prompt: ${!!metadata?.pair_prompt}`);
           console.log(`[BasePromptsDebug]   pair_prompt value: "${metadata?.pair_prompt || '(none)'}"`);
-          console.log(`[BasePromptsDebug]   has_pair_negative_prompt: ${!!metadata?.pair_negative_prompt}`);
-          console.log(`[BasePromptsDebug]   pair_negative_prompt value: "${metadata?.pair_negative_prompt || '(none)'}"`);
+          console.log(`[NegPromptDebug]   has_pair_negative_prompt: ${!!metadata?.pair_negative_prompt}`);
+          console.log(`[NegPromptDebug]   pair_negative_prompt value: "${metadata?.pair_negative_prompt || '(none)'}"`);
           console.log(`[BasePromptsDebug]   has_enhanced_prompt: ${!!metadata?.enhanced_prompt}`);
           
           if (metadata?.pair_prompt || metadata?.pair_negative_prompt) {
@@ -758,8 +786,77 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
             enhancedPrompts[i] = metadata.enhanced_prompt;
             console.log(`[BasePromptsDebug] ✅ Loaded enhanced prompt ${i} from metadata`);
           }
+
+          // NEW: Extract per-pair parameter overrides
+          // Check BOTH the new structured fields AND user_overrides (from useSegmentSettings)
+          const userOverrides = metadata?.user_overrides as Record<string, any> | undefined;
+
+          // Phase config: prefer pair_phase_config, fall back to user_overrides.phase_config
+          // [PhaseConfigDebug] Log what we're reading from metadata
+          console.log(`[PhaseConfigDebug] 🔍 Reading pair ${i} metadata:`, {
+            shotGenId: firstItem.id.substring(0, 8),
+            // New pair_X fields (preferred)
+            hasPairPhaseConfig: !!metadata?.pair_phase_config,
+            hasPairMotionSettings: !!metadata?.pair_motion_settings,
+            hasPairLoras: !!metadata?.pair_loras,
+            pairMotionMode: metadata?.pair_motion_settings?.motion_mode ?? '(none)',
+            pairPhaseConfigFlowShift: metadata?.pair_phase_config?.flow_shift ?? '(none)',
+            // Legacy user_overrides (fallback)
+            hasLegacyOverrides: !!userOverrides,
+            legacyMotionMode: userOverrides?.motion_mode ?? '(none)',
+            legacyPhaseConfigFlowShift: userOverrides?.phase_config?.flow_shift ?? '(none)',
+          });
+          // Check if motion_mode is 'basic' - if so, ignore any phase_config (handles stale data)
+          const motionMode = metadata?.pair_motion_settings?.motion_mode || userOverrides?.motion_mode;
+          const isBasicMode = motionMode === 'basic';
+
+          if (isBasicMode && (metadata?.pair_phase_config || userOverrides?.phase_config)) {
+            console.log(`[PhaseConfigDebug] 🧹 Ignoring stale phase_config for pair ${i} (motion_mode is basic)`);
+          } else if (metadata?.pair_phase_config) {
+            pairPhaseConfigsOverrides[i] = metadata.pair_phase_config;
+            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from pair_phase_config`);
+          } else if (userOverrides?.phase_config) {
+            pairPhaseConfigsOverrides[i] = userOverrides.phase_config;
+            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from user_overrides`);
+          } else {
+            console.log(`[PhaseConfigDebug] ⚠️ No phase config override for pair ${i}`);
+          }
+
+          // LoRAs: prefer pair_loras, fall back to user_overrides.additional_loras
+          if (metadata?.pair_loras && metadata.pair_loras.length > 0) {
+            pairLorasOverrides[i] = metadata.pair_loras.map((lora: any) => ({
+              path: lora.path,
+              strength: lora.strength,
+            }));
+            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from pair_loras:`, pairLorasOverrides[i]);
+          } else if (userOverrides?.additional_loras && Object.keys(userOverrides.additional_loras).length > 0) {
+            // Convert from URL->strength map to array format
+            pairLorasOverrides[i] = Object.entries(userOverrides.additional_loras).map(([path, strength]) => ({
+              path,
+              strength: typeof strength === 'number' ? strength : 1.0,
+            }));
+            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from user_overrides:`, pairLorasOverrides[i]);
+          }
+
+          // Motion settings: prefer pair_motion_settings, fall back to user_overrides
+          if (metadata?.pair_motion_settings) {
+            pairMotionSettingsOverrides[i] = metadata.pair_motion_settings;
+            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from pair_motion_settings:`, pairMotionSettingsOverrides[i]);
+          } else if (userOverrides?.amount_of_motion !== undefined || userOverrides?.motion_mode !== undefined) {
+            pairMotionSettingsOverrides[i] = {
+              amount_of_motion: userOverrides.amount_of_motion,
+              motion_mode: userOverrides.motion_mode,
+            };
+            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from user_overrides:`, pairMotionSettingsOverrides[i]);
+          }
+
+          // Num frames: use pair-specific value if set (timeline mode)
+          if (metadata?.pair_num_frames !== undefined) {
+            pairNumFramesOverrides[i] = metadata.pair_num_frames;
+            console.log(`[PairOverrides] ✅ Loaded numFrames override for pair ${i}: ${pairNumFramesOverrides[i]}`);
+          }
         }
-        
+
         console.log('[PairPrompts-LOAD] 📊 Pair prompts loaded from database:', {
           totalPairs: filteredShotGenerations.length - 1,
           customPairs: Object.keys(pairPrompts).length,
@@ -767,7 +864,11 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
           allPairPrompts: pairPrompts,
           enhancedPromptsCount: Object.keys(enhancedPrompts).length,
           enhancedPromptIndexes: Object.keys(enhancedPrompts).map(Number),
-          allEnhancedPrompts: enhancedPrompts
+          allEnhancedPrompts: enhancedPrompts,
+          // NEW: Log per-pair overrides
+          pairPhaseConfigsCount: Object.keys(pairPhaseConfigsOverrides).length,
+          pairLorasCount: Object.keys(pairLorasOverrides).length,
+          pairMotionSettingsCount: Object.keys(pairMotionSettingsOverrides).length,
         });
       }
     } catch (err) {
@@ -812,14 +913,22 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       return finalPrompt;
     }) : [''];
     
-    segmentFrames = frameGaps.length > 0 ? frameGaps : [batchVideoFrames];
+    // Use per-pair numFrames override if set, otherwise use frame gap from timeline positions
+    segmentFrames = frameGaps.length > 0 ? frameGaps.map((gap, index) => {
+      const pairFrames = pairNumFramesOverrides[index];
+      if (pairFrames !== undefined) {
+        console.log(`[PairOverrides] 🎬 Using per-pair frames for pair ${index}: ${pairFrames} (timeline gap was ${gap})`);
+        return pairFrames;
+      }
+      return gap;
+    }) : [batchVideoFrames];
     frameOverlap = frameGaps.length > 0 ? frameGaps.map(() => 10) : [10]; // Fixed context of 10 frames
     
     negativePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
       // Use pair-specific negative prompt if available, otherwise fall back to default
       const pairNegativePrompt = pairPrompts[index]?.negativePrompt;
       const finalNegativePrompt = (pairNegativePrompt && pairNegativePrompt.trim()) ? pairNegativePrompt.trim() : defaultNegativePrompt;
-      console.log(`[PairPrompts-GENERATION] 🚫 Pair ${index} negative:`, {
+      console.log(`[NegPromptDebug] 🚫 Pair ${index} negative:`, {
         hasPairNegativePrompt: !!pairNegativePrompt,
         pairNegativePromptRaw: pairNegativePrompt || '(none)',
         finalNegativePromptUsed: finalNegativePrompt,
@@ -838,6 +947,34 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       });
       return enhancedPrompt;
     }) : [];
+
+    // NEW: Build per-pair parameter override arrays (null = use shot default)
+    // Strip mode field from phase configs - backend determines mode from actual model
+    pairPhaseConfigsArray = frameGaps.length > 0 ? frameGaps.map((_, index) => {
+      const config = pairPhaseConfigsOverrides[index];
+      return config ? stripModeFromPhaseConfig(config) : null;
+    }) : [];
+
+    pairLorasArray = frameGaps.length > 0 ? frameGaps.map((_, index) => {
+      return pairLorasOverrides[index] || null;
+    }) : [];
+
+    pairMotionSettingsArray = frameGaps.length > 0 ? frameGaps.map((_, index) => {
+      return pairMotionSettingsOverrides[index] || null;
+    }) : [];
+
+    console.log('[PairOverrides] ✅ Built per-pair override arrays:', {
+      pairPhaseConfigsCount: pairPhaseConfigsArray.filter(x => x !== null).length,
+      pairLorasCount: pairLorasArray.filter(x => x !== null).length,
+      pairMotionSettingsCount: pairMotionSettingsArray.filter(x => x !== null).length,
+    });
+    // [PhaseConfigDebug] Log the actual phase configs being sent
+    console.log('[PhaseConfigDebug] 📤 Final pair_phase_configs:', pairPhaseConfigsArray.map((cfg, i) => ({
+      pairIndex: i,
+      hasConfig: cfg !== null,
+      flowShift: cfg?.flow_shift ?? '(none)',
+    })));
+    console.log('[PhaseConfigDebug] 📤 Final pair_motion_settings:', pairMotionSettingsArray);
 
     console.log(`[PairPrompts-GENERATION] ✅ Final prompts array:`, {
       basePrompts,
@@ -861,6 +998,11 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // Individual prompts work in BOTH batch and timeline modes!
     let pairPrompts: Record<number, { prompt: string; negativePrompt: string }> = {};
     let enhancedPrompts: Record<number, string> = {};
+    // NEW: Per-pair parameter override records for batch mode
+    let pairPhaseConfigsOverrides: Record<number, PhaseConfig> = {};
+    let pairLorasOverrides: Record<number, Array<{ path: string; strength: number }>> = {};
+    let pairMotionSettingsOverrides: Record<number, Record<string, any>> = {};
+    let pairNumFramesOverrides: Record<number, number> = {};
     
     try {
       console.log('[BasePromptsDebug] 🔍 Querying shot_generations table for shot:', selectedShotId.substring(0, 8));
@@ -930,8 +1072,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
           console.log(`[BasePromptsDebug]   shotGenId: ${firstItem.id.substring(0, 8)}`);
           console.log(`[BasePromptsDebug]   has_pair_prompt: ${!!metadata?.pair_prompt}`);
           console.log(`[BasePromptsDebug]   pair_prompt value: "${metadata?.pair_prompt || '(none)'}"`);
-          console.log(`[BasePromptsDebug]   has_pair_negative_prompt: ${!!metadata?.pair_negative_prompt}`);
-          console.log(`[BasePromptsDebug]   pair_negative_prompt value: "${metadata?.pair_negative_prompt || '(none)'}"`);
+          console.log(`[NegPromptDebug]   has_pair_negative_prompt: ${!!metadata?.pair_negative_prompt}`);
+          console.log(`[NegPromptDebug]   pair_negative_prompt value: "${metadata?.pair_negative_prompt || '(none)'}"`);
           console.log(`[BasePromptsDebug]   has_enhanced_prompt: ${!!metadata?.enhanced_prompt}`);
           
           if (metadata?.pair_prompt || metadata?.pair_negative_prompt) {
@@ -949,8 +1091,77 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
             enhancedPrompts[i] = metadata.enhanced_prompt;
             console.log(`[BasePromptsDebug] ✅ Loaded enhanced prompt ${i} from metadata`);
           }
+
+          // NEW: Extract per-pair parameter overrides (batch mode)
+          // Check BOTH the new structured fields AND user_overrides (from useSegmentSettings)
+          const userOverrides = metadata?.user_overrides as Record<string, any> | undefined;
+
+          // Phase config: prefer pair_phase_config, fall back to user_overrides.phase_config
+          // [PhaseConfigDebug] Log what we're reading from metadata
+          console.log(`[PhaseConfigDebug] 🔍 Reading pair ${i} metadata:`, {
+            shotGenId: firstItem.id.substring(0, 8),
+            // New pair_X fields (preferred)
+            hasPairPhaseConfig: !!metadata?.pair_phase_config,
+            hasPairMotionSettings: !!metadata?.pair_motion_settings,
+            hasPairLoras: !!metadata?.pair_loras,
+            pairMotionMode: metadata?.pair_motion_settings?.motion_mode ?? '(none)',
+            pairPhaseConfigFlowShift: metadata?.pair_phase_config?.flow_shift ?? '(none)',
+            // Legacy user_overrides (fallback)
+            hasLegacyOverrides: !!userOverrides,
+            legacyMotionMode: userOverrides?.motion_mode ?? '(none)',
+            legacyPhaseConfigFlowShift: userOverrides?.phase_config?.flow_shift ?? '(none)',
+          });
+          // Check if motion_mode is 'basic' - if so, ignore any phase_config (handles stale data)
+          const motionMode = metadata?.pair_motion_settings?.motion_mode || userOverrides?.motion_mode;
+          const isBasicMode = motionMode === 'basic';
+
+          if (isBasicMode && (metadata?.pair_phase_config || userOverrides?.phase_config)) {
+            console.log(`[PhaseConfigDebug] 🧹 Ignoring stale phase_config for pair ${i} (motion_mode is basic)`);
+          } else if (metadata?.pair_phase_config) {
+            pairPhaseConfigsOverrides[i] = metadata.pair_phase_config;
+            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from pair_phase_config`);
+          } else if (userOverrides?.phase_config) {
+            pairPhaseConfigsOverrides[i] = userOverrides.phase_config;
+            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from user_overrides`);
+          } else {
+            console.log(`[PhaseConfigDebug] ⚠️ No phase config override for pair ${i}`);
+          }
+
+          // LoRAs: prefer pair_loras, fall back to user_overrides.additional_loras
+          if (metadata?.pair_loras && metadata.pair_loras.length > 0) {
+            pairLorasOverrides[i] = metadata.pair_loras.map((lora: any) => ({
+              path: lora.path,
+              strength: lora.strength,
+            }));
+            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from pair_loras:`, pairLorasOverrides[i]);
+          } else if (userOverrides?.additional_loras && Object.keys(userOverrides.additional_loras).length > 0) {
+            // Convert from URL->strength map to array format
+            pairLorasOverrides[i] = Object.entries(userOverrides.additional_loras).map(([path, strength]) => ({
+              path,
+              strength: typeof strength === 'number' ? strength : 1.0,
+            }));
+            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from user_overrides:`, pairLorasOverrides[i]);
+          }
+
+          // Motion settings: prefer pair_motion_settings, fall back to user_overrides
+          if (metadata?.pair_motion_settings) {
+            pairMotionSettingsOverrides[i] = metadata.pair_motion_settings;
+            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from pair_motion_settings:`, pairMotionSettingsOverrides[i]);
+          } else if (userOverrides?.amount_of_motion !== undefined || userOverrides?.motion_mode !== undefined) {
+            pairMotionSettingsOverrides[i] = {
+              amount_of_motion: userOverrides.amount_of_motion,
+              motion_mode: userOverrides.motion_mode,
+            };
+            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from user_overrides:`, pairMotionSettingsOverrides[i]);
+          }
+
+          // Num frames: use pair-specific value if set
+          if (metadata?.pair_num_frames !== undefined) {
+            pairNumFramesOverrides[i] = metadata.pair_num_frames;
+            console.log(`[PairOverrides] ✅ Loaded numFrames override for pair ${i}: ${pairNumFramesOverrides[i]}`);
+          }
         }
-        
+
         // Build arrays with one entry per pair
         const numPairs = filteredShotGenerations.length - 1;
         
@@ -975,10 +1186,10 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
           const pairNegativePrompt = pairPrompts[index]?.negativePrompt;
           const finalNegativePrompt = (pairNegativePrompt && pairNegativePrompt.trim()) ? pairNegativePrompt.trim() : defaultNegativePrompt;
           
-          console.log(`[BasePromptsDebug] 🚫 Pair ${index} negative:`);
-          console.log(`[BasePromptsDebug]   hasPairNegativePrompt: ${!!pairNegativePrompt}`);
-          console.log(`[BasePromptsDebug]   finalNegativePromptUsed: "${finalNegativePrompt?.substring(0, 30) || '(none)'}"`);
-          
+          console.log(`[NegPromptDebug] 🚫 Pair ${index} negative:`);
+          console.log(`[NegPromptDebug]   hasPairNegativePrompt: ${!!pairNegativePrompt}`);
+          console.log(`[NegPromptDebug]   finalNegativePromptUsed: "${finalNegativePrompt?.substring(0, 30) || '(none)'}"`);
+
           return finalNegativePrompt;
         }) : [defaultNegativePrompt];
         
@@ -989,17 +1200,51 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
           console.log(`[BasePromptsDebug]   promptPreview: "${enhancedPrompt ? enhancedPrompt.substring(0, 50) : '(none)'}"`);
           return enhancedPrompt;
         }) : [];
-        
-        segmentFrames = numPairs > 0 ? Array.from({ length: numPairs }, () => batchVideoFrames) : [batchVideoFrames];
+
+        // NEW: Build per-pair parameter override arrays for batch mode
+        // Strip mode field from phase configs - backend determines mode from actual model
+        pairPhaseConfigsArray = numPairs > 0 ? Array.from({ length: numPairs }, (_, index) => {
+          const config = pairPhaseConfigsOverrides[index];
+          return config ? stripModeFromPhaseConfig(config) : null;
+        }) : [];
+
+        pairLorasArray = numPairs > 0 ? Array.from({ length: numPairs }, (_, index) => {
+          return pairLorasOverrides[index] || null;
+        }) : [];
+
+        pairMotionSettingsArray = numPairs > 0 ? Array.from({ length: numPairs }, (_, index) => {
+          return pairMotionSettingsOverrides[index] || null;
+        }) : [];
+
+        console.log('[PairOverrides] ✅ Built per-pair override arrays (batch mode):', {
+          pairPhaseConfigsCount: pairPhaseConfigsArray.filter(x => x !== null).length,
+          pairLorasCount: pairLorasArray.filter(x => x !== null).length,
+          pairMotionSettingsCount: pairMotionSettingsArray.filter(x => x !== null).length,
+          pairNumFramesOverrideCount: Object.keys(pairNumFramesOverrides).length,
+        });
+
+        // Use per-pair numFrames if set, otherwise fall back to batch default
+        segmentFrames = numPairs > 0 ? Array.from({ length: numPairs }, (_, index) => {
+          const pairFrames = pairNumFramesOverrides[index];
+          if (pairFrames !== undefined) {
+            console.log(`[PairOverrides] 🎬 Using per-pair frames for pair ${index}: ${pairFrames}`);
+            return pairFrames;
+          }
+          return batchVideoFrames;
+        }) : [batchVideoFrames];
         frameOverlap = numPairs > 0 ? Array.from({ length: numPairs }, () => 10) : [10];
-        
+
         console.log('[BasePromptsDebug] ✅ Final arrays for batch mode:', {
           basePrompts,
           negativePrompts,
           enhancedPrompts: enhancedPromptsArray,
           segmentFrames,
           frameOverlap,
-          pairPromptsObject: pairPrompts
+          pairPromptsObject: pairPrompts,
+          // NEW: Log per-pair override counts
+          pairPhaseConfigsOverrideCount: pairPhaseConfigsArray.filter(x => x !== null).length,
+          pairLorasOverrideCount: pairLorasArray.filter(x => x !== null).length,
+          pairMotionSettingsOverrideCount: pairMotionSettingsArray.filter(x => x !== null).length,
         });
       }
     } catch (err) {
@@ -1362,6 +1607,11 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // CRITICAL: Only include enhanced_prompts if we have actual enhanced prompts to send
     // This prevents the backend from duplicating base_prompt into enhanced_prompts_expanded
     ...(hasValidEnhancedPrompts ? { enhanced_prompts: enhancedPromptsArray } : {}),
+    // NEW: Per-pair parameter overrides (null = use shot default)
+    // Only include if there are actual overrides to send
+    ...(pairPhaseConfigsArray.some(x => x !== null) ? { pair_phase_configs: pairPhaseConfigsArray } : {}),
+    ...(pairLorasArray.some(x => x !== null) ? { pair_loras: pairLorasArray } : {}),
+    ...(pairMotionSettingsArray.some(x => x !== null) ? { pair_motion_settings: pairMotionSettingsArray } : {}),
     model_name: actualModelName,
     model_type: modelType,
     seed: seed,
@@ -1380,7 +1630,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // advanced_mode reflects whether user's custom phase config is being used vs computed basic mode
     advanced_mode: useAdvancedMode,
     motion_mode: motionMode, // Motion control mode (basic/presets/advanced) - for UI state
-    phase_config: effectivePhaseConfig, // Always send phase config (computed or user-defined)
+    // Strip mode field from phase config - backend determines mode from actual model
+    phase_config: stripModeFromPhaseConfig(effectivePhaseConfig), // Always send phase config (computed or user-defined)
     regenerate_anchors: false, // Always false
     // Include selected phase preset ID for UI state restoration (saved in all modes)
     selected_phase_preset_id: selectedPhasePresetId || undefined,

@@ -42,6 +42,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   defaultPrompt,
   defaultNegativePrompt,
   onClearEnhancedPrompt,
+  pairOverrides,
   segmentSlots,
   onSegmentClick,
   hasPendingTask,
@@ -476,10 +477,14 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                     isMobile={true}
                     onClearEnhancedPrompt={onClearEnhancedPrompt}
                     onPairClick={() => onPairClick(pair.index)}
-                    hasCustomPrompt={!!(pairPrompts?.[pair.index]?.prompt || pairPrompts?.[pair.index]?.negativePrompt)}
-                    hasEnhancedPrompt={!!enhancedPrompts?.[pair.index]}
+                    pairPrompt={pairPrompts?.[pair.index]?.prompt}
+                    pairNegativePrompt={pairPrompts?.[pair.index]?.negativePrompt}
+                    enhancedPrompt={enhancedPrompts?.[pair.index]}
                     defaultPrompt={defaultPrompt}
                     defaultNegativePrompt={defaultNegativePrompt}
+                    pairPhaseConfig={pairOverrides?.[pair.index]?.phaseConfig}
+                    pairLoras={pairOverrides?.[pair.index]?.loras}
+                    pairMotionSettings={pairOverrides?.[pair.index]?.motionSettings}
                   />
                 )}
               </div>
@@ -592,6 +597,9 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       enhancedPrompt={prevEnhancedPrompt}
                       defaultPrompt={defaultPrompt}
                       defaultNegativePrompt={defaultNegativePrompt}
+                      pairPhaseConfig={pairOverrides?.[index - 1]?.phaseConfig}
+                      pairLoras={pairOverrides?.[index - 1]?.loras}
+                      pairMotionSettings={pairOverrides?.[index - 1]?.motionSettings}
                     />
                   </div>
                 )}
@@ -688,6 +696,9 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       enhancedPrompt={enhancedPrompt}
                       defaultPrompt={defaultPrompt}
                       defaultNegativePrompt={defaultNegativePrompt}
+                      pairPhaseConfig={pairOverrides?.[index]?.phaseConfig}
+                      pairLoras={pairOverrides?.[index]?.loras}
+                      pairMotionSettings={pairOverrides?.[index]?.motionSettings}
                     />
                   </div>
                 )}

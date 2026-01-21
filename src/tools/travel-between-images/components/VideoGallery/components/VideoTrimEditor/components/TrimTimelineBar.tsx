@@ -105,15 +105,33 @@ export const TrimTimelineBar: React.FC<TrimTimelineBarProps> = ({
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
       if (isDragging) {
+        const wasDraggingStart = isDragging === 'start';
+        const wasDraggingEnd = isDragging === 'end';
+
         try {
           (e.target as HTMLElement).releasePointerCapture(e.pointerId);
         } catch {
           // Ignore
         }
         setIsDragging(null);
+
+        if (videoRef?.current) {
+          // When dropping the start handle, seek video to the new start position and play
+          if (wasDraggingStart) {
+            videoRef.current.currentTime = startTrim;
+            videoRef.current.play().catch(() => {});
+          }
+          // When dropping the end handle, seek to 0.5s before the end point and play
+          else if (wasDraggingEnd) {
+            const endPoint = duration - endTrim;
+            const seekTo = Math.max(startTrim, endPoint - 0.5);
+            videoRef.current.currentTime = seekTo;
+            videoRef.current.play().catch(() => {});
+          }
+        }
       }
     },
-    [isDragging]
+    [isDragging, videoRef, startTrim, endTrim, duration]
   );
 
   // Format time as mm:ss.s

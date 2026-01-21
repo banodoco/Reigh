@@ -189,6 +189,8 @@ interface TimelineContainerProps {
   // Shared output selection state (syncs FinalVideoSection with SegmentOutputStrip)
   selectedOutputId?: string | null;
   onSelectedOutputChange?: (id: string | null) => void;
+  // Callback when segment frame count changes (for instant timeline updates)
+  onSegmentFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
@@ -241,6 +243,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   maxFrameLimit = 81,
   selectedOutputId,
   onSelectedOutputChange,
+  onSegmentFrameCountChange,
 }) => {
   // [ZoomDebug] Track component mounts to detect unwanted remounts
   const mountCountRef = useRef(0);
@@ -1296,6 +1299,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             } : undefined}
             selectedParentId={selectedOutputId}
             onSelectedParentChange={onSelectedOutputChange}
+            onSegmentFrameCountChange={onSegmentFrameCountChange}
           />
         )}
 

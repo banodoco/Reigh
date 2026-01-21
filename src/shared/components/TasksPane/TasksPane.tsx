@@ -328,10 +328,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   return (
     <>
-      {/* Backdrop overlay for mobile */}
+      {/* Backdrop overlay for mobile - z-index just below TasksPane (100001) */}
       {showBackdrop && (
         <div
-          className="fixed inset-0 z-[59] touch-none"
+          className="fixed inset-0 z-[100000] touch-none"
           onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); closePane(); }}
           onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); closePane(); }}
           aria-hidden="true"
@@ -367,7 +367,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           top: 0,
           bottom: 0,
           width: `${tasksPaneWidth}px`,
-          zIndex: 60,
+          // z-index must be above MediaLightbox (z-100000) so TasksPane stays on top
+          // when images are dragged in reposition mode
+          zIndex: 100001,
         }}
       >
         <div

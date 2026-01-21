@@ -239,11 +239,17 @@ export function expandArrayToCount<T>(arr: T[] | undefined, targetCount: number)
   if (!arr || arr.length === 0) {
     return [];
   }
-  
+
   if (arr.length === 1 && targetCount > 1) {
     return Array(targetCount).fill(arr[0]);
   }
-  
+
+  // Truncate arrays that are longer than the target count
+  // This handles the case where images were deleted and arrays are stale
+  if (arr.length > targetCount) {
+    return arr.slice(0, targetCount);
+  }
+
   return arr;
 }
 

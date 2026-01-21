@@ -425,7 +425,23 @@ export interface TravelBetweenImagesTaskParams extends
   independent_segments?: boolean;
   /** Enable smooth video interpolation (SVI) for smoother transitions */
   use_svi?: boolean;
-  
+
+  // ============================================================================
+  // PER-PAIR PARAMETER OVERRIDES
+  // ============================================================================
+  // These arrays allow per-segment customization of generation parameters.
+  // null = use shot default, explicit value = use per-pair override.
+  // Array length should match number of pairs (image_urls.length - 1).
+
+  /** Per-pair phase config overrides (null = use shot default) */
+  pair_phase_configs?: (PhaseConfig | null)[];
+
+  /** Per-pair LoRA overrides (null = use shot default) */
+  pair_loras?: (Array<{ path: string; strength: number }> | null)[];
+
+  /** Per-pair motion settings overrides (null = use shot default) */
+  pair_motion_settings?: (Record<string, any> | null)[];
+
   // ============================================================================
   // NEW UNIFIED STRUCTURE GUIDANCE FORMAT
   // ============================================================================
@@ -584,6 +600,12 @@ function buildTravelBetweenImagesPayload(
     // CRITICAL FIX: Only include enhanced_prompts_expanded if actually provided
     // This prevents the backend from misinterpreting empty arrays
     ...(enhancedPromptsExpanded !== undefined ? { enhanced_prompts_expanded: enhancedPromptsExpanded } : {}),
+    // NEW: Per-pair parameter overrides (only include if there are actual overrides)
+    // Names must match backend expectations: phase_configs_expanded, loras_per_segment_expanded
+    // IMPORTANT: Truncate to numSegments to handle deleted images with stale arrays
+    ...(params.pair_phase_configs?.some(x => x !== null) ? { phase_configs_expanded: params.pair_phase_configs.slice(0, numSegments) } : {}),
+    ...(params.pair_loras?.some(x => x !== null) ? { loras_per_segment_expanded: params.pair_loras.slice(0, numSegments) } : {}),
+    ...(params.pair_motion_settings?.some(x => x !== null) ? { motion_settings_expanded: params.pair_motion_settings.slice(0, numSegments) } : {}),
     segment_frames_expanded: segmentFramesExpanded,
     frame_overlap_expanded: frameOverlapExpanded,
     parsed_resolution_wh: finalResolution,

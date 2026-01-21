@@ -304,7 +304,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
               </div>
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-start gap-1">
             {/* Make new image button - for any variant when promote handler provided */}
             {onPromoteToGeneration && (
               <Tooltip>
@@ -315,16 +315,16 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                     onClick={handlePromoteToGeneration}
                     disabled={localIsPromoting || isPromoting}
                     className={cn(
-                      "h-6 text-xs px-2 gap-1",
+                      "h-auto min-h-6 text-xs px-2 py-1 gap-1 whitespace-normal text-left",
                       promoteSuccess && "bg-green-500/20 border-green-500/50 text-green-400"
                     )}
                   >
                     {localIsPromoting || isPromoting ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                     ) : promoteSuccess ? (
-                      <Check className="w-3 h-3" />
+                      <Check className="w-3 h-3 shrink-0" />
                     ) : (
-                      <ImagePlus className="w-3 h-3" />
+                      <ImagePlus className="w-3 h-3 shrink-0" />
                     )}
                     {promoteSuccess ? 'Created!' : 'Make new image'}
                   </Button>
@@ -341,12 +341,12 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                 variant="outline"
                 onClick={handleMakePrimary}
                 disabled={isMakingPrimary}
-                className="h-6 text-xs px-2 gap-1"
+                className="h-auto min-h-6 text-xs px-2 py-1 gap-1 whitespace-normal text-left"
               >
                 {isMakingPrimary ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                 ) : (
-                  <Star className="w-3 h-3" />
+                  <Star className="w-3 h-3 shrink-0" />
                 )}
                 Make current main
               </Button>

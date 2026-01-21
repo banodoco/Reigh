@@ -181,6 +181,8 @@ export interface TimelineProps {
   // Shared output selection state (syncs FinalVideoSection with SegmentOutputStrip)
   selectedOutputId?: string | null;
   onSelectedOutputChange?: (id: string | null) => void;
+  // Callback when segment frame count changes (for instant timeline updates)
+  onSegmentFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
 }
 
 /**
@@ -252,6 +254,8 @@ const Timeline: React.FC<TimelineProps> = ({
   // Shared output selection (syncs FinalVideoSection with SegmentOutputStrip)
   selectedOutputId,
   onSelectedOutputChange,
+  // Instant timeline updates from MediaLightbox
+  onSegmentFrameCountChange,
 }) => {
   // [RefactorMetrics] Track render count for baseline measurements
   useRenderCount('Timeline');
@@ -939,6 +943,7 @@ const Timeline: React.FC<TimelineProps> = ({
         maxFrameLimit={maxFrameLimit}
         selectedOutputId={selectedOutputId}
         onSelectedOutputChange={onSelectedOutputChange}
+        onSegmentFrameCountChange={onSegmentFrameCountChange}
       />
 
       {/* Lightbox */}

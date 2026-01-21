@@ -183,6 +183,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               defaultPrompt={props.defaultPrompt}
               defaultNegativePrompt={props.defaultNegativePrompt}
               onClearEnhancedPrompt={props.onClearEnhancedPrompt}
+              pairOverrides={props.pairOverrides}
               activeDragId={dragAndDrop.activeId}
               dropTargetIndex={dropTargetIndex}
               segmentSlots={segmentSlots}

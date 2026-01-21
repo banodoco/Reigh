@@ -1696,34 +1696,70 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     loadPositions,
   });
 
-  // Handler for deleting the final video
-  const handleDeleteFinalVideo = useCallback((generationId: string) => {
-    console.log('[FinalVideoDelete] handleDeleteFinalVideo called', {
+  // State to track final video clearing operation
+  const [isClearingFinalVideo, setIsClearingFinalVideo] = useState(false);
+
+  // Handler for clearing the final video output (not deleting the entire generation)
+  // This clears the location/thumbnail and deletes the primary variant,
+  // but keeps the generation so it can be regenerated
+  const handleDeleteFinalVideo = useCallback(async (generationId: string) => {
+    console.log('[FinalVideoDelete] handleDeleteFinalVideo (clear output) called', {
       generationId: generationId?.substring(0, 8),
-      isPending: deleteGenerationMutation.isPending,
       selectedShotId: selectedShot?.id?.substring(0, 8),
       projectId: projectId?.substring(0, 8),
     });
-    deleteGenerationMutation.mutate(generationId, {
-      onSuccess: () => {
-        console.log('[FinalVideoDelete] Delete mutation SUCCESS - invalidating queries');
-        // Invalidate the segment parent generations query to refresh the list
-        queryClient.invalidateQueries({ queryKey: ['segment-parent-generations', selectedShot?.id, projectId] });
-        // Also invalidate generations query
-        queryClient.invalidateQueries({ queryKey: ['generations'] });
-        // Invalidate the video counts cache to clear skeleton state
-        queryClient.invalidateQueries({ queryKey: ['project-video-counts', projectId] });
-        // Clear the selection if we deleted the selected one
-        if (selectedOutputId === generationId) {
-          console.log('[FinalVideoDelete] Clearing selected output (deleted the selected one)');
-          setSelectedOutputId?.(null);
-        }
-      },
-      onError: (error) => {
-        console.error('[FinalVideoDelete] Delete mutation ERROR:', error);
-      },
-    });
-  }, [deleteGenerationMutation, queryClient, selectedShot?.id, projectId, selectedOutputId, setSelectedOutputId]);
+
+    setIsClearingFinalVideo(true);
+
+    try {
+      // 1. Clear the generation's location and thumbnail_url (keeps the generation record)
+      const { error: updateError } = await supabase
+        .from('generations')
+        .update({
+          location: null,
+          thumbnail_url: null
+        })
+        .eq('id', generationId);
+
+      if (updateError) {
+        console.error('[FinalVideoDelete] Error clearing generation location:', updateError);
+        toast.error('Failed to clear final video output');
+        return;
+      }
+
+      console.log('[FinalVideoDelete] Cleared generation location');
+
+      // 2. Delete the primary variant of this generation (if it exists)
+      const { error: deleteVariantError } = await supabase
+        .from('generation_variants')
+        .delete()
+        .eq('generation_id', generationId)
+        .eq('is_primary', true);
+
+      if (deleteVariantError) {
+        console.error('[FinalVideoDelete] Error deleting primary variant:', deleteVariantError);
+        // Don't fail the whole operation if variant delete fails
+      } else {
+        console.log('[FinalVideoDelete] Deleted primary variant');
+      }
+
+      console.log('[FinalVideoDelete] Clear output SUCCESS - invalidating queries');
+
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['segment-parent-generations', selectedShot?.id, projectId] });
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      queryClient.invalidateQueries({ queryKey: ['project-video-counts', projectId] });
+
+      // Note: Don't clear selection - the generation still exists, just without an output
+
+      toast.success('Final video output cleared');
+    } catch (error) {
+      console.error('[FinalVideoDelete] Unexpected error:', error);
+      toast.error('Failed to clear final video output');
+    } finally {
+      setIsClearingFinalVideo(false);
+    }
+  }, [queryClient, selectedShot?.id, projectId]);
 
   // Early return check moved to end of component
 
@@ -2209,7 +2245,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           isParentLoading={isSegmentOutputsLoading}
           getFinalVideoCount={getFinalVideoCount}
           onDelete={handleDeleteFinalVideo}
-          isDeleting={deleteGenerationMutation.isPending}
+          isDeleting={isClearingFinalVideo}
         />
       </div>
 

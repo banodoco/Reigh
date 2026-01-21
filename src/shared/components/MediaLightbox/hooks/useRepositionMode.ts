@@ -41,6 +41,8 @@ export interface UseRepositionModeProps {
   activeVariantLocation?: string | null;
   // Active variant ID - for tracking source_variant_id in task params
   activeVariantId?: string | null;
+  // Active variant's params - for loading saved transform data
+  activeVariantParams?: Record<string, any> | null;
 }
 
 export interface UseRepositionModeReturn {
@@ -107,6 +109,7 @@ export const useRepositionMode = ({
   advancedSettings,
   activeVariantLocation,
   activeVariantId,
+  activeVariantParams,
 }: UseRepositionModeProps): UseRepositionModeReturn => {
   const queryClient = useQueryClient();
   const [transform, setTransform] = useState<ImageTransform>(DEFAULT_TRANSFORM);
@@ -124,29 +127,50 @@ export const useRepositionMode = ({
     transform.flipH ||
     transform.flipV;
   
-  // Per-media transform cache (optional - preserves transforms when switching media)
-  const mediaTransformCacheRef = useRef<Map<string, ImageTransform>>(new Map());
-  const prevMediaIdRef = useRef(media.id);
-  
-  // Cache transform when media changes
+  // Per-variant transform cache (preserves transforms when switching variants)
+  // Uses variant ID when available, falls back to generation ID
+  const transformCacheRef = useRef<Map<string, ImageTransform>>(new Map());
+  const getCacheKey = useCallback(() => {
+    // Use variant ID if available, otherwise use generation ID
+    return activeVariantId || media.id;
+  }, [activeVariantId, media.id]);
+  const prevCacheKeyRef = useRef(getCacheKey());
+
+  // Cache transform when variant/media changes
   useEffect(() => {
-    if (prevMediaIdRef.current !== media.id) {
-      // Save current transform for old media
-      if (prevMediaIdRef.current) {
-        mediaTransformCacheRef.current.set(prevMediaIdRef.current, transform);
+    const currentCacheKey = getCacheKey();
+    if (prevCacheKeyRef.current !== currentCacheKey) {
+      // Save current transform for old variant/media
+      if (prevCacheKeyRef.current) {
+        transformCacheRef.current.set(prevCacheKeyRef.current, transform);
       }
-      
-      // Load cached transform for new media or reset
-      const cachedTransform = mediaTransformCacheRef.current.get(media.id);
+
+      // Try to load transform in order of priority:
+      // 1. From session cache (user's current edits)
+      // 2. From variant params (saved transform from previous session)
+      // 3. Default transform
+      const cachedTransform = transformCacheRef.current.get(currentCacheKey);
+      const savedTransform = activeVariantParams?.transform as ImageTransform | undefined;
+
       if (cachedTransform) {
         setTransform(cachedTransform);
+      } else if (savedTransform && typeof savedTransform === 'object') {
+        // Load saved transform from variant params
+        setTransform({
+          translateX: savedTransform.translateX ?? 0,
+          translateY: savedTransform.translateY ?? 0,
+          scale: savedTransform.scale ?? 1,
+          rotation: savedTransform.rotation ?? 0,
+          flipH: savedTransform.flipH ?? false,
+          flipV: savedTransform.flipV ?? false,
+        });
       } else {
         setTransform(DEFAULT_TRANSFORM);
       }
-      
-      prevMediaIdRef.current = media.id;
+
+      prevCacheKeyRef.current = currentCacheKey;
     }
-  }, [media.id, transform]);
+  }, [getCacheKey, transform, activeVariantParams]);
   
   // Individual transform setters
   const setTranslateX = useCallback((value: number) => {
@@ -453,6 +477,7 @@ export const useRepositionMode = ({
         tool_type: toolTypeOverride,
         loras: loras,
         create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
+        source_variant_id: activeVariantId || undefined, // Track which variant was the source if editing from a variant
         hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
       });
       

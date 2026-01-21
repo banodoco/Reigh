@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shar
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useEnhancedShotImageReorder } from "@/shared/hooks/useEnhancedShotImageReorder";
 import { useTimelinePositionUtils } from "@/shared/hooks/useTimelinePositionUtils";
+import { supabase } from "@/integrations/supabase/client";
 import SegmentSettingsModal from "./Timeline/SegmentSettingsModal";
 import type { PairData } from "./Timeline/TimelineContainer";
 import { Download, Loader2, Play, Pause, ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
@@ -675,22 +676,32 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   });
 
   // Compute pair data for SegmentSettingsModal (shared source of truth with TimelineContainer)
-  // IMPORTANT: In batch mode, use uniform batchVideoFrames; in timeline mode, use actual timeline_frame differences
+  // IMPORTANT: In batch mode, use per-pair pair_num_frames or modal override; in timeline mode, use actual timeline_frame differences
+  // The modal override (segmentSettingsModalData) provides immediate visual feedback before DB save completes
   const pairDataByIndex = React.useMemo(() => {
     const dataMap = new Map<number, PairData>();
     const sortedImages = [...(shotGenerations || [])]
       .filter((img: any) => img.timeline_frame != null && img.timeline_frame >= 0)
       .sort((a: any, b: any) => a.timeline_frame - b.timeline_frame);
 
+    // Get modal override for immediate feedback (before DB save completes)
+    const modalPairIndex = segmentSettingsModalData.pairData?.index;
+    const modalFramesOverride = segmentSettingsModalData.isOpen ? segmentSettingsModalData.pairData?.frames : undefined;
+
     for (let pairIndex = 0; pairIndex < sortedImages.length - 1; pairIndex++) {
       const startImage = sortedImages[pairIndex];
       const endImage = sortedImages[pairIndex + 1];
 
-      // In batch mode: use uniform batchVideoFrames for all pairs
+      // In batch mode: use modal override > metadata pair_num_frames > uniform batchVideoFrames
       // In timeline mode: use actual timeline_frame differences
       const isBatchMode = effectiveGenerationMode === 'batch';
+      const pairNumFramesFromMetadata = startImage.metadata?.pair_num_frames;
+      // Use modal override for immediate feedback on currently open pair
+      const pairNumFramesOverride = (pairIndex === modalPairIndex && modalFramesOverride !== undefined)
+        ? modalFramesOverride
+        : pairNumFramesFromMetadata;
       const frames = isBatchMode
-        ? batchVideoFrames
+        ? (pairNumFramesOverride ?? batchVideoFrames)
         : (endImage.timeline_frame ?? 0) - (startImage.timeline_frame ?? 0);
       const startFrame = isBatchMode
         ? pairIndex * batchVideoFrames
@@ -721,7 +732,136 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       });
     }
     return dataMap;
-  }, [shotGenerations, effectiveGenerationMode, batchVideoFrames]);
+  }, [shotGenerations, effectiveGenerationMode, batchVideoFrames, segmentSettingsModalData]);
+
+  // Debounce for modal frame count changes
+  const frameCountDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Unified frame count update handler - called from both MediaLightbox and SegmentSettingsModal
+  // Timeline positions are the source of truth - no metadata sync needed
+  // Handles constraints: if increasing would exceed maxFrameLimit, compresses subsequent pairs proportionally
+  const updatePairFrameCount = useCallback(async (pairShotGenerationId: string, newFrameCount: number) => {
+    console.log('[FrameCountUpdate] Frame count change requested:', {
+      pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
+      newFrameCount,
+      maxFrameLimit,
+    });
+
+    if (!shotGenerations?.length || effectiveGenerationMode !== 'timeline') {
+      console.log('[FrameCountUpdate] ❌ Skipped: no generations or not in timeline mode');
+      return;
+    }
+
+    // Find the pair by startImage.id (pairShotGenerationId)
+    const sortedImages = [...shotGenerations]
+      .filter((img: any) => img.timeline_frame != null && img.timeline_frame >= 0)
+      .sort((a: any, b: any) => a.timeline_frame - b.timeline_frame);
+
+    const pairIndex = sortedImages.findIndex((img: any) => img.id === pairShotGenerationId);
+    if (pairIndex === -1 || pairIndex >= sortedImages.length - 1) {
+      console.log('[FrameCountUpdate] ❌ Pair not found:', pairShotGenerationId?.substring(0, 8));
+      return;
+    }
+
+    const startImage = sortedImages[pairIndex];
+    const endImage = sortedImages[pairIndex + 1];
+    const currentFrameCount = (endImage.timeline_frame ?? 0) - (startImage.timeline_frame ?? 0);
+
+    // Check if requested frame count exceeds maxFrameLimit
+    const exceedsMax = newFrameCount > maxFrameLimit;
+    const effectiveNewFrameCount = Math.min(newFrameCount, maxFrameLimit);
+
+    // Collect original frame counts for subsequent pairs
+    const subsequentPairs: Array<{ startIdx: number; endIdx: number; originalFrames: number }> = [];
+    for (let j = pairIndex + 1; j < sortedImages.length - 1; j++) {
+      const pairStart = sortedImages[j];
+      const pairEnd = sortedImages[j + 1];
+      subsequentPairs.push({
+        startIdx: j,
+        endIdx: j + 1,
+        originalFrames: (pairEnd.timeline_frame ?? 0) - (pairStart.timeline_frame ?? 0),
+      });
+    }
+
+    // If exceeds max and there are subsequent pairs, borrow from them proportionally
+    const overflow = exceedsMax ? newFrameCount - maxFrameLimit : 0;
+    const needsCompression = overflow > 0 && subsequentPairs.length > 0;
+    const totalSubsequentFrames = subsequentPairs.reduce((sum, p) => sum + p.originalFrames, 0);
+
+    // Calculate how much we can actually borrow (can't compress below 1 frame per pair)
+    const minTotalSubsequent = subsequentPairs.length; // 1 frame minimum per pair
+    const maxBorrowable = Math.max(0, totalSubsequentFrames - minTotalSubsequent);
+    const actualBorrow = Math.min(overflow, maxBorrowable);
+    const finalFrameCount = effectiveNewFrameCount + actualBorrow;
+    const finalDelta = finalFrameCount - currentFrameCount;
+
+    if (finalDelta === 0) {
+      console.log('[FrameCountUpdate] No change needed');
+      return;
+    }
+
+    console.log('[FrameCountUpdate] Updating:', {
+      pairIndex,
+      currentFrameCount,
+      finalFrameCount,
+      finalDelta,
+      needsCompression,
+    });
+
+    // Calculate new positions for all subsequent images
+    const updates: Array<{ id: string; newFrame: number }> = [];
+
+    if (needsCompression && actualBorrow > 0) {
+      // Calculate compression ratio
+      const targetTotal = totalSubsequentFrames - actualBorrow;
+      const compressionRatio = targetTotal / totalSubsequentFrames;
+
+      console.log('[FrameCountUpdate] Compression mode:', { actualBorrow, compressionRatio: compressionRatio.toFixed(3) });
+
+      // Apply proportional compression
+      let currentFrame = (startImage.timeline_frame ?? 0) + finalFrameCount;
+
+      // First subsequent image (end of target pair)
+      updates.push({ id: sortedImages[pairIndex + 1].id, newFrame: currentFrame });
+
+      for (let i = 0; i < subsequentPairs.length; i++) {
+        const pair = subsequentPairs[i];
+        const compressedFrames = Math.max(1, Math.min(maxFrameLimit, Math.round(pair.originalFrames * compressionRatio)));
+        currentFrame += compressedFrames;
+
+        if (pair.endIdx < sortedImages.length) {
+          updates.push({ id: sortedImages[pair.endIdx].id, newFrame: currentFrame });
+        }
+      }
+    } else {
+      // Simple shift: just add delta to all subsequent images
+      for (let j = pairIndex + 1; j < sortedImages.length; j++) {
+        const img = sortedImages[j];
+        const newFrame = (img.timeline_frame ?? 0) + finalDelta;
+        updates.push({ id: img.id, newFrame });
+      }
+    }
+
+    // Apply updates in parallel to database
+    await Promise.all(updates.map(update =>
+      supabase
+        .from('shot_generations')
+        .update({ timeline_frame: update.newFrame })
+        .eq('id', update.id)
+    ));
+
+    console.log('[FrameCountUpdate] ✅ Updated', updates.length, 'positions');
+
+    // Refresh data to show the updated positions
+    if (loadPositions) {
+      await loadPositions({ silent: true, reason: 'frame-count-update' as any });
+    }
+
+    return { finalFrameCount };
+  }, [shotGenerations, effectiveGenerationMode, loadPositions, maxFrameLimit]);
+
+  // Alias for MediaLightbox compatibility
+  const handleSegmentFrameCountChange = updatePairFrameCount;
 
   // Get ALL segments for preview (both with videos and image-only)
   // NOTE: This must be after shotGenerations is defined
@@ -1647,6 +1787,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // Shared output selection (syncs FinalVideoSection with SegmentOutputStrip)
                 selectedOutputId={selectedOutputId}
                 onSelectedOutputChange={onSelectedOutputChange}
+                // Instant timeline updates from MediaLightbox
+                onSegmentFrameCountChange={handleSegmentFrameCountChange}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}
@@ -1915,7 +2057,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         )}
       </CardContent>
 
-      {/* Segment Settings Modal - Uses SegmentRegenerateControls form */}
+      {/* Segment Settings Modal - Uses SegmentSettingsForm */}
       <SegmentSettingsModal
         isOpen={segmentSettingsModalData.isOpen}
         onClose={() => setSegmentSettingsModalData({ isOpen: false, pairData: null })}
@@ -2086,7 +2228,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               // NO separate structure_videos array
               ...(structureGuidance ? { structure_guidance: structureGuidance } : {}),
             },
-            // Include user_overrides so SegmentRegenerateControls can apply them on top
+            // Include user_overrides so useSegmentSettings can apply them on top
             user_overrides: userOverrides,
           };
         })()}
@@ -2141,113 +2283,39 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           return pairDataByIndex.has(segmentSettingsModalData.pairData.index + 1);
         })()}
         onFrameCountChange={(frameCount: number) => {
-          console.log('[FrameCountDebug] onFrameCountChange CALLED with:', frameCount, 'mode:', effectiveGenerationMode);
+          console.log('[ModalFrameCount] onFrameCountChange:', frameCount, 'mode:', effectiveGenerationMode);
 
-          // In batch mode, don't update timeline_frame values - batch mode uses uniform batchVideoFrames
-          // The slider change only affects params.num_frames for the current generation
-          if (effectiveGenerationMode === 'batch') {
-            console.log('[FrameCountDebug] Skipping timeline_frame update in batch mode');
-            // Still update local modal state so display stays in sync during this session
-            setSegmentSettingsModalData(prev => ({
-              ...prev,
-              pairData: prev.pairData ? {
-                ...prev.pairData,
-                frames: frameCount,
-              } : null,
-            }));
-            return;
-          }
-
-          // Timeline mode: Update the end image's timeline_frame when frame count changes
-          // AND shift all subsequent images by the delta
-          const pairData = segmentSettingsModalData.pairData;
-          if (!pairData?.endImage?.id || pairData.startFrame === undefined) {
-            console.warn('[FrameCountDebug] Cannot update frame count: missing endImage or startFrame', {
-              hasEndImage: !!pairData?.endImage,
-              endImageId: pairData?.endImage?.id,
-              startFrame: pairData?.startFrame,
-            });
-            return;
-          }
-          
-          const oldEndFrame = pairData.endFrame;
-          const newEndFrame = pairData.startFrame + frameCount;
-          const delta = newEndFrame - oldEndFrame;
-
-          if (delta === 0) {
-            // Nothing to do
-            return;
-          }
-          
-          console.log('[FrameCountDebug] Updating timeline frames:', {
-            frameCount,
-            startFrame: pairData.startFrame,
-            oldEndFrame,
-            newEndFrame,
-            delta,
-            endImageId: pairData.endImage.id.substring(0, 8),
-          });
-          
-          // Get all images sorted by timeline_frame
-          const sortedImages = [...shotGenerations]
-            .filter(sg => sg.timeline_frame != null && sg.timeline_frame >= 0)
-            .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
-
-          // Find the end image in the ordered list, then shift it and everything after it.
-          // Index-based shifting avoids accidentally shifting unrelated images that happen to share the same frame.
-          let startShiftIndex = sortedImages.findIndex(sg => sg.id === pairData.endImage?.id);
-          if (startShiftIndex === -1) {
-            console.warn('[FrameCountDebug] End image not found in sortedImages; falling back to frame-based cutoff', {
-              endImageId: pairData.endImage.id.substring(0, 8),
-              oldEndFrame,
-            });
-            startShiftIndex = sortedImages.findIndex(sg => sg.timeline_frame === oldEndFrame);
-          }
-
-          if (startShiftIndex === -1) {
-            console.warn('[FrameCountDebug] Could not determine shift start index; aborting shift', {
-              endImageId: pairData.endImage.id.substring(0, 8),
-              oldEndFrame,
-            });
-            return;
-          }
-
-          const imagesToShift = sortedImages.slice(startShiftIndex);
-          
-          console.log('[FrameCountDebug] Images to shift:', {
-            total: imagesToShift.length,
-            ids: imagesToShift.map(sg => sg.id.substring(0, 8)),
-            frames: imagesToShift.map(sg => sg.timeline_frame),
-          });
-
-          const updates = imagesToShift.map(sg => {
-            const nextFrame = (sg.timeline_frame as number) + delta;
-            console.log('[FrameCountDebug] Shifting image:', sg.id.substring(0, 8), sg.timeline_frame, '->', nextFrame);
-            return { id: sg.id, newFrame: nextFrame };
-          });
-
-          // Prefer batch update to avoid N sequential writes/races
-          batchExchangePositions(updates as any)
-            .then(() => {
-              console.log('[FrameCountDebug] All frames shifted successfully (batch)');
-            })
-            .catch(err => {
-              console.error('[FrameCountDebug] Error shifting frames (batch):', err);
-            });
-          
-          // Also update the local modal state so the display stays in sync
+          // Always update local modal state immediately for responsive UI
           setSegmentSettingsModalData(prev => ({
             ...prev,
             pairData: prev.pairData ? {
               ...prev.pairData,
               frames: frameCount,
-              endFrame: newEndFrame,
-              endImage: prev.pairData.endImage ? {
-                ...prev.pairData.endImage,
-                timeline_frame: newEndFrame,
-              } : undefined,
+              endFrame: (prev.pairData.startFrame ?? 0) + frameCount,
             } : null,
           }));
+
+          // In batch mode, don't update timeline - batch mode uses uniform batchVideoFrames
+          if (effectiveGenerationMode === 'batch') {
+            console.log('[ModalFrameCount] Skipping timeline update in batch mode');
+            return;
+          }
+
+          // Get the start image ID for this pair
+          const startImageId = segmentSettingsModalData.pairData?.startImage?.id;
+          if (!startImageId) {
+            console.warn('[ModalFrameCount] No startImageId available');
+            return;
+          }
+
+          // Debounce and call the unified handler
+          if (frameCountDebounceRef.current) {
+            clearTimeout(frameCountDebounceRef.current);
+          }
+
+          frameCountDebounceRef.current = setTimeout(() => {
+            updatePairFrameCount(startImageId, frameCount);
+          }, 150);
         }}
         onGenerateStarted={(pairShotGenerationId) => {
           // Optimistic UI update - show pending state immediately before task is detected

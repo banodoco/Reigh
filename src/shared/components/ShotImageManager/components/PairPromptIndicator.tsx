@@ -1,8 +1,10 @@
 import React from 'react';
-import { MessageSquare, X } from 'lucide-react';
+import { MessageSquare, X, Clapperboard, Palette, Settings2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { Button } from '@/shared/components/ui/button';
 import { cn } from '@/shared/lib/utils';
+import type { PhaseConfig } from '@/tools/travel-between-images/settings';
+import type { PairLoraConfig, PairMotionSettings } from '@/types/shots';
 
 interface PairPromptIndicatorProps {
   pairIndex: number;
@@ -18,6 +20,10 @@ interface PairPromptIndicatorProps {
   className?: string;
   isMobile?: boolean;
   onClearEnhancedPrompt?: (pairIndex: number) => void;
+  // NEW: Per-pair parameter override indicators
+  pairPhaseConfig?: PhaseConfig;
+  pairLoras?: PairLoraConfig[];
+  pairMotionSettings?: PairMotionSettings;
 }
 
 /**
@@ -38,6 +44,10 @@ const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
   className,
   isMobile = false,
   onClearEnhancedPrompt,
+  // NEW: Per-pair parameter override indicators
+  pairPhaseConfig,
+  pairLoras,
+  pairMotionSettings,
 }) => {
   console.log('[PairIndicatorDebug] PairPromptIndicator render:', {
     pairIndex,
@@ -50,6 +60,10 @@ const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
     pairPrompt: pairPrompt?.substring(0, 30),
     pairNegativePrompt: pairNegativePrompt?.substring(0, 30),
     isMobile,
+    // NEW: Log override status
+    hasMotionOverride: !!pairMotionSettings,
+    hasLoraOverride: !!(pairLoras && pairLoras.length > 0),
+    hasPhaseConfigOverride: !!pairPhaseConfig,
   });
 
   // Color schemes matching timeline PairRegion
@@ -65,6 +79,11 @@ const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
 
   // Check if there's a custom prompt OR enhanced prompt for this pair
   const hasCustomPrompt = (pairPrompt && pairPrompt.trim()) || (pairNegativePrompt && pairNegativePrompt.trim()) || (enhancedPrompt && enhancedPrompt.trim());
+
+  // NEW: Check for per-pair parameter overrides
+  const hasMotionOverride = !!pairMotionSettings;
+  const hasLoraOverride = !!(pairLoras && pairLoras.length > 0);
+  const hasAdvancedOverride = !!pairPhaseConfig;
 
   return (
     <div className={cn("flex items-center justify-center", className)}>
@@ -88,12 +107,33 @@ const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
               Pair {pairIndex + 1}
             </span>
             {!isMobile && (
-              <MessageSquare 
-                className={cn(
-                  "h-2.5 w-2.5",
-                  hasCustomPrompt ? 'opacity-100' : 'text-gray-400 dark:text-gray-500 opacity-60'
+              <div className="flex items-center gap-0.5">
+                <MessageSquare
+                  className={cn(
+                    "h-2.5 w-2.5",
+                    hasCustomPrompt ? 'opacity-100' : 'text-gray-400 dark:text-gray-500 opacity-60'
+                  )}
+                />
+                {/* NEW: Override indicator icons */}
+                {hasMotionOverride && (
+                  <Clapperboard
+                    className="h-2.5 w-2.5 text-amber-500 dark:text-amber-400"
+                    title="Motion override"
+                  />
                 )}
-              />
+                {hasLoraOverride && (
+                  <Palette
+                    className="h-2.5 w-2.5 text-violet-500 dark:text-violet-400"
+                    title="LoRA override"
+                  />
+                )}
+                {hasAdvancedOverride && (
+                  <Settings2
+                    className="h-2.5 w-2.5 text-cyan-500 dark:text-cyan-400"
+                    title="Advanced override"
+                  />
+                )}
+              </div>
             )}
           </button>
         </TooltipTrigger>
@@ -157,6 +197,7 @@ export const PairPromptIndicator = React.memo(
   PairPromptIndicatorComponent,
   (prevProps, nextProps) => {
     // Only compare value props, not callbacks (which are unstable inline functions)
+    // For override objects/arrays, use truthiness check (re-render if presence changes)
     return (
       prevProps.pairIndex === nextProps.pairIndex &&
       prevProps.frames === nextProps.frames &&
@@ -168,7 +209,11 @@ export const PairPromptIndicator = React.memo(
       prevProps.defaultPrompt === nextProps.defaultPrompt &&
       prevProps.defaultNegativePrompt === nextProps.defaultNegativePrompt &&
       prevProps.isMobile === nextProps.isMobile &&
-      prevProps.className === nextProps.className
+      prevProps.className === nextProps.className &&
+      // NEW: Check override presence (truthiness comparison is sufficient for icons)
+      !!prevProps.pairPhaseConfig === !!nextProps.pairPhaseConfig &&
+      !!(prevProps.pairLoras?.length) === !!(nextProps.pairLoras?.length) &&
+      !!prevProps.pairMotionSettings === !!nextProps.pairMotionSettings
     );
   }
 );

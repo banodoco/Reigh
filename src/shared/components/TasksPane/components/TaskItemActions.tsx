@@ -59,7 +59,7 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
   const [idCopied, setIdCopied] = useState(false);
 
   return (
-    <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
+    <div className={cn("flex items-center flex-shrink-0 ml-auto", isMobile ? "gap-1" : "gap-0.5")}>
       {/* ID copy button - always visible */}
       <Tooltip>
         <TooltipTrigger asChild>
@@ -71,9 +71,10 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
               setTimeout(() => setIdCopied(false), 2000);
             }}
             className={cn(
-              "px-1 py-0.5 text-xs rounded transition-colors",
-              idCopied 
-                ? "text-green-400" 
+              "text-xs rounded transition-colors",
+              isMobile ? "px-2 py-1" : "px-1 py-0.5",
+              idCopied
+                ? "text-green-400"
                 : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
             )}
           >
@@ -101,8 +102,8 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
                 onSwitchProject(task.projectId);
               }}
               className={cn(
-                "p-1 rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
-                isMobile && "min-w-[32px] min-h-[32px] flex items-center justify-center"
+                "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
+                isMobile ? "p-1.5" : "p-1"
               )}
               title={`Go to project: ${projectName}`}
             >
@@ -130,7 +131,7 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
               }}
               className={cn(
                 "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
-                isMobile ? "p-2 min-w-[32px] min-h-[32px]" : "p-1"
+                isMobile ? "p-1.5" : "p-1"
               )}
               disabled={isLoadingVideoGen && waitingForVideoToOpen}
             >
@@ -142,7 +143,7 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
           </TooltipContent>
         </Tooltip>
       )}
-      
+
       {/* Open Image button */}
       {isImageTask && generationData && (
         <Tooltip>
@@ -156,7 +157,7 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
               }}
               className={cn(
                 "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
-                isMobile ? "p-2 min-w-[32px] min-h-[32px]" : "p-1"
+                isMobile ? "p-1.5" : "p-1"
               )}
             >
               <ImageIcon className={isMobile ? "w-4 h-4" : "w-3 h-3"} />
@@ -167,7 +168,7 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
           </TooltipContent>
         </Tooltip>
       )}
-      
+
       {/* Visit Shot button */}
       {shotId && (
         <Tooltip>
@@ -181,7 +182,7 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
               }}
               className={cn(
                 "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
-                isMobile ? "p-2 min-w-[32px] min-h-[32px]" : "p-1"
+                isMobile ? "p-1.5" : "p-1"
               )}
             >
               <ExternalLink className={isMobile ? "w-4 h-4" : "w-3 h-3"} />
