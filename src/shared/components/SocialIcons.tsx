@@ -1,5 +1,5 @@
 import React from 'react';
-import { Github, MessageCircle, Plus } from 'lucide-react';
+import { Github, MessageCircle } from 'lucide-react';
 
 export const SocialIcons: React.FC = () => {
   return (
@@ -23,11 +23,6 @@ export const SocialIcons: React.FC = () => {
           >
             <MessageCircle className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
           </a>
-        </div>
-        
-        {/* Placeholder icon beneath them */}
-        <div className="p-1.5 bg-card/20 dark:bg-gray-800/20 backdrop-blur-sm rounded-full border border-wes-vintage-gold/5 opacity-30">
-          <Plus className="w-2.5 h-2.5 text-wes-vintage-gold/40" />
         </div>
       </div>
     </div>
