@@ -14,21 +14,26 @@ export interface ImageGalleryGridProps {
   images: GeneratedImageWithMetadata[];
   paginatedImages: GeneratedImageWithMetadata[];
   filteredImages: GeneratedImageWithMetadata[];
-  
+
   // Layout props
   reducedSpacing?: boolean;
   whiteText?: boolean;
   gridColumnClasses: string;
   columnsPerRow?: number;
   projectAspectRatio?: string;
-  
+
   // Loading props
   isLoading?: boolean;
   isGalleryLoading: boolean;
-  setIsGalleryLoading: (loading: boolean) => void;
   isServerPagination: boolean;
-  setLoadingButton: (button: 'prev' | 'next' | null) => void;
-  safetyTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+
+  // Navigation completion - the SINGLE way to clear loading state
+  clearNavigation: () => void;
+
+  // Legacy props (kept for backwards compatibility, but prefer clearNavigation)
+  setIsGalleryLoading?: (loading: boolean) => void;
+  setLoadingButton?: (button: 'prev' | 'next' | null) => void;
+  safetyTimeoutRef?: React.MutableRefObject<NodeJS.Timeout | null>;
   
   // Progressive loading props
   effectivePage: number;
@@ -68,19 +73,24 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   images,
   paginatedImages,
   filteredImages,
-  
+
   // Layout props
   reducedSpacing = false,
   whiteText = false,
   gridColumnClasses,
   columnsPerRow = 5,
   projectAspectRatio,
-  
+
   // Loading props
   isLoading = false,
   isGalleryLoading,
-  setIsGalleryLoading,
   isServerPagination,
+
+  // Navigation completion - the SINGLE way to clear loading state
+  clearNavigation,
+
+  // Legacy props (kept for backwards compatibility)
+  setIsGalleryLoading,
   setLoadingButton,
   safetyTimeoutRef,
   
@@ -119,7 +129,36 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   
   // Track previous paginated images length to detect when new images arrive
   const prevPaginatedLengthRef = React.useRef(paginatedImages.length);
-  
+
+  // === SIMPLE PAGE CHANGE DETECTION ===
+  // Create a signature for the current page to detect when new data arrives
+  const pageSignature = React.useMemo(() => {
+    if (paginatedImages.length === 0) return 'empty';
+    const firstId = paginatedImages[0]?.id || 'none';
+    const lastId = paginatedImages[paginatedImages.length - 1]?.id || 'none';
+    return `${paginatedImages.length}-${firstId}-${lastId}`;
+  }, [paginatedImages]);
+
+  const prevPageSignatureRef = React.useRef<string>(pageSignature);
+  // Store clearNavigation in a ref to avoid effect dependency issues
+  const clearNavigationRef = React.useRef(clearNavigation);
+  clearNavigationRef.current = clearNavigation;
+
+  // When page data changes and we're loading, clear navigation immediately
+  // This is the moment when the new page becomes visible
+  React.useEffect(() => {
+    if (prevPageSignatureRef.current !== pageSignature) {
+      console.log(`[NAV_STATE] Page signature changed: ${prevPageSignatureRef.current} -> ${pageSignature}, isGalleryLoading: ${isGalleryLoading}`);
+      prevPageSignatureRef.current = pageSignature;
+
+      // If we were navigating, we've arrived - clear the loading state
+      if (isGalleryLoading) {
+        console.log(`[NAV_STATE] Clearing navigation - new page data arrived`);
+        clearNavigationRef.current();
+      }
+    }
+  }, [pageSignature, isGalleryLoading]);
+
   // Clear skeleton immediately when new images arrive
   React.useEffect(() => {
     if (isBackfillLoading && paginatedImages.length > prevPaginatedLengthRef.current) {
@@ -251,17 +290,14 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
             isLightboxOpen={isLightboxOpen}
             instanceId={`gallery-${isServerPagination ? (serverPage || 1) : page}`}
             onImagesReady={() => {
-              console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing gallery loading state`);
+              // This callback is only used for skeleton cleanup
               console.log('[SKELETON_DEBUG] ProgressiveLoadingManager onImagesReady fired:', {
                 isBackfillLoading,
                 hasSetters: !!(setIsBackfillLoading && setBackfillSkeletonCount),
                 paginatedImagesLength: paginatedImages.length,
                 timestamp: Date.now()
               });
-              
-              // Only update if needed to prevent render thrash
-              if (isGalleryLoading) setIsGalleryLoading(false);
-              
+
               // If we were showing backfill skeletons, hide them as soon as real images appear
               if (isBackfillLoading && setIsBackfillLoading) {
                 console.log('[SKELETON_DEBUG] ProgressiveLoadingManager - clearing skeleton (images ready):', {
@@ -271,21 +307,6 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
                 });
                 setIsBackfillLoading(false);
                 if (setBackfillSkeletonCount) setBackfillSkeletonCount(0);
-              }
-
-              // Clear button loading when images are ready - this syncs animation timing with gallery update
-              // Works for both server and client pagination to ensure proper sync
-              console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing button loading (${isServerPagination ? 'server' : 'client'} pagination)`);
-              console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton - buttons will be re-enabled`, {
-                reason: `${isServerPagination ? 'Server' : 'Client'} pagination images ready`,
-                timestamp: Date.now()
-              });
-              setLoadingButton(null);
-              
-              // Clear the gallery safety timeout since loading completed successfully
-              if (safetyTimeoutRef.current) {
-                clearTimeout(safetyTimeoutRef.current);
-                safetyTimeoutRef.current = null;
               }
             }}
           >

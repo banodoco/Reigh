@@ -726,19 +726,19 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
           images={images}
           paginatedImages={paginatedImagesWithBadges}
           filteredImages={filtersHook.filteredImages}
-          
+
           // Layout props
           reducedSpacing={reducedSpacing}
           whiteText={whiteText}
           gridColumnClasses={gridColumnClasses}
           projectAspectRatio={projectAspectRatio}
-          
+
           // Loading props
           isGalleryLoading={paginationHook.isGalleryLoading}
-          setIsGalleryLoading={paginationHook.setIsGalleryLoading}
           isServerPagination={paginationHook.isServerPagination}
-          setLoadingButton={paginationHook.setLoadingButton}
-          safetyTimeoutRef={stateHook.safetyTimeoutRef}
+
+          // Navigation completion - the SINGLE way to clear loading state
+          clearNavigation={paginationHook.clearNavigation}
           
           // Progressive loading props
           effectivePage={effectivePage}

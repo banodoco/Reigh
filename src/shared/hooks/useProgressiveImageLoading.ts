@@ -37,6 +37,7 @@ interface LoadingSession {
   id: string;
   abortController: AbortController;
   timeouts: (NodeJS.Timeout | number)[];
+  rafIds: number[]; // requestAnimationFrame handles
   isActive: boolean;
   startTime: number;
 }
@@ -73,13 +74,16 @@ export const useProgressiveImageLoading = ({
   const cancelActiveSession = (reason: string) => {
     if (activeSessionRef.current?.isActive) {
       console.log(`🧹 [PAGELOADINGDEBUG] [PROG:${activeSessionRef.current.id}] Canceling session: ${reason}`);
-      
+
       // Abort any ongoing operations
       activeSessionRef.current.abortController.abort();
-      
+
       // Clear all timeouts
       activeSessionRef.current.timeouts.forEach(timeout => clearTimeout(timeout));
-      
+
+      // Cancel all requestAnimationFrame handles
+      activeSessionRef.current.rafIds.forEach(rafId => cancelAnimationFrame(rafId));
+
       // Mark as inactive
       activeSessionRef.current.isActive = false;
       activeSessionRef.current = null;
@@ -133,11 +137,13 @@ export const useProgressiveImageLoading = ({
     const sessionId = `prog-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const abortController = new AbortController();
     const timeouts: (NodeJS.Timeout | number)[] = [];
-    
+    const rafIds: number[] = [];
+
     const session: LoadingSession = {
       id: sessionId,
       abortController,
       timeouts,
+      rafIds,
       isActive: true,
       startTime: now
     };
@@ -194,29 +200,21 @@ export const useProgressiveImageLoading = ({
       
     console.log(`📦 [PAGELOADINGDEBUG] [PROG:${sessionId}] Immediate load: ${images.length} images (${cachedCount}/${images.length} cached)`);
     
-    // Notify that images are ready
+    // Notify that images are ready (for skeleton cleanup etc)
+    // NOTE: Navigation clearing is now handled by actual image onLoad events in ImageGalleryGrid
     if (stableOnImagesReady.current && isSessionActive()) {
-      if (allCached) {
-        // Immediate callback for cached images
-        console.log(`⚡ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: IMMEDIATE (all cached)`);
-        stableOnImagesReady.current();
-      } else {
-        // Adaptive delay based on number of uncached images
-        // Later pages may have more uncached images, so increase delay slightly
-        const uncachedCount = images.length - cachedCount;
-        // Use a small delay that scales slightly with uncached count, but caps at reasonable value
-        const delay = Math.min(uncachedCount > 10 ? 32 : 16, 50);
-        console.log(`⏱️ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback: DELAYED ${delay}ms (${uncachedCount} uncached)`);
-        const readyTimeout = setTimeout(() => {
+      // Use double rAF to wait for React to commit and browser to paint
+      const rafId1 = requestAnimationFrame(() => {
+        if (!isSessionActive()) return;
+        const rafId2 = requestAnimationFrame(() => {
           if (isSessionActive()) {
-            console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback executed`);
+            console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback (after paint)`);
             stableOnImagesReady.current?.();
-          } else {
-            console.log(`❌ [PAGELOADINGDEBUG] [PROG:${sessionId}] Ready callback cancelled (session inactive)`);
           }
-        }, delay);
-        timeouts.push(readyTimeout);
-      }
+        });
+        rafIds.push(rafId2);
+      });
+      rafIds.push(rafId1);
     }
     
     console.log(`✅ [PAGELOADINGDEBUG] [PROG:${sessionId}] Complete - all images shown immediately`);

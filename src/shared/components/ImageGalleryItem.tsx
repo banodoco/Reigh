@@ -95,6 +95,8 @@ interface ImageGalleryItemProps {
   videosAsThumbnails?: boolean;
   /** Optional data-tour attribute for product tour targeting */
   dataTour?: string;
+  /** Callback when the image has fully loaded and is visible */
+  onImageLoaded?: (imageId: string) => void;
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -148,6 +150,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   onImageClick,
   videosAsThumbnails = false,
   dataTour,
+  onImageLoaded,
 }) => {
   // Local pending state to scope star button disabled to this item only
   const [isTogglingStar, setIsTogglingStar] = useState<boolean>(false);
@@ -360,7 +363,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     try {
       setImageCacheStatus(image, true);
     } catch (_) {}
-  }, [index, image.id, isPreloadedAndCached]);
+    // Notify parent that this image has loaded (if callback provided)
+    onImageLoaded?.(image.id);
+  }, [image, onImageLoaded]);
+
   const MAX_RETRIES = 2;
   
   // Handle shot creation

@@ -1,5 +1,34 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { GeneratedImageWithMetadata } from '../ImageGallery';
+
+/**
+ * UNIFIED NAVIGATION STATE
+ *
+ * This replaces the previous dual-state approach (loadingButton + isGalleryLoading)
+ * with a single state machine that's easier to reason about.
+ *
+ * States:
+ * - idle: No navigation in progress
+ * - navigating: User clicked prev/next, waiting for data & images to be ready
+ *
+ * The loading state is ALWAYS shown immediately when navigating starts,
+ * and is ONLY cleared by onImagesReady (called by ProgressiveLoadingManager).
+ */
+export type NavigationStatus = 'idle' | 'navigating';
+
+export interface NavigationState {
+  status: NavigationStatus;
+  direction: 'prev' | 'next' | null;  // null when idle
+  targetPage: number | null;           // null when idle
+  startedAt: number | null;            // timestamp for debugging/timeout
+}
+
+const INITIAL_NAVIGATION_STATE: NavigationState = {
+  status: 'idle',
+  direction: null,
+  targetPage: null,
+  startedAt: null,
+};
 
 export interface UseImageGalleryPaginationProps {
   filteredImages: GeneratedImageWithMetadata[];
@@ -18,18 +47,26 @@ export interface UseImageGalleryPaginationReturn {
   page: number;
   setPage: (page: number) => void;
   isServerPagination: boolean;
+
+  // Unified navigation state (new)
+  navigationState: NavigationState;
+
+  // Backwards-compatible derived values (derived from navigationState)
   loadingButton: 'prev' | 'next' | null;
   setLoadingButton: (button: 'prev' | 'next' | null) => void;
   isGalleryLoading: boolean;
   setIsGalleryLoading: (loading: boolean) => void;
-  
+
+  // Clear navigation (the canonical way to end a navigation)
+  clearNavigation: () => void;
+
   // Computed values
   paginatedImages: GeneratedImageWithMetadata[];
   totalFilteredItems: number;
   totalPages: number;
   rangeStart: number;
   rangeEnd: number;
-  
+
   // Handlers
   handlePageChange: (newPage: number, direction: 'prev' | 'next', fromBottom?: boolean) => void;
 }
@@ -45,32 +82,42 @@ export const useImageGalleryPagination = ({
   isMobile,
   galleryTopRef,
 }: UseImageGalleryPaginationProps): UseImageGalleryPaginationReturn => {
-  
+
   // Pagination state
   const [page, setPage] = useState(0);
-  const [loadingButton, setLoadingButton] = useState<'prev' | 'next' | null>(null);
+
   // Determine if we're in server-side pagination mode (available at init time)
   const isServerPagination = !!(onServerPageChange && serverPage);
-  // Start with loading when in server pagination to avoid initial empty flash
-  const [isGalleryLoading, setIsGalleryLoading] = useState<boolean>(isServerPagination);
-  
+
+  // UNIFIED NAVIGATION STATE
+  // Start with navigating=true for server pagination to show loading on initial mount
+  const [navigationState, setNavigationState] = useState<NavigationState>(
+    isServerPagination
+      ? { status: 'navigating', direction: null, targetPage: serverPage ?? 1, startedAt: Date.now() }
+      : INITIAL_NAVIGATION_STATE
+  );
+
   // Safety timeout ref for clearing stuck loading states
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Track last applied server data signature so we can clear loading when new data arrives
   const lastServerDataSignatureRef = useRef<string>('');
 
-  // CRITICAL: Track loadingButton state changes to debug disabled buttons
+  // CRITICAL: Track navigation state changes for debugging
   useEffect(() => {
-    console.warn(`[ReconnectionIssue][UI_LOADING_STATE] loadingButton state changed`, {
-      loadingButton,
+    console.log(`[NAV_STATE] Navigation state changed:`, {
+      status: navigationState.status,
+      direction: navigationState.direction,
+      targetPage: navigationState.targetPage,
       isServerPagination,
-      buttonsDisabled: loadingButton !== null,
       currentPage: isServerPagination ? serverPage : page,
+      elapsed: navigationState.startedAt ? Date.now() - navigationState.startedAt : null,
       timestamp: Date.now()
     });
-  }, [loadingButton, isServerPagination, serverPage, page]);
-  
-  // isServerPagination already computed
+  }, [navigationState, isServerPagination, serverPage, page]);
+
+  // Derive backwards-compatible values from unified state
+  const loadingButton = navigationState.status === 'navigating' ? navigationState.direction : null;
+  const isGalleryLoading = navigationState.status === 'navigating';
   
   // When filters change, reset to first page (debounced to avoid rapid state changes)
   useEffect(() => {
@@ -102,13 +149,65 @@ export const useImageGalleryPagination = ({
     }
   }, [totalPages, page]);
 
+  // Canonical way to clear navigation state - called by onImagesReady
+  const clearNavigation = useCallback(() => {
+    console.log(`[NAV_STATE] clearNavigation called`, {
+      previousStatus: navigationState.status,
+      previousDirection: navigationState.direction,
+      timestamp: Date.now()
+    });
+
+    setNavigationState(INITIAL_NAVIGATION_STATE);
+
+    // Clear safety timeout since loading completed successfully
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = null;
+    }
+  }, [navigationState.status, navigationState.direction]);
+
+  // Backwards-compatible setters (for external callers)
+  // These allow gradual migration - eventually these should be removed
+  const setLoadingButton = useCallback((button: 'prev' | 'next' | null) => {
+    if (button === null) {
+      // Clearing loading - use the canonical method
+      clearNavigation();
+    } else {
+      // Setting loading - this shouldn't happen via setter anymore
+      // but support it for backwards compatibility
+      console.warn(`[NAV_STATE] setLoadingButton called with "${button}" - prefer handlePageChange`);
+      setNavigationState({
+        status: 'navigating',
+        direction: button,
+        targetPage: null,
+        startedAt: Date.now(),
+      });
+    }
+  }, [clearNavigation]);
+
+  const setIsGalleryLoading = useCallback((loading: boolean) => {
+    if (!loading) {
+      // Clearing loading - use the canonical method
+      clearNavigation();
+    } else {
+      // Setting loading without direction - used by filter changes
+      console.log(`[NAV_STATE] setIsGalleryLoading(true) - showing loading for filter change`);
+      setNavigationState({
+        status: 'navigating',
+        direction: null, // No direction for filter changes
+        targetPage: null,
+        startedAt: Date.now(),
+      });
+    }
+  }, [clearNavigation]);
+
   // Detect when new server data has been applied (includes mobile where prefetch is disabled)
   // IMPORTANT: Only clear loading when actual IMAGE DATA changes, not when serverPage changes.
   // The parent may update serverPage optimistically before data arrives.
   useEffect(() => {
     if (!isServerPagination) return;
     // Only proceed if we're actually in a loading state
-    if (loadingButton === null && !isGalleryLoading) return;
+    if (navigationState.status !== 'navigating') return;
 
     const firstId = filteredImages[0]?.id ?? 'none';
     const lastId = filteredImages[filteredImages.length - 1]?.id ?? 'none';
@@ -121,149 +220,82 @@ export const useImageGalleryPagination = ({
     }
     lastServerDataSignatureRef.current = signature;
 
-    console.log(`[PAGELOADINGDEBUG] Server page data applied – clearing loading states`, {
+    console.log(`[NAV_STATE] Server data changed, clearing navigation`, {
       serverPage,
       filteredCount: filteredImages.length,
       signature,
     });
 
-    if (loadingButton !== null) {
-      console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton after data sync`, {
-        serverPage,
-        signature,
-        timestamp: Date.now(),
-      });
-      setLoadingButton(null);
-    }
+    // Clear navigation - new page data has arrived
+    clearNavigation();
 
-    if (isGalleryLoading) {
-      setIsGalleryLoading(false);
-    }
-
-    if (safetyTimeoutRef.current) {
-      clearTimeout(safetyTimeoutRef.current);
-      safetyTimeoutRef.current = null;
-    }
-  }, [filteredImages, isServerPagination, loadingButton, isGalleryLoading]);
+  }, [filteredImages, isServerPagination, navigationState.status, serverPage, clearNavigation]);
   
   // Handle pagination with loading state
   const handlePageChange = useCallback((newPage: number, direction: 'prev' | 'next', fromBottom = false) => {
     // Generate unique navigation ID for tracking
     const navId = `nav-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    console.log(`🔄 [PAGELOADINGDEBUG] [NAV:${navId}] ${direction.toUpperCase()} pressed: ${isServerPagination ? serverPage : page} → ${newPage} (${isServerPagination ? 'server' : 'client'} mode)`);
-    
-    if (loadingButton) {
-      console.log(`❌ [PAGELOADINGDEBUG] [NAV:${navId}] BLOCKED - ${loadingButton} button still loading`);
+
+    console.log(`[NAV_STATE] [${navId}] ${direction.toUpperCase()} pressed: ${isServerPagination ? serverPage : page} → ${newPage} (${isServerPagination ? 'server' : 'client'} mode)`);
+
+    // Prevent multiple clicks while navigation is in progress
+    if (navigationState.status === 'navigating') {
+      console.log(`[NAV_STATE] [${navId}] BLOCKED - already navigating (${navigationState.direction})`);
       return;
-    } // Prevent multiple clicks while any button is loading
-    
-    setLoadingButton(direction);
-    console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Setting loadingButton to "${direction}" - buttons will be disabled`, {
-      navId,
-      direction,
-      isServerPagination,
-      currentPage: isServerPagination ? serverPage : page,
-      targetPage: newPage,
-      timestamp: Date.now()
-    });
-    
-    // Smart loading state: only show gallery loading for non-adjacent pages or when preloading is disabled
-    const currentPageNum = isServerPagination ? (serverPage || 1) - 1 : page;
-    const isAdjacentPage = Math.abs(newPage - currentPageNum) === 1;
-    const shouldShowGalleryLoading = !isAdjacentPage || !enableAdjacentPagePreloading;
-    
-    if (shouldShowGalleryLoading) {
-      console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Loading state: ON (${isAdjacentPage ? 'preloading disabled' : 'distant page'})`);
-      setIsGalleryLoading(true); // Show loading state for distant pages or when preloading disabled
-    } else {
-      // For adjacent pages, set a shorter fallback timeout since images should be preloaded
-      console.log(`⚡ [PAGELOADINGDEBUG] [NAV:${navId}] Loading state: DELAYED (adjacent page, likely preloaded)`);
-      const fallbackTimeout = setTimeout(() => {
-        console.log(`⏰ [PAGELOADINGDEBUG] [NAV:${navId}] Fallback loading activated (50ms elapsed)`);
-        setIsGalleryLoading(true);
-      }, 50); // Reduced from 200ms - shorter timeout for preloaded pages
-      
-      // The progressive loading hook will clear the loading state once ready
-      // Store timeout for potential cleanup (though it will likely complete before cleanup)
-      setTimeout(() => {
-        clearTimeout(fallbackTimeout);
-      }, 1000);
     }
-    
-    // Separate safety timeouts for button and gallery loading states
-    // This prevents the UI from getting stuck in loading state
-    // Clear any existing safety timeout first
+
+    // ALWAYS show loading state immediately
+    // This is the single place where we start navigation
+    setNavigationState({
+      status: 'navigating',
+      direction,
+      targetPage: newPage,
+      startedAt: Date.now(),
+    });
+
+    console.log(`[NAV_STATE] [${navId}] Navigation started - loading shown immediately`);
+
+    // Clear any existing safety timeout
     if (safetyTimeoutRef.current) {
       clearTimeout(safetyTimeoutRef.current);
     }
-    
-    // Gallery loading safety timeout (longer since it depends on progressive loading)
+
+    // Single safety timeout for the entire navigation
+    // This is a FALLBACK only - normal completion is via onImagesReady
     safetyTimeoutRef.current = setTimeout(() => {
-      console.log(`🚨 [PAGELOADINGDEBUG] [NAV:${navId}] GALLERY SAFETY TIMEOUT - progressive loading failed after 1.5s`);
-      setIsGalleryLoading(false);
+      console.warn(`[NAV_STATE] [${navId}] SAFETY TIMEOUT - navigation stuck after 5s, force clearing`);
+      setNavigationState(INITIAL_NAVIGATION_STATE);
       safetyTimeoutRef.current = null;
-    }, 1500);
-    
+    }, 5000); // Reduced from 8s - 5s is plenty for any network condition
+
     if (isServerPagination && onServerPageChange) {
-      // Server-side pagination: notify the parent, which will handle scrolling.
-      console.log(`📡 [PAGELOADINGDEBUG] [NAV:${navId}] Calling server pagination handler`);
-      onServerPageChange(newPage, fromBottom); 
-      
-      // NOTE: Don't use a short timeout to clear button loading state.
-      // The effect watching filteredImages changes (see ~line 106) will clear loadingButton
-      // when the new data actually arrives. Using a fixed timeout (like 800ms) causes the
-      // spinner to finish before data is displayed.
-      // Only keep a very long safety timeout as a true fallback for stuck states.
-      const buttonSafetyTimeout = setTimeout(() => {
-        console.log(`🚨 [PAGELOADINGDEBUG] [NAV:${navId}] Button SAFETY TIMEOUT - data never arrived after 8s`);
-        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via safety timeout - buttons will be re-enabled`, {
-          navId,
-          reason: 'Server pagination safety timeout (8000ms)',
-          timestamp: Date.now()
-        });
-        setLoadingButton(null);
-      }, 8000); // Safety timeout only - data-arrival effect should clear this first
-      
-      console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination initiated - waiting for data arrival to clear loading...`);
+      // Server-side pagination: notify the parent, which will handle scrolling
+      console.log(`[NAV_STATE] [${navId}] Calling server pagination handler`);
+      onServerPageChange(newPage, fromBottom);
+      // Loading will be cleared by onImagesReady when new data renders
     } else {
       // Client-side pagination - update page state immediately
-      // The ProgressiveLoadingManager will clear loadingButton when images are ready
-      // This ensures the animation syncs with when new items are actually rendered
-      console.log(`🖥️ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination - updating local page state`);
+      console.log(`[NAV_STATE] [${navId}] Client pagination - updating local page state`);
       setPage(newPage);
-      
-      // Set a longer safety timeout for client pagination to ensure loading clears even if ProgressiveLoadingManager doesn't fire
-      // But prefer ProgressiveLoadingManager callback for proper sync
-      const clientSafetyTimeout = setTimeout(() => {
-        console.log(`✅ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination safety timeout - clearing loading`);
-        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via safety timeout - buttons will be re-enabled`, {
-          navId,
-          reason: `Client pagination safety timeout (500ms)`,
-          timestamp: Date.now()
-        });
-        setLoadingButton(null);
-        setIsGalleryLoading(false);
-        
-        // Scroll to top of gallery AFTER page loads (only for bottom buttons)
-        if (fromBottom && galleryTopRef.current) {
-          const rect = galleryTopRef.current.getBoundingClientRect();
+
+      // Handle scroll for bottom button clicks
+      // Note: This happens in a timeout to ensure the page state update has been processed
+      if (fromBottom && galleryTopRef.current) {
+        setTimeout(() => {
+          const rect = galleryTopRef.current!.getBoundingClientRect();
           const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-          const targetPosition = rect.top + scrollTop - (isMobile ? 80 : 20); // Account for mobile nav/header
-          
-          console.log(`📜 [PAGELOADINGDEBUG] [NAV:${navId}] Auto-scrolling to top (bottom button used)`);
+          const targetPosition = rect.top + scrollTop - (isMobile ? 80 : 20);
+
+          console.log(`[NAV_STATE] [${navId}] Auto-scrolling to top (bottom button used)`);
           window.scrollTo({
-            top: Math.max(0, targetPosition), // Ensure we don't scroll above page top
+            top: Math.max(0, targetPosition),
             behavior: 'smooth'
           });
-        }
-      }, 500); // Longer timeout to allow React to render, but ProgressiveLoadingManager should fire first
-      
-      // Store timeout ref for cleanup (though ProgressiveLoadingManager should clear loading first)
-      // Note: ProgressiveLoadingManager's onImagesReady callback will clear loadingButton
-      // before this timeout fires, ensuring proper sync between animation and gallery update
+        }, 50);
+      }
+      // Loading will be cleared by onImagesReady when images render
     }
-  }, [loadingButton, isServerPagination, onServerPageChange, setPage, isMobile, page, serverPage, enableAdjacentPagePreloading, galleryTopRef]);
+  }, [navigationState.status, navigationState.direction, isServerPagination, onServerPageChange, setPage, isMobile, page, serverPage, galleryTopRef]);
   
   // Clean up safety timeout on unmount
   useEffect(() => {
@@ -279,18 +311,26 @@ export const useImageGalleryPagination = ({
     page,
     setPage,
     isServerPagination,
+
+    // Unified navigation state (new)
+    navigationState,
+
+    // Backwards-compatible derived values
     loadingButton,
     setLoadingButton,
     isGalleryLoading,
     setIsGalleryLoading,
-    
+
+    // Clear navigation (canonical way to end navigation)
+    clearNavigation,
+
     // Computed values
     paginatedImages,
     totalFilteredItems,
     totalPages,
     rangeStart,
     rangeEnd,
-    
+
     // Handlers
     handlePageChange,
   };

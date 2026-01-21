@@ -1,29 +1,40 @@
 /**
  * ImagePreloadManager
- * 
- * Dedicated component for handling adjacent page preloading.
- * Clear separation from progressive loading and gallery rendering.
+ *
+ * Dedicated component for handling adjacent page preloading and cache cleanup.
+ * Renders nothing - just manages preloading logic.
  */
 
 import React from 'react';
-import { useAdjacentPagePreloading } from '@/shared/hooks/useAdjacentPagePreloading';
+import { useImagePreloading } from '@/shared/hooks/useImagePreloading';
+import { useCacheCleanup } from '@/shared/hooks/useCacheCleanup';
 
 interface ImagePreloadManagerProps {
+  /** Whether preloading is enabled */
   enabled?: boolean;
+  /** Whether using server-side pagination */
   isServerPagination?: boolean;
+  /** Current page (0-indexed for client pagination) */
   page: number;
+  /** Server page number (1-indexed) */
   serverPage?: number;
+  /** Total items (for server pagination) */
   totalFilteredItems: number;
+  /** Items per page */
   itemsPerPage: number;
+  /** Callback to prefetch adjacent pages (for server pagination) */
   onPrefetchAdjacentPages?: (prevPage: number | null, nextPage: number | null) => void;
+  /** All images (for client pagination) */
   allImages?: any[];
+  /** Project ID (for cache cleanup) */
   projectId?: string | null;
+  /** Pause preloading when lightbox is open */
   isLightboxOpen?: boolean;
 }
 
 /**
- * This component has one job: manage adjacent page preloading
- * It doesn't render anything visible - just handles preloading logic
+ * Manages adjacent page preloading and cache cleanup.
+ * Doesn't render anything visible.
  */
 export const ImagePreloadManager: React.FC<ImagePreloadManagerProps> = ({
   enabled = true,
@@ -35,23 +46,28 @@ export const ImagePreloadManager: React.FC<ImagePreloadManagerProps> = ({
   onPrefetchAdjacentPages,
   allImages = [],
   projectId = null,
-  isLightboxOpen = false
+  isLightboxOpen = false,
 }) => {
-  
-  // Use the adjacent page preloading hook
-  useAdjacentPagePreloading({
-    enabled,
-    isServerPagination,
-    page,
-    serverPage,
-    totalFilteredItems,
+  // Preload adjacent pages
+  useImagePreloading({
+    images: allImages,
+    currentPage: page,
     itemsPerPage,
-    onPrefetchAdjacentPages,
-    allImages,
-    projectId,
-    isLightboxOpen,
+    enabled,
+    paused: isLightboxOpen,
+    onPrefetchServerPages: onPrefetchAdjacentPages,
+    isServerPagination,
+    serverPage,
+    totalItems: totalFilteredItems,
   });
 
-  // This component doesn't render anything
+  // Cleanup distant pages from cache
+  useCacheCleanup({
+    projectId,
+    currentPage: isServerPagination ? (serverPage ?? 1) - 1 : page,
+    maxCachedPages: 5,
+    enabled,
+  });
+
   return null;
 };

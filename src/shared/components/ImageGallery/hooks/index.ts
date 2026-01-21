@@ -8,6 +8,6 @@ export { useMobileInteractions } from './useMobileInteractions';
 // Export types (using the optimized implementations)
 export type { UseImageGalleryStateOptimizedProps as UseImageGalleryStateProps, UseImageGalleryStateOptimizedReturn as UseImageGalleryStateReturn } from './useImageGalleryStateOptimized';
 export type { UseImageGalleryFiltersOptimizedProps as UseImageGalleryFiltersProps, UseImageGalleryFiltersOptimizedReturn as UseImageGalleryFiltersReturn } from './useImageGalleryFiltersOptimized';
-export type { UseImageGalleryPaginationProps, UseImageGalleryPaginationReturn } from './useImageGalleryPagination';
+export type { UseImageGalleryPaginationProps, UseImageGalleryPaginationReturn, NavigationState, NavigationStatus } from './useImageGalleryPagination';
 export type { UseImageGalleryActionsProps, UseImageGalleryActionsReturn } from './useImageGalleryActions';
 export type { UseMobileInteractionsProps, UseMobileInteractionsReturn } from './useMobileInteractions';
