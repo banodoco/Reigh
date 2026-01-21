@@ -1783,8 +1783,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       queryClient.invalidateQueries({ queryKey: ['project-video-counts', projectId] });
 
       // Note: Don't clear selection - the generation still exists, just without an output
-
-      toast.success('Final video output cleared');
     } catch (error) {
       console.error('[FinalVideoDelete] Unexpected error:', error);
       toast.error('Failed to clear final video output');
