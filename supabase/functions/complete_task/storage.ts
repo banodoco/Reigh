@@ -3,8 +3,6 @@
  * Handles file uploads, thumbnail generation, and URL retrieval
  */
 
-// @ts-ignore
-import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
 import { getContentType } from './params.ts';
 import type { ParsedRequest } from './request.ts';
 import { storagePaths, MEDIA_BUCKET } from '../_shared/storagePaths.ts';
@@ -120,67 +118,58 @@ async function handleThumbnail(
     }
   }
 
-  // Auto-generate thumbnail for images
+  // Auto-generate thumbnail for images using Supabase transforms
   const contentType = getContentType(parsedRequest.filename);
-  if (contentType.startsWith("image/") && parsedRequest.fileData) {
-    // Match legacy behavior: if auto-thumbnail generation fails, fall back to main image URL
-    return await generateThumbnail(supabase, parsedRequest.fileData, userId, taskId, mainFileUrl);
+  if (contentType.startsWith("image/")) {
+    // Pass objectPath for SDK-based transforms (objectPath is available from the caller context)
+    const objectPath = storagePaths.taskOutput(userId, taskId, parsedRequest.filename);
+    return generateThumbnail(supabase, parsedRequest.fileData!, userId, taskId, mainFileUrl, objectPath);
   }
 
   return null;
 }
 
 /**
- * Auto-generate a thumbnail from image data (1/3 size)
+ * Auto-generate a thumbnail URL using Supabase Image Transformations
+ * Uses the SDK's transform option for proper URL generation
+ * Falls back to main image URL if transforms aren't available (requires Pro plan)
+ *
+ * @see https://supabase.com/docs/guides/storage/serving/image-transformations
  */
-async function generateThumbnail(
+function generateThumbnail(
   supabase: any,
-  sourceBytes: Uint8Array,
-  userId: string,
-  taskId: string,
-  fallbackUrl: string
-): Promise<string | null> {
-  console.log(`[ThumbnailGen] Starting auto-thumbnail generation`);
-  
-  try {
-    const image = await ImageScript.decode(sourceBytes);
-    const originalWidth = image.width;
-    const originalHeight = image.height;
-    console.log(`[ThumbnailGen] Original dimensions: ${originalWidth}x${originalHeight}`);
+  _sourceBytes: Uint8Array,
+  _userId: string,
+  _taskId: string,
+  mainImageUrl: string,
+  objectPath?: string
+): string {
+  console.log(`[ThumbnailGen] Using Supabase image transforms for thumbnail`);
 
-    const thumbWidth = Math.max(1, Math.round(originalWidth / 3));
-    const thumbHeight = Math.max(1, Math.round(originalHeight / 3));
-    console.log(`[ThumbnailGen] Thumbnail dimensions: ${thumbWidth}x${thumbHeight}`);
-
-    image.resize(thumbWidth, thumbHeight);
-    const jpegQuality = 80;
-    const thumbBytes = await image.encodeJPEG(jpegQuality);
-    console.log(`[ThumbnailGen] Encoded JPEG: ${thumbBytes.length} bytes`);
-
-    // Upload thumbnail using standardized task thumbnail path
-    const ts = Date.now();
-    const rand = Math.random().toString(36).substring(2, 8);
-    const thumbFilename = `thumb_${ts}_${rand}.jpg`;
-    const thumbPath = storagePaths.taskThumbnail(userId, taskId, thumbFilename);
-
-    const { error: uploadErr } = await supabase.storage
-      .from(MEDIA_BUCKET)
-      .upload(thumbPath, thumbBytes, { contentType: 'image/jpeg', upsert: true });
-
-    if (uploadErr) {
-      console.error('[ThumbnailGen] Upload error:', uploadErr);
-      console.log(`[ThumbnailGen] Using fallback - main image URL as thumbnail: ${fallbackUrl}`);
-      return fallbackUrl;
+  // If we have the object path, use the SDK's transform option (recommended)
+  if (objectPath) {
+    try {
+      const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(objectPath, {
+        transform: {
+          width: 400,
+          height: 400,
+          resize: 'contain',
+          quality: 80,
+        },
+      });
+      if (data?.publicUrl) {
+        console.log(`[ThumbnailGen] ✅ Generated thumbnail URL via SDK transform`);
+        return data.publicUrl;
+      }
+    } catch (err) {
+      console.warn(`[ThumbnailGen] SDK transform failed, using main URL:`, err);
     }
-
-    const { data: thumbUrlData } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(thumbPath);
-    console.log(`[ThumbnailGen] ✅ Auto-generated thumbnail: ${thumbUrlData.publicUrl}`);
-    return thumbUrlData.publicUrl;
-
-  } catch (err: any) {
-    console.error('[ThumbnailGen] Generation failed:', err);
-    return null;
   }
+
+  // Fallback: Use main image URL (works on all plans, just no resizing)
+  // This is fine for most use cases - browser will handle display sizing
+  console.log(`[ThumbnailGen] Using main image URL as thumbnail (no transform)`);
+  return mainImageUrl;
 }
 
 /**
