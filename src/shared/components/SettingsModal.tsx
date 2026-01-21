@@ -632,7 +632,7 @@ python worker.py --reigh-access-token ${token}${debugFlag}${profileFlag}`;
                       </button>
                       <button
                         onClick={() => setPreserveUserText(true)}
-                        className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
+                        className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all title-case ${
                           preserveUserText
                             ? 'bg-teal-600 text-white'
                             : 'bg-muted text-muted-foreground hover:bg-muted/80'

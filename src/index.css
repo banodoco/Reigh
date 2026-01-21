@@ -290,6 +290,11 @@
     text-transform: none !important;
   }
 
+  /* Force title case regardless of global lowercase setting */
+  .title-case {
+    text-transform: capitalize !important;
+  }
+
   /* Support modern viewport units for iOS browser chrome handling */
   /* dvh (dynamic viewport height) adjusts automatically when browser chrome shows/hides */
   /* Fallback to 100vh for older browsers, then override with dvh where supported */
