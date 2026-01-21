@@ -171,14 +171,14 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') onEditingGenerationNameChange?.(false); }}
                 autoFocus
                 placeholder="Enter variant name..."
-                className="flex-1 px-2 py-1 text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary w-full"
+                className="flex-1 px-2 py-1 text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary w-full preserve-case"
               />
             ) : (
               <div 
                 className="flex items-center justify-between group cursor-pointer hover:bg-muted/50 px-2 py-1 rounded transition-colors"
                 onClick={() => onEditingGenerationNameChange?.(true)}
               >
-                <p className={`${config.textSize} ${config.fontWeight} text-foreground ${!generationName && 'text-muted-foreground italic'}`}>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground preserve-case ${!generationName && 'text-muted-foreground italic'}`}>
                   {generationName || 'Click to add variant name...'}
                 </p>
                 <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">Edit</span>
@@ -255,7 +255,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
         <div className="space-y-3 pt-1">
           <div className="space-y-1">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt{enhancePrompt ? ' (enhanced)' : ''}</p>
-            <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap`}>
+            <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap preserve-case`}>
               {prompt ? (showFullPrompt || prompt.length <= config.promptLength ? prompt : prompt.slice(0, config.promptLength) + '...') : 'None'}
             </p>
             {prompt && prompt.length > config.promptLength && onShowFullPromptChange && (
@@ -267,7 +267,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
           {negativePrompt && negativePrompt !== 'N/A' && (
             <div className="space-y-1">
               <p className={`${config.textSize} font-medium text-muted-foreground`}>Negative Prompt</p>
-              <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap`}>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap preserve-case`}>
                 {showFullNegativePrompt || negativePrompt.length <= config.negativePromptLength ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...'}
               </p>
               {negativePrompt.length > config.negativePromptLength && onShowFullNegativePromptChange && (

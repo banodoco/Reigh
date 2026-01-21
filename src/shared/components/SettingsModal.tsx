@@ -42,6 +42,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/
 import { DialogFooter } from "@/shared/components/ui/dialog";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { useDarkMode } from "@/shared/hooks/useDarkMode";
+import { useTextCase } from "@/shared/hooks/useTextCase";
 import CreditsManagement from "./CreditsManagement";
 
 interface SettingsModalProps {
@@ -140,6 +141,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   
   // Dark mode
   const { darkMode, setDarkMode } = useDarkMode();
+
+  // Text case mode (whether to preserve user-inputted text casing)
+  const { preserveUserText, setPreserveUserText } = useTextCase();
 
   // Generation method preferences (database-backed)
   const { 
@@ -608,6 +612,38 @@ python worker.py --reigh-access-token ${token}${debugFlag}${profileFlag}`;
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Switch between light and dark color schemes
+                  </p>
+                </div>
+
+                {/* User Text Case Toggle */}
+                <div className={`${isMobile ? 'p-3' : 'p-4'} bg-muted/30 rounded-lg space-y-2 mt-3`}>
+                  <div className={`flex ${isMobile ? 'flex-col gap-2' : 'items-center justify-between'}`}>
+                    <span className="font-medium">User Text:</span>
+                    <div className="flex items-center gap-0">
+                      <button
+                        onClick={() => setPreserveUserText(false)}
+                        className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-l-full transition-all ${
+                          !preserveUserText
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        lowercase
+                      </button>
+                      <button
+                        onClick={() => setPreserveUserText(true)}
+                        className={`${isMobile ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm'} rounded-r-full transition-all ${
+                          preserveUserText
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        Original Case
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    How project names, shot names, and prompts are displayed
                   </p>
                 </div>
               </div>

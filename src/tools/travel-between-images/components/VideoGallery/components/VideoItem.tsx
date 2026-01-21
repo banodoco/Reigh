@@ -1169,7 +1169,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
           <div className="flex flex-col items-start gap-2 pointer-events-auto">
             {/* Variant Name Display */}
             {video.variant_name && (
-              <div className="text-[10px] font-medium text-white/90 bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm border border-white/10 max-w-[120px] truncate">
+              <div className="text-[10px] font-medium text-white/90 bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm border border-white/10 max-w-[120px] truncate preserve-case">
                 {video.variant_name}
               </div>
             )}

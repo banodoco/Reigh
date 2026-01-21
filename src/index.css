@@ -279,7 +279,15 @@
 @layer base {
   * {
     @apply border-border;
+    /* UI text is always lowercase for aesthetic consistency */
     text-transform: lowercase !important;
+  }
+
+  /* When "preserve user text" setting is enabled, elements with .preserve-case
+   * show their original casing. This applies to user-inputted text like
+   * project names, shot names, prompts, etc. */
+  :root.preserve-user-text .preserve-case {
+    text-transform: none !important;
   }
 
   /* Support modern viewport units for iOS browser chrome handling */

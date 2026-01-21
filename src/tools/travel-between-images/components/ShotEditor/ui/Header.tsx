@@ -193,8 +193,8 @@ const HeaderComponent: React.FC<HeaderProps> = ({
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               
-              <span 
-                className={`text-xl font-semibold text-primary truncate px-4 w-[200px] text-center border-2 border-transparent rounded-md py-2 ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''}`}
+              <span
+                className={`text-xl font-semibold text-primary truncate px-4 w-[200px] text-center border-2 border-transparent rounded-md py-2 preserve-case ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
@@ -283,8 +283,8 @@ const HeaderComponent: React.FC<HeaderProps> = ({
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               
-              <span 
-                className={`text-base font-semibold text-primary truncate text-center px-1 w-[70px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+              <span
+                className={`text-base font-semibold text-primary truncate text-center px-1 w-[70px] preserve-case ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >

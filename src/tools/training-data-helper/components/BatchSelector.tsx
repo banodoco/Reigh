@@ -412,7 +412,7 @@ File Size: ${segmentBlob.size} bytes`;
                   </SelectTrigger>
                   <SelectContent>
                     {batches.map((batch) => (
-                      <SelectItem key={batch.id} value={batch.id}>
+                      <SelectItem key={batch.id} value={batch.id} className="preserve-case">
                         {batch.name}
                       </SelectItem>
                     ))}
@@ -478,7 +478,7 @@ File Size: ${segmentBlob.size} bytes`;
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-light text-sm">{selectedBatch.name}</h4>
+                      <h4 className="font-light text-sm preserve-case">{selectedBatch.name}</h4>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -583,7 +583,7 @@ File Size: ${segmentBlob.size} bytes`;
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Are you sure you want to delete "{batchToDelete?.name}"? This action cannot be undone.
+                Are you sure you want to delete "<span className="preserve-case">{batchToDelete?.name}</span>"? This action cannot be undone.
               </p>
               {batchToDelete && videos.filter(v => v.batchId === batchToDelete.id).length > 0 && (
                 <p className="text-sm text-red-600 font-light">

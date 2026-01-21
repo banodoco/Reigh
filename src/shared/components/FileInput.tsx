@@ -314,7 +314,7 @@ const FileInput: React.FC<FileInputProps> = ({
                                     <X className="h-3 w-3" />
                                 </Button>
                             )}
-                            <p className="text-xs text-muted-foreground mt-1 truncate text-center" title={file.name}>
+                            <p className="text-xs text-muted-foreground mt-1 truncate text-center preserve-case" title={file.name}>
                               {cropFilename(file.name)}
                             </p>
                         </div>

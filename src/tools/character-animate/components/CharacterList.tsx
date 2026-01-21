@@ -110,7 +110,7 @@ const CharacterList: React.FC<CharacterListProps> = ({
 
             {/* Character Info */}
             <div className="p-4">
-              <h3 className="font-medium text-foreground group-hover:text-primary transition-colors">
+              <h3 className="font-medium text-foreground group-hover:text-primary transition-colors preserve-case">
                 {shot.name}
               </h3>
               {shot.created_at && (

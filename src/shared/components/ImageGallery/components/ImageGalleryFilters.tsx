@@ -108,7 +108,7 @@ export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
                   placeholder="Search prompts..."
                   value={searchTerm}
                   onChange={(e) => handleSearchChange(e.target.value)}
-                  className={`bg-transparent border-none outline-none text-base w-32 sm:w-40 ${whiteText ? 'text-white placeholder-zinc-400' : ''}`}
+                  className={`bg-transparent border-none outline-none text-base w-32 sm:w-40 preserve-case ${whiteText ? 'text-white placeholder-zinc-400' : ''}`}
                 />
                 {searchTerm && (
                   <Button

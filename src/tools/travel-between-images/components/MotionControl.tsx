@@ -452,12 +452,12 @@ export const MotionControl: React.FC<MotionControlProps> = ({
                         )}
                         <div className="flex min-w-0 flex-col items-start">
                           {isBuiltinDefault ? (
-                            <span className="text-sm font-medium whitespace-nowrap">
+                            <span className="text-sm font-medium whitespace-nowrap preserve-case">
                               {metadata?.name || 'Preset'}{' '}
                               <span className="font-normal text-muted-foreground">(default)</span>
                             </span>
                           ) : (
-                            <span className="text-sm font-medium truncate">
+                            <span className="text-sm font-medium truncate preserve-case">
                               {metadata?.name || 'Preset'}
                             </span>
                           )}
@@ -657,7 +657,7 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
         {/* Left side - Name, Description, and Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between mb-2">
-            <h3 className="font-semibold text-base text-blue-900 dark:text-blue-100">
+            <h3 className="font-semibold text-base text-blue-900 dark:text-blue-100 preserve-case">
               {metadata?.name || 'Unnamed Preset'}
             </h3>
             <div className="flex items-center gap-1">

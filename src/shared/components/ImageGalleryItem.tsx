@@ -1034,7 +1034,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 z-20">
               {/* Variant Name */}
               {(image as any).name && (
-                <div className="bg-black/50 text-white text-xs sm:text-sm px-2 py-0.5 rounded-md mb-1 font-medium backdrop-blur-sm">
+                <div className="bg-black/50 text-white text-xs sm:text-sm px-2 py-0.5 rounded-md mb-1 font-medium backdrop-blur-sm preserve-case">
                   {(image as any).name}
                 </div>
               )}
@@ -1050,8 +1050,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
               {/* Shot Navigation Button */}
               {image.shot_id && simplifiedShotOptions.length > 0 && (
-                <button 
-                    className="px-2 py-1 rounded-md bg-black/40 hover:bg-black/60 text-white/90 hover:text-white text-xs font-normal transition-all backdrop-blur-sm flex items-center gap-1.5"
+                <button
+                    className="px-2 py-1 rounded-md bg-black/40 hover:bg-black/60 text-white/90 hover:text-white text-xs font-normal transition-all backdrop-blur-sm flex items-center gap-1.5 preserve-case"
                     onClick={() => {
                         const targetShot = simplifiedShotOptions.find(s => s.id === image.shot_id);
                         if (targetShot) {

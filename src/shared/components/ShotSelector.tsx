@@ -303,7 +303,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
                   >
                     <div className="flex items-center justify-between w-full">
                       <span className={cn(
-                        "truncate",
+                        "truncate preserve-case",
                         value === shot.id && "font-medium"
                       )}>
                         {shot.name}

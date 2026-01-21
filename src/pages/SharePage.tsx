@@ -269,7 +269,7 @@ const SharePage: React.FC = () => {
                 ) : (
                   <div className="h-6 w-6 rounded-full bg-muted border" />
                 )}
-                <span>
+                <span className="preserve-case">
                   Shot shared by {creator?.name || creator?.username || 'a Reigh artist'}
                 </span>
               </div>

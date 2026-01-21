@@ -750,7 +750,7 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete LoRA</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{loraToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete "<span className="preserve-case">{loraToDelete?.name}</span>"? This action cannot be undone.
               {loraToDelete?.isAdded && (
                 <span className="block mt-2 text-amber-600 dark:text-amber-400">
                   Note: This LoRA is currently added to your generator and will be removed.
@@ -1584,7 +1584,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                                 <div className="text-sm flex-1 min-w-0">
                                                     {loraFiles.highNoise ? (
                                                         <div className="flex items-center gap-2">
-                                                            <span className="font-medium text-green-700 dark:text-green-300 truncate">{loraFiles.highNoise.name}</span>
+                                                            <span className="font-medium text-green-700 dark:text-green-300 truncate preserve-case">{loraFiles.highNoise.name}</span>
                                                             <span className="text-xs text-muted-foreground flex-shrink-0">
                                                                 ({(loraFiles.highNoise.size / 1024 / 1024).toFixed(1)} MB)
                                                             </span>
@@ -1655,7 +1655,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                                 <div className="text-sm flex-1 min-w-0">
                                                     {loraFiles.lowNoise ? (
                                                         <div className="flex items-center gap-2">
-                                                            <span className="font-medium text-green-700 dark:text-green-300 truncate">{loraFiles.lowNoise.name}</span>
+                                                            <span className="font-medium text-green-700 dark:text-green-300 truncate preserve-case">{loraFiles.lowNoise.name}</span>
                                                             <span className="text-xs text-muted-foreground flex-shrink-0">
                                                                 ({(loraFiles.lowNoise.size / 1024 / 1024).toFixed(1)} MB)
                                                             </span>
@@ -1731,7 +1731,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                                 <Upload className="h-8 w-8 text-muted-foreground" />
                                                 <div className="text-sm">
                                                     {loraFiles.single ? (
-                                                        <span className="font-medium text-green-700 dark:text-green-300">{loraFiles.single.name}</span>
+                                                        <span className="font-medium text-green-700 dark:text-green-300 preserve-case">{loraFiles.single.name}</span>
                                                     ) : (
                                                         <span className="text-muted-foreground">
                                                             Drop or click to select a <code>.safetensors</code> file
@@ -1944,7 +1944,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                                                     ×
                                                 </Button>
                                             </div>
-                                            <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
+                                            <p className="text-xs text-gray-600 mt-1 truncate preserve-case" title={file.name}>
                                                 {file.name}
                                             </p>
                                         </div>

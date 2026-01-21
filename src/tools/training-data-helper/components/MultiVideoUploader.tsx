@@ -353,7 +353,7 @@ export function MultiVideoUploader({ onUpload, isUploading, selectedBatchId }: M
                       {/* Video Info */}
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-light text-sm truncate" title={videoFile.file.name}>
+                          <span className="font-light text-sm truncate preserve-case" title={videoFile.file.name}>
                             {cropFilename(videoFile.file.name)}
                           </span>
                           {processingScenes === videoFile.id && (

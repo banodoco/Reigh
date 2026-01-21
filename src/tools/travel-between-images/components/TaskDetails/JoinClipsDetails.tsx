@@ -90,7 +90,7 @@ export const JoinClipsDetails: React.FC<TaskDetailsProps> = ({
               <div key={index}>
                 {renderVideoPreview(clip.url, index, `Clip ${index + 1}`)}
                 {clip.name && (
-                  <p className={`${config.textSize} text-muted-foreground text-center truncate mt-1`} title={clip.name}>
+                  <p className={`${config.textSize} text-muted-foreground text-center truncate mt-1 preserve-case`} title={clip.name}>
                     {clip.name}
                   </p>
                 )}

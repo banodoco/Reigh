@@ -16,6 +16,7 @@ import { useProjectContextDebug } from '@/shared/hooks/useProjectContextDebug';
 
 import { useIsTablet } from '@/shared/hooks/use-mobile';
 import { useDarkMode } from '@/shared/hooks/useDarkMode';
+import { useTextCase } from '@/shared/hooks/useTextCase';
 import { usePanes } from '@/shared/contexts/PanesContext';
 
 interface GlobalHeaderProps {
@@ -34,6 +35,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   const navigate = useNavigate();
   const isTablet = useIsTablet();
   const { darkMode } = useDarkMode();
+  useTextCase(); // Initialize text case styling on app load
   const { isGenerationsPaneLocked } = usePanes();
 
   // Mobile Safari keeps :hover "stuck" after taps. For the brand icon we explicitly
@@ -384,7 +386,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                             <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                               <Star className="h-2 w-2 text-white flex-shrink-0" fill="white" strokeWidth={0} />
                             </div>
-                            <span className="truncate">
+                            <span className="truncate preserve-case">
                               {selectedProject.name.length > 30 ? `${selectedProject.name.substring(0, 30)}...` : selectedProject.name}
                             </span>
                           </div>
@@ -446,7 +448,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                                   <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                                     <Star className="h-2 w-2 text-white flex-shrink-0" />
                                   </div>
-                                  <span className="truncate">
+                                  <span className="truncate preserve-case">
                                     {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
                                   </span>
                                 </div>
@@ -702,7 +704,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                           <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                             <Star className="h-2 w-2 text-white flex-shrink-0" fill="white" strokeWidth={0} />
                           </div>
-                          <span className="text-sm truncate">
+                          <span className="text-sm truncate preserve-case">
                             {selectedProject.name.length > 30 ? `${selectedProject.name.substring(0, 30)}...` : selectedProject.name}
                           </span>
                         </div>
@@ -763,7 +765,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                                 <div className="w-4 h-4 bg-[#6a8a8a] dark:bg-[#8a9a9a] rounded-full flex items-center justify-center flex-shrink-0">
                                   <Star className="h-2 w-2 text-white flex-shrink-0" />
                                 </div>
-                                <span className="text-sm truncate">
+                                <span className="text-sm truncate preserve-case">
                                   {project.name.length > 30 ? `${project.name.substring(0, 30)}...` : project.name}
                                 </span>
                               </div>

@@ -43,7 +43,7 @@ export const ImageEditTaskDetails: React.FC<TaskDetailsProps> = ({
       {prompt && (
         <div className="space-y-1">
           <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt</p>
-          <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+          <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed preserve-case`}>
             {prompt.length > config.promptLength ? prompt.slice(0, config.promptLength) + '...' : prompt}
           </p>
         </div>
@@ -76,9 +76,9 @@ export const ImageEditTaskDetails: React.FC<TaskDetailsProps> = ({
           <div className="space-y-1">
             {loras.slice(0, config.maxLoras).map((lora, idx) => (
               <div key={idx} className={`flex items-center justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
-                <span className={`${config.fontWeight} truncate`} title={lora.displayName}>
-                  {lora.displayName.length > config.loraNameLength 
-                    ? lora.displayName.slice(0, config.loraNameLength) + '...' 
+                <span className={`${config.fontWeight} truncate preserve-case`} title={lora.displayName}>
+                  {lora.displayName.length > config.loraNameLength
+                    ? lora.displayName.slice(0, config.loraNameLength) + '...'
                     : lora.displayName}
                 </span>
                 <span className="text-muted-foreground ml-1">{lora.strength}</span>

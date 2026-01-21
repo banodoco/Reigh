@@ -258,7 +258,7 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
                 const displayText = showFullPrompt || !shouldTruncate ? prompt : prompt.slice(0, config.promptLength) + '...';
                 return (
                   <div>
-                    <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed preserve-case`}>
                       "{displayText}"
                     </p>
                     {shouldTruncate && onShowFullPromptChange && (
@@ -291,7 +291,7 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
                 const displayText = showFullNegativePrompt || !shouldTruncate ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...';
                 return (
                   <div>
-                    <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed preserve-case`}>
                       "{displayText}"
                     </p>
                     {shouldTruncate && onShowFullNegativePromptChange && (
@@ -364,7 +364,7 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
               {lorasToDisplay.slice(0, config.maxLoras).map((lora, index) => (
                 <div key={index} className={`flex items-center justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
                   <div className="flex-1 min-w-0">
-                    <p className={`${config.fontWeight} truncate`} title={lora.name}>
+                    <p className={`${config.fontWeight} truncate preserve-case`} title={lora.name}>
                       {lora.name.length > config.loraNameLength ? lora.name.slice(0, config.loraNameLength) + '...' : lora.name}
                     </p>
                   </div>

@@ -488,7 +488,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                                   phases: newPhases
                                 });
                               }}
-                              className="text-xs"
+                              className="text-xs preserve-case"
                             >
                               {predefinedLora.name}
                             </DropdownMenuItem>

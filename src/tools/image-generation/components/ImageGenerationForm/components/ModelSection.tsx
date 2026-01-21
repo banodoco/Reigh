@@ -99,7 +99,7 @@ const LoraGrid: React.FC<LoraGridProps> = ({
 
                 {/* Name and strength */}
                 <div className="p-2 space-y-2">
-                  <p className="text-xs font-medium truncate" title={lora.name}>
+                  <p className="text-xs font-medium truncate preserve-case" title={lora.name}>
                     {lora.name}
                   </p>
                   <SliderWithValue
@@ -1159,7 +1159,7 @@ const JustTextSection: React.FC<{
               <RadioGroupItem value={model.id} id={`model-${model.id}`} />
               <Label
                 htmlFor={`model-${model.id}`}
-                className="cursor-pointer font-normal"
+                className="cursor-pointer font-normal preserve-case"
                 title={model.description}
               >
                 {model.name}

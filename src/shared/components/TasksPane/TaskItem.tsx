@@ -417,7 +417,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
       {taskParams.promptText && !taskInfo.isVideoTask && !IMAGE_EDIT_TASK_TYPES.includes(task.taskType as any) && (
         <div className="mb-1 mt-3">
           <div className="bg-blue-500/10 border border-blue-400/20 rounded px-2 py-1.5 flex items-center justify-between">
-            <div className="text-xs text-zinc-200 flex-1 min-w-0 pr-2">
+            <div className="text-xs text-zinc-200 flex-1 min-w-0 pr-2 preserve-case">
               "{taskParams.promptText.length > 50 ? `${taskParams.promptText.substring(0, 50)}...` : taskParams.promptText}"
             </div>
             {generationData && (
@@ -451,7 +451,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
         </span>
         
         {variantName && (
-          <span className="ml-2 px-1.5 py-0.5 bg-black/50 text-white text-[10px] rounded-md flex-shrink-0">
+          <span className="ml-2 px-1.5 py-0.5 bg-black/50 text-white text-[10px] rounded-md flex-shrink-0 preserve-case">
             {variantName}
           </span>
         )}

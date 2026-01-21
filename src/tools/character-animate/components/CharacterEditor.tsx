@@ -328,7 +328,7 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
             />
           ) : (
             <h1
-              className="text-xl font-semibold cursor-pointer hover:text-primary transition-colors"
+              className="text-xl font-semibold cursor-pointer hover:text-primary transition-colors preserve-case"
               onClick={() => setIsEditingName(true)}
             >
               {shot.name}

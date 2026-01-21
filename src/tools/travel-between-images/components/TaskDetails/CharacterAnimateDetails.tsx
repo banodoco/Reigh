@@ -102,7 +102,7 @@ export const CharacterAnimateDetails: React.FC<TaskDetailsProps> = ({
       {prompt && (
         <div className="space-y-1">
           <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt</p>
-          <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+          <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed preserve-case`}>
             {prompt}
           </p>
         </div>

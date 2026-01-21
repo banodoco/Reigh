@@ -108,7 +108,7 @@ export const useVideoTravelHeader = ({
                     placeholder="Search shots..."
                     value={shotSearchQuery}
                     onChange={(e) => onSearchQueryChange(e.target.value)}
-                    className="bg-transparent border-none outline-none text-base flex-1"
+                    className="bg-transparent border-none outline-none text-base flex-1 preserve-case"
                     style={{ fontSize: '16px' }} // Prevents iOS auto-zoom on focus
                   />
                   {shotSearchQuery && (
@@ -137,7 +137,7 @@ export const useVideoTravelHeader = ({
                   placeholder="Search shots..."
                   value={shotSearchQuery}
                   onChange={(e) => onSearchQueryChange(e.target.value)}
-                  className="bg-transparent border-none outline-none text-base flex-1"
+                  className="bg-transparent border-none outline-none text-base flex-1 preserve-case"
                   style={{ fontSize: '16px' }} // Prevents iOS auto-zoom on focus
                 />
                 {shotSearchQuery && (

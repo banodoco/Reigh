@@ -153,7 +153,7 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments
 
               {/* Video info */}
               <div className="space-y-2">
-                <h3 className="font-light text-sm truncate" title={video.originalFilename}>
+                <h3 className="font-light text-sm truncate preserve-case" title={video.originalFilename}>
                   {cropFilename(video.originalFilename)}
                 </h3>
                 
@@ -203,7 +203,7 @@ export function VideoUploadList({ videos, selectedVideo, onVideoSelect, segments
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Video</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete "{cropFilename(video.originalFilename)}"? 
+                        Are you sure you want to delete "<span className="preserve-case">{cropFilename(video.originalFilename)}</span>"?
                         This will also delete all associated segments and cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>

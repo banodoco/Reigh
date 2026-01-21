@@ -293,8 +293,8 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
               </Button>
             </div>
           ) : (
-            <h3 
-              className="text-xl font-light group-hover:text-primary/80 transition-colors duration-300 flex-grow mr-2 truncate"
+            <h3
+              className="text-xl font-light group-hover:text-primary/80 transition-colors duration-300 flex-grow mr-2 truncate preserve-case"
             >
               {shot.name}
             </h3>
@@ -559,7 +559,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Shot</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete shot "{shot.name}"? This will permanently remove the shot and all its associated data. This action cannot be undone.
+              Are you sure you want to delete shot "<span className="preserve-case">{shot.name}</span>"? This will permanently remove the shot and all its associated data. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex items-center space-x-2 py-2">

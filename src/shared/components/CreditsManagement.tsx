@@ -874,7 +874,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                             checked={taskLogFilters.projectIds.includes(project.id)}
                             onCheckedChange={() => toggleArrayFilter('projectIds', project.id)}
                           />
-                          <label htmlFor={`project-${project.id}`} className="text-sm cursor-pointer truncate">
+                          <label htmlFor={`project-${project.id}`} className="text-sm cursor-pointer truncate preserve-case">
                             {project.name}
                           </label>
                         </div>

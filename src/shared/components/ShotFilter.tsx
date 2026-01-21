@@ -109,7 +109,7 @@ export const ShotFilter: React.FC<ShotFilterProps> = ({
               } />
             )}
             {shots?.map(shot => (
-              <SelectItem variant={whiteText ? "zinc" : "default"} key={shot.id} value={shot.id}>
+              <SelectItem variant={whiteText ? "zinc" : "default"} key={shot.id} value={shot.id} className="preserve-case">
                 {shot.name}
               </SelectItem>
             ))}

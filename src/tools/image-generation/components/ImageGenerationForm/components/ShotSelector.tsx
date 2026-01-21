@@ -98,7 +98,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
             <SelectContent variant="retro">
               <SelectItem variant="retro" value="none">None</SelectItem>
               {sortedShots.map((shot) => (
-                <SelectItem variant="retro" key={shot.id} value={shot.id}>
+                <SelectItem variant="retro" key={shot.id} value={shot.id} className="preserve-case">
                   {shot.name}
                 </SelectItem>
               ))}

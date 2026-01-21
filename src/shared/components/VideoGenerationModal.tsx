@@ -345,7 +345,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <DialogTitle className="text-xl font-light">
-                  Generate Video - {shot.name || 'Unnamed Shot'}
+                  Generate Video - <span className="preserve-case">{shot.name || 'Unnamed Shot'}</span>
                 </DialogTitle>
                 <Tooltip delayDuration={500}>
                   <TooltipTrigger asChild>

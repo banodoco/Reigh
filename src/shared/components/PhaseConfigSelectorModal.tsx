@@ -364,7 +364,7 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
                       <div className="flex-grow">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2 flex-wrap flex-1">
-                            <CardTitle className="text-xl">{metadata.name}</CardTitle>
+                            <CardTitle className="text-xl preserve-case">{metadata.name}</CardTitle>
                             {isMyPreset && (
                               <Badge variant="secondary" className="text-xs">
                                 Mine
@@ -737,7 +737,7 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Preset</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{presetToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete "<span className="preserve-case">{presetToDelete?.name}</span>"? This action cannot be undone.
               {presetToDelete?.isSelected && (
                 <span className="block mt-2 text-amber-600 dark:text-amber-400">
                   Note: This preset is currently selected and will be deselected.
@@ -1224,7 +1224,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         }`}>
           <div className="flex items-center gap-2">
             <Pencil className={`h-4 w-4 ${isOverwriting ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}`} />
-            <span className={`text-sm font-medium ${isOverwriting ? 'text-orange-900 dark:text-orange-100' : 'text-blue-900 dark:text-blue-100'}`}>
+            <span className={`text-sm font-medium preserve-case ${isOverwriting ? 'text-orange-900 dark:text-orange-100' : 'text-blue-900 dark:text-blue-100'}`}>
               {isOverwriting ? `Overwriting: ${editingPreset?.metadata.name}` : `Editing: ${editingPreset?.metadata.name}`}
             </span>
           </div>
@@ -1685,7 +1685,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                                         phases: newPhases
                                       });
                                     }}
-                                    className="text-xs"
+                                    className="text-xs preserve-case"
                                   >
                                     {predefinedLora.name}
                                   </DropdownMenuItem>
@@ -2034,7 +2034,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                           ×
                         </Button>
                       </div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate" title={file.name}>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate preserve-case" title={file.name}>
                         {file.name}
                       </p>
                     </div>

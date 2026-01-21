@@ -54,7 +54,7 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
         {/* Left side - Name, Description, and Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between mb-2">
-            <h3 className="font-semibold text-base text-blue-900 dark:text-blue-100">
+            <h3 className="font-semibold text-base text-blue-900 dark:text-blue-100 preserve-case">
               {metadata?.name || 'Unnamed Preset'}
             </h3>
             <Button

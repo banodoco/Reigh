@@ -246,7 +246,7 @@ const ShotsPage: React.FC = () => {
       ) : (
         <>
           <Button onPointerUp={handleBackToList} className="mb-4">Back to All Shots</Button>
-          <h2 className="text-2xl font-normal mb-4">Images in: {selectedShot.name}</h2>
+          <h2 className="text-2xl font-normal mb-4">Images in: <span className="preserve-case">{selectedShot.name}</span></h2>
           <ShotImageManager
             images={managedImages}
             onImageDelete={handleDeleteImage}

@@ -98,7 +98,7 @@ export const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">
+          <p className="text-sm font-medium truncate preserve-case">
             {metadata?.name || 'Custom Preset'}
           </p>
           {metadata?.description && (

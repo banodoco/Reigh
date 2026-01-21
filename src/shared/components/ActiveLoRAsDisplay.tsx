@@ -86,7 +86,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                 <div className="flex-grow min-w-0">
                   <div className="flex justify-between items-start mb-1">
                     <div className="flex-grow min-w-0">
-                      <Label htmlFor={`lora-strength-${lora.id}`} className="text-sm font-light truncate pr-2 block">
+                      <Label htmlFor={`lora-strength-${lora.id}`} className="text-sm font-light truncate pr-2 block preserve-case">
                         {lora.name}
                       </Label>
                       {(() => {
