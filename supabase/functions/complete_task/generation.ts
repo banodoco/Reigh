@@ -337,6 +337,37 @@ export async function createGenerationFromTask(
       }
     }
 
+    // SPECIAL CASE 3: join_final_stitch - create variant on parent generation
+    if (taskData.task_type === TASK_TYPES.JOIN_FINAL_STITCH) {
+      const orchTaskId = taskData.params?.orchestrator_task_id_ref ||
+                         taskData.params?.orchestrator_task_id ||
+                         taskData.params?.full_orchestrator_payload?.orchestrator_task_id;
+
+      if (orchTaskId) {
+        console.log(`[GenMigration] join_final_stitch - getting parent generation for orchestrator ${orchTaskId}`);
+        const parentGen = await getOrCreateParentGeneration(supabase, orchTaskId, taskData.project_id, taskData.params);
+
+        if (parentGen?.id) {
+          console.log(`[GenMigration] join_final_stitch task ${taskId} - creating variant on parent generation ${parentGen.id}`);
+          logger?.info("SPECIAL CASE 3: join_final_stitch creating variant on parent", {
+            task_id: taskId,
+            parent_generation_id: parentGen.id,
+            orchestrator_task_id: orchTaskId,
+            action: "create_variant_on_parent"
+          });
+          const result = await createVariantOnParent(
+            supabase, parentGen.id, publicUrl, thumbnailUrl || null, taskData, taskId,
+            VARIANT_TYPES.JOIN_FINAL_STITCH, { tool_type: TOOL_TYPES.JOIN_CLIPS, created_from: 'join_final_stitch_completion' }
+          );
+          if (result) return result;
+        } else {
+          console.log(`[GenMigration] join_final_stitch task ${taskId} - could not find/create parent generation`);
+        }
+      } else {
+        console.log(`[GenMigration] join_final_stitch task ${taskId} - no orchestrator_task_id found`);
+      }
+    }
+
     // ===== SUB-TASK (SEGMENT) HANDLING =====
     const orchestratorTaskId = extractOrchestratorTaskId(taskData.params, 'GenMigration');
     let parentGenerationId: string | null = null;
