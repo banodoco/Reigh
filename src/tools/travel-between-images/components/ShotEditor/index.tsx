@@ -1566,11 +1566,29 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Handler to restore join clips defaults
   // Note: Does NOT reset generateMode (that's a mode toggle, not a setting)
   const handleRestoreJoinDefaults = useCallback(() => {
+    // Default values
+    let context = 15;
+    let gap = 23;
+
+    // Scale down proportionally if constraint is violated
+    // REPLACE mode constraint: min_clip_frames ≥ gap + 2*context
+    const shortestFrames = joinValidationData.shortestClipFrames;
+    if (shortestFrames && shortestFrames > 0) {
+      const framesNeeded = gap + 2 * context;
+      if (framesNeeded > shortestFrames) {
+        // Scale down proportionally while maintaining gap:context ratio
+        const scale = shortestFrames / framesNeeded;
+        context = Math.max(4, Math.floor(context * scale));
+        gap = Math.max(1, Math.floor(gap * scale));
+        console.log('[ShotEditor] Scaled join defaults to fit constraint:', { context, gap, shortestFrames, framesNeeded });
+      }
+    }
+
     joinSettings.updateFields({
       prompt: '',
       negativePrompt: '',
-      contextFrameCount: 15,
-      gapFrameCount: 23,
+      contextFrameCount: context,
+      gapFrameCount: gap,
       replaceMode: true,
       keepBridgingImages: false,
       enhancePrompt: true,
@@ -1580,7 +1598,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       randomSeed: true,
       selectedLoras: [], // Also reset LoRAs
     });
-  }, [joinSettings]);
+  }, [joinSettings, joinValidationData.shortestClipFrames]);
 
   // [SelectorPattern] Filtered views now come from selector hooks defined above.
   // simpleFilteredImages is replaced by timelineImages (same filtering logic)

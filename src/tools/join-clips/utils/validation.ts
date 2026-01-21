@@ -1,8 +1,19 @@
 /**
  * Join Clips Validation Utilities
- * 
+ *
  * Calculates frame requirements and provides info for constraining
  * UI sliders to prevent invalid settings.
+ *
+ * CONSTRAINT (to avoid double-blending artifacts in REPLACE mode):
+ *   min_clip_frames ≥ gap_frame_count + 2 × context_frame_count
+ *
+ * Examples:
+ * | gap_frame_count | context_frame_count | min_clip_frames |
+ * |-----------------|---------------------|-----------------|
+ * | 23              | 15                  | 53              |
+ * | 23              | 11                  | 45              |
+ * | 15              | 15                  | 45              |
+ * | 53              | 8                   | 69              |
  */
 
 export interface ClipFrameInfo {
@@ -18,16 +29,38 @@ export interface ValidationResult {
   shortestClipFrames: number;
   maxSafeGap: number;
   maxSafeContext: number;
+  /** Minimum frames required per clip based on current settings */
+  minClipFramesRequired: number;
+}
+
+/**
+ * Calculate minimum clip frames required based on the constraint:
+ *   min_clip_frames ≥ gap_frame_count + 2 × context_frame_count
+ *
+ * This applies to REPLACE mode to avoid double-blending artifacts.
+ * In INSERT mode, the constraint is simpler (just context frames).
+ */
+export function calculateMinClipFramesRequired(
+  contextFrames: number,
+  gapFrames: number,
+  replaceMode: boolean
+): number {
+  if (!replaceMode) {
+    // INSERT mode - only need context frames from each clip
+    return contextFrames;
+  }
+  // REPLACE mode - need gap + 2*context to avoid double-blending
+  return gapFrames + 2 * contextFrames;
 }
 
 /**
  * Get the minimum frames required from a clip based on its position
- * 
+ *
  * In REPLACE mode:
  * - First clip: needs contextFrames + ceil(gapFrames/2) from the END
  * - Last clip: needs contextFrames + floor(gapFrames/2) from the START
  * - Middle clips: need frames from BOTH ends for two transitions
- * 
+ *
  * In INSERT mode:
  * - Only need contextFrames (no frames are removed from source clips)
  */
@@ -50,21 +83,26 @@ export function getMinFramesRequired(
     }
   }
 
-  // REPLACE mode - need context + portion of gap
+  // REPLACE mode - use the new constraint formula
+  // Each clip needs at least: gap + 2*context total frames
+  const minRequired = calculateMinClipFramesRequired(contextFrames, gapFrames, replaceMode);
+
+  // For position-specific breakdown (used for visualization):
   const gapFromFirst = Math.ceil(gapFrames / 2);
   const gapFromSecond = Math.floor(gapFrames / 2);
 
   switch (position) {
     case 'first':
       const firstEnd = contextFrames + gapFromFirst;
-      return { fromStart: 0, fromEnd: firstEnd, total: firstEnd };
+      return { fromStart: 0, fromEnd: firstEnd, total: minRequired };
     case 'last':
       const lastStart = contextFrames + gapFromSecond;
-      return { fromStart: lastStart, fromEnd: 0, total: lastStart };
+      return { fromStart: lastStart, fromEnd: 0, total: minRequired };
     case 'middle':
       const midStart = contextFrames + gapFromSecond;
       const midEnd = contextFrames + gapFromFirst;
-      return { fromStart: midStart, fromEnd: midEnd, total: midStart + midEnd };
+      // Middle clips need frames for TWO transitions
+      return { fromStart: midStart, fromEnd: midEnd, total: minRequired * 2 };
   }
 }
 
@@ -94,6 +132,10 @@ export function calculateEffectiveFrameCount(
 /**
  * Validate clips and calculate constraints for UI sliders.
  * Returns shortestClipFrames which is used to limit slider max values.
+ *
+ * CONSTRAINT (REPLACE mode): min_clip_frames ≥ gap + 2 × context
+ * - max_gap = shortest_clip - 2 × context
+ * - max_context = (shortest_clip - gap) / 2
  */
 export function validateClipsForJoin(
   clipFrameInfos: ClipFrameInfo[],
@@ -109,11 +151,19 @@ export function validateClipsForJoin(
       shortestClipFrames: 0,
       maxSafeGap: 0,
       maxSafeContext: 0,
+      minClipFramesRequired: 0,
     };
   }
 
   // Find shortest clip
   const shortestClipFrames = Math.min(...clipFrameInfos.map(c => c.frameCount));
+
+  // Calculate minimum frames required based on current settings
+  const minClipFramesRequired = calculateMinClipFramesRequired(
+    contextFrameCount,
+    gapFrameCount,
+    replaceMode
+  );
 
   // Calculate max safe settings based on shortest clip
   let maxSafeGap = 0;
@@ -121,14 +171,14 @@ export function validateClipsForJoin(
 
   if (shortestClipFrames > 0) {
     if (replaceMode) {
-      // Max gap: 2 * (shortestClipFrames - contextFrameCount) - 1
-      maxSafeGap = Math.max(1, 2 * (shortestClipFrames - contextFrameCount) - 1);
+      // CONSTRAINT: shortest_clip ≥ gap + 2*context
+      // Rearranged: max_gap = shortest_clip - 2*context
+      maxSafeGap = Math.max(1, shortestClipFrames - 2 * contextFrameCount);
       // Quantize to valid 4N+1 value
       maxSafeGap = Math.max(1, Math.floor((maxSafeGap - 1) / 4) * 4 + 1);
-      
-      // Max context for current gap
-      const gapPortion = Math.ceil(gapFrameCount / 2);
-      maxSafeContext = Math.max(4, shortestClipFrames - gapPortion);
+
+      // max_context = (shortest_clip - gap) / 2
+      maxSafeContext = Math.max(4, Math.floor((shortestClipFrames - gapFrameCount) / 2));
     } else {
       // INSERT mode - gap doesn't affect clip length requirements
       maxSafeGap = 81;
@@ -148,6 +198,7 @@ export function validateClipsForJoin(
     shortestClipFrames,
     maxSafeGap,
     maxSafeContext,
+    minClipFramesRequired,
   };
 }
 

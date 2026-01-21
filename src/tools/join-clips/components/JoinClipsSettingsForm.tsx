@@ -728,56 +728,64 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
     
     // Calculate dynamic max values for sliders based on combined constraint:
-    // In REPLACE mode, each clip needs: context + ceil(gap/2) frames
-    // In INSERT mode, each clip needs: context frames
-    const { maxGapFrames, maxContextFrames, framesUsedPerClip } = useMemo(() => {
+    //
+    // REPLACE mode CONSTRAINT (to avoid double-blending artifacts):
+    //   min_clip_frames ≥ gap_frame_count + 2 × context_frame_count
+    //
+    // Rearranged:
+    //   max_gap = shortest_clip - 2 × context
+    //   max_context = (shortest_clip - gap) / 2
+    //
+    // In INSERT mode, each clip only needs: context frames
+    const { maxGapFrames, maxContextFrames, minClipFramesRequired } = useMemo(() => {
         // Standard limits (without clip constraints)
         const standardMaxTotal = 81; // 4N+1 format max
         const standardMaxContext = 30;
-        
-        // Calculate frames used per clip for current settings
-        const gapPortion = Math.ceil(gapFrames / 2);
-        const currentFramesUsed = replaceMode ? (contextFrames + gapPortion) : contextFrames;
-        
+
+        // Calculate minimum frames required per clip based on current settings
+        const minRequired = replaceMode
+            ? gapFrames + 2 * contextFrames  // gap + 2*context
+            : contextFrames;                  // just context for INSERT mode
+
         // Default case: no clip info available
         if (!shortestClipFrames || shortestClipFrames <= 0) {
             const defaultMaxGap = Math.max(1, standardMaxTotal - (contextFrames * 2));
-            return { 
-                maxGapFrames: defaultMaxGap, 
+            return {
+                maxGapFrames: defaultMaxGap,
                 maxContextFrames: standardMaxContext,
-                framesUsedPerClip: currentFramesUsed,
+                minClipFramesRequired: minRequired,
             };
         }
-        
+
         if (replaceMode) {
-            // REPLACE mode: each clip needs context + ceil(gap/2) frames
-            // Max gap: context + ceil(gap/2) <= shortestClipFrames
-            // ceil(gap/2) <= shortestClipFrames - context
-            // gap <= 2 * (shortestClipFrames - context)
-            const maxGapForClip = Math.max(1, 2 * (shortestClipFrames - contextFrames));
+            // REPLACE mode: min_clip_frames ≥ gap + 2*context
+            // max_gap = shortest_clip - 2*context
+            const maxGapForClip = Math.max(1, shortestClipFrames - 2 * contextFrames);
             const maxGapForTotal = Math.max(1, standardMaxTotal - (contextFrames * 2));
-            const finalMaxGap = Math.min(maxGapForClip, maxGapForTotal);
-            
-            // Max context: context <= shortestClipFrames - ceil(gap/2)
-            const maxContextForClip = shortestClipFrames - gapPortion;
+            let finalMaxGap = Math.min(maxGapForClip, maxGapForTotal);
+            // Quantize to valid 4N+1 value
+            finalMaxGap = Math.max(1, Math.floor((finalMaxGap - 1) / 4) * 4 + 1);
+
+            // max_context = (shortest_clip - gap) / 2
+            const maxContextForClip = Math.floor((shortestClipFrames - gapFrames) / 2);
             const maxContextForTotal = Math.floor((standardMaxTotal - gapFrames) / 2);
             const finalMaxContext = Math.max(4, Math.min(maxContextForClip, maxContextForTotal, standardMaxContext));
-            
-            return { 
-                maxGapFrames: Math.max(1, finalMaxGap), 
+
+            return {
+                maxGapFrames: Math.max(1, finalMaxGap),
                 maxContextFrames: finalMaxContext,
-                framesUsedPerClip: currentFramesUsed,
+                minClipFramesRequired: minRequired,
             };
         } else {
             // INSERT mode: only need context frames from each clip
             const maxContextForClip = shortestClipFrames;
             const finalMaxContext = Math.max(4, Math.min(maxContextForClip, standardMaxContext));
             const maxGapForTotal = Math.max(1, standardMaxTotal - (contextFrames * 2));
-            
-            return { 
-                maxGapFrames: maxGapForTotal, 
+
+            return {
+                maxGapFrames: maxGapForTotal,
                 maxContextFrames: finalMaxContext,
-                framesUsedPerClip: currentFramesUsed,
+                minClipFramesRequired: minRequired,
             };
         }
     }, [shortestClipFrames, contextFrames, gapFrames, replaceMode]);
@@ -1240,17 +1248,18 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                                 </>
                                             )}
                                             <span className="mx-2">•</span>
-                                            <span className="font-medium">Using:</span>{' '}
+                                            <span className="font-medium">Min required:</span>{' '}
                                             <span className={cn(
                                                 "font-mono",
-                                                framesUsedPerClip > shortestClipFrames * 0.9 && "text-yellow-600 dark:text-yellow-400"
+                                                minClipFramesRequired > shortestClipFrames && "text-red-600 dark:text-red-400",
+                                                minClipFramesRequired > shortestClipFrames * 0.9 && minClipFramesRequired <= shortestClipFrames && "text-yellow-600 dark:text-yellow-400"
                                             )}>
-                                                {framesUsedPerClip}
+                                                {minClipFramesRequired}
                                             </span>
                                             {' '}frames per clip
                                             {replaceMode && (
                                                 <span className="text-muted-foreground/70 ml-1">
-                                                    ({contextFrames} context + {Math.ceil(gapFrames / 2)} half-gap)
+                                                    ({gapFrames} gap + 2×{contextFrames} context)
                                                 </span>
                                             )}
                                         </>

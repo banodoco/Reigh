@@ -1637,18 +1637,18 @@ const JoinClipsPage: React.FC = () => {
                               let context = 10;
                               let gap = 13;
                               const replaceMode = true;
-                              
+
                               // Scale down proportionally if constraint is violated
-                              // In REPLACE mode: each clip needs context + ceil(gap/2) frames
+                              // REPLACE mode constraint: min_clip_frames ≥ gap + 2*context
                               const shortestFrames = validationResult?.shortestClipFrames;
                               if (shortestFrames && shortestFrames > 0) {
-                                const framesNeeded = context + Math.ceil(gap / 2);
+                                const framesNeeded = gap + 2 * context;
                                 if (framesNeeded > shortestFrames) {
-                                  // Scale down proportionally
+                                  // Scale down proportionally while maintaining gap:context ratio
                                   const scale = shortestFrames / framesNeeded;
                                   context = Math.max(4, Math.floor(context * scale));
                                   gap = Math.max(1, Math.floor(gap * scale));
-                                  console.log('[JoinClips] Scaled defaults to fit constraint:', { context, gap, shortestFrames });
+                                  console.log('[JoinClips] Scaled defaults to fit constraint:', { context, gap, shortestFrames, framesNeeded });
                                 }
                               }
                               
