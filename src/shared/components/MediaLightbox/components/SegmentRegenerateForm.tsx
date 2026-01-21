@@ -129,11 +129,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
       // Create task
       const result = await createIndividualTravelSegmentTask(taskParams);
 
-      if (result.success) {
-        toast({
-          title: "Task Created",
-          description: "Video regeneration started",
-        });
+      if (result.task_id) {
+        // Success - task was created
       } else {
         throw new Error(result.error || 'Failed to create task');
       }

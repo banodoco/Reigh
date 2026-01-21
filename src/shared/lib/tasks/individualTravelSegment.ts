@@ -4,7 +4,7 @@ import {
   resolveProjectResolution
 } from "../taskCreation";
 import { supabase } from '@/integrations/supabase/client';
-import { PhaseConfig } from '@/tools/travel-between-images/settings';
+import { PhaseConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG, PhaseLoraConfig } from '@/tools/travel-between-images/settings';
 
 /**
  * Interface for individual travel segment regeneration task parameters
@@ -69,6 +69,55 @@ export interface IndividualTravelSegmentParams {
 
 // Maximum frames allowed per segment (81-frame limit)
 const MAX_SEGMENT_FRAMES = 81;
+
+// Motion LoRA URL (same as in generateVideoService.ts)
+const MOTION_LORA_URL = 'https://huggingface.co/peteromallet/random_junk/resolve/main/14b-i2v.safetensors';
+
+/**
+ * Build default phase config with user LoRAs for basic mode.
+ * Mirrors buildBasicModePhaseConfig in generateVideoService.ts.
+ */
+function buildBasicModePhaseConfig(
+  useVaceModel: boolean,
+  amountOfMotion: number,
+  userLoras: Array<{ path: string; strength: number }>
+): PhaseConfig {
+  const baseConfig = useVaceModel ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
+
+  return {
+    ...baseConfig,
+    steps_per_phase: [...baseConfig.steps_per_phase],
+    phases: baseConfig.phases.map((phase) => {
+      const additionalLoras: PhaseLoraConfig[] = [];
+
+      // Add motion LoRA scaled by amount
+      if (amountOfMotion > 0) {
+        additionalLoras.push({
+          url: MOTION_LORA_URL,
+          multiplier: amountOfMotion.toFixed(2)
+        });
+      }
+
+      // Add user-selected LoRAs
+      userLoras.forEach(lora => {
+        if (lora.path) {
+          additionalLoras.push({
+            url: lora.path,
+            multiplier: lora.strength.toFixed(2)
+          });
+        }
+      });
+
+      return {
+        ...phase,
+        loras: [
+          ...phase.loras.map(l => ({ ...l })),
+          ...additionalLoras
+        ]
+      };
+    })
+  };
+}
 
 /**
  * Validates individual travel segment parameters
@@ -148,52 +197,51 @@ function buildIndividualTravelSegmentParams(
     console.log('[IndividualTravelSegment] Using orchestrator_details additional_loras');
   }
 
-  // Determine phase_config
-  const phaseConfig = params.phase_config || orig.phase_config || orchDetails.phase_config;
-  
-  // Determine advanced_mode
-  const advancedMode = params.advanced_mode ?? orig.advanced_mode ?? orchDetails.advanced_mode ?? false;
-  
-  // Build lora_multipliers from phase_config if available
-  const loraMultipliers = orig.lora_multipliers || orchDetails.lora_multipliers || [];
-  
-  // Determine model settings
-  // Model selection depends on structure guidance target:
-  // - Uni3C (target === 'uni3c'): use I2V model with guidance video
-  // - VACE (target === 'vace'): use VACE model
-  // - No structure guidance: use I2V model (default)
-  
+  // Determine model settings FIRST (needed for basic mode phase config)
   // Get structure_guidance from new unified format (preferred)
-  // NEW UNIFIED FORMAT: structure_guidance contains videos array inside:
-  // { target, videos: [...], strength, ... }
   const structureGuidance = orig.structure_guidance || orchDetails.structure_guidance;
-  
-  // Check for structure videos:
-  // 1. NEW: Inside structure_guidance.videos array (preferred)
-  // 2. LEGACY: Separate structure_videos array or single structure_video_path
+
+  // Check for structure videos
   const hasStructureVideos = !!(
     (structureGuidance?.videos as unknown[] | undefined)?.length > 0 ||
-    orchDetails.structure_videos?.length > 0 || 
+    orchDetails.structure_videos?.length > 0 ||
     orig.structure_videos?.length > 0 ||
     orchDetails.structure_video_path ||
     orig.structure_video_path
   );
-  
-  // Determine if using uni3c mode:
-  // 1. NEW: Check structure_guidance.target === 'uni3c'
-  // 2. LEGACY: Check structure_type === 'uni3c'
+
+  // Determine if using uni3c mode
   let isUni3c = false;
   if (structureGuidance?.target === 'uni3c') {
     isUni3c = hasStructureVideos;
   } else if (hasStructureVideos && !structureGuidance) {
-    // Legacy fallback: check structure_type
-    const structureType = orig.structure_type || orchDetails.structure_type || 
+    const structureType = orig.structure_type || orchDetails.structure_type ||
       orchDetails.structure_videos?.[0]?.structure_type || orig.structure_videos?.[0]?.structure_type ||
       orchDetails.structure_video_type || orig.structure_video_type;
     isUni3c = structureType === 'uni3c';
   }
-  
+
   const useVaceModel = hasStructureVideos && !isUni3c;
+
+  // Determine motion settings
+  const motionMode = params.motion_mode ?? orig.motion_mode ?? orchDetails.motion_mode ?? 'basic';
+  const isBasicMode = motionMode === 'basic';
+  const amountOfMotion = params.amount_of_motion ?? orig.amount_of_motion ?? orchDetails.amount_of_motion ?? 0.5;
+  const userLoras = params.loras ?? [];
+
+  // Phase config is ALWAYS built and sent (matches batch mode behavior)
+  // - Basic mode: build from defaults with user LoRAs
+  // - Advanced mode: use explicit if provided, otherwise build from defaults
+  const explicitPhaseConfig = params.phase_config || orig.phase_config || orchDetails.phase_config;
+  const phaseConfig: PhaseConfig = explicitPhaseConfig || buildBasicModePhaseConfig(useVaceModel, amountOfMotion, userLoras);
+
+  // advanced_mode indicates whether user provided explicit config (true) or we computed it (false)
+  const advancedMode = isBasicMode ? false : (params.advanced_mode ?? orig.advanced_mode ?? orchDetails.advanced_mode ?? !!explicitPhaseConfig);
+
+  // Build lora_multipliers from phase_config (always available now)
+  const loraMultipliers = phaseConfig.phases.flatMap((phase) =>
+    (phase.loras || []).map((lora) => ({ url: lora.url, multiplier: lora.multiplier }))
+  );
   const defaultModelName = useVaceModel
     ? "wan_2_2_vace_lightning_baseline_2_2_2"
     : "wan_2_2_i2v_lightning_baseline_2_2_2";
@@ -211,13 +259,16 @@ function buildIndividualTravelSegmentParams(
     defaultModelName,
     finalModelName: modelName,
   });
-  const flowShift = orig.flow_shift ?? orchDetails.flow_shift ?? 5;
-  const sampleSolver = orig.sample_solver || orchDetails.sample_solver || "euler";
-  const guidanceScale = orig.guidance_scale ?? orchDetails.guidance_scale ?? 3;
-  const guidance2Scale = orig.guidance2_scale ?? orchDetails.guidance2_scale ?? 1;
-  const guidancePhases = orig.guidance_phases ?? orchDetails.guidance_phases ?? 2;
-  const numInferenceSteps = orig.num_inference_steps ?? orchDetails.num_inference_steps ?? 6;
-  const modelSwitchPhase = orig.model_switch_phase ?? orchDetails.model_switch_phase ?? 1;
+  // Extract flat fields from phaseConfig (when available) or fallback to orig/orchDetails
+  const flowShift = phaseConfig?.flow_shift ?? orig.flow_shift ?? orchDetails.flow_shift ?? 5;
+  const sampleSolver = phaseConfig?.sample_solver ?? orig.sample_solver ?? orchDetails.sample_solver ?? "euler";
+  const guidanceScale = phaseConfig?.phases?.[0]?.guidance_scale ?? orig.guidance_scale ?? orchDetails.guidance_scale ?? 1;
+  const guidance2Scale = phaseConfig?.phases?.[1]?.guidance_scale ?? orig.guidance2_scale ?? orchDetails.guidance2_scale ?? 1;
+  const guidancePhases = phaseConfig?.num_phases ?? orig.guidance_phases ?? orchDetails.guidance_phases ?? 2;
+  const numInferenceSteps = phaseConfig?.steps_per_phase
+    ? phaseConfig.steps_per_phase.reduce((sum: number, steps: number) => sum + steps, 0)
+    : (orig.num_inference_steps ?? orchDetails.num_inference_steps ?? 6);
+  const modelSwitchPhase = phaseConfig?.model_switch_phase ?? orig.model_switch_phase ?? orchDetails.model_switch_phase ?? 1;
   const switchThreshold = orig.switch_threshold ?? orchDetails.switch_threshold;
   
   // Segment-specific settings (UI overrides take precedence)
@@ -229,7 +280,6 @@ function buildIndividualTravelSegmentParams(
   // params.base_prompt is the explicit override from the SegmentCard UI
   const basePrompt = params.base_prompt ?? orig.base_prompt ?? orig.prompt ?? "";
   const negativePrompt = params.negative_prompt ?? orig.negative_prompt ?? "";
-  const amountOfMotion = params.amount_of_motion ?? orig.amount_of_motion ?? orchDetails.amount_of_motion ?? 0.5;
   
   // [SegmentPromptDebug] Log prompt resolution to verify UI values are being used
   console.log('[IndividualTravelSegment] [SegmentPromptDebug] Prompt resolution:', {
@@ -467,10 +517,8 @@ function buildIndividualTravelSegmentParams(
       orchDetails.after_first_post_generation_brightness ?? 0,
   };
 
-  // Add phase_config at top level if in advanced mode
-  if (advancedMode && phaseConfig) {
-    taskParams.phase_config = phaseConfig;
-  }
+  // Don't add phase_config at top level - it goes in individual_segment_params (per-segment override)
+  // The worker checks individual_segment_params first, then falls back to orchestrator_details
 
   // Add generation name if provided
   if (params.generation_name) {
@@ -519,10 +567,8 @@ function buildIndividualTravelSegmentParams(
       orchDetails.after_first_post_generation_brightness ?? 0,
   };
 
-  // Add phase_config to individual_segment_params if in advanced mode
-  if (advancedMode && phaseConfig) {
-    individualSegmentParams.phase_config = phaseConfig;
-  }
+  // Always add phase_config
+  individualSegmentParams.phase_config = phaseConfig;
 
   // Add the individual_segment_params to task params
   taskParams.individual_segment_params = individualSegmentParams;

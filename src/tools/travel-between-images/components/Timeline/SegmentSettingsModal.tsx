@@ -200,11 +200,8 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
       // Create task
       const result = await createIndividualTravelSegmentTask(taskParams);
 
-      if (result.success) {
-        toast({
-          title: "Task Created",
-          description: "Video generation started",
-        });
+      if (result.task_id) {
+        // Success - task was created
       } else {
         throw new Error(result.error || 'Failed to create task');
       }

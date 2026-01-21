@@ -130,6 +130,8 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     try {
       await onSubmit();
       setSubmitSuccess(true);
+      // Reset after 2 seconds
+      setTimeout(() => setSubmitSuccess(false), 2000);
     } catch (error) {
       console.error('[SegmentSettingsForm] Submit error:', error);
     }
@@ -174,11 +176,13 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     setIsLoraModalOpen(true);
   }, []);
 
-  const handleLoraSelect = useCallback((loraId: string, loraName: string) => {
-    const lora = availableLoras.find(l => l.id === loraId);
-    if (!lora?.['Model File']) return;
+  const handleLoraSelect = useCallback((lora: LoraModel) => {
+    const loraId = lora['Model ID'] || (lora as any).id;
+    // Model Files is an array - get the URL from the first file
+    const loraPath = lora['Model Files']?.[0]?.url || (lora as any)['Model File'];
+    const loraName = lora.Name || (lora as any).name;
 
-    const loraPath = lora['Model File'];
+    if (!loraPath) return;
     if (settings.loras.some(l => l.id === loraId || l.path === loraPath)) return;
 
     onChange({
@@ -189,7 +193,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
         strength: 1.0,
       }],
     });
-  }, [availableLoras, settings.loras, onChange]);
+  }, [settings.loras, onChange]);
 
   const handleRemoveLora = useCallback((loraId: string) => {
     onChange({
