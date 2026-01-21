@@ -7,24 +7,23 @@ import { SystemLogger } from "../_shared/systemLogger.ts";
 declare const Deno: any;
 
 /**
- * Edge function: get-task-output
+ * Edge function: get-orchestrator-children
  *
- * Fetches the output_location and status for a specific task.
- * Used by workers to get outputs from dependency tasks (e.g., final_stitch getting transition outputs).
+ * Fetches all child tasks for a given orchestrator task ID.
+ * Used by workers to get segment, stitch, and join tasks for an orchestrator.
  *
- * - Service-role key: can fetch any task
+ * - Service-role key: can fetch any orchestrator's children
  * - User token: can only fetch tasks from their own projects
  *
- * POST /functions/v1/get-task-output
+ * POST /functions/v1/get-orchestrator-children
  * Headers: Authorization: Bearer <JWT or PAT>
- * Body: { "task_id": "uuid" }
+ * Body: { "orchestrator_task_id": "uuid" }
  *
  * Returns:
- * - 200 OK with { status, output_location }
- * - 400 Bad Request if task_id missing
+ * - 200 OK with { tasks: [...] }
+ * - 400 Bad Request if orchestrator_task_id missing
  * - 401 Unauthorized if no valid token
- * - 403 Forbidden if user doesn't own the task's project
- * - 404 Not Found if task doesn't exist
+ * - 403 Forbidden if user doesn't own the tasks' project
  * - 500 Internal Server Error
  */
 serve(async (req) => {
@@ -32,7 +31,7 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
 
   if (!serviceKey || !supabaseUrl) {
-    console.error("[GET-TASK-OUTPUT] Missing required environment variables");
+    console.error("[GET-ORCHESTRATOR-CHILDREN] Missing required environment variables");
     return new Response("Server configuration error", { status: 500 });
   }
 
@@ -40,7 +39,7 @@ serve(async (req) => {
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
   // Create logger
-  const logger = new SystemLogger(supabaseAdmin, 'get-task-output');
+  const logger = new SystemLogger(supabaseAdmin, 'get-orchestrator-children');
 
   // Only accept POST requests
   if (req.method !== "POST") {
@@ -72,15 +71,15 @@ serve(async (req) => {
     return new Response("Invalid JSON body", { status: 400 });
   }
 
-  const taskId = requestBody.task_id;
-  if (!taskId) {
-    logger.error("Missing task_id");
+  const orchestratorTaskId = requestBody.orchestrator_task_id;
+  if (!orchestratorTaskId) {
+    logger.error("Missing orchestrator_task_id");
     await logger.flush();
-    return new Response("task_id is required", { status: 400 });
+    return new Response("orchestrator_task_id is required", { status: 400 });
   }
 
-  // Set task_id for all subsequent logs
-  logger.setDefaultTaskId(taskId);
+  // Set orchestrator task_id for logs
+  logger.setDefaultTaskId(orchestratorTaskId);
 
   let callerId: string | null = null;
   let isServiceRole = false;
@@ -141,52 +140,66 @@ serve(async (req) => {
   }
 
   try {
-    // Fetch the task with all needed fields
-    const { data: task, error: taskError } = await supabaseAdmin
+    // Query child tasks - those with orchestrator_task_id_ref in params matching the given ID
+    const { data: tasks, error: tasksError } = await supabaseAdmin
       .from("tasks")
-      .select("id, status, output_location, project_id, params, dependant_on")
-      .eq("id", taskId)
-      .single();
+      .select("id, task_type, status, params, output_location, project_id")
+      .contains("params", { orchestrator_task_id_ref: orchestratorTaskId })
+      .order("created_at", { ascending: true });
 
-    if (taskError || !task) {
-      logger.error("Task not found", { error: taskError?.message });
+    if (tasksError) {
+      logger.error("Error fetching child tasks", { error: tasksError.message });
       await logger.flush();
-      return new Response("Task not found", { status: 404 });
+      return new Response(`Error fetching tasks: ${tasksError.message}`, { status: 500 });
     }
 
-    // If user token (not service role), verify ownership
+    // If no tasks found, return empty array
+    if (!tasks || tasks.length === 0) {
+      logger.info("No child tasks found", { orchestrator_task_id: orchestratorTaskId });
+      await logger.flush();
+      return new Response(JSON.stringify({ tasks: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    // If user token (not service role), verify ownership of all tasks
     if (!isServiceRole && callerId) {
-      // Check if user owns the project
-      const { data: project, error: projectError } = await supabaseAdmin
-        .from("projects")
-        .select("user_id")
-        .eq("id", task.project_id)
-        .single();
+      // Get unique project IDs from the tasks
+      const projectIds = [...new Set(tasks.map(t => t.project_id))];
 
-      if (projectError || !project) {
-        logger.error("Project not found", { error: projectError?.message });
+      // Check if user owns all the projects
+      const { data: projects, error: projectError } = await supabaseAdmin
+        .from("projects")
+        .select("id, user_id")
+        .in("id", projectIds);
+
+      if (projectError) {
+        logger.error("Error checking project ownership", { error: projectError.message });
         await logger.flush();
-        return new Response("Project not found", { status: 404 });
+        return new Response("Error verifying access", { status: 500 });
       }
 
-      if (project.user_id !== callerId) {
-        logger.error("Access denied - user doesn't own project", {
-          user_id: callerId,
-          project_id: task.project_id
-        });
-        await logger.flush();
-        return new Response("Access denied - you don't own this task's project", { status: 403 });
+      // Verify user owns all projects
+      for (const project of projects || []) {
+        if (project.user_id !== callerId) {
+          logger.error("Access denied - user doesn't own project", {
+            user_id: callerId,
+            project_id: project.id
+          });
+          await logger.flush();
+          return new Response("Access denied - you don't own these tasks' project", { status: 403 });
+        }
       }
     }
 
-    // Return the task data
-    logger.info("Returning task output", { status: task.status, has_output: !!task.output_location });
+    // Remove project_id from response (not needed by caller)
+    const tasksWithoutProjectId = tasks.map(({ project_id, ...rest }) => rest);
+
+    logger.info("Returning child tasks", { count: tasks.length });
     await logger.flush();
     return new Response(JSON.stringify({
-      status: task.status,
-      output_location: task.output_location,
-      params: task.params,
-      dependant_on: task.dependant_on
+      tasks: tasksWithoutProjectId
     }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
