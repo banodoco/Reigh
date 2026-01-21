@@ -1732,7 +1732,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isClearingFinalVideo, setIsClearingFinalVideo] = useState(false);
 
   // Handler for clearing the final video output (not deleting the entire generation)
-  // This clears the location/thumbnail and deletes the primary variant,
+  // This clears the location/thumbnail and deletes ALL variants,
   // but keeps the generation so it can be regenerated
   const handleDeleteFinalVideo = useCallback(async (generationId: string) => {
     console.log('[FinalVideoDelete] handleDeleteFinalVideo (clear output) called', {
@@ -1761,18 +1761,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
       console.log('[FinalVideoDelete] Cleared generation location');
 
-      // 2. Delete the primary variant of this generation (if it exists)
-      const { error: deleteVariantError } = await supabase
+      // 2. Delete ALL variants of this generation (not just primary)
+      const { data: deletedVariants, error: deleteVariantError } = await supabase
         .from('generation_variants')
         .delete()
         .eq('generation_id', generationId)
-        .eq('is_primary', true);
+        .select('id');
 
       if (deleteVariantError) {
-        console.error('[FinalVideoDelete] Error deleting primary variant:', deleteVariantError);
+        console.error('[FinalVideoDelete] Error deleting variants:', deleteVariantError);
         // Don't fail the whole operation if variant delete fails
       } else {
-        console.log('[FinalVideoDelete] Deleted primary variant');
+        console.log('[FinalVideoDelete] Deleted all variants:', deletedVariants?.length || 0);
       }
 
       console.log('[FinalVideoDelete] Clear output SUCCESS - invalidating queries');
