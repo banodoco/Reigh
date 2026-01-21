@@ -108,6 +108,19 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     }
   }, [activeScrubbingIndex]); // Don't include scrubbing.containerProps to avoid loops
 
+  // Clear scrubbing preview on scroll - prevents preview from "following" when scrolling quickly
+  useEffect(() => {
+    if (activeScrubbingIndex === null) return;
+
+    const handleScroll = () => {
+      setActiveScrubbingIndex(null);
+      scrubbing.reset();
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [activeScrubbingIndex, scrubbing]);
+
   // Fetch segment outputs data - uses controlled state if provided
   const {
     parentGenerations,

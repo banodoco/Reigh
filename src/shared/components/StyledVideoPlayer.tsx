@@ -3,6 +3,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Play, Pause, Volume2, VolumeX, Maximize } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { getDisplayUrl } from '@/shared/lib/utils';
 
 interface StyledVideoPlayerProps {
   src: string;
@@ -44,6 +45,8 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  // Track video loading state - show thumbnail until video can play
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   const formatTime = (seconds: number): string => {
     if (!Number.isFinite(seconds) || seconds < 0) {
@@ -103,6 +106,16 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   const effectiveStart = playbackStart ?? 0;
   const effectiveEnd = playbackEnd ?? duration;
 
+  // Reset video ready state when src changes
+  useEffect(() => {
+    setIsVideoReady(false);
+    console.log('[StyledVideoPlayer] src changed, resetting isVideoReady:', {
+      src: src?.substring(0, 60),
+      poster: poster?.substring(0, 60),
+      hasPoster: !!poster
+    });
+  }, [src, poster]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -149,6 +162,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         readyState: video.readyState,
         duration: video.duration,
       });
+      setIsVideoReady(true);
     };
     
     const handleError = (e: Event) => {
@@ -251,13 +265,39 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         autoPlay={autoPlay}
         playsInline={playsInline}
         preload={preload}
-        className="w-full h-auto object-contain rounded-lg bg-black/5 cursor-pointer video-clickable-area"
+        className="w-full h-auto object-contain rounded-lg bg-black cursor-pointer video-clickable-area"
         style={{ maxHeight: '100%' }}
         onDoubleClick={isMobile ? undefined : toggleFullscreen}
         onLoadedMetadata={onLoadedMetadata}
       >
         Your browser does not support the video tag.
       </video>
+
+      {/* Thumbnail overlay while video is loading - only show if poster is a different URL (actual thumbnail, not video fallback) */}
+      {poster && poster !== src && !isVideoReady && (
+        <div className="absolute inset-0 pointer-events-none">
+          <img
+            src={getDisplayUrl(poster)}
+            alt=""
+            className="w-full h-full object-contain rounded-lg"
+          />
+          {/* Loading spinner overlay */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="bg-black/60 rounded-full p-3">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading spinner when no thumbnail available */}
+      {(!poster || poster === src) && !isVideoReady && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-black/60 rounded-full p-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          </div>
+        </div>
+      )}
 
       {/* Clickable overlay for play/pause */}
       <div 
