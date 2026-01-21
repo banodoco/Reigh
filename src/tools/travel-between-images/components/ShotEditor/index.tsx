@@ -2430,7 +2430,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         {/* Generation Settings */}
         <div className="w-full" ref={generateVideosCardRef} style={{ overflowAnchor: 'none' }}>
           <Card>
-            <CardHeader className="pb-4">
+            <CardHeader className="pb-2">
                 {/* Toggle header - selected option on left, swap icon, other option on right */}
                 {/* Hidden when stitchAfterGenerate is enabled (stitch settings shown inline instead) */}
                 {stitchAfterGenerate ? (
@@ -2696,7 +2696,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     stitchEnabled={stitchAfterGenerate}
                     middleContent={
                       stitchAfterGenerate ? (
-                        <Collapsible className="mb-4 w-full">
+                        <Collapsible className="mb-6 w-full">
                           {/* Stitch toggle + settings trigger on same row */}
                           <div className="flex items-center justify-center gap-4">
                             <div className="flex items-center gap-2">
@@ -2709,7 +2709,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                 htmlFor="stitch-after-generate"
                                 className="text-sm font-normal cursor-pointer"
                               >
-                                Stitch together generated clips
+                                Stitch generated clips
                               </Label>
                             </div>
                             <CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group">
@@ -2766,7 +2766,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         </Collapsible>
                       ) : (
                         /* Just the toggle when stitch is disabled */
-                        <div className="mb-4 flex items-center justify-center gap-2">
+                        <div className="mb-6 flex items-center justify-center gap-2">
                           <Switch
                             id="stitch-after-generate"
                             checked={stitchAfterGenerate}
@@ -2776,24 +2776,24 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             htmlFor="stitch-after-generate"
                             className="text-sm font-normal cursor-pointer"
                           >
-                            Stitch together generated clips
+                            Stitch generated clips
                           </Label>
                         </div>
                       )
                     }
+                    bottomContent={
+                      !stitchAfterGenerate ? (
+                        <button
+                          ref={swapButtonRef}
+                          onClick={() => toggleGenerateModePreserveScroll('join')}
+                          className="mt-4 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors pt-2"
+                        >
+                          <ArrowLeftRight className="w-4 h-4" />
+                          <span>Swap to Join Segments</span>
+                        </button>
+                      ) : undefined
+                    }
                   />
-
-                  {/* Swap to Join Segments - hidden when stitch is enabled */}
-                  {!stitchAfterGenerate && (
-                    <button
-                      ref={swapButtonRef}
-                      onClick={() => toggleGenerateModePreserveScroll('join')}
-                      className="mt-3 w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-                    >
-                      <ArrowLeftRight className="w-4 h-4" />
-                      <span>Swap to Join Segments</span>
-                    </button>
-                  )}
                 </div>
                 </>
               ) : (

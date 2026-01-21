@@ -14,6 +14,8 @@ interface GenerateVideoCTAProps {
   videoCount?: number;
   /** Optional content to render between variant name input and generate button */
   middleContent?: React.ReactNode;
+  /** Optional content to render below the generate button */
+  bottomContent?: React.ReactNode;
   /** Whether stitch mode is enabled (changes button text) */
   stitchEnabled?: boolean;
 }
@@ -32,6 +34,7 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
   inputId = 'variant-name',
   videoCount = 1,
   middleContent,
+  bottomContent,
   stitchEnabled = false,
 }) => {
   const isPlural = videoCount >= 2;
@@ -82,6 +85,9 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
               : getButtonText()}
         </span>
       </Button>
+
+      {/* Optional bottom content (e.g., swap mode button) */}
+      {bottomContent}
     </div>
   );
 };
