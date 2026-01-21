@@ -15,7 +15,7 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { MobileImageItem } from './MobileImageItem';
 import { BaseShotImageManagerProps } from './types';
 import { PairPromptIndicator } from './components/PairPromptIndicator';
-import { BatchSegmentVideo } from './components/BatchSegmentVideo';
+import { InlineSegmentVideo } from '@/tools/travel-between-images/components/Timeline/InlineSegmentVideo';
 
 const DOUBLE_TAP_WINDOW_MS = 275;
 
@@ -432,41 +432,68 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       <>
         <div className="flex flex-col gap-4 pt-2">
           {pairs.map((pair) => (
-            <div key={`pair-${pair.index}`} className="flex items-center gap-2">
-              {/* Left image - tap to enter move mode */}
-              <div className="flex-1 relative">
-                <MobileImageItem
-                  image={pair.leftImage}
-                  index={pair.index}
-                  isSelected={false}
-                  onMobileTap={() => {
-                    // Select this image to enter move mode
-                    setMobileSelectedIds([pair.leftImage.id as string]);
-                    setLastSelectedIndex(pair.index);
-                  }}
-                  onDelete={() => {}}
-                  onOpenLightbox={() => onOpenLightbox?.(pair.index)}
-                  duplicatingImageId={duplicatingImageId}
-                  duplicateSuccessImageId={duplicateSuccessImageId}
-                  frameNumber={pair.index * batchVideoFrames}
-                  projectAspectRatio={projectAspectRatio}
-                  readOnly={true}
-                />
-              </div>
-              
-              {/* Video/indicator in the middle */}
-              <div className="flex flex-col items-center gap-1 w-24 flex-shrink-0">
-                {pair.segmentSlot && (
-                  <BatchSegmentVideo
-                    slot={pair.segmentSlot}
-                    pairIndex={pair.index}
-                    onClick={() => onSegmentClick?.(pair.index)}
-                    onOpenPairSettings={onPairClick ? () => onPairClick(pair.index) : undefined}
+            <div key={`pair-${pair.index}`} className="relative">
+              {/* Images side by side with small gap */}
+              <div className="flex items-center gap-3">
+                {/* Left image - tap to enter move mode */}
+                <div className="flex-1 relative">
+                  <MobileImageItem
+                    image={pair.leftImage}
+                    index={pair.index}
+                    isSelected={false}
+                    onMobileTap={() => {
+                      // Select this image to enter move mode
+                      setMobileSelectedIds([pair.leftImage.id as string]);
+                      setLastSelectedIndex(pair.index);
+                    }}
+                    onDelete={() => {}}
+                    onOpenLightbox={() => onOpenLightbox?.(pair.index)}
+                    duplicatingImageId={duplicatingImageId}
+                    duplicateSuccessImageId={duplicateSuccessImageId}
+                    frameNumber={pair.index * batchVideoFrames}
                     projectAspectRatio={projectAspectRatio}
-                    isMobile={true}
-                    compact={false}
-                    isPending={hasPendingTask?.(pair.segmentSlot?.pairShotGenerationId)}
+                    readOnly={true}
                   />
+                </div>
+
+                {/* Right image - tap to enter move mode */}
+                <div className="flex-1 relative">
+                  <MobileImageItem
+                    image={pair.rightImage}
+                    index={pair.index + 1}
+                    isSelected={false}
+                    onMobileTap={() => {
+                      // Select this image to enter move mode
+                      setMobileSelectedIds([pair.rightImage.id as string]);
+                      setLastSelectedIndex(pair.index + 1);
+                    }}
+                    onDelete={() => {}}
+                    onOpenLightbox={() => onOpenLightbox?.(pair.index + 1)}
+                    duplicatingImageId={duplicatingImageId}
+                    duplicateSuccessImageId={duplicateSuccessImageId}
+                    frameNumber={(pair.index + 1) * batchVideoFrames}
+                    projectAspectRatio={projectAspectRatio}
+                    readOnly={true}
+                  />
+                </div>
+              </div>
+
+              {/* Video and pair indicator - centered together in the gap */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-1 pointer-events-auto">
+                {pair.segmentSlot && (
+                  <div className="w-16">
+                    <InlineSegmentVideo
+                      slot={pair.segmentSlot}
+                      pairIndex={pair.index}
+                      onClick={() => onSegmentClick?.(pair.index)}
+                      onOpenPairSettings={onPairClick ? () => onPairClick(pair.index) : undefined}
+                      projectAspectRatio={projectAspectRatio}
+                      isMobile={true}
+                      layout="flow"
+                      compact={true}
+                      isPending={hasPendingTask?.(pair.segmentSlot?.pairShotGenerationId)}
+                    />
+                  </div>
                 )}
                 {onPairClick && (
                   <PairPromptIndicator
@@ -488,31 +515,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   />
                 )}
               </div>
-              
-              {/* Right image - tap to enter move mode */}
-              <div className="flex-1 relative">
-                <MobileImageItem
-                  image={pair.rightImage}
-                  index={pair.index + 1}
-                  isSelected={false}
-                  onMobileTap={() => {
-                    // Select this image to enter move mode
-                    setMobileSelectedIds([pair.rightImage.id as string]);
-                    setLastSelectedIndex(pair.index + 1);
-                  }}
-                  onDelete={() => {}}
-                  onOpenLightbox={() => onOpenLightbox?.(pair.index + 1)}
-                  duplicatingImageId={duplicatingImageId}
-                  duplicateSuccessImageId={duplicateSuccessImageId}
-                  frameNumber={(pair.index + 1) * batchVideoFrames}
-                  projectAspectRatio={projectAspectRatio}
-                  readOnly={true}
-                />
-              </div>
             </div>
           ))}
         </div>
-        
+
         {/* Selection bar - hidden in pair-per-row mode */}
       </>
     );
@@ -562,13 +568,14 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 {/* Video output from previous pair - shows on LEFT if at start of row (only in move mode, not pair-per-row) */}
                 {prevImageWasEndOfRow && prevSegmentSlot && mobileSelectedIds.length === 0 && isInMoveMode && (
                   <div className="absolute -top-4 -left-[6px] -translate-x-1/2 z-20 pointer-events-auto w-20">
-                    <BatchSegmentVideo
+                    <InlineSegmentVideo
                       slot={prevSegmentSlot}
                       pairIndex={index - 1}
                       onClick={() => onSegmentClick?.(index - 1)}
                       onOpenPairSettings={onPairClick}
                       projectAspectRatio={projectAspectRatio}
                       isMobile={true}
+                      layout="flow"
                       compact={true}
                       isPending={hasPendingTask?.(prevSegmentSlot?.pairShotGenerationId)}
                     />
@@ -661,13 +668,14 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 {/* Video output above pair indicator - shows on RIGHT if NOT at end of row */}
                 {!isLastItem && segmentSlot && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (
                   <div className="absolute -top-4 -right-[6px] translate-x-1/2 z-20 pointer-events-auto w-20">
-                    <BatchSegmentVideo
+                    <InlineSegmentVideo
                       slot={segmentSlot}
                       pairIndex={index}
                       onClick={() => onSegmentClick?.(index)}
                       onOpenPairSettings={onPairClick}
                       projectAspectRatio={projectAspectRatio}
                       isMobile={true}
+                      layout="flow"
                       compact={true}
                       isPending={hasPendingTask?.(segmentSlot?.pairShotGenerationId)}
                     />

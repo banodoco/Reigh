@@ -273,8 +273,8 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         Your browser does not support the video tag.
       </video>
 
-      {/* Thumbnail overlay while video is loading - only show if poster is a different URL (actual thumbnail, not video fallback) */}
-      {poster && poster !== src && !isVideoReady && (
+      {/* Thumbnail overlay while video is loading */}
+      {poster && !isVideoReady && (
         <div className="absolute inset-0 pointer-events-none">
           <img
             src={getDisplayUrl(poster)}
@@ -291,7 +291,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
       )}
 
       {/* Loading spinner when no thumbnail available */}
-      {(!poster || poster === src) && !isVideoReady && (
+      {!poster && !isVideoReady && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="bg-black/60 rounded-full p-3">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />

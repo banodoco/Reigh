@@ -21,9 +21,15 @@ interface InlineSegmentVideoProps {
   onClick: () => void;
   projectAspectRatio?: string;
   isMobile?: boolean;
-  // Position props for alignment with timeline
-  leftPercent: number;
-  widthPercent: number;
+  // Position props for alignment with timeline (optional - if not provided, uses flow layout)
+  leftPercent?: number;
+  widthPercent?: number;
+  /** Layout mode: 'absolute' for timeline positioning, 'flow' for grid layout */
+  layout?: 'absolute' | 'flow';
+  /** Height class for flow layout mode (e.g., 'h-16', 'h-18') */
+  heightClass?: string;
+  /** Compact mode for smaller display in flow layout */
+  compact?: boolean;
   /** Callback to open pair settings modal */
   onOpenPairSettings?: (pairIndex: number) => void;
   /** Callback to delete this segment */
@@ -57,6 +63,9 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   isMobile = false,
   leftPercent,
   widthPercent,
+  layout = 'absolute',
+  heightClass,
+  compact = false,
   onOpenPairSettings,
   onDelete,
   isDeleting = false,
@@ -87,38 +96,58 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
     !!generationId
   );
   const badgeData = generationId ? getBadgeData(generationId) : null;
-  
-  // Show NEW badge if: generation has any unviewed variants (including the auto-created primary)
-  // The DB trigger auto-creates a primary variant with viewed_at=null when a generation is inserted
-  const showNewBadge = badgeData?.hasUnviewedVariants || false;
+
+  // Check if recently created (show NEW for segments created in last 10 minutes)
+  const isRecentlyCreated = useMemo(() => {
+    if (slot.type !== 'child') return false;
+    const createdAt = (slot.child as any).created_at || (slot.child as any).createdAt;
+    if (!createdAt) return false;
+    const createdTime = new Date(createdAt).getTime();
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+    return createdTime > tenMinutesAgo;
+  }, [slot]);
+
+  // Show NEW badge if: has unviewed variants OR is recently created with no variants yet
+  const showNewBadge = badgeData?.hasUnviewedVariants || (isRecentlyCreated && (badgeData?.derivedCount || 0) === 0);
   
   // Calculate preview width and aspect ratio (let height be determined by aspect ratio)
   const previewStyle = useMemo(() => {
-    const baseWidth = 240;
+    const baseWidth = compact ? 180 : 240;
     if (!projectAspectRatio) return { width: baseWidth, aspectRatio: '16/9' };
     const [w, h] = projectAspectRatio.split(':').map(Number);
     if (w && h) {
       return { width: baseWidth, aspectRatio: `${w}/${h}` };
     }
     return { width: baseWidth, aspectRatio: '16/9' };
-  }, [projectAspectRatio]);
-  
+  }, [projectAspectRatio, compact]);
+
   // Calculate height for positioning (approximate, used for tooltip placement)
   const estimatedPreviewHeight = useMemo(() => {
-    if (!projectAspectRatio) return Math.round(240 * 9 / 16);
+    const baseWidth = compact ? 180 : 240;
+    if (!projectAspectRatio) return Math.round(baseWidth * 9 / 16);
     const [w, h] = projectAspectRatio.split(':').map(Number);
-    if (w && h) return Math.round(240 * h / w);
-    return Math.round(240 * 9 / 16);
-  }, [projectAspectRatio]);
-  
-  // Position style for absolute positioning
-  const positionStyle: React.CSSProperties = {
+    if (w && h) return Math.round(baseWidth * h / w);
+    return Math.round(baseWidth * 9 / 16);
+  }, [projectAspectRatio, compact]);
+
+  // Position style - absolute for timeline, undefined for flow layout
+  const positionStyle: React.CSSProperties | undefined = layout === 'absolute' ? {
     position: 'absolute',
     left: `${leftPercent}%`,
     width: `${widthPercent}%`,
     top: 0,
     bottom: 0,
-  };
+  } : undefined;
+
+  // Adjusted position style with gaps (for absolute layout)
+  const adjustedPositionStyle: React.CSSProperties | undefined = layout === 'absolute' ? {
+    ...positionStyle,
+    left: `calc(${leftPercent}% + 2px)`,
+    width: `calc(${widthPercent}% - 4px)`,
+  } : undefined;
+
+  // Default height class for flow layout
+  const flowHeightClass = heightClass || (isMobile ? 'h-12' : (compact ? 'h-16' : 'h-18'));
   
   // Handle mouse events - integrates with external scrubbing system
   const handleMouseEnter = useCallback((e: React.MouseEvent) => {
@@ -201,13 +230,17 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   // Calculate current frame number and progress percentage
   const currentFrame = Math.floor(currentTime * FPS);
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-  
-  // Adjusted position style with gaps
-  const adjustedPositionStyle: React.CSSProperties = {
-    ...positionStyle,
-    left: `calc(${leftPercent}% + 2px)`,
-    width: `calc(${widthPercent}% - 4px)`,
-  };
+
+  // Container classes for flow layout
+  const flowContainerClasses = layout === 'flow' ? cn("w-full", flowHeightClass) : "";
+
+  // Different border/styling for flow layout (matches BatchSegmentVideo's prominent styling)
+  const containerBorderClasses = layout === 'flow'
+    ? "border-[3px] border-primary ring-2 ring-primary/20 shadow-lg"
+    : "border-2 border-primary/30 shadow-md";
+
+  // Rounded corners - flow layout uses rounded-md for compact display
+  const roundedClass = layout === 'flow' ? "rounded-md" : "rounded-lg";
 
   // Placeholder (no video generated yet) state - show CTA to generate or pending indicator
   if (slot.type === 'placeholder') {
@@ -215,11 +248,16 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
     if (isPending) {
       return (
         <div
-          className="bg-muted/40 rounded-lg border-2 border-dashed border-primary/40 flex items-center justify-center"
+          className={cn(
+            "bg-muted/40 border-2 border-dashed border-primary/40 flex items-center justify-center",
+            roundedClass,
+            layout === 'flow' && "shadow-sm",
+            flowContainerClasses
+          )}
           style={adjustedPositionStyle}
         >
-          <div className="flex flex-col items-center gap-1 text-primary">
-            <Loader2 className="w-4 h-4 animate-spin" />
+          <div className="flex flex-col items-center gap-0.5 text-primary">
+            <Loader2 className={cn(layout === 'flow' && compact ? "w-3.5 h-3.5" : "w-4 h-4", "animate-spin")} />
             <span className="text-[10px] font-medium">Pending</span>
           </div>
         </div>
@@ -229,39 +267,61 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
     // Otherwise show generate CTA
     return (
       <button
-        className="bg-muted/30 rounded-lg border-2 border-dashed border-border/40 flex items-center justify-center cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-colors group"
+        className={cn(
+          "border-2 border-dashed flex items-center justify-center cursor-pointer transition-all duration-150 group",
+          roundedClass,
+          layout === 'flow'
+            ? "bg-muted/70 border-primary/50 shadow-sm hover:bg-muted hover:border-primary hover:scale-[1.02]"
+            : "bg-muted/30 border-border/40 hover:bg-muted/50 hover:border-primary/40",
+          flowContainerClasses
+        )}
         style={adjustedPositionStyle}
         onClick={() => onOpenPairSettings?.(pairIndex)}
       >
-        <div className="flex flex-col items-center gap-1 text-muted-foreground group-hover:text-foreground transition-colors">
-          <Sparkles className="w-4 h-4 opacity-60 group-hover:opacity-100" />
+        <div className={cn(
+          "flex flex-col items-center transition-colors",
+          layout === 'flow'
+            ? "gap-0.5 text-foreground group-hover:text-primary"
+            : "gap-1 text-muted-foreground group-hover:text-foreground"
+        )}>
+          <Sparkles className={cn(
+            layout === 'flow' && compact ? "w-3.5 h-3.5" : "w-4 h-4",
+            layout === 'flow' ? "group-hover:scale-110 transition-transform" : "opacity-60 group-hover:opacity-100"
+          )} />
           <span className="text-[10px] font-medium">Generate</span>
         </div>
       </button>
     );
   }
-  
+
   // Child slot
   const child = slot.child;
   const hasOutput = !!child.location;
   const thumbUrl = child.thumbUrl || child.location;
   const videoUrl = child.location;
-  
+
   // No output yet (processing)
   if (!hasOutput) {
     return (
-      <div 
-        className="bg-muted/40 rounded-lg border-2 border-dashed border-border/50 flex items-center justify-center"
+      <div
+        className={cn(
+          "bg-muted/40 border border-dashed border-border/50 flex items-center justify-center",
+          roundedClass,
+          flowContainerClasses
+        )}
         style={adjustedPositionStyle}
       >
-        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <Loader2 className="w-6 h-6 animate-spin" />
-          <span className="text-xs font-medium">Processing...</span>
+        <div className={cn(
+          "flex items-center text-muted-foreground",
+          layout === 'flow' ? "gap-1.5" : "flex-col gap-2"
+        )}>
+          <Loader2 className={cn(layout === 'flow' && compact ? "w-3 h-3" : "w-6 h-6", "animate-spin")} />
+          <span className={cn(layout === 'flow' && compact ? "text-[9px]" : "text-xs", "font-medium")}>Processing...</span>
         </div>
       </div>
     );
   }
-  
+
   // Use scrubbing ref when active, otherwise use local ref
   const containerRefToUse = isScrubbingActive && scrubbingContainerRef ? scrubbingContainerRef : localContainerRef;
 
@@ -270,10 +330,14 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
       <div
         ref={containerRefToUse}
         className={cn(
-          "cursor-pointer overflow-hidden rounded-lg border-2 border-primary/30 shadow-md bg-muted/20",
-          "transition-all duration-150",
-          isHovering && "z-10 border-primary",
-          isScrubbingActive && "ring-2 ring-primary ring-offset-1"
+          "cursor-pointer overflow-hidden bg-muted/20",
+          roundedClass,
+          "transition-all duration-150 relative",
+          containerBorderClasses,
+          isHovering && "z-10 border-primary shadow-xl",
+          layout === 'flow' && isHovering && "ring-primary/40",
+          isScrubbingActive && "ring-2 ring-primary ring-offset-1",
+          flowContainerClasses
         )}
         style={adjustedPositionStyle}
         onClick={onClick}
@@ -295,7 +359,7 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
           />
         ) : imageError ? (
           <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-            <ImageOff className="w-8 h-8 text-muted-foreground" />
+            <ImageOff className={cn(layout === 'flow' && compact ? "w-4 h-4" : "w-8 h-8", "text-muted-foreground")} />
           </div>
         ) : (
           <div className="absolute inset-0 bg-muted animate-pulse" />
@@ -311,7 +375,7 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
             alwaysShowNew={showNewBadge}
             variant="overlay"
             size="lg"
-            position="top-2 left-2"
+            position={layout === 'flow' && compact ? "top-1.5 left-1.5" : "top-2 left-2"}
           />
         )}
         
@@ -348,8 +412,17 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
             "transition-opacity duration-150",
             isHovering ? "opacity-0" : "opacity-100"
           )}>
-            <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center">
-              <Play className="w-6 h-6 text-white ml-0.5" fill="white" />
+            <div className={cn(
+              "rounded-full bg-black/50 flex items-center justify-center",
+              layout === 'flow' && compact ? "w-6 h-6" : "w-12 h-12"
+            )}>
+              <Play
+                className={cn(
+                  "text-white ml-0.5",
+                  layout === 'flow' && compact ? "w-3 h-3" : "w-6 h-6"
+                )}
+                fill="white"
+              />
             </div>
           </div>
         )}
@@ -371,7 +444,10 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
         
         {/* Progress bar / scrubber when hovering */}
         {isHovering && (scrubbingProgress !== undefined || duration > 0) && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30 pointer-events-none">
+          <div className={cn(
+            "absolute bottom-0 left-0 right-0 bg-black/30 pointer-events-none",
+            layout === 'flow' && compact ? "h-0.5" : "h-1"
+          )}>
             <div
               className="h-full bg-primary transition-all duration-75"
               style={{

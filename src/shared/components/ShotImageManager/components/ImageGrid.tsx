@@ -5,9 +5,10 @@ import { cn } from '@/shared/lib/utils';
 import { DEFAULT_BATCH_VIDEO_FRAMES } from '../constants';
 import { AddImagesCard } from './AddImagesCard';
 import { PairPromptIndicator } from './PairPromptIndicator';
-import { BatchSegmentVideo } from './BatchSegmentVideo';
+import { InlineSegmentVideo } from '@/tools/travel-between-images/components/Timeline/InlineSegmentVideo';
 import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
 import type { PhaseConfig } from '@/tools/travel-between-images/settings';
+import type { UseVideoScrubbingReturn } from '@/shared/hooks/useVideoScrubbing';
 
 const FPS = 16;
 
@@ -52,6 +53,13 @@ interface ImageGridProps {
   onSegmentClick?: (slotIndex: number) => void;
   /** Check if a pair_shot_generation_id has a pending task */
   hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
+  // Scrubbing preview props
+  /** Index of the currently scrubbing segment (null if none) */
+  activeScrubbingIndex?: number | null;
+  /** Callback when scrubbing starts on a segment */
+  onScrubbingStart?: (index: number, rect: DOMRect) => void;
+  /** Scrubbing hook return for the active segment */
+  scrubbing?: UseVideoScrubbingReturn;
 }
 
 export const ImageGrid: React.FC<ImageGridProps> = ({
@@ -86,6 +94,9 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   segmentSlots,
   onSegmentClick,
   hasPendingTask,
+  activeScrubbingIndex,
+  onScrubbingStart,
+  scrubbing,
 }) => {
   // [BatchModeSelection] Debug: trace segmentSlots in ImageGrid
   console.log('[BatchModeSelection] ImageGrid received segmentSlots:', {
@@ -171,20 +182,31 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             />
 
             {/* Cross-row: Previous pair's video output - shows on LEFT at start of row */}
-            {isAtStartOfRow && prevSegmentSlot && !shouldHideIndicator && (
-              <div className="absolute -top-4 -left-[6px] -translate-x-1/2 z-20 pointer-events-auto w-28">
-                <BatchSegmentVideo
-                  slot={prevSegmentSlot}
-                  pairIndex={index - 1}
-                  onClick={() => onSegmentClick?.(index - 1)}
-                  onOpenPairSettings={onPairClick}
-                  projectAspectRatio={projectAspectRatio}
-                  isMobile={isMobile}
-                  compact={true}
-                  isPending={hasPendingTask?.(prevSegmentSlot.pairShotGenerationId)}
-                />
-              </div>
-            )}
+            {isAtStartOfRow && prevSegmentSlot && !shouldHideIndicator && (() => {
+              const slotIndex = index - 1;
+              const isActiveScrubbing = activeScrubbingIndex === slotIndex;
+              return (
+                <div className="absolute -top-4 -left-[6px] -translate-x-1/2 z-20 pointer-events-auto w-20">
+                  <InlineSegmentVideo
+                    slot={prevSegmentSlot}
+                    pairIndex={slotIndex}
+                    onClick={() => onSegmentClick?.(slotIndex)}
+                    onOpenPairSettings={onPairClick}
+                    projectAspectRatio={projectAspectRatio}
+                    isMobile={isMobile}
+                    layout="flow"
+                    compact={true}
+                    isPending={hasPendingTask?.(prevSegmentSlot.pairShotGenerationId)}
+                    // Scrubbing props
+                    isScrubbingActive={isActiveScrubbing}
+                    onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
+                    scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
+                    scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
+                    scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
+                  />
+                </div>
+              );
+            })()}
 
             {/* Cross-row: Previous pair indicator - shows on LEFT at start of row (below video if present) */}
             {isAtStartOfRow && onPairClick && !shouldHideIndicator && (
@@ -215,20 +237,31 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             )}
 
             {/* Video output above pair indicator - positioned in the gap to the right (skip if at end of row) */}
-            {!isLastImage && !isAtEndOfRow && segmentSlot && !shouldHideIndicator && (
-              <div className="absolute -top-4 -right-[6px] translate-x-1/2 z-20 pointer-events-auto w-28">
-                <BatchSegmentVideo
-                  slot={segmentSlot}
-                  pairIndex={index}
-                  onClick={() => onSegmentClick?.(index)}
-                  onOpenPairSettings={onPairClick}
-                  projectAspectRatio={projectAspectRatio}
-                  isMobile={isMobile}
-                  compact={true}
-                  isPending={hasPendingTask?.(segmentSlot.pairShotGenerationId)}
-                />
-              </div>
-            )}
+            {!isLastImage && !isAtEndOfRow && segmentSlot && !shouldHideIndicator && (() => {
+              const slotIndex = index;
+              const isActiveScrubbing = activeScrubbingIndex === slotIndex;
+              return (
+                <div className="absolute -top-4 -right-[6px] translate-x-1/2 z-20 pointer-events-auto w-20">
+                  <InlineSegmentVideo
+                    slot={segmentSlot}
+                    pairIndex={slotIndex}
+                    onClick={() => onSegmentClick?.(slotIndex)}
+                    onOpenPairSettings={onPairClick}
+                    projectAspectRatio={projectAspectRatio}
+                    isMobile={isMobile}
+                    layout="flow"
+                    compact={true}
+                    isPending={hasPendingTask?.(segmentSlot.pairShotGenerationId)}
+                    // Scrubbing props
+                    isScrubbingActive={isActiveScrubbing}
+                    onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
+                    scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
+                    scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
+                    scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
+                  />
+                </div>
+              );
+            })()}
 
             {/* Pair indicator positioned in the gap to the right (below video if present, skip if at end of row) */}
             {!isLastImage && !isAtEndOfRow && onPairClick && !shouldHideIndicator && (

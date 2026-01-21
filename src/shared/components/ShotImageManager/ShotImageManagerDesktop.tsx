@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   closestCenter,
@@ -21,7 +22,9 @@ import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useState, useEffect, useCallback } from 'react';
 import { useTaskDetails } from './hooks/useTaskDetails';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
+import { useVideoScrubbing } from '@/shared/hooks/useVideoScrubbing';
 import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
+import { getDisplayUrl, cn } from '@/shared/lib/utils';
 
 interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   selection: any;
@@ -128,9 +131,142 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   
   // Detect tablet/iPad size for task details
   const { isTabletOrLarger } = useDeviceDetection();
-  
+
+  // ===== SCRUBBING PREVIEW STATE =====
+  const [activeScrubbingIndex, setActiveScrubbingIndex] = useState<number | null>(null);
+  const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Video scrubbing hook - controls the preview video
+  const scrubbing = useVideoScrubbing({
+    enabled: !isMobile && activeScrubbingIndex !== null,
+    playOnStopScrubbing: true,
+    playDelay: 400,
+    resetOnLeave: true,
+    onHoverEnd: () => setActiveScrubbingIndex(null),
+  });
+
+  // When active scrubbing index changes, manually trigger onMouseEnter
+  useEffect(() => {
+    if (activeScrubbingIndex !== null) {
+      scrubbing.containerProps.onMouseEnter();
+    }
+  }, [activeScrubbingIndex]); // Don't include scrubbing.containerProps to avoid loops
+
+  // Clear scrubbing preview on scroll
+  useEffect(() => {
+    if (activeScrubbingIndex === null) return;
+
+    const handleScroll = () => {
+      setActiveScrubbingIndex(null);
+      scrubbing.reset();
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [activeScrubbingIndex, scrubbing]);
+
+  // Get the active segment's video URL
+  const activeSegmentSlot = activeScrubbingIndex !== null ? segmentSlots?.[activeScrubbingIndex] : null;
+  const activeSegmentVideoUrl = activeSegmentSlot?.type === 'child' ? activeSegmentSlot.child.location : null;
+
+  // Connect preview video to scrubbing hook when active segment changes
+  useEffect(() => {
+    if (previewVideoRef.current && activeScrubbingIndex !== null) {
+      scrubbing.setVideoElement(previewVideoRef.current);
+    }
+  }, [activeScrubbingIndex, activeSegmentVideoUrl, scrubbing.setVideoElement]);
+
+  // Handle scrubbing start - capture the segment's position for preview placement
+  const handleScrubbingStart = useCallback((index: number, segmentRect: DOMRect) => {
+    setActiveScrubbingIndex(index);
+    // Position preview centered above the hovered segment
+    setPreviewPosition({
+      x: segmentRect.left + segmentRect.width / 2,
+      y: segmentRect.top,
+    });
+  }, []);
+
+  // Calculate preview dimensions based on aspect ratio
+  const previewDimensions = useMemo(() => {
+    const maxHeight = 200;
+    if (!props.projectAspectRatio) return { width: Math.round(maxHeight * 16 / 9), height: maxHeight };
+    const [w, h] = props.projectAspectRatio.split(':').map(Number);
+    if (w && h) {
+      const aspectRatio = w / h;
+      return { width: Math.round(maxHeight * aspectRatio), height: maxHeight };
+    }
+    return { width: Math.round(maxHeight * 16 / 9), height: maxHeight };
+  }, [props.projectAspectRatio]);
+
+  // Calculate clamped preview position to keep it within viewport
+  const clampedPreviewX = useMemo(() => {
+    const padding = 16;
+    const halfWidth = previewDimensions.width / 2;
+    const minX = padding + halfWidth;
+    const maxX = (typeof window !== 'undefined' ? window.innerWidth : 1920) - padding - halfWidth;
+    return Math.max(minX, Math.min(maxX, previewPosition.x));
+  }, [previewPosition.x, previewDimensions.width]);
+
   return (
-    <BatchDropZone
+    <>
+      {/* Scrubbing Preview Portal - shared video preview for segment hover */}
+      {activeScrubbingIndex !== null && activeSegmentVideoUrl && createPortal(
+        <div
+          className="fixed pointer-events-none"
+          style={{
+            left: `${clampedPreviewX}px`,
+            top: `${previewPosition.y - previewDimensions.height - 16}px`,
+            transform: 'translateX(-50%)',
+            zIndex: 999999,
+          }}
+        >
+          <div
+            className="relative bg-black rounded-lg overflow-hidden shadow-xl border-2 border-primary/50"
+            style={{
+              width: previewDimensions.width,
+              height: previewDimensions.height,
+            }}
+          >
+            <video
+              ref={previewVideoRef}
+              src={getDisplayUrl(activeSegmentVideoUrl)}
+              className="w-full h-full object-contain"
+              muted
+              playsInline
+              preload="auto"
+              loop
+              {...scrubbing.videoProps}
+            />
+
+            {/* Scrubber progress bar */}
+            {scrubbing.scrubberPosition !== null && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+                <div
+                  className={cn(
+                    "h-full bg-primary transition-opacity duration-200",
+                    scrubbing.scrubberVisible ? "opacity-100" : "opacity-50"
+                  )}
+                  style={{ width: `${scrubbing.scrubberPosition}%` }}
+                />
+              </div>
+            )}
+
+            {/* Segment label */}
+            <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              Segment {(activeSegmentSlot?.index ?? 0) + 1}
+              {scrubbing.duration > 0 && (
+                <span className="ml-2 text-white/70">
+                  {scrubbing.currentTime.toFixed(1)}s / {scrubbing.duration.toFixed(1)}s
+                </span>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      <BatchDropZone
       onImageDrop={props.onFileDrop}
       onGenerationDrop={props.onGenerationDrop}
       columns={props.columns || 4}
@@ -189,6 +325,10 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               segmentSlots={segmentSlots}
               onSegmentClick={onSegmentClick}
               hasPendingTask={hasPendingTask}
+              // Scrubbing props
+              activeScrubbingIndex={activeScrubbingIndex}
+              onScrubbingStart={handleScrubbingStart}
+              scrubbing={scrubbing}
             />
           </SortableContext>
           
@@ -380,6 +520,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
         </DndContext>
       )}
     </BatchDropZone>
+    </>
   );
 };
 
