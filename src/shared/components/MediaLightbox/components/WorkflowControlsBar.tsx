@@ -63,10 +63,9 @@ export interface WorkflowControlsBarProps {
   onClose?: () => void;
 
   // Variant promotion - for adding a variant as a new generation to a shot
-  onAddVariantAsNewGeneration?: (shotId: string, variantId: string, currentTimelineFrame?: number, nextTimelineFrame?: number) => Promise<boolean>;
+  onAddVariantAsNewGeneration?: (shotId: string, variantId: string, currentTimelineFrame?: number) => Promise<boolean>;
   activeVariantId?: string | null;
   currentTimelineFrame?: number;
-  nextTimelineFrame?: number;
 }
 
 /**
@@ -106,7 +105,6 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
   onAddVariantAsNewGeneration,
   activeVariantId,
   currentTimelineFrame,
-  nextTimelineFrame,
 }) => {
   // Track if shots loaded after initial render (race condition detection)
   const prevShotsLengthRef = React.useRef(allShots?.length || 0);
@@ -173,7 +171,6 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
             onAddVariantAsNewGeneration={onAddVariantAsNewGeneration}
             activeVariantId={activeVariantId}
             currentTimelineFrame={currentTimelineFrame}
-            nextTimelineFrame={nextTimelineFrame}
             onShowTick={onShowTick}
             onOptimisticPositioned={onOptimisticPositioned}
             onShowSecondaryTick={onShowSecondaryTick}

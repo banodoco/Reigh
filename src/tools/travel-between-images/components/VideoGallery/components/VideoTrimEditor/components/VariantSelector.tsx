@@ -326,7 +326,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                     ) : (
                       <ImagePlus className="w-3 h-3 shrink-0" />
                     )}
-                    {promoteSuccess ? 'Created!' : 'Make new image'}
+                    {promoteSuccess ? 'Created!' : 'New image'}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="z-[100001]">
@@ -334,22 +334,29 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                 </TooltipContent>
               </Tooltip>
             )}
-            {/* Make current main button */}
+            {/* Make main button */}
             {isViewingNonPrimary && onMakePrimary ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleMakePrimary}
-                disabled={isMakingPrimary}
-                className="h-auto min-h-6 text-xs px-2 py-1 gap-1 whitespace-normal text-left"
-              >
-                {isMakingPrimary ? (
-                  <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                ) : (
-                  <Star className="w-3 h-3 shrink-0" />
-                )}
-                Make current main
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleMakePrimary}
+                    disabled={isMakingPrimary}
+                    className="h-auto min-h-6 text-xs px-2 py-1 gap-1 whitespace-normal text-left"
+                  >
+                    {isMakingPrimary ? (
+                      <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                    ) : (
+                      <Star className="w-3 h-3 shrink-0" />
+                    )}
+                    Make main
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="z-[100001]">
+                  <p>Set this variant as the primary display version</p>
+                </TooltipContent>
+              </Tooltip>
             ) : activeVariant?.is_primary ? (
               <div className="flex items-center gap-1 h-6 text-xs px-2 text-green-500">
                 <Star className="w-3 h-3 fill-current" />

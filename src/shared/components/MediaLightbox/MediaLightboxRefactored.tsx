@@ -136,8 +136,6 @@ interface MediaLightboxProps {
   // Navigation availability
   hasNext?: boolean;
   hasPrevious?: boolean;
-  // Timeline frame of the next item (for positioning "add variant as new image")
-  nextTimelineFrame?: number;
   // Workflow-specific props
   allShots?: ShotOption[];
   selectedShotId?: string;
@@ -246,7 +244,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Navigation availability
   hasNext = true,
   hasPrevious = true,
-  nextTimelineFrame,
   // Workflow-specific props
   allShots = [],
   selectedShotId,
@@ -679,25 +676,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [promoteVariantMutation, selectedProjectId, actualGenerationId]);
 
   // Handler for "Add as new image to shot" button in ShotSelectorControls
-  // Now supports positioning: places the new image between current and next item (like duplicate)
+  // Positions new image between current and next item in the TARGET shot
   const handleAddVariantAsNewGenerationToShot = useCallback(async (
     shotId: string,
     variantId: string,
-    currentTimelineFrame?: number,
-    nextTimelineFrame?: number
+    currentTimelineFrame?: number
   ): Promise<boolean> => {
     if (!selectedProjectId) {
       toast.error('No project selected');
       return false;
     }
 
-    console.log('[PromoteVariantToShot] Starting:', {
+    console.log('[VariantToShot] Starting:', {
       shotId: shotId.substring(0, 8),
       variantId: variantId.substring(0, 8),
       projectId: selectedProjectId.substring(0, 8),
       sourceGenerationId: actualGenerationId.substring(0, 8),
       currentTimelineFrame,
-      nextTimelineFrame,
     });
 
     try {
@@ -708,42 +703,56 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         sourceGenerationId: actualGenerationId,
       });
 
-      console.log('[PromoteVariantToShot] Created generation:', newGen.id.substring(0, 8));
+      console.log('[VariantToShot] Created generation:', newGen.id.substring(0, 8));
 
-      // 2. Calculate target timeline frame (like duplicate: place between current and next)
+      // 2. Calculate target timeline frame by querying the TARGET shot's items
       let targetTimelineFrame: number | undefined;
       if (currentTimelineFrame !== undefined) {
+        // Query the target shot to find the next item after current position
+        const { data: shotItems } = await supabase
+          .from('shot_generations')
+          .select('timeline_frame')
+          .eq('shot_id', shotId)
+          .gt('timeline_frame', currentTimelineFrame)
+          .order('timeline_frame', { ascending: true })
+          .limit(1);
+
+        const nextTimelineFrame = shotItems?.[0]?.timeline_frame ?? undefined;
+
+        console.log('[VariantToShot] Frame calculation:', {
+          currentTimelineFrame,
+          nextTimelineFrame,
+          hasNext: nextTimelineFrame !== undefined,
+        });
+
         if (nextTimelineFrame !== undefined && nextTimelineFrame > currentTimelineFrame) {
           // Place in the middle between current and next
           targetTimelineFrame = Math.floor((currentTimelineFrame + nextTimelineFrame) / 2);
-          // If middle would be same as current, use current + 1
+          console.log('[VariantToShot] Midpoint:', currentTimelineFrame, '+', nextTimelineFrame, '/ 2 =', targetTimelineFrame);
+          // If middle would be same as current (consecutive frames), use current + 1
           if (targetTimelineFrame === currentTimelineFrame) {
             targetTimelineFrame = currentTimelineFrame + 1;
           }
         } else {
-          // No next item, just place at current + 1
+          // No next item in shot, place at current + 1
           targetTimelineFrame = currentTimelineFrame + 1;
+          console.log('[VariantToShot] No next item, using current +1:', targetTimelineFrame);
         }
-        console.log('[PromoteVariantToShot] Calculated target frame:', targetTimelineFrame);
       }
 
-      // 3. Add to shot using mutation directly for position support
-      if (newGen) {
-        await addImageToShotMutation.mutateAsync({
-          shot_id: shotId,
-          generation_id: newGen.id,
-          project_id: selectedProjectId,
-          imageUrl: newGen.location,
-          thumbUrl: newGen.thumbnail_url || undefined,
-          timelineFrame: targetTimelineFrame, // Position between current and next
-        });
-        console.log('[PromoteVariantToShot] Successfully added to shot at frame:', targetTimelineFrame);
-        return true;
-      }
-      return false;
+      // 3. Add to shot
+      await addImageToShotMutation.mutateAsync({
+        shot_id: shotId,
+        generation_id: newGen.id,
+        project_id: selectedProjectId,
+        imageUrl: newGen.location,
+        thumbUrl: newGen.thumbnail_url || undefined,
+        timelineFrame: targetTimelineFrame,
+      });
+      console.log('[VariantToShot] Added to shot at frame:', targetTimelineFrame);
+      return true;
     } catch (error) {
-      console.error('[PromoteVariantToShot] Error:', error);
-      // Error toast is handled in the hook for the mutation part
+      console.error('[VariantToShot] Error:', error);
       return false;
     }
   }, [promoteVariantMutation, addImageToShotMutation, selectedProjectId, actualGenerationId]);
@@ -1376,8 +1385,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                    variantParams?.orchestrator_task_id ||
                    variantParams?.task_id ||
                    null;
+    // Validate it's a UUID before using (some params have non-UUID identifiers)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validTaskId = taskId && uuidRegex.test(taskId) ? taskId : null;
     const hasOrchestratorDetails = !!variantParams?.orchestrator_details;
-    return { variantSourceTaskId: taskId, variantHasOrchestratorDetails: hasOrchestratorDetails };
+    return { variantSourceTaskId: validTaskId, variantHasOrchestratorDetails: hasOrchestratorDetails };
   }, [activeVariant?.params, activeVariant?.id, activeVariant?.variant_type]);
 
   // Fetch the variant's source task when it differs from taskDetailsData
@@ -3188,9 +3200,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onNavigateToShot={handleNavigateToShotFromSelector}
                       onClose={onClose}
                       onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
-                      activeVariantId={activeVariant?.id}
+                      activeVariantId={activeVariant?.id || primaryVariant?.id}
                       currentTimelineFrame={media.timeline_frame}
-                      nextTimelineFrame={nextTimelineFrame}
                     />
                   </div>
 
@@ -3548,9 +3559,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onNavigateToShot={handleNavigateToShotFromSelector}
                       onClose={onClose}
                       onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
-                      activeVariantId={activeVariant?.id}
+                      activeVariantId={activeVariant?.id || primaryVariant?.id}
                       currentTimelineFrame={media.timeline_frame}
-                      nextTimelineFrame={nextTimelineFrame}
                     />
 
                     {/* Navigation Arrows */}
@@ -4018,9 +4028,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     onNavigateToShot={handleNavigateToShotFromSelector}
                     onClose={onClose}
                     onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
-                    activeVariantId={activeVariant?.id}
+                    activeVariantId={activeVariant?.id || primaryVariant?.id}
                     currentTimelineFrame={media.timeline_frame}
-                      nextTimelineFrame={nextTimelineFrame}
                   />
 
                   {/* Navigation Arrows */}
