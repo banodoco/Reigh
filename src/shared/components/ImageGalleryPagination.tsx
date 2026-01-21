@@ -73,7 +73,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
         const rect = topPagination.getBoundingClientRect();
         // Show sticky pagination when top pagination is partially hidden (more responsive)
         // Using a threshold so it appears before completely scrolling past
-        const threshold = 100; // Show when top pagination is 100px above viewport
+        const threshold = 300; // Show earlier - when top pagination approaches top of viewport
         setShowStickyPagination(rect.bottom < threshold);
       }
     };
