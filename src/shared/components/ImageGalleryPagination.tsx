@@ -51,39 +51,74 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
 }) => {
   // All hooks must be called before any early returns
   const [showStickyPagination, setShowStickyPagination] = useState(false);
+  const [dynamicBottom, setDynamicBottom] = useState(60); // Start lower
   const topPaginationRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-  
+
   // Get pane states to adjust sticky pagination position
-  const { 
-    isShotsPaneLocked, 
+  const {
+    isShotsPaneLocked,
     isTasksPaneLocked,
     shotsPaneWidth,
     tasksPaneWidth
   } = usePanes();
 
-  // Scroll detection for sticky pagination
+  // Scroll detection for sticky pagination and dynamic positioning
   useEffect(() => {
     if (!isBottom) return;
 
+    let rafId: number | null = null;
+    let lastBottom = 60;
+
     const handleScroll = () => {
-      // Find the top pagination element
-      const topPagination = document.querySelector('[data-pagination-top]');
-      if (topPagination) {
-        const rect = topPagination.getBoundingClientRect();
-        // Show sticky pagination when top pagination is partially hidden (more responsive)
-        // Using a threshold so it appears before completely scrolling past
-        const threshold = 300; // Show earlier - when top pagination approaches top of viewport
-        setShowStickyPagination(rect.bottom < threshold);
-      }
+      if (rafId) return; // Throttle with RAF
+
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+
+        // Find the top pagination element
+        const topPagination = document.querySelector('[data-pagination-top]');
+        if (topPagination) {
+          const rect = topPagination.getBoundingClientRect();
+          const threshold = 300;
+          setShowStickyPagination(rect.bottom < threshold);
+        }
+
+        // Calculate dynamic bottom position based on proximity to page bottom
+        const scrollTop = window.scrollY;
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+
+        // When far from bottom: 60px, when near bottom: 120px
+        const minBottom = 60;
+        const maxBottom = 120;
+        const transitionStart = 300;
+
+        let targetBottom: number;
+        if (distanceFromBottom <= 0) {
+          targetBottom = maxBottom;
+        } else if (distanceFromBottom >= transitionStart) {
+          targetBottom = minBottom;
+        } else {
+          const progress = 1 - (distanceFromBottom / transitionStart);
+          targetBottom = minBottom + (maxBottom - minBottom) * progress;
+        }
+
+        // Only update if changed significantly (reduces jitter)
+        if (Math.abs(targetBottom - lastBottom) > 2) {
+          lastBottom = targetBottom;
+          setDynamicBottom(targetBottom);
+        }
+      });
     };
 
-    window.addEventListener('scroll', handleScroll);
-    // Use a small timeout to ensure DOM is ready
+    window.addEventListener('scroll', handleScroll, { passive: true });
     const timeout = setTimeout(handleScroll, 100);
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
+      if (rafId) cancelAnimationFrame(rafId);
       clearTimeout(timeout);
     };
   }, [isBottom]);
@@ -198,8 +233,8 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
     return (
       <>
         {/* Sticky navigation buttons - only show when scrolled and >1 page */}
-        <div 
-          className={`fixed z-40 transition-all duration-300 ease-in-out ${
+        <div
+          className={`fixed z-[100] transition-all duration-300 ease-in-out ${
             showStickyPagination && totalPages > 1
               ? 'translate-y-0 opacity-100 scale-100'
               : 'translate-y-8 opacity-0 scale-95 pointer-events-none'
@@ -208,12 +243,13 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
             // Calculate horizontal constraints based on locked panes
             left: `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
             right: `${isTasksPaneLocked ? tasksPaneWidth : 0}px`,
-            bottom: '100px', // Positioned from bottom of viewport
+            bottom: `${dynamicBottom}px`, // Dynamic: lower when high on page, higher when near bottom
             // Center within the available space
             display: 'flex',
             justifyContent: 'center',
             paddingLeft: '16px',
             paddingRight: '16px',
+            transition: 'bottom 0.15s ease-out',
           }}
         >
           <div className="bg-card/80 dark:bg-gray-900/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-border/50">
