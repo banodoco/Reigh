@@ -59,7 +59,7 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
   const [idCopied, setIdCopied] = useState(false);
 
   return (
-    <div className={cn("flex items-center flex-shrink-0 ml-auto", isMobile ? "gap-1" : "gap-0.5")}>
+    <div className="flex items-center flex-shrink-0 ml-auto gap-0">
       {/* ID copy button - always visible */}
       <Tooltip>
         <TooltipTrigger asChild>
@@ -72,7 +72,7 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
             }}
             className={cn(
               "text-xs rounded transition-colors",
-              isMobile ? "px-2 py-1" : "px-1 py-0.5",
+              isMobile ? "px-1.5 py-0.5" : "px-1 py-0.5",
               idCopied
                 ? "text-green-400"
                 : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
@@ -103,11 +103,11 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
               }}
               className={cn(
                 "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
-                isMobile ? "p-1.5" : "p-1"
+                isMobile ? "p-1" : "p-0.5"
               )}
               title={`Go to project: ${projectName}`}
             >
-              <FolderOpen className={cn(isMobile ? "w-4 h-4" : "w-3 h-3")} />
+              <FolderOpen className={cn(isMobile ? "w-3 h-3" : "w-2.5 h-2.5")} />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
@@ -131,11 +131,11 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
               }}
               className={cn(
                 "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
-                isMobile ? "p-1.5" : "p-1"
+                isMobile ? "p-1" : "p-0.5"
               )}
               disabled={isLoadingVideoGen && waitingForVideoToOpen}
             >
-              <Play className={cn(isMobile ? "w-4 h-4" : "w-3 h-3", isLoadingVideoGen && waitingForVideoToOpen && "animate-pulse")} />
+              <Play className={cn(isMobile ? "w-3 h-3" : "w-2.5 h-2.5", isLoadingVideoGen && waitingForVideoToOpen && "animate-pulse")} />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
@@ -157,10 +157,10 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
               }}
               className={cn(
                 "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
-                isMobile ? "p-1.5" : "p-1"
+                isMobile ? "p-1" : "p-0.5"
               )}
             >
-              <ImageIcon className={isMobile ? "w-4 h-4" : "w-3 h-3"} />
+              <ImageIcon className={isMobile ? "w-3 h-3" : "w-2.5 h-2.5"} />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
@@ -182,10 +182,10 @@ export const TaskItemActions: React.FC<TaskItemActionsProps> = ({
               }}
               className={cn(
                 "rounded transition-colors text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700",
-                isMobile ? "p-1.5" : "p-1"
+                isMobile ? "p-1" : "p-0.5"
               )}
             >
-              <ExternalLink className={isMobile ? "w-4 h-4" : "w-3 h-3"} />
+              <ExternalLink className={isMobile ? "w-3 h-3" : "w-2.5 h-2.5"} />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">

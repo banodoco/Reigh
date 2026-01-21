@@ -108,11 +108,6 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     }
   }, [activeScrubbingIndex]); // Don't include scrubbing.containerProps to avoid loops
 
-  // Track mouse position for portal placement
-  const handlePreviewMouseMove = useCallback((e: React.MouseEvent) => {
-    setPreviewPosition({ x: e.clientX, y: e.clientY });
-  }, []);
-
   // Fetch segment outputs data - uses controlled state if provided
   const {
     parentGenerations,
@@ -415,15 +410,24 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     return { width: Math.round(maxHeight * 16 / 9), height: maxHeight };
   }, [projectAspectRatio]);
 
-  // Get strip container position for portal placement
-  const getPreviewPosition = useCallback(() => {
-    if (!stripContainerRef.current) return null;
-    const rect = stripContainerRef.current.getBoundingClientRect();
-    return {
-      x: rect.left + rect.width / 2,
-      y: rect.top,
-    };
+  // Handle scrubbing start - capture the segment's position for preview placement
+  const handleScrubbingStart = useCallback((index: number, segmentRect: DOMRect) => {
+    setActiveScrubbingIndex(index);
+    // Position preview centered above the hovered segment
+    setPreviewPosition({
+      x: segmentRect.left + segmentRect.width / 2,
+      y: segmentRect.top,
+    });
   }, []);
+
+  // Calculate clamped preview position to keep it within viewport
+  const clampedPreviewX = useMemo(() => {
+    const padding = 16;
+    const halfWidth = previewDimensions.width / 2;
+    const minX = padding + halfWidth;
+    const maxX = (typeof window !== 'undefined' ? window.innerWidth : 1920) - padding - halfWidth;
+    return Math.max(minX, Math.min(maxX, previewPosition.x));
+  }, [previewPosition.x, previewDimensions.width]);
 
   // Don't render if no pairs (need at least 2 images for a pair)
   if (pairInfo.length === 0) {
@@ -437,8 +441,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
         <div
           className="fixed pointer-events-none"
           style={{
-            left: `${getPreviewPosition()?.x ?? 0}px`,
-            top: `${(getPreviewPosition()?.y ?? 0) - previewDimensions.height - 16}px`,
+            left: `${clampedPreviewX}px`,
+            top: `${previewPosition.y - previewDimensions.height - 16}px`,
             transform: 'translateX(-50%)',
             zIndex: 999999,
           }}
@@ -527,7 +531,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
                     isPending={hasPendingTask(slot.pairShotGenerationId)}
                     // Scrubbing props - when active, this segment controls the preview
                     isScrubbingActive={isActiveScrubbing}
-                    onScrubbingStart={() => setActiveScrubbingIndex(index)}
+                    onScrubbingStart={(rect: DOMRect) => handleScrubbingStart(index, rect)}
                     scrubbingContainerRef={isActiveScrubbing ? scrubbing.containerRef : undefined}
                     scrubbingContainerProps={isActiveScrubbing ? scrubbing.containerProps : undefined}
                     scrubbingProgress={isActiveScrubbing ? scrubbing.progress : undefined}

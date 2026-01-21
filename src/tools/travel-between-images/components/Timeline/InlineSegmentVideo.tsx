@@ -35,8 +35,8 @@ interface InlineSegmentVideoProps {
   // Scrubbing props - for external preview control
   /** Whether this segment is actively being scrubbed */
   isScrubbingActive?: boolean;
-  /** Callback when scrubbing should start (mouse enters this segment) */
-  onScrubbingStart?: () => void;
+  /** Callback when scrubbing should start (mouse enters this segment) - receives element rect for positioning */
+  onScrubbingStart?: (rect: DOMRect) => void;
   /** Ref to attach to container for scrubbing (from useVideoScrubbing) */
   scrubbingContainerRef?: React.RefObject<HTMLDivElement>;
   /** Props to spread on container for scrubbing (from useVideoScrubbing) */
@@ -126,7 +126,11 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
     setIsHovering(true);
 
     // Notify parent that scrubbing should start on this segment
-    onScrubbingStart?.();
+    // Pass the element's bounding rect for preview positioning
+    const target = e.currentTarget as HTMLElement;
+    if (target && onScrubbingStart) {
+      onScrubbingStart(target.getBoundingClientRect());
+    }
 
     // If we have external scrubbing props, call their handler
     if (scrubbingContainerProps?.onMouseEnter) {
