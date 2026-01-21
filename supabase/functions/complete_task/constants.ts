@@ -13,11 +13,12 @@ export const TASK_TYPES = {
   TRAVEL_SEGMENT: 'travel_segment',
   JOIN_CLIPS_SEGMENT: 'join_clips_segment',
   INDIVIDUAL_TRAVEL_SEGMENT: 'individual_travel_segment',
-  
+  JOIN_FINAL_STITCH: 'join_final_stitch',
+
   // Orchestrator tasks
   TRAVEL_ORCHESTRATOR: 'travel_orchestrator',
   JOIN_CLIPS_ORCHESTRATOR: 'join_clips_orchestrator',
-  
+
   // Processing tasks
   TRAVEL_STITCH: 'travel_stitch',
   IMAGE_INPAINT: 'image_inpaint',
@@ -80,6 +81,7 @@ export const VARIANT_TYPES = {
   TRAVEL_STITCH: 'travel_stitch',
   JOIN_CLIPS_SEGMENT: 'join_clips_segment',
   CLIP_JOIN: 'clip_join',
+  JOIN_FINAL_STITCH: 'join_final_stitch',
   INDIVIDUAL_SEGMENT: 'individual_segment',
 } as const;
 
@@ -94,6 +96,16 @@ export interface SegmentTypeConfig {
   segmentType: TaskType;
   runIdField: string;
   expectedCountField: string;
+  /**
+   * If true, this task type is the final step that directly completes the orchestrator.
+   * When it completes, the orchestrator is marked complete immediately (no sibling counting).
+   */
+  isFinalStep?: boolean;
+  /**
+   * If set, when this segment type completes, check if there's a pending task of this type
+   * before marking the orchestrator complete. Used to wait for a final stitch step.
+   */
+  waitForFinalStepType?: TaskType;
 }
 
 export const SEGMENT_TYPE_CONFIG: Record<string, SegmentTypeConfig> = {
@@ -105,7 +117,15 @@ export const SEGMENT_TYPE_CONFIG: Record<string, SegmentTypeConfig> = {
   [TASK_TYPES.JOIN_CLIPS_SEGMENT]: {
     segmentType: TASK_TYPES.JOIN_CLIPS_SEGMENT,
     runIdField: 'run_id',
-    expectedCountField: 'num_joins'
+    expectedCountField: 'num_joins',
+    // Wait for join_final_stitch before marking orchestrator complete
+    waitForFinalStepType: TASK_TYPES.JOIN_FINAL_STITCH
+  },
+  [TASK_TYPES.JOIN_FINAL_STITCH]: {
+    segmentType: TASK_TYPES.JOIN_FINAL_STITCH,
+    runIdField: 'run_id',
+    expectedCountField: '', // Not used - this is a single task
+    isFinalStep: true
   }
 };
 
@@ -115,8 +135,9 @@ export const SEGMENT_TYPE_CONFIG: Record<string, SegmentTypeConfig> = {
  * Check if a task type is a segment type (part of an orchestrator workflow)
  */
 export function isSegmentType(taskType: string): boolean {
-  return taskType === TASK_TYPES.TRAVEL_SEGMENT || 
-         taskType === TASK_TYPES.JOIN_CLIPS_SEGMENT;
+  return taskType === TASK_TYPES.TRAVEL_SEGMENT ||
+         taskType === TASK_TYPES.JOIN_CLIPS_SEGMENT ||
+         taskType === TASK_TYPES.JOIN_FINAL_STITCH;
 }
 
 /**

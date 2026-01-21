@@ -60,9 +60,37 @@ export async function checkOrchestratorCompletion(
     return;
   }
 
+  // Handle final step tasks (like join_final_stitch) - they directly complete the orchestrator
+  if (config.isFinalStep) {
+    console.log(`[OrchestratorComplete] ${taskType} is a final step task - marking orchestrator complete directly`);
+
+    // Fetch the segment tasks for billing timestamps
+    const segmentTasks = await findSiblingSegments(
+      supabase,
+      TASK_TYPES.JOIN_CLIPS_SEGMENT,
+      completedTask.project_id,
+      orchestratorTaskId,
+      orchestratorRunId
+    );
+
+    await markOrchestratorComplete(
+      supabase,
+      orchestratorTaskId,
+      orchestratorTask,
+      segmentTasks || [],
+      publicUrl,
+      thumbnailUrl,
+      taskType,
+      taskIdString,
+      supabaseUrl,
+      serviceKey
+    );
+    return;
+  }
+
   // Get expected segment count
   let expectedSegmentCount: number | null = null;
-  
+
   if (taskType === TASK_TYPES.TRAVEL_SEGMENT) {
     expectedSegmentCount = orchestratorTask.params?.orchestrator_details?.num_new_segments_to_generate ||
       orchestratorTask.params?.num_new_segments_to_generate || null;
@@ -115,6 +143,33 @@ export async function checkOrchestratorCompletion(
     return;
   }
 
+  // Check if we need to wait for a final step task (like join_final_stitch)
+  if (config.waitForFinalStepType) {
+    const finalStitchStatus = await checkFinalStitchStatus(
+      supabase,
+      config.waitForFinalStepType,
+      completedTask.project_id,
+      orchestratorTaskId,
+      orchestratorRunId
+    );
+
+    if (finalStitchStatus === 'pending') {
+      console.log(`[OrchestratorComplete] Waiting for ${config.waitForFinalStepType} to complete`);
+      return;
+    }
+
+    if (finalStitchStatus === 'failed') {
+      console.log(`[OrchestratorComplete] Final stitch failed - marking orchestrator as Failed`);
+      await markOrchestratorFailed(supabase, orchestratorTaskId, 1, 1);
+      return;
+    }
+
+    // finalStitchStatus === 'complete' or 'not_found' - continue to mark orchestrator complete
+    if (finalStitchStatus === 'complete') {
+      console.log(`[OrchestratorComplete] Final stitch is complete - will mark orchestrator complete`);
+    }
+  }
+
   if (completedSegments === foundSegments && (expectedSegmentCount === null || foundSegments === expectedSegmentCount)) {
     // All segments complete! Mark orchestrator as Complete
     await markOrchestratorComplete(
@@ -129,6 +184,51 @@ export async function checkOrchestratorCompletion(
       supabaseUrl,
       serviceKey
     );
+  }
+}
+
+/**
+ * Check the status of the final stitch task for this orchestrator
+ * Returns: 'not_found' | 'pending' | 'complete' | 'failed'
+ */
+async function checkFinalStitchStatus(
+  supabase: any,
+  finalStepType: string,
+  projectId: string,
+  orchestratorTaskId: string,
+  orchestratorRunId: string | null
+): Promise<'not_found' | 'pending' | 'complete' | 'failed'> {
+  console.log(`[OrchestratorComplete] Checking status of ${finalStepType} tasks for orchestrator ${orchestratorTaskId}`);
+
+  // Query for any final step tasks for this orchestrator (any status)
+  const { data: finalStepTasks, error } = await supabase
+    .from("tasks")
+    .select("id, status")
+    .eq("task_type", finalStepType)
+    .eq("project_id", projectId)
+    .or(`params->>orchestrator_task_id.eq.${orchestratorTaskId},params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->orchestrator_details->>orchestrator_task_id.eq.${orchestratorTaskId}`);
+
+  if (error) {
+    console.error(`[OrchestratorComplete] Error checking final stitch status:`, error);
+    return 'not_found';
+  }
+
+  if (!finalStepTasks || finalStepTasks.length === 0) {
+    console.log(`[OrchestratorComplete] No ${finalStepType} tasks found - task not yet created`);
+    return 'not_found';
+  }
+
+  // Check the status of the final stitch task(s)
+  const task = finalStepTasks[0]; // Should only be one per orchestrator
+  console.log(`[OrchestratorComplete] Found ${finalStepType} task ${task.id} with status: ${task.status}`);
+
+  if (task.status === 'Complete') {
+    return 'complete';
+  } else if (task.status === 'Failed' || task.status === 'Cancelled') {
+    return 'failed';
+  } else {
+    // Queued or In Progress
+    return 'pending';
   }
 }
 
