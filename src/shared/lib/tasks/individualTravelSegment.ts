@@ -1,9 +1,9 @@
 import {
   createTask,
   TaskValidationError,
-  TaskCreationResult,
   resolveProjectResolution
 } from "../taskCreation";
+import type { TaskCreationResult } from "../taskCreation";
 import { supabase } from '@/integrations/supabase/client';
 import { PhaseConfig, buildBasicModePhaseConfig } from '@/tools/travel-between-images/settings';
 
@@ -742,4 +742,5 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
 /**
  * Re-export types and error class for convenience
  */
-export { TaskValidationError, TaskCreationResult } from "../taskCreation";
+export { TaskValidationError } from "../taskCreation";
+export type { TaskCreationResult } from "../taskCreation";
