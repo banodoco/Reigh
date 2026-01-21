@@ -312,7 +312,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
           >
             {(showImageIndices) => (
               <div>
-                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${(reducedSpacing || hideBottomPagination) ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`} data-tour="gallery-grid">
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${(reducedSpacing || hideBottomPagination) ? 'mb-0' : 'mb-12'} ${gridColumnClasses}`} data-tour="gallery-grid">
                   {paginatedImages.map((image, index) => {
                     const shouldShow = showImageIndices.has(index);
                     
