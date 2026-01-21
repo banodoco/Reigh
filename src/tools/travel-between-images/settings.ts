@@ -109,6 +109,102 @@ export const DEFAULT_VACE_PHASE_CONFIG: PhaseConfig = {
   ]
 };
 
+// =============================================================================
+// SHARED PHASE CONFIG UTILITIES
+// =============================================================================
+
+/** Motion LoRA URL - used when amount_of_motion > 0 */
+export const MOTION_LORA_URL = 'https://huggingface.co/peteromallet/random_junk/resolve/main/14b-i2v.safetensors';
+
+/**
+ * User LoRA input format for buildBasicModePhaseConfig
+ */
+export interface UserLoraInput {
+  path: string;
+  strength: number;
+  /** For multi-stage LoRAs - low noise variant path */
+  lowNoisePath?: string;
+  /** Whether this is a multi-stage LoRA (high/low noise variants) */
+  isMultiStage?: boolean;
+}
+
+/**
+ * Build a default phase config with user LoRAs for basic mode.
+ * This is the single source of truth for basic mode phase config generation.
+ * Used by both batch generation (generateVideoService.ts) and individual segment
+ * regeneration (individualTravelSegment.ts).
+ *
+ * @param useVaceModel - Whether to use VACE model (determines base config)
+ * @param amountOfMotion - 0-1 motion value (NOT 0-100)
+ * @param userLoras - User-selected LoRAs to add to each phase
+ * @returns PhaseConfig with base LoRAs + motion LoRA + user LoRAs
+ */
+export function buildBasicModePhaseConfig(
+  useVaceModel: boolean,
+  amountOfMotion: number,
+  userLoras: UserLoraInput[]
+): PhaseConfig {
+  const baseConfig = useVaceModel ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
+  const totalPhases = baseConfig.phases.length;
+
+  return {
+    ...baseConfig,
+    steps_per_phase: [...baseConfig.steps_per_phase],
+    phases: baseConfig.phases.map((phase, phaseIndex) => {
+      const isLastPhase = phaseIndex === totalPhases - 1;
+      const additionalLoras: PhaseLoraConfig[] = [];
+
+      // Add motion LoRA scaled by amount
+      if (amountOfMotion > 0) {
+        additionalLoras.push({
+          url: MOTION_LORA_URL,
+          multiplier: amountOfMotion.toFixed(2)
+        });
+      }
+
+      // Add user-selected LoRAs with multi-stage support
+      userLoras.forEach(lora => {
+        if (lora.isMultiStage) {
+          // Multi-stage LoRA: route to correct phase based on noise level
+          if (isLastPhase) {
+            // Final phase: use low_noise LoRA if available
+            if (lora.lowNoisePath) {
+              additionalLoras.push({
+                url: lora.lowNoisePath,
+                multiplier: lora.strength.toFixed(2)
+              });
+            }
+          } else {
+            // Early phases: use high_noise LoRA (main path)
+            if (lora.path) {
+              additionalLoras.push({
+                url: lora.path,
+                multiplier: lora.strength.toFixed(2)
+              });
+            }
+          }
+        } else {
+          // Single-stage LoRA: apply to all phases
+          if (lora.path) {
+            additionalLoras.push({
+              url: lora.path,
+              multiplier: lora.strength.toFixed(2)
+            });
+          }
+        }
+      });
+
+      return {
+        ...phase,
+        loras: [
+          ...phase.loras.map(l => ({ ...l })), // Deep clone base LoRAs
+          ...additionalLoras
+        ]
+      };
+    })
+  };
+}
+
 export interface VideoTravelSettings {
   videoControlMode: 'individual' | 'batch';
   batchVideoPrompt: string;

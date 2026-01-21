@@ -344,6 +344,57 @@ Structure video parameters are added to `TravelBetweenImagesTaskParams`:
 
 ---
 
+## 🔧 Individual Segment Regeneration
+
+> **Source of Truth**: `src/shared/lib/tasks/individualTravelSegment.ts`
+
+Individual segments can be regenerated via `SegmentSettingsModal` (timeline) or `SegmentRegenerateForm` (lightbox).
+
+### Phase Config Placement Hierarchy
+
+Phase config appears in task params at multiple levels. GPU worker checks them in priority order:
+
+| Priority | Location | Purpose |
+|----------|----------|---------|
+| 1st | `individual_segment_params.phase_config` | Per-segment override (UI form values) |
+| 2nd | `orchestrator_details.phase_config` | Original batch settings (inherited) |
+| 3rd | Default computed | `buildBasicModePhaseConfig()` fallback |
+
+**Key Invariant**: Individual segment tasks should place phase_config in `individual_segment_params`, NOT at top level. This allows per-segment overrides while preserving original batch settings.
+
+### Shared Utilities
+
+Phase config building logic is centralized in `src/tools/travel-between-images/settings.ts`:
+
+```typescript
+import { buildBasicModePhaseConfig, MOTION_LORA_URL } from '@/tools/travel-between-images/settings';
+
+// Build phase config with user LoRAs for basic mode
+const phaseConfig = buildBasicModePhaseConfig(
+  useVaceModel,      // boolean: true for VACE, false for I2V
+  amountOfMotion,    // number 0-1: motion strength
+  userLoras          // Array<{ path, strength, lowNoisePath?, isMultiStage? }>
+);
+```
+
+This function is used by both batch generation (`generateVideoService.ts`) and individual segment regeneration (`individualTravelSegment.ts`).
+
+### Task Creation Result
+
+All task creation functions return `TaskCreationResult`:
+
+```typescript
+interface TaskCreationResult {
+  task_id: string;   // Created task ID
+  status: string;    // Task status (typically 'pending')
+  error?: string;    // Error message if failed
+}
+```
+
+Check `result.task_id` for success, NOT `result.success`.
+
+---
+
 <div align="center">
 
 **🔗 Related Documentation**

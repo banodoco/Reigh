@@ -1,10 +1,11 @@
 import {
   createTask,
   TaskValidationError,
+  TaskCreationResult,
   resolveProjectResolution
 } from "../taskCreation";
 import { supabase } from '@/integrations/supabase/client';
-import { PhaseConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG, PhaseLoraConfig } from '@/tools/travel-between-images/settings';
+import { PhaseConfig, buildBasicModePhaseConfig } from '@/tools/travel-between-images/settings';
 
 /**
  * Interface for individual travel segment regeneration task parameters
@@ -69,55 +70,6 @@ export interface IndividualTravelSegmentParams {
 
 // Maximum frames allowed per segment (81-frame limit)
 const MAX_SEGMENT_FRAMES = 81;
-
-// Motion LoRA URL (same as in generateVideoService.ts)
-const MOTION_LORA_URL = 'https://huggingface.co/peteromallet/random_junk/resolve/main/14b-i2v.safetensors';
-
-/**
- * Build default phase config with user LoRAs for basic mode.
- * Mirrors buildBasicModePhaseConfig in generateVideoService.ts.
- */
-function buildBasicModePhaseConfig(
-  useVaceModel: boolean,
-  amountOfMotion: number,
-  userLoras: Array<{ path: string; strength: number }>
-): PhaseConfig {
-  const baseConfig = useVaceModel ? DEFAULT_VACE_PHASE_CONFIG : DEFAULT_PHASE_CONFIG;
-
-  return {
-    ...baseConfig,
-    steps_per_phase: [...baseConfig.steps_per_phase],
-    phases: baseConfig.phases.map((phase) => {
-      const additionalLoras: PhaseLoraConfig[] = [];
-
-      // Add motion LoRA scaled by amount
-      if (amountOfMotion > 0) {
-        additionalLoras.push({
-          url: MOTION_LORA_URL,
-          multiplier: amountOfMotion.toFixed(2)
-        });
-      }
-
-      // Add user-selected LoRAs
-      userLoras.forEach(lora => {
-        if (lora.path) {
-          additionalLoras.push({
-            url: lora.path,
-            multiplier: lora.strength.toFixed(2)
-          });
-        }
-      });
-
-      return {
-        ...phase,
-        loras: [
-          ...phase.loras.map(l => ({ ...l })),
-          ...additionalLoras
-        ]
-      };
-    })
-  };
-}
 
 /**
  * Validates individual travel segment parameters
@@ -589,7 +541,7 @@ function buildIndividualTravelSegmentParams(
  * @param params - Individual travel segment parameters
  * @returns Promise resolving to the created task
  */
-export async function createIndividualTravelSegmentTask(params: IndividualTravelSegmentParams): Promise<any> {
+export async function createIndividualTravelSegmentTask(params: IndividualTravelSegmentParams): Promise<TaskCreationResult> {
   console.log("[IndividualTravelSegment] Creating task with params:", {
     project_id: params.project_id,
     parent_generation_id: params.parent_generation_id,
@@ -788,6 +740,6 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
 }
 
 /**
- * Re-export the error class for convenience
+ * Re-export types and error class for convenience
  */
-export { TaskValidationError } from "../taskCreation";
+export { TaskValidationError, TaskCreationResult } from "../taskCreation";

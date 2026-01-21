@@ -125,12 +125,25 @@ export interface BaseTaskParams {
 }
 
 /**
+ * Result from creating a task via the edge function.
+ * This is the standard response shape for all task creation operations.
+ */
+export interface TaskCreationResult {
+  /** The created task's unique ID */
+  task_id: string;
+  /** Task status (typically 'pending' for newly created tasks) */
+  status: string;
+  /** Error message if task creation failed */
+  error?: string;
+}
+
+/**
  * Creates a task using the unified create-task edge function
  * 
  * @param taskParams - The task parameters to create
  * @returns Promise resolving to the created task data
  */
-export async function createTask(taskParams: BaseTaskParams): Promise<any> {
+export async function createTask(taskParams: BaseTaskParams): Promise<TaskCreationResult> {
   // Get current session for authentication
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   

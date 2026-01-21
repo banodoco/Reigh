@@ -28,7 +28,7 @@ import {
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { DEFAULT_RESOLUTION } from '../utils/dimension-utils';
 import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../state/types';
-import { PhaseConfig, PhaseLoraConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '../../../settings';
+import { PhaseConfig, buildBasicModePhaseConfig as buildPhaseConfigCore } from '../../../settings';
 import { isVideoShotGenerations, type ShotGenerationsLike } from '@/shared/lib/typeGuards';
 
 // Strip 'mode' field from phaseConfig before sending to backend
@@ -239,20 +239,11 @@ export function logTimelineMasterState(params: {
 // ============================================================================
 
 /**
- * Motion LoRA URL - applied based on Amount of Motion slider
- */
-const MOTION_LORA_URL = 'https://huggingface.co/peteromallet/random_junk/resolve/main/14b-i2v.safetensors';
-
-/**
  * Build phase config for basic mode based on structure video presence, motion amount, and user LoRAs.
- * Uses DEFAULT_PHASE_CONFIG and DEFAULT_VACE_PHASE_CONFIG from settings.ts as the base configs.
- *
- * For multi-stage LoRAs (Wan 2.2 I2V):
- * - High-noise LoRA (path) is applied to early phases (phase 0, 1 for 3-phase; phase 0 for 2-phase)
- * - Low-noise LoRA (lowNoisePath) is applied to the final phase
+ * Wraps the shared buildBasicModePhaseConfig from settings.ts, adding model selection logic.
  *
  * @param hasStructureVideo - Whether a structure video is set
- * @param amountOfMotion - 0-100 motion slider value
+ * @param amountOfMotion - 0-100 motion slider value (converted to 0-1 internally)
  * @param userLoras - User-selected LoRAs to add to phases (with optional multi-stage support)
  * @param structureType - Structure type determines mode: 'uni3c' uses I2V model, others use VACE model
  * @returns Object with model name and phase config
@@ -263,20 +254,14 @@ export function buildBasicModePhaseConfig(
   userLoras: Array<{ path: string; strength: number; lowNoisePath?: string; isMultiStage?: boolean }>,
   structureType?: 'uni3c' | 'flow' | 'canny' | 'depth'
 ): { model: string; phaseConfig: PhaseConfig } {
-
   // Check if using uni3c mode (I2V with guidance video)
   const isUni3c = structureType === 'uni3c' && hasStructureVideo;
 
-  // Get base config from settings.ts (single source of truth)
-  // Uni3C mode: uses I2V config (same as standard I2V)
-  // VACE mode: use DEFAULT_VACE_PHASE_CONFIG
-  // Standard I2V mode: use DEFAULT_PHASE_CONFIG
-  const baseConfig = (hasStructureVideo && !isUni3c)
-    ? DEFAULT_VACE_PHASE_CONFIG 
-    : DEFAULT_PHASE_CONFIG;
-  
+  // Determine if using VACE model
+  const useVaceModel = hasStructureVideo && !isUni3c;
+
   // Model selection:
-  // Uni3C mode: use I2V model (wan_2_2_i2v_lightning_baseline_2_2_2)
+  // Uni3C mode: use I2V model
   // VACE mode: use VACE model
   // Standard I2V mode: use I2V model
   const model = isUni3c
@@ -285,76 +270,12 @@ export function buildBasicModePhaseConfig(
       ? 'wan_2_2_vace_lightning_baseline_2_2_2'
       : 'wan_2_2_i2v_lightning_baseline_2_2_2');
 
-  const totalPhases = baseConfig.phases.length;
-
-  // DEEP CLONE: Create completely new phase config with new LoRA objects
-  // This prevents shared references that cause strength changes to affect multiple phases
-  const phaseConfig: PhaseConfig = {
-    ...baseConfig,
-    steps_per_phase: [...baseConfig.steps_per_phase], // Clone array
-    phases: baseConfig.phases.map((phase, phaseIndex) => {
-      const isLastPhase = phaseIndex === totalPhases - 1;
-
-      // Build additional LoRAs for THIS phase (new objects for each phase!)
-      const additionalLoras: PhaseLoraConfig[] = [];
-
-      // Add motion LoRA if motion > 0 (strength scales with amount of motion)
-      if (amountOfMotion > 0) {
-        additionalLoras.push({
-          url: MOTION_LORA_URL,
-          multiplier: (amountOfMotion / 100).toFixed(2)
-        });
-      }
-
-      // Add user-selected LoRAs with multi-stage support
-      userLoras.forEach(lora => {
-        const multiplier = lora.strength.toFixed(2);
-
-        if (lora.isMultiStage) {
-          // Multi-stage LoRA: route to correct phase based on available URLs
-          const hasHighNoise = !!lora.path; // High noise stored in path
-          const hasLowNoise = !!lora.lowNoisePath;
-
-          if (isLastPhase) {
-            // Final phase: use low_noise LoRA if available
-            if (hasLowNoise) {
-              additionalLoras.push({
-                url: lora.lowNoisePath!,
-                multiplier
-              });
-            }
-            // If only high_noise exists, don't apply anything to final phase
-          } else {
-            // Early phases: use high_noise LoRA if available
-            if (hasHighNoise) {
-              additionalLoras.push({
-                url: lora.path,
-                multiplier
-              });
-            }
-            // If only low_noise exists, don't apply anything to early phases
-          }
-        } else {
-          // Single-stage LoRA: apply to all phases (existing behavior)
-          if (lora.path) {
-            additionalLoras.push({
-              url: lora.path,
-              multiplier
-            });
-          }
-        }
-      });
-
-      return {
-        ...phase,
-        // Deep clone each base LoRA object, then add new additional LoRAs
-        loras: [
-          ...phase.loras.map(l => ({ ...l })), // Deep clone base LoRAs
-          ...additionalLoras // These are already new objects per phase
-        ]
-      };
-    })
-  };
+  // Use shared core function (converts 0-100 to 0-1)
+  const phaseConfig = buildPhaseConfigCore(
+    useVaceModel,
+    amountOfMotion / 100,
+    userLoras
+  );
 
   return { model, phaseConfig };
 }
