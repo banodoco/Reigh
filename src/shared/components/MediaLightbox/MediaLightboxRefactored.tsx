@@ -136,6 +136,8 @@ interface MediaLightboxProps {
   // Navigation availability
   hasNext?: boolean;
   hasPrevious?: boolean;
+  // Timeline frame of the next item (for positioning "add variant as new image")
+  nextTimelineFrame?: number;
   // Workflow-specific props
   allShots?: ShotOption[];
   selectedShotId?: string;
@@ -244,6 +246,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Navigation availability
   hasNext = true,
   hasPrevious = true,
+  nextTimelineFrame,
   // Workflow-specific props
   allShots = [],
   selectedShotId,
@@ -3187,6 +3190,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
                       activeVariantId={activeVariant?.id}
                       currentTimelineFrame={media.timeline_frame}
+                      nextTimelineFrame={nextTimelineFrame}
                     />
                   </div>
 
@@ -3546,6 +3550,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
                       activeVariantId={activeVariant?.id}
                       currentTimelineFrame={media.timeline_frame}
+                      nextTimelineFrame={nextTimelineFrame}
                     />
 
                     {/* Navigation Arrows */}
@@ -4015,6 +4020,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
                     activeVariantId={activeVariant?.id}
                     currentTimelineFrame={media.timeline_frame}
+                      nextTimelineFrame={nextTimelineFrame}
                   />
 
                   {/* Navigation Arrows */}

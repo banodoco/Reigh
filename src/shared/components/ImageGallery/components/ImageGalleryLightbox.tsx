@@ -183,6 +183,17 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     }
   }, [activeLightboxMedia, filteredImages, isServerPagination, serverPage, totalPages]);
 
+  // Calculate next item's timeline frame for positioning "add variant as new image"
+  const nextTimelineFrame = useMemo(() => {
+    if (!activeLightboxMedia) return undefined;
+
+    const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
+    if (currentIndex === -1 || currentIndex >= filteredImages.length - 1) return undefined;
+
+    const nextItem = filteredImages[currentIndex + 1];
+    return nextItem?.timeline_frame ?? undefined;
+  }, [activeLightboxMedia, filteredImages]);
+
   const starredValue = useMemo(() => {
     const foundImage = filteredImages.find(img => img.id === activeLightboxMedia?.id);
     const starred = foundImage?.starred || false;
@@ -622,6 +633,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           showMagicEdit={true}
           hasNext={hasNext}
           hasPrevious={hasPrevious}
+          nextTimelineFrame={nextTimelineFrame}
           allShots={simplifiedShotOptions}
           selectedShotId={lightboxSelectedShotId || (selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined)}
           shotId={selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined}
