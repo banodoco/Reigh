@@ -1555,6 +1555,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     return undefined;
   }, [shotAspectRatioData, shotId, isLoadingShotAspectRatio, isVideo]);
 
+  // Determine if regenerate mode is available for this video
+  // Used to auto-fallback when persisted mode is 'regenerate' but it's not available
+  const canRegenerate = useMemo(() => {
+    if (!isVideo) return false;
+
+    // Root parent videos (no parent_generation_id) cannot be regenerated
+    const isRootParent = !(media as any).parent_generation_id;
+    if (isRootParent) return false;
+
+    // Join-clips outputs cannot be regenerated
+    const mediaParams = (media as any).params as Record<string, any> | undefined;
+    const toolType = (media.metadata as any)?.tool_type || mediaParams?.tool_type;
+    if (toolType === 'join-clips') return false;
+
+    // Need task params to regenerate
+    const taskDataParams = adjustedTaskDetailsData?.task?.params;
+    if (!taskDataParams && !mediaParams) return false;
+
+    return true;
+  }, [isVideo, media, adjustedTaskDetailsData]);
+
   // Create regenerate form for video edit panel
   // IMPORTANT: Use PRIMARY variant's params for regeneration, not the active variant's
   // This ensures regeneration respects the "main" variant's settings (e.g., LoRAs)
@@ -1864,8 +1885,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Handle entering video edit mode (unified) - restores last used sub-mode
   const handleEnterVideoEditMode = useCallback(() => {
     // Restore from persisted value (defaults to 'trim' if not set)
-    const restoredMode = persistedVideoEditSubMode || 'trim';
-    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoEditMode: restoring to', restoredMode, '(persisted:', persistedVideoEditSubMode, ')');
+    let restoredMode = persistedVideoEditSubMode || 'trim';
+
+    // Auto-fallback: if restoring to 'regenerate' but it's not available, use 'trim' instead
+    if (restoredMode === 'regenerate' && !canRegenerate) {
+      console.log('[EDIT_DEBUG] 🎬 handleEnterVideoEditMode: regenerate unavailable, falling back to trim');
+      restoredMode = 'trim';
+    }
+
+    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoEditMode: restoring to', restoredMode, '(persisted:', persistedVideoEditSubMode, ', canRegenerate:', canRegenerate, ')');
     setVideoEditSubMode(restoredMode);
     setPersistedPanelMode('edit');
 
@@ -1883,7 +1911,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         }
       });
     }, 100);
-  }, [onTrimModeChange, setVideoDuration, persistedVideoEditSubMode, setVideoEditSubMode, setPersistedPanelMode]);
+  }, [onTrimModeChange, setVideoDuration, persistedVideoEditSubMode, setVideoEditSubMode, setPersistedPanelMode, canRegenerate]);
 
   // Handle exiting video edit mode entirely
   const handleExitVideoEditMode = useCallback(() => {

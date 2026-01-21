@@ -196,10 +196,9 @@ export function useVideoGenerations({
     
     return videoGenerations.map(gen => {
       const genAny = gen as any;
-      const isIndividualSegment = task.taskType === 'individual_travel_segment';
-      const effectiveParentGenId = isIndividualSegment
-        ? undefined
-        : (taskParentGenerationId || genAny.parent_generation_id);
+      // Individual segments have their parent_generation_id on the generation itself (from DB)
+      // Other video tasks may have it in task params or on the generation
+      const effectiveParentGenId = genAny.parent_generation_id || taskParentGenerationId;
 
       return {
         id: gen.id,
