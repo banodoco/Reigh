@@ -472,8 +472,8 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
         // At the end of current page, go to next page if available
         const page = currentServerPage || 1;
         if (page < totalPages && onServerPageChange) {
-          // Close lightbox and navigate to next page
-          stateHook.setActiveLightboxMedia(null);
+          // Keep lightbox open showing current image, set pending target for new page
+          // When new page data arrives, the pendingLightboxTarget effect will swap in the new image
           stateHook.setPendingLightboxTarget('first'); // Open first item of next page
           onServerPageChange(page + 1);
         }
@@ -501,8 +501,8 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
         // At the beginning of current page, go to previous page if available
         const page = currentServerPage || 1;
         if (page > 1 && onServerPageChange) {
-          // Close lightbox and navigate to previous page
-          stateHook.setActiveLightboxMedia(null);
+          // Keep lightbox open showing current image, set pending target for new page
+          // When new page data arrives, the pendingLightboxTarget effect will swap in the new image
           stateHook.setPendingLightboxTarget('last'); // Open last item of previous page
           onServerPageChange(page - 1);
         }
