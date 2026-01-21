@@ -2695,6 +2695,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     disabled={isGenerationDisabled}
                     inputId="variant-name"
                     videoCount={Math.max(0, simpleFilteredImages.length - 1)}
+                    stitchEnabled={stitchAfterGenerate}
                     middleContent={
                       stitchAfterGenerate ? (
                         <Collapsible className="mb-4 w-full">

@@ -14,6 +14,8 @@ interface GenerateVideoCTAProps {
   videoCount?: number;
   /** Optional content to render between variant name input and generate button */
   middleContent?: React.ReactNode;
+  /** Whether stitch mode is enabled (changes button text) */
+  stitchEnabled?: boolean;
 }
 
 /**
@@ -30,8 +32,18 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
   inputId = 'variant-name',
   videoCount = 1,
   middleContent,
+  stitchEnabled = false,
 }) => {
   const isPlural = videoCount >= 2;
+
+  // Determine button text based on stitch mode
+  const getButtonText = () => {
+    if (stitchEnabled) {
+      return isPlural ? 'Generate Videos & Stitch' : 'Generate Video & Stitch';
+    }
+    return isPlural ? 'Generate Videos' : 'Generate Video';
+  };
+
   return (
     <div className="flex flex-col items-center">
       {/* Variant Name Input - commented out for now */}
@@ -67,7 +79,7 @@ export const GenerateVideoCTA: React.FC<GenerateVideoCTAProps> = ({
             ? 'Added to queue!'
             : isGenerating
               ? 'Creating Tasks...'
-              : isPlural ? 'Generate Videos' : 'Generate Video'}
+              : getButtonText()}
         </span>
       </Button>
     </div>
