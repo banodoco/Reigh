@@ -18,8 +18,11 @@ declare const Deno: any;
  * Headers: Authorization: Bearer <JWT or PAT>
  * Body: {
  *   "task_id": "uuid-string",
- *   "status": "In Progress" | "Failed" | "Complete" | "Cancelled",
- *   "output_location": "optional-string"
+ *   "status": "Queued" | "In Progress" | "Failed" | "Complete" | "Cancelled",
+ *   "output_location": "optional-string",
+ *   "attempts": "optional-number (for tracking retry count)",
+ *   "error_details": "optional-string (stores last error message)",
+ *   "clear_worker": "optional-boolean (when true, clears worker_id and generation_started_at for requeue)"
  * }
  * 
  * Returns:
@@ -365,7 +368,15 @@ serve(async (req) => {
   }
 
   // Validate required fields
-  const { task_id, status } = requestBody;
+  const { 
+    task_id, 
+    status, 
+    output_location,
+    // Support for task retry/requeue
+    attempts,
+    error_details,
+    clear_worker 
+  } = requestBody;
 
   // Set task_id for all subsequent logs
   if (task_id) {
@@ -474,8 +485,24 @@ serve(async (req) => {
       updatePayload.generation_processed_at = new Date().toISOString();
     }
 
-    if (requestBody.output_location) {
-      updatePayload.output_location = requestBody.output_location;
+    // Handle output_location for Failed/Complete statuses
+    if (output_location !== undefined) {
+      updatePayload.output_location = output_location;
+    }
+
+    // Handle retry-related fields
+    if (attempts !== undefined) {
+      updatePayload.attempts = attempts;
+    }
+
+    if (error_details !== undefined) {
+      updatePayload.error_details = error_details;
+    }
+
+    // When requeuing, clear worker assignment
+    if (clear_worker === true) {
+      updatePayload.worker_id = null;
+      updatePayload.generation_started_at = null;
     }
 
     let updateResult;

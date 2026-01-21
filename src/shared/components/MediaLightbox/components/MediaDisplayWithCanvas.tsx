@@ -245,10 +245,10 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
         />
       ) : (
         // Image with Canvas Overlays - Progressive loading: thumbnail first, then full image
-        // Wrapper div shrinks to fit the image so overlays match image bounds, not container
-        // Using inline-block (not inline-flex) ensures wrapper sizes exactly to image content
+        // When showing thumbnail (loading), use w-full h-full so it doesn't appear smaller
+        // Once full image loads, inline-block sizes exactly to image content
         <div
-          className="relative inline-block max-w-full max-h-full"
+          className={`relative max-w-full max-h-full ${fullImageLoaded ? 'inline-block' : 'w-full h-full flex items-center justify-center'}`}
           style={{
             // Enable drag-to-move cursor in reposition mode
             cursor: isRepositionMode
@@ -273,7 +273,8 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
             alt="Media content"
             draggable={false}
             className={`
-              block max-w-full max-h-full object-contain select-none
+              block object-contain select-none
+              ${fullImageLoaded ? 'max-w-full max-h-full' : 'w-full h-full'}
               ${variant === 'regular-centered' ? 'rounded' : ''}
               ${isFlippedHorizontally ? 'scale-x-[-1]' : ''}
               ${isSaving ? 'opacity-30' : 'opacity-100'}
