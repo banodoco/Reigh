@@ -78,7 +78,7 @@ serve(async (req) => {
   }
 
   const { task_id, params, task_type, project_id, dependant_on } = body;
-  
+
   // Set task_id for logs if provided by client
   if (task_id) {
     logger.setDefaultTaskId(task_id);
@@ -90,10 +90,27 @@ serve(async (req) => {
     return createCorsResponse("params, task_type required", 400);
   }
 
-  logger.info("Creating task", { 
-    task_type, 
+  // Normalize dependant_on to array format (supports both single value and array input)
+  // - null/undefined -> null (no dependencies)
+  // - "uuid-string" -> ["uuid-string"]
+  // - ["uuid1", "uuid2"] -> ["uuid1", "uuid2"]
+  // - [] -> null (empty array = no dependencies)
+  let normalizedDependantOn: string[] | null = null;
+  if (dependant_on) {
+    if (Array.isArray(dependant_on)) {
+      // Filter out any null/undefined/empty values
+      const filtered = dependant_on.filter((id: any) => id && typeof id === 'string');
+      normalizedDependantOn = filtered.length > 0 ? filtered : null;
+    } else if (typeof dependant_on === 'string') {
+      normalizedDependantOn = [dependant_on];
+    }
+  }
+
+  logger.info("Creating task", {
+    task_type,
     project_id,
-    has_dependant_on: !!dependant_on,
+    has_dependant_on: !!normalizedDependantOn,
+    dependency_count: normalizedDependantOn?.length ?? 0,
     client_provided_id: !!task_id
   });
 
@@ -230,13 +247,13 @@ serve(async (req) => {
     finalProjectId = project_id;
   }
 
-  // ─── 7. Insert row using admin client ───────────────────────────
+  // ─── 8. Insert row using admin client ───────────────────────────
   try {
     const insertObject: any = {
       params,
       task_type,
       project_id: finalProjectId,
-      dependant_on: dependant_on ?? null,
+      dependant_on: normalizedDependantOn,  // Now an array or null
       status: "Queued",
       created_at: new Date().toISOString()
     };
@@ -259,12 +276,13 @@ serve(async (req) => {
 
     // Set task_id for final log entry
     logger.setDefaultTaskId(insertedTask.id);
-    logger.info("Task created successfully", { 
+    logger.info("Task created successfully", {
       task_id: insertedTask.id,
       task_type,
       project_id: finalProjectId,
       created_by: isServiceRole ? 'service-role' : callerId,
-      has_dependency: !!dependant_on
+      has_dependency: !!normalizedDependantOn,
+      dependency_count: normalizedDependantOn?.length ?? 0
     });
 
     await logger.flush();

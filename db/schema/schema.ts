@@ -25,7 +25,7 @@ export const tasks = pgTable('tasks', {
   taskType: text('task_type').notNull(),
   params: jsonb('params').notNull(),
   status: taskStatus('status').default('Queued').notNull(),
-  dependantOn: uuid('dependant_on').references((): any => tasks.id),
+  dependantOn: uuid('dependant_on').array(),  // Array of task IDs this task depends on
   outputLocation: text('output_location'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),

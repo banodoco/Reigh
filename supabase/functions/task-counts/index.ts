@@ -194,7 +194,9 @@ serve(async (req) => {
           const isOrchestrator = task.task_type?.toLowerCase().includes('orchestrator') ? 'ORCH' : 'NORMAL';
           const hasWorker = task.worker_id ? 'CLOUD' : 'LOCAL';
           const inCloudSetting = task.projects.users.settings?.ui?.generationMethods?.inCloud ?? true;
-          const hasDep = task.dependant_on ? 'DEP' : 'NODEP';
+          // dependant_on is now an array - check if it has any dependencies
+          const depCount = Array.isArray(task.dependant_on) ? task.dependant_on.length : 0;
+          const hasDep = depCount > 0 ? `DEP(${depCount})` : 'NODEP';
           console.log(`[TASK_COUNT_DEBUG] [RAW_TASKS] [${runType || 'ALL'}] ${task.id.substring(0, 8)}: ${task.task_type} | ${task.status} | ${isOrchestrator} | ${hasWorker} | ${hasDep} | user=${task.projects.user_id.substring(0, 8)} | credits=${task.projects.users.credits} | inCloud=${inCloudSetting}`);
         });
       } else {
@@ -347,7 +349,7 @@ serve(async (req) => {
       // - Status = 'Queued'
       // - NOT orchestrator tasks (filtered in JS)
       // - User has credits > 0 (filtered in JS)
-      // - No dependencies (dependant_on IS NULL)
+      // - No blocking dependencies (checked in JS - dependant_on is now an array)
       // - Optionally filter by run_type via task_types.run_type (GPU vs API tasks)
       const { data: queuedTasksData, error: queuedError } = await supabaseAdmin
         .from('tasks')
@@ -362,7 +364,7 @@ serve(async (req) => {
           )
         `)
         .eq('status', 'Queued')
-        .is('dependant_on', null)  // No dependencies
+        // Note: dependant_on is now an array, filtering done in JS
         .order('created_at', { ascending: true });
       
       if (queuedError) {
@@ -395,35 +397,49 @@ serve(async (req) => {
         console.error(`[TASK_COUNT_DEBUG] [DETAILS] Error fetching active tasks:`, activeError);
       }
 
+      // Helper function to check if task has no dependencies (null or empty array)
+      const hasNoDependencies = (dependant_on: any): boolean => {
+        if (dependant_on === null || dependant_on === undefined) return true;
+        if (Array.isArray(dependant_on) && dependant_on.length === 0) return true;
+        return false;
+      };
+
       // Apply eligibility filters that can't be done in SQL
       const queuedFiltered = (queuedTasksData || []).filter(task => {
         // Exclude orchestrator tasks
         if (task.task_type && task.task_type.toLowerCase().includes('orchestrator')) {
           return false;
         }
-        
+
         // User must have credits > 0
         if (task.projects.users.credits <= 0) {
           return false;
         }
-        
+
+        // Exclude tasks with dependencies (for display purposes - accurate counts come from RPC)
+        // Note: We can't easily check if dependencies are complete here without additional queries
+        // The RPC functions handle the proper dependency check
+        if (!hasNoDependencies(task.dependant_on)) {
+          return false;
+        }
+
         // Filter by run_type if specified
         if (runType && taskTypeRunTypeMap) {
           const taskRunType = taskTypeRunTypeMap.get(task.task_type);
-          
+
           // If task type not found in map, exclude it by default
           if (taskRunType === undefined) {
             console.log(`[TASK_COUNT_DEBUG] [FILTER] Excluding queued task ${task.id.substring(0, 8)} (${task.task_type}) - task type not found in task_types table`);
             return false;
           }
-          
+
           // Exclude if run_type doesn't match
           if (taskRunType !== runType) {
             console.log(`[TASK_COUNT_DEBUG] [FILTER] Excluding queued task ${task.id.substring(0, 8)} (${task.task_type}) - run_type ${taskRunType} != ${runType}`);
             return false;
           }
         }
-        
+
         return true;
       });
 
@@ -576,11 +592,18 @@ serve(async (req) => {
       let user_queued_tasks: any[] = [];
       let user_active_tasks: any[] = [];
       
+      // Helper function to check if task has no dependencies (null or empty array)
+      const hasNoDependencies = (dependant_on: any): boolean => {
+        if (dependant_on === null || dependant_on === undefined) return true;
+        if (Array.isArray(dependant_on) && dependant_on.length === 0) return true;
+        return false;
+      };
+
       if (projectIds.length > 0) {
         // Fetch queued tasks with eligibility criteria:
         // - Status = 'Queued'
         // - NOT orchestrator tasks (filtered in JS)
-        // - No dependencies (dependant_on IS NULL)
+        // - No blocking dependencies (checked in JS - dependant_on is now an array)
         // - User's projects only (via projectIds)
         // Note: PAT functions bypass credits check, so we don't filter by credits here
         // Note: User token path doesn't use run_type filtering (users manage their own tasks)
@@ -594,9 +617,9 @@ serve(async (req) => {
             project_id
           `)
           .eq('status', 'Queued')
-          .in('project_id', projectIds)
-          .is('dependant_on', null);  // No dependencies
-        
+          .in('project_id', projectIds);
+          // Note: dependant_on is now an array, filtering done in JS
+
         const { data: queuedTasksData, error: queuedError } = await userQueuedQuery.order('created_at', { ascending: true });
         
         if (queuedError) {
@@ -631,6 +654,10 @@ serve(async (req) => {
         const queuedFiltered = (queuedTasksData || []).filter(task => {
           // Exclude orchestrator tasks
           if (task.task_type && task.task_type.toLowerCase().includes('orchestrator')) {
+            return false;
+          }
+          // Exclude tasks with dependencies (for display purposes - accurate counts come from RPC)
+          if (!hasNoDependencies(task.dependant_on)) {
             return false;
           }
           return true;

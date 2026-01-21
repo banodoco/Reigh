@@ -2,16 +2,19 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 /**
  * Edge function: get-predecessor-output
- * 
- * Gets the output location of a task's dependency in a single call.
- * Combines dependency lookup + output location retrieval.
- * 
+ *
+ * Gets the output locations of a task's dependencies in a single call.
+ * Supports both single and multiple dependencies (dependant_on is now an array).
+ *
  * POST /functions/v1/get-predecessor-output
  * Headers: Authorization: Bearer <JWT or PAT>
  * Body: { task_id: "uuid" }
- * 
+ *
  * Returns:
- * - 200 OK with { predecessor_id, output_location } or null if no dependency
+ * - 200 OK with:
+ *   - No dependencies: { predecessors: [] }
+ *   - Single dependency (backward compat): { predecessor_id, output_location, predecessors: [...] }
+ *   - Multiple dependencies: { predecessors: [{ predecessor_id, output_location, status }, ...] }
  * - 400 Bad Request if task_id missing
  * - 401 Unauthorized if no valid token
  * - 403 Forbidden if token invalid or user not authorized
@@ -135,11 +138,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
       console.log(`Task ${task_id} authorization verified for user ${callerId}`);
     }
     // Return the dependency info
-    if (!taskData.dependant_on) {
-      // No dependency
+    // dependant_on is now an array (or null)
+    const dependantOnArray: string[] = taskData.dependant_on || [];
+
+    if (dependantOnArray.length === 0) {
+      // No dependencies
       return new Response(JSON.stringify({
         predecessor_id: null,
-        output_location: null
+        output_location: null,
+        predecessors: []
       }), {
         status: 200,
         headers: {
@@ -147,15 +154,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
         }
       });
     }
-    // Get the predecessor task details
-    const { data: predecessorData, error: predecessorError } = await supabaseAdmin.from("tasks").select("id, status, output_location").eq("id", taskData.dependant_on).single();
+
+    // Fetch all predecessor tasks
+    const { data: predecessorsData, error: predecessorError } = await supabaseAdmin
+      .from("tasks")
+      .select("id, status, output_location")
+      .in("id", dependantOnArray);
+
     if (predecessorError) {
-      console.error("Predecessor lookup error:", predecessorError);
-      // Dependency exists but predecessor task not found
+      console.error("Predecessors lookup error:", predecessorError);
       return new Response(JSON.stringify({
-        predecessor_id: taskData.dependant_on,
+        predecessor_id: dependantOnArray[0], // backward compat
         output_location: null,
-        status: "not_found"
+        status: "error",
+        predecessors: dependantOnArray.map(id => ({
+          predecessor_id: id,
+          output_location: null,
+          status: "error"
+        }))
       }), {
         status: 200,
         headers: {
@@ -163,24 +179,39 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
         }
       });
     }
-    if (predecessorData.status !== "Complete" || !predecessorData.output_location) {
-      // Dependency exists but not complete or no output
-      return new Response(JSON.stringify({
-        predecessor_id: taskData.dependant_on,
-        output_location: null,
-        status: predecessorData.status
-      }), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-    }
-    // Dependency is complete with output
-    console.log(`Found predecessor output: ${predecessorData.id} -> ${predecessorData.output_location}`);
+
+    // Build predecessors array with status info
+    const predecessors = dependantOnArray.map(depId => {
+      const pred = predecessorsData?.find(p => p.id === depId);
+      if (!pred) {
+        return {
+          predecessor_id: depId,
+          output_location: null,
+          status: "not_found"
+        };
+      }
+      return {
+        predecessor_id: pred.id,
+        output_location: pred.status === "Complete" ? pred.output_location : null,
+        status: pred.status
+      };
+    });
+
+    // Check if all predecessors are complete with output
+    const allComplete = predecessors.every(p => p.status === "Complete" && p.output_location);
+
+    // For backward compatibility, also include single predecessor fields if there's only one
+    const firstPred = predecessors[0];
+    console.log(`Found ${predecessors.length} predecessor(s), all complete: ${allComplete}`);
+
     return new Response(JSON.stringify({
-      predecessor_id: predecessorData.id,
-      output_location: predecessorData.output_location
+      // Backward compatibility fields (for single dependency)
+      predecessor_id: firstPred?.predecessor_id || null,
+      output_location: allComplete ? firstPred?.output_location : null,
+      status: allComplete ? "Complete" : (firstPred?.status || null),
+      // New array format for multiple dependencies
+      predecessors,
+      all_complete: allComplete
     }), {
       status: 200,
       headers: {

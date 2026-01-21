@@ -46,7 +46,7 @@ class DebugClient:
         info.generation = self._get_generation_for_task(task_id)
         info.worker = self._get_worker_info(state.get('worker_id'))
         info.credit_entries = self._get_credit_entries(task_id)
-        info.predecessor_task = self._get_predecessor_task(state.get('dependant_on'))
+        info.predecessor_tasks = self._get_predecessor_tasks(state.get('dependant_on'))
         info.dependent_tasks = self._get_dependent_tasks(task_id)
         
         # Get variants if we have a generation
@@ -152,18 +152,24 @@ class DebugClient:
         except:
             return []
     
-    def _get_predecessor_task(self, dependant_on_id: str) -> Optional[Dict[str, Any]]:
-        """Get the task this one depends on."""
-        if not dependant_on_id:
-            return None
-        return self._get_task_summary(dependant_on_id)
-    
+    def _get_predecessor_tasks(self, dependant_on: any) -> List[Dict[str, Any]]:
+        """Get the tasks this one depends on (dependant_on is now an array)."""
+        if not dependant_on:
+            return []
+        # dependant_on is now an array of task IDs
+        if isinstance(dependant_on, list):
+            return [t for t in (self._get_task_summary(tid) for tid in dependant_on) if t]
+        # Backward compat: single string
+        task = self._get_task_summary(dependant_on)
+        return [task] if task else []
+
     def _get_dependent_tasks(self, task_id: str) -> List[Dict[str, Any]]:
         """Get tasks that depend on this one."""
         try:
+            # dependant_on is now an array - use contains filter
             result = self.supabase.table('tasks').select(
                 'id, task_type, status, created_at, generation_processed_at'
-            ).eq('dependant_on', task_id).order('created_at').execute()
+            ).contains('dependant_on', [task_id]).order('created_at').execute()
             return result.data or []
         except:
             return []

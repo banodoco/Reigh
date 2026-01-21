@@ -22,7 +22,7 @@ class TaskInfo:
     child_tasks: List[Dict[str, Any]] = field(default_factory=list)  # For orchestrators: child segments
     run_siblings: List[Dict[str, Any]] = field(default_factory=list)  # Other tasks in same run
     dependent_tasks: List[Dict[str, Any]] = field(default_factory=list)  # Tasks that depend on this one
-    predecessor_task: Optional[Dict[str, Any]] = None  # Task this depends on (dependant_on)
+    predecessor_tasks: List[Dict[str, Any]] = field(default_factory=list)  # Tasks this depends on (dependant_on array)
     
     # Shot associations
     shot_associations: List[Dict[str, Any]] = field(default_factory=list)
@@ -40,7 +40,7 @@ class TaskInfo:
             'child_tasks': self.child_tasks,
             'run_siblings': self.run_siblings,
             'dependent_tasks': self.dependent_tasks,
-            'predecessor_task': self.predecessor_task,
+            'predecessor_tasks': self.predecessor_tasks,
             'shot_associations': self.shot_associations,
         }
 

@@ -1,3 +1,5 @@
+WARN: no SMS provider is enabled. Disabling phone login
+Initialising cli_login_postgres role...
 export type Json =
   | string
   | number
@@ -11,6 +13,31 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -94,39 +121,117 @@ export type Database = {
           },
         ]
       }
-      generation_variants: {
+      dev_tasks: {
         Row: {
-          id: string
-          generation_id: string
-          location: string
-          thumbnail_url: string | null
-          params: Json | null
-          is_primary: boolean
-          variant_type: string | null
-          name: string | null
+          area: string | null
+          commit_hash: string | null
+          completed_at: string | null
           created_at: string
+          description: string | null
+          execution_details: Json | null
+          id: string
+          notes: string | null
+          status: string
+          title: string
         }
         Insert: {
-          id?: string
-          generation_id: string
-          location: string
-          thumbnail_url?: string | null
-          params?: Json | null
-          is_primary?: boolean
-          variant_type?: string | null
-          name?: string | null
+          area?: string | null
+          commit_hash?: string | null
+          completed_at?: string | null
           created_at?: string
+          description?: string | null
+          execution_details?: Json | null
+          id?: string
+          notes?: string | null
+          status?: string
+          title: string
         }
         Update: {
-          id?: string
-          generation_id?: string
-          location?: string
-          thumbnail_url?: string | null
-          params?: Json | null
-          is_primary?: boolean
-          variant_type?: string | null
-          name?: string | null
+          area?: string | null
+          commit_hash?: string | null
+          completed_at?: string | null
           created_at?: string
+          description?: string | null
+          execution_details?: Json | null
+          id?: string
+          notes?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      external_api_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_value: string
+          metadata: Json | null
+          service: string
+          updated_at: string
+          user_id: string
+          vault_secret_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_value: string
+          metadata?: Json | null
+          service: string
+          updated_at?: string
+          user_id: string
+          vault_secret_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_value?: string
+          metadata?: Json | null
+          service?: string
+          updated_at?: string
+          user_id?: string
+          vault_secret_id?: string | null
+        }
+        Relationships: []
+      }
+      generation_variants: {
+        Row: {
+          created_at: string
+          generation_id: string
+          id: string
+          is_primary: boolean
+          location: string
+          name: string | null
+          params: Json | null
+          project_id: string | null
+          thumbnail_url: string | null
+          variant_type: string | null
+          viewed_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          generation_id: string
+          id?: string
+          is_primary?: boolean
+          location: string
+          name?: string | null
+          params?: Json | null
+          project_id?: string | null
+          thumbnail_url?: string | null
+          variant_type?: string | null
+          viewed_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          generation_id?: string
+          id?: string
+          is_primary?: boolean
+          location?: string
+          name?: string | null
+          params?: Json | null
+          project_id?: string | null
+          thumbnail_url?: string | null
+          variant_type?: string | null
+          viewed_at?: string | null
         }
         Relationships: [
           {
@@ -136,6 +241,13 @@ export type Database = {
             referencedRelation: "generations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "generation_variants_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       generations: {
@@ -143,6 +255,7 @@ export type Database = {
           based_on: string | null
           child_order: number | null
           children: Json | null
+          copied_from_share: string | null
           created_at: string
           id: string
           is_child: boolean
@@ -153,11 +266,9 @@ export type Database = {
           primary_variant_id: string | null
           project_id: string
           shot_data: Json | null
-          shot_id: string | null
           starred: boolean
           tasks: Json | null
           thumbnail_url: string | null
-          timeline_frame: number | null
           type: string | null
           updated_at: string | null
         }
@@ -165,6 +276,7 @@ export type Database = {
           based_on?: string | null
           child_order?: number | null
           children?: Json | null
+          copied_from_share?: string | null
           created_at?: string
           id?: string
           is_child?: boolean
@@ -175,11 +287,9 @@ export type Database = {
           primary_variant_id?: string | null
           project_id: string
           shot_data?: Json | null
-          shot_id?: string | null
           starred?: boolean
           tasks?: Json | null
           thumbnail_url?: string | null
-          timeline_frame?: number | null
           type?: string | null
           updated_at?: string | null
         }
@@ -187,6 +297,7 @@ export type Database = {
           based_on?: string | null
           child_order?: number | null
           children?: Json | null
+          copied_from_share?: string | null
           created_at?: string
           id?: string
           is_child?: boolean
@@ -197,11 +308,9 @@ export type Database = {
           primary_variant_id?: string | null
           project_id?: string
           shot_data?: Json | null
-          shot_id?: string | null
           starred?: boolean
           tasks?: Json | null
           thumbnail_url?: string | null
-          timeline_frame?: number | null
           type?: string | null
           updated_at?: string | null
         }
@@ -235,6 +344,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onboarding_config: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
       }
       projects: {
         Row: {
@@ -285,6 +412,27 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          count: number
+          key: string
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          key: string
+          updated_at?: string
+          window_start?: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       referral_sessions: {
         Row: {
           converted_at: string | null
@@ -298,7 +446,7 @@ export type Database = {
           session_id: string | null
           visit_count: number | null
           visitor_fingerprint: string | null
-          visitor_ip: unknown | null
+          visitor_ip: unknown
         }
         Insert: {
           converted_at?: string | null
@@ -312,7 +460,7 @@ export type Database = {
           session_id?: string | null
           visit_count?: number | null
           visitor_fingerprint?: string | null
-          visitor_ip?: unknown | null
+          visitor_ip?: unknown
         }
         Update: {
           converted_at?: string | null
@@ -326,7 +474,7 @@ export type Database = {
           session_id?: string | null
           visit_count?: number | null
           visitor_fingerprint?: string | null
-          visitor_ip?: unknown | null
+          visitor_ip?: unknown
         }
         Relationships: [
           {
@@ -514,6 +662,141 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_generations: {
+        Row: {
+          cached_generation_data: Json | null
+          cached_task_data: Json | null
+          created_at: string | null
+          creator_avatar_url: string | null
+          creator_id: string | null
+          creator_name: string | null
+          creator_username: string | null
+          generation_id: string
+          id: string
+          last_viewed_at: string | null
+          share_slug: string
+          task_id: string
+          view_count: number | null
+        }
+        Insert: {
+          cached_generation_data?: Json | null
+          cached_task_data?: Json | null
+          created_at?: string | null
+          creator_avatar_url?: string | null
+          creator_id?: string | null
+          creator_name?: string | null
+          creator_username?: string | null
+          generation_id: string
+          id?: string
+          last_viewed_at?: string | null
+          share_slug: string
+          task_id: string
+          view_count?: number | null
+        }
+        Update: {
+          cached_generation_data?: Json | null
+          cached_task_data?: Json | null
+          created_at?: string | null
+          creator_avatar_url?: string | null
+          creator_id?: string | null
+          creator_name?: string | null
+          creator_username?: string | null
+          generation_id?: string
+          id?: string
+          last_viewed_at?: string | null
+          share_slug?: string
+          task_id?: string
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_generations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "referral_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_generations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "user_credit_balance"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "shared_generations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_generations_generation_id_fkey"
+            columns: ["generation_id"]
+            isOneToOne: false
+            referencedRelation: "generations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_generations_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "active_workers_health"
+            referencedColumns: ["current_task_id"]
+          },
+          {
+            foreignKeyName: "shared_generations_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "normalized_task_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_generations_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "recent_task_activity"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_generations_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shot_data_audit: {
+        Row: {
+          changed_by: string | null
+          created_at: string | null
+          generation_id: string | null
+          id: number
+          new_shot_data: Json | null
+          old_shot_data: Json | null
+          operation: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string | null
+          generation_id?: string | null
+          id?: number
+          new_shot_data?: Json | null
+          old_shot_data?: Json | null
+          operation?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string | null
+          generation_id?: string | null
+          id?: number
+          new_shot_data?: Json | null
+          old_shot_data?: Json | null
+          operation?: string | null
+        }
+        Relationships: []
+      }
       shot_generations: {
         Row: {
           created_at: string | null
@@ -607,6 +890,45 @@ export type Database = {
           },
         ]
       }
+      system_logs: {
+        Row: {
+          cycle_number: number | null
+          id: string
+          log_level: string
+          message: string
+          metadata: Json | null
+          source_id: string
+          source_type: string
+          task_id: string | null
+          timestamp: string
+          worker_id: string | null
+        }
+        Insert: {
+          cycle_number?: number | null
+          id?: string
+          log_level: string
+          message: string
+          metadata?: Json | null
+          source_id: string
+          source_type: string
+          task_id?: string | null
+          timestamp?: string
+          worker_id?: string | null
+        }
+        Update: {
+          cycle_number?: number | null
+          id?: string
+          log_level?: string
+          message?: string
+          metadata?: Json | null
+          source_id?: string
+          source_type?: string
+          task_id?: string | null
+          timestamp?: string
+          worker_id?: string | null
+        }
+        Relationships: []
+      }
       task_types: {
         Row: {
           base_cost_per_second: number
@@ -619,8 +941,10 @@ export type Database = {
           display_name: string
           id: string
           is_active: boolean | null
+          is_visible: boolean | null
           name: string
           run_type: string
+          supports_progress: boolean | null
           tool_type: string | null
           unit_cost: number | null
           updated_at: string
@@ -636,8 +960,10 @@ export type Database = {
           display_name: string
           id?: string
           is_active?: boolean | null
+          is_visible?: boolean | null
           name: string
           run_type?: string
+          supports_progress?: boolean | null
           tool_type?: string | null
           unit_cost?: number | null
           updated_at?: string
@@ -653,8 +979,10 @@ export type Database = {
           display_name?: string
           id?: string
           is_active?: boolean | null
+          is_visible?: boolean | null
           name?: string
           run_type?: string
+          supports_progress?: boolean | null
           tool_type?: string | null
           unit_cost?: number | null
           updated_at?: string
@@ -664,8 +992,9 @@ export type Database = {
       tasks: {
         Row: {
           attempts: number
+          copied_from_share: string | null
           created_at: string
-          dependant_on: string | null
+          dependant_on: string[] | null
           error_message: string | null
           generation_created: boolean
           generation_processed_at: string | null
@@ -682,8 +1011,9 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          copied_from_share?: string | null
           created_at?: string
-          dependant_on?: string | null
+          dependant_on?: string[] | null
           error_message?: string | null
           generation_created?: boolean
           generation_processed_at?: string | null
@@ -700,8 +1030,9 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          copied_from_share?: string | null
           created_at?: string
-          dependant_on?: string | null
+          dependant_on?: string[] | null
           error_message?: string | null
           generation_created?: boolean
           generation_processed_at?: string | null
@@ -730,6 +1061,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "active_workers_health"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "v_worker_log_activity"
+            referencedColumns: ["worker_id"]
           },
           {
             foreignKeyName: "tasks_worker_id_fkey"
@@ -931,7 +1269,9 @@ export type Database = {
           auto_topup_amount: number | null
           auto_topup_enabled: boolean
           auto_topup_last_triggered: string | null
+          auto_topup_setup_completed: boolean
           auto_topup_threshold: number | null
+          avatar_url: string | null
           credits: number
           email: string | null
           given_credits: boolean
@@ -948,7 +1288,9 @@ export type Database = {
           auto_topup_amount?: number | null
           auto_topup_enabled?: boolean
           auto_topup_last_triggered?: string | null
+          auto_topup_setup_completed?: boolean
           auto_topup_threshold?: number | null
+          avatar_url?: string | null
           credits?: number
           email?: string | null
           given_credits?: boolean
@@ -965,7 +1307,9 @@ export type Database = {
           auto_topup_amount?: number | null
           auto_topup_enabled?: boolean
           auto_topup_last_triggered?: string | null
+          auto_topup_setup_completed?: boolean
           auto_topup_threshold?: number | null
+          avatar_url?: string | null
           credits?: number
           email?: string | null
           given_credits?: boolean
@@ -982,6 +1326,7 @@ export type Database = {
       workers: {
         Row: {
           created_at: string
+          current_model: string | null
           id: string
           instance_type: string
           last_heartbeat: string
@@ -990,6 +1335,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_model?: string | null
           id: string
           instance_type: string
           last_heartbeat?: string
@@ -998,6 +1344,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_model?: string | null
           id?: string
           instance_type?: string
           last_heartbeat?: string
@@ -1090,6 +1437,13 @@ export type Database = {
             foreignKeyName: "tasks_worker_id_fkey"
             columns: ["worker_id"]
             isOneToOne: false
+            referencedRelation: "v_worker_log_activity"
+            referencedColumns: ["worker_id"]
+          },
+          {
+            foreignKeyName: "tasks_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
             referencedRelation: "worker_performance"
             referencedColumns: ["worker_id"]
           },
@@ -1116,6 +1470,7 @@ export type Database = {
       }
       shot_statistics: {
         Row: {
+          final_video_count: number | null
           positioned_count: number | null
           project_id: string | null
           shot_id: string | null
@@ -1206,6 +1561,30 @@ export type Database = {
         }
         Relationships: []
       }
+      v_recent_errors: {
+        Row: {
+          error_count: number | null
+          last_error_time: string | null
+          source_id: string | null
+          source_type: string | null
+          task_id: string | null
+          unique_messages: string[] | null
+          worker_id: string | null
+        }
+        Relationships: []
+      }
+      v_worker_log_activity: {
+        Row: {
+          error_count: number | null
+          last_heartbeat: string | null
+          last_log_time: string | null
+          log_count: number | null
+          status: string | null
+          warning_count: number | null
+          worker_id: string | null
+        }
+        Relationships: []
+      }
       worker_performance: {
         Row: {
           avg_processing_time_seconds: number | null
@@ -1239,52 +1618,33 @@ export type Database = {
           timeline_frame: number
         }[]
       }
-      duplicate_shot_generations: {
-        Args: {
-          p_source_shot_id: string
-          p_target_shot_id: string
-        }
-        Returns: {
-          inserted_count: number
-          skipped_videos: number
-          skipped_unpositioned: number
-        }[]
-      }
-      update_tool_settings_atomic: {
-        Args: {
-          p_table_name: string
-          p_id: string
-          p_tool_id: string
-          p_settings: Record<string, any>
-        }
-        Returns: void
+      all_dependencies_complete: {
+        Args: { p_dependant_on: string[] }
+        Returns: boolean
       }
       analyze_task_availability_service_role: {
         Args: { p_include_active?: boolean; p_run_type?: string }
-        Returns: {
-          in_progress_tasks: number
-          queued_tasks: number
-          run_type: string
-          task_breakdown: Json
-          total_tasks: number
-        }[]
+        Returns: Json
       }
-      analyze_task_availability_user: {
-        Args:
-          | {
+      analyze_task_availability_user:
+        | {
+            Args: { p_include_active?: boolean; p_user_id: string }
+            Returns: Json
+          }
+        | {
+            Args: {
               p_include_active?: boolean
               p_run_type?: string
               p_user_id: string
             }
-          | { p_include_active?: boolean; p_user_id: string }
-        Returns: {
-          in_progress_tasks: number
-          queued_tasks: number
-          run_type: string
-          task_breakdown: Json
-          total_tasks: number
-        }[]
-      }
+            Returns: {
+              in_progress_tasks: number
+              queued_tasks: number
+              run_type: string
+              task_breakdown: Json
+              total_tasks: number
+            }[]
+          }
       analyze_task_availability_user_pat: {
         Args: { p_include_active?: boolean; p_user_id: string }
         Returns: Json
@@ -1307,6 +1667,7 @@ export type Database = {
         Args: { p_instance_type?: string; p_worker_id: string }
         Returns: undefined
       }
+      batch_update_timeline_frames: { Args: { p_updates: Json }; Returns: Json }
       batch_update_timeline_positions: {
         Args: { updates: Json }
         Returns: {
@@ -1317,19 +1678,24 @@ export type Database = {
           timeline_frame: number
         }[]
       }
-      bytea_to_text: {
-        Args: { data: string }
-        Returns: string
+      bytea_to_text: { Args: { data: string }; Returns: string }
+      check_rate_limit: {
+        Args: {
+          p_key: string
+          p_max_requests: number
+          p_window_seconds: number
+        }
+        Returns: Json
       }
       check_shot_generations_functions: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           function_definition: string
           function_name: string
         }[]
       }
       check_shot_generations_triggers: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           trigger_definition: string
           trigger_enabled: boolean
@@ -1338,7 +1704,7 @@ export type Database = {
         }[]
       }
       check_welcome_bonus_eligibility: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           already_had_bonus: boolean
           current_credits_balance: number
@@ -1350,6 +1716,7 @@ export type Database = {
         Args: {
           p_include_active?: boolean
           p_run_type?: string
+          p_same_model_only?: boolean
           p_worker_id: string
         }
         Returns: {
@@ -1374,18 +1741,42 @@ export type Database = {
           user_id: string
         }[]
       }
-      claim_next_task_user_pat: {
-        Args: { p_include_active?: boolean; p_user_id: string }
-        Returns: {
-          params: Json
-          project_id: string
-          task_id: string
-          task_type: string
-        }[]
-      }
+      claim_next_task_user_pat:
+        | {
+            Args: { p_include_active?: boolean; p_user_id: string }
+            Returns: {
+              params: Json
+              project_id: string
+              task_id: string
+              task_type: string
+            }[]
+          }
+        | {
+            Args: {
+              p_include_active?: boolean
+              p_run_type?: string
+              p_user_id: string
+            }
+            Returns: {
+              params: Json
+              project_id: string
+              task_id: string
+              task_type: string
+              user_id: string
+            }[]
+          }
+      cleanup_old_rate_limits: { Args: never; Returns: number }
       complete_task_with_timing: {
         Args: { p_output_location: string; p_task_id: string }
         Returns: boolean
+      }
+      copy_onboarding_template: {
+        Args: { target_project_id: string; target_shot_id: string }
+        Returns: undefined
+      }
+      copy_onboarding_template_admin: {
+        Args: { target_project_id: string; target_shot_id: string }
+        Returns: undefined
       }
       count_eligible_tasks_service_role: {
         Args: { p_include_active?: boolean; p_run_type?: string }
@@ -1424,10 +1815,7 @@ export type Database = {
           success: boolean
         }[]
       }
-      create_user_record_if_not_exists: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      create_user_record_if_not_exists: { Args: never; Returns: undefined }
       debug_timeline_update: {
         Args: {
           p_generation_id: string
@@ -1436,6 +1824,19 @@ export type Database = {
           p_shot_id: string
         }
         Returns: Json
+      }
+      delete_external_api_key: { Args: { p_service: string }; Returns: Json }
+      duplicate_shot: {
+        Args: { original_shot_id: string; project_id: string }
+        Returns: string
+      }
+      duplicate_shot_generations: {
+        Args: { p_source_shot_id: string; p_target_shot_id: string }
+        Returns: {
+          inserted_count: number
+          skipped_unpositioned: number
+          skipped_videos: number
+        }[]
       }
       ensure_shot_association_from_params: {
         Args: { p_generation_id: string; p_params: Json }
@@ -1478,6 +1879,10 @@ export type Database = {
           worker_id: string
         }[]
       }
+      func_cleanup_old_logs: {
+        Args: { retention_hours?: number }
+        Returns: Json
+      }
       func_get_tasks_by_status: {
         Args: { status_filter: string[] }
         Returns: {
@@ -1495,16 +1900,20 @@ export type Database = {
         Args: { p_table_name?: string }
         Returns: string
       }
+      func_insert_logs_batch: { Args: { logs: Json }; Returns: Json }
       func_mark_task_complete: {
         Args: { result_data_param?: Json; task_id_param: string }
         Returns: undefined
       }
-      func_mark_task_failed: {
-        Args:
-          | { error_message_param?: string; task_id_param: string }
-          | { p_error_message: string; p_task_id: string }
-        Returns: boolean
-      }
+      func_mark_task_failed:
+        | {
+            Args: { p_error_message: string; p_task_id: string }
+            Returns: boolean
+          }
+        | {
+            Args: { error_message_param?: string; task_id_param: string }
+            Returns: undefined
+          }
       func_migrate_tasks_for_task_type: {
         Args: { p_table_name?: string }
         Returns: string
@@ -1530,6 +1939,39 @@ export type Database = {
         }
         Returns: undefined
       }
+      func_worker_heartbeat_with_logs:
+        | {
+            Args: {
+              current_task_id_param?: string
+              logs_param?: Json
+              vram_total_mb_param?: number
+              vram_used_mb_param?: number
+              worker_id_param: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              current_task_id_param?: string
+              logs_param?: Json
+              status_param?: string
+              vram_total_mb_param?: number
+              vram_used_mb_param?: number
+              worker_id_param: string
+            }
+            Returns: Json
+          }
+      get_external_api_key_decrypted: {
+        Args: { p_service: string; p_user_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          key_value: string
+          metadata: Json
+          service: string
+          updated_at: string
+        }[]
+      }
       get_recent_timeline_updates: {
         Args: { p_generation_id?: string; p_minutes?: number }
         Returns: {
@@ -1551,54 +1993,82 @@ export type Database = {
         }
         Returns: number
       }
-      get_task_run_type: {
-        Args: { p_task_type: string }
-        Returns: string
-      }
-      gtrgm_compress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_decompress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_in: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_options: {
-        Args: { "": unknown }
-        Returns: undefined
-      }
-      gtrgm_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
+      get_task_model: { Args: { p_params: Json }; Returns: string }
+      get_task_run_type: { Args: { p_task_type: string }; Returns: string }
       http: {
         Args: { request: Database["public"]["CompositeTypes"]["http_request"] }
         Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "http_request"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      http_delete: {
-        Args:
-          | { content: string; content_type: string; uri: string }
-          | { uri: string }
-        Returns: Database["public"]["CompositeTypes"]["http_response"]
-      }
-      http_get: {
-        Args: { data: Json; uri: string } | { uri: string }
-        Returns: Database["public"]["CompositeTypes"]["http_response"]
-      }
+      http_delete:
+        | {
+            Args: { uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { content: string; content_type: string; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      http_get:
+        | {
+            Args: { uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { data: Json; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       http_head: {
         Args: { uri: string }
         Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "*"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       http_header: {
         Args: { field: string; value: string }
         Returns: Database["public"]["CompositeTypes"]["http_header"]
+        SetofOptions: {
+          from: "*"
+          to: "http_header"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       http_list_curlopt: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           curlopt: string
           value: string
@@ -1607,24 +2077,52 @@ export type Database = {
       http_patch: {
         Args: { content: string; content_type: string; uri: string }
         Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "*"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      http_post: {
-        Args:
-          | { content: string; content_type: string; uri: string }
-          | { data: Json; uri: string }
-        Returns: Database["public"]["CompositeTypes"]["http_response"]
-      }
+      http_post:
+        | {
+            Args: { content: string; content_type: string; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { data: Json; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       http_put: {
         Args: { content: string; content_type: string; uri: string }
         Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "*"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      http_reset_curlopt: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      http_reset_curlopt: { Args: never; Returns: boolean }
       http_set_curlopt: {
         Args: { curlopt: string; value: string }
         Returns: boolean
+      }
+      increment_share_view_count: {
+        Args: { share_slug_param: string }
+        Returns: undefined
       }
       initialize_timeline_frames_for_shot: {
         Args: { p_frame_spacing?: number; p_shot_id: string }
@@ -1639,21 +2137,16 @@ export type Database = {
           success: boolean
         }[]
       }
-      normalize_image_path: {
-        Args: { image_path: string }
-        Returns: string
-      }
-      normalize_image_paths_in_jsonb: {
-        Args: { data: Json }
-        Returns: Json
-      }
+      normalize_image_path: { Args: { image_path: string }; Returns: string }
+      normalize_image_paths_in_jsonb: { Args: { data: Json }; Returns: Json }
       per_user_capacity_stats_service_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
+          allows_cloud: boolean
+          at_limit: boolean
           credits: number
           in_progress_tasks: number
           queued_tasks: number
-          total_pending_tasks: number
           user_id: string
         }[]
       }
@@ -1677,26 +2170,14 @@ export type Database = {
         }
         Returns: boolean
       }
-      sanitize_discord_handle: {
-        Args: { handle: string }
-        Returns: string
+      sanitize_discord_handle: { Args: { handle: string }; Returns: string }
+      save_external_api_key: {
+        Args: { p_key_value: string; p_metadata?: Json; p_service: string }
+        Returns: Json
       }
-      set_limit: {
-        Args: { "": number }
-        Returns: number
-      }
-      show_limit: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      show_trgm: {
-        Args: { "": string }
-        Returns: string[]
-      }
-      text_to_bytea: {
-        Args: { data: string }
-        Returns: string
-      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      text_to_bytea: { Args: { data: string }; Returns: string }
       timeline_sync_bulletproof: {
         Args: {
           frame_changes: Json
@@ -1742,6 +2223,12 @@ export type Database = {
           timeline_frame: number | null
           updated_at: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "shot_generations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       update_timeline_frame_debug: {
         Args: {
@@ -1752,22 +2239,49 @@ export type Database = {
         }
         Returns: Json
       }
-      urlencode: {
-        Args: { data: Json } | { string: string } | { string: string }
-        Returns: string
+      update_tool_settings_atomic: {
+        Args: {
+          p_id: string
+          p_settings: Json
+          p_table_name: string
+          p_tool_id: string
+        }
+        Returns: undefined
       }
-      verify_api_token: {
-        Args: { p_token: string }
-        Returns: boolean
-      }
+      urlencode:
+        | { Args: { data: Json }; Returns: string }
+        | {
+            Args: { string: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { string: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+      verify_api_token: { Args: { p_token: string }; Returns: boolean }
       verify_referral_security: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           anon_permissions: string[]
           auth_permissions: string[]
           policy_count: number
           rls_enabled: boolean
           table_name: string
+        }[]
+      }
+      verify_shot_sync: {
+        Args: never
+        Returns: {
+          gen_frame: number
+          gen_shot_id: string
+          generation_id: string
+          sg_frame: number
+          sg_shot_id: string
+          status: string
         }[]
       }
     }
@@ -1791,7 +2305,7 @@ export type Database = {
         value: string | null
       }
       http_request: {
-        method: unknown | null
+        method: unknown
         uri: string | null
         headers: Database["public"]["CompositeTypes"]["http_header"][] | null
         content_type: string | null
@@ -1803,6 +2317,511 @@ export type Database = {
         headers: Database["public"]["CompositeTypes"]["http_header"][] | null
         content: string | null
       }
+    }
+  }
+  storage: {
+    Tables: {
+      buckets: {
+        Row: {
+          allowed_mime_types: string[] | null
+          avif_autodetection: boolean | null
+          created_at: string | null
+          file_size_limit: number | null
+          id: string
+          name: string
+          owner: string | null
+          owner_id: string | null
+          public: boolean | null
+          type: Database["storage"]["Enums"]["buckettype"]
+          updated_at: string | null
+        }
+        Insert: {
+          allowed_mime_types?: string[] | null
+          avif_autodetection?: boolean | null
+          created_at?: string | null
+          file_size_limit?: number | null
+          id: string
+          name: string
+          owner?: string | null
+          owner_id?: string | null
+          public?: boolean | null
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string | null
+        }
+        Update: {
+          allowed_mime_types?: string[] | null
+          avif_autodetection?: boolean | null
+          created_at?: string | null
+          file_size_limit?: number | null
+          id?: string
+          name?: string
+          owner?: string | null
+          owner_id?: string | null
+          public?: boolean | null
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      buckets_analytics: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          format: string
+          id: string
+          name: string
+          type: Database["storage"]["Enums"]["buckettype"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          format?: string
+          id?: string
+          name: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          format?: string
+          id?: string
+          name?: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      buckets_vectors: {
+        Row: {
+          created_at: string
+          id: string
+          type: Database["storage"]["Enums"]["buckettype"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      migrations: {
+        Row: {
+          executed_at: string | null
+          hash: string
+          id: number
+          name: string
+        }
+        Insert: {
+          executed_at?: string | null
+          hash: string
+          id: number
+          name: string
+        }
+        Update: {
+          executed_at?: string | null
+          hash?: string
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      objects: {
+        Row: {
+          bucket_id: string | null
+          created_at: string | null
+          id: string
+          last_accessed_at: string | null
+          level: number | null
+          metadata: Json | null
+          name: string | null
+          owner: string | null
+          owner_id: string | null
+          path_tokens: string[] | null
+          updated_at: string | null
+          user_metadata: Json | null
+          version: string | null
+        }
+        Insert: {
+          bucket_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          level?: number | null
+          metadata?: Json | null
+          name?: string | null
+          owner?: string | null
+          owner_id?: string | null
+          path_tokens?: string[] | null
+          updated_at?: string | null
+          user_metadata?: Json | null
+          version?: string | null
+        }
+        Update: {
+          bucket_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          level?: number | null
+          metadata?: Json | null
+          name?: string | null
+          owner?: string | null
+          owner_id?: string | null
+          path_tokens?: string[] | null
+          updated_at?: string | null
+          user_metadata?: Json | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objects_bucketId_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prefixes: {
+        Row: {
+          bucket_id: string
+          created_at: string | null
+          level: number
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string | null
+          level?: number
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string | null
+          level?: number
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prefixes_bucketId_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      s3_multipart_uploads: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          id: string
+          in_progress_size: number
+          key: string
+          owner_id: string | null
+          upload_signature: string
+          user_metadata: Json | null
+          version: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          id: string
+          in_progress_size?: number
+          key: string
+          owner_id?: string | null
+          upload_signature: string
+          user_metadata?: Json | null
+          version: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          id?: string
+          in_progress_size?: number
+          key?: string
+          owner_id?: string | null
+          upload_signature?: string
+          user_metadata?: Json | null
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "s3_multipart_uploads_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      s3_multipart_uploads_parts: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          etag: string
+          id: string
+          key: string
+          owner_id: string | null
+          part_number: number
+          size: number
+          upload_id: string
+          version: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          etag: string
+          id?: string
+          key: string
+          owner_id?: string | null
+          part_number: number
+          size?: number
+          upload_id: string
+          version: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          etag?: string
+          id?: string
+          key?: string
+          owner_id?: string | null
+          part_number?: number
+          size?: number
+          upload_id?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "s3_multipart_uploads_parts_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "s3_multipart_uploads_parts_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "s3_multipart_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vector_indexes: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          data_type: string
+          dimension: number
+          distance_metric: string
+          id: string
+          metadata_configuration: Json | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          data_type: string
+          dimension: number
+          distance_metric: string
+          id?: string
+          metadata_configuration?: Json | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          data_type?: string
+          dimension?: number
+          distance_metric?: string
+          id?: string
+          metadata_configuration?: Json | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vector_indexes_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets_vectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      add_prefixes: {
+        Args: { _bucket_id: string; _name: string }
+        Returns: undefined
+      }
+      can_insert_object: {
+        Args: { bucketid: string; metadata: Json; name: string; owner: string }
+        Returns: undefined
+      }
+      delete_leaf_prefixes: {
+        Args: { bucket_ids: string[]; names: string[] }
+        Returns: undefined
+      }
+      delete_prefix: {
+        Args: { _bucket_id: string; _name: string }
+        Returns: boolean
+      }
+      extension: { Args: { name: string }; Returns: string }
+      filename: { Args: { name: string }; Returns: string }
+      foldername: { Args: { name: string }; Returns: string[] }
+      get_level: { Args: { name: string }; Returns: number }
+      get_prefix: { Args: { name: string }; Returns: string }
+      get_prefixes: { Args: { name: string }; Returns: string[] }
+      get_size_by_bucket: {
+        Args: never
+        Returns: {
+          bucket_id: string
+          size: number
+        }[]
+      }
+      list_multipart_uploads_with_delimiter: {
+        Args: {
+          bucket_id: string
+          delimiter_param: string
+          max_keys?: number
+          next_key_token?: string
+          next_upload_token?: string
+          prefix_param: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          key: string
+        }[]
+      }
+      list_objects_with_delimiter: {
+        Args: {
+          bucket_id: string
+          delimiter_param: string
+          max_keys?: number
+          next_token?: string
+          prefix_param: string
+          start_after?: string
+        }
+        Returns: {
+          id: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      lock_top_prefixes: {
+        Args: { bucket_ids: string[]; names: string[] }
+        Returns: undefined
+      }
+      operation: { Args: never; Returns: string }
+      search: {
+        Args: {
+          bucketname: string
+          levels?: number
+          limits?: number
+          offsets?: number
+          prefix: string
+          search?: string
+          sortcolumn?: string
+          sortorder?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      search_legacy_v1: {
+        Args: {
+          bucketname: string
+          levels?: number
+          limits?: number
+          offsets?: number
+          prefix: string
+          search?: string
+          sortcolumn?: string
+          sortorder?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      search_v1_optimised: {
+        Args: {
+          bucketname: string
+          levels?: number
+          limits?: number
+          offsets?: number
+          prefix: string
+          search?: string
+          sortcolumn?: string
+          sortorder?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      search_v2: {
+        Args: {
+          bucket_name: string
+          levels?: number
+          limits?: number
+          prefix: string
+          sort_column?: string
+          sort_column_after?: string
+          sort_order?: string
+          start_after?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          key: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+    }
+    Enums: {
+      buckettype: "STANDARD" | "ANALYTICS" | "VECTOR"
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }
@@ -1925,10 +2944,20 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       credit_ledger_type: ["stripe", "manual", "spend", "refund", "auto_topup"],
       task_status: ["Queued", "In Progress", "Complete", "Failed", "Cancelled"],
     },
   },
+  storage: {
+    Enums: {
+      buckettype: ["STANDARD", "ANALYTICS", "VECTOR"],
+    },
+  },
 } as const
+A new version of Supabase CLI is available: v2.72.7 (currently installed v2.33.3)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
