@@ -208,7 +208,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
             // Calculate horizontal constraints based on locked panes
             left: `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
             right: `${isTasksPaneLocked ? tasksPaneWidth : 0}px`,
-            bottom: '120px', // Positioned higher from bottom of viewport
+            bottom: '100px', // Positioned from bottom of viewport
             // Center within the available space
             display: 'flex',
             justifyContent: 'center',
