@@ -1,6 +1,7 @@
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { authenticateRequest } from "../_shared/auth.ts";
 import { SystemLogger } from "../_shared/systemLogger.ts";
 import { checkRateLimit, rateLimitResponse, getClientIp, RATE_LIMITS } from "../_shared/rateLimit.ts";
 
@@ -114,76 +115,28 @@ serve(async (req) => {
     client_provided_id: !!task_id
   });
 
-  // ─── 2. Extract authorization header ────────────────────────────
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    logger.error("Missing or invalid Authorization header");
+  // ─── 2. Authenticate using shared auth module ────────────────────
+  // Enable JWT user auth for frontend users (extracts user ID from Supabase JWT)
+  const auth = await authenticateRequest(req, supabaseAdmin, "[CREATE-TASK]", { allowJwtUserAuth: true });
+
+  if (!auth.success) {
+    logger.error("Authentication failed", { error: auth.error });
     await logger.flush();
-    return createCorsResponse("Missing or invalid Authorization header", 401);
+    return createCorsResponse(auth.error || "Authentication failed", auth.statusCode || 403);
   }
 
-  const token = authHeader.slice(7); // Remove "Bearer " prefix
+  const isServiceRole = auth.isServiceRole;
+  const callerId = auth.userId;
 
-  let callerId: string | null = null;
-  let isServiceRole = false;
-
-  // ─── 3. Check if token matches service-role key directly ────────
-  if (token === serviceKey) {
-    isServiceRole = true;
+  if (isServiceRole) {
     logger.debug("Authenticated via service-role key");
+  } else if (auth.isJwtAuth) {
+    logger.debug("Authenticated via JWT", { user_id: callerId });
+  } else {
+    logger.debug("Authenticated via PAT", { user_id: callerId });
   }
 
-  // ─── 4. If not service key, try to decode as JWT and check role ──
-  let isJwtToken = false;
-  if (!isServiceRole) {
-    try {
-      const parts = token.split(".");
-      if (parts.length === 3) {
-        const payloadB64 = parts[1];
-        const padded = payloadB64 + "=".repeat((4 - payloadB64.length % 4) % 4);
-        const payload = JSON.parse(atob(padded));
-        
-        isJwtToken = true;
-        
-        const role = payload.role || payload.app_metadata?.role;
-        if (["service_role", "supabase_admin"].includes(role)) {
-          isServiceRole = true;
-          logger.debug("Authenticated via JWT service-role");
-        } else {
-          callerId = payload.sub;
-          logger.debug("Authenticated via JWT", { user_id: callerId });
-        }
-      }
-    } catch (e) {
-      isJwtToken = false;
-    }
-  }
-  
-  // ─── 5. PAT PATH - resolve callerId via user_api_token table ──
-  if (!isServiceRole && !isJwtToken) {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from("user_api_tokens")
-        .select("user_id")
-        .eq("token", token)
-        .single();
-
-      if (error || !data) {
-        logger.error("PAT lookup failed", { error: error?.message });
-        await logger.flush();
-        return createCorsResponse("Invalid or expired token", 403);
-      }
-
-      callerId = data.user_id;
-      logger.debug("Authenticated via PAT", { user_id: callerId });
-    } catch (e: any) {
-      logger.error("Error querying user_api_token", { error: e?.message });
-      await logger.flush();
-      return createCorsResponse("Token validation failed", 403);
-    }
-  }
-
-  // ─── 6. Rate limit check (skip for service role) ─────────────────
+  // ─── 3. Rate limit check (skip for service role) ────────────────────
   if (!isServiceRole && callerId) {
     const rateLimitResult = await checkRateLimit(
       supabaseAdmin,
@@ -200,7 +153,7 @@ serve(async (req) => {
     }
   }
 
-  // ─── 7. Determine final project_id and validate permissions ─────
+  // ─── 4. Determine final project_id and validate permissions ─────
   let finalProjectId;
   if (isServiceRole) {
     if (!project_id) {
@@ -247,7 +200,7 @@ serve(async (req) => {
     finalProjectId = project_id;
   }
 
-  // ─── 8. Insert row using admin client ───────────────────────────
+  // ─── 5. Insert row using admin client ───────────────────────────
   try {
     const insertObject: any = {
       params,

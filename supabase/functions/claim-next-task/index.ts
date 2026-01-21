@@ -1,6 +1,7 @@
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { authenticateRequest } from "../_shared/auth.ts";
 import { SystemLogger } from "../_shared/systemLogger.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -8,28 +9,28 @@ declare const Deno: any;
 
 /**
  * Edge function: claim-next-task
- * 
+ *
  * OPTIMIZED VERSION - Performance improvements over original:
  * - Single database query instead of N+1 queries
  * - Database-level filtering instead of JavaScript filtering
  * - Atomic operations to prevent race conditions
  * - Dramatically reduced network round trips
  * - Enhanced debugging capabilities
- * 
+ *
  * Claims the next queued task atomically using optimized PostgreSQL functions.
  * - Service-role key: claims any task across all users (cloud processing)
  * - User token: claims only tasks for that specific user (local processing)
- * 
+ *
  * NOTE: For task counts and statistics, use the separate task-counts function.
- * 
+ *
  * POST /functions/v1/claim-next-task
- * Headers: Authorization: Bearer <JWT or PAT>
+ * Headers: Authorization: Bearer <service-key or PAT>
  * Body: {
  *   worker_id?: string,        // Optional worker ID for service role
  *   run_type?: 'gpu' | 'api', // Optional: filter tasks by execution environment
  *   same_model_only?: boolean // Optional: only claim tasks matching worker's current_model (for model affinity)
  * }
- * 
+ *
  * Returns:
  * - 200 OK with task data if task claimed successfully
  * - 204 No Content if no tasks available
@@ -48,7 +49,7 @@ serve(async (req) => {
 
   // Create admin client for database operations
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-  
+
   // Create logger
   const logger = new SystemLogger(supabaseAdmin, 'claim-next-task');
 
@@ -58,16 +59,6 @@ serve(async (req) => {
     await logger.flush();
     return new Response("Method not allowed", { status: 405 });
   }
-
-  // Extract authorization header
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    logger.error("Missing or invalid Authorization header");
-    await logger.flush();
-    return new Response("Missing or invalid Authorization header", { status: 401 });
-  }
-
-  const token = authHeader.slice(7); // Remove "Bearer " prefix
 
   // Parse request body
   let requestBody: any = {};
@@ -84,63 +75,22 @@ serve(async (req) => {
   const runType = requestBody.run_type || null; // 'gpu', 'api', or null (no filtering)
   const sameModelOnly = requestBody.same_model_only || false; // Only claim tasks matching worker's current model
 
-  let callerId: string | null = null;
-  let isServiceRole = false;
+  // Authenticate using shared auth module
+  const auth = await authenticateRequest(req, supabaseAdmin, "[CLAIM-NEXT-TASK]");
 
-  // 1) Check if token matches service-role key directly
-  if (token === serviceKey) {
-    isServiceRole = true;
+  if (!auth.success) {
+    logger.error("Authentication failed", { error: auth.error });
+    await logger.flush();
+    return new Response(auth.error || "Authentication failed", { status: auth.statusCode || 403 });
+  }
+
+  const isServiceRole = auth.isServiceRole;
+  const callerId = auth.userId;
+
+  if (isServiceRole) {
     logger.info("Authenticated via service-role key", { worker_id: workerId, run_type: runType });
-  }
-
-  // 2) If not service key, try to decode as JWT and check role
-  if (!isServiceRole) {
-    try {
-      const parts = token.split(".");
-      if (parts.length === 3) {
-        // It's a JWT - decode and check role
-        const payloadB64 = parts[1];
-        const padded = payloadB64 + "=".repeat((4 - (payloadB64.length % 4)) % 4);
-        const payload = JSON.parse(atob(padded));
-
-        // Check for service role in various claim locations
-        const role = payload.role || payload.app_metadata?.role;
-        if (["service_role", "supabase_admin"].includes(role)) {
-          isServiceRole = true;
-          logger.info("Authenticated via JWT service-role", { worker_id: workerId, run_type: runType });
-        }
-      }
-    } catch (e) {
-      // Not a valid JWT - will be treated as PAT
-      logger.debug("Token is not a valid JWT, treating as PAT");
-    }
-  }
-
-  // 3) USER TOKEN PATH - resolve callerId via user_api_token table
-  if (!isServiceRole) {
-    logger.debug("Looking up token in user_api_token table");
-    
-    try {
-      // Query user_api_tokens table to find user
-      const { data, error } = await supabaseAdmin
-        .from("user_api_tokens")
-        .select("user_id")
-        .eq("token", token)
-        .single();
-
-      if (error || !data) {
-        logger.error("Token lookup failed", { error: error?.message });
-        await logger.flush();
-        return new Response("Invalid or expired token", { status: 403 });
-      }
-
-      callerId = data.user_id;
-      logger.info("Authenticated via PAT", { user_id: callerId });
-    } catch (e: any) {
-      logger.error("Error querying user_api_token", { error: e?.message });
-      await logger.flush();
-      return new Response("Token validation failed", { status: 403 });
-    }
+  } else {
+    logger.info("Authenticated via PAT", { user_id: callerId });
   }
 
   try {

@@ -8,29 +8,44 @@ declare const Deno: any;
  */
 export interface AuthResult {
   isServiceRole: boolean;
-  userId: string | null; // Set if user token (PAT)
+  userId: string | null; // Set if user token (PAT or JWT)
   success: boolean;
   error?: string;
   statusCode?: number;
+  isJwtAuth?: boolean; // True if authenticated via JWT (as opposed to PAT)
+}
+
+/**
+ * Options for authenticateRequest
+ */
+export interface AuthOptions {
+  /** If true, also accept Supabase JWTs and extract user ID from payload.sub */
+  allowJwtUserAuth?: boolean;
 }
 
 /**
  * Authenticates a request using Bearer token (Service Role Key, JWT, or PAT)
- * 
- * This function handles three types of authentication:
+ *
+ * This function handles authentication methods:
  * 1. Service Role Key - Direct match with SUPABASE_SERVICE_ROLE_KEY
- * 2. JWT with service_role/supabase_admin role
- * 3. Personal Access Token (PAT) - Looked up in user_api_tokens table
- * 
+ * 2. Personal Access Token (PAT) - Looked up in user_api_tokens table
+ * 3. JWT User Auth (optional) - Extract user ID from JWT payload.sub
+ *
+ * NOTE: We intentionally do NOT accept JWTs with service_role claims.
+ * Only the actual service key can be used for service role access.
+ * This prevents unsigned/forged JWTs from gaining elevated privileges.
+ *
  * @param req - The incoming HTTP request
  * @param supabaseAdmin - Supabase admin client for database queries
  * @param logPrefix - Optional prefix for log messages (e.g., "[FUNCTION-NAME]")
+ * @param options - Optional settings for auth behavior
  * @returns AuthResult with authentication details
  */
 export async function authenticateRequest(
   req: Request,
   supabaseAdmin: any,
-  logPrefix: string = "[AUTH]"
+  logPrefix: string = "[AUTH]",
+  options: AuthOptions = {}
 ): Promise<AuthResult> {
   // Extract authorization header
   const authHeader = req.headers.get("Authorization");
@@ -69,12 +84,36 @@ export async function authenticateRequest(
     };
   }
 
-  // 2) Personal Access Token (PAT) - look up in user_api_tokens table (SECURE)
-  // NOTE: We intentionally do NOT accept JWTs with service_role claims.
-  // Only the actual service key can be used for service role access.
-  // This prevents unsigned/forged JWTs from gaining elevated privileges.
+  // 2) If JWT user auth is enabled, try to decode JWT and extract user ID
+  if (options.allowJwtUserAuth) {
+    try {
+      const parts = token.split(".");
+      if (parts.length === 3) {
+        const payloadB64 = parts[1];
+        const padded = payloadB64 + "=".repeat((4 - payloadB64.length % 4) % 4);
+        const payload = JSON.parse(atob(padded));
+
+        // Check if this is a regular user JWT (not service role)
+        const role = payload.role || payload.app_metadata?.role;
+        if (!["service_role", "supabase_admin"].includes(role) && payload.sub) {
+          console.log(`${logPrefix} Authenticated via JWT, user ID: ${payload.sub}`);
+          return {
+            isServiceRole: false,
+            userId: payload.sub,
+            success: true,
+            isJwtAuth: true
+          };
+        }
+      }
+    } catch (e) {
+      // Not a valid JWT - continue to PAT lookup
+      console.log(`${logPrefix} Token is not a valid JWT, checking PAT...`);
+    }
+  }
+
+  // 3) Personal Access Token (PAT) - look up in user_api_tokens table (SECURE)
   console.log(`${logPrefix} Looking up token in user_api_token table...`);
-  
+
   const { data, error } = await supabaseAdmin
     .from("user_api_tokens")
     .select("user_id")

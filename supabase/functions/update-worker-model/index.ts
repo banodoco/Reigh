@@ -1,6 +1,7 @@
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { authenticateRequest } from "../_shared/auth.ts";
 import { SystemLogger } from "../_shared/systemLogger.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -8,19 +9,19 @@ declare const Deno: any;
 
 /**
  * Edge function: update-worker-model
- * 
+ *
  * Updates a worker's current_model field to track which model is loaded.
  * This enables model-aware task claiming to minimize expensive model reloads.
- * 
+ *
  * Only accepts service-role authentication (workers use service key).
- * 
+ *
  * POST /functions/v1/update-worker-model
  * Headers: Authorization: Bearer <service-role-key>
  * Body: {
  *   worker_id: string,       // Required: the worker's ID
  *   current_model: string    // Required: the model currently loaded (e.g., "wan_2_2_i2v_480p")
  * }
- * 
+ *
  * Returns:
  * - 200 OK with worker data on success
  * - 400 Bad Request if missing required fields
@@ -39,7 +40,7 @@ serve(async (req) => {
 
   // Create admin client for database operations
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-  
+
   // Create logger
   const logger = new SystemLogger(supabaseAdmin, 'update-worker-model');
 
@@ -50,44 +51,17 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Extract authorization header
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    logger.error("Missing or invalid Authorization header");
+  // Authenticate using shared auth module
+  const auth = await authenticateRequest(req, supabaseAdmin, "[UPDATE-WORKER-MODEL]");
+
+  if (!auth.success) {
+    logger.error("Authentication failed", { error: auth.error });
     await logger.flush();
-    return new Response("Missing or invalid Authorization header", { status: 401 });
+    return new Response(auth.error || "Authentication failed", { status: auth.statusCode || 403 });
   }
 
-  const token = authHeader.slice(7); // Remove "Bearer " prefix
-
-  // Only allow service role access
-  let isServiceRole = false;
-
-  // 1) Check if token matches service-role key directly
-  if (token === serviceKey) {
-    isServiceRole = true;
-  }
-
-  // 2) If not service key, try to decode as JWT and check role
-  if (!isServiceRole) {
-    try {
-      const parts = token.split(".");
-      if (parts.length === 3) {
-        const payloadB64 = parts[1];
-        const padded = payloadB64 + "=".repeat((4 - (payloadB64.length % 4)) % 4);
-        const payload = JSON.parse(atob(padded));
-
-        const role = payload.role || payload.app_metadata?.role;
-        if (["service_role", "supabase_admin"].includes(role)) {
-          isServiceRole = true;
-        }
-      }
-    } catch (e) {
-      // Not a valid JWT
-    }
-  }
-
-  if (!isServiceRole) {
+  // This endpoint only allows service role access
+  if (!auth.isServiceRole) {
     logger.error("Service role required");
     await logger.flush();
     return new Response("Service role authentication required", { status: 403 });
