@@ -2483,7 +2483,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               })();
 
               return (
-                <div className="space-y-4">
+                <div className="space-y-4 w-full overflow-hidden">
                   <div
                     className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center mx-auto"
                     style={{ minHeight: '300px', maxHeight: '60vh', ...previewAspectStyle }}
@@ -2790,37 +2790,40 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   {/* Segment thumbnail indicators - horizontally scrollable */}
                   <div
                     ref={previewThumbnailsRef}
-                    className="flex items-center justify-center gap-2 overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
+                    className="w-full overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
                     style={{ scrollbarWidth: 'thin' }}
                   >
-                    {previewableSegments.map((segment, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        className={`relative flex-shrink-0 transition-all duration-200 rounded-lg overflow-hidden ${
-                          idx === safeIndex
-                            ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
-                            : 'opacity-60 hover:opacity-100'
-                        }`}
-                        style={{ width: 64, height: 36 }}
-                        onClick={() => setCurrentPreviewIndex(idx)}
-                        aria-label={`Go to segment ${segment.index + 1}`}
-                      >
-                        <img
-                          src={segment.thumbUrl || segment.startImageUrl || ''}
-                          alt={`Segment ${segment.index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        {!segment.hasVideo && (
-                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                            <span className="text-[8px] text-white">IMG</span>
-                          </div>
-                        )}
-                        <span className="absolute bottom-0.5 right-1 text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                          {segment.index + 1}
-                        </span>
-                      </button>
-                    ))}
+                    {/* Inner container: centers when content fits, scrolls when it doesn't */}
+                    <div className="flex items-center gap-2 w-fit mx-auto">
+                      {previewableSegments.map((segment, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          className={`relative flex-shrink-0 transition-all duration-200 rounded-lg overflow-hidden ${
+                            idx === safeIndex
+                              ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                              : 'opacity-60 hover:opacity-100'
+                          }`}
+                          style={{ width: 64, height: 36 }}
+                          onClick={() => setCurrentPreviewIndex(idx)}
+                          aria-label={`Go to segment ${segment.index + 1}`}
+                        >
+                          <img
+                            src={segment.thumbUrl || segment.startImageUrl || ''}
+                            alt={`Segment ${segment.index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          {!segment.hasVideo && (
+                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                              <span className="text-[8px] text-white">IMG</span>
+                            </div>
+                          )}
+                          <span className="absolute bottom-0.5 right-1 text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                            {segment.index + 1}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               );
