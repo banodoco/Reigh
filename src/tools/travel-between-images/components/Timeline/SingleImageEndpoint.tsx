@@ -28,6 +28,8 @@ interface SingleImageEndpointProps {
   maxAllowedGap: number;
   /** Read-only mode */
   readOnly?: boolean;
+  /** Click handler for the duration label - opens settings modal */
+  onDurationClick?: () => void;
 }
 
 // Constant ID for the endpoint - used in positions map and drag system
@@ -53,6 +55,7 @@ const SingleImageEndpoint: React.FC<SingleImageEndpointProps> = ({
   gapToImage,
   maxAllowedGap,
   readOnly = false,
+  onDurationClick,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -120,16 +123,18 @@ const SingleImageEndpoint: React.FC<SingleImageEndpointProps> = ({
         }}
       />
 
-      {/* Duration label (centered in the region) */}
+      {/* Duration label (centered in the region) - clickable to open settings */}
       <div
-        className={`absolute top-1/2 -translate-y-1/2 whitespace-nowrap pointer-events-none z-10
+        className={`absolute top-1/2 -translate-y-1/2 whitespace-nowrap z-10
           px-2.5 py-1 rounded-full text-[11px] font-light shadow-sm
           bg-card/90 dark:bg-gray-800/90 ${colorScheme.text} border ${colorScheme.regionBorder}
+          ${onDurationClick ? 'cursor-pointer hover:bg-card dark:hover:bg-gray-800 hover:shadow-md transition-all duration-200' : 'pointer-events-none'}
         `}
         style={{
           left: `${(imageLeftPercent + endpointLeftPercent) / 2}%`,
           transform: 'translate(-50%, -50%)',
         }}
+        onClick={onDurationClick}
       >
         Duration • {framesToSeconds(displayGap)}
       </div>
@@ -167,18 +172,6 @@ const SingleImageEndpoint: React.FC<SingleImageEndpointProps> = ({
           <GripVertical className="h-4 w-4 text-white" />
         </div>
 
-        {/* "End" label below the handle */}
-        <div
-          className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap
-            px-2 py-0.5 rounded-full text-[10px] font-medium
-            ${colorScheme.labelBg} ${colorScheme.text} border ${colorScheme.regionBorder}
-          `}
-          style={{
-            top: 'calc(50% + 36px)',
-          }}
-        >
-          End
-        </div>
       </div>
     </>
   );

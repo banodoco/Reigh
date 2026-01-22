@@ -1685,8 +1685,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // BUT: Only pass if not using preloaded images (to avoid filtering conflict)
                 hookData={preloadedImages ? undefined : hookData}
                 onDragStateChange={handleDragStateChange}
-                onPairClick={(pairIndex) => {
-                  const pairData = pairDataByIndex.get(pairIndex);
+                onPairClick={(pairIndex, passedPairData) => {
+                  // Use passed pairData (for single-image mode) or look up from local map
+                  const pairData = passedPairData || pairDataByIndex.get(pairIndex);
                   if (pairData) {
                     setSegmentSettingsModalData({ isOpen: true, pairData });
                   }
@@ -1864,8 +1865,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     return { shotId, shotName };
                   } : undefined}
                   // Pair prompt props - lookup from pairDataByIndex (single source of truth)
-                  onPairClick={(pairIndex) => {
-                    const pairData = pairDataByIndex.get(pairIndex);
+                  onPairClick={(pairIndex, passedPairData) => {
+                    // Use passed pairData (for single-image mode) or look up from local map
+                    const pairData = passedPairData || pairDataByIndex.get(pairIndex);
                     console.log('[PairIndicatorDebug] ShotImagesEditor onPairClick called', { pairIndex, pairData });
                     if (pairData) {
                       setSegmentSettingsModalData({ isOpen: true, pairData });
@@ -2061,7 +2063,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       <SegmentSettingsModal
         isOpen={segmentSettingsModalData.isOpen}
         onClose={() => setSegmentSettingsModalData({ isOpen: false, pairData: null })}
-        pairData={segmentSettingsModalData.pairData}
+        pairData={
+          // In batch mode with multiple images, always use batchVideoFrames for task submission
+          // This ensures the "Duration per pair" setting is respected
+          (effectiveGenerationMode === 'batch' && images.length > 1 && segmentSettingsModalData.pairData)
+            ? { ...segmentSettingsModalData.pairData, frames: batchVideoFrames }
+            : segmentSettingsModalData.pairData
+        }
         projectId={projectId || null}
         shotId={selectedShotId}
         generationId={selectedParentId || undefined}
@@ -2282,41 +2290,50 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           if (!segmentSettingsModalData.pairData) return false;
           return pairDataByIndex.has(segmentSettingsModalData.pairData.index + 1);
         })()}
-        onFrameCountChange={(frameCount: number) => {
-          console.log('[ModalFrameCount] onFrameCountChange:', frameCount, 'mode:', effectiveGenerationMode);
+        onFrameCountChange={
+          // In batch mode with multiple images, don't allow changing frame count per-pair
+          // Users should use the "Duration per pair" setting instead
+          (effectiveGenerationMode === 'batch' && images.length > 1)
+            ? undefined
+            : (frameCount: number) => {
+                console.log('[ModalFrameCount] onFrameCountChange:', frameCount, 'mode:', effectiveGenerationMode);
 
-          // Always update local modal state immediately for responsive UI
-          setSegmentSettingsModalData(prev => ({
-            ...prev,
-            pairData: prev.pairData ? {
-              ...prev.pairData,
-              frames: frameCount,
-              endFrame: (prev.pairData.startFrame ?? 0) + frameCount,
-            } : null,
-          }));
+                // Always update local modal state immediately for responsive UI
+                setSegmentSettingsModalData(prev => ({
+                  ...prev,
+                  pairData: prev.pairData ? {
+                    ...prev.pairData,
+                    frames: frameCount,
+                    endFrame: (prev.pairData.startFrame ?? 0) + frameCount,
+                  } : null,
+                }));
 
-          // In batch mode, don't update timeline - batch mode uses uniform batchVideoFrames
-          if (effectiveGenerationMode === 'batch') {
-            console.log('[ModalFrameCount] Skipping timeline update in batch mode');
-            return;
-          }
+                // In batch mode with single image, update batchVideoFrames
+                if (effectiveGenerationMode === 'batch') {
+                  console.log('[ModalFrameCount] Updating batchVideoFrames in batch mode:', frameCount);
+                  if (onSingleImageDurationChange) {
+                    onSingleImageDurationChange(frameCount);
+                  }
+                  return;
+                }
 
-          // Get the start image ID for this pair
-          const startImageId = segmentSettingsModalData.pairData?.startImage?.id;
-          if (!startImageId) {
-            console.warn('[ModalFrameCount] No startImageId available');
-            return;
-          }
+                // Timeline mode: update individual pair frame count
+                const startImageId = segmentSettingsModalData.pairData?.startImage?.id;
+                if (!startImageId) {
+                  console.warn('[ModalFrameCount] No startImageId available');
+                  return;
+                }
 
-          // Debounce and call the unified handler
-          if (frameCountDebounceRef.current) {
-            clearTimeout(frameCountDebounceRef.current);
-          }
+                // Debounce and call the unified handler
+                if (frameCountDebounceRef.current) {
+                  clearTimeout(frameCountDebounceRef.current);
+                }
 
-          frameCountDebounceRef.current = setTimeout(() => {
-            updatePairFrameCount(startImageId, frameCount);
-          }, 150);
-        }}
+                frameCountDebounceRef.current = setTimeout(() => {
+                  updatePairFrameCount(startImageId, frameCount);
+                }, 150);
+              }
+        }
         onGenerateStarted={(pairShotGenerationId) => {
           // Optimistic UI update - show pending state immediately before task is detected
           addOptimisticPending(pairShotGenerationId);

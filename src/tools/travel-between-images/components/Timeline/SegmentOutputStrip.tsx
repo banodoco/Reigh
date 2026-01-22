@@ -53,6 +53,12 @@ interface SegmentOutputStripProps {
   pairDataByIndex?: Map<number, PairData>;
   /** Callback when segment frame count changes (for instant timeline updates) */
   onSegmentFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
+  /** Single image mode - when there's only one image, show a segment placeholder */
+  singleImageMode?: {
+    imageId: string;
+    imageFrame: number;
+    endFrame: number;
+  };
 }
 
 export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
@@ -71,6 +77,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   onSelectedParentChange,
   pairDataByIndex,
   onSegmentFrameCountChange,
+  singleImageMode,
 }) => {
   // ===== ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP =====
   const isMobile = useIsMobile();
@@ -360,34 +367,52 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   // Calculate segment positions based on pair info
   // Uses same coordinate system as timeline for alignment
   const segmentPositions = useMemo(() => {
-    if (!pairInfo.length || fullRange <= 0 || containerWidth <= 0) return [];
-    
+    if (fullRange <= 0 || containerWidth <= 0) return [];
+
     const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
-    
+
+    // Handle single-image mode - create a single position spanning from image to endpoint
+    if (singleImageMode && pairInfo.length === 0) {
+      const startPixel = TIMELINE_PADDING_OFFSET + ((singleImageMode.imageFrame - fullMin) / fullRange) * effectiveWidth;
+      const endPixel = TIMELINE_PADDING_OFFSET + ((singleImageMode.endFrame - fullMin) / fullRange) * effectiveWidth;
+      const width = endPixel - startPixel;
+
+      const leftPercent = (startPixel / containerWidth) * 100;
+      const widthPercent = (width / containerWidth) * 100;
+
+      return [{
+        pairIndex: 0,
+        leftPercent,
+        widthPercent,
+      }];
+    }
+
+    if (!pairInfo.length) return [];
+
     const positions = pairInfo.map((pair) => {
       // Calculate pixel positions using same formula as timeline
       const startPixel = TIMELINE_PADDING_OFFSET + ((pair.startFrame - fullMin) / fullRange) * effectiveWidth;
       const endPixel = TIMELINE_PADDING_OFFSET + ((pair.endFrame - fullMin) / fullRange) * effectiveWidth;
       const width = endPixel - startPixel;
-      
+
       // Convert to percentages for CSS
       const leftPercent = (startPixel / containerWidth) * 100;
       const widthPercent = (width / containerWidth) * 100;
-      
+
       return {
         pairIndex: pair.index,
         leftPercent,
         widthPercent,
       };
     });
-    
+
     // Debug: log segment positions
-    console.log('[PairSlot] 📐 POSITIONS:', positions.map(p => 
+    console.log('[PairSlot] 📐 POSITIONS:', positions.map(p =>
       `[${p.pairIndex}]→${p.leftPercent.toFixed(1)}%`
     ).join(' '));
-    
+
     return positions;
-  }, [pairInfo, fullMin, fullRange, containerWidth]);
+  }, [pairInfo, fullMin, fullRange, containerWidth, singleImageMode]);
   
   // ===== NOW WE CAN HAVE EARLY RETURNS =====
 
@@ -399,6 +424,19 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       return segmentSlots;
     }
 
+    // Handle single-image mode - create a single placeholder slot
+    if (singleImageMode && pairInfo.length === 0) {
+      return [{
+        type: 'placeholder' as const,
+        index: 0,
+        pairShotGenerationId: singleImageMode.imageId,
+        expectedFrames: singleImageMode.endFrame - singleImageMode.imageFrame,
+        expectedPrompt: undefined,
+        startImage: undefined,
+        endImage: undefined,
+      }];
+    }
+
     // No segment data - create placeholder slots from pairInfo
     return pairInfo.map((pair) => ({
       type: 'placeholder' as const,
@@ -408,7 +446,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       startImage: undefined,
       endImage: undefined,
     }));
-  }, [segmentSlots, pairInfo]);
+  }, [segmentSlots, pairInfo, singleImageMode]);
 
   // Calculate preview dimensions based on aspect ratio
   // NOTE: This must be before the early return to follow React's rules of hooks
@@ -442,8 +480,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     return Math.max(minX, Math.min(maxX, previewPosition.x));
   }, [previewPosition.x, previewDimensions.width]);
 
-  // Don't render if no pairs (need at least 2 images for a pair)
-  if (pairInfo.length === 0) {
+  // Don't render if no pairs AND not in single-image mode
+  if (pairInfo.length === 0 && !singleImageMode) {
     return null;
   }
 

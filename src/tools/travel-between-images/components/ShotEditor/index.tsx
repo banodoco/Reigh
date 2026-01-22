@@ -2432,10 +2432,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           <Card>
             <CardHeader className="pb-2">
                 {/* Toggle header - selected option on left, swap icon, other option on right */}
-                {/* Hidden when stitchAfterGenerate is enabled (stitch settings shown inline instead) */}
-                {stitchAfterGenerate ? (
+                {/* Hidden when stitchAfterGenerate is enabled OR when there are 2 or fewer images */}
+                {stitchAfterGenerate || simpleFilteredImages.length <= 2 ? (
                   <span className="text-base sm:text-lg font-light text-foreground">
-                    Batch Generate
+                    {simpleFilteredImages.length <= 1 ? 'Generate' : 'Batch Generate'}
                   </span>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -2695,94 +2695,98 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     videoCount={Math.max(0, simpleFilteredImages.length - 1)}
                     stitchEnabled={stitchAfterGenerate}
                     middleContent={
-                      stitchAfterGenerate ? (
-                        <Collapsible className="mb-6 w-full">
-                          {/* Stitch toggle + settings trigger on same row */}
-                          <div className="flex items-center justify-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                id="stitch-after-generate"
-                                checked={stitchAfterGenerate}
-                                onCheckedChange={(checked) => joinSettings.updateField('stitchAfterGenerate', checked)}
-                              />
-                              <Label
-                                htmlFor="stitch-after-generate"
-                                className="text-sm font-normal cursor-pointer"
-                              >
-                                Stitch generated clips
-                              </Label>
+                      /* Only show stitch options when there are more than 2 images (multiple segments to stitch) */
+                      simpleFilteredImages.length > 2 ? (
+                        stitchAfterGenerate ? (
+                          <Collapsible className="mb-6 w-full">
+                            {/* Stitch toggle + settings trigger on same row */}
+                            <div className="flex items-center justify-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  id="stitch-after-generate"
+                                  checked={stitchAfterGenerate}
+                                  onCheckedChange={(checked) => joinSettings.updateField('stitchAfterGenerate', checked)}
+                                />
+                                <Label
+                                  htmlFor="stitch-after-generate"
+                                  className="text-sm font-normal cursor-pointer"
+                                >
+                                  Stitch generated clips
+                                </Label>
+                              </div>
+                              <CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group">
+                                <Settings className="w-4 h-4" />
+                                <span>Settings</span>
+                                <ChevronDown className="w-3 h-3 transition-transform group-data-[state=open]:rotate-180" />
+                              </CollapsibleTrigger>
                             </div>
-                            <CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group">
-                              <Settings className="w-4 h-4" />
-                              <span>Settings</span>
-                              <ChevronDown className="w-3 h-3 transition-transform group-data-[state=open]:rotate-180" />
-                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-4 pt-4 border-t">
+                                <JoinClipsSettingsForm
+                                  gapFrames={joinGapFrames}
+                                  setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
+                                  contextFrames={joinContextFrames}
+                                  setContextFrames={(val) => joinSettings.updateField('contextFrameCount', val)}
+                                  replaceMode={joinReplaceMode}
+                                  setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
+                                  keepBridgingImages={joinKeepBridgingImages}
+                                  setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
+                                  prompt={joinPrompt}
+                                  setPrompt={(val) => joinSettings.updateField('prompt', val)}
+                                  negativePrompt={joinNegativePrompt}
+                                  setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
+                                  enhancePrompt={joinEnhancePrompt}
+                                  setEnhancePrompt={(val) => joinSettings.updateField('enhancePrompt', val)}
+                                  availableLoras={availableLoras}
+                                  projectId={projectId}
+                                  loraPersistenceKey="join-clips-shot-editor-stitch"
+                                  loraManager={joinLoraManager}
+                                  onGenerate={() => {}} // No-op since generate is handled by main button
+                                  isGenerating={false}
+                                  generateSuccess={false}
+                                  generateButtonText=""
+                                  showGenerateButton={false}
+                                  onRestoreDefaults={handleRestoreJoinDefaults}
+                                  shortestClipFrames={joinValidationData.shortestClipFrames}
+                                  motionMode={joinMotionMode}
+                                  onMotionModeChange={(mode) => joinSettings.updateField('motionMode', mode)}
+                                  phaseConfig={joinPhaseConfig ?? DEFAULT_JOIN_CLIPS_PHASE_CONFIG}
+                                  onPhaseConfigChange={(config) => joinSettings.updateField('phaseConfig', config)}
+                                  randomSeed={joinRandomSeed}
+                                  onRandomSeedChange={(val) => joinSettings.updateField('randomSeed', val)}
+                                  selectedPhasePresetId={joinSelectedPhasePresetId ?? BUILTIN_JOIN_CLIPS_DEFAULT_ID}
+                                  onPhasePresetSelect={(presetId, config) => {
+                                    joinSettings.updateFields({
+                                      selectedPhasePresetId: presetId,
+                                      phaseConfig: config,
+                                    });
+                                  }}
+                                  onPhasePresetRemove={() => {
+                                    joinSettings.updateField('selectedPhasePresetId', null);
+                                  }}
+                                />
+                              </CollapsibleContent>
+                          </Collapsible>
+                        ) : (
+                          /* Just the toggle when stitch is disabled */
+                          <div className="mb-6 flex items-center justify-center gap-2">
+                            <Switch
+                              id="stitch-after-generate"
+                              checked={stitchAfterGenerate}
+                              onCheckedChange={(checked) => joinSettings.updateField('stitchAfterGenerate', checked)}
+                            />
+                            <Label
+                              htmlFor="stitch-after-generate"
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              Stitch generated clips
+                            </Label>
                           </div>
-                          <CollapsibleContent className="mt-4 pt-4 border-t">
-                              <JoinClipsSettingsForm
-                                gapFrames={joinGapFrames}
-                                setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
-                                contextFrames={joinContextFrames}
-                                setContextFrames={(val) => joinSettings.updateField('contextFrameCount', val)}
-                                replaceMode={joinReplaceMode}
-                                setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
-                                keepBridgingImages={joinKeepBridgingImages}
-                                setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
-                                prompt={joinPrompt}
-                                setPrompt={(val) => joinSettings.updateField('prompt', val)}
-                                negativePrompt={joinNegativePrompt}
-                                setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
-                                enhancePrompt={joinEnhancePrompt}
-                                setEnhancePrompt={(val) => joinSettings.updateField('enhancePrompt', val)}
-                                availableLoras={availableLoras}
-                                projectId={projectId}
-                                loraPersistenceKey="join-clips-shot-editor-stitch"
-                                loraManager={joinLoraManager}
-                                onGenerate={() => {}} // No-op since generate is handled by main button
-                                isGenerating={false}
-                                generateSuccess={false}
-                                generateButtonText=""
-                                showGenerateButton={false}
-                                onRestoreDefaults={handleRestoreJoinDefaults}
-                                shortestClipFrames={joinValidationData.shortestClipFrames}
-                                motionMode={joinMotionMode}
-                                onMotionModeChange={(mode) => joinSettings.updateField('motionMode', mode)}
-                                phaseConfig={joinPhaseConfig ?? DEFAULT_JOIN_CLIPS_PHASE_CONFIG}
-                                onPhaseConfigChange={(config) => joinSettings.updateField('phaseConfig', config)}
-                                randomSeed={joinRandomSeed}
-                                onRandomSeedChange={(val) => joinSettings.updateField('randomSeed', val)}
-                                selectedPhasePresetId={joinSelectedPhasePresetId ?? BUILTIN_JOIN_CLIPS_DEFAULT_ID}
-                                onPhasePresetSelect={(presetId, config) => {
-                                  joinSettings.updateFields({
-                                    selectedPhasePresetId: presetId,
-                                    phaseConfig: config,
-                                  });
-                                }}
-                                onPhasePresetRemove={() => {
-                                  joinSettings.updateField('selectedPhasePresetId', null);
-                                }}
-                              />
-                            </CollapsibleContent>
-                        </Collapsible>
-                      ) : (
-                        /* Just the toggle when stitch is disabled */
-                        <div className="mb-6 flex items-center justify-center gap-2">
-                          <Switch
-                            id="stitch-after-generate"
-                            checked={stitchAfterGenerate}
-                            onCheckedChange={(checked) => joinSettings.updateField('stitchAfterGenerate', checked)}
-                          />
-                          <Label
-                            htmlFor="stitch-after-generate"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Stitch generated clips
-                          </Label>
-                        </div>
-                      )
+                        )
+                      ) : undefined
                     }
                     bottomContent={
-                      !stitchAfterGenerate ? (
+                      /* Only show swap button when there are more than 2 images and stitch is disabled */
+                      simpleFilteredImages.length > 2 && !stitchAfterGenerate ? (
                         <button
                           ref={swapButtonRef}
                           onClick={() => toggleGenerateModePreserveScroll('join')}

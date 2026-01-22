@@ -1,6 +1,7 @@
 import { GenerationRow, PairLoraConfig, PairMotionSettings } from '@/types/shots';
 import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
 import type { PhaseConfig } from '@/tools/travel-between-images/settings';
+import type { PairData } from '@/tools/travel-between-images/components/Timeline/TimelineContainer';
 
 /** Per-pair parameter overrides for showing override icons */
 export type PairOverridesMap = Record<number, {
@@ -40,8 +41,8 @@ export interface ShotImageManagerProps {
   onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
-  // Pair prompt props - only pass index, parent handles lookup from pairDataByIndex
-  onPairClick?: (pairIndex: number) => void;
+  // Pair prompt props - pass index and optionally pairData (for single-image mode)
+  onPairClick?: (pairIndex: number, pairData?: PairData) => void;
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
@@ -91,8 +92,8 @@ export interface BaseShotImageManagerProps {
   isUploadingImage?: boolean;
   onSelectionChange?: (hasSelection: boolean) => void;
   readOnly?: boolean;
-  // Pair prompt props - only pass index, parent handles lookup from pairDataByIndex
-  onPairClick?: (pairIndex: number) => void;
+  // Pair prompt props - pass index and optionally pairData (for single-image mode)
+  onPairClick?: (pairIndex: number, pairData?: PairData) => void;
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;

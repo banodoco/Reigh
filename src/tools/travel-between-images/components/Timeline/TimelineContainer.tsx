@@ -1291,6 +1291,30 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             localShotGenPositions={localShotGenPositions}
             pairDataByIndex={pairDataByIndex}
             onOpenPairSettings={onPairClick ? (pairIndex: number) => {
+              // Handle single-image mode
+              if (images.length === 1 && singleImageEndFrame !== undefined) {
+                const entry = [...currentPositions.entries()][0];
+                if (entry) {
+                  const [imageId, imageFrame] = entry;
+                  const image = images[0];
+                  onPairClick(pairIndex, {
+                    index: 0,
+                    frames: singleImageEndFrame - imageFrame,
+                    startFrame: imageFrame,
+                    endFrame: singleImageEndFrame,
+                    startImage: {
+                      id: imageId,
+                      generationId: image.generation_id,
+                      url: image.imageUrl || image.thumbUrl,
+                      thumbUrl: image.thumbUrl,
+                      position: 1,
+                    },
+                    // No end image in single-image mode
+                    endImage: undefined,
+                  });
+                }
+                return;
+              }
               // Use precomputed pair data (same source of truth for modal and lightbox)
               const pairData = pairDataByIndex.get(pairIndex);
               if (pairData) {
@@ -1300,6 +1324,16 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             selectedParentId={selectedOutputId}
             onSelectedParentChange={onSelectedOutputChange}
             onSegmentFrameCountChange={onSegmentFrameCountChange}
+            singleImageMode={images.length === 1 && singleImageEndFrame !== undefined ? (() => {
+              const entry = [...currentPositions.entries()][0];
+              if (!entry) return undefined;
+              const [imageId, imageFrame] = entry;
+              return {
+                imageId,
+                imageFrame,
+                endFrame: singleImageEndFrame,
+              };
+            })() : undefined}
           />
         )}
 
@@ -1687,6 +1721,24 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 gapToImage={gapToImage}
                 maxAllowedGap={maxAllowedGap}
                 readOnly={readOnly}
+                onDurationClick={onPairClick ? () => {
+                  // Open modal for single-image mode
+                  const image = images[0];
+                  onPairClick(0, {
+                    index: 0,
+                    frames: effectiveEndFrame - imageFrame,
+                    startFrame: imageFrame,
+                    endFrame: effectiveEndFrame,
+                    startImage: {
+                      id,
+                      generationId: image.generation_id,
+                      url: image.imageUrl || image.thumbUrl,
+                      thumbUrl: image.thumbUrl,
+                      position: 1,
+                    },
+                    endImage: undefined,
+                  });
+                } : undefined}
               />
             );
           })()}

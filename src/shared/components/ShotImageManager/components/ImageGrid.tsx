@@ -9,6 +9,8 @@ import { InlineSegmentVideo } from '@/tools/travel-between-images/components/Tim
 import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
 import type { PhaseConfig } from '@/tools/travel-between-images/settings';
 import type { UseVideoScrubbingReturn } from '@/shared/hooks/useVideoScrubbing';
+import type { PairData } from '@/tools/travel-between-images/components/Timeline/TimelineContainer';
+import { SingleImageDurationIndicator } from './SingleImageDurationIndicator';
 
 const FPS = 16;
 
@@ -32,8 +34,8 @@ interface ImageGridProps {
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
   readOnly?: boolean;
-  // Pair prompt props - only pass index, parent handles lookup from pairDataByIndex
-  onPairClick?: (pairIndex: number) => void;
+  // Pair prompt props - pass index and optionally pairData (for single-image mode)
+  onPairClick?: (pairIndex: number, pairData?: PairData) => void;
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
@@ -293,7 +295,37 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
           </div>
         );
       })}
-      
+
+      {/* Single-image duration indicator - only show when there's exactly 1 image */}
+      {images.length === 1 && onPairClick && (
+        <div className="flex items-center justify-center">
+          <SingleImageDurationIndicator
+            frames={batchVideoFrames}
+            fps={FPS}
+            readOnly={readOnly}
+            projectAspectRatio={projectAspectRatio}
+            onClick={() => {
+              const image = images[0];
+              const pairData: PairData = {
+                index: 0,
+                frames: batchVideoFrames,
+                startFrame: 0,
+                endFrame: batchVideoFrames,
+                startImage: {
+                  id: image.id,
+                  generationId: image.generation_id || undefined,
+                  url: (image as any).imageUrl || (image as any).thumbUrl,
+                  thumbUrl: (image as any).thumbUrl,
+                  position: 1,
+                },
+                endImage: null,
+              };
+              onPairClick(0, pairData);
+            }}
+          />
+        </div>
+      )}
+
       {/* Add Images card - appears as next item in grid */}
       {onImageUpload && !readOnly && (
         <AddImagesCard
