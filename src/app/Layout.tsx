@@ -365,8 +365,8 @@ const Layout: React.FC = () => {
         <GenerationsPane />
         
         {/* Social Icons Footer */}
-        <div 
-          className="relative z-10 transition-[margin] duration-300 ease-smooth"
+        <div
+          className="relative transition-[margin] duration-300 ease-smooth"
           style={footerStyle}
         >
           <SocialIcons />
