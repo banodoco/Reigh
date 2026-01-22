@@ -2316,6 +2316,101 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           // Optimistic UI update - show pending state immediately before task is detected
           addOptimisticPending(pairShotGenerationId);
         }}
+        structureVideoType={(() => {
+          // Determine if this segment has structure video coverage
+          if (!propStructureVideos || propStructureVideos.length === 0) return null;
+
+          const pairStartFrame = segmentSettingsModalData.pairData?.startFrame ?? 0;
+          const pairEndFrame = segmentSettingsModalData.pairData?.endFrame ?? 0;
+
+          // In batch mode, the structure video covers all segments
+          if (effectiveGenerationMode === 'batch') {
+            return propStructureVideos[0].structure_type ?? 'flow';
+          }
+
+          // In timeline mode, find a structure video that overlaps with this segment
+          const coveringVideo = propStructureVideos.find(video => {
+            const videoStart = video.start_frame ?? 0;
+            const videoEnd = video.end_frame ?? Infinity;
+            // Check for overlap: segment overlaps with video if segmentEnd > videoStart AND segmentStart < videoEnd
+            return pairEndFrame > videoStart && pairStartFrame < videoEnd;
+          });
+
+          return coveringVideo?.structure_type ?? null;
+        })()}
+        structureVideoDefaults={(() => {
+          // Get structure video defaults for this segment
+          if (!propStructureVideos || propStructureVideos.length === 0) return undefined;
+
+          const pairStartFrame = segmentSettingsModalData.pairData?.startFrame ?? 0;
+          const pairEndFrame = segmentSettingsModalData.pairData?.endFrame ?? 0;
+
+          let coveringVideo = propStructureVideos[0]; // Default to first video
+
+          // In timeline mode, find the specific video that covers this segment
+          if (effectiveGenerationMode !== 'batch') {
+            const found = propStructureVideos.find(video => {
+              const videoStart = video.start_frame ?? 0;
+              const videoEnd = video.end_frame ?? Infinity;
+              return pairEndFrame > videoStart && pairStartFrame < videoEnd;
+            });
+            if (!found) return undefined;
+            coveringVideo = found;
+          }
+
+          return {
+            motionStrength: coveringVideo.motion_strength ?? 1.2,
+            treatment: coveringVideo.treatment ?? 'adjust',
+            uni3cEndPercent: coveringVideo.uni3c_end_percent ?? 0.1,
+          };
+        })()}
+        structureVideoUrl={(() => {
+          if (!propStructureVideos || propStructureVideos.length === 0) return undefined;
+
+          const pairStartFrame = segmentSettingsModalData.pairData?.startFrame ?? 0;
+          const pairEndFrame = segmentSettingsModalData.pairData?.endFrame ?? 0;
+
+          // In batch mode, use first video
+          if (effectiveGenerationMode === 'batch') {
+            return propStructureVideos[0].path;
+          }
+
+          // In timeline mode, find covering video
+          const found = propStructureVideos.find(video => {
+            const videoStart = video.start_frame ?? 0;
+            const videoEnd = video.end_frame ?? Infinity;
+            return pairEndFrame > videoStart && pairStartFrame < videoEnd;
+          });
+          return found?.path;
+        })()}
+        structureVideoFrameRange={(() => {
+          if (!propStructureVideos || propStructureVideos.length === 0) return undefined;
+
+          const pairStartFrame = segmentSettingsModalData.pairData?.startFrame ?? 0;
+          const pairEndFrame = segmentSettingsModalData.pairData?.endFrame ?? 0;
+
+          let coveringVideo = propStructureVideos[0];
+
+          if (effectiveGenerationMode !== 'batch') {
+            const found = propStructureVideos.find(video => {
+              const videoStart = video.start_frame ?? 0;
+              const videoEnd = video.end_frame ?? Infinity;
+              return pairEndFrame > videoStart && pairStartFrame < videoEnd;
+            });
+            if (!found) return undefined;
+            coveringVideo = found;
+          }
+
+          const videoTotalFrames = coveringVideo.metadata?.total_frames ?? 60;
+          const videoFps = coveringVideo.metadata?.frame_rate ?? 24;
+
+          return {
+            segmentStart: pairStartFrame,
+            segmentEnd: pairEndFrame,
+            videoTotalFrames,
+            videoFps,
+          };
+        })()}
       />
       
       {/* Preview Together Dialog */}

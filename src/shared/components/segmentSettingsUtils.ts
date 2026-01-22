@@ -95,6 +95,10 @@ export interface SegmentSettings {
   seed?: number;
   // Variant behavior
   makePrimaryVariant: boolean;
+  // Structure video overrides (only when segment has structure video)
+  structureMotionStrength?: number; // 0-2 scale
+  structureTreatment?: 'adjust' | 'clip';
+  structureUni3cEndPercent?: number; // 0-1 scale
 }
 
 /**
@@ -417,6 +421,10 @@ export interface PairSettingsToSave {
   seed?: number;
   // UI state
   selectedPhasePresetId?: string | null;
+  // Structure video overrides
+  structureMotionStrength?: number;
+  structureTreatment?: 'adjust' | 'clip';
+  structureUni3cEndPercent?: number;
 }
 
 /**
@@ -596,37 +604,64 @@ export function buildMetadataUpdate(
   });
 
   // Convert PairSettingsToSave to SegmentOverrides format for new storage
+  // Convention:
+  //   undefined = don't touch this field (keep existing value)
+  //   '' (empty) = explicitly clear the override (use shot default)
+  //   'value' = set the override
   const overrides: SegmentOverrides = {};
 
+  // Track fields that should be explicitly cleared (set to '' means remove override)
+  const fieldsToClear: (keyof SegmentOverrides)[] = [];
+
   if (settings.prompt !== undefined) {
-    overrides.prompt = settings.prompt;
+    if (settings.prompt === '') {
+      fieldsToClear.push('prompt');
+    } else {
+      overrides.prompt = settings.prompt;
+    }
   }
   if (settings.negativePrompt !== undefined) {
-    overrides.negativePrompt = settings.negativePrompt;
+    if (settings.negativePrompt === '') {
+      fieldsToClear.push('negativePrompt');
+    } else {
+      overrides.negativePrompt = settings.negativePrompt;
+    }
   }
+  // Motion settings: null = clear, undefined = don't touch, value = set
   if (settings.motionMode !== undefined) {
-    overrides.motionMode = settings.motionMode;
+    if (settings.motionMode === null) {
+      fieldsToClear.push('motionMode');
+    } else {
+      overrides.motionMode = settings.motionMode;
+    }
   }
   if (settings.amountOfMotion !== undefined) {
-    // Store in 0-100 scale (UI scale) in new format
-    overrides.amountOfMotion = settings.amountOfMotion;
+    if (settings.amountOfMotion === null) {
+      fieldsToClear.push('amountOfMotion');
+    } else {
+      // Store in 0-100 scale (UI scale) in new format
+      overrides.amountOfMotion = settings.amountOfMotion;
+    }
   }
   if (settings.phaseConfig !== undefined) {
     if (settings.phaseConfig === null) {
-      // null means clear - we need to explicitly remove it from segmentOverrides
-      // Set to undefined so writeSegmentOverrides doesn't touch it, then delete manually below
+      fieldsToClear.push('phaseConfig');
     } else {
       overrides.phaseConfig = stripModeFromPhaseConfig(settings.phaseConfig);
     }
   }
   if (settings.loras !== undefined) {
-    // Convert ActiveLora[] to LoraConfig[]
-    overrides.loras = settings.loras.map((l): LoraConfig => ({
-      id: l.id,
-      name: l.name,
-      path: l.path,
-      strength: l.strength,
-    }));
+    if (settings.loras === null) {
+      fieldsToClear.push('loras');
+    } else {
+      // Convert ActiveLora[] to LoraConfig[]
+      overrides.loras = settings.loras.map((l): LoraConfig => ({
+        id: l.id,
+        name: l.name,
+        path: l.path,
+        strength: l.strength,
+      }));
+    }
   }
   // Note: numFrames is NOT saved - timeline positions are the source of truth
   if (settings.randomSeed !== undefined) {
@@ -636,7 +671,33 @@ export function buildMetadataUpdate(
     overrides.seed = settings.seed;
   }
   if (settings.selectedPhasePresetId !== undefined) {
-    overrides.selectedPhasePresetId = settings.selectedPhasePresetId;
+    if (settings.selectedPhasePresetId === null) {
+      fieldsToClear.push('selectedPhasePresetId');
+    } else {
+      overrides.selectedPhasePresetId = settings.selectedPhasePresetId;
+    }
+  }
+  // Structure video overrides: null = clear, undefined = don't touch, value = set
+  if (settings.structureMotionStrength !== undefined) {
+    if (settings.structureMotionStrength === null) {
+      fieldsToClear.push('structureMotionStrength');
+    } else {
+      overrides.structureMotionStrength = settings.structureMotionStrength;
+    }
+  }
+  if (settings.structureTreatment !== undefined) {
+    if (settings.structureTreatment === null) {
+      fieldsToClear.push('structureTreatment');
+    } else {
+      overrides.structureTreatment = settings.structureTreatment;
+    }
+  }
+  if (settings.structureUni3cEndPercent !== undefined) {
+    if (settings.structureUni3cEndPercent === null) {
+      fieldsToClear.push('structureUni3cEndPercent');
+    } else {
+      overrides.structureUni3cEndPercent = settings.structureUni3cEndPercent;
+    }
   }
 
   // Use writeSegmentOverrides to write to new format
@@ -646,6 +707,13 @@ export function buildMetadataUpdate(
   if (settings.phaseConfig === null && newMetadata.segmentOverrides) {
     delete newMetadata.segmentOverrides.phaseConfig;
     delete newMetadata.segmentOverrides.selectedPhasePresetId; // Also clear preset when clearing config
+  }
+
+  // Handle explicitly cleared fields ('' means remove override, use shot default)
+  if (fieldsToClear.length > 0 && newMetadata.segmentOverrides) {
+    for (const field of fieldsToClear) {
+      delete newMetadata.segmentOverrides[field];
+    }
   }
 
   // Clean up old pair_* fields (migration cleanup)

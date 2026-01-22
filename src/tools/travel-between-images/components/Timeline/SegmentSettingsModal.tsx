@@ -62,6 +62,23 @@ interface SegmentSettingsModalProps {
   onFrameCountChange?: (frameCount: number) => void;
   /** Callback when generate is initiated (for optimistic UI updates) */
   onGenerateStarted?: (pairShotGenerationId: string | null | undefined) => void;
+  /** Structure video type for this segment (null = no structure video coverage) */
+  structureVideoType?: 'uni3c' | 'flow' | 'canny' | 'depth' | null;
+  /** Shot-level structure video defaults */
+  structureVideoDefaults?: {
+    motionStrength: number;
+    treatment: 'adjust' | 'clip';
+    uni3cEndPercent: number;
+  };
+  /** Structure video URL for preview */
+  structureVideoUrl?: string;
+  /** Frame range info for this segment's structure video usage */
+  structureVideoFrameRange?: {
+    segmentStart: number;
+    segmentEnd: number;
+    videoTotalFrames: number;
+    videoFps: number;
+  };
 }
 
 const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
@@ -86,6 +103,10 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
   hasNext = false,
   onFrameCountChange,
   onGenerateStarted,
+  structureVideoType,
+  structureVideoDefaults,
+  structureVideoUrl,
+  structureVideoFrameRange,
 }) => {
   const { toast } = useToast();
   const modal = useMediumModal();
@@ -103,6 +124,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
       negativePrompt: '',
       numFrames: pairData?.frames || 25,
     },
+    structureVideoDefaults: structureVideoDefaults ?? null,
   });
 
   // Handle close - optimistic update + background save
@@ -121,6 +143,12 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
             randomSeed: settings.randomSeed,
             seed: settings.seed,
             selectedPhasePresetId: settings.selectedPhasePresetId,
+            // Structure video overrides (only if segment has structure video)
+            ...(structureVideoType && {
+              structureMotionStrength: settings.structureMotionStrength,
+              structureTreatment: settings.structureTreatment,
+              structureUni3cEndPercent: settings.structureUni3cEndPercent,
+            }),
           });
         });
 
@@ -128,7 +156,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
       }
       onClose();
     }
-  }, [isDirty, pairShotGenerationId, saveSettings, onClose, queryClient, settings]);
+  }, [isDirty, pairShotGenerationId, saveSettings, onClose, queryClient, settings, structureVideoType]);
 
   // Navigation handlers
   const handleNavigatePrevious = useCallback(() => {
@@ -326,6 +354,10 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
             onRestoreDefaults={resetSettings}
             hasOverride={hasOverride}
             shotDefaults={shotDefaults}
+            structureVideoType={structureVideoType}
+            structureVideoDefaults={structureVideoDefaults}
+            structureVideoUrl={structureVideoUrl}
+            structureVideoFrameRange={structureVideoFrameRange}
           />
           {!generationId && !shotId && (
             <p className="text-xs text-muted-foreground text-center mt-2">

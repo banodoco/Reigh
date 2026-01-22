@@ -62,18 +62,37 @@ export interface UseSegmentSettingsOptions {
     /** Frame count from timeline positions (source of truth) */
     numFrames?: number;
   };
+  /** Structure video defaults for this segment (from shot-level config) */
+  structureVideoDefaults?: {
+    motionStrength: number;
+    treatment: 'adjust' | 'clip';
+    uni3cEndPercent: number;
+  } | null;
 }
 
 /** Tracks which fields have pair-level overrides vs using shot defaults */
 export interface FieldOverrides {
   prompt: boolean;
   negativePrompt: boolean;
+  motionMode: boolean;
+  amountOfMotion: boolean;
+  phaseConfig: boolean;
+  loras: boolean;
+  selectedPhasePresetId: boolean;
+  structureMotionStrength: boolean;
+  structureTreatment: boolean;
+  structureUni3cEndPercent: boolean;
 }
 
 /** Shot-level default values (for showing as placeholder when no override) */
 export interface ShotDefaults {
   prompt: string;
   negativePrompt: string;
+  motionMode: 'basic' | 'advanced';
+  amountOfMotion: number;
+  phaseConfig?: import('@/tools/travel-between-images/settings').PhaseConfig;
+  loras: import('@/shared/types/segmentSettings').LoraConfig[];
+  selectedPhasePresetId: string | null;
 }
 
 export interface UseSegmentSettingsReturn {
@@ -106,6 +125,7 @@ export function useSegmentSettings({
   pairShotGenerationId,
   shotId,
   defaults,
+  structureVideoDefaults,
 }: UseSegmentSettingsOptions): UseSegmentSettingsReturn {
   // Unique instance ID for debugging
   const instanceIdRef = useRef<number | null>(null);
@@ -209,31 +229,47 @@ export function useSegmentSettings({
     };
   }, [shotVideoSettings]);
 
-  // Compute merged settings from all sources
-  // Priority: pair metadata > shot batch settings > defaults
-  // Note: numFrames always comes from defaults (timeline-derived) - timeline positions are source of truth
+  // Compute settings from segment overrides ONLY (not merged with shot defaults)
+  // This prevents "baking in" shot defaults as segment overrides when saving
+  // The form will use shotDefaults prop for display when fields are undefined
   const mergedSettings = useMemo(() => {
-    const merged = mergeSegmentSettings(
-      pairMetadata,
-      shotBatchSettings,
-      { prompt: defaults.prompt, negativePrompt: defaults.negativePrompt }
-    );
+    // Read segment-specific overrides from pair metadata
+    const pairOverrides = readSegmentOverrides(pairMetadata as Record<string, any> | null);
 
-    // numFrames: Always use defaults (computed from timeline positions by caller)
-    // Timeline positions are the source of truth for frame counts
-    const numFrames = defaults.numFrames ?? 25;
-    const randomSeed = pairMetadata?.pair_random_seed ?? true;
-    const seed = pairMetadata?.pair_seed;
-    // selectedPhasePresetId: pair metadata > shot video settings > null
-    const selectedPhasePresetId = pairMetadata?.pair_selected_phase_preset_id ?? shotVideoSettings?.selectedPhasePresetId ?? null;
+    // Build settings with ONLY segment overrides
+    // undefined = no override (use shot default)
+    // '' = explicitly cleared (remove override when saving)
+    // 'value' = override exists
+    const formSettings: SegmentSettings = {
+      // Prompts: undefined if no override, string if override exists
+      prompt: pairOverrides.prompt,
+      negativePrompt: pairOverrides.negativePrompt,
 
-    return mergedToFormSettings(merged, {
-      numFrames,
-      randomSeed,
-      seed,
-      selectedPhasePresetId,
-    });
-  }, [pairMetadata, shotBatchSettings, shotVideoSettings, defaults]);
+      // Motion settings: only include if segment has override (undefined = use shot default)
+      motionMode: pairOverrides.motionMode as 'basic' | 'advanced' | undefined,
+      amountOfMotion: pairOverrides.amountOfMotion,
+      phaseConfig: pairOverrides.phaseConfig,
+      selectedPhasePresetId: pairOverrides.selectedPhasePresetId,
+      loras: pairOverrides.loras,
+
+      // Frame count: always from timeline (source of truth)
+      numFrames: defaults.numFrames ?? 25,
+
+      // Seed settings from pair metadata
+      randomSeed: pairMetadata?.pair_random_seed ?? true,
+      seed: pairMetadata?.pair_seed,
+
+      // Default for regeneration behavior
+      makePrimaryVariant: false,
+
+      // Structure video: only include if segment has override
+      structureMotionStrength: pairOverrides.structureMotionStrength,
+      structureTreatment: pairOverrides.structureTreatment,
+      structureUni3cEndPercent: pairOverrides.structureUni3cEndPercent,
+    };
+
+    return formSettings;
+  }, [pairMetadata, defaults]);
 
   // Compute which fields have pair-level overrides (vs using shot defaults)
   // This tells the form whether to show the value as actual content or as placeholder
@@ -247,14 +283,27 @@ export function useSegmentSettings({
     return {
       prompt: !!pairOverrides.prompt,
       negativePrompt: !!pairOverrides.negativePrompt,
+      motionMode: pairOverrides.motionMode !== undefined,
+      amountOfMotion: pairOverrides.amountOfMotion !== undefined,
+      phaseConfig: pairOverrides.phaseConfig !== undefined,
+      loras: pairOverrides.loras !== undefined && pairOverrides.loras.length > 0,
+      selectedPhasePresetId: pairOverrides.selectedPhasePresetId !== undefined,
+      structureMotionStrength: pairOverrides.structureMotionStrength !== undefined,
+      structureTreatment: pairOverrides.structureTreatment !== undefined,
+      structureUni3cEndPercent: pairOverrides.structureUni3cEndPercent !== undefined,
     };
   }, [pairMetadata, isLoadingPair]);
 
-  // Shot-level default prompts (for showing as placeholder when no pair override)
-  const shotDefaultPrompts = useMemo((): ShotDefaults => {
+  // Shot-level defaults (for showing as placeholder/fallback when no pair override)
+  const shotDefaultsValue = useMemo((): ShotDefaults => {
     return {
       prompt: shotVideoSettings?.prompt || '',
       negativePrompt: shotVideoSettings?.negativePrompt || '',
+      motionMode: shotVideoSettings?.motionMode || 'basic',
+      amountOfMotion: shotVideoSettings?.amountOfMotion ?? 50,
+      phaseConfig: shotVideoSettings?.phaseConfig,
+      loras: shotVideoSettings?.loras || [],
+      selectedPhasePresetId: shotVideoSettings?.selectedPhasePresetId ?? null,
     };
   }, [shotVideoSettings]);
 
@@ -390,6 +439,10 @@ export function useSegmentSettings({
         randomSeed: settings.randomSeed,
         seed: settings.seed,
         selectedPhasePresetId: settings.selectedPhasePresetId,
+        // Structure video overrides (only saved if set)
+        structureMotionStrength: settings.structureMotionStrength,
+        structureTreatment: settings.structureTreatment,
+        structureUni3cEndPercent: settings.structureUni3cEndPercent,
       });
 
       console.log(`[useSegmentSettings:${instanceId}] 📝 Built metadata update:`, {
@@ -494,35 +547,40 @@ export function useSegmentSettings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount/unmount
 
-  // Reset to shot batch settings (ignoring pair-level overrides)
+  // Reset to shot defaults by clearing all segment overrides
+  // Convention: '' for strings, null for other types = clear the override
   const resetSettings = useCallback(() => {
-    // Build settings from shot defaults only (not pair metadata)
-    const shotDefaults = createDefaultSettings();
+    const clearedSettings: SegmentSettings = {
+      // Clear all overridable fields
+      // '' for strings = clear override
+      // null for other types = clear override
+      prompt: '',
+      negativePrompt: '',
+      motionMode: null as any, // null = clear override
+      amountOfMotion: null as any,
+      phaseConfig: null,
+      selectedPhasePresetId: null as any,
+      loras: null as any,
 
-    // Apply shot video settings if available (already in correct format from migration utility)
-    if (shotVideoSettings) {
-      shotDefaults.prompt = shotVideoSettings.prompt;
-      shotDefaults.negativePrompt = shotVideoSettings.negativePrompt;
-      shotDefaults.motionMode = shotVideoSettings.motionMode;
-      shotDefaults.amountOfMotion = shotVideoSettings.amountOfMotion; // Already 0-100
-      shotDefaults.phaseConfig = shotVideoSettings.phaseConfig;
-      shotDefaults.selectedPhasePresetId = shotVideoSettings.selectedPhasePresetId;
-      shotDefaults.loras = shotVideoSettings.loras;
-    }
+      // Keep timeline-derived values
+      numFrames: settings.numFrames,
+      randomSeed: true,
+      seed: undefined,
+      makePrimaryVariant: false,
 
-    // Keep current numFrames (from timeline - source of truth)
-    shotDefaults.numFrames = settings.numFrames;
+      // Clear structure video overrides
+      structureMotionStrength: null as any,
+      structureTreatment: null as any,
+      structureUni3cEndPercent: null as any,
+    };
 
-    console.log(`[useSegmentSettings:${instanceId}] 🔄 Restoring to shot defaults (ignoring pair overrides):`, {
+    console.log(`[useSegmentSettings:${instanceId}] 🔄 Clearing segment overrides (will use shot defaults):`, {
       shotId: shotId?.substring(0, 8) || null,
-      hasShotVideoSettings: !!shotVideoSettings,
-      shotVideoSummary: shotVideoSettings ? summarizeSettings(shotVideoSettings) : null,
-      restoredSummary: summarizeSettings(shotDefaults),
     });
 
-    setLocalSettings(shotDefaults);
-    setIsDirty(true); // Mark dirty so it gets saved
-  }, [instanceId, shotId, shotVideoSettings, settings.numFrames]);
+    setLocalSettings(clearedSettings);
+    setIsDirty(true); // Mark dirty so cleared state gets saved
+  }, [instanceId, shotId, settings.numFrames]);
 
   return {
     settings,
@@ -534,6 +592,6 @@ export function useSegmentSettings({
     pairMetadata: pairMetadata ?? null,
     shotBatchSettings: shotBatchSettings ?? null,
     hasOverride,
-    shotDefaults: shotDefaultPrompts,
+    shotDefaults: shotDefaultsValue,
   };
 }

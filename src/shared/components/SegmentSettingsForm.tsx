@@ -19,14 +19,14 @@
  * ```
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
-import { ChevronLeft, Loader2, RotateCcw } from 'lucide-react';
+import { ChevronLeft, Loader2, RotateCcw, Video } from 'lucide-react';
 import { MotionPresetSelector } from '@/shared/components/MotionPresetSelector';
 import { detectGenerationMode, BUILTIN_I2V_PRESET, BUILTIN_VACE_PRESET } from './segmentSettingsUtils';
 import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
@@ -82,10 +82,152 @@ export interface SegmentSettingsFormProps {
   /** Callback to restore default settings */
   onRestoreDefaults?: () => void;
   /** Which fields have pair-level overrides (vs using shot defaults) */
-  hasOverride?: { prompt: boolean; negativePrompt: boolean };
+  hasOverride?: {
+    prompt: boolean;
+    negativePrompt: boolean;
+    motionMode: boolean;
+    amountOfMotion: boolean;
+    phaseConfig: boolean;
+    loras: boolean;
+    selectedPhasePresetId: boolean;
+    structureMotionStrength: boolean;
+    structureTreatment: boolean;
+    structureUni3cEndPercent: boolean;
+  };
   /** Shot-level defaults (shown as placeholder when no override) */
-  shotDefaults?: { prompt: string; negativePrompt: string };
+  shotDefaults?: {
+    prompt: string;
+    negativePrompt: string;
+    motionMode: 'basic' | 'advanced';
+    amountOfMotion: number;
+    phaseConfig?: import('@/tools/travel-between-images/settings').PhaseConfig;
+    loras: import('@/shared/types/segmentSettings').LoraConfig[];
+    selectedPhasePresetId: string | null;
+  };
+
+  // Structure video context (for per-segment overrides)
+  /** Structure video type for this segment (null = no structure video) */
+  structureVideoType?: 'uni3c' | 'flow' | 'canny' | 'depth' | null;
+  /** Shot-level structure video defaults (for display when no segment override) */
+  structureVideoDefaults?: {
+    motionStrength: number;
+    treatment: 'adjust' | 'clip';
+    uni3cEndPercent: number;
+  };
+  /** Structure video URL for preview */
+  structureVideoUrl?: string;
+  /** Frame range info for this segment's structure video usage */
+  structureVideoFrameRange?: {
+    segmentStart: number;
+    segmentEnd: number;
+    videoTotalFrames: number;
+    videoFps: number;
+  };
 }
+
+// =============================================================================
+// STRUCTURE VIDEO PREVIEW (3 frames: start, middle, end)
+// =============================================================================
+
+interface StructureVideoPreviewProps {
+  videoUrl: string;
+  frameRange: {
+    segmentStart: number;
+    segmentEnd: number;
+    videoTotalFrames: number;
+    videoFps: number;
+  };
+}
+
+const StructureVideoPreview: React.FC<StructureVideoPreviewProps> = ({ videoUrl, frameRange }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRefs = [useRef<HTMLCanvasElement>(null), useRef<HTMLCanvasElement>(null), useRef<HTMLCanvasElement>(null)];
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [currentCapture, setCurrentCapture] = useState(0);
+
+  // Calculate the 3 frame positions (start, middle, end of segment's portion)
+  const framePositions = useMemo(() => {
+    const { segmentStart, segmentEnd, videoTotalFrames, videoFps } = frameRange;
+    const segmentFrames = segmentEnd - segmentStart;
+
+    // Map segment frames to video frames (simple linear mapping)
+    const videoFrameStart = Math.floor((segmentStart / (segmentEnd || 1)) * videoTotalFrames);
+    const videoFrameEnd = Math.min(videoTotalFrames - 1, Math.floor((segmentEnd / (segmentEnd || 1)) * videoTotalFrames));
+    const videoFrameMid = Math.floor((videoFrameStart + videoFrameEnd) / 2);
+
+    return [
+      { frame: videoFrameStart, time: videoFrameStart / videoFps, label: 'Start' },
+      { frame: videoFrameMid, time: videoFrameMid / videoFps, label: 'Mid' },
+      { frame: videoFrameEnd, time: videoFrameEnd / videoFps, label: 'End' },
+    ];
+  }, [frameRange]);
+
+  // Capture frames sequentially after video loads
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isLoaded || currentCapture >= 3) return;
+
+    const captureFrame = () => {
+      const canvas = canvasRefs[currentCapture].current;
+      if (!canvas || !video.videoWidth) return;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
+      }
+
+      // Move to next frame
+      if (currentCapture < 2) {
+        setCurrentCapture(prev => prev + 1);
+        video.currentTime = framePositions[currentCapture + 1].time;
+      }
+    };
+
+    video.onseeked = captureFrame;
+    video.currentTime = framePositions[currentCapture].time;
+
+    return () => {
+      video.onseeked = null;
+    };
+  }, [isLoaded, currentCapture, framePositions]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2 text-[10px]">
+        <span className="text-muted-foreground">
+          Frames {framePositions[0].frame} - {framePositions[2].frame} of structure video
+        </span>
+        <span className="text-primary/70 italic">Make changes on the timeline</span>
+      </div>
+      <div className="flex gap-1">
+        {/* Hidden video for seeking */}
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          className="hidden"
+          muted
+          playsInline
+          crossOrigin="anonymous"
+          onLoadedMetadata={() => setIsLoaded(true)}
+        />
+        {/* 3 frame previews */}
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex-1 relative">
+            <canvas
+              ref={canvasRefs[i]}
+              className="w-full aspect-video bg-muted/50 rounded object-cover"
+            />
+            <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/60 text-white py-0.5 rounded-b">
+              {framePositions[i].label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // =============================================================================
 // COMPONENT
@@ -111,6 +253,10 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   onRestoreDefaults,
   hasOverride,
   shotDefaults,
+  structureVideoType,
+  structureVideoDefaults,
+  structureVideoUrl,
+  structureVideoFrameRange,
 }) => {
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -151,9 +297,9 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     onChange({
       motionMode: mode,
       // Clear phase config when switching to basic (invariant)
-      phaseConfig: mode === 'basic' ? undefined : settings.phaseConfig,
+      phaseConfig: mode === 'basic' ? undefined : (settings.phaseConfig ?? shotDefaults?.phaseConfig),
     });
-  }, [onChange, settings.phaseConfig]);
+  }, [onChange, settings.phaseConfig, shotDefaults?.phaseConfig]);
 
   // Phase config change
   const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
@@ -192,31 +338,34 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     const loraName = lora.Name || (lora as any).name;
 
     if (!loraPath) return;
-    if (settings.loras.some(l => l.id === loraId || l.path === loraPath)) return;
+    const currentLoras = settings.loras ?? shotDefaults?.loras ?? [];
+    if (currentLoras.some(l => l.id === loraId || l.path === loraPath)) return;
 
     onChange({
-      loras: [...settings.loras, {
+      loras: [...currentLoras, {
         id: loraId,
         name: loraName,
         path: loraPath,
         strength: 1.0,
       }],
     });
-  }, [settings.loras, onChange]);
+  }, [settings.loras, shotDefaults?.loras, onChange]);
 
   const handleRemoveLora = useCallback((loraId: string) => {
+    const currentLoras = settings.loras ?? shotDefaults?.loras ?? [];
     onChange({
-      loras: settings.loras.filter(l => l.id !== loraId && l.path !== loraId),
+      loras: currentLoras.filter(l => l.id !== loraId && l.path !== loraId),
     });
-  }, [settings.loras, onChange]);
+  }, [settings.loras, shotDefaults?.loras, onChange]);
 
   const handleLoraStrengthChange = useCallback((loraId: string, strength: number) => {
+    const currentLoras = settings.loras ?? shotDefaults?.loras ?? [];
     onChange({
-      loras: settings.loras.map(l =>
+      loras: currentLoras.map(l =>
         (l.id === loraId || l.path === loraId) ? { ...l, strength } : l
       ),
     });
-  }, [settings.loras, onChange]);
+  }, [settings.loras, shotDefaults?.loras, onChange]);
 
   // Frame count change
   const handleFrameCountChange = useCallback((value: number) => {
@@ -403,9 +552,9 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               builtinPreset={builtinPreset}
               featuredPresetIds={[]}
               generationTypeMode={generationMode}
-              selectedPhasePresetId={settings.selectedPhasePresetId}
-              phaseConfig={settings.phaseConfig ?? builtinPreset.metadata.phaseConfig}
-              motionMode={settings.motionMode}
+              selectedPhasePresetId={settings.selectedPhasePresetId ?? shotDefaults?.selectedPhasePresetId ?? null}
+              phaseConfig={settings.phaseConfig ?? shotDefaults?.phaseConfig ?? builtinPreset.metadata.phaseConfig}
+              motionMode={settings.motionMode ?? shotDefaults?.motionMode ?? 'basic'}
               onPresetSelect={handlePhasePresetSelect}
               onPresetRemove={handlePhasePresetRemove}
               onModeChange={handleMotionModeChange}
@@ -417,7 +566,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               renderBasicModeContent={() => (
                 <div className="space-y-3">
                   <ActiveLoRAsDisplay
-                    selectedLoras={settings.loras}
+                    selectedLoras={settings.loras ?? shotDefaults?.loras ?? []}
                     onRemoveLora={handleRemoveLora}
                     onLoraStrengthChange={handleLoraStrengthChange}
                     availableLoras={availableLoras}
@@ -431,6 +580,81 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                 </div>
               )}
             />
+
+            {/* Structure Video Overrides - only shown when segment has structure video */}
+            {structureVideoType && (
+              <div className="space-y-3 pt-3 border-t border-border/50">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Structure Video Overrides</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground/80">
+                    {structureVideoType === 'uni3c' ? 'Uni3C' : structureVideoType === 'flow' ? 'Optical Flow' : structureVideoType === 'canny' ? 'Canny' : structureVideoType === 'depth' ? 'Depth' : structureVideoType}
+                  </span>
+                </div>
+
+                {/* 3-Frame Preview */}
+                {structureVideoUrl && structureVideoFrameRange && (
+                  <StructureVideoPreview
+                    videoUrl={structureVideoUrl}
+                    frameRange={structureVideoFrameRange}
+                  />
+                )}
+
+                {/* Motion Strength */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium">Strength:</Label>
+                    <span className="text-xs font-medium">
+                      {(settings.structureMotionStrength ?? structureVideoDefaults?.motionStrength ?? 1.2).toFixed(1)}x
+                      {settings.structureMotionStrength === undefined && (
+                        <span className="text-muted-foreground/60 ml-1">(default)</span>
+                      )}
+                    </span>
+                  </div>
+                  <Slider
+                    value={[settings.structureMotionStrength ?? structureVideoDefaults?.motionStrength ?? 1.2]}
+                    onValueChange={([value]) => onChange({ structureMotionStrength: value })}
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>0x</span>
+                    <span>1x</span>
+                    <span>2x</span>
+                  </div>
+                </div>
+
+                {/* Uni3C End Percent - only shown when structure type is uni3c */}
+                {structureVideoType === 'uni3c' && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">End Percent:</Label>
+                      <span className="text-xs font-medium">
+                        {((settings.structureUni3cEndPercent ?? structureVideoDefaults?.uni3cEndPercent ?? 0.1) * 100).toFixed(0)}%
+                        {settings.structureUni3cEndPercent === undefined && (
+                          <span className="text-muted-foreground/60 ml-1">(default)</span>
+                        )}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[settings.structureUni3cEndPercent ?? structureVideoDefaults?.uni3cEndPercent ?? 0.1]}
+                      onValueChange={([value]) => onChange({ structureUni3cEndPercent: value })}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>0%</span>
+                      <span>50%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* LoRA Selector Modal */}
@@ -441,7 +665,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             onAddLora={handleLoraSelect}
             onRemoveLora={handleRemoveLora}
             onUpdateLoraStrength={handleLoraStrengthChange}
-            selectedLoras={settings.loras.map(lora => {
+            selectedLoras={(settings.loras ?? shotDefaults?.loras ?? []).map(lora => {
               const fullLora = availableLoras.find(l => l.id === lora.id || l.path === lora.path);
               return {
                 ...fullLora,

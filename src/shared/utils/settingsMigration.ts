@@ -270,6 +270,17 @@ export function readSegmentOverrides(metadata: Record<string, any> | null | unde
     overrides.seed = seed;
   }
 
+  // Structure video overrides (new format only, no legacy fields)
+  if (newOverrides.structureMotionStrength !== undefined) {
+    overrides.structureMotionStrength = newOverrides.structureMotionStrength;
+  }
+  if (newOverrides.structureTreatment !== undefined) {
+    overrides.structureTreatment = newOverrides.structureTreatment;
+  }
+  if (newOverrides.structureUni3cEndPercent !== undefined) {
+    overrides.structureUni3cEndPercent = newOverrides.structureUni3cEndPercent;
+  }
+
   return overrides;
 }
 
@@ -328,6 +339,16 @@ export function writeSegmentOverrides(
   if (overrides.seed !== undefined) {
     newOverrides.seed = overrides.seed;
   }
+  // Structure video overrides
+  if (overrides.structureMotionStrength !== undefined) {
+    newOverrides.structureMotionStrength = overrides.structureMotionStrength;
+  }
+  if (overrides.structureTreatment !== undefined) {
+    newOverrides.structureTreatment = overrides.structureTreatment;
+  }
+  if (overrides.structureUni3cEndPercent !== undefined) {
+    newOverrides.structureUni3cEndPercent = overrides.structureUni3cEndPercent;
+  }
 
   metadata.segmentOverrides = newOverrides;
 
@@ -372,6 +393,10 @@ export function mergeSettingsWithOverrides(
     randomSeed: overrides.randomSeed ?? shotSettings.randomSeed,
     seed: overrides.seed ?? shotSettings.seed,
     makePrimaryVariant: shotSettings.makePrimaryVariant,
+    // Structure video overrides (segment-level only, no shot-level defaults)
+    structureMotionStrength: overrides.structureMotionStrength,
+    structureTreatment: overrides.structureTreatment,
+    structureUni3cEndPercent: overrides.structureUni3cEndPercent,
   };
 }
 
@@ -419,6 +444,16 @@ export function extractOverrides(
   if (settings.seed !== defaults.seed) {
     overrides.seed = settings.seed;
   }
+  // Structure video overrides (always include if set since no shot-level defaults)
+  if (settings.structureMotionStrength !== undefined) {
+    overrides.structureMotionStrength = settings.structureMotionStrength;
+  }
+  if (settings.structureTreatment !== undefined) {
+    overrides.structureTreatment = settings.structureTreatment;
+  }
+  if (settings.structureUni3cEndPercent !== undefined) {
+    overrides.structureUni3cEndPercent = settings.structureUni3cEndPercent;
+  }
 
   return overrides;
 }
@@ -463,6 +498,17 @@ export function settingsToTaskParams(settings: SegmentSettings): Record<string, 
     // Seed
     random_seed: settings.randomSeed,
     seed: settings.seed,
+
+    // Structure video overrides (only included if set)
+    ...(settings.structureMotionStrength !== undefined && {
+      structure_motion_strength: settings.structureMotionStrength,
+    }),
+    ...(settings.structureTreatment !== undefined && {
+      structure_treatment: settings.structureTreatment,
+    }),
+    ...(settings.structureUni3cEndPercent !== undefined && {
+      structure_uni3c_end_percent: settings.structureUni3cEndPercent,
+    }),
   };
 }
 

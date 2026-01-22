@@ -87,6 +87,14 @@ export interface SegmentSettings {
   // === VARIANT BEHAVIOR ===
   /** Whether to make this the primary variant when regenerating */
   makePrimaryVariant: boolean;
+
+  // === STRUCTURE VIDEO OVERRIDES (only applicable when segment has structure video) ===
+  /** Structure video motion strength override (0-2, default ~1.2) */
+  structureMotionStrength?: number;
+  /** Structure video treatment mode override */
+  structureTreatment?: 'adjust' | 'clip';
+  /** Uni3C guidance end percent override (0-1, only for uni3c type) */
+  structureUni3cEndPercent?: number;
 }
 
 // =============================================================================
