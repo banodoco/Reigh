@@ -1021,7 +1021,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     setIsLoadingDurations(false);
   }, [isPreviewTogetherOpen, previewableSegments]);
 
-  // Auto-scroll thumbnail strip to keep current segment centered
+  // Auto-scroll thumbnail strip to keep current segment centered (when possible)
+  // At start: first thumbnail at left edge, at end: last thumbnail at right edge
   React.useEffect(() => {
     if (!isPreviewTogetherOpen || !previewThumbnailsRef.current) return;
 
@@ -1030,20 +1031,29 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     const gap = 8; // gap-2 = 0.5rem = 8px
     const itemTotalWidth = thumbnailWidth + gap;
     const containerWidth = container.offsetWidth;
+    const totalSegments = previewableSegments.length;
 
-    // The leading spacer width is calc(50% - 32px)
-    const spacerWidth = (containerWidth / 2) - 32;
+    // Total content width (all thumbnails + gaps, minus last gap)
+    const totalContentWidth = (totalSegments * thumbnailWidth) + ((totalSegments - 1) * gap);
 
-    // Calculate the scroll position to center the current thumbnail
-    // Position = spacer + (index * itemWidth) + half thumbnail - half container
-    const thumbnailCenter = spacerWidth + (currentPreviewIndex * itemTotalWidth) + (thumbnailWidth / 2);
-    const targetScrollLeft = thumbnailCenter - (containerWidth / 2);
+    // If all thumbnails fit, no scrolling needed
+    if (totalContentWidth <= containerWidth) {
+      return;
+    }
+
+    // Calculate ideal scroll to center current thumbnail
+    const thumbnailCenter = (currentPreviewIndex * itemTotalWidth) + (thumbnailWidth / 2);
+    const idealScrollLeft = thumbnailCenter - (containerWidth / 2);
+
+    // Clamp to valid scroll range (0 to maxScroll)
+    const maxScroll = totalContentWidth - containerWidth;
+    const clampedScrollLeft = Math.max(0, Math.min(maxScroll, idealScrollLeft));
 
     container.scrollTo({
-      left: Math.max(0, targetScrollLeft),
+      left: clampedScrollLeft,
       behavior: 'smooth'
     });
-  }, [isPreviewTogetherOpen, currentPreviewIndex]);
+  }, [isPreviewTogetherOpen, currentPreviewIndex, previewableSegments.length]);
 
   // Keyboard navigation for preview dialog
   React.useEffect(() => {
@@ -2475,7 +2485,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               return (
                 <div className="space-y-4">
                   <div
-                    className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center"
+                    className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center mx-auto"
                     style={{ minHeight: '300px', maxHeight: '60vh', ...previewAspectStyle }}
                   >
                     {/* Loading skeleton - shown while video is loading */}
@@ -2780,11 +2790,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   {/* Segment thumbnail indicators - horizontally scrollable */}
                   <div
                     ref={previewThumbnailsRef}
-                    className="flex items-center gap-2 overflow-x-auto py-2 px-4 -mx-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
+                    className="flex items-center justify-center gap-2 overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
                     style={{ scrollbarWidth: 'thin' }}
                   >
-                    {/* Spacer to allow first item to be centered */}
-                    <div className="flex-shrink-0" style={{ width: 'calc(50% - 32px)' }} />
                     {previewableSegments.map((segment, idx) => (
                       <button
                         key={idx}
@@ -2813,8 +2821,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                         </span>
                       </button>
                     ))}
-                    {/* Spacer to allow last item to be centered */}
-                    <div className="flex-shrink-0" style={{ width: 'calc(50% - 32px)' }} />
                   </div>
                 </div>
               );
