@@ -324,7 +324,7 @@ export function useSegmentSettings({
           randomSeed: mergedSettings.randomSeed,
           seed: mergedSettings.seed,
           selectedPhasePresetId: mergedSettings.selectedPhasePresetId,
-          loraCount: mergedSettings.loras.length,
+          loraCount: mergedSettings.loras?.length ?? 0,
         },
       });
     }
