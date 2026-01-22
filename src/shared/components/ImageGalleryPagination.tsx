@@ -234,10 +234,10 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
       <>
         {/* Sticky navigation buttons - only show when scrolled and >1 page */}
         <div
-          className={`fixed z-[100] transition-all duration-300 ease-in-out ${
+          className={`fixed z-[100] transition-all duration-300 ease-in-out pointer-events-none ${
             showStickyPagination && totalPages > 1
               ? 'translate-y-0 opacity-100 scale-100'
-              : 'translate-y-8 opacity-0 scale-95 pointer-events-none'
+              : 'translate-y-8 opacity-0 scale-95'
           }`}
           style={{
             // Calculate horizontal constraints based on locked panes
@@ -252,7 +252,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
             transition: 'bottom 0.15s ease-out',
           }}
         >
-          <div className="bg-card/80 dark:bg-gray-900/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-border/50">
+          <div className="bg-card/80 dark:bg-gray-900/80 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-border/50 pointer-events-auto">
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
