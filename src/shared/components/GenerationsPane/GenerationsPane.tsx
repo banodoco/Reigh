@@ -494,7 +494,7 @@ const GenerationsPaneComponent: React.FC = () => {
                           placeholder="Search..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="bg-transparent border-none outline-none text-xs w-24 sm:w-32 text-white placeholder-zinc-400 preserve-case"
+                          className="bg-transparent border-none outline-none text-base lg:text-xs w-24 sm:w-32 text-white placeholder-zinc-400 preserve-case"
                         />
                         <Button
                           variant="ghost"

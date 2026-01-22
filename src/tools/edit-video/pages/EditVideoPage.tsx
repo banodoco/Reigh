@@ -15,7 +15,7 @@ import { useListShots } from '@/shared/hooks/useShots';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
-import MediaLightbox from '@/shared/components/MediaLightbox/MediaLightboxRefactored';
+import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import type { PortionSelection } from '@/shared/components/VideoPortionTimeline';
 import { parseRatio } from '@/shared/lib/aspectRatios';

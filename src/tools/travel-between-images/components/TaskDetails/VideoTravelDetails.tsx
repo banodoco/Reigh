@@ -171,7 +171,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') onEditingGenerationNameChange?.(false); }}
                 autoFocus
                 placeholder="Enter variant name..."
-                className="flex-1 px-2 py-1 text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary w-full preserve-case"
+                className="flex-1 px-2 py-1 text-base lg:text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary w-full preserve-case"
               />
             ) : (
               <div 

@@ -238,7 +238,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   const textareaMinHeight = isMobile ? 'min-h-[50px]' : 'min-h-[100px]';
   const textareaRows = isMobile ? 2 : 4;
   const textareaPadding = isMobile ? 'px-2 py-1.5' : 'px-3 py-2';
-  const textareaTextSize = isMobile ? 'text-sm' : 'text-sm';
+  const textareaTextSize = isMobile ? 'text-base' : 'text-sm'; // 16px on mobile prevents iOS zoom
   const buttonSize = isMobile ? 'sm' : 'default';
   const iconSize = isMobile ? 'h-3 w-3' : 'h-4 w-4';
   const togglePadding = isMobile ? 'px-1.5 py-1' : 'px-3 py-1.5';
@@ -520,9 +520,9 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 onChange={(e) => setCustomLoraUrl(e.target.value)}
                 placeholder="https://huggingface.co/.../lora.safetensors"
                 className={cn(
-                  "w-full mt-1.5 bg-background border border-input rounded-md text-sm preserve-case",
+                  "w-full mt-1.5 bg-background border border-input rounded-md preserve-case",
                   "focus:outline-none focus:ring-2 focus:ring-ring",
-                  isMobile ? "px-2 py-1.5 text-xs" : "px-3 py-2"
+                  isMobile ? "px-2 py-1.5 text-base" : "px-3 py-2 text-sm"
                 )}
               />
             )}

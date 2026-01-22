@@ -501,7 +501,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'his
                       handleAutoTopupThresholdChange(val);
                     }}
                     disabled={!localAutoTopupEnabled || isUpdatingAutoTopup}
-                    className="w-12 px-1 py-0.5 text-sm text-center border border-border rounded disabled:opacity-50 disabled:bg-muted bg-background text-foreground"
+                    className="w-12 px-1 py-0.5 text-base lg:text-sm text-center border border-border rounded disabled:opacity-50 disabled:bg-muted bg-background text-foreground"
                         />
                       </div>
                   </div>
