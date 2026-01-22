@@ -48,7 +48,7 @@ export const useProgressiveImageLoading = ({
   enabled = true,
   onImagesReady,
   isMobile,
-  useIntersectionObserver = false, // Disable by default for compatibility
+  useIntersectionObserver = true, // Enable by default for better mobile performance
   isLightboxOpen = false, // Pause loading when lightbox is open
   instanceId = 'default' // Default instance ID
 }: UseProgressiveImageLoadingProps) => {

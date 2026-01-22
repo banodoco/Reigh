@@ -125,22 +125,22 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   } = props;
 
   // [VideoSkeletonDebug] Mount/props summary for video gallery use
+  // Optimized: only log on mount and significant changes, using ref to track
+  const videoGalleryDebugRef = useRef({ lastImagesLength: 0 });
   React.useEffect(() => {
     const isVideoGallery = currentToolType === 'travel-between-images' && initialMediaTypeFilter === 'video';
     if (!isVideoGallery) return;
-    console.log('[VideoSkeletonDebug] ImageGallery mount/props:', {
-      isVideoGallery,
-      imagesLength: images?.length,
-      totalCount,
-      columnsPerRow,
-      itemsPerPage,
-      initialMediaTypeFilter,
-      currentToolType,
-      initialToolTypeFilter,
-      showShotFilter,
-      timestamp: Date.now()
-    });
-  }, [images, totalCount, columnsPerRow, itemsPerPage, initialMediaTypeFilter, currentToolType, initialToolTypeFilter, showShotFilter]);
+    // Only log when images length changes significantly
+    const imagesLength = images?.length ?? 0;
+    if (videoGalleryDebugRef.current.lastImagesLength !== imagesLength) {
+      videoGalleryDebugRef.current.lastImagesLength = imagesLength;
+      console.log('[VideoSkeletonDebug] ImageGallery props:', {
+        imagesLength,
+        totalCount,
+        timestamp: Date.now()
+      });
+    }
+  }, [images?.length, totalCount, currentToolType, initialMediaTypeFilter]);
 
   // Get project context for cache clearing and aspect ratio
   const { selectedProjectId, projects } = useProject();
@@ -155,36 +155,31 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   // Fallback mobile detection in case useIsMobile fails
   const isMobile = rawIsMobile ?? (typeof window !== 'undefined' && window.innerWidth < 768);
   
-  // Debug mobile detection (reduced frequency)
+  // Debug mobile detection - only log on actual changes (mount-only in production)
+  const prevMobileRef = useRef(isMobile);
   React.useEffect(() => {
-    console.log('[MobileDebug] Mobile detection changed:', {
-      rawIsMobile,
-      isMobile,
-      windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'undefined',
-      isMobileType: typeof isMobile,
-      timestamp: Date.now()
-    });
-  }, [isMobile]); // Only log when isMobile actually changes
-  
-  // Add global debug function for mobile testing
+    if (prevMobileRef.current !== isMobile) {
+      prevMobileRef.current = isMobile;
+      console.log('[MobileDebug] Mobile detection changed:', { isMobile });
+    }
+  }, [isMobile]);
+
+  // Global debug function for mobile testing - reads fresh values when called
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).debugMobile = () => {
+        const freshIsMobile = window.innerWidth < 768;
         const debugInfo = {
-          isMobile,
-          rawIsMobile,
+          isMobile: freshIsMobile,
           windowWidth: window.innerWidth,
           windowHeight: window.innerHeight,
-          userAgent: navigator.userAgent,
           touchSupported: 'ontouchstart' in window,
-          timestamp: Date.now()
         };
         console.log('[MobileDebug] Debug info:', debugInfo);
-        alert(`Mobile Debug:\nisMobile: ${isMobile}\nrawIsMobile: ${rawIsMobile}\nWindow: ${window.innerWidth}x${window.innerHeight}\nTouch: ${'ontouchstart' in window}`);
         return debugInfo;
       };
     }
-  }, [isMobile, rawIsMobile]);
+  }, []); // Only setup once on mount - reads fresh values when called
   
   // Star functionality
   const toggleStarMutation = useToggleGenerationStar();

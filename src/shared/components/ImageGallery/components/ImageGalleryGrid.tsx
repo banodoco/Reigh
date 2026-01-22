@@ -68,7 +68,8 @@ export interface ImageGalleryGridProps {
   [key: string]: any; // This allows passing through all other props
 }
 
-export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
+// Memoized grid component to prevent unnecessary re-renders from parent
+const ImageGalleryGridInner: React.FC<ImageGalleryGridProps> = ({
   // Data props
   images,
   paginatedImages,
@@ -180,24 +181,23 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
     prevPaginatedLengthRef.current = paginatedImages.length;
   }, [paginatedImages.length, isBackfillLoading, setIsBackfillLoading, setBackfillSkeletonCount, onSkeletonCleared]);
 
-  // [VideoSkeletonDebug] Track grid render and loading/skeleton decisions for video gallery context
+  // [VideoSkeletonDebug] Track grid render - only log on significant state changes
+  // Reduced dependencies to prevent excessive effect runs on mobile
+  const debugStateRef = React.useRef({ logged: false, lastSignature: '' });
   React.useEffect(() => {
-    // Heuristic: in videos view, mediaType is enforced at parent; here we just log state
-    console.log('[VideoSkeletonDebug] ImageGalleryGrid render state:', {
-      paginatedImagesLength: paginatedImages.length,
-      filteredImagesLength: filteredImages.length,
-      imagesLength: images.length,
-      isGalleryLoading,
-      isServerPagination,
-      isBackfillLoading,
-      backfillSkeletonCount,
-      itemsPerPage,
-      page,
-      serverPage,
-      hasFilters,
-      timestamp: Date.now()
-    });
-  }, [paginatedImages.length, filteredImages.length, images.length, isGalleryLoading, isServerPagination, isBackfillLoading, backfillSkeletonCount, itemsPerPage, page, serverPage, hasFilters]);
+    // Only log when signature changes significantly (reduces logging frequency)
+    const signature = `${paginatedImages.length}-${isGalleryLoading}-${isBackfillLoading}`;
+    if (debugStateRef.current.lastSignature !== signature) {
+      debugStateRef.current.lastSignature = signature;
+      console.log('[VideoSkeletonDebug] ImageGalleryGrid state changed:', {
+        paginatedImagesLength: paginatedImages.length,
+        isGalleryLoading,
+        isBackfillLoading,
+        backfillSkeletonCount,
+        timestamp: Date.now()
+      });
+    }
+  }, [paginatedImages.length, isGalleryLoading, isBackfillLoading, backfillSkeletonCount]);
 
   // Compute aspect ratio padding to match ImageGalleryItem container
   const aspectRatioPadding = React.useMemo(() => {
@@ -387,3 +387,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
     </>
   );
 };
+
+// Wrap in React.memo with default shallow comparison
+// This prevents re-renders when parent re-renders but props are referentially equal
+export const ImageGalleryGrid = React.memo(ImageGalleryGridInner);
