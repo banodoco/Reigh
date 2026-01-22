@@ -2483,7 +2483,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               })();
 
               return (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 overflow-hidden">
                   {/* Video container - centered with max-width constraint */}
                   <div className="flex justify-center w-full">
                     <div
