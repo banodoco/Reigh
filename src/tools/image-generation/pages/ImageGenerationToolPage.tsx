@@ -1188,8 +1188,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
             
             return (
-              <div 
-                className={`fixed z-50 flex justify-center transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2`}
+              <div
+                className={`fixed z-50 flex justify-center transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 pointer-events-none`}
                 style={{
                   top: `${topPosition}px`,
                   left: `${leftOffset}px`,
@@ -1202,7 +1202,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
               >
                 <Button
                   variant="ghost"
-                  className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl gradient-primary-collapsed backdrop-blur-md shadow-xl transition-all duration-700 ease-in-out hover:scale-105 active:scale-95 rounded-lg transform hover:shadow-2xl`}
+                  className={`justify-between ${isMobile ? 'p-3 text-sm' : 'p-4'} w-full max-w-2xl gradient-primary-collapsed backdrop-blur-md shadow-xl transition-all duration-700 ease-in-out hover:scale-105 active:scale-95 rounded-lg transform hover:shadow-2xl pointer-events-auto`}
                   onClick={() => handleCollapsibleOpenChange(true, true)}
                   type="button"
                 >
