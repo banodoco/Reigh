@@ -79,6 +79,12 @@ export interface SegmentSettingsFormProps {
   queryKeyPrefix?: string;
   /** Callback when frame count changes (for timeline sync) */
   onFrameCountChange?: (frames: number) => void;
+  /** Callback to restore default settings */
+  onRestoreDefaults?: () => void;
+  /** Which fields have pair-level overrides (vs using shot defaults) */
+  hasOverride?: { prompt: boolean; negativePrompt: boolean };
+  /** Shot-level defaults (shown as placeholder when no override) */
+  shotDefaults?: { prompt: string; negativePrompt: string };
 }
 
 // =============================================================================
@@ -102,6 +108,9 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   maxFrames = 81,
   queryKeyPrefix = 'segment-settings',
   onFrameCountChange,
+  onRestoreDefaults,
+  hasOverride,
+  shotDefaults,
 }) => {
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -291,10 +300,15 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
       <div className="space-y-2">
         <Label className="text-xs font-medium">Prompt:</Label>
         <Textarea
-          value={settings.prompt}
+          value={hasOverride?.prompt === false ? '' : settings.prompt}
           onChange={(e) => onChange({ prompt: e.target.value })}
           className="h-20 text-sm resize-none"
-          placeholder="Describe this segment..."
+          placeholder={
+            // Show default placeholder if: no saved override OR field is empty (user cleared)
+            (hasOverride?.prompt === false || !settings.prompt) && shotDefaults?.prompt
+              ? `[default] ${shotDefaults.prompt}`
+              : 'Describe this segment...'
+          }
           clearable
           onClear={() => onChange({ prompt: '' })}
           voiceInput
@@ -341,10 +355,15 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Negative Prompt:</Label>
               <Textarea
-                value={settings.negativePrompt}
+                value={hasOverride?.negativePrompt === false ? '' : settings.negativePrompt}
                 onChange={(e) => onChange({ negativePrompt: e.target.value })}
                 className="h-16 text-xs resize-none"
-                placeholder="Things to avoid..."
+                placeholder={
+                  // Show default placeholder if: no saved override OR field is empty (user cleared)
+                  (hasOverride?.negativePrompt === false || !settings.negativePrompt) && shotDefaults?.negativePrompt
+                    ? `[default] ${shotDefaults.negativePrompt}`
+                    : 'Things to avoid...'
+                }
                 clearable
                 onClear={() => onChange({ negativePrompt: '' })}
                 voiceInput
@@ -458,6 +477,20 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
           <span>{buttonLabel || (isRegeneration ? 'Regenerate Segment' : 'Generate Segment')}</span>
         )}
       </Button>
+
+      {/* Restore Defaults Button */}
+      {onRestoreDefaults && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onRestoreDefaults}
+          disabled={isSubmitting}
+          className="w-full h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
+        >
+          <RotateCcw className="w-3 h-3" />
+          Restore Default Settings
+        </Button>
+      )}
     </div>
   );
 };

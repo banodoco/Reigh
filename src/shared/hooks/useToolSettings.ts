@@ -683,6 +683,12 @@ export function useToolSettings<T>(
           };
         }
       );
+
+      // Also invalidate shot-batch-settings cache used by useSegmentSettings
+      // This ensures "restore defaults" in segment settings picks up latest shot settings
+      if (shotId) {
+        queryClient.invalidateQueries({ queryKey: ['shot-batch-settings', shotId] });
+      }
     },
     onError: (error: Error) => {
       // Don't log or show errors for cancelled requests during task cancellation

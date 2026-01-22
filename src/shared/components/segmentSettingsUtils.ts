@@ -18,6 +18,7 @@
 
 import { PhaseConfig, DEFAULT_PHASE_CONFIG, DEFAULT_VACE_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
 import type { ActiveLora } from '@/shared/hooks/useLoraManager';
+import { readSegmentOverrides, writeSegmentOverrides, type SegmentOverrides, type LoraConfig } from '@/shared/utils/settingsMigration';
 
 // =============================================================================
 // BUILT-IN PRESETS
@@ -153,23 +154,45 @@ export function mergedToFormSettings(
 
 // Types for the settings sources
 export interface PairMetadata {
-  // New format - root level fields
+  // NEW FORMAT: Segment overrides in nested structure
+  segmentOverrides?: {
+    prompt?: string;
+    negativePrompt?: string;
+    motionMode?: 'basic' | 'advanced';
+    amountOfMotion?: number; // 0-100 scale
+    phaseConfig?: PhaseConfig;
+    selectedPhasePresetId?: string | null;
+    loras?: Array<{ path: string; strength: number; id?: string; name?: string }>;
+    numFrames?: number;
+    randomSeed?: boolean;
+    seed?: number;
+  };
+  // AI-generated prompt (not user settings, kept separate)
+  enhanced_prompt?: string;
+  // DEPRECATED: Old pair_* fields (kept for backward compatibility during migration)
+  /** @deprecated Use segmentOverrides.prompt instead */
   pair_prompt?: string;
+  /** @deprecated Use segmentOverrides.negativePrompt instead */
   pair_negative_prompt?: string;
+  /** @deprecated Use segmentOverrides.phaseConfig instead */
   pair_phase_config?: PhaseConfig;
+  /** @deprecated Use segmentOverrides.motionMode and segmentOverrides.amountOfMotion instead */
   pair_motion_settings?: {
     motion_mode?: 'basic' | 'advanced';
     amount_of_motion?: number;
   };
+  /** @deprecated Use segmentOverrides.loras instead */
   pair_loras?: Array<{ path: string; strength: number }>;
-  // Video settings (per-pair overrides)
+  /** @deprecated Use segmentOverrides.numFrames instead */
   pair_num_frames?: number;
+  /** @deprecated Use segmentOverrides.randomSeed instead */
   pair_random_seed?: boolean;
+  /** @deprecated Use segmentOverrides.seed instead */
   pair_seed?: number;
-  // UI state (for restoring preset selection)
+  /** @deprecated Use segmentOverrides.selectedPhasePresetId instead */
   pair_selected_phase_preset_id?: string | null;
-  enhanced_prompt?: string;
-  // Legacy format - nested in user_overrides
+  // LEGACY: Very old format nested in user_overrides
+  /** @deprecated Use segmentOverrides instead */
   user_overrides?: {
     phase_config?: PhaseConfig;
     motion_mode?: 'basic' | 'advanced';
@@ -274,37 +297,43 @@ export function mergeSegmentSettings(
     loras: 'none',
   };
 
-  // Extract from pair metadata (new format + legacy fallback)
-  const legacyOverrides = pairMetadata?.user_overrides || {};
+  // Use migration utility to read from new or old format
+  const overrides = readSegmentOverrides(pairMetadata as Record<string, any> | null);
 
-  // Prompts: pair_prompt (explicit override) > enhanced_prompt > batch > default
+  // Legacy user_overrides for very old data fallback
+  const legacyOverrides = (pairMetadata as any)?.user_overrides || {};
+
+  // enhanced_prompt is separate (AI-generated, not user settings)
+  const enhancedPrompt = (pairMetadata as any)?.enhanced_prompt;
+
+  // Prompts: overrides.prompt > enhanced_prompt > batch > default
   // Note: empty string is a valid override (user explicitly cleared)
   let prompt = defaults.prompt;
-  if (typeof pairMetadata?.pair_prompt === 'string') {
+  if (typeof overrides.prompt === 'string') {
     // User explicitly set a prompt (even if empty)
-    prompt = pairMetadata.pair_prompt;
+    prompt = overrides.prompt;
     sources.prompt = 'pair';
-  } else if (pairMetadata?.enhanced_prompt) {
+  } else if (enhancedPrompt) {
     // AI-generated prompt (fallback when no user override)
-    prompt = pairMetadata.enhanced_prompt;
+    prompt = enhancedPrompt;
     sources.prompt = 'pair';
   } else if (shotBatchSettings?.prompt) {
     prompt = shotBatchSettings.prompt;
     sources.prompt = 'batch';
   }
 
-  // Negative prompt: pair > batch > default
+  // Negative prompt: overrides > batch > default
   let negativePrompt = defaults.negativePrompt;
-  if (pairMetadata?.pair_negative_prompt !== undefined) {
-    negativePrompt = pairMetadata.pair_negative_prompt;
+  if (overrides.negativePrompt !== undefined) {
+    negativePrompt = overrides.negativePrompt;
     sources.prompt = 'pair'; // Negative follows positive source for simplicity
   } else if (shotBatchSettings?.negativePrompt !== undefined) {
     negativePrompt = shotBatchSettings.negativePrompt;
   }
 
-  // Motion mode: pair (new) > pair (legacy) > batch > default
+  // Motion mode: overrides > legacy > batch > default
   let motionMode: 'basic' | 'advanced' = 'basic';
-  const pairMotionMode = pairMetadata?.pair_motion_settings?.motion_mode ?? legacyOverrides.motion_mode;
+  const pairMotionMode = overrides.motionMode ?? legacyOverrides.motion_mode;
   if (pairMotionMode !== undefined) {
     motionMode = pairMotionMode;
     sources.motionMode = 'pair';
@@ -313,20 +342,23 @@ export function mergeSegmentSettings(
     sources.motionMode = 'batch';
   }
 
-  // Amount of motion: pair (new) > pair (legacy) > batch > default (0.5)
+  // Amount of motion: overrides (0-100) > legacy (0-1) > batch (0-1) > default (0.5)
+  // Note: overrides.amountOfMotion is already normalized to 0-100 by migration utility
+  // We return 0-1 scale for backwards compatibility with callers
   let amountOfMotion = 0.5;
-  const pairAmount = pairMetadata?.pair_motion_settings?.amount_of_motion ?? legacyOverrides.amount_of_motion;
-  if (pairAmount !== undefined) {
-    amountOfMotion = pairAmount;
+  if (overrides.amountOfMotion !== undefined) {
+    amountOfMotion = overrides.amountOfMotion / 100; // Convert 0-100 to 0-1
+  } else if (legacyOverrides.amount_of_motion !== undefined) {
+    amountOfMotion = legacyOverrides.amount_of_motion;
   } else if (shotBatchSettings?.amountOfMotion !== undefined) {
     amountOfMotion = shotBatchSettings.amountOfMotion;
   }
 
   // Phase config: only when motion mode is advanced
-  // pair (new) > pair (legacy) > batch > none
+  // overrides > legacy > batch > none
   let phaseConfig: PhaseConfig | undefined = undefined;
   if (motionMode === 'advanced') {
-    const pairPhaseConfig = pairMetadata?.pair_phase_config ?? legacyOverrides.phase_config;
+    const pairPhaseConfig = overrides.phaseConfig ?? legacyOverrides.phase_config;
     if (pairPhaseConfig) {
       phaseConfig = stripModeFromPhaseConfig(pairPhaseConfig);
       sources.phaseConfig = 'pair';
@@ -337,10 +369,16 @@ export function mergeSegmentSettings(
   }
   // When in basic mode, phaseConfig is always undefined (invariant)
 
-  // LoRAs: pair (new) > pair (legacy) > batch > none
+  // LoRAs: overrides > legacy > batch > none
   let loras: ActiveLora[] = [];
-  if (pairMetadata?.pair_loras && pairMetadata.pair_loras.length > 0) {
-    loras = pairLorasToArray(pairMetadata.pair_loras);
+  if (overrides.loras && overrides.loras.length > 0) {
+    // Convert LoraConfig[] to ActiveLora[]
+    loras = overrides.loras.map((lora) => ({
+      id: lora.id || lora.path,
+      name: lora.name || lora.path.split('/').pop()?.replace('.safetensors', '') || lora.path,
+      path: lora.path,
+      strength: lora.strength,
+    }));
     sources.loras = 'pair';
   } else if (legacyOverrides.additional_loras && Object.keys(legacyOverrides.additional_loras).length > 0) {
     loras = legacyLorasToArray(legacyOverrides.additional_loras);
@@ -429,78 +467,225 @@ export function buildTaskParams(
   };
 }
 
+/**
+ * Extract SegmentSettings from variant/generation params.
+ * Used to populate the form with settings from an existing generation.
+ */
+export function extractSettingsFromParams(
+  params: Record<string, any>,
+  defaults?: Partial<SegmentSettings>
+): SegmentSettings {
+  console.log('[extractSettingsFromParams] Input params:', params);
+  console.log('[extractSettingsFromParams] Defaults:', defaults);
+
+  // Handle nested orchestrator_details (common in task params)
+  const orchDetails = params.orchestrator_details || {};
+  console.log('[extractSettingsFromParams] orchestrator_details:', orchDetails);
+
+  // Extract prompt: base_prompt > prompt > orchestrator > default
+  const prompt = params.base_prompt ?? params.prompt ?? orchDetails.base_prompt ?? defaults?.prompt ?? '';
+  console.log('[extractSettingsFromParams] Prompt sources:', {
+    'params.base_prompt': params.base_prompt,
+    'params.prompt': params.prompt,
+    'orchDetails.base_prompt': orchDetails.base_prompt,
+    'defaults?.prompt': defaults?.prompt,
+    'final': prompt,
+  });
+
+  // Extract negative prompt
+  const negativePrompt = params.negative_prompt ?? orchDetails.negative_prompt ?? defaults?.negativePrompt ?? '';
+
+  // Extract num_frames
+  const numFrames = params.num_frames ?? orchDetails.num_frames ?? defaults?.numFrames ?? 25;
+  console.log('[extractSettingsFromParams] numFrames sources:', {
+    'params.num_frames': params.num_frames,
+    'orchDetails.num_frames': orchDetails.num_frames,
+    'defaults?.numFrames': defaults?.numFrames,
+    'final': numFrames,
+  });
+
+  // Extract seed/randomSeed
+  const randomSeed = params.random_seed ?? orchDetails.random_seed ?? defaults?.randomSeed ?? true;
+  const seed = params.seed ?? orchDetails.seed ?? defaults?.seed;
+
+  // Extract motion settings
+  const motionMode = params.motion_mode ?? orchDetails.motion_mode ?? defaults?.motionMode ?? 'basic';
+  const amountOfMotion = params.amount_of_motion != null
+    ? Math.round(params.amount_of_motion * 100) // Convert 0-1 to 0-100
+    : (orchDetails.amount_of_motion != null
+        ? Math.round(orchDetails.amount_of_motion * 100)
+        : (defaults?.amountOfMotion ?? 50));
+
+  // Extract phase config (only if advanced mode)
+  let phaseConfig: PhaseConfig | undefined = undefined;
+  if (motionMode === 'advanced') {
+    phaseConfig = params.phase_config ?? orchDetails.phase_config ?? defaults?.phaseConfig;
+    if (phaseConfig) {
+      phaseConfig = stripModeFromPhaseConfig(phaseConfig);
+    }
+  }
+
+  // Extract selected preset ID
+  const selectedPhasePresetId = params.selected_phase_preset_id ?? orchDetails.selected_phase_preset_id ?? defaults?.selectedPhasePresetId ?? null;
+
+  // Extract LoRAs - handle multiple formats
+  let loras: ActiveLora[] = [];
+
+  console.log('[extractSettingsFromParams] LoRA sources:', {
+    'params.loras': params.loras,
+    'params.additional_loras': params.additional_loras,
+    'orchDetails.loras': orchDetails.loras,
+    'orchDetails.additional_loras': orchDetails.additional_loras,
+    'defaults?.loras': defaults?.loras,
+  });
+
+  // Format 1: loras array at top level (new format)
+  if (Array.isArray(params.loras) && params.loras.length > 0) {
+    console.log('[extractSettingsFromParams] Using params.loras');
+    loras = pairLorasToArray(params.loras);
+  }
+  // Format 2: additional_loras object at top level (legacy)
+  else if (params.additional_loras && typeof params.additional_loras === 'object' && Object.keys(params.additional_loras).length > 0) {
+    console.log('[extractSettingsFromParams] Using params.additional_loras (legacy)');
+    loras = legacyLorasToArray(params.additional_loras);
+  }
+  // Format 3: in orchestrator_details (either format)
+  else if (Array.isArray(orchDetails.loras) && orchDetails.loras.length > 0) {
+    console.log('[extractSettingsFromParams] Using orchDetails.loras');
+    loras = pairLorasToArray(orchDetails.loras);
+  }
+  else if (orchDetails.additional_loras && typeof orchDetails.additional_loras === 'object' && Object.keys(orchDetails.additional_loras).length > 0) {
+    console.log('[extractSettingsFromParams] Using orchDetails.additional_loras (legacy)');
+    loras = legacyLorasToArray(orchDetails.additional_loras);
+  }
+  // Format 4: use defaults if provided
+  else if (defaults?.loras) {
+    console.log('[extractSettingsFromParams] Using defaults.loras');
+    loras = defaults.loras;
+  }
+
+  console.log('[extractSettingsFromParams] Final loras:', loras);
+
+  const result = {
+    prompt,
+    negativePrompt,
+    motionMode,
+    amountOfMotion,
+    phaseConfig,
+    selectedPhasePresetId,
+    loras,
+    numFrames,
+    randomSeed,
+    seed,
+    makePrimaryVariant: defaults?.makePrimaryVariant ?? false,
+  };
+
+  console.log('[extractSettingsFromParams] Final result:', result);
+  return result;
+}
+
 export function buildMetadataUpdate(
   currentMetadata: Record<string, any>,
   settings: PairSettingsToSave
 ): Record<string, any> {
-  const newMetadata = { ...currentMetadata };
+  console.log(`[PairPromptDebug] buildMetadataUpdate called`, {
+    settingsPrompt: settings.prompt?.substring(0, 30),
+    settingsNegPrompt: settings.negativePrompt?.substring(0, 30),
+    currentMetadataKeys: Object.keys(currentMetadata || {}),
+    currentSegmentOverrides: currentMetadata?.segmentOverrides,
+  });
 
-  // Prompts
+  // Convert PairSettingsToSave to SegmentOverrides format for new storage
+  const overrides: SegmentOverrides = {};
+
   if (settings.prompt !== undefined) {
-    newMetadata.pair_prompt = settings.prompt;
+    overrides.prompt = settings.prompt;
   }
   if (settings.negativePrompt !== undefined) {
-    newMetadata.pair_negative_prompt = settings.negativePrompt;
+    overrides.negativePrompt = settings.negativePrompt;
   }
-
-  // Motion settings
-  if (settings.motionMode !== undefined || settings.amountOfMotion !== undefined) {
-    const existingMotion = newMetadata.pair_motion_settings || {};
-    newMetadata.pair_motion_settings = {
-      ...existingMotion,
-      ...(settings.motionMode !== undefined && { motion_mode: settings.motionMode }),
-      ...(settings.amountOfMotion !== undefined && { amount_of_motion: settings.amountOfMotion }),
-    };
-    // Clear legacy fields
-    if (newMetadata.user_overrides) {
-      delete newMetadata.user_overrides.motion_mode;
-      delete newMetadata.user_overrides.amount_of_motion;
-    }
+  if (settings.motionMode !== undefined) {
+    overrides.motionMode = settings.motionMode;
   }
-
-  // Phase config
+  if (settings.amountOfMotion !== undefined) {
+    // Store in 0-100 scale (UI scale) in new format
+    overrides.amountOfMotion = settings.amountOfMotion;
+  }
   if (settings.phaseConfig !== undefined) {
     if (settings.phaseConfig === null) {
-      delete newMetadata.pair_phase_config;
+      // null means clear - we need to explicitly remove it from segmentOverrides
+      // Set to undefined so writeSegmentOverrides doesn't touch it, then delete manually below
     } else {
-      newMetadata.pair_phase_config = stripModeFromPhaseConfig(settings.phaseConfig);
-    }
-    // Clear legacy field
-    if (newMetadata.user_overrides?.phase_config !== undefined) {
-      delete newMetadata.user_overrides.phase_config;
+      overrides.phaseConfig = stripModeFromPhaseConfig(settings.phaseConfig);
     }
   }
-
-  // LoRAs
   if (settings.loras !== undefined) {
-    if (settings.loras.length === 0) {
-      delete newMetadata.pair_loras;
-    } else {
-      newMetadata.pair_loras = lorasToSaveFormat(settings.loras);
-    }
-    // Clear legacy field
-    if (newMetadata.user_overrides?.additional_loras !== undefined) {
-      delete newMetadata.user_overrides.additional_loras;
-    }
+    // Convert ActiveLora[] to LoraConfig[]
+    overrides.loras = settings.loras.map((l): LoraConfig => ({
+      id: l.id,
+      name: l.name,
+      path: l.path,
+      strength: l.strength,
+    }));
   }
-
-  // Video settings (randomSeed, seed)
   // Note: numFrames is NOT saved - timeline positions are the source of truth
   if (settings.randomSeed !== undefined) {
-    newMetadata.pair_random_seed = settings.randomSeed;
+    overrides.randomSeed = settings.randomSeed;
   }
   if (settings.seed !== undefined) {
-    newMetadata.pair_seed = settings.seed;
+    overrides.seed = settings.seed;
   }
-
-  // UI state (selectedPhasePresetId)
   if (settings.selectedPhasePresetId !== undefined) {
-    newMetadata.pair_selected_phase_preset_id = settings.selectedPhasePresetId;
+    overrides.selectedPhasePresetId = settings.selectedPhasePresetId;
   }
 
-  // Clean up empty user_overrides
-  if (newMetadata.user_overrides && Object.keys(newMetadata.user_overrides).length === 0) {
-    delete newMetadata.user_overrides;
+  // Use writeSegmentOverrides to write to new format
+  const newMetadata = writeSegmentOverrides(currentMetadata, overrides);
+
+  // Handle explicit clear of phaseConfig (when switching to basic mode)
+  if (settings.phaseConfig === null && newMetadata.segmentOverrides) {
+    delete newMetadata.segmentOverrides.phaseConfig;
+    delete newMetadata.segmentOverrides.selectedPhasePresetId; // Also clear preset when clearing config
+  }
+
+  // Clean up old pair_* fields (migration cleanup)
+  // These fields are now stored in segmentOverrides
+  if (settings.prompt !== undefined) {
+    delete newMetadata.pair_prompt;
+  }
+  if (settings.negativePrompt !== undefined) {
+    delete newMetadata.pair_negative_prompt;
+  }
+  if (settings.motionMode !== undefined || settings.amountOfMotion !== undefined) {
+    delete newMetadata.pair_motion_settings;
+  }
+  if (settings.phaseConfig !== undefined) {
+    delete newMetadata.pair_phase_config;
+  }
+  if (settings.loras !== undefined) {
+    delete newMetadata.pair_loras;
+  }
+  if (settings.randomSeed !== undefined) {
+    delete newMetadata.pair_random_seed;
+  }
+  if (settings.seed !== undefined) {
+    delete newMetadata.pair_seed;
+  }
+  if (settings.selectedPhasePresetId !== undefined) {
+    delete newMetadata.pair_selected_phase_preset_id;
+  }
+
+  // Clean up legacy user_overrides if present
+  if (newMetadata.user_overrides) {
+    if (settings.motionMode !== undefined) delete newMetadata.user_overrides.motion_mode;
+    if (settings.amountOfMotion !== undefined) delete newMetadata.user_overrides.amount_of_motion;
+    if (settings.phaseConfig !== undefined) delete newMetadata.user_overrides.phase_config;
+    if (settings.loras !== undefined) delete newMetadata.user_overrides.additional_loras;
+
+    // Clean up empty user_overrides
+    if (Object.keys(newMetadata.user_overrides).length === 0) {
+      delete newMetadata.user_overrides;
+    }
   }
 
   return newMetadata;

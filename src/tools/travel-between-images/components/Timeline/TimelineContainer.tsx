@@ -1560,12 +1560,13 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             // CRITICAL: Get the first image in this pair to read its metadata
             // startEntry[0] is the shot_generations.id which matches img.id
             const startImage = images.find(img => img.id === startEntry?.[0]);
-            
-            // Read pair prompts from props first, then fallback to metadata
-            // Props take precedence when passed (used during batch generation setup)
-            // Type-safe access to metadata (no 'as any' needed)
-            const pairPromptFromMetadata = startImage?.metadata?.pair_prompt || '';
-            const pairNegativePromptFromMetadata = startImage?.metadata?.pair_negative_prompt || '';
+
+            // Read pair prompts from pairPrompts prop (reactive, already migrated)
+            // The prop is computed by useEnhancedShotPositions/useTimelinePositionUtils
+            // which uses readSegmentOverrides to read from new or old format
+            const pairPromptData = pairPrompts?.[index];
+            const pairPromptFromMetadata = pairPromptData?.prompt || '';
+            const pairNegativePromptFromMetadata = pairPromptData?.negativePrompt || '';
             
             // Enhanced prompt: use prop if provided, otherwise fallback to metadata
             const enhancedPromptFromProps = enhancedPrompts?.[index] || '';

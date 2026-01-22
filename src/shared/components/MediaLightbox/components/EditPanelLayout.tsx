@@ -42,6 +42,9 @@ export interface EditPanelLayoutProps {
   /** Variant promotion (only for images) */
   onPromoteToGeneration?: (variantId: string) => Promise<void>;
   isPromoting?: boolean;
+
+  /** Handler to load a variant's settings into the regenerate form */
+  onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
 }
 
 export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
@@ -58,6 +61,7 @@ export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
   isLoadingVariants,
   onPromoteToGeneration,
   isPromoting,
+  onLoadVariantSettings,
 }) => {
   const isMobile = variant === 'mobile';
   const hasVariants = variants && variants.length >= 1 && onVariantSelect;
@@ -122,6 +126,7 @@ export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
               isLoading={isLoadingVariants}
               onPromoteToGeneration={onPromoteToGeneration}
               isPromoting={isPromoting}
+              onLoadVariantSettings={onLoadVariantSettings}
             />
           </div>
         )}

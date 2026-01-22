@@ -115,6 +115,7 @@ import {
 import { VideoPortionEditor } from '@/tools/edit-video/components/VideoPortionEditor';
 import { MultiPortionTimeline } from '@/shared/components/VideoPortionTimeline';
 import { useVideoEditing } from './hooks/useVideoEditing';
+import { readSegmentOverrides } from '@/shared/utils/settingsMigration';
 
 interface ShotOption {
   id: string;
@@ -386,6 +387,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   // Create as variant toggle - when false (createAsGeneration=true), creates new generation instead of variant
   const [createAsGeneration, setCreateAsGeneration] = useState(false);
+
+  // Variant params to load into regenerate form (triggered from VariantSelector hover)
+  const [variantParamsToLoad, setVariantParamsToLoad] = useState<Record<string, any> | null>(null);
 
   // Track component lifecycle and media changes - ALL TOP LEVEL
   useEffect(() => {
@@ -1893,9 +1897,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         pairShotGenerationId={pairShotGenerationId}
         onFrameCountChange={onSegmentFrameCountChange}
         currentFrameCount={currentFrameCount}
+        variantParamsToLoad={variantParamsToLoad}
+        onVariantParamsLoaded={() => setVariantParamsToLoad(null)}
       />
     );
-  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId, currentSegmentImages, onSegmentFrameCountChange, currentFrameCount]);
+  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId, currentSegmentImages, onSegmentFrameCountChange, currentFrameCount, variantParamsToLoad, setVariantParamsToLoad]);
 
   // Handle entering video edit mode (unified) - restores last used sub-mode
   const handleEnterVideoEditMode = useCallback(() => {
@@ -2104,9 +2110,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     // Use the effective media URL (may be a variant)
     const urlToDownload = isVideo ? effectiveVideoUrl : effectiveMediaUrl;
     // Extract prompt from various possible sources for a better filename
+    // Use migration utility to read segment overrides (handles new + old format)
+    const segmentOverrides = readSegmentOverrides(media.metadata as Record<string, any> | null);
     const prompt = (media.params as any)?.prompt ||
                    (media.metadata as any)?.enhanced_prompt ||
-                   (media.metadata as any)?.pair_prompt ||
+                   segmentOverrides.prompt ||
                    (media.metadata as any)?.prompt;
     await downloadMedia(urlToDownload, media.id, isVideo, media.contentType, prompt);
   };
@@ -3337,6 +3345,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isLoadingVariants={isLoadingVariants}
                     onPromoteToGeneration={handlePromoteToGeneration}
                     isPromoting={promoteVariantMutation.isPending}
+                    onLoadVariantSettings={setVariantParamsToLoad}
                   />
                 </div>
               </div>
@@ -3706,6 +3715,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isLoadingVariants={isLoadingVariants}
                     onPromoteToGeneration={handlePromoteToGeneration}
                     isPromoting={promoteVariantMutation.isPending}
+                    onLoadVariantSettings={setVariantParamsToLoad}
                   />
                 </div>
               </div>

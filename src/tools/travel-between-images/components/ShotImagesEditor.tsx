@@ -26,6 +26,7 @@ import { isVideoGeneration, isPositioned, isVideoAny } from '@/shared/lib/typeGu
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
 import { usePendingSegmentTasks } from '@/shared/hooks/usePendingSegmentTasks';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+import { readSegmentOverrides } from '@/shared/utils/settingsMigration';
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -1873,35 +1874,16 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       setSegmentSettingsModalData({ isOpen: true, pairData });
                     }
                   }}
-                  pairPrompts={(() => {
-                    // Convert pairPrompts from useEnhancedShotPositions to the format expected by ShotImageManager
-                    const result: Record<number, { prompt: string; negativePrompt: string }> = {};
-                    shotGenerations.forEach((sg, index) => {
-                      const prompt = sg.metadata?.pair_prompt || "";
-                      const negativePrompt = sg.metadata?.pair_negative_prompt || "";
-                      if (prompt || negativePrompt) {
-                        result[index] = { prompt, negativePrompt };
-                      }
-                    });
-                    console.log('[PairIndicatorDebug] ShotImagesEditor pairPrompts:', {
-                      shotGenerationsCount: shotGenerations.length,
-                      resultKeys: Object.keys(result),
-                      result
-                    });
-                    return result;
-                  })()}
+                  pairPrompts={pairPrompts}
                   enhancedPrompts={(() => {
                     // Convert enhanced prompts to index-based format
+                    // CRITICAL: Use sorted/filtered images array for correct index alignment
                     const result: Record<number, string> = {};
-                    shotGenerations.forEach((sg, index) => {
-                      const enhancedPrompt = sg.metadata?.enhanced_prompt;
+                    images.forEach((img, index) => {
+                      const enhancedPrompt = (img as any).metadata?.enhanced_prompt;
                       if (enhancedPrompt) {
                         result[index] = enhancedPrompt;
                       }
-                    });
-                    console.log('[PairIndicatorDebug] ShotImagesEditor enhancedPrompts:', {
-                      shotGenerationsCount: shotGenerations.length,
-                      resultKeys: Object.keys(result),
                     });
                     return result;
                   })()}
@@ -2191,9 +2173,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           // Load user_overrides from the start image's shot_generation.metadata so user edits persist
           const startImageId = segmentSettingsModalData.pairData?.startImage?.id;
           const startShotGen = startImageId ? shotGenerations.find(sg => sg.id === startImageId) : undefined;
-          const userOverrides = startShotGen?.metadata?.user_overrides as Record<string, any> | undefined;
-          const pairPromptVal = startShotGen?.metadata?.pair_prompt;
-          const enhancedPromptVal = startShotGen?.metadata?.enhanced_prompt;
+          // Use migration utility to read segment overrides
+          const segmentOverrides = readSegmentOverrides(startShotGen?.metadata as Record<string, any> | null);
+          const userOverrides = (startShotGen?.metadata as any)?.user_overrides as Record<string, any> | undefined;
+          const pairPromptVal = segmentOverrides.prompt;
+          // enhanced_prompt is separate (AI-generated, not user settings)
+          const enhancedPromptVal = (startShotGen?.metadata as any)?.enhanced_prompt;
 
           // Only log when we have actual pair data (avoid noise from closed modal)
           if (segmentSettingsModalData.pairData?.index !== undefined) {
@@ -2244,12 +2229,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         pairPrompt={(() => {
           if (!segmentSettingsModalData.pairData?.startImage?.id) return "";
           const shotGen = shotGenerations.find(sg => sg.id === segmentSettingsModalData.pairData.startImage.id);
-          return shotGen?.metadata?.pair_prompt || "";
+          const overrides = readSegmentOverrides(shotGen?.metadata as Record<string, any> | null);
+          return overrides.prompt || "";
         })()}
         pairNegativePrompt={(() => {
           if (!segmentSettingsModalData.pairData?.startImage?.id) return "";
           const shotGen = shotGenerations.find(sg => sg.id === segmentSettingsModalData.pairData.startImage.id);
-          return shotGen?.metadata?.pair_negative_prompt || "";
+          const overrides = readSegmentOverrides(shotGen?.metadata as Record<string, any> | null);
+          return overrides.negativePrompt || "";
         })()}
         enhancedPrompt={(() => {
           if (!segmentSettingsModalData.pairData?.startImage?.id) return "";

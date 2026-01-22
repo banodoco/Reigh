@@ -149,6 +149,9 @@ export interface ControlsPanelProps extends ModeProps {
   // Variant promotion
   onPromoteToGeneration?: (variantId: string) => Promise<void>;
   isPromoting?: boolean;
+
+  /** Handler to load a variant's settings into the regenerate form */
+  onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
 }
 
 export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
@@ -270,6 +273,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     // Variant promotion
     onPromoteToGeneration,
     isPromoting,
+    // Load variant settings
+    onLoadVariantSettings,
   } = props;
 
   // Route to VideoEditPanel
@@ -311,6 +316,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         isLoadingVariants={isLoadingVariants}
         onPromoteToGeneration={onPromoteToGeneration}
         isPromoting={isPromoting}
+        onLoadVariantSettings={onLoadVariantSettings}
       />
     );
   }

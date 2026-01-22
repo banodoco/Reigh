@@ -43,6 +43,12 @@ import {
   mergedToFormSettings,
   buildMetadataUpdate,
 } from '@/shared/components/segmentSettingsUtils';
+import {
+  readShotSettings,
+  readSegmentOverrides,
+  summarizeSettings,
+  type ShotVideoSettings,
+} from '@/shared/utils/settingsMigration';
 
 export interface UseSegmentSettingsOptions {
   /** Shot generation ID for pair-specific settings */
@@ -56,6 +62,18 @@ export interface UseSegmentSettingsOptions {
     /** Frame count from timeline positions (source of truth) */
     numFrames?: number;
   };
+}
+
+/** Tracks which fields have pair-level overrides vs using shot defaults */
+export interface FieldOverrides {
+  prompt: boolean;
+  negativePrompt: boolean;
+}
+
+/** Shot-level default values (for showing as placeholder when no override) */
+export interface ShotDefaults {
+  prompt: string;
+  negativePrompt: string;
 }
 
 export interface UseSegmentSettingsReturn {
@@ -75,6 +93,10 @@ export interface UseSegmentSettingsReturn {
   pairMetadata: PairMetadata | null;
   /** Raw shot batch settings (for debugging) */
   shotBatchSettings: ShotBatchSettings | null;
+  /** Which fields have pair-level overrides (vs using shot defaults). Undefined during loading. */
+  hasOverride: FieldOverrides | undefined;
+  /** Shot-level default values (for showing as placeholder) */
+  shotDefaults: ShotDefaults;
 }
 
 // Track hook instances for debugging
@@ -140,10 +162,10 @@ export function useSegmentSettings({
     staleTime: 10000,
   });
 
-  // Fetch shot batch settings
-  const { data: shotBatchSettings, isLoading: isLoadingBatch } = useQuery({
+  // Fetch shot batch settings using migration utility
+  const { data: shotVideoSettings, isLoading: isLoadingBatch } = useQuery({
     queryKey: ['shot-batch-settings', shotId],
-    queryFn: async () => {
+    queryFn: async (): Promise<ShotVideoSettings | null> => {
       if (!shotId) return null;
       console.log('[useSegmentSettings] 📥 Fetching shot batch settings for:', shotId.substring(0, 8));
       const { data, error } = await supabase
@@ -156,36 +178,36 @@ export function useSegmentSettings({
         return null;
       }
       const allSettings = data?.settings as Record<string, any>;
-      const batchSettings = allSettings?.['travel-between-images'] ?? {};
-      // Note: shot batch settings store amountOfMotion in 0-100 scale (UI scale)
-      // We need to convert to 0-1 scale to match the merge function's expectations
-      const rawAmount = batchSettings.amountOfMotion;
-      const normalizedAmount = rawAmount !== undefined && rawAmount > 1 ? rawAmount / 100 : rawAmount;
+      const rawSettings = allSettings?.['travel-between-images'] ?? {};
 
-      const result = {
-        amountOfMotion: normalizedAmount,
-        motionMode: batchSettings.motionMode,
-        selectedLoras: batchSettings.selectedLoras,
-        phaseConfig: batchSettings.phaseConfig,
-        selectedPhasePresetId: batchSettings.selectedPhasePresetId,
-        prompt: batchSettings.prompt,
-        negativePrompt: batchSettings.negativePrompt,
-      } as ShotBatchSettings & { selectedPhasePresetId?: string };
-      console.log('[useSegmentSettings] 📦 Shot batch settings loaded:', {
+      // Use migration utility to normalize field names
+      const result = readShotSettings(rawSettings);
+
+      console.log('[useSegmentSettings] 📦 Shot batch settings loaded (via migration):', {
         shotId: shotId.substring(0, 8),
-        hasPrompt: !!result.prompt,
-        hasNegPrompt: !!result.negativePrompt,
-        motionMode: result.motionMode,
-        rawMotionAmount: rawAmount,
-        normalizedMotionAmount: normalizedAmount,
-        hasPhaseConfig: !!result.phaseConfig,
-        hasLoras: !!result.selectedLoras?.length,
+        ...summarizeSettings(result),
+        // Also log raw for debugging during migration
+        rawBatchVideoPrompt: rawSettings.batchVideoPrompt?.substring(0, 30) || null,
+        rawSteerableNegPrompt: rawSettings.steerableMotionSettings?.negative_prompt?.substring(0, 30) || null,
       });
       return result;
     },
     enabled: !!shotId,
     staleTime: 30000,
   });
+
+  // Convert ShotVideoSettings to ShotBatchSettings for compatibility with existing merge logic
+  const shotBatchSettings = useMemo((): ShotBatchSettings | null => {
+    if (!shotVideoSettings) return null;
+    return {
+      amountOfMotion: shotVideoSettings.amountOfMotion / 100, // Convert to 0-1 for merge function
+      motionMode: shotVideoSettings.motionMode,
+      selectedLoras: shotVideoSettings.loras,
+      phaseConfig: shotVideoSettings.phaseConfig,
+      prompt: shotVideoSettings.prompt,
+      negativePrompt: shotVideoSettings.negativePrompt,
+    };
+  }, [shotVideoSettings]);
 
   // Compute merged settings from all sources
   // Priority: pair metadata > shot batch settings > defaults
@@ -202,8 +224,8 @@ export function useSegmentSettings({
     const numFrames = defaults.numFrames ?? 25;
     const randomSeed = pairMetadata?.pair_random_seed ?? true;
     const seed = pairMetadata?.pair_seed;
-    // selectedPhasePresetId: pair metadata > shot batch > null
-    const selectedPhasePresetId = pairMetadata?.pair_selected_phase_preset_id ?? (shotBatchSettings as any)?.selectedPhasePresetId ?? null;
+    // selectedPhasePresetId: pair metadata > shot video settings > null
+    const selectedPhasePresetId = pairMetadata?.pair_selected_phase_preset_id ?? shotVideoSettings?.selectedPhasePresetId ?? null;
 
     return mergedToFormSettings(merged, {
       numFrames,
@@ -211,7 +233,30 @@ export function useSegmentSettings({
       seed,
       selectedPhasePresetId,
     });
-  }, [pairMetadata, shotBatchSettings, defaults]);
+  }, [pairMetadata, shotBatchSettings, shotVideoSettings, defaults]);
+
+  // Compute which fields have pair-level overrides (vs using shot defaults)
+  // This tells the form whether to show the value as actual content or as placeholder
+  // Returns undefined during loading so form knows to show merged settings (not empty)
+  const hasOverride = useMemo((): FieldOverrides | undefined => {
+    // Return undefined while loading - form will show merged settings
+    if (isLoadingPair) return undefined;
+
+    // Use migration utility to read pair overrides from either old or new format
+    const pairOverrides = readSegmentOverrides(pairMetadata as Record<string, any> | null);
+    return {
+      prompt: !!pairOverrides.prompt,
+      negativePrompt: !!pairOverrides.negativePrompt,
+    };
+  }, [pairMetadata, isLoadingPair]);
+
+  // Shot-level default prompts (for showing as placeholder when no pair override)
+  const shotDefaultPrompts = useMemo((): ShotDefaults => {
+    return {
+      prompt: shotVideoSettings?.prompt || '',
+      negativePrompt: shotVideoSettings?.negativePrompt || '',
+    };
+  }, [shotVideoSettings]);
 
   // Log merged settings when data loads (separate effect to avoid log spam)
   useEffect(() => {
@@ -338,7 +383,7 @@ export function useSegmentSettings({
         prompt: settings.prompt,
         negativePrompt: settings.negativePrompt,
         motionMode: settings.motionMode,
-        amountOfMotion: settings.amountOfMotion / 100, // Convert 0-100 to 0-1
+        amountOfMotion: settings.amountOfMotion, // Store in 0-100 scale (UI scale) - new format
         phaseConfig: settings.motionMode === 'basic' ? null : settings.phaseConfig,
         loras: settings.loras,
         // numFrames intentionally omitted - timeline positions are source of truth
@@ -373,14 +418,22 @@ export function useSegmentSettings({
         return false;
       }
 
-      console.log(`[useSegmentSettings:${instanceId}] ✅ Settings saved`);
+      console.log(`[useSegmentSettings:${instanceId}] ✅ Settings saved`, {
+        pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
+        shotId: shotId?.substring(0, 8),
+        savedPrompt: settings.prompt?.substring(0, 50),
+        savedNegativePrompt: settings.negativePrompt?.substring(0, 50),
+      });
 
       // Invalidate the cache so the next read gets fresh data
+      console.log(`[PairPromptDebug] 🔄 Invalidating pair-metadata cache...`);
       await queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
 
-      // Also invalidate shot generations so timeline/pairDataByIndex updates
+      // Refetch (not just invalidate) shot generations so timeline/pairDataByIndex updates immediately
+      // Using refetchQueries ensures the query is actively refetched and events are reliably emitted
       if (shotId) {
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
+        console.log(`[PairPromptDebug] 🔄 Refetching all-shot-generations...`, { shotId: shotId.substring(0, 8) });
+        queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
       }
 
       setIsDirty(false);
@@ -441,11 +494,35 @@ export function useSegmentSettings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount/unmount
 
-  // Reset to merged defaults
+  // Reset to shot batch settings (ignoring pair-level overrides)
   const resetSettings = useCallback(() => {
-    setLocalSettings(null);
-    setIsDirty(false);
-  }, []);
+    // Build settings from shot defaults only (not pair metadata)
+    const shotDefaults = createDefaultSettings();
+
+    // Apply shot video settings if available (already in correct format from migration utility)
+    if (shotVideoSettings) {
+      shotDefaults.prompt = shotVideoSettings.prompt;
+      shotDefaults.negativePrompt = shotVideoSettings.negativePrompt;
+      shotDefaults.motionMode = shotVideoSettings.motionMode;
+      shotDefaults.amountOfMotion = shotVideoSettings.amountOfMotion; // Already 0-100
+      shotDefaults.phaseConfig = shotVideoSettings.phaseConfig;
+      shotDefaults.selectedPhasePresetId = shotVideoSettings.selectedPhasePresetId;
+      shotDefaults.loras = shotVideoSettings.loras;
+    }
+
+    // Keep current numFrames (from timeline - source of truth)
+    shotDefaults.numFrames = settings.numFrames;
+
+    console.log(`[useSegmentSettings:${instanceId}] 🔄 Restoring to shot defaults (ignoring pair overrides):`, {
+      shotId: shotId?.substring(0, 8) || null,
+      hasShotVideoSettings: !!shotVideoSettings,
+      shotVideoSummary: shotVideoSettings ? summarizeSettings(shotVideoSettings) : null,
+      restoredSummary: summarizeSettings(shotDefaults),
+    });
+
+    setLocalSettings(shotDefaults);
+    setIsDirty(true); // Mark dirty so it gets saved
+  }, [instanceId, shotId, shotVideoSettings, settings.numFrames]);
 
   return {
     settings,
@@ -456,5 +533,7 @@ export function useSegmentSettings({
     isDirty,
     pairMetadata: pairMetadata ?? null,
     shotBatchSettings: shotBatchSettings ?? null,
+    hasOverride,
+    shotDefaults: shotDefaultPrompts,
   };
 }

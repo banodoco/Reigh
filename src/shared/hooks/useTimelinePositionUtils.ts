@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { GenerationRow } from '@/types/shots';
 import type { ShotGeneration, PositionMetadata } from './useEnhancedShotPositions';
+import { readSegmentOverrides, writeSegmentOverrides } from '@/shared/utils/settingsMigration';
 import { isVideoGeneration } from '@/shared/lib/typeGuards';
 import { calculateAverageSpacing, DEFAULT_FRAME_SPACING } from '@/shared/utils/timelinePositionCalculator';
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
@@ -74,15 +75,23 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     unpositioned: shotGenerations.filter(sg => sg.timeline_frame === -1).length,
   });
 
-  // Extract pair prompts from metadata
+  // Extract pair prompts from metadata using migration utility
+  // CRITICAL: Filter and sort to match getImagesForMode output (indices must align with displayed images)
   const pairPrompts: Record<number, { prompt: string; negativePrompt: string }> = {};
-  shotGenerations.forEach((sg, index) => {
-    const prompt = sg.metadata?.pair_prompt || "";
-    const negativePrompt = sg.metadata?.pair_negative_prompt || "";
+  const sortedPositionedGenerations = shotGenerations
+    .filter(sg => sg.timeline_frame >= 0) // Filter out unpositioned (sentinel value -1)
+    .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+
+  // Each pair is represented by its first item (index in the sorted array)
+  for (let i = 0; i < sortedPositionedGenerations.length - 1; i++) {
+    const firstItem = sortedPositionedGenerations[i];
+    const overrides = readSegmentOverrides(firstItem.metadata as Record<string, any> | null);
+    const prompt = overrides.prompt || "";
+    const negativePrompt = overrides.negativePrompt || "";
     if (prompt || negativePrompt) {
-      pairPrompts[index] = { prompt, negativePrompt };
+      pairPrompts[i] = { prompt, negativePrompt };
     }
-  });
+  }
 
   /**
    * Load positions from database (refresh)
@@ -634,13 +643,17 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
       existingMetadataKeys: Object.keys(shotGen.metadata || {}),
     });
 
-    // Merge with existing metadata
-    const existingMetadata = shotGen.metadata || {};
-    const updatedMetadata = {
-      ...existingMetadata,
-      pair_prompt: prompt,
-      pair_negative_prompt: negativePrompt
-    };
+    // Use new format for writing
+    let updatedMetadata = writeSegmentOverrides(
+      shotGen.metadata as Record<string, any> | null,
+      {
+        prompt: prompt,
+        negativePrompt: negativePrompt,
+      }
+    );
+    // Clean up old fields (migration cleanup)
+    delete updatedMetadata.pair_prompt;
+    delete updatedMetadata.pair_negative_prompt;
 
     console.log('[PairPromptFlow] 💾 Executing Supabase UPDATE on shot_generations table...', {
       table: 'shot_generations',
@@ -674,7 +687,10 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     if (projectId) {
       queryClient.refetchQueries({ queryKey: ['shots', projectId] });
     }
-    
+
+    // Also invalidate pair-metadata cache used by useSegmentSettings modal
+    queryClient.invalidateQueries({ queryKey: ['pair-metadata', shotGen.id] });
+
     console.log('[PairPromptFlow] ✅ Refetch queued - UI should refresh with new data');
   }, [shotId, shotGenerations, loadPositions, queryClient, projectId]);
 
@@ -720,6 +736,10 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     if (projectId) {
       queryClient.refetchQueries({ queryKey: ['shots', projectId] });
     }
+
+    // Also invalidate pair-metadata cache used by useSegmentSettings modal
+    queryClient.invalidateQueries({ queryKey: ['pair-metadata', shotGenerationId] });
+
     console.log('[PairPromptFlow] ✅ Refetch queued');
   }, [shotId, shotGenerations, loadPositions]);
 

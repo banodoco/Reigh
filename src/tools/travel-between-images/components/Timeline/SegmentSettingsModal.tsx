@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Button } from "@/shared/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -7,7 +8,7 @@ import { useToast } from "@/shared/hooks/use-toast";
 import { framesToSeconds } from "./utils/time-utils";
 import { useSegmentSettings } from "@/shared/hooks/useSegmentSettings";
 import { SegmentSettingsForm } from "@/shared/components/SegmentSettingsForm";
-import { buildTaskParams } from "@/shared/components/segmentSettingsUtils";
+import { buildTaskParams, buildMetadataUpdate } from "@/shared/components/segmentSettingsUtils";
 import { createIndividualTravelSegmentTask } from "@/shared/lib/tasks/individualTravelSegment";
 
 interface SegmentSettingsModalProps {
@@ -88,12 +89,13 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
 }) => {
   const { toast } = useToast();
   const modal = useMediumModal();
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Use the segment settings hook for data management
   // Settings are merged from: pair metadata > shot batch settings > defaults
   const pairShotGenerationId = pairData?.startImage?.id;
-  const { settings, updateSettings, saveSettings, isLoading } = useSegmentSettings({
+  const { settings, updateSettings, saveSettings, resetSettings, isLoading, isDirty, hasOverride, shotDefaults } = useSegmentSettings({
     pairShotGenerationId,
     shotId,
     defaults: {
@@ -102,6 +104,31 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
       numFrames: pairData?.frames || 25,
     },
   });
+
+  // Handle close - optimistic update + background save
+  const handleClose = useCallback((open: boolean) => {
+    if (!open) {
+      if (isDirty && pairShotGenerationId) {
+        // Optimistic cache update - immediately reflect changes so reopening shows new values
+        queryClient.setQueryData(['pair-metadata', pairShotGenerationId], (old: any) => {
+          return buildMetadataUpdate(old || {}, {
+            prompt: settings.prompt,
+            negativePrompt: settings.negativePrompt,
+            motionMode: settings.motionMode,
+            amountOfMotion: settings.amountOfMotion,
+            phaseConfig: settings.motionMode === 'basic' ? null : settings.phaseConfig,
+            loras: settings.loras,
+            randomSeed: settings.randomSeed,
+            seed: settings.seed,
+            selectedPhasePresetId: settings.selectedPhasePresetId,
+          });
+        });
+
+        saveSettings(); // Fire and forget - persists to DB
+      }
+      onClose();
+    }
+  }, [isDirty, pairShotGenerationId, saveSettings, onClose, queryClient, settings]);
 
   // Navigation handlers
   const handleNavigatePrevious = useCallback(() => {
@@ -235,7 +262,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
   const endImageUrl = pairData.endImage?.url || pairData.endImage?.thumbUrl;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
         className={`${modal.className} p-0 gap-0`}
         style={modal.style}
@@ -296,6 +323,9 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
             showHeader={false}
             queryKeyPrefix={`pair-${pairData.index}-modal`}
             onFrameCountChange={onFrameCountChange}
+            onRestoreDefaults={resetSettings}
+            hasOverride={hasOverride}
+            shotDefaults={shotDefaults}
           />
           {!generationId && !shotId && (
             <p className="text-xs text-muted-foreground text-center mt-2">

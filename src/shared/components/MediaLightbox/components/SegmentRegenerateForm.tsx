@@ -5,11 +5,11 @@
  * Uses the controlled SegmentSettingsForm pattern.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useSegmentSettings } from '@/shared/hooks/useSegmentSettings';
 import { SegmentSettingsForm } from '@/shared/components/SegmentSettingsForm';
-import { buildTaskParams } from '@/shared/components/segmentSettingsUtils';
+import { buildTaskParams, extractSettingsFromParams } from '@/shared/components/segmentSettingsUtils';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
 
 export interface SegmentRegenerateFormProps {
@@ -41,6 +41,10 @@ export interface SegmentRegenerateFormProps {
   onFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
   /** Current frame count from timeline positions (source of truth) */
   currentFrameCount?: number;
+  /** Variant params to load into the form (set externally, e.g., from VariantSelector hover) */
+  variantParamsToLoad?: Record<string, any> | null;
+  /** Callback when variant params have been loaded (to clear the trigger) */
+  onVariantParamsLoaded?: () => void;
 }
 
 export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
@@ -58,6 +62,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   projectResolution,
   onFrameCountChange,
   currentFrameCount,
+  variantParamsToLoad,
+  onVariantParamsLoaded,
 }) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,7 +72,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   // Settings are merged from: pair metadata > shot batch settings > defaults
   // numFrames: prefer currentFrameCount (from timeline positions - source of truth),
   // fall back to initialParams (from video) if not provided
-  const { settings, updateSettings, saveSettings } = useSegmentSettings({
+  const { settings, updateSettings, saveSettings, resetSettings, hasOverride, shotDefaults } = useSegmentSettings({
     pairShotGenerationId,
     shotId,
     defaults: {
@@ -82,6 +88,42 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
       onFrameCountChange(pairShotGenerationId, frameCount);
     }
   }, [pairShotGenerationId, onFrameCountChange]);
+
+  // Effect to load variant settings when triggered from outside (e.g., VariantSelector hover button)
+  useEffect(() => {
+    if (!variantParamsToLoad) return;
+
+    console.log('[LoadVariantSettings] Loading from external trigger:', variantParamsToLoad);
+
+    const variantSettings = extractSettingsFromParams(variantParamsToLoad, {
+      numFrames: currentFrameCount ?? settings.numFrames,
+      makePrimaryVariant: settings.makePrimaryVariant,
+    });
+
+    console.log('[LoadVariantSettings] Extracted settings from external params:', variantSettings);
+
+    // Update all settings from the variant
+    updateSettings({
+      prompt: variantSettings.prompt,
+      negativePrompt: variantSettings.negativePrompt,
+      motionMode: variantSettings.motionMode,
+      amountOfMotion: variantSettings.amountOfMotion,
+      phaseConfig: variantSettings.phaseConfig,
+      selectedPhasePresetId: variantSettings.selectedPhasePresetId,
+      loras: variantSettings.loras,
+      randomSeed: variantSettings.randomSeed,
+      seed: variantSettings.seed,
+      numFrames: variantSettings.numFrames,
+    });
+
+    // Trigger frame count change callback if provided
+    if (onFrameCountChange && pairShotGenerationId && variantSettings.numFrames) {
+      onFrameCountChange(pairShotGenerationId, variantSettings.numFrames);
+    }
+
+    // Notify parent that we've loaded the params (so it can clear the trigger)
+    onVariantParamsLoaded?.();
+  }, [variantParamsToLoad]); // Only re-run when variantParamsToLoad changes
 
   // Handle form submission
   const handleSubmit = useCallback(async () => {
@@ -178,6 +220,9 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         showHeader={false}
         queryKeyPrefix="lightbox-segment-presets"
         onFrameCountChange={handleFrameCountChange}
+        onRestoreDefaults={resetSettings}
+        hasOverride={hasOverride}
+        shotDefaults={shotDefaults}
       />
     </div>
   );

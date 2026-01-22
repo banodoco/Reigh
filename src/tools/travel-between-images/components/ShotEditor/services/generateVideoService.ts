@@ -31,6 +31,11 @@ import { DEFAULT_RESOLUTION } from '../utils/dimension-utils';
 import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../state/types';
 import { PhaseConfig, buildBasicModePhaseConfig as buildPhaseConfigCore } from '../../../settings';
 import { isVideoShotGenerations, type ShotGenerationsLike } from '@/shared/lib/typeGuards';
+import {
+  readSegmentOverrides,
+  migrateLoras,
+  type SegmentOverrides,
+} from '@/shared/utils/settingsMigration';
 
 // Strip 'mode' field from phaseConfig before sending to backend
 // The backend should determine mode from the actual model, not a potentially stale field
@@ -38,6 +43,35 @@ const stripModeFromPhaseConfig = (config: PhaseConfig): PhaseConfig => {
   const { mode, ...rest } = config as PhaseConfig & { mode?: string };
   return rest as PhaseConfig;
 };
+
+/**
+ * Extract segment overrides from metadata using migration utility.
+ * Handles new format (segmentOverrides.*), old format (pair_*), and legacy (user_overrides).
+ *
+ * @param metadata - Raw metadata from shot_generations
+ * @returns Object with normalized overrides and legacy fallback data
+ */
+function extractPairOverrides(metadata: Record<string, any> | null | undefined): {
+  overrides: SegmentOverrides;
+  enhancedPrompt: string | undefined;
+  /** Legacy user_overrides for very old data fallback */
+  legacyOverrides: Record<string, any>;
+} {
+  if (!metadata) {
+    return { overrides: {}, enhancedPrompt: undefined, legacyOverrides: {} };
+  }
+
+  // Use migration utility to read from new or old format
+  const overrides = readSegmentOverrides(metadata);
+
+  // Keep legacy user_overrides as final fallback for very old data
+  const legacyOverrides = metadata.user_overrides || {};
+
+  // enhanced_prompt is separate (AI-generated, not user settings)
+  const enhancedPrompt = metadata.enhanced_prompt;
+
+  return { overrides, enhancedPrompt, legacyOverrides };
+}
 
 // Re-export API types for UI code to use
 export type {
@@ -687,99 +721,104 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
 
         for (let i = 0; i < filteredShotGenerations.length - 1; i++) {
           const firstItem = filteredShotGenerations[i];
-          const metadata = firstItem.metadata as any;
+          const metadata = firstItem.metadata as Record<string, any> | null;
+
+          // Use migration utility to extract overrides (handles new + old formats)
+          const { overrides, enhancedPrompt, legacyOverrides } = extractPairOverrides(metadata);
 
           console.log(`[BasePromptsDebug] 🔍 Pair ${i} (Image ${i} -> Image ${i+1})`);
           console.log(`[BasePromptsDebug]   shotGenId: ${firstItem.id.substring(0, 8)}`);
           console.log(`[BasePromptsDebug]   timeline_frame: ${firstItem.timeline_frame}`);
-          console.log(`[BasePromptsDebug]   has_pair_prompt: ${!!metadata?.pair_prompt}`);
-          console.log(`[BasePromptsDebug]   pair_prompt value: "${metadata?.pair_prompt || '(none)'}"`);
-          console.log(`[NegPromptDebug]   has_pair_negative_prompt: ${!!metadata?.pair_negative_prompt}`);
-          console.log(`[NegPromptDebug]   pair_negative_prompt value: "${metadata?.pair_negative_prompt || '(none)'}"`);
-          console.log(`[BasePromptsDebug]   has_enhanced_prompt: ${!!metadata?.enhanced_prompt}`);
-          
-          if (metadata?.pair_prompt || metadata?.pair_negative_prompt) {
+          console.log(`[BasePromptsDebug]   has_prompt: ${!!overrides.prompt}`);
+          console.log(`[BasePromptsDebug]   prompt value: "${overrides.prompt || '(none)'}"`);
+          console.log(`[NegPromptDebug]   has_negative_prompt: ${!!overrides.negativePrompt}`);
+          console.log(`[NegPromptDebug]   negative_prompt value: "${overrides.negativePrompt || '(none)'}"`);
+          console.log(`[BasePromptsDebug]   has_enhanced_prompt: ${!!enhancedPrompt}`);
+
+          // Load prompts from overrides
+          if (overrides.prompt || overrides.negativePrompt) {
             pairPrompts[i] = {
-              prompt: metadata.pair_prompt || '',
-              negativePrompt: metadata.pair_negative_prompt || '',
+              prompt: overrides.prompt || '',
+              negativePrompt: overrides.negativePrompt || '',
             };
             console.log(`[BasePromptsDebug] ✅ Loaded pair prompt ${i} from metadata`);
           } else {
             console.log(`[BasePromptsDebug] ⚠️ No custom prompt for pair ${i} - will use default`);
           }
-          
-          // Extract enhanced prompt if present
-          if (metadata?.enhanced_prompt) {
-            enhancedPrompts[i] = metadata.enhanced_prompt;
+
+          // Extract enhanced prompt if present (separate from settings)
+          if (enhancedPrompt) {
+            enhancedPrompts[i] = enhancedPrompt;
             console.log(`[BasePromptsDebug] ✅ Loaded enhanced prompt ${i} from metadata`);
           }
 
-          // NEW: Extract per-pair parameter overrides
-          // Check BOTH the new structured fields AND user_overrides (from useSegmentSettings)
-          const userOverrides = metadata?.user_overrides as Record<string, any> | undefined;
-
-          // Phase config: prefer pair_phase_config, fall back to user_overrides.phase_config
-          // [PhaseConfigDebug] Log what we're reading from metadata
+          // Log what we're reading from metadata (for debugging)
           console.log(`[PhaseConfigDebug] 🔍 Reading pair ${i} metadata:`, {
             shotGenId: firstItem.id.substring(0, 8),
-            // New pair_X fields (preferred)
-            hasPairPhaseConfig: !!metadata?.pair_phase_config,
-            hasPairMotionSettings: !!metadata?.pair_motion_settings,
-            hasPairLoras: !!metadata?.pair_loras,
-            pairMotionMode: metadata?.pair_motion_settings?.motion_mode ?? '(none)',
-            pairPhaseConfigFlowShift: metadata?.pair_phase_config?.flow_shift ?? '(none)',
+            // Via migration utility
+            hasPhaseConfig: !!overrides.phaseConfig,
+            motionMode: overrides.motionMode ?? '(none)',
+            amountOfMotion: overrides.amountOfMotion ?? '(none)',
+            hasLoras: !!(overrides.loras && overrides.loras.length > 0),
+            phaseConfigFlowShift: overrides.phaseConfig?.flow_shift ?? '(none)',
             // Legacy user_overrides (fallback)
-            hasLegacyOverrides: !!userOverrides,
-            legacyMotionMode: userOverrides?.motion_mode ?? '(none)',
-            legacyPhaseConfigFlowShift: userOverrides?.phase_config?.flow_shift ?? '(none)',
+            hasLegacyOverrides: Object.keys(legacyOverrides).length > 0,
+            legacyMotionMode: legacyOverrides?.motion_mode ?? '(none)',
+            legacyPhaseConfigFlowShift: legacyOverrides?.phase_config?.flow_shift ?? '(none)',
           });
+
           // Check if motion_mode is 'basic' - if so, ignore any phase_config (handles stale data)
-          const motionMode = metadata?.pair_motion_settings?.motion_mode || userOverrides?.motion_mode;
+          const motionMode = overrides.motionMode || legacyOverrides?.motion_mode;
           const isBasicMode = motionMode === 'basic';
 
-          if (isBasicMode && (metadata?.pair_phase_config || userOverrides?.phase_config)) {
+          // Phase config: use overrides, with legacy fallback
+          if (isBasicMode && (overrides.phaseConfig || legacyOverrides?.phase_config)) {
             console.log(`[PhaseConfigDebug] 🧹 Ignoring stale phase_config for pair ${i} (motion_mode is basic)`);
-          } else if (metadata?.pair_phase_config) {
-            pairPhaseConfigsOverrides[i] = metadata.pair_phase_config;
-            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from pair_phase_config`);
-          } else if (userOverrides?.phase_config) {
-            pairPhaseConfigsOverrides[i] = userOverrides.phase_config;
-            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from user_overrides`);
+          } else if (overrides.phaseConfig) {
+            pairPhaseConfigsOverrides[i] = overrides.phaseConfig;
+            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i}`);
+          } else if (legacyOverrides?.phase_config) {
+            pairPhaseConfigsOverrides[i] = legacyOverrides.phase_config;
+            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from legacy user_overrides`);
           } else {
             console.log(`[PhaseConfigDebug] ⚠️ No phase config override for pair ${i}`);
           }
 
-          // LoRAs: prefer pair_loras, fall back to user_overrides.additional_loras
-          if (metadata?.pair_loras && metadata.pair_loras.length > 0) {
-            pairLorasOverrides[i] = metadata.pair_loras.map((lora: any) => ({
+          // LoRAs: use overrides, with legacy fallback
+          if (overrides.loras && overrides.loras.length > 0) {
+            pairLorasOverrides[i] = overrides.loras.map((lora) => ({
               path: lora.path,
               strength: lora.strength,
             }));
-            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from pair_loras:`, pairLorasOverrides[i]);
-          } else if (userOverrides?.additional_loras && Object.keys(userOverrides.additional_loras).length > 0) {
-            // Convert from URL->strength map to array format
-            pairLorasOverrides[i] = Object.entries(userOverrides.additional_loras).map(([path, strength]) => ({
+            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i}:`, pairLorasOverrides[i]);
+          } else if (legacyOverrides?.additional_loras && Object.keys(legacyOverrides.additional_loras).length > 0) {
+            // Convert from URL->strength map to array format (legacy)
+            pairLorasOverrides[i] = Object.entries(legacyOverrides.additional_loras).map(([path, strength]) => ({
               path,
               strength: typeof strength === 'number' ? strength : 1.0,
             }));
-            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from user_overrides:`, pairLorasOverrides[i]);
+            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from legacy user_overrides:`, pairLorasOverrides[i]);
           }
 
-          // Motion settings: prefer pair_motion_settings, fall back to user_overrides
-          if (metadata?.pair_motion_settings) {
-            pairMotionSettingsOverrides[i] = metadata.pair_motion_settings;
-            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from pair_motion_settings:`, pairMotionSettingsOverrides[i]);
-          } else if (userOverrides?.amount_of_motion !== undefined || userOverrides?.motion_mode !== undefined) {
+          // Motion settings: build from overrides
+          if (overrides.motionMode !== undefined || overrides.amountOfMotion !== undefined) {
             pairMotionSettingsOverrides[i] = {
-              amount_of_motion: userOverrides.amount_of_motion,
-              motion_mode: userOverrides.motion_mode,
+              // Convert back to backend format (0-1 scale)
+              ...(overrides.amountOfMotion !== undefined && { amount_of_motion: overrides.amountOfMotion / 100 }),
+              ...(overrides.motionMode !== undefined && { motion_mode: overrides.motionMode }),
             };
-            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from user_overrides:`, pairMotionSettingsOverrides[i]);
+            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i}:`, pairMotionSettingsOverrides[i]);
+          } else if (legacyOverrides?.amount_of_motion !== undefined || legacyOverrides?.motion_mode !== undefined) {
+            pairMotionSettingsOverrides[i] = {
+              amount_of_motion: legacyOverrides.amount_of_motion,
+              motion_mode: legacyOverrides.motion_mode,
+            };
+            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from legacy user_overrides:`, pairMotionSettingsOverrides[i]);
           }
 
-          // Num frames: use pair-specific value if set (timeline mode)
-          if (metadata?.pair_num_frames !== undefined) {
-            pairNumFramesOverrides[i] = metadata.pair_num_frames;
+          // Num frames: use overrides
+          if (overrides.numFrames !== undefined) {
+            pairNumFramesOverrides[i] = overrides.numFrames;
             console.log(`[PairOverrides] ✅ Loaded numFrames override for pair ${i}: ${pairNumFramesOverrides[i]}`);
           }
         }
@@ -993,98 +1032,103 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         
         for (let i = 0; i < filteredShotGenerations.length - 1; i++) {
           const firstItem = filteredShotGenerations[i];
-          const metadata = firstItem.metadata as any;
-          
+          const metadata = firstItem.metadata as Record<string, any> | null;
+
+          // Use migration utility to extract overrides (handles new + old formats)
+          const { overrides, enhancedPrompt, legacyOverrides } = extractPairOverrides(metadata);
+
           console.log(`[BasePromptsDebug] 🔍 Pair ${i} (Image ${i} -> Image ${i+1})`);
           console.log(`[BasePromptsDebug]   shotGenId: ${firstItem.id.substring(0, 8)}`);
-          console.log(`[BasePromptsDebug]   has_pair_prompt: ${!!metadata?.pair_prompt}`);
-          console.log(`[BasePromptsDebug]   pair_prompt value: "${metadata?.pair_prompt || '(none)'}"`);
-          console.log(`[NegPromptDebug]   has_pair_negative_prompt: ${!!metadata?.pair_negative_prompt}`);
-          console.log(`[NegPromptDebug]   pair_negative_prompt value: "${metadata?.pair_negative_prompt || '(none)'}"`);
-          console.log(`[BasePromptsDebug]   has_enhanced_prompt: ${!!metadata?.enhanced_prompt}`);
-          
-          if (metadata?.pair_prompt || metadata?.pair_negative_prompt) {
+          console.log(`[BasePromptsDebug]   has_prompt: ${!!overrides.prompt}`);
+          console.log(`[BasePromptsDebug]   prompt value: "${overrides.prompt || '(none)'}"`);
+          console.log(`[NegPromptDebug]   has_negative_prompt: ${!!overrides.negativePrompt}`);
+          console.log(`[NegPromptDebug]   negative_prompt value: "${overrides.negativePrompt || '(none)'}"`);
+          console.log(`[BasePromptsDebug]   has_enhanced_prompt: ${!!enhancedPrompt}`);
+
+          // Load prompts from overrides
+          if (overrides.prompt || overrides.negativePrompt) {
             pairPrompts[i] = {
-              prompt: metadata.pair_prompt || '',
-              negativePrompt: metadata.pair_negative_prompt || '',
+              prompt: overrides.prompt || '',
+              negativePrompt: overrides.negativePrompt || '',
             };
             console.log(`[BasePromptsDebug] ✅ Loaded pair prompt ${i} from metadata`);
           } else {
             console.log(`[BasePromptsDebug] ⚠️ No custom prompt for pair ${i} - will use default`);
           }
-          
-          // Extract enhanced prompt if present
-          if (metadata?.enhanced_prompt) {
-            enhancedPrompts[i] = metadata.enhanced_prompt;
+
+          // Extract enhanced prompt if present (separate from settings)
+          if (enhancedPrompt) {
+            enhancedPrompts[i] = enhancedPrompt;
             console.log(`[BasePromptsDebug] ✅ Loaded enhanced prompt ${i} from metadata`);
           }
 
-          // NEW: Extract per-pair parameter overrides (batch mode)
-          // Check BOTH the new structured fields AND user_overrides (from useSegmentSettings)
-          const userOverrides = metadata?.user_overrides as Record<string, any> | undefined;
-
-          // Phase config: prefer pair_phase_config, fall back to user_overrides.phase_config
-          // [PhaseConfigDebug] Log what we're reading from metadata
+          // Log what we're reading from metadata (for debugging)
           console.log(`[PhaseConfigDebug] 🔍 Reading pair ${i} metadata:`, {
             shotGenId: firstItem.id.substring(0, 8),
-            // New pair_X fields (preferred)
-            hasPairPhaseConfig: !!metadata?.pair_phase_config,
-            hasPairMotionSettings: !!metadata?.pair_motion_settings,
-            hasPairLoras: !!metadata?.pair_loras,
-            pairMotionMode: metadata?.pair_motion_settings?.motion_mode ?? '(none)',
-            pairPhaseConfigFlowShift: metadata?.pair_phase_config?.flow_shift ?? '(none)',
+            // Via migration utility
+            hasPhaseConfig: !!overrides.phaseConfig,
+            motionMode: overrides.motionMode ?? '(none)',
+            amountOfMotion: overrides.amountOfMotion ?? '(none)',
+            hasLoras: !!(overrides.loras && overrides.loras.length > 0),
+            phaseConfigFlowShift: overrides.phaseConfig?.flow_shift ?? '(none)',
             // Legacy user_overrides (fallback)
-            hasLegacyOverrides: !!userOverrides,
-            legacyMotionMode: userOverrides?.motion_mode ?? '(none)',
-            legacyPhaseConfigFlowShift: userOverrides?.phase_config?.flow_shift ?? '(none)',
+            hasLegacyOverrides: Object.keys(legacyOverrides).length > 0,
+            legacyMotionMode: legacyOverrides?.motion_mode ?? '(none)',
+            legacyPhaseConfigFlowShift: legacyOverrides?.phase_config?.flow_shift ?? '(none)',
           });
+
           // Check if motion_mode is 'basic' - if so, ignore any phase_config (handles stale data)
-          const motionMode = metadata?.pair_motion_settings?.motion_mode || userOverrides?.motion_mode;
+          const motionMode = overrides.motionMode || legacyOverrides?.motion_mode;
           const isBasicMode = motionMode === 'basic';
 
-          if (isBasicMode && (metadata?.pair_phase_config || userOverrides?.phase_config)) {
+          // Phase config: use overrides, with legacy fallback
+          if (isBasicMode && (overrides.phaseConfig || legacyOverrides?.phase_config)) {
             console.log(`[PhaseConfigDebug] 🧹 Ignoring stale phase_config for pair ${i} (motion_mode is basic)`);
-          } else if (metadata?.pair_phase_config) {
-            pairPhaseConfigsOverrides[i] = metadata.pair_phase_config;
-            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from pair_phase_config`);
-          } else if (userOverrides?.phase_config) {
-            pairPhaseConfigsOverrides[i] = userOverrides.phase_config;
-            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from user_overrides`);
+          } else if (overrides.phaseConfig) {
+            pairPhaseConfigsOverrides[i] = overrides.phaseConfig;
+            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i}`);
+          } else if (legacyOverrides?.phase_config) {
+            pairPhaseConfigsOverrides[i] = legacyOverrides.phase_config;
+            console.log(`[PhaseConfigDebug] ✅ Loaded phase config for pair ${i} from legacy user_overrides`);
           } else {
             console.log(`[PhaseConfigDebug] ⚠️ No phase config override for pair ${i}`);
           }
 
-          // LoRAs: prefer pair_loras, fall back to user_overrides.additional_loras
-          if (metadata?.pair_loras && metadata.pair_loras.length > 0) {
-            pairLorasOverrides[i] = metadata.pair_loras.map((lora: any) => ({
+          // LoRAs: use overrides, with legacy fallback
+          if (overrides.loras && overrides.loras.length > 0) {
+            pairLorasOverrides[i] = overrides.loras.map((lora) => ({
               path: lora.path,
               strength: lora.strength,
             }));
-            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from pair_loras:`, pairLorasOverrides[i]);
-          } else if (userOverrides?.additional_loras && Object.keys(userOverrides.additional_loras).length > 0) {
-            // Convert from URL->strength map to array format
-            pairLorasOverrides[i] = Object.entries(userOverrides.additional_loras).map(([path, strength]) => ({
+            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i}:`, pairLorasOverrides[i]);
+          } else if (legacyOverrides?.additional_loras && Object.keys(legacyOverrides.additional_loras).length > 0) {
+            // Convert from URL->strength map to array format (legacy)
+            pairLorasOverrides[i] = Object.entries(legacyOverrides.additional_loras).map(([path, strength]) => ({
               path,
               strength: typeof strength === 'number' ? strength : 1.0,
             }));
-            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from user_overrides:`, pairLorasOverrides[i]);
+            console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from legacy user_overrides:`, pairLorasOverrides[i]);
           }
 
-          // Motion settings: prefer pair_motion_settings, fall back to user_overrides
-          if (metadata?.pair_motion_settings) {
-            pairMotionSettingsOverrides[i] = metadata.pair_motion_settings;
-            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from pair_motion_settings:`, pairMotionSettingsOverrides[i]);
-          } else if (userOverrides?.amount_of_motion !== undefined || userOverrides?.motion_mode !== undefined) {
+          // Motion settings: build from overrides
+          if (overrides.motionMode !== undefined || overrides.amountOfMotion !== undefined) {
             pairMotionSettingsOverrides[i] = {
-              amount_of_motion: userOverrides.amount_of_motion,
-              motion_mode: userOverrides.motion_mode,
+              // Convert back to backend format (0-1 scale)
+              ...(overrides.amountOfMotion !== undefined && { amount_of_motion: overrides.amountOfMotion / 100 }),
+              ...(overrides.motionMode !== undefined && { motion_mode: overrides.motionMode }),
             };
-            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from user_overrides:`, pairMotionSettingsOverrides[i]);
+            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i}:`, pairMotionSettingsOverrides[i]);
+          } else if (legacyOverrides?.amount_of_motion !== undefined || legacyOverrides?.motion_mode !== undefined) {
+            pairMotionSettingsOverrides[i] = {
+              amount_of_motion: legacyOverrides.amount_of_motion,
+              motion_mode: legacyOverrides.motion_mode,
+            };
+            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i} from legacy user_overrides:`, pairMotionSettingsOverrides[i]);
           }
 
-          // Num frames: use pair-specific value if set
-          if (metadata?.pair_num_frames !== undefined) {
-            pairNumFramesOverrides[i] = metadata.pair_num_frames;
+          // Num frames: use overrides
+          if (overrides.numFrames !== undefined) {
+            pairNumFramesOverrides[i] = overrides.numFrames;
             console.log(`[PairOverrides] ✅ Loaded numFrames override for pair ${i}: ${pairNumFramesOverrides[i]}`);
           }
         }

@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Check, Scissors, Sparkles, Film, Star, Loader2, ArrowDown, ArrowUp, X, ChevronLeft, ChevronRight, ImagePlus } from 'lucide-react';
+import { Check, Scissors, Sparkles, Film, Star, Loader2, ArrowDown, ArrowUp, X, ChevronLeft, ChevronRight, ImagePlus, Download } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -91,12 +91,14 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   isLoading = false,
   onPromoteToGeneration,
   isPromoting = false,
+  onLoadVariantSettings,
 }) => {
   const [isMakingPrimary, setIsMakingPrimary] = useState(false);
   const [localIsPromoting, setLocalIsPromoting] = useState(false);
   const [promoteSuccess, setPromoteSuccess] = useState(false);
   const [relationshipFilter, setRelationshipFilter] = useState<RelationshipFilter>('all');
   const [currentPage, setCurrentPage] = useState(0);
+  const [loadedSettingsVariantId, setLoadedSettingsVariantId] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   // Calculate variant relationships based on source_variant_id in params
@@ -520,12 +522,33 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                       {(variant.params as any).prompt}
                     </p>
                   )}
+                  {/* Variant settings details */}
+                  {(() => {
+                    const params = variant.params as any;
+                    const orchDetails = params?.orchestrator_details || {};
+                    const numFrames = params?.num_frames ?? orchDetails?.num_frames;
+                    const seed = params?.seed ?? orchDetails?.seed;
+                    const loras = params?.loras ?? params?.additional_loras ?? orchDetails?.loras ?? orchDetails?.additional_loras;
+                    const hasLoras = Array.isArray(loras) ? loras.length > 0 : (loras && typeof loras === 'object' && Object.keys(loras).length > 0);
+                    const loraCount = Array.isArray(loras) ? loras.length : (loras ? Object.keys(loras).length : 0);
+
+                    if (numFrames || seed || hasLoras) {
+                      return (
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 text-[10px] text-muted-foreground">
+                          {numFrames && <span>Frames: {numFrames}</span>}
+                          {seed && <span>Seed: {seed}</span>}
+                          {hasLoras && <span>LoRAs: {loraCount}</span>}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   {parentVariant && (
                     <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-border/50">
                       <span className="text-xs text-muted-foreground">Based on:</span>
                       <div className="w-8 h-5 rounded overflow-hidden bg-muted flex-shrink-0">
-                        <img 
-                          src={parentVariant.thumbnail_url || parentVariant.location} 
+                        <img
+                          src={parentVariant.thumbnail_url || parentVariant.location}
                           alt="Parent variant"
                           className="w-full h-full object-cover"
                         />
@@ -536,6 +559,36 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                   {isActive && !isPrimary && <p className="text-xs text-muted-foreground mt-1">Currently viewing</p>}
                   {isParent && <p className="text-xs text-blue-400 mt-1">Current is based on this</p>}
                   {isChild && <p className="text-xs text-purple-400 mt-1">Based on current</p>}
+                  {/* Load Settings button */}
+                  {onLoadVariantSettings && variant.params && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('[VariantSelector] Load settings clicked for variant:', variant.id);
+                        onLoadVariantSettings(variant.params as Record<string, any>);
+                        setLoadedSettingsVariantId(variant.id);
+                        setTimeout(() => setLoadedSettingsVariantId(null), 2000);
+                      }}
+                      className={cn(
+                        "w-full mt-2 h-6 text-xs gap-1",
+                        loadedSettingsVariantId === variant.id && "bg-green-500/20 border-green-500/50 text-green-400"
+                      )}
+                    >
+                      {loadedSettingsVariantId === variant.id ? (
+                        <>
+                          <Check className="w-3 h-3" />
+                          Loaded!
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3 h-3" />
+                          Load Settings
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </TooltipContent>
               </Tooltip>
             );

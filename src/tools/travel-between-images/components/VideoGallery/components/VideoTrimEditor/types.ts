@@ -137,6 +137,8 @@ export interface VariantSelectorProps {
   onPromoteToGeneration?: (variantId: string) => Promise<void>;
   /** Whether a promotion is currently in progress */
   isPromoting?: boolean;
+  /** Handler to load a variant's settings into the regenerate form */
+  onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
 }
 
 /**

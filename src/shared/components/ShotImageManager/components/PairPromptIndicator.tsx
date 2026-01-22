@@ -49,23 +49,6 @@ const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
   pairLoras,
   pairMotionSettings,
 }) => {
-  console.log('[PairIndicatorDebug] PairPromptIndicator render:', {
-    pairIndex,
-    frames,
-    startFrame,
-    endFrame,
-    hasPairPrompt: !!pairPrompt,
-    hasPairNegativePrompt: !!pairNegativePrompt,
-    hasEnhancedPrompt: !!enhancedPrompt,
-    pairPrompt: pairPrompt?.substring(0, 30),
-    pairNegativePrompt: pairNegativePrompt?.substring(0, 30),
-    isMobile,
-    // NEW: Log override status
-    hasMotionOverride: !!pairMotionSettings,
-    hasLoraOverride: !!(pairLoras && pairLoras.length > 0),
-    hasPhaseConfigOverride: !!pairPhaseConfig,
-  });
-
   // Color schemes matching timeline PairRegion
   const pairColorSchemes = [
     { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-300 dark:border-blue-700', text: 'text-blue-700 dark:text-gray-300' },

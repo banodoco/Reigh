@@ -74,6 +74,9 @@ export interface VideoEditPanelProps {
   onVariantSelect: (variantId: string) => void;
   onMakePrimary: (variantId: string) => Promise<void>;
   isLoadingVariants: boolean;
+
+  /** Handler to load a variant's settings into the regenerate form */
+  onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
 }
 
 export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
@@ -110,6 +113,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   onVariantSelect,
   onMakePrimary,
   isLoadingVariants,
+  onLoadVariantSettings,
 }) => {
   // Mode selector items for video editing
   const modeSelectorItems = [
@@ -151,6 +155,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
       onVariantSelect={onVariantSelect}
       onMakePrimary={onMakePrimary}
       isLoadingVariants={isLoadingVariants}
+      onLoadVariantSettings={onLoadVariantSettings}
     >
       {/* Sub-mode content */}
       {videoEditSubMode === 'trim' && (

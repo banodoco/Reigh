@@ -9,6 +9,7 @@ import { isVideoGeneration, isVideoShotGeneration, isPositioned, type ShotGenera
 import { useInvalidateGenerations } from '@/shared/hooks/useGenerationInvalidation';
 import { calculateNextAvailableFrame, extractExistingFrames, DEFAULT_FRAME_SPACING } from '@/shared/utils/timelinePositionCalculator';
 import type { PhaseConfig } from '@/tools/travel-between-images/settings';
+import { readSegmentOverrides, writeSegmentOverrides } from '@/shared/utils/settingsMigration';
 
 
 export interface ShotGeneration {
@@ -36,13 +37,31 @@ export interface PositionMetadata {
   auto_initialized?: boolean;
   drag_source?: string;
   drag_session_id?: string;
-  // Pair prompts (stored on the first item of each pair)
-  pair_prompt?: string;
-  pair_negative_prompt?: string;
+  // NEW FORMAT: Segment overrides (stored on first item of each pair)
+  segmentOverrides?: {
+    prompt?: string;
+    negativePrompt?: string;
+    motionMode?: 'basic' | 'advanced';
+    amountOfMotion?: number; // 0-100 scale
+    phaseConfig?: PhaseConfig;
+    selectedPhasePresetId?: string | null;
+    loras?: Array<{ path: string; strength: number; id?: string; name?: string }>;
+    numFrames?: number;
+    randomSeed?: boolean;
+    seed?: number;
+  };
+  // AI-generated prompt (not user settings, kept separate)
   enhanced_prompt?: string;
-  // NEW: Per-pair parameter overrides (following the same pattern as prompts)
+  // DEPRECATED: Old pair_* fields (kept for backward compatibility during migration)
+  /** @deprecated Use segmentOverrides.prompt instead */
+  pair_prompt?: string;
+  /** @deprecated Use segmentOverrides.negativePrompt instead */
+  pair_negative_prompt?: string;
+  /** @deprecated Use segmentOverrides.phaseConfig instead */
   pair_phase_config?: PhaseConfig;
+  /** @deprecated Use segmentOverrides.loras instead */
   pair_loras?: PairLoraConfig[];
+  /** @deprecated Use segmentOverrides.motionMode and segmentOverrides.amountOfMotion instead */
   pair_motion_settings?: PairMotionSettings;
 }
 
@@ -219,9 +238,21 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   useEffect(() => {
     if (!shotId) return;
 
+    // Track which queries we've already reloaded for to avoid duplicate reloads
+    const reloadedForRef = new Set<string>();
+
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (event.type === 'updated' && event.query.state.isInvalidated) {
+      // Listen for invalidation OR successful fetch completion
+      // - isInvalidated: query was marked stale
+      // - status === 'success' with new dataUpdatedAt: query just finished refetching
+      const isRelevantUpdate = event.type === 'updated' && (
+        event.query.state.isInvalidated ||
+        event.query.state.status === 'success'
+      );
+
+      if (isRelevantUpdate) {
         const queryKey = event.query.queryKey;
+        const queryKeyStr = JSON.stringify(queryKey);
 
         // Detect shot-related queries
         const isUnifiedGenerationsShot = queryKey[0] === 'unified-generations' && queryKey[1] === 'shot' && queryKey[2] === shotId;
@@ -239,7 +270,13 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         );
 
         if (shouldReload) {
-          loadPositions({ reason: 'invalidation' });
+          // Debounce: only reload once per query per event cycle
+          // Clear the set after a short delay to allow future reloads
+          if (!reloadedForRef.has(queryKeyStr)) {
+            reloadedForRef.add(queryKeyStr);
+            setTimeout(() => reloadedForRef.delete(queryKeyStr), 100);
+            loadPositions({ reason: 'invalidation' });
+          }
         }
       }
     });
@@ -1090,14 +1127,20 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         });
       }
 
-      // Update metadata with pair prompts
+      // Update metadata with pair prompts using new format
       // CRITICAL: Clear enhanced_prompt when user manually edits pair_prompt
-      const updatedMetadata: PositionMetadata = {
-        ...generation.metadata,
-        pair_prompt: pairPrompt?.trim() || undefined,
-        pair_negative_prompt: pairNegativePrompt?.trim() || undefined,
-        enhanced_prompt: '', // Clear enhanced prompt when manually editing
-      };
+      let updatedMetadata = writeSegmentOverrides(
+        generation.metadata as Record<string, any> | null,
+        {
+          prompt: pairPrompt?.trim() || '',
+          negativePrompt: pairNegativePrompt?.trim() || '',
+        }
+      );
+      // enhanced_prompt is separate (AI-generated, not user settings)
+      updatedMetadata.enhanced_prompt = '';
+      // Clean up old pair_* fields (migration cleanup)
+      delete updatedMetadata.pair_prompt;
+      delete updatedMetadata.pair_negative_prompt;
 
       console.error('[updatePairPrompts] NEW metadata.pair_prompt:', updatedMetadata.pair_prompt);
       console.error('[updatePairPrompts] NEW metadata.pair_negative_prompt:', updatedMetadata.pair_negative_prompt);
@@ -1156,6 +1199,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       // CRITICAL: Invalidate query cache to ensure other components see the update
       // This prevents stale data from being loaded when other operations trigger cache invalidation
       invalidateGenerations(shotId, { reason: 'update-pair-prompts', scope: 'all' });
+
+      // Also invalidate pair-metadata cache used by useSegmentSettings modal
+      queryClient.invalidateQueries({ queryKey: ['pair-metadata', generationId] });
     } catch (err) {
       console.error('[updatePairPrompts] Error:', err);
       throw err;
@@ -1166,7 +1212,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   const pairPrompts = useMemo((): Record<number, { prompt: string; negativePrompt: string }> => {
     // CRITICAL: Filter out videos AND unpositioned images to match the timeline display
     // Uses canonical isVideoShotGeneration from typeGuards
-    const filteredGenerations = shotGenerations.filter(sg => 
+    const filteredGenerations = shotGenerations.filter(sg =>
       sg.generation && sg.timeline_frame != null && !isVideoShotGeneration(sg)
     );
 
@@ -1183,11 +1229,13 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     // Each pair is represented by its first item (index in the sorted array)
     for (let i = 0; i < sortedGenerations.length - 1; i++) {
       const firstItem = sortedGenerations[i];
-      
-      if (firstItem.metadata?.pair_prompt || firstItem.metadata?.pair_negative_prompt) {
+      // Use migration utility to read from new or old format
+      const overrides = readSegmentOverrides(firstItem.metadata as Record<string, any> | null);
+
+      if (overrides.prompt || overrides.negativePrompt) {
         pairPromptsData[i] = {
-          prompt: firstItem.metadata.pair_prompt || '',
-          negativePrompt: firstItem.metadata.pair_negative_prompt || '',
+          prompt: overrides.prompt || '',
+          negativePrompt: overrides.negativePrompt || '',
         };
       }
     }
@@ -1435,13 +1483,22 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     // Each pair is represented by its first item (index in the sorted array)
     for (let i = 0; i < sortedGenerations.length - 1; i++) {
       const firstItem = sortedGenerations[i];
-      const metadata = firstItem.metadata;
+      // Use migration utility to read from new or old format
+      const overrides = readSegmentOverrides(firstItem.metadata as Record<string, any> | null);
 
-      if (metadata?.pair_phase_config || metadata?.pair_loras || metadata?.pair_motion_settings) {
+      const hasOverrides = overrides.phaseConfig || (overrides.loras && overrides.loras.length > 0) ||
+        overrides.motionMode !== undefined || overrides.amountOfMotion !== undefined;
+
+      if (hasOverrides) {
         overridesData[i] = {
-          phaseConfig: metadata.pair_phase_config,
-          loras: metadata.pair_loras,
-          motionSettings: metadata.pair_motion_settings,
+          phaseConfig: overrides.phaseConfig,
+          // Convert LoraConfig[] to PairLoraConfig[] (same structure)
+          loras: overrides.loras?.map(l => ({ path: l.path, strength: l.strength })),
+          // Build motionSettings from separate fields, converting amountOfMotion back to 0-1 scale
+          motionSettings: (overrides.motionMode !== undefined || overrides.amountOfMotion !== undefined) ? {
+            motion_mode: overrides.motionMode,
+            amount_of_motion: overrides.amountOfMotion !== undefined ? overrides.amountOfMotion / 100 : undefined,
+          } : undefined,
         };
       }
     }
@@ -1501,10 +1558,15 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         throw new Error(`Generation ${shotGenId} not found`);
       }
 
-      const updatedMetadata: PositionMetadata = {
-        ...generation.metadata,
-        pair_phase_config: phaseConfig || undefined,
-      };
+      // Use new format for writing
+      let updatedMetadata = writeSegmentOverrides(
+        generation.metadata as Record<string, any> | null,
+        {
+          phaseConfig: phaseConfig || undefined,
+        }
+      );
+      // Clean up old field (migration cleanup)
+      delete updatedMetadata.pair_phase_config;
 
       const { error } = await supabase
         .from('shot_generations')
@@ -1524,11 +1586,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       ));
 
       invalidateGenerations(shotId, { reason: 'update-pair-phase-config', scope: 'all' });
+
+      // Also invalidate pair-metadata cache used by useSegmentSettings modal
+      queryClient.invalidateQueries({ queryKey: ['pair-metadata', shotGenId] });
     } catch (err) {
       console.error('[PairOverrides] Error:', err);
       throw err;
     }
-  }, [shotId, shotGenerations, getShotGenerationIdForPair, invalidateGenerations]);
+  }, [shotId, shotGenerations, getShotGenerationIdForPair, invalidateGenerations, queryClient]);
 
   // Update LoRAs for a specific pair
   const updatePairLoras = useCallback(async (pairIndex: number, loras: PairLoraConfig[] | null) => {
@@ -1546,10 +1611,17 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         throw new Error(`Generation ${shotGenId} not found`);
       }
 
-      const updatedMetadata: PositionMetadata = {
-        ...generation.metadata,
-        pair_loras: loras && loras.length > 0 ? loras : undefined,
-      };
+      // Use new format for writing - convert PairLoraConfig[] to LoraConfig[]
+      let updatedMetadata = writeSegmentOverrides(
+        generation.metadata as Record<string, any> | null,
+        {
+          loras: loras && loras.length > 0
+            ? loras.map(l => ({ path: l.path, strength: l.strength }))
+            : undefined,
+        }
+      );
+      // Clean up old field (migration cleanup)
+      delete updatedMetadata.pair_loras;
 
       const { error } = await supabase
         .from('shot_generations')
@@ -1569,11 +1641,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       ));
 
       invalidateGenerations(shotId, { reason: 'update-pair-loras', scope: 'all' });
+
+      // Also invalidate pair-metadata cache used by useSegmentSettings modal
+      queryClient.invalidateQueries({ queryKey: ['pair-metadata', shotGenId] });
     } catch (err) {
       console.error('[PairOverrides] Error:', err);
       throw err;
     }
-  }, [shotId, shotGenerations, getShotGenerationIdForPair, invalidateGenerations]);
+  }, [shotId, shotGenerations, getShotGenerationIdForPair, invalidateGenerations, queryClient]);
 
   // Update motion settings for a specific pair
   const updatePairMotionSettings = useCallback(async (pairIndex: number, settings: PairMotionSettings | null) => {
@@ -1591,10 +1666,20 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         throw new Error(`Generation ${shotGenId} not found`);
       }
 
-      const updatedMetadata: PositionMetadata = {
-        ...generation.metadata,
-        pair_motion_settings: settings || undefined,
-      };
+      // Use new format for writing
+      // Note: PairMotionSettings uses 0-1 scale, new format uses 0-100
+      let updatedMetadata = writeSegmentOverrides(
+        generation.metadata as Record<string, any> | null,
+        {
+          motionMode: settings?.motion_mode,
+          // Convert from 0-1 to 0-100 for new format
+          amountOfMotion: settings?.amount_of_motion !== undefined
+            ? settings.amount_of_motion * 100
+            : undefined,
+        }
+      );
+      // Clean up old field (migration cleanup)
+      delete updatedMetadata.pair_motion_settings;
 
       const { error } = await supabase
         .from('shot_generations')
@@ -1614,6 +1699,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       ));
 
       invalidateGenerations(shotId, { reason: 'update-pair-motion-settings', scope: 'all' });
+
+      // Also invalidate pair-metadata cache used by useSegmentSettings modal
+      queryClient.invalidateQueries({ queryKey: ['pair-metadata', shotGenId] });
     } catch (err) {
       console.error('[PairOverrides] Error:', err);
       throw err;
@@ -1636,8 +1724,13 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         throw new Error(`Generation ${shotGenId} not found`);
       }
 
-      // Remove all per-pair override fields
-      const { pair_phase_config, pair_loras, pair_motion_settings, ...restMetadata } = generation.metadata || {};
+      // Remove all per-pair override fields (both new and old formats)
+      const {
+        segmentOverrides, // New format
+        pair_phase_config, pair_loras, pair_motion_settings, // Old format
+        pair_prompt, pair_negative_prompt, // Old prompts
+        ...restMetadata
+      } = generation.metadata || {};
       const updatedMetadata: PositionMetadata = restMetadata;
 
       const { error } = await supabase
