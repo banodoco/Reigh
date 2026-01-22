@@ -2483,11 +2483,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               })();
 
               return (
-                <div className="space-y-4 w-full overflow-hidden">
-                  <div
-                    className="relative bg-black rounded-lg overflow-hidden flex items-center justify-center mx-auto"
-                    style={{ minHeight: '300px', maxHeight: '60vh', ...previewAspectStyle }}
-                  >
+                <div className="flex flex-col gap-4">
+                  {/* Video container - centered with max-width constraint */}
+                  <div className="flex justify-center w-full">
+                    <div
+                      className="relative bg-black rounded-lg overflow-hidden max-w-full"
+                      style={{ maxHeight: '60vh', ...previewAspectStyle }}
+                    >
                     {/* Loading skeleton - shown while video is loading */}
                     {currentSegment.hasVideo && isPreviewVideoLoading && (
                       <div className="absolute inset-0 flex items-center justify-center">
@@ -2785,16 +2787,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                         </div>
                       </div>
                     </div>
+                    </div>
                   </div>
-                  
-                  {/* Segment thumbnail indicators - horizontally scrollable */}
+
+                  {/* Segment thumbnail strip - scrolls when overflows, centered when fits */}
                   <div
                     ref={previewThumbnailsRef}
-                    className="w-full overflow-x-auto py-2 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
-                    style={{ scrollbarWidth: 'thin' }}
+                    className="overflow-x-auto w-full"
                   >
-                    {/* Inner container: centers when content fits, scrolls when it doesn't */}
-                    <div className="flex items-center gap-2 w-fit mx-auto">
+                    <div className="flex gap-2 min-w-full justify-center">
                       {previewableSegments.map((segment, idx) => (
                         <button
                           key={idx}
