@@ -137,12 +137,15 @@ export function useSegmentSettings({
   const queryClient = useQueryClient();
 
   // Log context on init (only when key IDs change)
+  // Guard against non-string values to prevent crashes
   useEffect(() => {
+    const safeSubstr = (val: unknown): string | null =>
+      typeof val === 'string' ? val.substring(0, 8) : null;
     console.log(`[useSegmentSettings:${instanceId}] 📋 Hook initialized:`, {
       hasPairShotGenerationId: !!pairShotGenerationId,
-      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || null,
+      pairShotGenerationId: safeSubstr(pairShotGenerationId),
       hasShotId: !!shotId,
-      shotId: shotId?.substring(0, 8) || null,
+      shotId: safeSubstr(shotId),
     });
   }, [pairShotGenerationId, shotId, instanceId]);
 
