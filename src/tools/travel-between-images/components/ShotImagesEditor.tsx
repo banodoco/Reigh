@@ -467,6 +467,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const previewAudioRef = useRef<HTMLAudioElement>(null);
+  const previewThumbnailsRef = useRef<HTMLDivElement>(null);
   const [previewIsPlaying, setPreviewIsPlaying] = useState(true);
   const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
   const [previewDuration, setPreviewDuration] = useState(0);
@@ -1019,7 +1020,31 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     setSegmentOffsets(offsets);
     setIsLoadingDurations(false);
   }, [isPreviewTogetherOpen, previewableSegments]);
-  
+
+  // Auto-scroll thumbnail strip to keep current segment centered
+  React.useEffect(() => {
+    if (!isPreviewTogetherOpen || !previewThumbnailsRef.current) return;
+
+    const container = previewThumbnailsRef.current;
+    const thumbnailWidth = 64; // Width of each thumbnail
+    const gap = 8; // gap-2 = 0.5rem = 8px
+    const itemTotalWidth = thumbnailWidth + gap;
+    const containerWidth = container.offsetWidth;
+
+    // The leading spacer width is calc(50% - 32px)
+    const spacerWidth = (containerWidth / 2) - 32;
+
+    // Calculate the scroll position to center the current thumbnail
+    // Position = spacer + (index * itemWidth) + half thumbnail - half container
+    const thumbnailCenter = spacerWidth + (currentPreviewIndex * itemTotalWidth) + (thumbnailWidth / 2);
+    const targetScrollLeft = thumbnailCenter - (containerWidth / 2);
+
+    container.scrollTo({
+      left: Math.max(0, targetScrollLeft),
+      behavior: 'smooth'
+    });
+  }, [isPreviewTogetherOpen, currentPreviewIndex]);
+
   // Keyboard navigation for preview dialog
   React.useEffect(() => {
     if (!isPreviewTogetherOpen) return;
@@ -2752,13 +2777,19 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     </div>
                   </div>
                   
-                  {/* Segment thumbnail indicators */}
-                  <div className="flex items-center justify-center gap-2">
+                  {/* Segment thumbnail indicators - horizontally scrollable */}
+                  <div
+                    ref={previewThumbnailsRef}
+                    className="flex items-center gap-2 overflow-x-auto py-2 px-4 -mx-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
+                    style={{ scrollbarWidth: 'thin' }}
+                  >
+                    {/* Spacer to allow first item to be centered */}
+                    <div className="flex-shrink-0" style={{ width: 'calc(50% - 32px)' }} />
                     {previewableSegments.map((segment, idx) => (
                       <button
                         key={idx}
                         type="button"
-                        className={`relative transition-all duration-200 rounded-lg overflow-hidden ${
+                        className={`relative flex-shrink-0 transition-all duration-200 rounded-lg overflow-hidden ${
                           idx === safeIndex
                             ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
                             : 'opacity-60 hover:opacity-100'
@@ -2782,6 +2813,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                         </span>
                       </button>
                     ))}
+                    {/* Spacer to allow last item to be centered */}
+                    <div className="flex-shrink-0" style={{ width: 'calc(50% - 32px)' }} />
                   </div>
                 </div>
               );
