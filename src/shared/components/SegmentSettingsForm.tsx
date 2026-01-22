@@ -259,20 +259,14 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                     {settings.numFrames} ({framesToSeconds(settings.numFrames)})
                   </span>
                 </div>
-                {onFrameCountChange ? (
-                  <Slider
-                    value={[quantizeFrameCount(settings.numFrames, 9)]}
-                    onValueChange={([value]) => handleFrameCountChange(value)}
-                    min={9}
-                    max={maxFrames}
-                    step={4}
-                    className="w-full"
-                  />
-                ) : (
-                  <span className="text-[10px] text-muted-foreground text-center">
-                    Set via Duration per pair below
-                  </span>
-                )}
+                <Slider
+                  value={[quantizeFrameCount(settings.numFrames, 9)]}
+                  onValueChange={([value]) => handleFrameCountChange(value)}
+                  min={9}
+                  max={maxFrames}
+                  step={4}
+                  className="w-full"
+                />
               </div>
             </div>
 
