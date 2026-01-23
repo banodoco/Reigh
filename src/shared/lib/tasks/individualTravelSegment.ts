@@ -407,6 +407,7 @@ function buildIndividualTravelSegmentParams(
     lora_names: orig.lora_names || orchDetails.lora_names || [],
     model_name: modelName,
     project_id: params.project_id,
+    shot_id: params.shot_id, // CRITICAL: Include shot_id for "Open Shot" button in TasksPane
     base_prompt: basePrompt,
     fps_helpers: orig.fps_helpers ?? orchDetails.fps_helpers ?? 16,
     seed_to_use: finalSeed,
