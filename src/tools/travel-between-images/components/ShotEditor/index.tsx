@@ -473,7 +473,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const { data, error } = await supabase
         .from('shot_generations')
         .select(`
-          generation:generations!inner (
+          generation:generations!shot_generations_generation_id_generations_id_fk (
             id,
             location,
             type,

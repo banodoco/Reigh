@@ -37,6 +37,8 @@ interface MediaDisplayWithCanvasProps {
   handlePointerDown?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   handlePointerMove?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   handlePointerUp?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
+  /** Called when clicking on the container background (not on media content) */
+  onContainerClick?: () => void;
   
   // Styling variants
   variant?: 'desktop-side-panel' | 'mobile-stacked' | 'regular-centered';
@@ -74,6 +76,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   handlePointerDown,
   handlePointerMove,
   handlePointerUp,
+  onContainerClick,
   variant = 'regular-centered',
   className = '',
   containerClassName = '',
@@ -206,9 +209,15 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   const isRepositionMode = editMode === 'reposition' && isInpaintMode;
   
   return (
-    <div 
-      ref={imageContainerRef} 
+    <div
+      ref={imageContainerRef}
       className={`relative flex items-center justify-center w-full h-full ${containerClassName}`}
+      onClick={(e) => {
+        // Close if clicking directly on the container background (not on children)
+        if (e.target === e.currentTarget && onContainerClick) {
+          onContainerClick();
+        }
+      }}
       style={{
         touchAction: 'none',
         // Checkered pattern background for reposition mode

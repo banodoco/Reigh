@@ -152,7 +152,7 @@ serve(async (req) => {
         generation_id,
         timeline_frame,
         metadata,
-        generation:generations!inner(
+        generation:generations!shot_generations_generation_id_generations_id_fk(
           id,
           type,
           location

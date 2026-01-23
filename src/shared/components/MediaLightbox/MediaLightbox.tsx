@@ -3195,6 +3195,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handlePointerDown={handlePointerDown}
                       handlePointerMove={handlePointerMove}
                       handlePointerUp={handlePointerUp}
+                      onContainerClick={onClose}
                       variant="desktop-side-panel"
                       containerClassName="max-w-full max-h-full"
                       tasksPaneWidth={effectiveTasksPaneOpen && !isMobile ? effectiveTasksPaneWidth : 0}
@@ -3246,7 +3247,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   })()}
 
                     {/* Top Left Controls Container - stacked vertically */}
-                    <div className="absolute top-4 left-4 z-[70] flex flex-col gap-2 items-start">
+                    <div
+                      className="absolute top-4 left-4 z-[70] flex flex-col gap-2 items-start select-none"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {/* Main Variant Badge/Button and New Image button */}
                       {!readOnly && activeVariant && variants && (
                         <div className="flex items-center gap-2">
@@ -3605,6 +3609,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handlePointerDown={handlePointerDown}
                       handlePointerMove={handlePointerMove}
                       handlePointerUp={handlePointerUp}
+                      onContainerClick={onClose}
                       variant="mobile-stacked"
                       containerClassName="w-full h-full"
                       debugContext="Mobile Stacked"
@@ -3613,7 +3618,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                     {/* Top Left - Main Variant Badge/Button (Mobile Stacked) */}
                     {!readOnly && activeVariant && variants && (
-                      <div className="absolute top-4 left-4 z-[70]">
+                      <div
+                        className="absolute top-4 left-4 z-[70] select-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center gap-2">
                           {/* Main variant badge - only show when multiple variants exist */}
                           {variants.length > 1 && activeVariant.is_primary && (
@@ -3993,6 +4001,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     handlePointerDown={handlePointerDown}
                     handlePointerMove={handlePointerMove}
                     handlePointerUp={handlePointerUp}
+                    onContainerClick={onClose}
                     variant="regular-centered"
                     containerClassName="w-full h-full"
                     debugContext="Regular Centered"
@@ -4001,7 +4010,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                   {/* Top Left - Main Variant Badge/Button */}
                   {!readOnly && activeVariant && variants && (
-                    <div className="absolute top-4 left-4 z-[70]">
+                    <div
+                      className="absolute top-4 left-4 z-[70] select-none"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex items-center gap-2">
                         {/* Main variant badge - only show when multiple variants exist */}
                         {variants.length > 1 && activeVariant.is_primary && (
@@ -4058,7 +4070,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                   {/* Bottom Left Controls - Mode Entry Buttons */}
                   {!readOnly && (
-                    <div className="absolute bottom-4 left-4 z-[70]">
+                    <div
+                      className="absolute bottom-4 left-4 z-[70] select-none"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex items-center space-x-2">
                         {!isSpecialEditMode && (
                         <>
