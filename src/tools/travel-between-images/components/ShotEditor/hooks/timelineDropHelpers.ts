@@ -145,8 +145,8 @@ export const calculateNextAvailableFrame = async (
       id: sg.id.substring(0, 8),
       generation_id: sg.generation_id?.substring(0, 8),
       timeline_frame: sg.timeline_frame,
-      hasGenerations: !!sg.generations,
-      generationType: (sg.generations as any)?.type
+      hasGenerations: !!sg.generation,
+      generationType: (sg.generation as any)?.type
     }))
   });
 
@@ -163,7 +163,7 @@ export const calculateNextAvailableFrame = async (
 
   // Filter out videos using canonical function from typeGuards
   const filteredShotGenerations = shotGenerationsData.filter(sg => 
-    sg.generations && !isVideoShotGenerations(sg as ShotGenerationsLike)
+    sg.generation && !isVideoShotGenerations(sg as ShotGenerationsLike)
   );
 
   console.log('[AddImagesDebug] 🔍 After filtering videos:', {
