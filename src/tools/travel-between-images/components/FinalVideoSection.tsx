@@ -296,8 +296,8 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
     <div className="w-full">
       <Card className="border rounded-xl shadow-sm">
         <CardContent className="p-4 sm:p-6">
-          {/* Header with title and output selector */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          {/* Header with title and Join clips button */}
+          <div className="flex items-center justify-between gap-3 mb-4">
             <h2 className="text-base sm:text-lg font-light flex items-center gap-2">
               <Film className="w-5 h-5 text-muted-foreground" />
               Final Video
@@ -312,53 +312,53 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
                 />
               )}
             </h2>
-            
-            <div className="flex items-center gap-3">
-              {/* Output Selector Dropdown */}
-              {parentGenerations.length > 1 && (
-                <Select value={selectedParentId || ''} onValueChange={handleOutputSelect}>
-                  <SelectTrigger className="w-auto min-w-[160px] h-8 text-sm">
-                    <SelectValue placeholder="Select output">
-                      {selectedParentId && (
-                        <span className="flex items-center gap-1.5">
-                          Output {selectedIndex + 1} of {parentGenerations.length}
-                        </span>
-                      )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {parentGenerations.map((parent, index) => {
-                      const createdAt = parent.created_at || (parent as any).createdAt;
-                      const timeAgo = createdAt ? formatDistanceToNow(new Date(createdAt), { addSuffix: true }) : '';
-                      const hasOutput = !!parent.location;
-                      
-                      return (
-                        <SelectItem key={parent.id} value={parent.id}>
-                          <div className="flex items-center gap-2">
-                            <span>Output {index + 1}</span>
-                            {hasOutput && <Check className="w-3 h-3 text-green-500" />}
-                            <span className="text-xs text-muted-foreground">{timeAgo}</span>
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              )}
-              
-              {/* Progress indicator */}
-              {currentProgress.total > 0 && currentProgress.completed === currentProgress.total && onJoinSegmentsClick && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onJoinSegmentsClick}
-                >
-                  Join clips
-                </Button>
-              )}
-            </div>
+
+            {/* Join clips button on the right */}
+            {currentProgress.total > 0 && currentProgress.completed === currentProgress.total && onJoinSegmentsClick && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onJoinSegmentsClick}
+              >
+                Join clips
+              </Button>
+            )}
           </div>
+
+          {/* Output Selector Dropdown (full width on mobile, left-aligned on desktop) */}
+          {parentGenerations.length > 1 && (
+            <div className="mb-4">
+              <Select value={selectedParentId || ''} onValueChange={handleOutputSelect}>
+                <SelectTrigger className="w-full sm:w-auto sm:min-w-[160px] h-8 text-sm">
+                  <SelectValue placeholder="Select output">
+                    {selectedParentId && (
+                      <span className="flex items-center gap-1.5">
+                        Output {selectedIndex + 1} of {parentGenerations.length}
+                      </span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {parentGenerations.map((parent, index) => {
+                    const createdAt = parent.created_at || (parent as any).createdAt;
+                    const timeAgo = createdAt ? formatDistanceToNow(new Date(createdAt), { addSuffix: true }) : '';
+                    const hasOutput = !!parent.location;
+
+                    return (
+                      <SelectItem key={parent.id} value={parent.id}>
+                        <div className="flex items-center gap-2">
+                          <span>Output {index + 1}</span>
+                          {hasOutput && <Check className="w-3 h-3 text-green-500" />}
+                          <span className="text-xs text-muted-foreground">{timeAgo}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           <Separator className="my-3" />
           
