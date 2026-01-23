@@ -480,19 +480,26 @@ async function findExistingGenerationAtPosition(
   }
 
   // Strategy 2: Fallback to child_order match
-  const { data: matchByChildOrder, error: matchByChildOrderError } = await supabase
-    .from('generations')
-    .select('id')
-    .eq('parent_generation_id', parentGenerationId)
-    .eq('is_child', true)
-    .eq('child_order', childOrder)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // IMPORTANT: Only use this fallback when NO pair_shot_generation_id was provided
+  // If pairShotGenId was provided but no match found, DON'T fall back to child_order
+  // because the existing child at that index may be for a different timeline layout
+  if (!pairShotGenId) {
+    const { data: matchByChildOrder, error: matchByChildOrderError } = await supabase
+      .from('generations')
+      .select('id')
+      .eq('parent_generation_id', parentGenerationId)
+      .eq('is_child', true)
+      .eq('child_order', childOrder)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (!matchByChildOrderError && matchByChildOrder?.id) {
-    console.log(`[GenHandler] Found match by child_order=${childOrder}: ${matchByChildOrder.id}`);
-    return matchByChildOrder.id;
+    if (!matchByChildOrderError && matchByChildOrder?.id) {
+      console.log(`[GenHandler] Found match by child_order=${childOrder}: ${matchByChildOrder.id}`);
+      return matchByChildOrder.id;
+    }
+  } else {
+    console.log(`[GenHandler] No match by pair_shot_generation_id, skipping child_order fallback (would match wrong slot after timeline rearrangement)`);
   }
 
   console.log(`[GenHandler] No existing generation found at position`);
