@@ -453,9 +453,10 @@ export class SimpleRealtimeManager {
       ['unified-generations', 'shot', shotId],
       ['shot-generations', shotId],
       ['all-shot-generations', shotId],
-      ['unpositioned-count', shotId]
+      ['unpositioned-count', shotId],
+      ['segment-live-timeline', shotId],  // For video slot positioning in useSegmentOutputsForShot
     ]);
-    
+
     dataFreshnessManager.onRealtimeEvent('shot-generation-positioned', queryKeys);
 
     // Emit single consolidated event with all payloads

@@ -304,9 +304,16 @@ export async function handleChildGeneration(
     }
   }
 
+  // Extract pair_shot_generation_id from multiple nested locations
+  // (individual_travel_segment stores it in individual_segment_params)
+  const segmentIndex = taskData.params?.segment_index ?? childOrder ?? 0;
+  const orchPairIds = taskData.params?.orchestrator_details?.pair_shot_generation_ids;
+  const pairShotGenId = taskData.params?.pair_shot_generation_id ||
+                        taskData.params?.individual_segment_params?.pair_shot_generation_id ||
+                        (Array.isArray(orchPairIds) && orchPairIds[segmentIndex]);
+
   // Check for existing generation at same position (config-driven)
   if (config.checkExistingAtPosition && childOrder !== null && !isNaN(childOrder)) {
-    const pairShotGenId = taskData.params?.pair_shot_generation_id;
     const existingGenId = await findExistingGenerationAtPosition(
       supabase, parentGenerationId, childOrder, pairShotGenId
     );
@@ -344,7 +351,7 @@ export async function handleChildGeneration(
   }
 
   // Create the child generation
-  return createChildGenerationRecord(ctx, parentGenerationId, childOrder, singleItemResult.isSingleItem);
+  return createChildGenerationRecord(ctx, parentGenerationId, childOrder, singleItemResult.isSingleItem, pairShotGenId);
 }
 
 // ===== SINGLE-ITEM DETECTION (CONFIG-DRIVEN) =====
@@ -499,7 +506,8 @@ async function createChildGenerationRecord(
   ctx: HandlerContext,
   parentGenerationId: string,
   childOrder: number | null,
-  isSingleItemCase: boolean
+  isSingleItemCase: boolean,
+  pairShotGenerationId?: string | null | false
 ): Promise<any> {
   const { supabase, taskId, taskData, publicUrl, thumbnailUrl, config, logger } = ctx;
 
@@ -507,9 +515,16 @@ async function createChildGenerationRecord(
   const generationType = taskData.content_type || 'video';
   // Use taskData.tool_type (resolved from DB) for consistency, fall back to config
   const toolType = taskData.tool_type || config.toolType;
-  const generationParams = buildGenerationParams(
+  let generationParams = buildGenerationParams(
     taskData.params, toolType, generationType, shotId, thumbnailUrl || undefined, taskId
   );
+
+  // Ensure pair_shot_generation_id is at top level of params (for slot matching)
+  if (pairShotGenerationId && !generationParams.pair_shot_generation_id) {
+    generationParams = { ...generationParams, pair_shot_generation_id: pairShotGenerationId };
+    console.log(`[GenHandler] Added pair_shot_generation_id to child generation params: ${pairShotGenerationId}`);
+  }
+
   const newGenerationId = crypto.randomUUID();
 
   const generationName = taskData.params?.generation_name ||
@@ -544,6 +559,7 @@ async function createChildGenerationRecord(
     child_order: childOrder,
     is_single_item: isSingleItemCase,
     based_on: basedOnGenerationId,
+    pair_shot_generation_id: pairShotGenerationId || null,
   });
 
   const generationRecord: Record<string, any> = {
