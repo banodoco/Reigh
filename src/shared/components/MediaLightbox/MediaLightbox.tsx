@@ -3526,8 +3526,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   />
                 </div>
               </div>
-            ) : (showTaskDetails || isSpecialEditMode || isVideoTrimModeActive || isVideoEditModeActive) && isMobile ? (
-              // Mobile layout with task details, special edit modes, or video edit modes - stacked
+            ) : (showTaskDetails || isSpecialEditMode || isVideoTrimModeActive || isVideoEditModeActive || (isSegmentSlotMode && hasSegmentVideo)) && isMobile ? (
+              // Mobile layout with task details, special edit modes, video edit modes, or segment slot mode - stacked
               <div className="w-full h-full flex flex-col bg-black/90">
                 {/* Media section - Top (50% height) with swipe navigation */}
                 <div
