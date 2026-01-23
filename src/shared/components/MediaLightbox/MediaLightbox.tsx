@@ -2136,6 +2136,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // On portrait mode or phones, use stacked layout; on landscape tablet+, use side panel layout
   const shouldShowSidePanelWithTrim = shouldShowSidePanel || ((!isPortraitMode && isTabletOrLarger) && (isVideoTrimModeActive || isVideoEditModeActive));
 
+  // ========================================
+  // UNIFIED LAYOUT MODE
+  // ========================================
+  // Single source of truth for layout decisions, replacing scattered conditionals.
+  // - 'fullscreen': Takes full viewport (mobile, or form-only mode, or side panel modes)
+  // - 'centered': Centered auto-size dialog (desktop image view without special modes)
+  const needsFullscreenLayout = isMobile || isFormOnlyMode || shouldShowSidePanel || shouldShowSidePanelWithTrim;
+
+  // Should account for tasks pane width offset (only on tablet+ in landscape with pane open)
+  const needsTasksPaneOffset = needsFullscreenLayout && effectiveTasksPaneOpen && !isPortraitMode && isTabletOrLarger;
+
   // DEBUG: Log variants state for troubleshooting variant display issues
   React.useEffect(() => {
     console.log('[VariantDisplay] 🔍 Variants display debug:', {
@@ -2593,20 +2604,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
                 return zIndex > 100000;
               });
-              
+
               if (hasHigherZIndexDialog) {
                 return; // Let the higher dialog handle the event
               }
-              
+
               // Prevent closing when in inpaint mode to avoid accidental data loss
               if (isInpaintMode) {
                 pointerDownTargetRef.current = null; // Reset
                 return;
               }
-              
-              // Single clicks don't close - only double-clicks close now
-              // Just reset the tracking
-              pointerDownTargetRef.current = null;
+
+              // Close on single click if both pointer down and click are on the overlay itself
+              // This prevents accidental closure when dragging from inside the modal
+              const clickStartedOnOverlay = pointerDownTargetRef.current === e.currentTarget;
+              const clickEndedOnOverlay = e.target === e.currentTarget;
+
+              if (clickStartedOnOverlay && clickEndedOnOverlay) {
+                onClose();
+              }
+
+              pointerDownTargetRef.current = null; // Reset
             }}
             onDoubleClick={(e) => {
               // Check if a higher z-index dialog is open - if so, don't handle the click
@@ -2984,20 +3002,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Disable animations on mobile to prevent blink during zoom/fade
               isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               "p-0 border-none bg-transparent shadow-none",
-              // Layout: Full screen for special modes on tablet+, otherwise centered
-              // IMPORTANT: isFormOnlyMode needs full-screen to display SegmentSlotFormView correctly
-              (shouldShowSidePanel || isFormOnlyMode)
-                ? "inset-0 w-full h-full" // Full screen layout
-                : isMobile
-                  ? "inset-0 w-full h-full" // Mobile: full screen
-                  : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+              // Layout: Use unified needsFullscreenLayout for consistent behavior
+              needsFullscreenLayout
+                ? "inset-0 w-full h-full"
+                : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             style={{
               // Smooth transition when tasks pane opens/closes
               transition: 'width 300ms cubic-bezier(0.22, 1, 0.36, 1)',
-              ...((shouldShowSidePanel || isFormOnlyMode) && effectiveTasksPaneOpen && !isPortraitMode && isTabletOrLarger ? {
+              // Use unified needsTasksPaneOffset for consistent tasks pane handling
+              ...(needsTasksPaneOffset ? {
                 width: `calc(100vw - ${effectiveTasksPaneWidth}px)`
-              } : (shouldShowSidePanelWithTrim || isFormOnlyMode) ? {
+              } : needsFullscreenLayout ? {
                 width: '100vw'
               } : {})
             }}
@@ -3029,28 +3045,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 return;
               }
               
-              if (isInpaintMode) {
-                // 🚀 MOBILE FIX: Prevent underlying click-throughs and then close manually
-                // Always stop propagation and default so the gesture does not reach elements behind
-                event.preventDefault();
-                event.stopPropagation();
-                
-                // Extra mobile protection: block all event propagation
-                if (typeof event.stopImmediatePropagation === 'function') {
-                  event.stopImmediatePropagation();
-                }
+              // Prevent underlying click-throughs
+              event.preventDefault();
+              event.stopPropagation();
 
-                if (shouldShowSidePanel) {
-                  // Tablet/Desktop with side panel: only close if clicking on the panel or buttons
-                  if (target.closest('[data-task-details-panel]') || target.closest('[role="button"]')) {
-                    return;
-                  }
+              // Extra mobile protection: block all event propagation
+              if (typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
+              }
+
+              // In special edit modes with side panel, don't close if clicking on panel elements
+              if (isInpaintMode && shouldShowSidePanel) {
+                if (target.closest('[data-task-details-panel]') || target.closest('[role="button"]')) {
+                  return;
                 }
-                
-                // Use setTimeout to ensure the event is fully blocked before closing
+              }
+
+              // Close the lightbox when clicking outside
+              // Use setTimeout on mobile to ensure the event is fully blocked before closing
+              if (isMobile) {
                 setTimeout(() => {
                   onClose();
                 }, 0);
+              } else {
+                onClose();
               }
             }}
           >
@@ -3078,31 +3096,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               />
             ) : shouldShowSidePanelWithTrim ? (
               // Tablet/Desktop layout with side panel (task details, inpaint, magic edit, or video trim)
-              <div 
+              <div
                 className="w-full h-full flex bg-black/90"
                 onClick={(e) => {
-                  // Swallow event - single clicks don't close, only double-clicks
                   e.stopPropagation();
-                }}
-                onDoubleClick={(e) => {
-                  // Close if double-clicking on the background (not on content)
-                  e.stopPropagation();
+                  // Close if clicking directly on the background (not on children)
                   if (e.target === e.currentTarget) {
                     onClose();
                   }
                 }}
               >
                 {/* Media section - Left side (60% width) */}
-                <div 
+                <div
                   className="flex-1 flex items-center justify-center relative"
                   style={{ width: '60%' }}
                   onClick={(e) => {
-                    // Swallow event - single clicks don't close, only double-clicks
                     e.stopPropagation();
-                  }}
-                  onDoubleClick={(e) => {
-                    // Close if double-clicking on the media section background (not on content)
-                    e.stopPropagation();
+                    // Close if clicking directly on the background (not on children)
                     if (e.target === e.currentTarget) {
                       onClose();
                     }
@@ -3500,19 +3510,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Mobile layout with task details, special edit modes, or video edit modes - stacked
               <div className="w-full h-full flex flex-col bg-black/90">
                 {/* Media section - Top (50% height) with swipe navigation */}
-                <div 
+                <div
                   className="flex-1 flex items-center justify-center relative touch-pan-y"
-                  style={{ 
+                  style={{
                     height: '50%',
                     transform: swipeNavigation.isSwiping ? `translateX(${swipeNavigation.swipeOffset}px)` : undefined,
                     transition: swipeNavigation.isSwiping ? 'none' : 'transform 0.2s ease-out',
                   }}
                   onClick={(e) => {
-                    // Single clicks don't close - only double-clicks
                     e.stopPropagation();
-                  }}
-                  onDoubleClick={(e) => {
-                    // Close if double-clicking on the black space (not on the media or controls)
+                    // Close if clicking directly on the background (not on children)
                     if (e.target === e.currentTarget) {
                       onClose();
                     }
@@ -3870,20 +3877,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Mobile/Tablet layout using new FlexContainer + MediaWrapper
               <FlexContainer
                 onClick={(e) => {
-                  // Single clicks don't close - only double-clicks
-                  if (isInpaintMode) {
-                    e.stopPropagation();
-                    return;
-                  }
                   e.stopPropagation();
-                }}
-                onDoubleClick={(e) => {
-                  // Only allow background double-clicks to close when not in edit modes
-                  // and only if the click is on the container itself (not children)
+                  // Don't close in edit modes to prevent accidental data loss
                   if (isInpaintMode) {
-                    e.stopPropagation();
                     return;
                   }
+                  // Close if clicking directly on the container background (not children)
                   if (e.target === e.currentTarget) {
                     onClose();
                   }
@@ -3892,8 +3891,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {/* Close Button - REMOVED */}
 
                 {/* Media Container with Controls - includes swipe navigation */}
-                <MediaWrapper 
-                  onClick={(e) => e.stopPropagation()}
+                <MediaWrapper
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Don't close in edit modes
+                    if (isInpaintMode) return;
+                    // Close if clicking directly on the wrapper background (not the video/image)
+                    if (e.target === e.currentTarget) {
+                      onClose();
+                    }
+                  }}
                   className={cn(
                     isMobile && isInpaintMode && "pointer-events-auto",
                     "touch-pan-y" // Allow vertical scrolling, capture horizontal

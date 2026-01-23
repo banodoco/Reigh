@@ -166,7 +166,15 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
   const endImageUrl = segmentSlotMode.pairData.endImage?.url ?? segmentSlotMode.pairData.endImage?.thumbUrl;
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-black/90 p-4 relative">
+    <div
+      className="w-full h-full flex items-center justify-center bg-black/90 p-4 relative"
+      onClick={(e) => {
+        // Close if clicking directly on the background (not on children)
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       {/* Floating Navigation Arrows */}
       <NavigationArrows
         showNavigation={true}
