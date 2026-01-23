@@ -576,6 +576,22 @@ async function createChildGenerationRecord(
     pair_shot_generation_id: pairShotGenerationId || null,
   });
 
+  // Verify pair_shot_generation_id still exists before inserting (FK constraint check)
+  // If the shot_generation was deleted between task creation and completion, set to NULL
+  let validatedPairShotGenId = pairShotGenerationId || null;
+  if (validatedPairShotGenId) {
+    const { data: shotGenExists } = await supabase
+      .from('shot_generations')
+      .select('id')
+      .eq('id', validatedPairShotGenId)
+      .maybeSingle();
+
+    if (!shotGenExists) {
+      console.log(`[GenHandler] pair_shot_generation_id ${validatedPairShotGenId} no longer exists, setting to NULL`);
+      validatedPairShotGenId = null;
+    }
+  }
+
   const generationRecord: Record<string, any> = {
     id: newGenerationId,
     tasks: [taskId],
@@ -589,7 +605,8 @@ async function createChildGenerationRecord(
     child_order: childOrder,
     // Store pair_shot_generation_id as proper column (not just in params)
     // This enables FK constraint and ON DELETE SET NULL behavior
-    pair_shot_generation_id: pairShotGenerationId || null,
+    // Validated above to prevent FK violation if shot_generation was deleted
+    pair_shot_generation_id: validatedPairShotGenId,
     created_at: new Date().toISOString()
   };
 
