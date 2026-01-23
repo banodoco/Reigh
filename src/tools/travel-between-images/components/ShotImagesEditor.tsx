@@ -2793,7 +2793,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   {/* Segment thumbnail strip - horizontal scroll, auto-scrolls to current */}
                   <div
                     ref={previewThumbnailsRef}
-                    className="overflow-x-auto w-full"
+                    className="overflow-x-auto w-full no-scrollbar"
                   >
                     <div className="flex gap-2">
                       {previewableSegments.map((segment, idx) => (
