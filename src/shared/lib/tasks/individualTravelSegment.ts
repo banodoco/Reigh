@@ -629,13 +629,14 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
     
     if (!effectiveChildGenerationId && effectiveParentGenerationId) {
       // Strategy 1: Look for child with matching pair_shot_generation_id (most accurate)
+      // Query the FK column (source of truth with referential integrity)
       if (params.pair_shot_generation_id) {
-        console.log("[IndividualTravelSegment] 🔍 Strategy 1: Looking for child by pair_shot_generation_id...");
+        console.log("[IndividualTravelSegment] 🔍 Strategy 1: Looking for child by pair_shot_generation_id column...");
         const { data: childByPairId, error: pairIdError } = await supabase
           .from('generations')
           .select('id')
           .eq('parent_generation_id', effectiveParentGenerationId)
-          .eq('params->>pair_shot_generation_id', params.pair_shot_generation_id)
+          .eq('pair_shot_generation_id', params.pair_shot_generation_id)
           .limit(1)
           .maybeSingle();
 
@@ -643,7 +644,7 @@ export async function createIndividualTravelSegmentTask(params: IndividualTravel
           console.log("[IndividualTravelSegment] ⚠️ Strategy 1 query error:", pairIdError.message);
         } else if (childByPairId) {
           effectiveChildGenerationId = childByPairId.id;
-          console.log("[IndividualTravelSegment] ✅ Strategy 1 SUCCESS - Found child by pair_shot_generation_id:", {
+          console.log("[IndividualTravelSegment] ✅ Strategy 1 SUCCESS - Found child by pair_shot_generation_id column:", {
             parent_generation_id: effectiveParentGenerationId?.substring(0, 8),
             pair_shot_generation_id: params.pair_shot_generation_id?.substring(0, 8),
             existing_child_id: effectiveChildGenerationId?.substring(0, 8),

@@ -5,7 +5,7 @@ import { createImageUpscaleTask } from '@/shared/lib/tasks/imageUpscale';
 import { getDisplayUrl } from '@/shared/lib/utils';
 
 export interface UseUpscaleProps {
-  media: GenerationRow;
+  media: GenerationRow | undefined;
   selectedProjectId: string | null;
   isVideo: boolean;
 }
@@ -44,17 +44,28 @@ export const useUpscale = ({
   // With variants, the media.url IS already the best version (primary variant)
   // We can detect if it's been upscaled by checking the name or variant info
   // For now, check if name includes 'Upscaled' as a heuristic
-  const hasUpscaledVersion = (media as any).name === 'Upscaled' ||
-                             (media as any).variant_type === 'upscaled';
+  // Guard for undefined media (segment slot mode without video)
+  const hasUpscaledVersion = media
+    ? ((media as any).name === 'Upscaled' || (media as any).variant_type === 'upscaled')
+    : false;
 
   // The URL from media is already the primary variant (upscaled if available)
-  const primaryUrl = (media as any).url || media.imageUrl || media.location || '';
+  const primaryUrl = media
+    ? ((media as any).url || media.imageUrl || media.location || '')
+    : '';
 
   // Track pending upscale tasks using localStorage
   const [isPendingUpscale, setIsPendingUpscale] = useState(false);
 
   // Reset state when media.id changes (navigation between items)
+  // Guard for undefined media (segment slot mode without video)
   useEffect(() => {
+    if (!media) {
+      setIsUpscaling(false);
+      setIsPendingUpscale(false);
+      return;
+    }
+
     // Reset isUpscaling when navigating to a new item
     setIsUpscaling(false);
 
@@ -70,10 +81,11 @@ export const useUpscale = ({
     } catch {
       setIsPendingUpscale(false);
     }
-  }, [media.id]);
+  }, [media?.id]);
 
   // Log upscale state changes
   useEffect(() => {
+    if (!media) return;
     console.log('[ImageUpscale] State update:', {
       mediaId: media.id,
       hasUpscaledVersion,
@@ -82,17 +94,18 @@ export const useUpscale = ({
       mediaName: (media as any).name,
       timestamp: Date.now()
     });
-  }, [media.id, hasUpscaledVersion, isPendingUpscale, isUpscaling, media]);
+  }, [media?.id, hasUpscaledVersion, isPendingUpscale, isUpscaling, media]);
 
   // Clear pending state when upscaled version becomes available
   // With variants, we detect this by checking if the media name changed to 'Upscaled'
   useEffect(() => {
+    if (!media) return;
     console.log('[ImageUpscale] Checking if should clear pending state:', {
       hasUpscaledVersion,
       isPendingUpscale,
       shouldClear: hasUpscaledVersion && isPendingUpscale
     });
-    
+
     if (hasUpscaledVersion && isPendingUpscale) {
       console.log('[ImageUpscale] ✅ Upscaled version now available, clearing pending state');
       setIsPendingUpscale(false);
@@ -107,11 +120,12 @@ export const useUpscale = ({
         reason: !hasUpscaledVersion ? 'no upscaled version yet' : 'not in pending state'
       });
     }
-  }, [hasUpscaledVersion, isPendingUpscale, media.id]);
+  }, [hasUpscaledVersion, isPendingUpscale, media?.id]);
 
   // Handle upscale
   const handleUpscale = async () => {
-    if (!selectedProjectId || isVideo) {
+    if (!media || !selectedProjectId || isVideo) {
+      if (!media) return; // Silent return when no media
       toast.error('Cannot upscale videos');
       return;
     }
@@ -127,7 +141,7 @@ export const useUpscale = ({
       // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
       // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
       const actualGenerationId = (media as any).generation_id || media.id;
-      
+
       console.log('[ImageUpscale] Starting upscale for generation:', actualGenerationId);
 
       // Create upscale task - this will create a new variant that becomes primary
@@ -138,7 +152,7 @@ export const useUpscale = ({
       });
 
       console.log('[ImageUpscale] ✅ Upscale task created successfully');
-      
+
       // Mark as pending in localStorage so it persists across component remounts
       setIsPendingUpscale(true);
       try {
@@ -150,7 +164,7 @@ export const useUpscale = ({
       } catch (e) {
         console.error('[ImageUpscale] ❌ Error setting pending state:', e);
       }
-      
+
     } catch (error) {
       console.error('[ImageUpscale] Error creating upscale task:', error);
       toast.error('Failed to create upscale task');
@@ -168,14 +182,16 @@ export const useUpscale = ({
 
   // The effective URL is always the primary URL (which is upscaled if that's primary)
   const effectiveImageUrl = primaryUrl;
-  
-  // Debug logging for URL issues
-  console.log('[MediaDisplay] 🖼️ URL COMPUTATION:', {
-    mediaId: media.id.substring(0, 8),
-    effectiveImageUrl: effectiveImageUrl?.substring(0, 50),
-    hasUpscaledVersion,
-    mediaName: (media as any).name,
-  });
+
+  // Debug logging for URL issues (only when media exists)
+  if (media) {
+    console.log('[MediaDisplay] 🖼️ URL COMPUTATION:', {
+      mediaId: media.id.substring(0, 8),
+      effectiveImageUrl: effectiveImageUrl?.substring(0, 50),
+      hasUpscaledVersion,
+      mediaName: (media as any).name,
+    });
+  }
   
   // Source URL for tasks is always the current primary
   const sourceUrlForTasks = getDisplayUrl(primaryUrl);

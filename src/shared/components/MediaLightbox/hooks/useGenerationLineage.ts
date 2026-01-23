@@ -8,6 +8,7 @@ import {
 
 export interface UseGenerationLineageProps {
   media: GenerationRow;
+  enabled?: boolean;
 }
 
 export interface UseGenerationLineageReturn {
@@ -35,13 +36,14 @@ export interface UseGenerationLineageReturn {
  */
 export const useGenerationLineage = ({
   media,
+  enabled = true,
 }: UseGenerationLineageProps): UseGenerationLineageReturn => {
   // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
   // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
   const actualGenerationId = (media as any).generation_id || media.id;
-  
+
   // Fetch derived items (both generations AND variants) - NEW UNIFIED
-  const { data: derivedItems, isLoading: isDerivedLoading } = useDerivedItems(actualGenerationId);
+  const { data: derivedItems, isLoading: isDerivedLoading } = useDerivedItems(actualGenerationId, enabled);
   const [derivedPage, setDerivedPage] = useState(1);
   const derivedPerPage = 6;
   const derivedTotalPages = derivedItems ? Math.ceil(derivedItems.length / derivedPerPage) : 0;
@@ -95,7 +97,7 @@ export const useGenerationLineage = ({
   // Fetch source generation if this is based on another generation
   // Check if media.metadata contains based_on field (from generation params)
   const basedOnId = (media as any).based_on || (media.metadata as any)?.based_on || null;
-  const { data: sourceGeneration, isLoading: isSourceLoading } = useSourceGeneration(basedOnId);
+  const { data: sourceGeneration, isLoading: isSourceLoading } = useSourceGeneration(basedOnId, enabled);
 
   return {
     // New unified

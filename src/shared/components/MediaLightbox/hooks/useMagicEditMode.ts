@@ -36,6 +36,8 @@ interface UseMagicEditModeParams {
   advancedSettings?: EditAdvancedSettings;
   // Model selection for cloud mode
   qwenEditModel?: QwenEditModel;
+  // Disable DB queries (for form-only mode with placeholder media)
+  enabled?: boolean;
 }
 
 interface UseMagicEditModeReturn {
@@ -84,6 +86,7 @@ export const useMagicEditMode = ({
   createAsGeneration,
   advancedSettings,
   qwenEditModel,
+  enabled = true,
 }: UseMagicEditModeParams): UseMagicEditModeReturn => {
   // Magic Edit mode state
   const [isMagicEditMode, setIsMagicEditMode] = useState(false);
@@ -104,7 +107,7 @@ export const useMagicEditMode = ({
   } = useShotGenerationMetadata({
     shotId: currentShotId || '',
     shotGenerationId: media.id,
-    enabled: !!(currentShotId && media.id)
+    enabled: !!(currentShotId && media.id) && enabled !== false
   });
 
   // Track if user has manually exited edit mode to prevent auto-re-enter

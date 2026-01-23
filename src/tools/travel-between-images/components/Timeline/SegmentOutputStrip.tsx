@@ -215,14 +215,24 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   }, [queryClient]);
 
   // Handle opening segment in lightbox
+  // When onOpenPairSettings is provided, use the unified segment slot lightbox
+  // Otherwise fall back to the local MediaLightbox
   const handleSegmentClick = useCallback((slotIndex: number) => {
     const slot = segmentSlots[slotIndex];
     if (slot?.type === 'child') {
       // Mark as viewed when opening lightbox
       markGenerationViewed(slot.child.id);
     }
-    setLightboxIndex(slotIndex);
-  }, [segmentSlots, markGenerationViewed]);
+
+    // Use unified segment slot lightbox when available (enables navigation to slots without videos)
+    if (onOpenPairSettings && slot) {
+      console.log('[SegmentOutputStrip] Using unified segment slot lightbox for pairIndex:', slot.index);
+      onOpenPairSettings(slot.index);
+    } else {
+      // Fallback to local lightbox
+      setLightboxIndex(slotIndex);
+    }
+  }, [segmentSlots, markGenerationViewed, onOpenPairSettings]);
   
   // Lightbox navigation - get indices of child slots that have locations
   const childSlotIndices = useMemo(() => 
@@ -265,16 +275,17 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       // Fetch the generation to find its parent and pair_shot_generation_id
       const { data: beforeData, error: fetchError } = await supabase
         .from('generations')
-        .select('id, type, parent_generation_id, location, params, primary_variant_id')
+        .select('id, type, parent_generation_id, location, params, primary_variant_id, pair_shot_generation_id')
         .eq('id', generationId)
         .single();
-      
+
       if (!beforeData) {
         console.log('[SegmentDelete] Generation not found before delete');
         return;
       }
 
-      const pairShotGenId = getPairShotGenIdFromParams(beforeData.params as any);
+      // Use FK column first, fall back to params for legacy data
+      const pairShotGenId = beforeData.pair_shot_generation_id || getPairShotGenIdFromParams(beforeData.params as any);
       const parentId = beforeData.parent_generation_id;
 
       // Delete ALL child generations for this pair (prevents another segment from taking its slot)
@@ -282,11 +293,15 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       if (pairShotGenId && parentId) {
         const { data: siblings } = await supabase
           .from('generations')
-          .select('id, params')
+          .select('id, pair_shot_generation_id, params')
           .eq('parent_generation_id', parentId);
 
         idsToDelete = (siblings || [])
-          .filter(child => getPairShotGenIdFromParams(child.params as any) === pairShotGenId)
+          .filter(child => {
+            // Use FK column first, fall back to params for legacy data
+            const childPairId = child.pair_shot_generation_id || getPairShotGenIdFromParams(child.params as any);
+            return childPairId === pairShotGenId;
+          })
           .map(child => child.id);
       }
 

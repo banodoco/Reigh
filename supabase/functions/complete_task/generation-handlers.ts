@@ -463,20 +463,27 @@ async function findExistingGenerationAtPosition(
 ): Promise<string | null> {
   console.log(`[GenHandler] Checking for existing generation at segment_index=${childOrder}, pair_shot_gen_id=${pairShotGenId || 'none'}`);
 
-  // Strategy 1: Try to find by pair_shot_generation_id in params
+  // Strategy 1: Try to find by pair_shot_generation_id column
   if (pairShotGenId) {
-    const { data: matchByPairId, error: matchByPairIdError } = await supabase
+    // Match by the FK column (source of truth with referential integrity)
+    const { data: matchByColumn, error: matchByColumnError } = await supabase
       .from('generations')
       .select('id')
       .eq('parent_generation_id', parentGenerationId)
       .eq('is_child', true)
-      .eq('params->>pair_shot_generation_id', pairShotGenId)
+      .eq('pair_shot_generation_id', pairShotGenId)
       .maybeSingle();
 
-    if (!matchByPairIdError && matchByPairId?.id) {
-      console.log(`[GenHandler] Found match by pair_shot_generation_id: ${matchByPairId.id}`);
-      return matchByPairId.id;
+    if (!matchByColumnError && matchByColumn?.id) {
+      console.log(`[GenHandler] Found match by pair_shot_generation_id column: ${matchByColumn.id}`);
+      return matchByColumn.id;
     }
+
+    // NOTE: We intentionally DON'T fall back to params JSONB here.
+    // Pre-migration generations have already been migrated to the column.
+    // Any generation with NULL column but non-NULL params is orphaned
+    // (FK cascade set column to NULL when shot_generation was deleted).
+    console.log(`[GenHandler] No match by pair_shot_generation_id column`);
   }
 
   // Strategy 2: Fallback to child_order match
@@ -580,6 +587,9 @@ async function createChildGenerationRecord(
     parent_generation_id: parentGenerationId,
     is_child: true,
     child_order: childOrder,
+    // Store pair_shot_generation_id as proper column (not just in params)
+    // This enables FK constraint and ON DELETE SET NULL behavior
+    pair_shot_generation_id: pairShotGenerationId || null,
     created_at: new Date().toISOString()
   };
 

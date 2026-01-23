@@ -59,3 +59,6 @@ export type { VideoTrimModeDisplayProps, TrimState } from './VideoTrimModeDispla
 
 export { SegmentRegenerateForm } from './SegmentRegenerateForm';
 export type { SegmentRegenerateFormProps } from './SegmentRegenerateForm';
+
+export { SegmentSlotFormView } from './SegmentSlotFormView';
+export type { SegmentSlotFormViewProps } from './SegmentSlotFormView';

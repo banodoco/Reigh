@@ -77,9 +77,24 @@ function extractExpectedSegmentData(parentParams: Record<string, any> | null): E
 }
 
 /**
- * Extract pair identifiers from a video's params
+ * Extract pair identifiers from a generation (checks column first, then params)
+ * @param generation - The generation row (may have pair_shot_generation_id column)
+ * @param params - The params JSONB (legacy storage location)
  */
-function getPairIdentifiers(params: Record<string, any> | null): { pairShotGenId?: string; startGenId?: string } {
+function getPairIdentifiers(
+  generation: { pair_shot_generation_id?: string } | null,
+  params: Record<string, any> | null
+): { pairShotGenId?: string; startGenId?: string } {
+  // Check the FK column first (new format with referential integrity)
+  const columnValue = generation?.pair_shot_generation_id;
+  if (columnValue) {
+    return {
+      pairShotGenId: columnValue,
+      startGenId: params?.individual_segment_params?.start_image_generation_id || params?.start_image_generation_id,
+    };
+  }
+
+  // Fallback to params JSONB (legacy format)
   if (!params) return {};
   const individualParams = params.individual_segment_params || {};
   return {
@@ -112,6 +127,8 @@ function transformToGenerationRow(gen: any): GenerationRow {
     parent_generation_id: gen.parent_generation_id,
     child_order: gen.child_order,
     starred: gen.starred,
+    // Include pair_shot_generation_id column (for FK-based slot matching)
+    pair_shot_generation_id: gen.pair_shot_generation_id,
   } as GenerationRow;
 }
 
@@ -341,7 +358,7 @@ export function useSegmentOutputsForShot(
       .map(([id, pos]) => `[${pos}]=${id.substring(0, 8)}`)
       .join(' ');
     const videoSummary = segments.map(v => {
-      const { pairShotGenId } = getPairIdentifiers(v.params as any);
+      const { pairShotGenId } = getPairIdentifiers(v as any, v.params as any);
       const pos = pairShotGenId ? positionMap.get(pairShotGenId) : undefined;
       return `${v.id.substring(0, 8)}→${pairShotGenId?.substring(0, 8) || 'NULL'}@${pos ?? '?'}`;
     }).join(' | ');
@@ -368,7 +385,7 @@ export function useSegmentOutputsForShot(
     // 1. pair_shot_generation_id → position (LOCAL for instant, LIVE as fallback)
     // 2. child_order (fallback ONLY for videos without pair_shot_generation_id)
     segments.forEach(child => {
-      const { pairShotGenId } = getPairIdentifiers(child.params as any);
+      const { pairShotGenId } = getPairIdentifiers(child as any, child.params as any);
       const childOrder = (child as any).child_order;
       
       let derivedSlot: number | undefined;

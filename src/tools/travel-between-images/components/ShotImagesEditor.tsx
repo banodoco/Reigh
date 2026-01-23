@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { GenerationRow } from "@/types/shots";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/card";
 import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
@@ -10,7 +10,8 @@ import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPosition
 import { useEnhancedShotImageReorder } from "@/shared/hooks/useEnhancedShotImageReorder";
 import { useTimelinePositionUtils } from "@/shared/hooks/useTimelinePositionUtils";
 import { supabase } from "@/integrations/supabase/client";
-import SegmentSettingsModal from "./Timeline/SegmentSettingsModal";
+import MediaLightbox from "@/shared/components/MediaLightbox";
+import type { SegmentSlotModeData } from "@/shared/components/MediaLightbox/types";
 import type { PairData } from "./Timeline/TimelineContainer";
 import { Download, Loader2, Play, Pause, ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
@@ -579,13 +580,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   
   // Note: Pair prompts are retrieved from the enhanced shot positions hook below
   
-  const [segmentSettingsModalData, setSegmentSettingsModalData] = useState<{
-    isOpen: boolean;
-    pairData: PairData | null;
-  }>({
-    isOpen: false,
-    pairData: null,
-  });
+  // Segment slot lightbox state - opens MediaLightbox in segment slot mode
+  // When pairIndex is set, MediaLightbox opens showing form (no video) or video+form (has video)
+  const [segmentSlotLightboxIndex, setSegmentSlotLightboxIndex] = useState<number | null>(null);
 
 
   // Enhanced position management
@@ -677,33 +674,24 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     hookDataShotGensCount: hookData.shotGenerations.length,
   });
 
-  // Compute pair data for SegmentSettingsModal (shared source of truth with TimelineContainer)
-  // IMPORTANT: In batch mode, use per-pair pair_num_frames or modal override; in timeline mode, use actual timeline_frame differences
-  // The modal override (segmentSettingsModalData) provides immediate visual feedback before DB save completes
+  // Compute pair data for segment slot lightbox (shared source of truth with TimelineContainer)
+  // IMPORTANT: In batch mode, use per-pair pair_num_frames; in timeline mode, use actual timeline_frame differences
   const pairDataByIndex = React.useMemo(() => {
     const dataMap = new Map<number, PairData>();
     const sortedImages = [...(shotGenerations || [])]
-      .filter((img: any) => img.timeline_frame != null && img.timeline_frame >= 0)
+      .filter((img: any) => img.timeline_frame != null && img.timeline_frame >= 0 && !isVideoAny(img))
       .sort((a: any, b: any) => a.timeline_frame - b.timeline_frame);
-
-    // Get modal override for immediate feedback (before DB save completes)
-    const modalPairIndex = segmentSettingsModalData.pairData?.index;
-    const modalFramesOverride = segmentSettingsModalData.isOpen ? segmentSettingsModalData.pairData?.frames : undefined;
 
     for (let pairIndex = 0; pairIndex < sortedImages.length - 1; pairIndex++) {
       const startImage = sortedImages[pairIndex];
       const endImage = sortedImages[pairIndex + 1];
 
-      // In batch mode: use modal override > metadata pair_num_frames > uniform batchVideoFrames
+      // In batch mode: use metadata pair_num_frames > uniform batchVideoFrames
       // In timeline mode: use actual timeline_frame differences
       const isBatchMode = effectiveGenerationMode === 'batch';
       const pairNumFramesFromMetadata = startImage.metadata?.pair_num_frames;
-      // Use modal override for immediate feedback on currently open pair
-      const pairNumFramesOverride = (pairIndex === modalPairIndex && modalFramesOverride !== undefined)
-        ? modalFramesOverride
-        : pairNumFramesFromMetadata;
       const frames = isBatchMode
-        ? (pairNumFramesOverride ?? batchVideoFrames)
+        ? (pairNumFramesFromMetadata ?? batchVideoFrames)
         : (endImage.timeline_frame ?? 0) - (startImage.timeline_frame ?? 0);
       const startFrame = isBatchMode
         ? pairIndex * batchVideoFrames
@@ -734,12 +722,121 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       });
     }
     return dataMap;
-  }, [shotGenerations, effectiveGenerationMode, batchVideoFrames, segmentSettingsModalData]);
+  }, [shotGenerations, effectiveGenerationMode, batchVideoFrames]);
 
-  // Debounce for modal frame count changes
+  // Debounce ref for frame count changes (declared before segmentSlotModeData memo that uses it)
   const frameCountDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Unified frame count update handler - called from both MediaLightbox and SegmentSettingsModal
+  // Build SegmentSlotModeData for MediaLightbox when a segment slot is open
+  const segmentSlotModeData: SegmentSlotModeData | null = useMemo(() => {
+    if (segmentSlotLightboxIndex === null) return null;
+
+    const pairData = pairDataByIndex.get(segmentSlotLightboxIndex);
+    if (!pairData) return null;
+
+    // Find the segment slot for this pair (if video exists)
+    const pairSlot = segmentSlots.find(slot => slot.index === segmentSlotLightboxIndex);
+    const segmentVideo = pairSlot?.type === 'child' ? pairSlot.child : null;
+
+    // Get structure video info for this segment
+    const pairStartFrame = pairData.startFrame ?? 0;
+    const pairEndFrame = pairData.endFrame ?? 0;
+
+    // Find covering structure video (if any)
+    const coveringVideo = (propStructureVideos || []).find(video => {
+      const videoStart = video.start_frame ?? 0;
+      const videoEnd = video.end_frame ?? Infinity;
+      return pairEndFrame > videoStart && pairStartFrame < videoEnd;
+    }) ?? (effectiveGenerationMode === 'batch' && propStructureVideos?.[0]);
+
+    // Get prompts from metadata
+    const shotGen = shotGenerations.find(sg => sg.id === pairData.startImage?.id);
+    const overrides = readSegmentOverrides(shotGen?.metadata as Record<string, any> | null);
+
+    return {
+      currentIndex: segmentSlotLightboxIndex,
+      totalPairs: pairDataByIndex.size,
+      pairData: {
+        index: pairData.index,
+        frames: pairData.frames,
+        startFrame: pairData.startFrame,
+        endFrame: pairData.endFrame,
+        startImage: pairData.startImage,
+        endImage: pairData.endImage,
+      },
+      segmentVideo,
+      activeChildGenerationId: pairSlot?.type === 'child' ? pairSlot.child.id : undefined,
+      onNavigateToPair: (index: number) => {
+        console.log('[SegmentSlotNav] onNavigateToPair called:', {
+          targetIndex: index,
+          hasPairData: pairDataByIndex.has(index),
+          pairDataSize: pairDataByIndex.size,
+          pairDataIndices: [...pairDataByIndex.keys()],
+          segmentSlotsCount: segmentSlots.length,
+          segmentSlotIndices: segmentSlots.map(s => s.index),
+        });
+        if (pairDataByIndex.has(index)) {
+          console.log('[SegmentSlotNav] Setting segmentSlotLightboxIndex to:', index);
+          setSegmentSlotLightboxIndex(index);
+        } else {
+          console.log('[SegmentSlotNav] ❌ pairDataByIndex does NOT have index:', index);
+        }
+      },
+      projectId: projectId || null,
+      shotId: selectedShotId,
+      parentGenerationId: selectedParentId || undefined,
+      pairPrompt: overrides.prompt || '',
+      pairNegativePrompt: overrides.negativePrompt || '',
+      defaultPrompt,
+      defaultNegativePrompt,
+      enhancedPrompt: shotGen?.metadata?.enhanced_prompt || '',
+      projectResolution: resolvedProjectResolution,
+      structureVideoType: coveringVideo?.structure_type ?? null,
+      structureVideoDefaults: coveringVideo ? {
+        motionStrength: coveringVideo.motion_strength ?? 1.2,
+        treatment: coveringVideo.treatment ?? 'adjust',
+        uni3cEndPercent: coveringVideo.uni3c_end_percent ?? 0.1,
+      } : undefined,
+      structureVideoUrl: coveringVideo?.path,
+      structureVideoFrameRange: coveringVideo ? {
+        segmentStart: pairStartFrame,
+        segmentEnd: pairEndFrame,
+        videoTotalFrames: coveringVideo.metadata?.total_frames ?? 60,
+        videoFps: coveringVideo.metadata?.frame_rate ?? 24,
+      } : undefined,
+      onFrameCountChange: (pairShotGenerationId: string, frameCount: number) => {
+        // In batch mode, don't update timeline
+        if (effectiveGenerationMode === 'batch') return;
+
+        // Debounce and call the unified handler
+        if (frameCountDebounceRef.current) {
+          clearTimeout(frameCountDebounceRef.current);
+        }
+        frameCountDebounceRef.current = setTimeout(() => {
+          updatePairFrameCount(pairShotGenerationId, frameCount);
+        }, 150);
+      },
+      onGenerateStarted: (pairShotGenerationId) => {
+        addOptimisticPending(pairShotGenerationId);
+      },
+    };
+  }, [
+    segmentSlotLightboxIndex,
+    pairDataByIndex,
+    segmentSlots,
+    propStructureVideos,
+    effectiveGenerationMode,
+    shotGenerations,
+    projectId,
+    selectedShotId,
+    selectedParentId,
+    defaultPrompt,
+    defaultNegativePrompt,
+    resolvedProjectResolution,
+    addOptimisticPending,
+  ]);
+
+  // Unified frame count update handler - called from MediaLightbox segment slot mode
   // Timeline positions are the source of truth - no metadata sync needed
   // Handles constraints: if increasing would exceed maxFrameLimit, compresses subsequent pairs proportionally
   const updatePairFrameCount = useCallback(async (pairShotGenerationId: string, newFrameCount: number) => {
@@ -1726,10 +1823,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 hookData={preloadedImages ? undefined : hookData}
                 onDragStateChange={handleDragStateChange}
                 onPairClick={(pairIndex, passedPairData) => {
-                  // Use passed pairData (for single-image mode) or look up from local map
-                  const pairData = passedPairData || pairDataByIndex.get(pairIndex);
-                  if (pairData) {
-                    setSegmentSettingsModalData({ isOpen: true, pairData });
+                  // Open MediaLightbox in segment slot mode for this pair
+                  // The pairData can be looked up from pairDataByIndex when needed
+                  if (passedPairData || pairDataByIndex.has(pairIndex)) {
+                    setSegmentSlotLightboxIndex(pairIndex);
                   }
                 }}
                 defaultPrompt={defaultPrompt}
@@ -1906,11 +2003,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   } : undefined}
                   // Pair prompt props - lookup from pairDataByIndex (single source of truth)
                   onPairClick={(pairIndex, passedPairData) => {
-                    // Use passed pairData (for single-image mode) or look up from local map
-                    const pairData = passedPairData || pairDataByIndex.get(pairIndex);
-                    console.log('[PairIndicatorDebug] ShotImagesEditor onPairClick called', { pairIndex, pairData });
-                    if (pairData) {
-                      setSegmentSettingsModalData({ isOpen: true, pairData });
+                    // Open MediaLightbox in segment slot mode for this pair
+                    console.log('[PairIndicatorDebug] ShotImagesEditor onPairClick called', { pairIndex });
+                    if (passedPairData || pairDataByIndex.has(pairIndex)) {
+                      setSegmentSlotLightboxIndex(pairIndex);
                     }
                   }}
                   pairPrompts={pairPrompts}
@@ -2080,10 +2176,21 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         )}
       </CardContent>
 
-      {/* Segment Settings Modal - Uses SegmentSettingsForm */}
+      {/* Segment Slot Lightbox - Unified segment editor (handles both video and no-video cases) */}
+      {segmentSlotModeData && (
+        <MediaLightbox
+          media={segmentSlotModeData.segmentVideo ?? undefined}
+          segmentSlotMode={segmentSlotModeData}
+          onClose={() => setSegmentSlotLightboxIndex(null)}
+          shotId={selectedShotId}
+          readOnly={readOnly}
+        />
+      )}
+
+      {/* DEPRECATED: SegmentSettingsModal - Replaced by MediaLightbox segment slot mode above
       <SegmentSettingsModal
-        isOpen={segmentSettingsModalData.isOpen}
-        onClose={() => setSegmentSettingsModalData({ isOpen: false, pairData: null })}
+        isOpen={false}
+        onClose={() => {}}
         pairData={
           // In batch mode with multiple images, always use batchVideoFrames for task submission
           // This ensures the "Duration per pair" setting is respected
@@ -2451,7 +2558,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           };
         })()}
       />
-      
+      */}
+
       {/* Preview Together Dialog */}
       <Dialog open={isPreviewTogetherOpen} onOpenChange={setIsPreviewTogetherOpen}>
         <DialogContent className="max-w-4xl w-full p-0 gap-0 overflow-hidden">

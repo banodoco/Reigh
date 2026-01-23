@@ -1013,13 +1013,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Sample segments to see their state
     const sample = joinSegments.slice(0, 8).map(seg => {
       const params = seg.params as any;
+      // Prefer FK column, fall back to params for legacy data
+      const pairShotGenId = (seg as any).pair_shot_generation_id
+        || params?.individual_segment_params?.pair_shot_generation_id
+        || params?.pair_shot_generation_id;
       return {
         id: seg.id?.substring(0, 8),
         type: seg.type,
         hasLocation: Boolean(seg.location),
-        pairShotGenId: params?.individual_segment_params?.pair_shot_generation_id?.substring(0, 8) 
-          || params?.pair_shot_generation_id?.substring(0, 8) 
-          || null,
+        pairShotGenId: pairShotGenId?.substring(0, 8) || null,
         segmentIndex: params?.segment_index,
         childOrder: (seg as any).child_order,
       };

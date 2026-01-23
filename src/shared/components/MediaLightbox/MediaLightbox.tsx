@@ -323,10 +323,40 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const isSegmentSlotMode = !!segmentSlotMode;
   const hasSegmentVideo = isSegmentSlotMode && !!segmentSlotMode.segmentVideo;
 
-  // Effective media: use slot's video if in slot mode, otherwise use prop
-  const media = hasSegmentVideo
+  // Flag for simplified form-only rendering (segment slot mode without video)
+  const isFormOnlyMode = isSegmentSlotMode && !hasSegmentVideo;
+
+  // Debug logging for segment slot navigation
+  console.log('[SegmentSlotNav] MediaLightbox render:', {
+    isSegmentSlotMode,
+    hasSegmentVideo,
+    isFormOnlyMode,
+    currentIndex: segmentSlotMode?.currentIndex,
+    totalPairs: segmentSlotMode?.totalPairs,
+    hasMediaProp: !!mediaProp,
+    segmentVideoId: segmentSlotMode?.segmentVideo?.id?.substring(0, 8),
+  });
+
+  // Placeholder media for form-only mode - ensures hooks always receive valid data
+  const placeholderMedia: GenerationRow = {
+    id: 'placeholder',
+    type: 'image',
+    imageUrl: '',
+    location: '',
+    thumbUrl: '',
+    contentType: 'image/png',
+    params: {},
+    metadata: {},
+    created_at: new Date().toISOString(),
+  };
+
+  // Raw media: use slot's video if in slot mode, otherwise use prop (can be undefined in form-only mode)
+  const rawMedia = hasSegmentVideo
     ? segmentSlotMode.segmentVideo!
     : mediaProp;
+
+  // Media is always defined - use placeholder in form-only mode
+  const media = rawMedia ?? placeholderMedia;
 
   // Slot-based navigation
   const hasNext = isSegmentSlotMode
@@ -338,6 +368,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Navigation handlers for slot mode
   const handleSlotNavNext = useCallback(() => {
+    console.log('[SegmentSlotNav] handleSlotNavNext called:', {
+      isSegmentSlotMode,
+      hasNext,
+      currentIndex: segmentSlotMode?.currentIndex,
+      targetIndex: (segmentSlotMode?.currentIndex ?? -1) + 1,
+    });
     if (isSegmentSlotMode && hasNext) {
       segmentSlotMode.onNavigateToPair(segmentSlotMode.currentIndex + 1);
     } else if (onNext) {
@@ -346,6 +382,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [isSegmentSlotMode, hasNext, segmentSlotMode, onNext]);
 
   const handleSlotNavPrev = useCallback(() => {
+    console.log('[SegmentSlotNav] handleSlotNavPrev called:', {
+      isSegmentSlotMode,
+      hasPrevious,
+      currentIndex: segmentSlotMode?.currentIndex,
+      targetIndex: (segmentSlotMode?.currentIndex ?? 1) - 1,
+    });
     if (isSegmentSlotMode && hasPrevious) {
       segmentSlotMode.onNavigateToPair(segmentSlotMode.currentIndex - 1);
     } else if (onPrevious) {
@@ -476,13 +518,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // - If generation_id exists, use it (this is the correct generations.id)
   // - Only fall back to media.id if this is NOT a shot_generation record
   //   (shot_generation records have shotImageEntryId or shot_generation_id set to media.id)
-  const isShotGenerationRecord = (media as any).shotImageEntryId === media.id ||
-                                  (media as any).shot_generation_id === media.id;
-  const actualGenerationId = (media as any).generation_id ||
-                              (!isShotGenerationRecord ? media.id : null);
+  // Note: All these are guarded for segment slot mode without video (media is undefined)
+  const isShotGenerationRecord = media
+    ? ((media as any).shotImageEntryId === media.id || (media as any).shot_generation_id === media.id)
+    : false;
+  const actualGenerationId = media
+    ? ((media as any).generation_id || (!isShotGenerationRecord ? media.id : null))
+    : null;
 
   // Warn if shot_generation record is missing generation_id - indicates data pipeline bug
-  if (isShotGenerationRecord && !(media as any).generation_id) {
+  if (media && isShotGenerationRecord && !(media as any).generation_id) {
     console.warn('[MediaLightbox] ⚠️ Shot generation record missing generation_id - edit settings will be disabled', {
       mediaId: media.id?.substring(0, 8),
       shotImageEntryId: (media as any).shotImageEntryId?.substring(0, 8),
@@ -493,20 +538,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // For variant fetching: determine which generation's variants to show.
   // - fetchVariantsForSelf=true: fetch variants for this generation (used by travel-between-images children)
   // - fetchVariantsForSelf=false: fetch from parent if available (used by edit-video children)
-  const variantFetchGenerationId = fetchVariantsForSelf
-    ? actualGenerationId
-    : ((media as any).parent_generation_id || actualGenerationId);
+  const variantFetchGenerationId = media
+    ? (fetchVariantsForSelf
+        ? actualGenerationId
+        : ((media as any).parent_generation_id || actualGenerationId))
+    : null;
 
-  // DEBUG: Log variant fetching context
-  console.log('[VariantFetchDebug] Media and variant context:', {
-    mediaId: media.id?.substring(0, 8),
-    actualGenerationId: actualGenerationId?.substring(0, 8),
-    hasParentGenerationId: !!(media as any).parent_generation_id,
-    parentGenerationId: (media as any).parent_generation_id?.substring(0, 8) || 'none',
-    fetchVariantsForSelf,
-    variantFetchGenerationId: variantFetchGenerationId?.substring(0, 8),
-    mediaKeys: Object.keys(media).join(', '),
-  });
+  // DEBUG: Log variant fetching context (only when media exists)
+  if (media) {
+    console.log('[VariantFetchDebug] Media and variant context:', {
+      mediaId: media.id?.substring(0, 8),
+      actualGenerationId: actualGenerationId?.substring(0, 8),
+      hasParentGenerationId: !!(media as any).parent_generation_id,
+      parentGenerationId: (media as any).parent_generation_id?.substring(0, 8) || 'none',
+      fetchVariantsForSelf,
+      variantFetchGenerationId: variantFetchGenerationId?.substring(0, 8),
+      mediaKeys: Object.keys(media).join(', '),
+    });
+  }
   
   // ========================================
   // ALL HOOKS - Business logic extracted
@@ -537,6 +586,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const editSettingsPersistence = useEditSettingsPersistence({
     generationId: actualGenerationId,
     projectId: selectedProjectId,
+    enabled: !isFormOnlyMode,
   });
   const { 
     loraMode, 
@@ -593,7 +643,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // This ensures edit-video variants show correctly when viewing from TasksPane
   const variantsHook = useVariants({
     generationId: variantFetchGenerationId,
-    enabled: true, // Always enabled to support variant display in VariantSelector
+    enabled: !isFormOnlyMode, // Disable DB queries in form-only mode (placeholder media)
   });
   const {
     variants,
@@ -653,9 +703,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [initialVariantId, variants, setActiveVariantId]);
   
   // Reset handled ref when media changes (new item opened)
+  // Guard for undefined media (segment slot mode without video)
   React.useEffect(() => {
     handledInitialVariantRef.current = null;
-  }, [media.id]);
+  }, [media?.id]);
 
   // Track which variant has been marked as viewed for this media to avoid duplicate marks
   const markedViewedVariantRef = React.useRef<string | null>(null);
@@ -663,6 +714,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Mark the initial/active variant as viewed when the lightbox opens
   // This handles the case where the primary variant is auto-selected without explicit setActiveVariantId call
   React.useEffect(() => {
+    if (!media) return;
     if (activeVariant && activeVariant.id && markedViewedVariantRef.current !== activeVariant.id) {
       const generationId = media.generation_id || media.id;
       console.log('[VariantViewed] Marking initial variant as viewed:', {
@@ -673,12 +725,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       markViewed({ variantId: activeVariant.id, generationId });
       markedViewedVariantRef.current = activeVariant.id;
     }
-  }, [activeVariant, media.generation_id, media.id, markViewed]);
+  }, [activeVariant, media?.generation_id, media?.id, markViewed, media]);
 
   // Reset marked-viewed ref when media changes (new item opened)
   React.useEffect(() => {
     markedViewedVariantRef.current = null;
-  }, [media.id]);
+  }, [media?.id]);
 
   // Compute isViewingNonPrimaryVariant early for edit hooks
   const isViewingNonPrimaryVariant = activeVariant && !activeVariant.is_primary;
@@ -1029,6 +1081,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     createAsGeneration, // If true, create a new generation instead of a variant
     advancedSettings, // Pass advanced settings for hires fix
     qwenEditModel, // Pass model selection for cloud mode
+    enabled: !isFormOnlyMode, // Disable DB queries in form-only mode (placeholder media)
   });
   const {
         isMagicEditMode,
@@ -1230,7 +1283,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [navigate]);
 
   // Generation lineage hook
-  const lineageHook = useGenerationLineage({ media });
+  const lineageHook = useGenerationLineage({ media, enabled: !isFormOnlyMode });
   const {
     sourceGeneration,
     derivedItems,        // NEW: Unified list of generations + variants
@@ -1276,10 +1329,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleQuickCreateSuccess,
   } = shotCreationHook;
 
-  // Navigation hook
+  // Navigation hook - use slot-aware handlers for unified navigation
   const navigationHook = useLightboxNavigation({
-    onNext,
-    onPrevious,
+    onNext: handleSlotNavNext,
+    onPrevious: handleSlotNavPrev,
     onClose,
   });
   const { safeClose, activateClickShield } = navigationHook;
@@ -2160,23 +2213,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   const swipeNavigation = useSwipeNavigation({
     onSwipeLeft: () => {
-      if (hasNext && onNext) {
-        console.log('[SwipeNav] Executing onNext');
-        onNext();
+      if (hasNext) {
+        console.log('[SwipeNav] Executing handleSlotNavNext');
+        handleSlotNavNext();
       }
     },
     onSwipeRight: () => {
-      if (hasPrevious && onPrevious) {
-        console.log('[SwipeNav] Executing onPrevious');
-        onPrevious();
+      if (hasPrevious) {
+        console.log('[SwipeNav] Executing handleSlotNavPrev');
+        handleSlotNavPrev();
       }
     },
-    disabled: 
-      isAnySpecialEditMode || 
-      readOnly || 
+    disabled:
+      isAnySpecialEditMode ||
+      readOnly ||
       !showNavigation,
-    hasNext: hasNext && !!onNext,
-    hasPrevious: hasPrevious && !!onPrevious,
+    hasNext,
+    hasPrevious,
     threshold: 50,
     velocityThreshold: 0.3,
   });
@@ -2932,18 +2985,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               "p-0 border-none bg-transparent shadow-none",
               // Layout: Full screen for special modes on tablet+, otherwise centered
-              shouldShowSidePanel
-                ? "left-0 top-0 h-full" // Full screen layout for side panel modes (width handled inline)
-                : isMobile 
+              // IMPORTANT: isFormOnlyMode needs full-screen to display SegmentSlotFormView correctly
+              (shouldShowSidePanel || isFormOnlyMode)
+                ? "inset-0 w-full h-full" // Full screen layout
+                : isMobile
                   ? "inset-0 w-full h-full" // Mobile: full screen
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             style={{
               // Smooth transition when tasks pane opens/closes
               transition: 'width 300ms cubic-bezier(0.22, 1, 0.36, 1)',
-              ...(shouldShowSidePanel && effectiveTasksPaneOpen && !isPortraitMode && isTabletOrLarger ? {
+              ...((shouldShowSidePanel || isFormOnlyMode) && effectiveTasksPaneOpen && !isPortraitMode && isTabletOrLarger ? {
                 width: `calc(100vw - ${effectiveTasksPaneWidth}px)`
-              } : shouldShowSidePanelWithTrim ? {
+              } : (shouldShowSidePanelWithTrim || isFormOnlyMode) ? {
                 width: '100vw'
               } : {})
             }}
@@ -3002,18 +3056,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           >
             {/* Accessibility: Hidden dialog title for screen readers */}
             <DialogPrimitive.Title className="sr-only">
-              {isSegmentSlotMode && !hasSegmentVideo
+              {isFormOnlyMode
                 ? `Segment ${(segmentSlotMode?.currentIndex ?? 0) + 1} Settings`
                 : `${media?.type?.includes('video') ? 'Video' : 'Image'} Lightbox - ${media?.id?.substring(0, 8)}`}
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
-              {isSegmentSlotMode && !hasSegmentVideo
+              {isFormOnlyMode
                 ? 'Configure and generate this video segment. Use Tab or arrow keys to navigate between segments.'
                 : `View and interact with ${media?.type?.includes('video') ? 'video' : 'image'} in full screen. Use arrow keys to navigate, Escape to close.`}
             </DialogPrimitive.Description>
 
             {/* Segment Slot Mode: Form-only view when no video exists */}
-            {isSegmentSlotMode && !hasSegmentVideo ? (
+            {isFormOnlyMode ? (
               <SegmentSlotFormView
                 segmentSlotMode={segmentSlotMode!}
                 onClose={onClose}
@@ -3058,8 +3112,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   <NavigationArrows
                     showNavigation={showNavigation}
                     readOnly={readOnly}
-                    onPrevious={onPrevious}
-                    onNext={onNext}
+                    onPrevious={handleSlotNavPrev}
+                    onNext={handleSlotNavNext}
                     hasPrevious={hasPrevious}
                     hasNext={hasNext}
                     variant="desktop"
@@ -3669,8 +3723,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <NavigationArrows
                       showNavigation={showNavigation}
                       readOnly={readOnly}
-                      onPrevious={onPrevious}
-                      onNext={onNext}
+                      onPrevious={handleSlotNavPrev}
+                      onNext={handleSlotNavNext}
                       hasPrevious={hasPrevious}
                       hasNext={hasNext}
                       variant="mobile"
@@ -4139,8 +4193,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   <NavigationArrows
                     showNavigation={showNavigation}
                     readOnly={readOnly}
-                    onPrevious={onPrevious}
-                    onNext={onNext}
+                    onPrevious={handleSlotNavPrev}
+                    onNext={handleSlotNavNext}
                     hasPrevious={hasPrevious}
                     hasNext={hasNext}
                     variant="mobile"
