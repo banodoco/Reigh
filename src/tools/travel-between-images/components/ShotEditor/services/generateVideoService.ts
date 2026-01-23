@@ -800,14 +800,23 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
             console.log(`[PairOverrides] ✅ Loaded LoRA override for pair ${i} from legacy user_overrides:`, pairLorasOverrides[i]);
           }
 
-          // Motion settings: build from overrides
-          if (overrides.motionMode !== undefined || overrides.amountOfMotion !== undefined) {
+          // Motion and structure settings: build from overrides
+          const hasMotionOverrides = overrides.motionMode !== undefined || overrides.amountOfMotion !== undefined;
+          const hasStructureOverrides = overrides.structureMotionStrength !== undefined ||
+                                        overrides.structureTreatment !== undefined ||
+                                        overrides.structureUni3cEndPercent !== undefined;
+
+          if (hasMotionOverrides || hasStructureOverrides) {
             pairMotionSettingsOverrides[i] = {
-              // Convert back to backend format (0-1 scale)
+              // Motion settings (convert back to backend format: 0-1 scale)
               ...(overrides.amountOfMotion !== undefined && { amount_of_motion: overrides.amountOfMotion / 100 }),
               ...(overrides.motionMode !== undefined && { motion_mode: overrides.motionMode }),
+              // Structure video settings
+              ...(overrides.structureMotionStrength !== undefined && { structure_motion_strength: overrides.structureMotionStrength }),
+              ...(overrides.structureTreatment !== undefined && { structure_treatment: overrides.structureTreatment }),
+              ...(overrides.structureUni3cEndPercent !== undefined && { uni3c_end_percent: overrides.structureUni3cEndPercent }),
             };
-            console.log(`[PairOverrides] ✅ Loaded motion settings override for pair ${i}:`, pairMotionSettingsOverrides[i]);
+            console.log(`[PairOverrides] ✅ Loaded motion/structure settings override for pair ${i}:`, pairMotionSettingsOverrides[i]);
           } else if (legacyOverrides?.amount_of_motion !== undefined || legacyOverrides?.motion_mode !== undefined) {
             pairMotionSettingsOverrides[i] = {
               amount_of_motion: legacyOverrides.amount_of_motion,
