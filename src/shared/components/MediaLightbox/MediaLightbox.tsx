@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { GenerationRow, Shot } from '@/types/shots';
 import { isVideoAny } from '@/shared/lib/typeGuards';
+import type { SegmentSlotModeData } from './types';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
@@ -94,6 +95,7 @@ import {
   VideoEditModeDisplay,
   VideoTrimModeDisplay,
   SegmentRegenerateForm,
+  SegmentSlotFormView,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -123,10 +125,17 @@ interface ShotOption {
 }
 
 interface MediaLightboxProps {
-  media: GenerationRow;
+  /** Media to display. Optional when segmentSlotMode is provided with no video. */
+  media?: GenerationRow;
   onClose: () => void;
   onNext?: () => void;
   onPrevious?: () => void;
+  /**
+   * Segment slot mode - when provided, MediaLightbox acts as a unified segment editor.
+   * If segmentVideo is null, shows only the generate form (no media display).
+   * Navigation uses onNavigateToPair for seamless slot-based navigation.
+   */
+  segmentSlotMode?: SegmentSlotModeData;
   // Configuration props to control features
   readOnly?: boolean; // Read-only mode - hides all interactive elements
   showNavigation?: boolean;
@@ -231,20 +240,22 @@ interface MediaLightboxProps {
   currentFrameCount?: number;
 }
 
-const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
-  media, 
-  onClose, 
-  onNext, 
-  onPrevious, 
+const MediaLightbox: React.FC<MediaLightboxProps> = ({
+  media: mediaProp,
+  onClose,
+  onNext,
+  onPrevious,
   readOnly = false,
   showNavigation = true,
   showImageEditTools = true,
   showDownload = true,
   showMagicEdit = false,
   autoEnterInpaint = false,
+  // Segment slot mode - for unified segment editor experience
+  segmentSlotMode,
   // Navigation availability
-  hasNext = true,
-  hasPrevious = true,
+  hasNext: hasNextProp = true,
+  hasPrevious: hasPreviousProp = true,
   // Workflow-specific props
   allShots = [],
   selectedShotId,
@@ -305,6 +316,44 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   currentFrameCount,
 }) => {
   // ========================================
+  // SEGMENT SLOT MODE - Unified segment editor
+  // ========================================
+
+  // When in segment slot mode, derive media and navigation from the slot data
+  const isSegmentSlotMode = !!segmentSlotMode;
+  const hasSegmentVideo = isSegmentSlotMode && !!segmentSlotMode.segmentVideo;
+
+  // Effective media: use slot's video if in slot mode, otherwise use prop
+  const media = hasSegmentVideo
+    ? segmentSlotMode.segmentVideo!
+    : mediaProp;
+
+  // Slot-based navigation
+  const hasNext = isSegmentSlotMode
+    ? segmentSlotMode.currentIndex < segmentSlotMode.totalPairs - 1
+    : hasNextProp;
+  const hasPrevious = isSegmentSlotMode
+    ? segmentSlotMode.currentIndex > 0
+    : hasPreviousProp;
+
+  // Navigation handlers for slot mode
+  const handleSlotNavNext = useCallback(() => {
+    if (isSegmentSlotMode && hasNext) {
+      segmentSlotMode.onNavigateToPair(segmentSlotMode.currentIndex + 1);
+    } else if (onNext) {
+      onNext();
+    }
+  }, [isSegmentSlotMode, hasNext, segmentSlotMode, onNext]);
+
+  const handleSlotNavPrev = useCallback(() => {
+    if (isSegmentSlotMode && hasPrevious) {
+      segmentSlotMode.onNavigateToPair(segmentSlotMode.currentIndex - 1);
+    } else if (onPrevious) {
+      onPrevious();
+    }
+  }, [isSegmentSlotMode, hasPrevious, segmentSlotMode, onPrevious]);
+
+  // ========================================
   // REFACTORED: All logic extracted to hooks
   // ========================================
 
@@ -313,6 +362,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     shotId: shotId?.substring(0, 8),
     mediaId: media?.id?.substring(0, 8),
     isVideo: media?.type === 'video' || media?.location?.includes('.mp4'),
+    isSegmentSlotMode,
+    hasSegmentVideo,
+    slotIndex: segmentSlotMode?.currentIndex,
   });
 
   // Refs
@@ -408,8 +460,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     };
   }, [media?.id, (media as any)?.url, media?.imageUrl, media?.location, media?.type]);
 
-  // Safety check
-  if (!media) {
+  // Safety check - media is required unless we're in segment slot mode without a video
+  if (!media && !isSegmentSlotMode) {
     console.error('[MediaLightbox] ❌ No media prop provided!');
     return null;
   }
@@ -1844,12 +1896,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       isChildSegment: parentGenerationId !== actualGenerationId,
     });
 
-    // If viewing a child segment, pass its ID so regeneration creates a variant instead of new child
-    // Priority: activeChildGenerationId from slot (always correct) > actualGenerationId (may be stale/wrong)
-    const isChildSegment = parentGenerationId !== actualGenerationId;
-    const childGenerationId = currentSegmentImages?.activeChildGenerationId ||
-                              (isChildSegment ? actualGenerationId : undefined);
-
     // Safe substring helper for debug logging (handles non-strings)
     const safeSubstr = (val: unknown): string => {
       if (typeof val === 'string') return val.substring(0, 8);
@@ -1857,30 +1903,47 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       return `[${typeof val}]`;
     };
 
+    // Extract pair_shot_generation_id for reading/writing per-pair metadata
+    // This links regeneration to the specific timeline pair's settings
+    // IMPORTANT: Prefer currentSegmentImages (live timeline) over stored params (may be stale)
+    const orchPairIds = taskParams.orchestrator_details?.pair_shot_generation_ids;
+    const pairShotGenerationId = [
+      currentSegmentImages?.startShotGenerationId,  // Live timeline (source of truth)
+      taskParams.pair_shot_generation_id,
+      taskParams.individual_segment_params?.pair_shot_generation_id,
+      Array.isArray(orchPairIds) ? orchPairIds[segmentIndex] : undefined,
+    ].find(v => typeof v === 'string') || undefined;
+
+    // Get the correct childGenerationId for regeneration
+    // PRIMARY: Use activeChildGenerationId from slot (matched by pair_shot_generation_id in SegmentOutputStrip)
+    // FALLBACK: If currentSegmentImages not provided, check if viewed media is a child segment
+    // SAFETY: Validate video's pair_shot_generation_id matches current slot (defense against stale data)
+    const isChildSegment = parentGenerationId !== actualGenerationId;
+    const videoPairShotGenId = taskParams.pair_shot_generation_id ||
+                               taskParams.individual_segment_params?.pair_shot_generation_id;
+    const videoMatchesCurrentSlot = !pairShotGenerationId || !videoPairShotGenId ||
+                                    pairShotGenerationId === videoPairShotGenId;
+
+    // Use slot's activeChildGenerationId (source of truth), with fallback and safety check
+    const childGenerationId = videoMatchesCurrentSlot
+      ? (currentSegmentImages?.activeChildGenerationId || (isChildSegment ? actualGenerationId : undefined))
+      : undefined;
+
     console.log('[MediaLightbox] childGenerationId resolution:', {
       activeChildFromSlot: safeSubstr(currentSegmentImages?.activeChildGenerationId),
       actualGenerationId: safeSubstr(actualGenerationId),
       isChildSegment,
+      pairShotGenerationId: safeSubstr(pairShotGenerationId),
+      videoPairShotGenId: safeSubstr(videoPairShotGenId),
+      videoMatchesCurrentSlot,
       final: safeSubstr(childGenerationId) || 'null (will create new child)',
     });
 
-    // Extract pair_shot_generation_id for reading/writing per-pair metadata
-    // This links regeneration to the specific timeline pair's settings
-    // Check: top level → individual_segment_params → currentSegmentImages → orchestrator_details array
-    // Only accept string values (UUIDs) - filter out numbers or other types
-    const orchPairIds = taskParams.orchestrator_details?.pair_shot_generation_ids;
-    const pairShotGenerationId = [
-      taskParams.pair_shot_generation_id,
-      taskParams.individual_segment_params?.pair_shot_generation_id,
-      currentSegmentImages?.startShotGenerationId,
-      Array.isArray(orchPairIds) ? orchPairIds[segmentIndex] : undefined,
-    ].find(v => typeof v === 'string') || undefined;
-
-    console.log('[PairMetadata] 🔗 MediaLightbox pairShotGenerationId sources:', {
-      fromTaskParams: safeSubstr(taskParams.pair_shot_generation_id),
-      fromIndividualSegmentParams: safeSubstr(taskParams.individual_segment_params?.pair_shot_generation_id),
-      fromCurrentSegmentImages: safeSubstr(currentSegmentImages?.startShotGenerationId),
-      fromOrchestratorDetails: Array.isArray(orchPairIds) ? safeSubstr(orchPairIds[segmentIndex]) : 'null',
+    console.log('[PairMetadata] 🔗 MediaLightbox pairShotGenerationId sources (priority order):', {
+      '1_fromCurrentSegmentImages': safeSubstr(currentSegmentImages?.startShotGenerationId),
+      '2_fromTaskParams': safeSubstr(taskParams.pair_shot_generation_id),
+      '3_fromIndividualSegmentParams': safeSubstr(taskParams.individual_segment_params?.pair_shot_generation_id),
+      '4_fromOrchestratorDetails': Array.isArray(orchPairIds) ? safeSubstr(orchPairIds[segmentIndex]) : 'null',
       final: safeSubstr(pairShotGenerationId),
     });
 
@@ -2939,13 +3002,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           >
             {/* Accessibility: Hidden dialog title for screen readers */}
             <DialogPrimitive.Title className="sr-only">
-              {media.type?.includes('video') ? 'Video' : 'Image'} Lightbox - {media.id?.substring(0, 8)}
+              {isSegmentSlotMode && !hasSegmentVideo
+                ? `Segment ${(segmentSlotMode?.currentIndex ?? 0) + 1} Settings`
+                : `${media?.type?.includes('video') ? 'Video' : 'Image'} Lightbox - ${media?.id?.substring(0, 8)}`}
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
-              View and interact with {media.type?.includes('video') ? 'video' : 'image'} in full screen. Use arrow keys to navigate, Escape to close.
+              {isSegmentSlotMode && !hasSegmentVideo
+                ? 'Configure and generate this video segment. Use Tab or arrow keys to navigate between segments.'
+                : `View and interact with ${media?.type?.includes('video') ? 'video' : 'image'} in full screen. Use arrow keys to navigate, Escape to close.`}
             </DialogPrimitive.Description>
-            
-            {shouldShowSidePanelWithTrim ? (
+
+            {/* Segment Slot Mode: Form-only view when no video exists */}
+            {isSegmentSlotMode && !hasSegmentVideo ? (
+              <SegmentSlotFormView
+                segmentSlotMode={segmentSlotMode!}
+                onClose={onClose}
+                onNavPrev={handleSlotNavPrev}
+                onNavNext={handleSlotNavNext}
+                hasPrevious={hasPrevious}
+                hasNext={hasNext}
+              />
+            ) : shouldShowSidePanelWithTrim ? (
               // Tablet/Desktop layout with side panel (task details, inpaint, magic edit, or video trim)
               <div 
                 className="w-full h-full flex bg-black/90"

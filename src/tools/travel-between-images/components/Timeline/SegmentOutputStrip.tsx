@@ -631,9 +631,12 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
           currentSegmentImages={(() => {
             // Derive currentSegmentImages from shared pairDataByIndex (same source as SegmentSettingsModal)
             const pairData = currentLightboxSlot ? pairDataByIndex?.get(currentLightboxSlot.index) : undefined;
+            // IMPORTANT: Use the slot's child ID (matched by pair_shot_generation_id), not the viewed media ID
+            // This ensures regeneration targets the correct child after timeline rearrangements
+            const slotChildId = currentLightboxSlot?.type === 'child' ? currentLightboxSlot.child.id : undefined;
             return {
               startShotGenerationId: pairData?.startImage?.id || currentLightboxSlot?.pairShotGenerationId,
-              activeChildGenerationId: currentLightboxMedia?.id,
+              activeChildGenerationId: slotChildId,
               startUrl: pairData?.startImage?.url,
               endUrl: pairData?.endImage?.url,
               startGenerationId: pairData?.startImage?.generationId,
