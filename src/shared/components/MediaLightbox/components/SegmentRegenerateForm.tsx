@@ -45,6 +45,23 @@ export interface SegmentRegenerateFormProps {
   variantParamsToLoad?: Record<string, any> | null;
   /** Callback when variant params have been loaded (to clear the trigger) */
   onVariantParamsLoaded?: () => void;
+  /** Structure video type for this segment (null = no structure video coverage) */
+  structureVideoType?: 'uni3c' | 'flow' | 'canny' | 'depth' | null;
+  /** Shot-level structure video defaults */
+  structureVideoDefaults?: {
+    motionStrength: number;
+    treatment: 'adjust' | 'clip';
+    uni3cEndPercent: number;
+  };
+  /** Structure video URL for preview */
+  structureVideoUrl?: string;
+  /** Frame range info for this segment's structure video usage */
+  structureVideoFrameRange?: {
+    segmentStart: number;
+    segmentEnd: number;
+    videoTotalFrames: number;
+    videoFps: number;
+  };
 }
 
 export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
@@ -64,6 +81,10 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   currentFrameCount,
   variantParamsToLoad,
   onVariantParamsLoaded,
+  structureVideoType,
+  structureVideoDefaults,
+  structureVideoUrl,
+  structureVideoFrameRange,
 }) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,6 +101,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
       negativePrompt: '',
       numFrames: currentFrameCount ?? initialParams?.num_frames ?? 25,
     },
+    structureVideoDefaults: structureVideoDefaults ?? null,
   });
 
   // Handle frame count change - wrap to include pairShotGenerationId
@@ -223,6 +245,10 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         onRestoreDefaults={resetSettings}
         hasOverride={hasOverride}
         shotDefaults={shotDefaults}
+        structureVideoType={structureVideoType}
+        structureVideoDefaults={structureVideoDefaults}
+        structureVideoUrl={structureVideoUrl}
+        structureVideoFrameRange={structureVideoFrameRange}
       />
     </div>
   );

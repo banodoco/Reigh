@@ -449,12 +449,12 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
       <div className="space-y-2">
         <Label className="text-xs font-medium">Prompt:</Label>
         <Textarea
-          value={hasOverride?.prompt === false ? '' : settings.prompt}
+          value={settings.prompt}
           onChange={(e) => onChange({ prompt: e.target.value })}
           className="h-20 text-sm resize-none"
           placeholder={
-            // Show default placeholder if: no saved override OR field is empty (user cleared)
-            (hasOverride?.prompt === false || !settings.prompt) && shotDefaults?.prompt
+            // Show default placeholder when prompt is empty
+            !settings.prompt && shotDefaults?.prompt
               ? `[default] ${shotDefaults.prompt}`
               : 'Describe this segment...'
           }
@@ -504,12 +504,12 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Negative Prompt:</Label>
               <Textarea
-                value={hasOverride?.negativePrompt === false ? '' : settings.negativePrompt}
+                value={settings.negativePrompt}
                 onChange={(e) => onChange({ negativePrompt: e.target.value })}
                 className="h-16 text-xs resize-none"
                 placeholder={
-                  // Show default placeholder if: no saved override OR field is empty (user cleared)
-                  (hasOverride?.negativePrompt === false || !settings.negativePrompt) && shotDefaults?.negativePrompt
+                  // Show default placeholder when negative prompt is empty
+                  !settings.negativePrompt && shotDefaults?.negativePrompt
                     ? `[default] ${shotDefaults.negativePrompt}`
                     : 'Things to avoid...'
                 }

@@ -1884,6 +1884,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       final: safeSubstr(pairShotGenerationId),
     });
 
+    // Extract structure video props for the form
+    const firstStructureVideo = shotStructureVideos?.[0];
+    const structureVideoType = firstStructureVideo?.structure_type as 'uni3c' | 'flow' | 'canny' | 'depth' | undefined;
+    const structureVideoDefaults = firstStructureVideo ? {
+      motionStrength: firstStructureVideo.motion_strength ?? 1.2,
+      treatment: (firstStructureVideo.treatment ?? 'adjust') as 'adjust' | 'clip',
+      uni3cEndPercent: firstStructureVideo.uni3c_end_percent ?? 0.1,
+    } : undefined;
+    const structureVideoUrl = firstStructureVideo?.path;
+
     return (
       <SegmentRegenerateForm
         params={taskParams}
@@ -1902,6 +1912,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         currentFrameCount={currentFrameCount}
         variantParamsToLoad={variantParamsToLoad}
         onVariantParamsLoaded={() => setVariantParamsToLoad(null)}
+        structureVideoType={structureVideoType}
+        structureVideoDefaults={structureVideoDefaults}
+        structureVideoUrl={structureVideoUrl}
       />
     );
   }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId, currentSegmentImages, onSegmentFrameCountChange, currentFrameCount, variantParamsToLoad, setVariantParamsToLoad]);
