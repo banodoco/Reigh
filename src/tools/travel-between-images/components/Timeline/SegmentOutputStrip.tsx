@@ -217,8 +217,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   // Handle opening segment in lightbox
   // When onOpenPairSettings is provided, use the unified segment slot lightbox
   // Otherwise fall back to the local MediaLightbox
-  const handleSegmentClick = useCallback((slotIndex: number) => {
-    const slot = segmentSlots[slotIndex];
+  // NOTE: We pass the slot directly to avoid array index mismatches between displaySlots and segmentSlots
+  const handleSegmentClick = useCallback((slot: typeof segmentSlots[number], slotIndex: number) => {
     if (slot?.type === 'child') {
       // Mark as viewed when opening lightbox
       markGenerationViewed(slot.child.id);
@@ -232,7 +232,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       // Fallback to local lightbox
       setLightboxIndex(slotIndex);
     }
-  }, [segmentSlots, markGenerationViewed, onOpenPairSettings]);
+  }, [markGenerationViewed, onOpenPairSettings]);
   
   // Lightbox navigation - get indices of child slots that have locations
   const childSlotIndices = useMemo(() => 
@@ -359,11 +359,44 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       setDeletingSegmentId(null);
     }
   }, [getPairShotGenIdFromParams, queryClient]);
-  
-  // Get current lightbox media
-  const currentLightboxSlot = useMemo(() => 
-    lightboxIndex !== null ? segmentSlots[lightboxIndex] : null,
-    [lightboxIndex, segmentSlots]
+
+  // Build placeholder slots from pairInfo when no segment data exists
+  // This ensures placeholders show even before any videos are generated
+  // NOTE: Moved here so it's available for currentLightboxSlot
+  const displaySlots = useMemo(() => {
+    // If we have actual segment slots, use them
+    if (segmentSlots.length > 0) {
+      return segmentSlots;
+    }
+
+    // Handle single-image mode - create a single placeholder slot
+    if (singleImageMode && pairInfo.length === 0) {
+      return [{
+        type: 'placeholder' as const,
+        index: 0,
+        pairShotGenerationId: singleImageMode.imageId,
+        expectedFrames: singleImageMode.endFrame - singleImageMode.imageFrame,
+        expectedPrompt: undefined,
+        startImage: undefined,
+        endImage: undefined,
+      }];
+    }
+
+    // No segment data - create placeholder slots from pairInfo
+    return pairInfo.map((pair) => ({
+      type: 'placeholder' as const,
+      index: pair.index,
+      expectedFrames: undefined,
+      expectedPrompt: undefined,
+      startImage: undefined,
+      endImage: undefined,
+    }));
+  }, [segmentSlots, pairInfo, singleImageMode]);
+
+  // Get current lightbox media - use displaySlots since lightboxIndex comes from displaySlots.map
+  const currentLightboxSlot = useMemo(() =>
+    lightboxIndex !== null ? displaySlots[lightboxIndex] : null,
+    [lightboxIndex, displaySlots]
   );
   const currentLightboxMedia = useMemo(() => 
     currentLightboxSlot?.type === 'child' ? currentLightboxSlot.child : null,
@@ -430,38 +463,6 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   }, [pairInfo, fullMin, fullRange, containerWidth, singleImageMode]);
   
   // ===== NOW WE CAN HAVE EARLY RETURNS =====
-
-  // Build placeholder slots from pairInfo when no segment data exists
-  // This ensures placeholders show even before any videos are generated
-  const displaySlots = useMemo(() => {
-    // If we have actual segment slots, use them
-    if (segmentSlots.length > 0) {
-      return segmentSlots;
-    }
-
-    // Handle single-image mode - create a single placeholder slot
-    if (singleImageMode && pairInfo.length === 0) {
-      return [{
-        type: 'placeholder' as const,
-        index: 0,
-        pairShotGenerationId: singleImageMode.imageId,
-        expectedFrames: singleImageMode.endFrame - singleImageMode.imageFrame,
-        expectedPrompt: undefined,
-        startImage: undefined,
-        endImage: undefined,
-      }];
-    }
-
-    // No segment data - create placeholder slots from pairInfo
-    return pairInfo.map((pair) => ({
-      type: 'placeholder' as const,
-      index: pair.index,
-      expectedFrames: undefined,
-      expectedPrompt: undefined,
-      startImage: undefined,
-      endImage: undefined,
-    }));
-  }, [segmentSlots, pairInfo, singleImageMode]);
 
   // Calculate preview dimensions based on aspect ratio
   // NOTE: This must be before the early return to follow React's rules of hooks
@@ -586,7 +587,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
                     key={slot.type === 'child' ? slot.child.id : `placeholder-${index}`}
                     slot={slot}
                     pairIndex={slot.index}
-                    onClick={() => handleSegmentClick(index)}
+                    onClick={() => handleSegmentClick(slot, index)}
                     projectAspectRatio={projectAspectRatio}
                     isMobile={isMobile}
                     leftPercent={position.leftPercent}
