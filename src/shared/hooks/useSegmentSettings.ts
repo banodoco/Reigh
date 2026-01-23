@@ -253,7 +253,7 @@ export function useSegmentSettings({
       amountOfMotion: pairOverrides.amountOfMotion,
       phaseConfig: pairOverrides.phaseConfig,
       selectedPhasePresetId: pairOverrides.selectedPhasePresetId,
-      loras: pairOverrides.loras,
+      loras: pairOverrides.loras ?? [],
 
       // Frame count: always from timeline (source of truth)
       numFrames: defaults.numFrames ?? 25,
@@ -406,7 +406,7 @@ export function useSegmentSettings({
       amountOfMotion: settings.amountOfMotion,
       hasPhaseConfig: !!settings.phaseConfig,
       phaseConfigFlowShift: settings.phaseConfig?.flow_shift,
-      loraCount: settings.loras.length,
+      loraCount: settings.loras?.length ?? 0,
       willSavePhaseConfig: settings.motionMode !== 'basic',
       numFrames: settings.numFrames,
       randomSeed: settings.randomSeed,
