@@ -128,7 +128,7 @@ export const calculateNextAvailableFrame = async (
       id,
       generation_id,
       timeline_frame,
-      generations:generation_id (
+      generation:generations!shot_generations_generation_id_generations_id_fk (
         id,
         location,
         type
