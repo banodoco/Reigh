@@ -2450,11 +2450,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       
       {/* Preview Together Dialog */}
       <Dialog open={isPreviewTogetherOpen} onOpenChange={setIsPreviewTogetherOpen}>
-        <DialogContent className="max-w-4xl w-full p-0 gap-0">
+        <DialogContent className="max-w-4xl w-full p-0 gap-0 overflow-hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>Preview Segments</DialogTitle>
           </DialogHeader>
-          <div className="p-4">
+          <div className="p-4 overflow-hidden">
             {previewableSegments.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground">
                 No segments available to preview
