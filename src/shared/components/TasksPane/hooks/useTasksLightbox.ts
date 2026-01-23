@@ -177,6 +177,9 @@ export function useTasksLightbox({
       showImageEditTools: lightboxData.type === 'image',
       showMagicEdit: lightboxData.type === 'image',
       initialVariantId: lightboxData.initialVariantId,
+      // For video tasks (especially individual segments), fetch variants for the video itself
+      // not from its parent - this ensures we show the correct video in the lightbox
+      fetchVariantsForSelf: lightboxData.type === 'video',
     };
   })() : null;
 

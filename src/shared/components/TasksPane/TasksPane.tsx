@@ -598,6 +598,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           tasksPaneOpen={true}
           tasksPaneWidth={tasksPaneWidth}
           initialVariantId={lightboxProps.initialVariantId}
+          fetchVariantsForSelf={lightboxProps.fetchVariantsForSelf}
         />,
         document.body
       )}
