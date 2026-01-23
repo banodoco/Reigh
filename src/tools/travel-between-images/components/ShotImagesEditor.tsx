@@ -2790,12 +2790,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     </div>
                   </div>
 
-                  {/* Segment thumbnail strip - scrolls when overflows, centered when fits */}
+                  {/* Segment thumbnail strip - horizontal scroll, auto-scrolls to current */}
                   <div
                     ref={previewThumbnailsRef}
                     className="overflow-x-auto w-full"
                   >
-                    <div className="flex gap-2 min-w-full justify-center">
+                    <div className="flex gap-2">
                       {previewableSegments.map((segment, idx) => (
                         <button
                           key={idx}
