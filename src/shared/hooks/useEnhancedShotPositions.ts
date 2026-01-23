@@ -897,7 +897,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       // AFTER the database update, fetch the updated state to check if order changed
       const { data: updatedGenerations, error: fetchError } = await supabase
         .from('shot_generations')
-        .select('id, generation_id, timeline_frame, generations:generations(type, location)')
+        .select('id, generation_id, timeline_frame, generations:generations!shot_generations_generation_id_generations_id_fk(type, location)')
         .eq('shot_id', shotId)
         .not('timeline_frame', 'is', null)
         .order('timeline_frame', { ascending: true });
@@ -1267,7 +1267,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         id,
         timeline_frame,
         metadata,
-        generation:generations(id, type, location)
+        generation:generations!shot_generations_generation_id_generations_id_fk(id, type, location)
       `)
       .eq('shot_id', shotId)
       .not('timeline_frame', 'is', null); // Only positioned images
@@ -1518,7 +1518,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         id,
         timeline_frame,
         metadata,
-        generation:generations(id, type, location)
+        generation:generations!shot_generations_generation_id_generations_id_fk(id, type, location)
       `)
       .eq('shot_id', shotId)
       .not('timeline_frame', 'is', null);

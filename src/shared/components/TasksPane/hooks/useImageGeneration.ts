@@ -42,7 +42,7 @@ export function useImageGeneration({
         .from('generations')
         .select(`
           *,
-          shot_generations(shot_id, timeline_frame)
+          shot_generations!shot_generations_generation_id_generations_id_fk(shot_id, timeline_frame)
         `)
         .eq('location', task.outputLocation)
         .eq('project_id', task.projectId)
@@ -70,7 +70,7 @@ export function useImageGeneration({
           .from('generations')
           .select(`
             *,
-            shot_generations(shot_id, timeline_frame)
+            shot_generations!shot_generations_generation_id_generations_id_fk(shot_id, timeline_frame)
           `)
           .eq('id', variant.generation_id)
           .single();
@@ -96,7 +96,7 @@ export function useImageGeneration({
         .from('generations')
         .select(`
           *,
-          shot_generations(shot_id, timeline_frame)
+          shot_generations!shot_generations_generation_id_generations_id_fk(shot_id, timeline_frame)
         `)
         .filter('tasks', 'cs', JSON.stringify([task.id]))
         .eq('project_id', task.projectId)

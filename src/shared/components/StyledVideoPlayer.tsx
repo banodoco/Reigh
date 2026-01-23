@@ -242,7 +242,10 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
 
   const handleContainerClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
-    if (target.tagName === 'VIDEO' || target.closest('.video-clickable-area')) {
+    // Only toggle if clicking on video itself or the container background
+    // Don't toggle if clicking on control buttons
+    if (target.tagName === 'VIDEO' || target === e.currentTarget) {
+      e.stopPropagation(); // Prevent bubbling to parent modal close handlers
       togglePlayPause();
     }
   }, [togglePlayPause]);
@@ -265,7 +268,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         autoPlay={autoPlay}
         playsInline={playsInline}
         preload={preload}
-        className="w-full h-auto object-contain rounded-lg bg-black cursor-pointer video-clickable-area"
+        className="w-full h-auto object-contain rounded-lg bg-black cursor-pointer"
         style={{ maxHeight: '100%' }}
         onDoubleClick={isMobile ? undefined : toggleFullscreen}
         onLoadedMetadata={onLoadedMetadata}
@@ -299,11 +302,6 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Clickable overlay for play/pause */}
-      <div 
-        className="absolute inset-0 video-clickable-area"
-        style={{ pointerEvents: (showControls && isPlaying) ? 'none' : 'all' }}
-      />
 
       {/* Custom Controls Overlay */}
       <div 
@@ -318,7 +316,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
             <Button
               variant="secondary"
               size="lg"
-              onClick={togglePlayPause}
+              onClick={(e) => { e.stopPropagation(); togglePlayPause(); }}
               className="bg-black/70 hover:bg-black/90 text-white h-16 w-16 rounded-full p-0 shadow-wes border border-white/20 pointer-events-auto"
             >
               <Play className="h-8 w-8 ml-1" fill="currentColor" />
@@ -327,7 +325,10 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         )}
 
         {/* Bottom Controls Bar */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent p-4 rounded-b-lg pointer-events-auto">
+        <div
+          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent p-4 rounded-b-lg pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center space-x-3">
             {/* Play/Pause */}
             <Button

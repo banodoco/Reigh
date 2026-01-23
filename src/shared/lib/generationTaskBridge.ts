@@ -91,7 +91,7 @@ export async function getGenerationForTask(taskId: string, outputLocation: strin
     .from('generations')
     .select(`
       *,
-      shot_generations(shot_id, timeline_frame)
+      shot_generations!shot_generations_generation_id_generations_id_fk(shot_id, timeline_frame)
     `)
     .eq('location', outputLocation)
     .eq('project_id', projectId)

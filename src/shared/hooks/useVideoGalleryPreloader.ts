@@ -108,7 +108,7 @@ export const useVideoGalleryPreloader = (options?: {
       const { data, error } = await supabase
         .from('shot_generations')
         .select(`
-          generation:generations(
+          generation:generations!shot_generations_generation_id_generations_id_fk(
             id,
             thumbnail_url,
             location

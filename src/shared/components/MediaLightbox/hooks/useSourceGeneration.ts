@@ -78,7 +78,7 @@ export const useSourceGeneration = ({
           .from('generations')
           .select(`
             *,
-            shot_generations(
+            shot_generations!shot_generations_generation_id_generations_id_fk(
               shot_id,
               timeline_frame
             ),

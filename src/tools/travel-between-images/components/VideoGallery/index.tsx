@@ -1129,6 +1129,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             onClose: () => setLightboxIndex(null)
           }}
           onShowTaskDetails={isTouchLikeDevice ? handleShowTaskDetails : undefined}
+          fetchVariantsForSelf={true}
         />
       )}
 

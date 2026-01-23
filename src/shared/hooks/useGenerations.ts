@@ -883,7 +883,7 @@ export async function fetchDerivedGenerations(
       starred,
       tasks,
       based_on,
-      shot_generations(shot_id, timeline_frame)
+      shot_generations!shot_generations_generation_id_generations_id_fk(shot_id, timeline_frame)
     `)
     .eq('based_on', sourceGenerationId)
     .order('starred', { ascending: false, nullsFirst: false })
@@ -1232,7 +1232,7 @@ export async function fetchSourceGeneration(
       starred,
       tasks,
       based_on,
-      shot_generations(shot_id, timeline_frame)
+      shot_generations!shot_generations_generation_id_generations_id_fk(shot_id, timeline_frame)
     `)
     .eq('id', sourceGenerationId)
     .single();

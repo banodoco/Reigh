@@ -243,7 +243,7 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
             id,
             timeline_frame,
             metadata,
-            generation:generations(id, type, location)
+            generation:generations!shot_generations_generation_id_generations_id_fk(id, type, location)
           `)
           .eq('shot_id', ctx.selectedShot!.id)
           .not('timeline_frame', 'is', null)
@@ -267,7 +267,7 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
         console.log('[ApplySettings] Step 4c: Loading snapshot (not loaded yet)...');
         const { data: snapshotRows } = await supabase
           .from('shot_generations')
-          .select(`id, timeline_frame, metadata, generation:generations(id, type, location)`)
+          .select(`id, timeline_frame, metadata, generation:generations!shot_generations_generation_id_generations_id_fk(id, type, location)`)
           .eq('shot_id', ctx.selectedShot.id)
           .not('timeline_frame', 'is', null)
           .order('timeline_frame', { ascending: true, nullsFirst: false })
