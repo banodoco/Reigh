@@ -113,9 +113,18 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
   const [segmentLightboxIndex, setSegmentLightboxIndex] = useState<number | null>(null);
   
   // Handle segment video click - open lightbox
+  // Use unified segment slot lightbox (via onPairClick) when available for consistent navigation
   const handleSegmentClick = useCallback((slotIndex: number) => {
-    setSegmentLightboxIndex(slotIndex);
-  }, []);
+    const slot = segmentSlots[slotIndex];
+
+    // Use unified segment slot lightbox when available (enables navigation to slots without videos)
+    if (props.onPairClick && slot) {
+      props.onPairClick(slot.index);
+    } else {
+      // Fallback to local lightbox
+      setSegmentLightboxIndex(slotIndex);
+    }
+  }, [segmentSlots, props.onPairClick]);
   
   // Get current segment lightbox media
   const currentSegmentSlot = segmentLightboxIndex !== null ? segmentSlots[segmentLightboxIndex] : null;

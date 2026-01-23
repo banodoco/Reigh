@@ -527,7 +527,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         generation_id,
         timeline_frame,
         metadata,
-        generations:generation_id (
+        generation:generations!shot_generations_generation_id_generations_id_fk (
           id,
           location,
           type
@@ -550,7 +550,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
 
     // Extract URLs, generation IDs, and shot_generation IDs
     const freshImagesWithIds = filteredShotGenerations.map(sg => {
-      const gen = sg.generations as any;
+      const gen = sg.generation as any;
       return {
         location: gen?.location,
         generationId: gen?.id || sg.generation_id, // Prefer joined id, fallback to FK
@@ -630,7 +630,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
           generation_id,
           timeline_frame,
           metadata,
-          generations:generation_id (
+          generation:generations!shot_generations_generation_id_generations_id_fk (
             id,
             location,
             type
@@ -651,7 +651,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
           generation_id: sg.generation_id?.substring(0, 8),
           timeline_frame: sg.timeline_frame,
           has_metadata: !!sg.metadata,
-          has_generations: !!sg.generations
+          has_generations: !!sg.generation
         })));
         
         // Build sorted positions from timeline_frame data
@@ -660,9 +660,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         // This ensures sortedPositions.length matches absoluteImageUrls.length
         // Uses canonical isVideoShotGenerations from typeGuards
         const filteredShotGenerations = shotGenerationsData.filter(sg => {
-          const gen = sg.generations as any;
+          const gen = sg.generation as any;
           const hasValidLocation = gen?.location && gen.location !== '/placeholder.svg';
-          return sg.generations &&
+          return sg.generation &&
                  !isVideoShotGenerations(sg as ShotGenerationsLike) &&
                  hasValidLocation;
         });
@@ -673,7 +673,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
           id: sg.id?.substring(0, 8),
           timeline_frame: sg.timeline_frame,
           has_metadata: !!sg.metadata,
-          location: (sg.generations as any)?.location?.substring(0, 30)
+          location: (sg.generation as any)?.location?.substring(0, 30)
         })));
 
         // Build sorted positions ONLY from items with valid timeline_frame
