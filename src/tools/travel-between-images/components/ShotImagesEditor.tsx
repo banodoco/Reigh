@@ -2795,7 +2795,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     ref={previewThumbnailsRef}
                     className="overflow-x-auto w-full no-scrollbar"
                   >
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 p-3">
                       {previewableSegments.map((segment, idx) => (
                         <button
                           key={idx}
