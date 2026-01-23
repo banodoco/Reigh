@@ -155,7 +155,7 @@ export function useSegmentOutputsForShot(
     shotId: shotId?.substring(0, 8) || 'null',
   });
 
-  // Fetch parent generations (video outputs without parent_generation_id)
+  // Fetch parent generations using the shot_final_videos view (single query, all filtering server-side)
   const {
     data: parentGenerationsData,
     isLoading: isLoadingParents,
@@ -165,85 +165,26 @@ export function useSegmentOutputsForShot(
     queryKey: ['segment-parent-generations', shotId, projectId],
     queryFn: async () => {
       if (!shotId || !projectId) return [];
-      
+
       console.log('[useSegmentOutputsForShot] Fetching parent generations for shot:', shotId.substring(0, 8));
-      
-      // First, get all generation_ids associated with this shot via shot_generations
-      const { data: shotGensData, error: shotGensError } = await supabase
-        .from('shot_generations')
-        .select('generation_id')
-        .eq('shot_id', shotId);
-      
-      if (shotGensError) {
-        console.error('[useSegmentOutputsForShot] Error fetching shot_generations:', shotGensError);
-        throw shotGensError;
-      }
-      
-      const generationIdsInShot = new Set((shotGensData || []).map(sg => sg.generation_id));
-      
-      if (generationIdsInShot.size === 0) {
-        console.log('[useSegmentOutputsForShot] No generations in shot');
-        return [];
-      }
-      
-      // Get video generations for this project that are parents
-      const { data: generations, error } = await supabase
-        .from('generations')
-        .select(`
-          id,
-          location,
-          thumbnail_url,
-          type,
-          created_at,
-          updated_at,
-          params,
-          starred,
-          parent_generation_id
-        `)
+
+      // Single query using the shot_final_videos view
+      // This replaces 3 queries + client-side filtering with 1 indexed query
+      const { data, error } = await supabase
+        .from('shot_final_videos')
+        .select('*')
+        .eq('shot_id', shotId)
         .eq('project_id', projectId)
-        .eq('type', 'video')
-        .is('parent_generation_id', null) // Only parents
         .order('created_at', { ascending: false });
-      
+
       if (error) {
-        console.error('[useSegmentOutputsForShot] Error fetching generations:', error);
+        console.error('[useSegmentOutputsForShot] Error fetching parent generations:', error);
         throw error;
       }
-      
-      // Filter to only include generations associated with this shot
-      // and that have orchestrator_details (indicating they are travel outputs)
-      const shotGenerations: any[] = [];
-      
-      // Batch check for child counts - get all parent IDs and check at once
-      const potentialParentIds = (generations || [])
-        .filter(gen => generationIdsInShot.has(gen.id))
-        .map(gen => gen.id);
-      
-      // Get child counts for all potential parents in one query
-      const { data: childCounts } = await supabase
-        .from('generations')
-        .select('parent_generation_id')
-        .in('parent_generation_id', potentialParentIds);
-      
-      const parentIdsWithChildren = new Set((childCounts || []).map(c => c.parent_generation_id));
-      
-      for (const gen of generations || []) {
-        // Must be associated with this shot
-        if (!generationIdsInShot.has(gen.id)) continue;
-        
-        // Check if it has orchestrator_details (travel output) or has children
-        const params = gen.params as any;
-        const hasOrchestratorDetails = !!params?.orchestrator_details;
-        const hasChildren = parentIdsWithChildren.has(gen.id);
-        
-        if (hasOrchestratorDetails || hasChildren) {
-          shotGenerations.push(gen);
-        }
-      }
-      
-      console.log('[useSegmentOutputsForShot] Found parent generations:', shotGenerations.length);
-      
-      return shotGenerations.map(transformToGenerationRow);
+
+      console.log('[useSegmentOutputsForShot] Found parent generations:', data?.length || 0);
+
+      return (data || []).map(transformToGenerationRow);
     },
     enabled: !!shotId && !!projectId,
     staleTime: 30000, // 30 seconds
