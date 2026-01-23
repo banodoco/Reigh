@@ -2490,6 +2490,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       className="relative bg-black rounded-lg overflow-hidden max-w-full"
                       style={{ maxHeight: '60vh', ...previewAspectStyle }}
                     >
+                    {/* Invisible spacer to maintain aspect ratio during transitions */}
+                    <div className="invisible w-full max-h-[60vh]" style={previewAspectStyle} />
+
                     {/* Loading skeleton - shown while video is loading */}
                     {currentSegment.hasVideo && isPreviewVideoLoading && (
                       <div className="absolute inset-0 flex items-center justify-center">
@@ -2501,7 +2504,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       <video
                         ref={previewVideoRef}
                         src={currentSegment.videoUrl!}
-                        className="max-w-full max-h-[60vh] object-contain cursor-pointer"
+                        className="absolute inset-0 w-full h-full object-contain cursor-pointer"
                         autoPlay
                         playsInline
                         onClick={() => {
@@ -2572,9 +2575,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       />
                     ) : (
                       // Image crossfade segment
-                      <div 
-                        className="relative w-full cursor-pointer"
-                        style={{ maxHeight: '60vh' }}
+                      <div
+                        className="absolute inset-0 cursor-pointer"
                         onClick={() => {
                           // Toggle play/pause for crossfade
                           setPreviewIsPlaying(prev => {
@@ -2591,12 +2593,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           });
                         }}
                       >
-                        {/* Base image to establish dimensions */}
-                        <img
-                          src={currentSegment.startImageUrl || currentSegment.endImageUrl || ''}
-                          alt="Base"
-                          className="w-full h-auto max-h-[60vh] object-contain invisible"
-                        />
                         {/* Start image - fades out */}
                         {currentSegment.startImageUrl && (
                           <img
