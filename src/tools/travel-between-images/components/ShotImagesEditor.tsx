@@ -901,11 +901,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       const startImage = sortedImages[pairIndex];
       const endImage = sortedImages[pairIndex + 1];
       
-      // Calculate duration from frame positions
+      // Get frame positions (for logging and timeline mode calculation)
       const startFrame = startImage?.timeline_frame ?? 0;
       const endFrame = endImage?.timeline_frame ?? startFrame;
-      const frameCount = endFrame - startFrame;
-      const durationFromFrames = frameCount / FPS;
+
+      // Calculate duration - in batch mode use uniform batchVideoFrames, otherwise from timeline positions
+      const isBatchMode = effectiveGenerationMode === 'batch';
+      const durationFromFrames = isBatchMode
+        ? batchVideoFrames / FPS  // Batch mode: uniform duration for all pairs
+        : (endFrame - startFrame) / FPS;  // Timeline mode: from actual frame positions
       
       // Check if there's a slot with video for this pair
       const slot = slotsByIndex.get(pairIndex);
@@ -957,7 +961,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     })));
     
     return segments;
-  }, [segmentSlots, shotGenerations]);
+  }, [segmentSlots, shotGenerations, effectiveGenerationMode, batchVideoFrames]);
   
   // Filter to just segments we can actually preview (have video OR have both images)
   const previewableSegments = React.useMemo(() => {
@@ -2484,14 +2488,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
               return (
                 <div className="flex flex-col gap-4 overflow-hidden">
-                  {/* Video container - centered with max-width constraint */}
+                  {/* Video container - centered, fixed height with aspect ratio determining width */}
                   <div className="flex justify-center w-full">
                     <div
-                      className="relative bg-black rounded-lg overflow-hidden max-w-full"
-                      style={{ maxHeight: '60vh', ...previewAspectStyle }}
+                      className="relative bg-black rounded-lg overflow-hidden max-w-full h-[60vh]"
+                      style={previewAspectStyle}
                     >
-                    {/* Invisible spacer to maintain aspect ratio during transitions */}
-                    <div className="invisible w-full max-h-[60vh]" style={previewAspectStyle} />
 
                     {/* Loading skeleton - shown while video is loading */}
                     {currentSegment.hasVideo && isPreviewVideoLoading && (
