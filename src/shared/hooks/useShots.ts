@@ -622,7 +622,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
               shot_id,
               timeline_frame,
               generation_id,
-              generations (
+              generation:generations!shot_generations_generation_id_generations_id_fk (
                 id,
                 location,
                 thumbnail_url,

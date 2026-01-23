@@ -732,11 +732,29 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     if (segmentSlotLightboxIndex === null) return null;
 
     const pairData = pairDataByIndex.get(segmentSlotLightboxIndex);
-    if (!pairData) return null;
+    if (!pairData) {
+      console.log('[SegmentClickDebug] No pairData for segmentSlotLightboxIndex:', segmentSlotLightboxIndex);
+      return null;
+    }
 
     // Find the segment slot for this pair (if video exists)
     const pairSlot = segmentSlots.find(slot => slot.index === segmentSlotLightboxIndex);
     const segmentVideo = pairSlot?.type === 'child' ? pairSlot.child : null;
+
+    console.log('[SegmentClickDebug] Building segmentSlotModeData:', {
+      segmentSlotLightboxIndex,
+      pairDataIndex: pairData.index,
+      segmentSlotsCount: segmentSlots.length,
+      segmentSlotIndices: segmentSlots.map(s => s.index),
+      foundPairSlot: !!pairSlot,
+      pairSlotType: pairSlot?.type,
+      pairSlotIndex: pairSlot?.index,
+      segmentVideoId: segmentVideo?.id?.substring(0, 8),
+      segmentVideoLocation: segmentVideo?.location?.substring(0, 50),
+      segmentVideoType: segmentVideo?.type,
+      // Check if this might be a parent generation
+      segmentVideoParentId: (segmentVideo as any)?.parent_generation_id?.substring(0, 8),
+    });
 
     // Get structure video info for this segment
     const pairStartFrame = pairData.startFrame ?? 0;
@@ -1825,7 +1843,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 onPairClick={(pairIndex, passedPairData) => {
                   // Open MediaLightbox in segment slot mode for this pair
                   // The pairData can be looked up from pairDataByIndex when needed
+                  console.log('[SegmentClickDebug] onPairClick (Timeline) called:', {
+                    pairIndex,
+                    passedPairDataIndex: passedPairData?.index,
+                    hasPairDataInMap: pairDataByIndex.has(pairIndex),
+                    pairDataByIndexKeys: [...pairDataByIndex.keys()],
+                  });
                   if (passedPairData || pairDataByIndex.has(pairIndex)) {
+                    console.log('[SegmentClickDebug] Setting segmentSlotLightboxIndex to:', pairIndex);
                     setSegmentSlotLightboxIndex(pairIndex);
                   }
                 }}
@@ -2184,6 +2209,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           onClose={() => setSegmentSlotLightboxIndex(null)}
           shotId={selectedShotId}
           readOnly={readOnly}
+          fetchVariantsForSelf={true}
         />
       )}
 

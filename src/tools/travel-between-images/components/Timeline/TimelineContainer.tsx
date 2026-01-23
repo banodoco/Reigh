@@ -1291,12 +1291,19 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             localShotGenPositions={localShotGenPositions}
             pairDataByIndex={pairDataByIndex}
             onOpenPairSettings={onPairClick ? (pairIndex: number) => {
+              console.log('[SegmentClickDebug] TimelineContainer onOpenPairSettings called:', {
+                pairIndex,
+                imagesLength: images.length,
+                singleImageEndFrame,
+                pairDataByIndexKeys: [...pairDataByIndex.keys()],
+              });
               // Handle single-image mode
               if (images.length === 1 && singleImageEndFrame !== undefined) {
                 const entry = [...currentPositions.entries()][0];
                 if (entry) {
                   const [imageId, imageFrame] = entry;
                   const image = images[0];
+                  console.log('[SegmentClickDebug] Single-image mode, calling onPairClick');
                   onPairClick(pairIndex, {
                     index: 0,
                     frames: singleImageEndFrame - imageFrame,
@@ -1317,6 +1324,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               }
               // Use precomputed pair data (same source of truth for modal and lightbox)
               const pairData = pairDataByIndex.get(pairIndex);
+              console.log('[SegmentClickDebug] Normal mode, pairData:', {
+                pairIndex,
+                foundPairData: !!pairData,
+                pairDataIndex: pairData?.index,
+              });
               if (pairData) {
                 onPairClick(pairIndex, pairData);
               }

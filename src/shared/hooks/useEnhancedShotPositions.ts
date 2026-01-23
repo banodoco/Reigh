@@ -147,6 +147,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     setError(null);
 
     try {
+      // NOTE: Must specify FK explicitly to avoid ambiguous relationship error (PGRST201)
+      // since there are two FKs between shot_generations and generations
       const { data, error: fetchError } = await supabase
         .from('shot_generations')
         .select(`
@@ -155,7 +157,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           generation_id,
           timeline_frame,
           metadata,
-          generation:generations(
+          generation:generations!shot_generations_generation_id_generations_id_fk(
             id,
             location,
             type,

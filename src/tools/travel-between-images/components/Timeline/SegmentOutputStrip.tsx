@@ -219,6 +219,15 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   // Otherwise fall back to the local MediaLightbox
   // NOTE: We pass the slot directly to avoid array index mismatches between displaySlots and segmentSlots
   const handleSegmentClick = useCallback((slot: typeof segmentSlots[number], slotIndex: number) => {
+    console.log('[SegmentClickDebug] handleSegmentClick called:', {
+      slotIndex,
+      slotType: slot?.type,
+      slotPairIndex: slot?.index,
+      childId: slot?.type === 'child' ? slot.child.id?.substring(0, 8) : null,
+      childLocation: slot?.type === 'child' ? slot.child.location?.substring(0, 50) : null,
+      hasOnOpenPairSettings: !!onOpenPairSettings,
+    });
+
     if (slot?.type === 'child') {
       // Mark as viewed when opening lightbox
       markGenerationViewed(slot.child.id);
@@ -226,10 +235,11 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
 
     // Use unified segment slot lightbox when available (enables navigation to slots without videos)
     if (onOpenPairSettings && slot) {
-      console.log('[SegmentOutputStrip] Using unified segment slot lightbox for pairIndex:', slot.index);
+      console.log('[SegmentClickDebug] Calling onOpenPairSettings with pairIndex:', slot.index);
       onOpenPairSettings(slot.index);
     } else {
       // Fallback to local lightbox
+      console.log('[SegmentClickDebug] Using local lightbox with slotIndex:', slotIndex);
       setLightboxIndex(slotIndex);
     }
   }, [markGenerationViewed, onOpenPairSettings]);

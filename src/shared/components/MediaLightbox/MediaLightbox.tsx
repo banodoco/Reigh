@@ -337,6 +337,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     segmentVideoId: segmentSlotMode?.segmentVideo?.id?.substring(0, 8),
   });
 
+  // More detailed debug logging with filterable tag
+  if (isSegmentSlotMode) {
+    console.log('[SegmentClickDebug] MediaLightbox opened in segment slot mode:', {
+      currentIndex: segmentSlotMode?.currentIndex,
+      hasSegmentVideo,
+      segmentVideoId: segmentSlotMode?.segmentVideo?.id?.substring(0, 8),
+      segmentVideoLocation: segmentSlotMode?.segmentVideo?.location?.substring(0, 50),
+      segmentVideoType: segmentSlotMode?.segmentVideo?.type,
+      mediaPropId: mediaProp?.id?.substring(0, 8),
+      mediaPropType: mediaProp?.type,
+      mediaPropLocation: mediaProp?.location?.substring(0, 50),
+      pairDataIndex: segmentSlotMode?.pairData?.index,
+      activeChildGenerationId: segmentSlotMode?.activeChildGenerationId?.substring(0, 8),
+    });
+  }
+
   // Placeholder media for form-only mode - ensures hooks always receive valid data
   const placeholderMedia: GenerationRow = {
     id: 'placeholder',

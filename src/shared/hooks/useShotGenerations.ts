@@ -185,6 +185,8 @@ export const useAllShotGenerations = (
       });
 
       // Query shot_generations with embedded generations data
+      // NOTE: Must specify FK explicitly to avoid ambiguous relationship error (PGRST201)
+      // since there are two FKs between shot_generations and generations
       const response = await supabase
         .from('shot_generations')
         .select(`
@@ -192,7 +194,7 @@ export const useAllShotGenerations = (
           generation_id,
           timeline_frame,
           metadata,
-          generations (
+          generation:generations!shot_generations_generation_id_generations_id_fk (
             id,
             location,
             thumbnail_url,

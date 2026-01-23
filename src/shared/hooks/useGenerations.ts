@@ -1065,6 +1065,8 @@ export async function fetchDerivedItems(
   // Fetch both in parallel
   const [generationsResult, variantsResult] = await Promise.all([
     // 1. Child generations (backwards compatible - generations with based_on = this)
+    // NOTE: Must specify FK explicitly to avoid ambiguous relationship error (PGRST201)
+    // since there are two FKs between generations and shot_generations
     supabase
       .from('generations')
       .select(`
@@ -1077,7 +1079,7 @@ export async function fetchDerivedItems(
         starred,
         tasks,
         based_on,
-        shot_generations(shot_id, timeline_frame)
+        shot_generations!shot_generations_generation_id_generations_id_fk(shot_id, timeline_frame)
       `)
       .eq('based_on', sourceGenerationId)
       .order('starred', { ascending: false, nullsFirst: false })
