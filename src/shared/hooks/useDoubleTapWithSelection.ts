@@ -1,15 +1,16 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 
 /**
  * useDoubleTapWithSelection - Generalized double-tap pattern from ShotEditor
- * 
+ *
  * Provides optimal mobile interaction:
- * - Single tap → Waits 250ms → Triggers onSingleTap (allows time for double-tap)
- * - Double-tap (< 300ms) → Immediately triggers onDoubleTap, cancels pending single-tap
- * - Scroll detection → Ignores taps if user scrolled > 10px
- * 
- * This pattern prevents conflicts between selection and opening items.
- * 
+ * - Single tap → Waits singleTapDelay (default 400ms) → Triggers onSingleTap (allows time for double-tap)
+ * - Double-tap (< doubleTapThreshold, default 800ms) → Immediately triggers onDoubleTap, cancels pending single-tap
+ * - Scroll detection → Ignores taps if user scrolled > scrollThreshold (default 10px)
+ *
+ * This pattern prevents conflicts between selection and opening items by delaying the single-tap action,
+ * giving users time to complete a double-tap gesture without triggering an unwanted selection/deselection.
+ *
  * @example
  * ```tsx
  * const { handleTouchStart, handleTouchEnd } = useDoubleTapWithSelection({
@@ -17,7 +18,7 @@ import { useRef, useCallback } from 'react';
  *   onDoubleTap: () => openLightbox(index),
  *   itemId: image.id,
  * });
- * 
+ *
  * <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
  *   {/* content *\/}
  * </div>
@@ -25,7 +26,7 @@ import { useRef, useCallback } from 'react';
  */
 
 interface UseDoubleTapWithSelectionProps {
-  /** Called after 250ms if no double-tap occurs */
+  /** Called after singleTapDelay (default 400ms) if no double-tap occurs */
   onSingleTap: () => void;
   
   /** Called immediately on double-tap detection */
@@ -37,12 +38,12 @@ interface UseDoubleTapWithSelectionProps {
   /** Disable all tap handling (e.g., for read-only mode) */
   disabled?: boolean;
   
-  /** Threshold in ms for double-tap detection (default: 500 for tablets, more forgiving than mobile) */
+  /** Threshold in ms for double-tap detection (default: 800 for tablets, more forgiving than mobile) */
   doubleTapThreshold?: number;
-  
-  /** Delay in ms before executing single-tap (default: 300, should be less than doubleTapThreshold) */
+
+  /** Delay in ms before executing single-tap (default: 400, should be less than doubleTapThreshold) */
   singleTapDelay?: number;
-  
+
   /** Movement threshold in px to distinguish tap from scroll (default: 10) */
   scrollThreshold?: number;
 }
@@ -53,14 +54,15 @@ export function useDoubleTapWithSelection({
   itemId,
   disabled = false,
   doubleTapThreshold = 800, // Very forgiving for tablet/touch interactions with potential lag
-  // singleTapDelay no longer needed - kept for backward compatibility
+  singleTapDelay = 400, // Delay before executing single-tap, allows time for double-tap
   scrollThreshold = 10,
 }: UseDoubleTapWithSelectionProps) {
-  
+
   // Track touch timing and position
   const lastTapTimeRef = useRef<number>(0);
   const lastTappedIdRef = useRef<string | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const singleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (disabled) return;
@@ -84,18 +86,18 @@ export function useDoubleTapWithSelection({
       });
       return;
     }
-    
+
     const touch = e.changedTouches[0];
     const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
     const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
-    
+
     console.log('[DoubleTapFlow] 👆 Touch END:', {
       itemId: itemId.substring(0, 8),
       movement: { deltaX, deltaY },
       scrollThreshold,
       position: { x: touch.clientX, y: touch.clientY }
     });
-    
+
     // Scroll detection: Ignore tap if user scrolled
     if (deltaX > scrollThreshold || deltaY > scrollThreshold) {
       console.log('[DoubleTapFlow] 📜 SCROLL DETECTED - Ignoring tap:', {
@@ -107,13 +109,13 @@ export function useDoubleTapWithSelection({
       touchStartPosRef.current = null;
       return;
     }
-    
-    
+
+
     const now = Date.now();
     const lastTapTime = lastTapTimeRef.current;
     const timeDiff = lastTapTime === 0 ? Infinity : now - lastTapTime; // Handle initial state
     const isSameItem = lastTappedIdRef.current === itemId;
-    
+
     console.log('[DoubleTapFlow] 🔍 Tap analysis:', {
       itemId: itemId.substring(0, 8),
       timeSinceLastTap: timeDiff === Infinity ? 'FIRST_TAP' : timeDiff,
@@ -123,46 +125,75 @@ export function useDoubleTapWithSelection({
       doubleTapThreshold,
       isDoubleTap: timeDiff > 10 && timeDiff < doubleTapThreshold && isSameItem
     });
-    
-    // Double-tap detection: < 300ms between taps on same item
+
+    // Double-tap detection: < doubleTapThreshold ms between taps on same item
     if (timeDiff > 10 && timeDiff < doubleTapThreshold && isSameItem) {
       console.log('[DoubleTapFlow] 👆👆 DOUBLE-TAP DETECTED!', {
         itemId: itemId.substring(0, 8),
         timeDiff,
         threshold: doubleTapThreshold
       });
-      
+
+      // Clear any pending single-tap timeout
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+        singleTapTimeoutRef.current = null;
+      }
+
       // Prevent default to avoid any unwanted behaviors
       e.preventDefault();
-      
+
       // Execute double-tap action immediately
       onDoubleTap();
-      
+
       // Reset refs to avoid triple taps chaining
       lastTapTimeRef.current = 0;
       lastTappedIdRef.current = null;
       touchStartPosRef.current = null;
-      
+
       console.log('[DoubleTapFlow] ✅ Double-tap handler executed, refs reset');
       return;
     }
-    
-    
-    // Single tap: Execute IMMEDIATELY for instant visual feedback
-    console.log('[DoubleTapFlow] ✅ Executing single-tap action IMMEDIATELY', {
-      itemId: itemId.substring(0, 8)
+
+
+    // Single tap: Wait singleTapDelay ms before executing to allow for double-tap
+    console.log('[DoubleTapFlow] ⏱️ Scheduling single-tap action with delay', {
+      itemId: itemId.substring(0, 8),
+      delay: singleTapDelay
     });
-    
-    onSingleTap();
-    
-    // Still track timing for potential double-tap detection
+
+    // Clear any existing timeout
+    if (singleTapTimeoutRef.current) {
+      clearTimeout(singleTapTimeoutRef.current);
+    }
+
+    // Set timeout to execute single-tap action
+    singleTapTimeoutRef.current = setTimeout(() => {
+      console.log('[DoubleTapFlow] ✅ Executing single-tap action after delay', {
+        itemId: itemId.substring(0, 8)
+      });
+      onSingleTap();
+      singleTapTimeoutRef.current = null;
+    }, singleTapDelay);
+
+    // Track timing for potential double-tap detection
     lastTapTimeRef.current = now;
     lastTappedIdRef.current = itemId;
-    
+
     touchStartPosRef.current = null;
-  }, [disabled, itemId, doubleTapThreshold, scrollThreshold, onSingleTap, onDoubleTap]);
+  }, [disabled, itemId, doubleTapThreshold, singleTapDelay, scrollThreshold, onSingleTap, onDoubleTap]);
   
-  
+
+  // Cleanup timeout on unmount or when disabled changes
+  useEffect(() => {
+    return () => {
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+        singleTapTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   return {
     handleTouchStart,
     handleTouchEnd,
