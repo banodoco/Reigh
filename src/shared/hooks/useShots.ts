@@ -1511,6 +1511,11 @@ export const useRemoveImageFromShot = () => {
         includeProjectUnified: true,
         projectId: data.projectId
       });
+
+      // Invalidate segment queries so videos associated with this shot_generation disappear
+      // This ensures that when the original duplicated item is deleted, its video doesn't persist
+      queryClient.invalidateQueries({ queryKey: ['segment-live-timeline', data.shotId] });
+      queryClient.invalidateQueries({ queryKey: ['segment-parent-generations', data.shotId, data.projectId] });
     },
   });
 };
@@ -2096,6 +2101,9 @@ export const useDuplicateAsNewGeneration = () => {
       queryClient.invalidateQueries({
         queryKey: ['derived-generations', data.original_generation_id],
       });
+      // Invalidate segment queries to ensure videos update with new timeline positions
+      queryClient.invalidateQueries({ queryKey: ['segment-live-timeline', data.shot_id] });
+      queryClient.invalidateQueries({ queryKey: ['segment-parent-generations', data.shot_id, data.project_id] });
     },
     onError: (error: Error) => {
       console.error('[DuplicateAsNew] Error:', error);
