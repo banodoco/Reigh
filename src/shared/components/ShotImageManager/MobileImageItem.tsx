@@ -175,8 +175,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
         {/* Top right - Copy and Delete buttons */}
         <div className="absolute top-2 right-2 flex gap-2 items-end opacity-100 transition-opacity">
-          {/* Duplicate button (hidden in readOnly, disabled for optimistic items) */}
-          {!readOnly && onDuplicate && (
+          {/* Duplicate button - hidden when selected */}
+          {!readOnly && onDuplicate && !isSelected && (
             <Button
               size="icon"
               variant="secondary"
@@ -201,8 +201,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               )}
             </Button>
           )}
-          {/* Delete button (hidden in readOnly, disabled for optimistic items) */}
-          {!readOnly && !hideDeleteButton && (
+          {/* Delete button - only shown when selected */}
+          {!readOnly && isSelected && onDelete && (
             <Button
               size="icon"
               variant="destructive"
