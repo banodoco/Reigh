@@ -2927,12 +2927,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             }}
           />
           
-          {/* Task pane handle - visible above lightbox overlay when pane is closed */}
+          {/* Task pane handle - visible above lightbox overlay */}
           {!isMobile && (
-            <div 
+            <div
               className="fixed top-1/2 -translate-y-1/2 flex flex-col items-center p-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700 rounded-l-md gap-1 touch-none"
-              style={{ 
-                zIndex: 100001, 
+              style={{
+                zIndex: 100001,
                 pointerEvents: 'auto',
                 right: effectiveTasksPaneOpen ? `${effectiveTasksPaneWidth}px` : 0,
                 transition: 'right 300ms cubic-bezier(0.22, 1, 0.36, 1)',
@@ -2941,7 +2941,31 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
             >
               <TooltipProvider delayDuration={300}>
-                {/* Single button showing task count + lock state */}
+                {/* Task count button - opens the pane */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onPointerUp={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        // Toggle pane open state (programmatic open for desktop)
+                        setTasksPaneOpenContext(!effectiveTasksPaneOpen);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                      aria-label={`${cancellableTaskCount} active tasks - click to ${effectiveTasksPaneOpen ? 'close' : 'open'}`}
+                    >
+                      <span className="text-xs font-light">{cancellableTaskCount}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="text-xs">
+                    {`${cancellableTaskCount} active task${cancellableTaskCount === 1 ? '' : 's'}`}
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Lock/Unlock button */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -2958,14 +2982,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
                       aria-label={isTasksPaneLocked ? "Unlock tasks pane" : "Lock tasks pane open"}
                     >
-                      {isTasksPaneLocked 
-                        ? <UnlockIcon className="h-4 w-4" /> 
+                      {isTasksPaneLocked
+                        ? <UnlockIcon className="h-4 w-4" />
                         : <LockIcon className="h-4 w-4" />
                       }
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left" className="text-xs">
-                    {isTasksPaneLocked ? "Unlock tasks pane" : `${cancellableTaskCount} task${cancellableTaskCount === 1 ? '' : 's'} - click to lock open`}
+                    {isTasksPaneLocked ? "Unlock tasks pane" : "Lock tasks pane open"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
