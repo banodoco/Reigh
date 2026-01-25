@@ -586,8 +586,9 @@ export function useSegmentSettings({
       console.log(`[SetAsShotDefaults] 🔄 Invalidating query caches...`);
       // 1. useSegmentSettings uses this key
       await queryClient.invalidateQueries({ queryKey: ['shot-batch-settings', shotId] });
-      // 2. useToolSettings / useShotSettings uses this key pattern
-      await queryClient.invalidateQueries({ queryKey: ['tool-settings', 'travel-between-images'] });
+      // 2. useToolSettings / useShotSettings uses 'toolSettings' (not 'tool-settings')
+      //    Key format: ['toolSettings', toolId, projectId, shotId]
+      await queryClient.invalidateQueries({ queryKey: ['toolSettings', 'travel-between-images'] });
       console.log(`[SetAsShotDefaults] ✅ Query caches invalidated`);
 
       return true;
