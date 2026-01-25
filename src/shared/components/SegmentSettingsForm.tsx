@@ -281,11 +281,17 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     return generationMode === 'vace' ? BUILTIN_VACE_PRESET : BUILTIN_I2V_PRESET;
   }, [generationMode]);
 
-  // Compute effective loras: use segment override if non-empty, otherwise shot defaults
-  // Note: settings.loras is always [] when no override (not undefined), so we check length
+  // Compute effective loras: use segment override if it exists, otherwise shot defaults
+  // hasOverride.loras tells us if user has set a segment-level override (could be empty array)
+  // This distinguishes "no override, use defaults" from "override to empty list"
   const effectiveLoras = useMemo(() => {
-    return (settings.loras && settings.loras.length > 0) ? settings.loras : (shotDefaults?.loras ?? []);
-  }, [settings.loras, shotDefaults?.loras]);
+    // If segment has a lora override (even if empty), use it
+    if (hasOverride?.loras) {
+      return settings.loras ?? [];
+    }
+    // No segment override - fall back to shot defaults
+    return shotDefaults?.loras ?? [];
+  }, [settings.loras, shotDefaults?.loras, hasOverride?.loras]);
 
   // ==========================================================================
   // HANDLERS
