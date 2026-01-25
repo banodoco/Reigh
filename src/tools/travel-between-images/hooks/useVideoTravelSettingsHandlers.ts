@@ -123,7 +123,13 @@ export const useVideoTravelSettingsHandlers = ({
   // BATCH VIDEO SETTINGS
   // =============================================================================
   const handleBatchVideoPromptChange = useCallback((prompt: string) => {
-    shotSettingsRef.current.updateField('batchVideoPrompt', prompt);
+    // Write to BOTH fields to ensure migration reads the correct value
+    // readShotSettings reads: raw.prompt ?? raw.batchVideoPrompt
+    // So we must update `prompt` (new name) as well as `batchVideoPrompt` (old name)
+    shotSettingsRef.current.updateFields({
+      prompt,
+      batchVideoPrompt: prompt,
+    });
   }, [shotSettingsRef]);
   
   const handleBatchVideoFramesChange = useCallback((frames: number) => {

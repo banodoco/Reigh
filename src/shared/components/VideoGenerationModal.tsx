@@ -89,6 +89,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
     settings,
     status,
     updateField,
+    updateFields,
   } = useShotSettings(isOpen ? shot.id : null, selectedProjectId);
   
   // Available LoRAs
@@ -186,9 +187,11 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
   const handleAddTriggerWord = useCallback((loraId: string, word: string) => {
     const currentPrompt = settings.batchVideoPrompt || '';
     if (!currentPrompt.includes(word)) {
-      updateField('batchVideoPrompt', currentPrompt ? `${currentPrompt}, ${word}` : word);
+      const newPrompt = currentPrompt ? `${currentPrompt}, ${word}` : word;
+      // Write to BOTH fields for migration compatibility
+      updateFields({ prompt: newPrompt, batchVideoPrompt: newPrompt });
     }
-  }, [settings.batchVideoPrompt, updateField]);
+  }, [settings.batchVideoPrompt, updateFields]);
   
   // Model name helper
   // Model selection depends on structure video TYPE:
@@ -443,7 +446,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
                     <div className="mb-4"><SectionHeader title="Settings" theme="orange" /></div>
                     <BatchSettingsForm
                       batchVideoPrompt={settings.batchVideoPrompt || ''}
-                      onBatchVideoPromptChange={(v) => updateField('batchVideoPrompt', v)}
+                      onBatchVideoPromptChange={(v) => updateFields({ prompt: v, batchVideoPrompt: v })}
                       batchVideoFrames={settings.batchVideoFrames || 61}
                       onBatchVideoFramesChange={(v) => updateField('batchVideoFrames', v)}
                       batchVideoSteps={settings.batchVideoSteps || 6}
