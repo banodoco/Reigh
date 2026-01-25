@@ -510,27 +510,43 @@ export function useSegmentSettings({
       return false;
     }
 
+    // Get the effective/displayed values by merging segment overrides with shot defaults
+    // This is what the user actually sees in the form
+    const effectivePrompt = settings.prompt || shotDefaultsValue.prompt || '';
+    const effectiveNegativePrompt = settings.negativePrompt || shotDefaultsValue.negativePrompt || '';
+    const effectiveMotionMode = settings.motionMode ?? shotDefaultsValue.motionMode ?? 'basic';
+    const effectiveAmountOfMotion = settings.amountOfMotion ?? shotDefaultsValue.amountOfMotion ?? 50;
+    const effectivePhaseConfig = settings.phaseConfig ?? shotDefaultsValue.phaseConfig;
+    const effectiveSelectedPhasePresetId = settings.selectedPhasePresetId ?? shotDefaultsValue.selectedPhasePresetId ?? null;
+    const effectiveLoras = (settings.loras && settings.loras.length > 0) ? settings.loras : (shotDefaultsValue.loras ?? []);
+
     console.log(`[useSegmentSettings:${instanceId}] 💾 Saving as shot defaults:`, shotId.substring(0, 8), {
-      prompt: settings.prompt?.substring(0, 30) + '...',
-      negPrompt: settings.negativePrompt?.substring(0, 30) + '...',
-      motionMode: settings.motionMode,
-      amountOfMotion: settings.amountOfMotion,
-      hasPhaseConfig: !!settings.phaseConfig,
-      loraCount: settings.loras?.length ?? 0,
+      // Raw settings (segment overrides only)
+      rawPrompt: settings.prompt?.substring(0, 30) || '(none)',
+      rawLoras: settings.loras?.length ?? 0,
+      // Shot defaults being used as fallback
+      shotDefaultPrompt: shotDefaultsValue.prompt?.substring(0, 30) || '(none)',
+      shotDefaultLoras: shotDefaultsValue.loras?.length ?? 0,
+      // Effective values that will be saved
+      effectivePrompt: effectivePrompt?.substring(0, 30) + '...',
+      effectiveNegPrompt: effectiveNegativePrompt?.substring(0, 30) + '...',
+      effectiveMotionMode,
+      effectiveAmountOfMotion,
+      hasPhaseConfig: !!effectivePhaseConfig,
+      effectiveLoraCount: effectiveLoras?.length ?? 0,
     });
 
     try {
-      // Build the patch for shot-level settings
-      // Only include fields that are editable in the segment form
-      // Other shot settings (batch-specific) are preserved via the atomic merge in updateToolSettingsSupabase
+      // Build the patch for shot-level settings using EFFECTIVE values
+      // (what the user sees in the form, merging segment overrides with shot defaults)
       const patch = {
-        prompt: settings.prompt || '',
-        negativePrompt: settings.negativePrompt || '',
-        motionMode: settings.motionMode ?? 'basic',
-        amountOfMotion: settings.amountOfMotion ?? 50,
-        phaseConfig: settings.phaseConfig,
-        selectedPhasePresetId: settings.selectedPhasePresetId ?? null,
-        loras: settings.loras ?? [],
+        prompt: effectivePrompt,
+        negativePrompt: effectiveNegativePrompt,
+        motionMode: effectiveMotionMode,
+        amountOfMotion: effectiveAmountOfMotion,
+        phaseConfig: effectivePhaseConfig,
+        selectedPhasePresetId: effectiveSelectedPhasePresetId,
+        loras: effectiveLoras,
         // Note: numFrames intentionally not included - timeline positions are source of truth
         randomSeed: settings.randomSeed ?? true,
         seed: settings.seed,
@@ -560,7 +576,7 @@ export function useSegmentSettings({
       console.error('[useSegmentSettings] Exception saving shot defaults:', error);
       return false;
     }
-  }, [shotId, settings, instanceId, queryClient]);
+  }, [shotId, settings, shotDefaultsValue, instanceId, queryClient]);
 
   // Keep saveSettingsRef updated
   useEffect(() => {
