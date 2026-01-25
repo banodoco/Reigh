@@ -281,6 +281,12 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     return generationMode === 'vace' ? BUILTIN_VACE_PRESET : BUILTIN_I2V_PRESET;
   }, [generationMode]);
 
+  // Compute effective loras: use segment override if non-empty, otherwise shot defaults
+  // Note: settings.loras is always [] when no override (not undefined), so we check length
+  const effectiveLoras = useMemo(() => {
+    return (settings.loras && settings.loras.length > 0) ? settings.loras : (shotDefaults?.loras ?? []);
+  }, [settings.loras, shotDefaults?.loras]);
+
   // ==========================================================================
   // HANDLERS
   // ==========================================================================
@@ -343,7 +349,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     const loraName = lora.Name || (lora as any).name;
 
     if (!loraPath) return;
-    const currentLoras = settings.loras ?? shotDefaults?.loras ?? [];
+    const currentLoras = effectiveLoras;
     if (currentLoras.some(l => l.id === loraId || l.path === loraPath)) return;
 
     onChange({
@@ -354,23 +360,23 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
         strength: 1.0,
       }],
     });
-  }, [settings.loras, shotDefaults?.loras, onChange]);
+  }, [effectiveLoras, onChange]);
 
   const handleRemoveLora = useCallback((loraId: string) => {
-    const currentLoras = settings.loras ?? shotDefaults?.loras ?? [];
+    const currentLoras = effectiveLoras;
     onChange({
       loras: currentLoras.filter(l => l.id !== loraId && l.path !== loraId),
     });
-  }, [settings.loras, shotDefaults?.loras, onChange]);
+  }, [effectiveLoras, onChange]);
 
   const handleLoraStrengthChange = useCallback((loraId: string, strength: number) => {
-    const currentLoras = settings.loras ?? shotDefaults?.loras ?? [];
+    const currentLoras = effectiveLoras;
     onChange({
       loras: currentLoras.map(l =>
         (l.id === loraId || l.path === loraId) ? { ...l, strength } : l
       ),
     });
-  }, [settings.loras, shotDefaults?.loras, onChange]);
+  }, [effectiveLoras, onChange]);
 
   // Frame count change
   const handleFrameCountChange = useCallback((value: number) => {
@@ -587,7 +593,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               renderBasicModeContent={() => (
                 <div className="space-y-3">
                   <ActiveLoRAsDisplay
-                    selectedLoras={settings.loras ?? shotDefaults?.loras ?? []}
+                    selectedLoras={effectiveLoras}
                     onRemoveLora={handleRemoveLora}
                     onLoraStrengthChange={handleLoraStrengthChange}
                     availableLoras={availableLoras}
@@ -686,7 +692,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             onAddLora={handleLoraSelect}
             onRemoveLora={handleRemoveLora}
             onUpdateLoraStrength={handleLoraStrengthChange}
-            selectedLoras={(settings.loras ?? shotDefaults?.loras ?? []).map(lora => {
+            selectedLoras={(effectiveLoras).map(lora => {
               const fullLora = availableLoras.find(l => l.id === lora.id || l.path === lora.path);
               return {
                 ...fullLora,
