@@ -46,6 +46,7 @@ import {
 import {
   readShotSettings,
   readSegmentOverrides,
+  writeShotSettings,
   summarizeSettings,
   type ShotVideoSettings,
 } from '@/shared/utils/settingsMigration';
@@ -104,6 +105,8 @@ export interface UseSegmentSettingsReturn {
   saveSettings: () => Promise<boolean>;
   /** Reset to merged defaults (discards local edits) */
   resetSettings: () => void;
+  /** Save current settings as shot-level defaults */
+  saveAsShotDefaults: () => Promise<boolean>;
   /** Whether data is still loading */
   isLoading: boolean;
   /** Whether user has made local edits */
@@ -499,6 +502,93 @@ export function useSegmentSettings({
       return false;
     }
   }, [pairShotGenerationId, shotId, settings, instanceId, queryClient]);
+
+  // Save current settings as shot-level defaults
+  const saveAsShotDefaults = useCallback(async (): Promise<boolean> => {
+    if (!shotId) {
+      console.warn('[useSegmentSettings] ⚠️ Cannot save as shot defaults - no shotId');
+      return false;
+    }
+
+    console.log(`[useSegmentSettings:${instanceId}] 💾 Saving as shot defaults:`, shotId.substring(0, 8), {
+      prompt: settings.prompt?.substring(0, 30) + '...',
+      negPrompt: settings.negativePrompt?.substring(0, 30) + '...',
+      motionMode: settings.motionMode,
+      amountOfMotion: settings.amountOfMotion,
+      hasPhaseConfig: !!settings.phaseConfig,
+      loraCount: settings.loras?.length ?? 0,
+    });
+
+    try {
+      // Fetch current shot settings
+      const { data: shot, error: fetchError } = await supabase
+        .from('shots')
+        .select('settings')
+        .eq('id', shotId)
+        .single();
+
+      if (fetchError) {
+        console.error('[useSegmentSettings] Error fetching shot settings:', fetchError);
+        return false;
+      }
+
+      const currentSettings = (shot?.settings as Record<string, any>) || {};
+      const currentTravelSettings = currentSettings['travel-between-images'] || {};
+
+      // Build new shot settings from current segment settings
+      // Merge with existing shot settings to preserve batch-specific fields
+      const newShotVideoSettings: ShotVideoSettings = {
+        // From current segment settings (what user sees in the form)
+        prompt: settings.prompt || '',
+        negativePrompt: settings.negativePrompt || '',
+        motionMode: settings.motionMode ?? 'basic',
+        amountOfMotion: settings.amountOfMotion ?? 50,
+        phaseConfig: settings.phaseConfig,
+        selectedPhasePresetId: settings.selectedPhasePresetId ?? null,
+        loras: settings.loras ?? [],
+        numFrames: settings.numFrames ?? 25,
+        randomSeed: settings.randomSeed ?? true,
+        seed: settings.seed,
+        makePrimaryVariant: settings.makePrimaryVariant ?? false,
+
+        // Preserve existing batch-specific settings (not editable in segment form)
+        batchVideoFrames: currentTravelSettings.batchVideoFrames ?? 25,
+        textBeforePrompts: currentTravelSettings.textBeforePrompts ?? '',
+        textAfterPrompts: currentTravelSettings.textAfterPrompts ?? '',
+        enhancePrompt: currentTravelSettings.enhancePrompt ?? false,
+        generationTypeMode: currentTravelSettings.generationTypeMode ?? 'i2v',
+      };
+
+      // Write in new format
+      const newTravelSettings = writeShotSettings(newShotVideoSettings);
+
+      // Update shot settings
+      const { error: updateError } = await supabase
+        .from('shots')
+        .update({
+          settings: {
+            ...currentSettings,
+            'travel-between-images': newTravelSettings,
+          },
+        })
+        .eq('id', shotId);
+
+      if (updateError) {
+        console.error('[useSegmentSettings] Error saving shot defaults:', updateError);
+        return false;
+      }
+
+      console.log(`[useSegmentSettings:${instanceId}] ✅ Saved as shot defaults`);
+
+      // Invalidate shot batch settings cache
+      await queryClient.invalidateQueries({ queryKey: ['shot-batch-settings', shotId] });
+
+      return true;
+    } catch (error) {
+      console.error('[useSegmentSettings] Exception saving shot defaults:', error);
+      return false;
+    }
+  }, [shotId, settings, instanceId, queryClient]);
 
   // Keep saveSettingsRef updated
   useEffect(() => {

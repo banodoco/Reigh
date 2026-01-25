@@ -38,8 +38,6 @@ import { ChevronDown, ChevronLeft, ChevronRight, Sparkles, Settings2 } from 'luc
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useStableObject } from '@/shared/hooks/useStableObject';
-import { useAutoSaveSettings } from '@/shared/hooks/useAutoSaveSettings';
-import { ImageGenShotSettings } from '../components/ImageGenerationForm/types';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -285,46 +283,25 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const { createShot } = useShotCreation();
 
-  // Shot settings for gallery filter override persistence
-  // Only enabled when a shot is selected in the form
-  const shotSettings = useAutoSaveSettings<ImageGenShotSettings>({
-    toolId: 'image-gen-prompts',
-    shotId: formAssociatedShotId,
-    projectId: selectedProjectId,
-    scope: 'shot',
-    defaults: { prompts: [], masterPrompt: '' },
-    enabled: !!formAssociatedShotId,
-  });
-
-  // Track if we've applied the saved gallery filter for the current shot
-  const appliedGalleryFilterForShotRef = useRef<string | null>(null);
-
-  // Apply saved gallery filter override when switching to a shot
-  useEffect(() => {
-    // Only run when shot settings are ready and we haven't applied for this shot yet
-    if (!formAssociatedShotId || shotSettings.status !== 'ready') return;
-    if (appliedGalleryFilterForShotRef.current === formAssociatedShotId) return;
-
-    appliedGalleryFilterForShotRef.current = formAssociatedShotId;
-
-    const savedOverride = shotSettings.settings.galleryFilterOverride;
-    if (savedOverride !== undefined) {
+  // Callback: Form notifies us when shot settings load with gallery filter override
+  const handleGalleryFilterOverrideLoaded = useCallback((override: string | undefined, shotId: string) => {
+    if (override !== undefined) {
       // User had explicitly set a filter for this shot - restore it
-      console.log('[GalleryFilter] Restoring saved override for shot:', formAssociatedShotId.substring(0, 8), '→', savedOverride);
-      setSelectedShotFilter(savedOverride);
+      console.log('[GalleryFilter] Restoring saved override for shot:', shotId.substring(0, 8), '→', override);
+      setSelectedShotFilter(override);
     } else {
       // No override - default to filtering by this shot
-      console.log('[GalleryFilter] No override, defaulting to shot:', formAssociatedShotId.substring(0, 8));
-      setSelectedShotFilter(formAssociatedShotId);
+      console.log('[GalleryFilter] No override, defaulting to shot:', shotId.substring(0, 8));
+      setSelectedShotFilter(shotId);
     }
-  }, [formAssociatedShotId, shotSettings.status, shotSettings.settings.galleryFilterOverride]);
+  }, []);
 
   // Handler for when user explicitly changes the gallery filter (not auto-sync)
   const handleGalleryFilterChange = useCallback((newFilter: string) => {
     setSelectedShotFilter(newFilter);
 
-    // Save the override if we're on a shot and it's different from the default (the shot itself)
-    if (formAssociatedShotId && shotSettings.status === 'ready') {
+    // Save the override via the form's imperative handle
+    if (formAssociatedShotId && imageGenerationFormRef.current) {
       // Only save if user chose something OTHER than the default (current shot)
       // If they chose the current shot, clear the override
       const shouldSaveOverride = newFilter !== formAssociatedShotId;
@@ -337,14 +314,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         valueToSave,
       });
 
-      if (shouldSaveOverride) {
-        shotSettings.updateField('galleryFilterOverride', newFilter);
-      } else if (shotSettings.settings.galleryFilterOverride !== undefined) {
-        // User set it back to the default - clear the override
-        shotSettings.updateField('galleryFilterOverride', undefined as any);
-      }
+      imageGenerationFormRef.current.setGalleryFilterOverride(valueToSave);
     }
-  }, [formAssociatedShotId, shotSettings]);
+  }, [formAssociatedShotId]);
 
   // Debug logging for state changes (after hook declarations)
   useEffect(() => {
@@ -1234,6 +1206,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                       });
                       return handleFormShotChange;
                     })()}
+                    onGalleryFilterOverrideLoaded={handleGalleryFilterOverrideLoaded}
                   />
                 </div>
               </CollapsibleContent>

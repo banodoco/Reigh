@@ -112,6 +112,11 @@ interface ImageGenerationFormProps {
    * persisted settings on initial render only.
    */
   initialShotId?: string | null;
+  /**
+   * Called when shot settings are loaded and we have the gallery filter override.
+   * Page uses this to restore saved filter preference when switching shots.
+   */
+  onGalleryFilterOverrideLoaded?: (override: string | undefined, shotId: string) => void;
 }
 
 interface LoraDataEntry {
@@ -218,6 +223,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   stickyFooter = false,
   footerPortalId,
   initialShotId,
+  onGalleryFilterOverrideLoaded,
 }, ref) => {
   
   // Debug logging for callback prop
@@ -1302,6 +1308,19 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       (shotPromptSettings.status === 'ready' || shotPromptSettings.status === 'saving');
   }, [associatedShotId, shotPromptSettings.entityId, shotPromptSettings.status]);
 
+  // Notify parent when gallery filter override is loaded for a shot
+  const notifiedGalleryFilterForShotRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!associatedShotId || !isShotSettingsReady || !onGalleryFilterOverrideLoaded) return;
+    // Only notify once per shot
+    if (notifiedGalleryFilterForShotRef.current === associatedShotId) return;
+    notifiedGalleryFilterForShotRef.current = associatedShotId;
+
+    const override = shotPromptSettings.settings.galleryFilterOverride;
+    console.log('[GalleryFilter] Notifying parent of override for shot:', associatedShotId.substring(0, 8), '→', override);
+    onGalleryFilterOverrideLoaded(override, associatedShotId);
+  }, [associatedShotId, isShotSettingsReady, shotPromptSettings.settings.galleryFilterOverride, onGalleryFilterOverrideLoaded]);
+
   // Get current prompts - from shot settings if shot selected, otherwise local state
   const prompts = useMemo(() => {
     if (associatedShotId) {
@@ -1629,9 +1648,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     applySettings: (settings: DisplayableMetadata) => {
       markAsInteracted();
       // Apply settings to the current shot's prompts
-      setPrompts([{ 
-        id: generatePromptId(), 
-        fullPrompt: settings.prompt || '', 
+      setPrompts([{
+        id: generatePromptId(),
+        fullPrompt: settings.prompt || '',
         shortPrompt: settings.shortPrompt
       }]);
       setImagesPerPrompt(1);
@@ -1656,7 +1675,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
       // Note: beforeEachPromptText/afterEachPromptText are NOT restored - they reset on page load
     },
-    getAssociatedShotId: () => associatedShotId
+    getAssociatedShotId: () => associatedShotId,
+    setGalleryFilterOverride: (override: string | undefined) => {
+      if (associatedShotId && shotPromptSettings.status === 'ready') {
+        shotPromptSettings.updateField('galleryFilterOverride', override as any);
+      }
+    }
   }));
 
   // Apply default LoRAs using the new generalized approach

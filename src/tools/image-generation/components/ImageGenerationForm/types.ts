@@ -37,6 +37,8 @@ export interface MetadataLora {
 export interface ImageGenerationFormHandles {
   applySettings: (settings: DisplayableMetadata) => void;
   getAssociatedShotId: () => string | null;
+  /** Update the gallery filter override for the current shot */
+  setGalleryFilterOverride: (override: string | undefined) => void;
 }
 
 export interface PromptEntry {
