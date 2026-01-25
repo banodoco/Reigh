@@ -104,6 +104,14 @@ export interface ImageGenShotSettings {
   beforeEachPromptText?: string;
   /** Text to append to every prompt (defaults to empty, not inherited between shots) */
   afterEachPromptText?: string;
+  /**
+   * Gallery filter override for this shot.
+   * - undefined = no override, use default (filter by current shot)
+   * - 'all' = show all shots
+   * - shotId = filter by specific shot
+   * Only set when user explicitly changes the gallery filter dropdown.
+   */
+  galleryFilterOverride?: string;
 }
 
 // Reference mode type - re-exported from shared at bottom of file

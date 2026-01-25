@@ -38,6 +38,8 @@ import { ChevronDown, ChevronLeft, ChevronRight, Sparkles, Settings2 } from 'luc
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useStableObject } from '@/shared/hooks/useStableObject';
+import { useAutoSaveSettings } from '@/shared/hooks/useAutoSaveSettings';
+import { ImageGenShotSettings } from '../components/ImageGenerationForm/types';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -282,7 +284,68 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   const positionExistingGenerationMutation = usePositionExistingGenerationInShot();
   const { createShot } = useShotCreation();
-  
+
+  // Shot settings for gallery filter override persistence
+  // Only enabled when a shot is selected in the form
+  const shotSettings = useAutoSaveSettings<ImageGenShotSettings>({
+    toolId: 'image-gen-prompts',
+    shotId: formAssociatedShotId,
+    projectId: selectedProjectId,
+    scope: 'shot',
+    defaults: { prompts: [], masterPrompt: '' },
+    enabled: !!formAssociatedShotId,
+  });
+
+  // Track if we've applied the saved gallery filter for the current shot
+  const appliedGalleryFilterForShotRef = useRef<string | null>(null);
+
+  // Apply saved gallery filter override when switching to a shot
+  useEffect(() => {
+    // Only run when shot settings are ready and we haven't applied for this shot yet
+    if (!formAssociatedShotId || shotSettings.status !== 'ready') return;
+    if (appliedGalleryFilterForShotRef.current === formAssociatedShotId) return;
+
+    appliedGalleryFilterForShotRef.current = formAssociatedShotId;
+
+    const savedOverride = shotSettings.settings.galleryFilterOverride;
+    if (savedOverride !== undefined) {
+      // User had explicitly set a filter for this shot - restore it
+      console.log('[GalleryFilter] Restoring saved override for shot:', formAssociatedShotId.substring(0, 8), '→', savedOverride);
+      setSelectedShotFilter(savedOverride);
+    } else {
+      // No override - default to filtering by this shot
+      console.log('[GalleryFilter] No override, defaulting to shot:', formAssociatedShotId.substring(0, 8));
+      setSelectedShotFilter(formAssociatedShotId);
+    }
+  }, [formAssociatedShotId, shotSettings.status, shotSettings.settings.galleryFilterOverride]);
+
+  // Handler for when user explicitly changes the gallery filter (not auto-sync)
+  const handleGalleryFilterChange = useCallback((newFilter: string) => {
+    setSelectedShotFilter(newFilter);
+
+    // Save the override if we're on a shot and it's different from the default (the shot itself)
+    if (formAssociatedShotId && shotSettings.status === 'ready') {
+      // Only save if user chose something OTHER than the default (current shot)
+      // If they chose the current shot, clear the override
+      const shouldSaveOverride = newFilter !== formAssociatedShotId;
+      const valueToSave = shouldSaveOverride ? newFilter : undefined;
+
+      console.log('[GalleryFilter] User changed filter:', {
+        shot: formAssociatedShotId.substring(0, 8),
+        newFilter,
+        savingOverride: shouldSaveOverride,
+        valueToSave,
+      });
+
+      if (shouldSaveOverride) {
+        shotSettings.updateField('galleryFilterOverride', newFilter);
+      } else if (shotSettings.settings.galleryFilterOverride !== undefined) {
+        // User set it back to the default - clear the override
+        shotSettings.updateField('galleryFilterOverride', undefined as any);
+      }
+    }
+  }, [formAssociatedShotId, shotSettings]);
+
   // Debug logging for state changes (after hook declarations)
   useEffect(() => {
     console.log('[ShotChangeDebug] 📊 formAssociatedShotId state changed:', {
@@ -747,8 +810,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Handle switching to the associated shot from the form
   const handleSwitchToAssociatedShot = useCallback((shotId: string) => {
-    setSelectedShotFilter(shotId);
-  }, []); // Remove dependencies to prevent stale closure issues
+    handleGalleryFilterChange(shotId);
+  }, [handleGalleryFilterChange]);
 
   // Handle backfill request to fill empty spaces after deletions
   const handleBackfillRequest = useCallback(async (deletedCount: number, currentPage: number, itemsPerPage: number): Promise<GeneratedImageWithMetadata[]> => {
@@ -1262,7 +1325,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 serverPage={currentPage}
                 showShotFilter={true}
                 initialShotFilter={selectedShotFilter}
-                onShotFilterChange={setSelectedShotFilter}
+                onShotFilterChange={handleGalleryFilterChange}
                 initialExcludePositioned={excludePositioned}
                 onExcludePositionedChange={setExcludePositioned}
                 showSearch={true}
