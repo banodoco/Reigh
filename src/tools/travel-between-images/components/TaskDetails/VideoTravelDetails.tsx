@@ -29,7 +29,13 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
   
   const parsedParams = useMemo(() => parseTaskParams(task?.params), [task?.params]);
   const derivedImages = useMemo(() => deriveInputImages(parsedParams), [parsedParams]);
-  const effectiveInputImages = inputImages.length > 0 ? inputImages : derivedImages;
+
+  // For segment tasks, prefer derived images from task params (they're more accurate)
+  // For other tasks, use inputImages if provided, otherwise derived
+  const isSegmentTaskCheck = parsedParams?.segment_index !== undefined;
+  const effectiveInputImages = (isSegmentTaskCheck && derivedImages.length > 0)
+    ? derivedImages
+    : (inputImages.length > 0 ? inputImages : derivedImages);
 
   const orchestratorDetails = parsedParams?.orchestrator_details;
   const orchestratorPayload = parsedParams?.full_orchestrator_payload;
@@ -92,15 +98,25 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
   // In basic mode, we don't show phase config details even if they exist internally
   const showPhaseContentInRightColumn = isAdvancedMode && phaseConfig?.phases && variant === 'panel';
 
-  // Get prompts
-  const prompt = individualSegmentParams?.base_prompt ||
-    (isSegmentTask 
-      ? (parsedParams?.base_prompt || parsedParams?.prompt)
-      : (orchestratorDetails?.base_prompts_expanded?.[0] || 
-         orchestratorPayload?.base_prompts_expanded?.[0] || 
-         orchestratorDetails?.base_prompt ||
-         orchestratorPayload?.base_prompt ||
-         parsedParams?.prompt));
+  // Get prompts - check multiple locations for segment tasks
+  const prompt = useMemo(() => {
+    // For segment tasks, prefer individual_segment_params first
+    if (isSegmentTask) {
+      return individualSegmentParams?.base_prompt ||
+        parsedParams?.base_prompt ||
+        parsedParams?.prompt ||
+        orchestratorDetails?.base_prompt ||
+        null;
+    }
+    // For full timeline/orchestrated tasks
+    return orchestratorDetails?.base_prompts_expanded?.[0] ||
+      orchestratorPayload?.base_prompts_expanded?.[0] ||
+      orchestratorDetails?.base_prompt ||
+      orchestratorPayload?.base_prompt ||
+      parsedParams?.base_prompt ||
+      parsedParams?.prompt ||
+      null;
+  }, [isSegmentTask, individualSegmentParams, parsedParams, orchestratorDetails, orchestratorPayload]);
   
   const negativePrompt = individualSegmentParams?.negative_prompt ||
     (isSegmentTask 

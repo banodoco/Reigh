@@ -142,7 +142,11 @@ export function deriveInputImages(parsedParams: Record<string, any>): string[] {
   if (Array.isArray(isp?.input_image_paths_resolved)) {
     urls.push(...isp.input_image_paths_resolved.filter((x: any) => typeof x === 'string'));
   }
-  
+
+  // For segment tasks: also check start_image_url and end_image_url
+  if (typeof isp?.start_image_url === 'string') urls.push(isp.start_image_url);
+  if (typeof isp?.end_image_url === 'string') urls.push(isp.end_image_url);
+
   return Array.from(new Set(urls.filter(Boolean)));
 }
 
