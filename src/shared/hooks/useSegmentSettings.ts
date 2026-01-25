@@ -373,6 +373,11 @@ export function useSegmentSettings({
 
   // Update settings (local state only)
   const updateSettings = useCallback((updates: Partial<SegmentSettings>) => {
+    console.log(`[SetAsShotDefaults] updateSettings called:`, {
+      keys: Object.keys(updates),
+      promptUpdate: updates.prompt?.substring(0, 30),
+      lorasUpdate: updates.loras?.length,
+    });
     setLocalSettings(prev => {
       const current = prev ?? mergedSettings;
       const next = { ...current, ...updates };
@@ -623,6 +628,12 @@ export function useSegmentSettings({
   // Auto-save on changes (debounced)
   useEffect(() => {
     // Only auto-save if user has edited and we have a pairShotGenerationId
+    console.log(`[SetAsShotDefaults] Auto-save check:`, {
+      hasUserEdited: hasUserEdited.current,
+      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || null,
+      isDirty,
+      willSave: hasUserEdited.current && pairShotGenerationId && isDirty,
+    });
     if (!hasUserEdited.current || !pairShotGenerationId || !isDirty) {
       return;
     }
