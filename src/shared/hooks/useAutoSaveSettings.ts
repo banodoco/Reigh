@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToolSettings, updateToolSettingsSupabase } from './useToolSettings';
 import { deepEqual } from '@/shared/lib/deepEqual';
 
@@ -95,6 +96,8 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     defaults,
     enabled = true,
   } = options;
+
+  const queryClient = useQueryClient();
 
   // Determine the entity ID based on scope
   const entityId = scope === 'shot' ? shotId : projectId;
@@ -218,9 +221,20 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
           id: pendingForEntity,
           toolId: currentToolId,
           patch: pending,
-        }, undefined, 'immediate').catch(err => {
-          console.error('[useAutoSaveSettings] Cleanup flush failed:', err);
-        });
+        }, undefined, 'immediate')
+          .then(() => {
+            // CRITICAL: Invalidate the React Query cache for this entity after save completes.
+            // This ensures that when we switch back to this entity, we fetch fresh data
+            // from the DB instead of serving stale cached data.
+            const cacheKey = currentScope === 'shot'
+              ? ['toolSettings', currentToolId, projectId, pendingForEntity]
+              : ['toolSettings', currentToolId, pendingForEntity, undefined];
+            queryClient.invalidateQueries({ queryKey: cacheKey });
+            console.log('[useAutoSaveSettings] ✅ Cleanup flush succeeded, cache invalidated');
+          })
+          .catch(err => {
+            console.error('[useAutoSaveSettings] Cleanup flush failed:', err);
+          });
       }
 
       // Always clear pending refs for the entity we are leaving
@@ -230,7 +244,7 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       }
     };
     // Only re-run when entityId changes
-  }, [entityId, scope, toolId]);
+  }, [entityId, scope, toolId, projectId, queryClient]);
 
   /**
    * Handle page close/navigation - save pending settings directly to DB.
