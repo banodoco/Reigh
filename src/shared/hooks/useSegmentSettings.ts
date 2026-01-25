@@ -552,24 +552,43 @@ export function useSegmentSettings({
         seed: settings.seed,
       };
 
+      console.log(`[SetAsShotDefaults] 📤 Sending patch to updateToolSettingsSupabase:`, {
+        shotId: shotId.substring(0, 8),
+        patch: {
+          prompt: patch.prompt?.substring(0, 50) || '(empty)',
+          negativePrompt: patch.negativePrompt?.substring(0, 50) || '(empty)',
+          motionMode: patch.motionMode,
+          amountOfMotion: patch.amountOfMotion,
+          hasPhaseConfig: !!patch.phaseConfig,
+          loraCount: patch.loras?.length ?? 0,
+          loraNames: patch.loras?.map(l => l.name) ?? [],
+        },
+      });
+
       // Use the proper settings update function which:
       // 1. Merges with existing settings (preserves batch-specific fields)
       // 2. Updates localStorage for settings inheritance
       // 3. Uses atomic RPC for consistency
-      await updateToolSettingsSupabase({
+      const result = await updateToolSettingsSupabase({
         scope: 'shot',
         id: shotId,
         toolId: 'travel-between-images',
         patch,
       }, undefined, 'immediate');
 
-      console.log(`[useSegmentSettings:${instanceId}] ✅ Saved as shot defaults`);
+      console.log(`[SetAsShotDefaults] ✅ updateToolSettingsSupabase returned:`, {
+        shotId: shotId.substring(0, 8),
+        resultPrompt: result?.prompt?.substring(0, 50) || '(none in result)',
+        resultLoraCount: result?.loras?.length ?? 0,
+      });
 
       // Invalidate both query caches so changes are visible everywhere:
+      console.log(`[SetAsShotDefaults] 🔄 Invalidating query caches...`);
       // 1. useSegmentSettings uses this key
       await queryClient.invalidateQueries({ queryKey: ['shot-batch-settings', shotId] });
       // 2. useToolSettings / useShotSettings uses this key pattern
       await queryClient.invalidateQueries({ queryKey: ['tool-settings', 'travel-between-images'] });
+      console.log(`[SetAsShotDefaults] ✅ Query caches invalidated`);
 
       return true;
     } catch (error) {
