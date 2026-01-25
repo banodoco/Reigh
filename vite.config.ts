@@ -13,9 +13,6 @@ logger.warn = (msg, options) => {
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }: { mode: string }) => {
-  console.log(`[Vite Config] Mode: ${mode}`);
-  console.log(`[Vite Config] No server proxy needed - using direct Supabase connections`);
-
   const port = process.env.PORT ? parseInt(process.env.PORT) : 2222;
 
   return {
