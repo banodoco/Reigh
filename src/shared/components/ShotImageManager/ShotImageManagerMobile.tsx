@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowDown, Check, Trash2 } from 'lucide-react';
+import { ArrowDown, Check, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -480,22 +480,40 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
 
               {/* Video and pair indicator - centered together in the gap */}
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-1 pointer-events-auto">
-                {/* Only show video when there's actual content (not placeholders) */}
-                {pair.segmentSlot && pair.segmentSlot.type === 'child' && pair.segmentSlot.child.location && (
-                  <div className="w-16">
-                    <InlineSegmentVideo
-                      slot={pair.segmentSlot}
-                      pairIndex={pair.index}
-                      onClick={() => onSegmentClick?.(pair.index)}
-                      onOpenPairSettings={onPairClick ? () => onPairClick(pair.index) : undefined}
-                      projectAspectRatio={projectAspectRatio}
-                      isMobile={true}
-                      layout="flow"
-                      compact={true}
-                      isPending={hasPendingTask?.(pair.segmentSlot?.pairShotGenerationId)}
-                    />
-                  </div>
-                )}
+                {/* Show video or pending indicator */}
+                {(() => {
+                  const hasVideo = pair.segmentSlot && pair.segmentSlot.type === 'child' && pair.segmentSlot.child.location;
+                  const pairShotGenId = pair.leftImage?.id;
+                  const isPending = hasPendingTask?.(pairShotGenId);
+                  const showSegmentArea = hasVideo || isPending;
+
+                  if (!showSegmentArea) return null;
+
+                  return (
+                    <div className="w-16">
+                      {pair.segmentSlot ? (
+                        <InlineSegmentVideo
+                          slot={pair.segmentSlot}
+                          pairIndex={pair.index}
+                          onClick={() => onSegmentClick?.(pair.index)}
+                          onOpenPairSettings={onPairClick ? () => onPairClick(pair.index) : undefined}
+                          projectAspectRatio={projectAspectRatio}
+                          isMobile={true}
+                          layout="flow"
+                          compact={true}
+                          isPending={isPending}
+                        />
+                      ) : isPending ? (
+                        <div className="h-12 bg-muted/40 border-2 border-dashed border-primary/40 rounded-md flex items-center justify-center shadow-sm">
+                          <div className="flex flex-col items-center gap-0.5 text-primary">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span className="text-[9px] font-medium">Pending</span>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
                 {onPairClick && (
                   <PairPromptIndicator
                     pairIndex={pair.index}
@@ -567,51 +585,75 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
             <React.Fragment key={imageKey}>
               <div className="relative">
                 {/* Video output from previous pair - shows on LEFT if at start of row (only in move mode, not pair-per-row) */}
-                {/* Only show when there's actual video content (not placeholders) */}
-                {prevImageWasEndOfRow && prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location && mobileSelectedIds.length === 0 && isInMoveMode && (
-                  <div className="absolute -top-4 -left-[6px] -translate-x-1/2 z-20 pointer-events-auto w-20">
-                    <InlineSegmentVideo
-                      slot={prevSegmentSlot}
-                      pairIndex={index - 1}
-                      onClick={() => onSegmentClick?.(index - 1)}
-                      onOpenPairSettings={onPairClick}
-                      projectAspectRatio={projectAspectRatio}
-                      isMobile={true}
-                      layout="flow"
-                      compact={true}
-                      isPending={hasPendingTask?.(prevSegmentSlot?.pairShotGenerationId)}
-                    />
-                  </div>
-                )}
-                
+                {prevImageWasEndOfRow && mobileSelectedIds.length === 0 && isInMoveMode && (() => {
+                  const hasPrevVideo = prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location;
+                  const prevPairShotGenId = prevStartImage?.id;
+                  const isPrevPending = hasPendingTask?.(prevPairShotGenId);
+                  const showPrevSegmentArea = hasPrevVideo || isPrevPending;
+
+                  if (!showPrevSegmentArea) return null;
+
+                  return (
+                    <div className="absolute -top-4 -left-[6px] -translate-x-1/2 z-20 pointer-events-auto w-20">
+                      {prevSegmentSlot ? (
+                        <InlineSegmentVideo
+                          slot={prevSegmentSlot}
+                          pairIndex={index - 1}
+                          onClick={() => onSegmentClick?.(index - 1)}
+                          onOpenPairSettings={onPairClick}
+                          projectAspectRatio={projectAspectRatio}
+                          isMobile={true}
+                          layout="flow"
+                          compact={true}
+                          isPending={isPrevPending}
+                        />
+                      ) : isPrevPending ? (
+                        <div className="h-12 bg-muted/40 border-2 border-dashed border-primary/40 rounded-md flex items-center justify-center shadow-sm">
+                          <div className="flex flex-col items-center gap-0.5 text-primary">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span className="text-[9px] font-medium">Pending</span>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+
                 {/* Pair indicator from previous image - shows on LEFT if at start of row (only in move mode, not pair-per-row) */}
-                {prevImageWasEndOfRow && onPairClick && mobileSelectedIds.length === 0 && isInMoveMode && (
-                  <div className={cn(
-                    "absolute -left-[6px] -translate-y-1/2 -translate-x-1/2 z-30 pointer-events-auto",
-                    (prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location) ? "top-[calc(50%+20px)]" : "top-1/2"
-                  )}>
-                    <PairPromptIndicator
-                      pairIndex={index - 1}
-                      frames={batchVideoFrames}
-                      startFrame={(index - 1) * batchVideoFrames}
-                      endFrame={index * batchVideoFrames}
-                      isMobile={true}
-                      onClearEnhancedPrompt={onClearEnhancedPrompt}
-                      onPairClick={() => {
-                        console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (left)', { pairIndex: index - 1 });
-                        onPairClick(index - 1);
-                      }}
-                      pairPrompt={prevPairPrompt?.prompt}
-                      pairNegativePrompt={prevPairPrompt?.negativePrompt}
-                      enhancedPrompt={prevEnhancedPrompt}
-                      defaultPrompt={defaultPrompt}
-                      defaultNegativePrompt={defaultNegativePrompt}
-                      pairPhaseConfig={pairOverrides?.[index - 1]?.phaseConfig}
-                      pairLoras={pairOverrides?.[index - 1]?.loras}
-                      pairMotionSettings={pairOverrides?.[index - 1]?.motionSettings}
-                    />
-                  </div>
-                )}
+                {prevImageWasEndOfRow && onPairClick && mobileSelectedIds.length === 0 && isInMoveMode && (() => {
+                  const hasPrevVideo = prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location;
+                  const prevPairShotGenId = prevStartImage?.id;
+                  const isPrevPending = hasPendingTask?.(prevPairShotGenId);
+                  const showPrevSegmentArea = hasPrevVideo || isPrevPending;
+
+                  return (
+                    <div className={cn(
+                      "absolute -left-[6px] -translate-y-1/2 -translate-x-1/2 z-30 pointer-events-auto",
+                      showPrevSegmentArea ? "top-[calc(50%+20px)]" : "top-1/2"
+                    )}>
+                      <PairPromptIndicator
+                        pairIndex={index - 1}
+                        frames={batchVideoFrames}
+                        startFrame={(index - 1) * batchVideoFrames}
+                        endFrame={index * batchVideoFrames}
+                        isMobile={true}
+                        onClearEnhancedPrompt={onClearEnhancedPrompt}
+                        onPairClick={() => {
+                          console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (left)', { pairIndex: index - 1 });
+                          onPairClick(index - 1);
+                        }}
+                        pairPrompt={prevPairPrompt?.prompt}
+                        pairNegativePrompt={prevPairPrompt?.negativePrompt}
+                        enhancedPrompt={prevEnhancedPrompt}
+                        defaultPrompt={defaultPrompt}
+                        defaultNegativePrompt={defaultNegativePrompt}
+                        pairPhaseConfig={pairOverrides?.[index - 1]?.phaseConfig}
+                        pairLoras={pairOverrides?.[index - 1]?.loras}
+                        pairMotionSettings={pairOverrides?.[index - 1]?.motionSettings}
+                      />
+                    </div>
+                  );
+                })()}
                 
                 <MobileImageItem
                   image={image}
@@ -668,51 +710,75 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 )}
                 
                 {/* Video output above pair indicator - shows on RIGHT if NOT at end of row */}
-                {/* Only show when there's actual video content (not placeholders) */}
-                {!isLastItem && segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (
-                  <div className="absolute -top-4 -right-[6px] translate-x-1/2 z-20 pointer-events-auto w-20">
-                    <InlineSegmentVideo
-                      slot={segmentSlot}
-                      pairIndex={index}
-                      onClick={() => onSegmentClick?.(index)}
-                      onOpenPairSettings={onPairClick}
-                      projectAspectRatio={projectAspectRatio}
-                      isMobile={true}
-                      layout="flow"
-                      compact={true}
-                      isPending={hasPendingTask?.(segmentSlot?.pairShotGenerationId)}
-                    />
-                  </div>
-                )}
-                
+                {!isLastItem && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (() => {
+                  const hasVideo = segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location;
+                  const pairShotGenId = startImage?.id;
+                  const isPending = hasPendingTask?.(pairShotGenId);
+                  const showSegmentArea = hasVideo || isPending;
+
+                  if (!showSegmentArea) return null;
+
+                  return (
+                    <div className="absolute -top-4 -right-[6px] translate-x-1/2 z-20 pointer-events-auto w-20">
+                      {segmentSlot ? (
+                        <InlineSegmentVideo
+                          slot={segmentSlot}
+                          pairIndex={index}
+                          onClick={() => onSegmentClick?.(index)}
+                          onOpenPairSettings={onPairClick}
+                          projectAspectRatio={projectAspectRatio}
+                          isMobile={true}
+                          layout="flow"
+                          compact={true}
+                          isPending={isPending}
+                        />
+                      ) : isPending ? (
+                        <div className="h-12 bg-muted/40 border-2 border-dashed border-primary/40 rounded-md flex items-center justify-center shadow-sm">
+                          <div className="flex flex-col items-center gap-0.5 text-primary">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span className="text-[9px] font-medium">Pending</span>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+
                 {/* Pair indicator after this image - shows on RIGHT if NOT at end of row */}
-                {!isLastItem && onPairClick && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (
-                  <div className={cn(
-                    "absolute -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto",
-                    (segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location) ? "top-[calc(50%+20px)]" : "top-1/2"
-                  )}>
-                    <PairPromptIndicator
-                      pairIndex={index}
-                      frames={batchVideoFrames}
-                      startFrame={index * batchVideoFrames}
-                      endFrame={(index + 1) * batchVideoFrames}
-                      isMobile={true}
-                      onClearEnhancedPrompt={onClearEnhancedPrompt}
-                      onPairClick={() => {
-                        console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (right)', { index });
-                        onPairClick(index);
-                      }}
-                      pairPrompt={pairPrompt?.prompt}
-                      pairNegativePrompt={pairPrompt?.negativePrompt}
-                      enhancedPrompt={enhancedPrompt}
-                      defaultPrompt={defaultPrompt}
-                      defaultNegativePrompt={defaultNegativePrompt}
-                      pairPhaseConfig={pairOverrides?.[index]?.phaseConfig}
-                      pairLoras={pairOverrides?.[index]?.loras}
-                      pairMotionSettings={pairOverrides?.[index]?.motionSettings}
-                    />
-                  </div>
-                )}
+                {!isLastItem && onPairClick && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (() => {
+                  const hasVideo = segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location;
+                  const pairShotGenId = startImage?.id;
+                  const isPending = hasPendingTask?.(pairShotGenId);
+                  const showSegmentArea = hasVideo || isPending;
+
+                  return (
+                    <div className={cn(
+                      "absolute -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto",
+                      showSegmentArea ? "top-[calc(50%+20px)]" : "top-1/2"
+                    )}>
+                      <PairPromptIndicator
+                        pairIndex={index}
+                        frames={batchVideoFrames}
+                        startFrame={index * batchVideoFrames}
+                        endFrame={(index + 1) * batchVideoFrames}
+                        isMobile={true}
+                        onClearEnhancedPrompt={onClearEnhancedPrompt}
+                        onPairClick={() => {
+                          console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (right)', { index });
+                          onPairClick(index);
+                        }}
+                        pairPrompt={pairPrompt?.prompt}
+                        pairNegativePrompt={pairPrompt?.negativePrompt}
+                        enhancedPrompt={enhancedPrompt}
+                        defaultPrompt={defaultPrompt}
+                        defaultNegativePrompt={defaultNegativePrompt}
+                        pairPhaseConfig={pairOverrides?.[index]?.phaseConfig}
+                        pairLoras={pairOverrides?.[index]?.loras}
+                        pairMotionSettings={pairOverrides?.[index]?.motionSettings}
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             </React.Fragment>
           );
