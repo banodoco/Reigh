@@ -480,7 +480,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
 
               {/* Video and pair indicator - centered together in the gap */}
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-1 pointer-events-auto">
-                {pair.segmentSlot && (
+                {/* Only show video when there's actual content (not placeholders) */}
+                {pair.segmentSlot && pair.segmentSlot.type === 'child' && pair.segmentSlot.child.location && (
                   <div className="w-16">
                     <InlineSegmentVideo
                       slot={pair.segmentSlot}
@@ -566,7 +567,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
             <React.Fragment key={imageKey}>
               <div className="relative">
                 {/* Video output from previous pair - shows on LEFT if at start of row (only in move mode, not pair-per-row) */}
-                {prevImageWasEndOfRow && prevSegmentSlot && mobileSelectedIds.length === 0 && isInMoveMode && (
+                {/* Only show when there's actual video content (not placeholders) */}
+                {prevImageWasEndOfRow && prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location && mobileSelectedIds.length === 0 && isInMoveMode && (
                   <div className="absolute -top-4 -left-[6px] -translate-x-1/2 z-20 pointer-events-auto w-20">
                     <InlineSegmentVideo
                       slot={prevSegmentSlot}
@@ -586,7 +588,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 {prevImageWasEndOfRow && onPairClick && mobileSelectedIds.length === 0 && isInMoveMode && (
                   <div className={cn(
                     "absolute -left-[6px] -translate-y-1/2 -translate-x-1/2 z-30 pointer-events-auto",
-                    prevSegmentSlot ? "top-[calc(50%+20px)]" : "top-1/2"
+                    (prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location) ? "top-[calc(50%+20px)]" : "top-1/2"
                   )}>
                     <PairPromptIndicator
                       pairIndex={index - 1}
@@ -666,7 +668,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 )}
                 
                 {/* Video output above pair indicator - shows on RIGHT if NOT at end of row */}
-                {!isLastItem && segmentSlot && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (
+                {/* Only show when there's actual video content (not placeholders) */}
+                {!isLastItem && segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (
                   <div className="absolute -top-4 -right-[6px] translate-x-1/2 z-20 pointer-events-auto w-20">
                     <InlineSegmentVideo
                       slot={segmentSlot}
@@ -686,7 +689,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 {!isLastItem && onPairClick && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (
                   <div className={cn(
                     "absolute -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto",
-                    segmentSlot ? "top-[calc(50%+20px)]" : "top-1/2"
+                    (segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location) ? "top-[calc(50%+20px)]" : "top-1/2"
                   )}>
                     <PairPromptIndicator
                       pairIndex={index}

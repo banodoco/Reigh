@@ -171,117 +171,111 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
               projectAspectRatio={projectAspectRatio}
             />
 
-            {/* Cross-row: Previous pair's video output - shows on LEFT at start of row */}
-            {/* Only show in batch mode when there's actual video content (not placeholders) */}
-            {isAtStartOfRow && prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location && !shouldHideIndicator && (() => {
+            {/* Cross-row: Previous pair's video + indicator - shows on LEFT at start of row, centered vertically together */}
+            {isAtStartOfRow && !shouldHideIndicator && (onPairClick || (prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location)) && (() => {
               const slotIndex = index - 1;
               const isActiveScrubbing = activeScrubbingIndex === slotIndex;
+              const hasVideo = prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location;
               return (
-                <div className="absolute -top-4 -left-[6px] -translate-x-1/2 z-20 pointer-events-auto w-20">
-                  <InlineSegmentVideo
-                    slot={prevSegmentSlot}
-                    pairIndex={slotIndex}
-                    onClick={() => onSegmentClick?.(slotIndex)}
-                    onOpenPairSettings={onPairClick}
-                    projectAspectRatio={projectAspectRatio}
-                    isMobile={isMobile}
-                    layout="flow"
-                    compact={true}
-                    isPending={hasPendingTask?.(prevSegmentSlot.pairShotGenerationId)}
-                    // Scrubbing props
-                    isScrubbingActive={isActiveScrubbing}
-                    onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
-                    scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
-                    scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
-                    scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
-                  />
+                <div className="absolute -left-[6px] top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-auto flex flex-col items-center gap-1">
+                  {hasVideo && (
+                    <div className="w-20">
+                      <InlineSegmentVideo
+                        slot={prevSegmentSlot}
+                        pairIndex={slotIndex}
+                        onClick={() => onSegmentClick?.(slotIndex)}
+                        onOpenPairSettings={onPairClick}
+                        projectAspectRatio={projectAspectRatio}
+                        isMobile={isMobile}
+                        layout="flow"
+                        compact={true}
+                        isPending={hasPendingTask?.(prevSegmentSlot.pairShotGenerationId)}
+                        // Scrubbing props
+                        isScrubbingActive={isActiveScrubbing}
+                        onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
+                        scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
+                        scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
+                        scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
+                      />
+                    </div>
+                  )}
+                  {onPairClick && (
+                    <PairPromptIndicator
+                      pairIndex={index - 1}
+                      frames={batchVideoFrames}
+                      startFrame={(index - 1) * batchVideoFrames}
+                      endFrame={index * batchVideoFrames}
+                      onClearEnhancedPrompt={onClearEnhancedPrompt}
+                      onPairClick={() => {
+                        console.log('[PairIndicatorDebug] Cross-row pair indicator clicked (left)', { pairIndex: index - 1 });
+                        onPairClick(index - 1);
+                      }}
+                      pairPrompt={prevPairPrompt?.prompt}
+                      pairNegativePrompt={prevPairPrompt?.negativePrompt}
+                      enhancedPrompt={prevEnhancedPrompt}
+                      defaultPrompt={defaultPrompt}
+                      defaultNegativePrompt={defaultNegativePrompt}
+                      pairPhaseConfig={pairOverrides?.[index - 1]?.phaseConfig}
+                      pairLoras={pairOverrides?.[index - 1]?.loras}
+                      pairMotionSettings={pairOverrides?.[index - 1]?.motionSettings}
+                    />
+                  )}
                 </div>
               );
             })()}
 
-            {/* Cross-row: Previous pair indicator - shows on LEFT at start of row (below video if present) */}
-            {isAtStartOfRow && onPairClick && !shouldHideIndicator && (
-              <div className={cn(
-                "absolute -left-[6px] -translate-y-1/2 -translate-x-1/2 z-30 pointer-events-auto",
-                (prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location) ? "top-[calc(50%+24px)]" : "top-1/2"
-              )}>
-                <PairPromptIndicator
-                  pairIndex={index - 1}
-                  frames={batchVideoFrames}
-                  startFrame={(index - 1) * batchVideoFrames}
-                  endFrame={index * batchVideoFrames}
-                  onClearEnhancedPrompt={onClearEnhancedPrompt}
-                  onPairClick={() => {
-                    console.log('[PairIndicatorDebug] Cross-row pair indicator clicked (left)', { pairIndex: index - 1 });
-                    onPairClick(index - 1);
-                  }}
-                  pairPrompt={prevPairPrompt?.prompt}
-                  pairNegativePrompt={prevPairPrompt?.negativePrompt}
-                  enhancedPrompt={prevEnhancedPrompt}
-                  defaultPrompt={defaultPrompt}
-                  defaultNegativePrompt={defaultNegativePrompt}
-                  pairPhaseConfig={pairOverrides?.[index - 1]?.phaseConfig}
-                  pairLoras={pairOverrides?.[index - 1]?.loras}
-                  pairMotionSettings={pairOverrides?.[index - 1]?.motionSettings}
-                />
-              </div>
-            )}
-
-            {/* Video output above pair indicator - positioned in the gap to the right (skip if at end of row) */}
-            {/* Only show in batch mode when there's actual video content (not placeholders) */}
-            {!isLastImage && !isAtEndOfRow && segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location && !shouldHideIndicator && (() => {
+            {/* Video + pair indicator - positioned in the gap to the right, centered vertically together (skip if at end of row) */}
+            {!isLastImage && !isAtEndOfRow && !shouldHideIndicator && (onPairClick || (segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location)) && (() => {
               const slotIndex = index;
               const isActiveScrubbing = activeScrubbingIndex === slotIndex;
+              const hasVideo = segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location;
               return (
-                <div className="absolute -top-4 -right-[6px] translate-x-1/2 z-20 pointer-events-auto w-20">
-                  <InlineSegmentVideo
-                    slot={segmentSlot}
-                    pairIndex={slotIndex}
-                    onClick={() => onSegmentClick?.(slotIndex)}
-                    onOpenPairSettings={onPairClick}
-                    projectAspectRatio={projectAspectRatio}
-                    isMobile={isMobile}
-                    layout="flow"
-                    compact={true}
-                    isPending={hasPendingTask?.(segmentSlot.pairShotGenerationId)}
-                    // Scrubbing props
-                    isScrubbingActive={isActiveScrubbing}
-                    onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
-                    scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
-                    scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
-                    scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
-                  />
+                <div className="absolute -right-[6px] top-1/2 translate-x-1/2 -translate-y-1/2 z-20 pointer-events-auto flex flex-col items-center gap-1">
+                  {hasVideo && (
+                    <div className="w-20">
+                      <InlineSegmentVideo
+                        slot={segmentSlot}
+                        pairIndex={slotIndex}
+                        onClick={() => onSegmentClick?.(slotIndex)}
+                        onOpenPairSettings={onPairClick}
+                        projectAspectRatio={projectAspectRatio}
+                        isMobile={isMobile}
+                        layout="flow"
+                        compact={true}
+                        isPending={hasPendingTask?.(segmentSlot.pairShotGenerationId)}
+                        // Scrubbing props
+                        isScrubbingActive={isActiveScrubbing}
+                        onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
+                        scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
+                        scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
+                        scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
+                      />
+                    </div>
+                  )}
+                  {onPairClick && (
+                    <PairPromptIndicator
+                      pairIndex={index}
+                      frames={batchVideoFrames}
+                      startFrame={index * batchVideoFrames}
+                      endFrame={(index + 1) * batchVideoFrames}
+                      onClearEnhancedPrompt={onClearEnhancedPrompt}
+                      onPairClick={() => {
+                        console.log('[PairIndicatorDebug] Pair indicator clicked', { index });
+                        onPairClick(index);
+                      }}
+                      pairPrompt={pairPrompt?.prompt}
+                      pairNegativePrompt={pairPrompt?.negativePrompt}
+                      enhancedPrompt={enhancedPrompt}
+                      defaultPrompt={defaultPrompt}
+                      defaultNegativePrompt={defaultNegativePrompt}
+                      pairPhaseConfig={pairOverrides?.[index]?.phaseConfig}
+                      pairLoras={pairOverrides?.[index]?.loras}
+                      pairMotionSettings={pairOverrides?.[index]?.motionSettings}
+                    />
+                  )}
                 </div>
               );
             })()}
-
-            {/* Pair indicator positioned in the gap to the right (below video if present, skip if at end of row) */}
-            {!isLastImage && !isAtEndOfRow && onPairClick && !shouldHideIndicator && (
-              <div className={cn(
-                "absolute -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto",
-                (segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location) ? "top-[calc(50%+24px)]" : "top-1/2"
-              )}>
-                <PairPromptIndicator
-                  pairIndex={index}
-                  frames={batchVideoFrames}
-                  startFrame={index * batchVideoFrames}
-                  endFrame={(index + 1) * batchVideoFrames}
-                  onClearEnhancedPrompt={onClearEnhancedPrompt}
-                  onPairClick={() => {
-                    console.log('[PairIndicatorDebug] Pair indicator clicked', { index });
-                    onPairClick(index);
-                  }}
-                  pairPrompt={pairPrompt?.prompt}
-                  pairNegativePrompt={pairPrompt?.negativePrompt}
-                  enhancedPrompt={enhancedPrompt}
-                  defaultPrompt={defaultPrompt}
-                  defaultNegativePrompt={defaultNegativePrompt}
-                  pairPhaseConfig={pairOverrides?.[index]?.phaseConfig}
-                  pairLoras={pairOverrides?.[index]?.loras}
-                  pairMotionSettings={pairOverrides?.[index]?.motionSettings}
-                />
-              </div>
-            )}
           </div>
         );
       })}
