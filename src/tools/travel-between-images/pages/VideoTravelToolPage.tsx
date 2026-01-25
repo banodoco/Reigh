@@ -903,12 +903,12 @@ const VideoTravelToolPage: React.FC = () => {
     // Scroll to absolute top to fully hide floating header
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Trigger edit mode after scroll completes
+    // Trigger edit mode after scroll completes (600ms for smooth scroll to finish)
     setTimeout(() => {
       if (nameClickRef.current) {
         nameClickRef.current();
       }
-    }, 300);
+    }, 600);
   }, []);
 
   // Initialize video gallery thumbnail preloader (after dependencies are defined)
