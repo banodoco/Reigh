@@ -464,6 +464,15 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
       return;
     }
 
+    // Log what we received from useToolSettings
+    console.log('[useAutoSaveSettings] 🔍 dbSettings received:', {
+      toolId,
+      entityId: entityId?.substring(0, 8),
+      dbPrompt: (dbSettings as any)?.prompt?.substring(0, 30) || '(none)',
+      dbLoraCount: (dbSettings as any)?.loras?.length ?? 0,
+      status,
+    });
+
     // Don't overwrite if user has pending edits for THIS entity (debounce hasn't fired yet)
     // This prevents React Query refetches from "unwriting" user input
     // IMPORTANT: We now protect pending edits even on first load - losing user's typing
@@ -500,6 +509,12 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
 
     // Avoid setState loops when dbSettings identity changes but values don't.
     if (loadedSettingsRef.current && deepEqual(clonedSettings, loadedSettingsRef.current)) {
+      console.log('[useAutoSaveSettings] ⏭️ Skipping DB load - settings unchanged:', {
+        toolId,
+        entityId: entityId.substring(0, 8),
+        promptInLoaded: (loadedSettingsRef.current as any)?.prompt?.substring(0, 30) || '(none)',
+        promptInNew: (clonedSettings as any)?.prompt?.substring(0, 30) || '(none)',
+      });
       if (status !== 'ready') {
         setStatus('ready');
       }
@@ -510,6 +525,8 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
     console.log('[useAutoSaveSettings] 📥 Loaded from DB:', {
       toolId,
       entityId: entityId.substring(0, 8),
+      promptInNew: (clonedSettings as any)?.prompt?.substring(0, 30) || '(none)',
+      loraCountInNew: (clonedSettings as any)?.loras?.length ?? 0,
     });
 
     setSettings(clonedSettings);
