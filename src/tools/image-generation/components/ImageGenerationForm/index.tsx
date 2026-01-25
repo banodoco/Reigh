@@ -219,13 +219,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   footerPortalId,
   initialShotId,
 }, ref) => {
-  
-  // Debug logging for callback prop
-  console.log('[ShotChangeDebug] 🏗️ ImageGenerationForm rendered with onShotChange:', {
-    hasCallback: !!onShotChange,
-    callbackType: typeof onShotChange,
-    timestamp: Date.now()
-  });
   // Track first-visit for this session using component state to avoid stale module-level cache
   const [hasVisitedImageGeneration, setHasVisitedImageGeneration] = useState<boolean>(() => {
     try {
@@ -340,18 +333,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     projectId: selectedProjectId,
     enabled: !!selectedProjectId
   });
-  
-  // Debug log to track when projectImageSettings changes
-  useEffect(() => {
-    console.log('[AddToRefDebug:Form] 📦 projectImageSettings updated', {
-      hasSettings: !!projectImageSettings,
-      referencesCount: projectImageSettings?.references?.length,
-      selectedReferenceIdByShot: projectImageSettings?.selectedReferenceIdByShot,
-      isLoading: isLoadingProjectSettings,
-      timestamp: Date.now()
-    });
-  }, [projectImageSettings, isLoadingProjectSettings]);
-  
+
   // Local optimistic override for model to avoid UI stutter while saving
   const [modelOverride, setModelOverride] = useState<GenerationMode | undefined>(undefined);
 
@@ -380,18 +362,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const selectedReferenceIdByShot = projectImageSettings?.selectedReferenceIdByShot ?? cachedProjectSettings?.selectedReferenceIdByShot ?? {};
   const selectedReferenceId = selectedReferenceIdByShot[effectiveShotId] ?? null;
 
-  // Debug log for reference selection tracking
-  useEffect(() => {
-    console.log('[AddToRefDebug:Form] 📋 Reference selection state', {
-      effectiveShotId,
-      selectedReferenceId,
-      selectedReferenceIdByShot,
-      referencePointersCount: referencePointers.length,
-      hasProjectImageSettings: !!projectImageSettings,
-      timestamp: Date.now()
-    });
-  }, [effectiveShotId, selectedReferenceId, selectedReferenceIdByShot, referencePointers.length, projectImageSettings]);
-  
   // Hydrate references with data from resources table
   const { hydratedReferences, isLoading: isLoadingReferences, hasLegacyReferences } = useHydratedReferences(referencePointers);
   
@@ -509,19 +479,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     lastValidSelectedReference.current = currentSelectedReference;
   }
   const selectedReference = currentSelectedReference || lastValidSelectedReference.current;
-  
-  // Debug log for final selected reference
-  useEffect(() => {
-    console.log('[AddToRefDebug:Form] 🎯 Final selected reference determined', {
-      selectedReferenceId,
-      currentSelectedReference: currentSelectedReference ? { id: currentSelectedReference.id, name: currentSelectedReference.name, resourceId: currentSelectedReference.resourceId } : null,
-      selectedReference: selectedReference ? { id: selectedReference.id, name: selectedReference.name, resourceId: selectedReference.resourceId } : null,
-      hydratedReferencesCount: hydratedReferences.length,
-      hydratedReferenceIds: hydratedReferences.map(r => r.id),
-      timestamp: Date.now()
-    });
-  }, [selectedReferenceId, currentSelectedReference, selectedReference, hydratedReferences]);
-  
+
   // Show loading state only if we don't have enough references hydrated yet
   // This prevents flickering when background queries (like isLoadingReferences) run but we already have data
   const hasEnoughReferences = referenceCount > 0 && hydratedReferences.length >= Math.floor(referenceCount * 0.9);
@@ -540,38 +498,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       ((isLoadingProjectSettings || isLoadingReferences) && !hasEnoughReferences) ||
       selectionPendingValidation
     );
-  
-  // Debug logging for reference loading state
-  useEffect(() => {
-    const threshold = Math.floor(referenceCount * 0.9);
-    console.log('[RefLoadingDebug] 📊 Reference loading state:', {
-      isLoadingProjectSettings,
-      referenceCount,
-      hydratedReferencesLength: hydratedReferences.length,
-      referencePointersLength: referencePointers.length,
-      isLoadingReferences,
-      threshold,
-      needsMoreRefs: hydratedReferences.length < threshold,
-      isReferenceDataLoading,
-      hasStaleSelection,
-      selectionPendingValidation,
-      calculationBreakdown: {
-        condition1_loadingSettings: isLoadingProjectSettings,
-        condition2_loadingReferences: isLoadingReferences,
-        condition3_notEnoughHydrated: !hasEnoughReferences,
-        condition4_staleSelection: hasStaleSelection,
-        condition5_pendingValidation: selectionPendingValidation,
-        selectedReferenceId: selectedReferenceId?.substring(0, 8),
-        hasCurrentSelectedReference: !!currentSelectedReference,
-        hydratedReferencesLength: hydratedReferences.length,
-      },
-      cachedReferenceCount: referenceCountFromCache,
-      hasCachedSettings: !!cachedProjectSettings,
-      hasProjectSettings: !!projectImageSettings,
-      timestamp: Date.now()
-    });
-  }, [isLoadingProjectSettings, referenceCount, hydratedReferences.length, referencePointers.length, isReferenceDataLoading, isLoadingReferences, referenceCountFromCache, cachedProjectSettings, projectImageSettings, hasStaleSelection, currentSelectedReference, selectedReferenceId, selectionPendingValidation]);
-  
+
   // Resource mutation hooks
   const createStyleReference = useCreateResource();
   const updateStyleReference = useUpdateResource();
@@ -580,35 +507,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Clear pending mode update when switching references
   const prevSelectedReferenceId = useRef(selectedReferenceId);
   useEffect(() => {
-    const hasChanged = prevSelectedReferenceId.current !== selectedReferenceId;
-    const prevId = prevSelectedReferenceId.current;
-    
-    if (hasChanged) {
-      console.log('[RefSettings] 🔄 Reference changed from', prevId, 'to', selectedReferenceId);
-      console.log('[RefSettings] 🔄 Clearing pending mode update');
+    if (prevSelectedReferenceId.current !== selectedReferenceId) {
       pendingReferenceModeUpdate.current = null;
-      
       prevSelectedReferenceId.current = selectedReferenceId;
     }
   }, [selectedReferenceId, hydratedReferences]);
-  
-  // Debug logging for reference state
-  useEffect(() => {
-    console.log('[RefSettings] 📊 Current state:', {
-      effectiveShotId,
-      referencesCount: hydratedReferences.length,
-      selectedReferenceId,
-      hasSelectedReference: !!selectedReference,
-      selectedReferenceName: selectedReference?.name,
-      selectedReferenceStrength: selectedReference?.styleReferenceStrength,
-      selectedSubjectStrength: selectedReference?.subjectStrength,
-      selectedReferenceMode: selectedReference?.referenceMode,
-      allReferenceIds: hydratedReferences.map(r => r.id),
-      allReferenceModes: hydratedReferences.map(r => ({ id: r.id, name: r.name, mode: r.referenceMode })),
-      allShotSelections: selectedReferenceIdByShot
-    });
-  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot]);
-  
+
   // For backward compatibility with single reference (used in display)
   const rawStyleReferenceImage = selectedReference?.styleReferenceImage || projectImageSettings?.styleReferenceImage || null;
   const rawStyleReferenceImageOriginal = selectedReference?.styleReferenceImageOriginal || projectImageSettings?.styleReferenceImageOriginal || null;
@@ -2944,32 +2848,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Handle shot change with proper prompt initialization
   const handleShotChange = (value: string) => {
-    console.log('[ShotChangeDebug] 🔄 handleShotChange called:', {
-      fromShotId: associatedShotId,
-      toValue: value,
-      hasOnShotChangeCallback: !!onShotChange,
-      timestamp: Date.now()
-    });
-
     markAsInteracted();
     const newShotId = value === "none" ? null : value;
-
-    console.log('[ShotChangeDebug] 📝 Setting new shot ID:', {
-      newShotId,
-      previousShotId: associatedShotId,
-      valueWasNone: value === "none"
-    });
 
     // usePersistentToolState auto-syncs associatedShotId to DB
     setAssociatedShotId(newShotId);
 
     // Call the parent callback if provided
     if (onShotChange) {
-      console.log('[ShotChangeDebug] 📞 Calling parent onShotChange callback with:', newShotId);
       onShotChange(newShotId);
-      console.log('[ShotChangeDebug] ✅ Parent callback called successfully');
-    } else {
-      console.log('[ShotChangeDebug] ❌ No onShotChange callback provided');
     }
 
     // Note: Prompts for the new shot will be loaded automatically via useAutoSaveSettings

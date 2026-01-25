@@ -35,6 +35,7 @@ import {
   deriveInputImages,
   DEFAULT_ITEMS_PER_PAGE,
   GRID_COLUMN_CLASSES,
+  getLayoutForAspectRatio,
 } from './utils';
 
 // Import types
@@ -185,27 +186,37 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   const toggleStarMutation = useToggleGenerationStar();
   const { navigateToShot } = useShotNavigation();
 
-  // Use mobile-optimized defaults to improve initial render performance
-  const defaultItemsPerPage = isMobile ? DEFAULT_ITEMS_PER_PAGE.MOBILE : DEFAULT_ITEMS_PER_PAGE.DESKTOP;
+  // Compute aspect-ratio-aware layout (columns, itemsPerPage, skeletonColumns)
+  // This adjusts columns based on image dimensions:
+  // - Wide images (16:9) → fewer columns (6)
+  // - Square images (1:1) → medium columns (7)
+  // - Tall images (9:16) → more columns (9)
+  const aspectRatioLayout = React.useMemo(() => {
+    return getLayoutForAspectRatio(projectAspectRatio, isMobile);
+  }, [projectAspectRatio, isMobile]);
+
+  // Use aspect-ratio-aware defaults, but allow explicit override via props
+  const effectiveColumnsPerRow = columnsPerRow !== 5 ? columnsPerRow : aspectRatioLayout.columns;
+  const defaultItemsPerPage = aspectRatioLayout.itemsPerPage;
   const actualItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
-  
+
   // Memoize simplified shot options to prevent re-computation on every render
-  const simplifiedShotOptions = React.useMemo(() => 
+  const simplifiedShotOptions = React.useMemo(() =>
     [...allShots]
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-      .map(s => ({ 
-        id: s.id, 
+      .map(s => ({
+        id: s.id,
         name: s.name,
         settings: s.settings,
-        created_at: s.created_at 
-      })), 
+        created_at: s.created_at
+      })),
     [allShots]
   );
-  
+
   // Memoize grid column classes to prevent unnecessary recalculations
   const gridColumnClasses = React.useMemo(() => {
-    return GRID_COLUMN_CLASSES[columnsPerRow as keyof typeof GRID_COLUMN_CLASSES] || GRID_COLUMN_CLASSES[5];
-  }, [columnsPerRow]);
+    return GRID_COLUMN_CLASSES[effectiveColumnsPerRow as keyof typeof GRID_COLUMN_CLASSES] || aspectRatioLayout.gridColumnClasses;
+  }, [effectiveColumnsPerRow, aspectRatioLayout.gridColumnClasses]);
 
   // Core state management hook
   const stateHook = useImageGalleryState({
@@ -726,6 +737,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
           reducedSpacing={reducedSpacing}
           whiteText={whiteText}
           gridColumnClasses={gridColumnClasses}
+          columnsPerRow={effectiveColumnsPerRow}
           projectAspectRatio={projectAspectRatio}
 
           // Loading props

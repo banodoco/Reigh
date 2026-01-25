@@ -77,7 +77,7 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
     freshnessThreshold = 30000, // 30 seconds default
     debug = false
   } = config;
-  
+
   // [MobileHeatDebug] Detect mobile devices and increase polling intervals
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
@@ -85,21 +85,46 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
   const [, forceUpdate] = useReducer(x => x + 1, 0);
   const lastIntervalRef = useRef<number | false | null>(null);
 
+  // 🎯 FIX: Stabilize queryKey for dependency comparison
+  // Arrays are compared by reference, so ['a', 'b'] !== ['a', 'b'] on every render
+  // Use a ref to store current queryKey so callback always has latest without needing it in deps
+  const queryKeyRef = useRef(queryKey);
+  queryKeyRef.current = queryKey;
+  const queryKeyString = JSON.stringify(queryKey);
+
+  // 🎯 FIX: Throttle forceUpdate to prevent rapid re-renders
+  // DataFreshnessManager can emit many notifications in quick succession
+  const pendingUpdateRef = useRef(false);
+  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     // Subscribe to freshness manager updates
     const unsubscribe = dataFreshnessManager.subscribe(() => {
       // 🎯 OPTIMIZATION: Only re-render if the calculated polling interval actually changes
-      const currentInterval = dataFreshnessManager.getPollingInterval(queryKey);
+      const currentInterval = dataFreshnessManager.getPollingInterval(queryKeyRef.current);
       if (lastIntervalRef.current !== currentInterval) {
         if (debug) {
-          console.log(`[SmartPolling] 🔄 Polling interval changed for ${JSON.stringify(queryKey)}: ${lastIntervalRef.current} -> ${currentInterval}`);
+          console.log(`[SmartPolling] 🔄 Polling interval changed for ${queryKeyString}: ${lastIntervalRef.current} -> ${currentInterval}`);
         }
-        forceUpdate();
+        // 🎯 THROTTLE: Batch rapid updates into a single re-render
+        if (!pendingUpdateRef.current) {
+          pendingUpdateRef.current = true;
+          // Use microtask to batch synchronous notifications
+          queueMicrotask(() => {
+            pendingUpdateRef.current = false;
+            forceUpdate();
+          });
+        }
       }
     });
 
-    return unsubscribe;
-  }, [queryKey, debug]);
+    return () => {
+      unsubscribe();
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current);
+      }
+    };
+  }, [queryKeyString, debug]);
 
   // Get current state from freshness manager
   const pollingInterval = dataFreshnessManager.getPollingInterval(queryKey);

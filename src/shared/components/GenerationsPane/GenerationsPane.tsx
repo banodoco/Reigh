@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import { useRenderCount } from '@/shared/components/debug/RefactorMetricsCollector';
 import { useSlidingPane } from '@/shared/hooks/useSlidingPane';
@@ -11,6 +11,7 @@ import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye, Spa
 import { ImageGenerationModal } from '@/shared/components/ImageGenerationModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
+import { getLayoutForAspectRatio } from '@/shared/components/ImageGallery/utils';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -35,7 +36,9 @@ import {
   SelectValue,
 } from '@/shared/components/ui/select';
 import { PANE_CONFIG } from '@/shared/config/panes';
-const GENERATIONS_PER_PAGE = 18;
+
+// Fallback rows for pane (smaller than full page galleries)
+const PANE_ROWS = 3;
 
 const GenerationsPaneComponent: React.FC = () => {
   // [RefactorMetrics] Track render count for baseline measurements
@@ -65,8 +68,19 @@ const GenerationsPaneComponent: React.FC = () => {
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;
   const shouldEnableDataLoading = isOnGenerationsPage || isGenerationsPaneOpen;
-  
+
   const isMobile = useIsMobile();
+
+  // Compute aspect-ratio-aware layout for the pane
+  // Uses fewer rows than full-page galleries since this is a sliding pane
+  const paneLayout = useMemo(() => {
+    const layout = getLayoutForAspectRatio(projectAspectRatio, isMobile);
+    // Override itemsPerPage to use fewer rows for the pane
+    const paneItemsPerPage = layout.columns * PANE_ROWS;
+    return { ...layout, itemsPerPage: paneItemsPerPage };
+  }, [projectAspectRatio, isMobile]);
+
+  const GENERATIONS_PER_PAGE = paneLayout.itemsPerPage;
   const { currentShotId } = useCurrentShot();
 
   // iOS browser chrome detection for bottom offset
@@ -704,8 +718,8 @@ const GenerationsPaneComponent: React.FC = () => {
         >
             {isLoading && (
                 <SkeletonGallery
-                    count={expectedItemCount ?? 12}
-                    columns={{ base: 2, sm: 3, md: 4, lg: 5, xl: 6, '2xl': 6 }}
+                    count={expectedItemCount ?? GENERATIONS_PER_PAGE}
+                    columns={paneLayout.skeletonColumns}
                     gapClasses="gap-2 sm:gap-4"
                     whiteText={true}
                     showControls={false}
@@ -759,7 +773,8 @@ const GenerationsPaneComponent: React.FC = () => {
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
                     totalCount={totalCount}
                     whiteText
-                    columnsPerRow={6}
+                    columnsPerRow={paneLayout.columns}
+                    itemsPerPage={GENERATIONS_PER_PAGE}
                     initialMediaTypeFilter={mediaTypeFilter}
                     onMediaTypeFilterChange={setMediaTypeFilter}
                     initialStarredFilter={starredOnly}
