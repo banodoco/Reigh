@@ -99,10 +99,10 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
     <>
       <div
         className={cn(
-          "relative group cursor-pointer transition-all duration-200 rounded-lg overflow-hidden border-4",
-          isSelected 
-            ? "border-blue-500 ring-4 ring-blue-200 dark:ring-blue-800" 
-            : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
+          "relative group cursor-pointer rounded-lg overflow-hidden border-4",
+          isSelected
+            ? "border-blue-500 ring-4 ring-blue-200 dark:ring-blue-800"
+            : "border-transparent"
         )}
         onClick={handleContainerClick}
         style={getAspectRatioStyle()}
@@ -113,11 +113,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           src={shouldLoad ? displayImageUrl : undefined}
           alt={`Generated image ${index + 1}`}
           className={cn(
-            "w-full h-full object-cover transition-opacity duration-300",
-            !shouldLoad && "bg-gray-100 dark:bg-gray-800",
-            // Remove blur effect on mobile - it's too aggressive and causes poor UX
-            // progressiveEnabled && isThumbShowing && !isFullLoaded && "filter blur-sm",
-            progressiveEnabled && isFullLoaded && "filter blur-none"
+            "w-full h-full object-cover",
+            !shouldLoad && "bg-gray-100 dark:bg-gray-800"
           )}
           loading="lazy"
         />
