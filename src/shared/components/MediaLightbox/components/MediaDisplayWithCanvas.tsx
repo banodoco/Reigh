@@ -225,16 +225,6 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
 
   const mediaStyle = getMediaStyle();
 
-  // Debug logging for media URL - ALL TOP LEVEL
-  console.log(`[${debugContext}] 🎬 ========== RENDERING ==========`);
-  console.log(`[${debugContext}] effectiveImageUrl:`, effectiveImageUrl);
-  console.log(`[${debugContext}] thumbUrl:`, thumbUrl);
-  console.log(`[${debugContext}] isVideo:`, isVideo);
-  console.log(`[${debugContext}] variant:`, variant);
-  console.log(`[${debugContext}] hasUrl:`, !!effectiveImageUrl);
-  console.log(`[${debugContext}] urlLength:`, effectiveImageUrl?.length || 0);
-  console.log(`[${debugContext}] ========================================`);
-
   // Check if URL is missing
   if (!effectiveImageUrl) {
     console.error(`[${debugContext}] ❌ Missing effectiveImageUrl!`);

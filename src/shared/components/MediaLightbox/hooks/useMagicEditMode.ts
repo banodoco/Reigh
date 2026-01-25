@@ -112,21 +112,24 @@ export const useMagicEditMode = ({
 
   // Track if user has manually exited edit mode to prevent auto-re-enter
   const hasManuallyExitedRef = useRef(false);
+  // Guard against double-entry during async state updates
+  const isEnteringEditModeRef = useRef(false);
 
-  // Reset manual exit flag when media changes
+  // Reset flags when media changes
   useEffect(() => {
     hasManuallyExitedRef.current = false;
+    isEnteringEditModeRef.current = false;
   }, [media.id]);
 
   const handleEnterMagicEditMode = useCallback(() => {
-    console.log('[MobilePaintDebug] ✨ Entering unified edit mode - START');
-    
+    // Prevent double-entry while state is updating
+    if (isEnteringEditModeRef.current) {
+      return;
+    }
+    isEnteringEditModeRef.current = true;
+
     setIsMagicEditMode(true);
-    console.log('[MobilePaintDebug] ✨ Called setIsMagicEditMode(true)');
-    
-    console.log('[MobilePaintDebug] About to call handleEnterInpaintMode, ref exists:', !!handleEnterInpaintMode);
     handleEnterInpaintMode();
-    console.log('[MobilePaintDebug] ✨ Called handleEnterInpaintMode()');
   }, [handleEnterInpaintMode]);
 
   const handleExitMagicEditMode = useCallback(() => {
@@ -139,19 +142,13 @@ export const useMagicEditMode = ({
 
   // Auto-enter unified edit mode if requested (only once, not after manual exit)
   useEffect(() => {
-    console.log('[EditModeDebug] Auto-enter effect check:', {
-      autoEnterInpaint,
-      isInpaintMode,
-      isMagicEditMode,
-      isVideo,
-      selectedProjectId,
-      hasManuallyExited: hasManuallyExitedRef.current,
-      willEnter: autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && !!selectedProjectId && !hasManuallyExitedRef.current,
-      timestamp: Date.now()
-    });
-    
-    if (autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && selectedProjectId && !hasManuallyExitedRef.current) {
-      console.log('[EditModeDebug] 🎨 Auto-entering unified edit mode NOW');
+    // Reset entry guard once we're actually in edit mode
+    if (isInpaintMode || isMagicEditMode) {
+      isEnteringEditModeRef.current = false;
+      return;
+    }
+
+    if (autoEnterInpaint && !isVideo && selectedProjectId && !hasManuallyExitedRef.current) {
       handleEnterMagicEditMode();
     }
   }, [autoEnterInpaint, isInpaintMode, isMagicEditMode, isVideo, selectedProjectId, handleEnterMagicEditMode]);
@@ -176,15 +173,6 @@ export const useMagicEditMode = ({
 
   // Unified edit mode - merging inpaint and magic edit
   const isSpecialEditMode = isInpaintMode || isMagicEditMode;
-
-  // Debug logging for state changes
-  useEffect(() => {
-    console.log('[MediaLightbox] 🔄 State changed');
-    console.log('  - isInpaintMode:', isInpaintMode);
-    console.log('  - isMagicEditMode:', isMagicEditMode);
-    console.log('  - isSpecialEditMode:', isSpecialEditMode);
-    console.log('  - brushStrokesCount:', brushStrokes.length);
-  }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, brushStrokes.length]);
 
   // Unified generate handler - routes based on brush strokes
   const handleUnifiedGenerate = useCallback(async () => {

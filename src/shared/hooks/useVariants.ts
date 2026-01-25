@@ -60,15 +60,10 @@ export const useVariants = ({
   const queryClient = useQueryClient();
   const [activeVariantId, setActiveVariantIdInternal] = useState<string | null>(null);
   
-  // Wrap setActiveVariantId with logging
+  // Stable callback - no deps needed since we just forward to internal setter
   const setActiveVariantId = useCallback((variantId: string | null) => {
-    console.log('[VariantClickDebug] useVariants.setActiveVariantId called:', {
-      newVariantId: variantId?.substring(0, 8),
-      currentActiveVariantId: activeVariantId?.substring(0, 8),
-      generationId: generationId?.substring(0, 8),
-    });
     setActiveVariantIdInternal(variantId);
-  }, [activeVariantId, generationId]);
+  }, []);
 
   // Fetch variants for this generation
   const {
@@ -131,33 +126,23 @@ export const useVariants = ({
 
   // Get the active variant (selected or primary, fallback to first variant)
   const activeVariant = useMemo(() => {
-    console.log('[VariantClickDebug] useVariants.activeVariant computing:', {
-      activeVariantId: activeVariantId?.substring(0, 8),
-      variantsCount: variants?.length,
-      primaryVariantId: primaryVariant?.id?.substring(0, 8),
-    });
-
     if (activeVariantId) {
       const found = variants.find((v) => v.id === activeVariantId);
       if (found) {
-        console.log('[VariantClickDebug] useVariants.activeVariant found:', found.id.substring(0, 8));
         return found;
-    }
-      console.log('[VariantClickDebug] useVariants.activeVariant NOT FOUND in variants list!');
+      }
     }
     // Fall back to primary, then first variant if no primary exists
-    const fallback = primaryVariant || variants[0] || null;
-    console.log('[VariantClickDebug] useVariants.activeVariant using fallback:', fallback?.id?.substring(0, 8));
-    return fallback;
+    return primaryVariant || variants[0] || null;
   }, [variants, activeVariantId, primaryVariant]);
 
   // Initialize active variant to primary (or first variant) when variants load
-  // (only if no active variant is set)
-  useMemo(() => {
-    if (!activeVariantId) {
+  // NOTE: Using useEffect, not useMemo - side effects should not be in useMemo
+  useEffect(() => {
+    if (!activeVariantId && variants.length > 0) {
       const variantToSelect = primaryVariant || variants[0];
       if (variantToSelect) {
-        setActiveVariantId(variantToSelect.id);
+        setActiveVariantIdInternal(variantToSelect.id);
       }
     }
   }, [primaryVariant, variants, activeVariantId]);

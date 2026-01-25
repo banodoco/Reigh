@@ -100,7 +100,6 @@ export function useLastUsedEditSettings({
       if (projectStored) {
         const parsed = JSON.parse(projectStored);
         const merged = { ...DEFAULT_LAST_USED, ...parsed };
-        console.log('[PanelRestore] LOADED from localStorage:', { panelMode: merged.panelMode, projectId: projectId.substring(0, 8) });
         return merged;
       }
 
@@ -109,20 +108,21 @@ export function useLastUsedEditSettings({
       if (globalStored) {
         const parsed = JSON.parse(globalStored);
         const merged = { ...DEFAULT_LAST_USED, ...parsed };
-        console.log('[PanelRestore] LOADED from GLOBAL localStorage (fallback):', { panelMode: merged.panelMode });
         return merged;
       }
-
-      console.log('[PanelRestore] No localStorage found, using defaults:', { panelMode: DEFAULT_LAST_USED.panelMode });
     } catch (e) {
-      console.warn('[EDIT_DEBUG] ❌ LAST-USED LOAD: Failed to read localStorage:', e);
+      // Failed to read localStorage
     }
-    
+
     return DEFAULT_LAST_USED;
   }, [projectId]);
   
   // Use ref for current value to avoid re-render on every access
-  const currentValueRef = useRef<LastUsedEditSettings>(getLocalStorageValue());
+  // Lazy initialization to prevent getLocalStorageValue from running every render
+  const currentValueRef = useRef<LastUsedEditSettings | null>(null);
+  if (currentValueRef.current === null) {
+    currentValueRef.current = getLocalStorageValue();
+  }
   
   // Reset on project change
   useEffect(() => {

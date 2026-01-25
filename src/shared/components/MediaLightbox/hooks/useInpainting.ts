@@ -123,14 +123,6 @@ export const useInpainting = ({
   thumbnailUrl,
   initialEditMode,
 }: UseInpaintingProps): UseInpaintingReturn => {
-  console.log('[InpaintDebug] 🎣 useInpainting hook received props:', {
-    shotId: shotId?.substring(0, 8),
-    toolTypeOverride,
-    selectedProjectId: selectedProjectId?.substring(0, 8),
-    mediaId: media.id.substring(0, 8),
-    activeVariantId: activeVariantId?.substring(0, 8),
-  });
-  
   // Storage key uses variant ID if available, otherwise falls back to generation ID
   // This allows different strokes per variant
   const storageKey = activeVariantId
@@ -293,18 +285,13 @@ export const useInpainting = ({
   
   // Computed: current brush strokes based on mode (memoized to prevent redraw loops)
   const brushStrokes = useMemo(() => {
-    const strokes = editMode === 'annotate' ? annotationStrokes : editMode === 'inpaint' ? inpaintStrokes : [];
-    console.log('[AnnotateDebug] 🎨 brushStrokes recomputed', {
-      mode: editMode,
-      inpaintCount: inpaintStrokes.length,
-      annotationCount: annotationStrokes.length,
-      activeCount: strokes.length,
-      mediaId: media.id.substring(0, 8)
-    });
-    return strokes;
-  }, [editMode, annotationStrokes, inpaintStrokes, media.id]);
-  
-  const setBrushStrokes = editMode === 'annotate' ? setAnnotationStrokes : setInpaintStrokes;
+    return editMode === 'annotate' ? annotationStrokes : editMode === 'inpaint' ? inpaintStrokes : [];
+  }, [editMode, annotationStrokes, inpaintStrokes]);
+
+  // Memoize setBrushStrokes to prevent callback recreation on every render
+  const setBrushStrokes = useMemo(() => {
+    return editMode === 'annotate' ? setAnnotationStrokes : setInpaintStrokes;
+  }, [editMode]);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [isDraggingShape, setIsDraggingShape] = useState(false);
   const [isDraggingControlPoint, setIsDraggingControlPoint] = useState(false);
@@ -593,15 +580,6 @@ export const useInpainting = ({
       transitionRafRef.current = null;
     });
   }, [media.id, isInpaintMode, loadEditModeFromDB, saveEditModeToDB]); // FIXED: Removed stroke state from deps (only trigger on media.id/mode changes)
-  
-  console.log('[InpaintPaint] 🔍 Hook initialized with refs', {
-    hasDisplayCanvasRef: !!displayCanvasRef,
-    hasDisplayCanvas: !!displayCanvasRef?.current,
-    hasMaskCanvasRef: !!maskCanvasRef,
-    hasMaskCanvas: !!maskCanvasRef?.current,
-    hasImageContainerRef: !!imageContainerRef,
-    hasImageContainer: !!imageContainerRef?.current
-  });
 
   // Load saved settings from localStorage ONLY when entering inpaint mode for the first time
   // (media changes are handled by useLayoutEffect above, which uses cache first)
@@ -842,6 +820,9 @@ export const useInpainting = ({
   // Track last initialized media to avoid redundant effect runs
   const lastInitializedMediaRef = useRef<string | null>(null);
 
+  // Track if we're currently loading to prevent duplicate loads
+  const isLoadingImageRef = useRef(false);
+
   // ============================================
   // Canvas-based image loading effect
   // ============================================
@@ -851,25 +832,23 @@ export const useInpainting = ({
       return;
     }
 
-    // Skip if already loaded this URL
-    if (loadedImageUrlRef.current === imageUrl && loadedImage) {
+    // Skip if already loaded this URL (check both thumbnail and full image URLs)
+    const urlToLoad = thumbnailUrl || imageUrl;
+    if (loadedImageUrlRef.current === imageUrl || loadedImageUrlRef.current === urlToLoad) {
       return;
     }
 
-    console.log('[CanvasImage] 🖼️ Loading image:', imageUrl.substring(0, 60));
+    // Skip if already loading
+    if (isLoadingImageRef.current) {
+      return;
+    }
+
+    isLoadingImageRef.current = true;
     setIsImageLoaded(false);
     setImageLoadError(null);
 
-    // Load thumbnail first if available, then full image
-    const urlToLoad = thumbnailUrl || imageUrl;
-
     loadImageFromUrl(urlToLoad)
       .then((img) => {
-        console.log('[CanvasImage] ✅ Image loaded:', {
-          url: urlToLoad.substring(0, 60),
-          naturalWidth: img.naturalWidth,
-          naturalHeight: img.naturalHeight,
-        });
         setLoadedImage(img);
         setIsImageLoaded(true);
         loadedImageUrlRef.current = urlToLoad;
@@ -878,21 +857,25 @@ export const useInpainting = ({
         if (thumbnailUrl && thumbnailUrl !== imageUrl) {
           loadImageFromUrl(imageUrl)
             .then((fullImg) => {
-              console.log('[CanvasImage] ✅ Full image loaded, swapping');
               setLoadedImage(fullImg);
               loadedImageUrlRef.current = imageUrl;
+              isLoadingImageRef.current = false;
             })
-            .catch((err) => {
-              console.warn('[CanvasImage] ⚠️ Full image failed, keeping thumbnail:', err);
+            .catch(() => {
+              // Keep thumbnail if full image fails
+              isLoadingImageRef.current = false;
             });
+        } else {
+          isLoadingImageRef.current = false;
         }
       })
       .catch((err) => {
-        console.error('[CanvasImage] ❌ Image load error:', err);
         setImageLoadError(err.message || 'Failed to load image');
         setIsImageLoaded(false);
+        isLoadingImageRef.current = false;
       });
-  }, [imageUrl, thumbnailUrl, isInpaintMode, loadImageFromUrl, loadedImage]);
+  }, [imageUrl, thumbnailUrl, isInpaintMode, loadImageFromUrl]);
+  // NOTE: Removed loadedImage from deps - it was causing a render loop!
 
   // ============================================
   // Canvas sizing effect
@@ -1425,10 +1408,35 @@ export const useInpainting = ({
     };
   }, [isInpaintMode, handleResize, imageContainerRef, imageUrl]);
 
+  // Helper function to get the 4 corners of a rectangle (handles both 2-point and 4-point forms)
+  // Defined first since other helpers depend on it
+  const getRectangleCorners = useCallback((stroke: BrushStroke): Array<{ x: number; y: number }> => {
+    if (stroke.isFreeForm && stroke.points.length === 4) {
+      // Free-form quadrilateral - return points as-is
+      return stroke.points;
+    }
+
+    // Standard rectangle - calculate 4 corners from 2 points
+    const startPoint = stroke.points[0];
+    const endPoint = stroke.points[stroke.points.length - 1];
+
+    const minX = Math.min(startPoint.x, endPoint.x);
+    const maxX = Math.max(startPoint.x, endPoint.x);
+    const minY = Math.min(startPoint.y, endPoint.y);
+    const maxY = Math.max(startPoint.y, endPoint.y);
+
+    return [
+      { x: minX, y: minY }, // top-left (0)
+      { x: maxX, y: minY }, // top-right (1)
+      { x: maxX, y: maxY }, // bottom-right (2)
+      { x: minX, y: maxY }  // bottom-left (3)
+    ];
+  }, []);
+
   // Helper function to detect if a point is near a shape
-  const isPointOnShape = (x: number, y: number, stroke: BrushStroke, threshold: number = 15): boolean => {
+  const isPointOnShape = useCallback((x: number, y: number, stroke: BrushStroke, threshold: number = 15): boolean => {
     if (!stroke.shapeType || stroke.shapeType === 'line') return false;
-    
+
     if (stroke.shapeType === 'rectangle') {
       // For free-form rectangles, calculate bounding box from all corners
       if (stroke.isFreeForm && stroke.points.length === 4) {
@@ -1436,11 +1444,11 @@ export const useInpainting = ({
         const maxX = Math.max(...stroke.points.map(p => p.x));
         const minY = Math.min(...stroke.points.map(p => p.y));
         const maxY = Math.max(...stroke.points.map(p => p.y));
-        
-        return x >= minX - threshold && x <= maxX + threshold && 
+
+        return x >= minX - threshold && x <= maxX + threshold &&
                y >= minY - threshold && y <= maxY + threshold;
       }
-      
+
       // Standard rectangle - use first and last points
       const startPoint = stroke.points[0];
       const endPoint = stroke.points[stroke.points.length - 1];
@@ -1448,83 +1456,59 @@ export const useInpainting = ({
       const maxX = Math.max(startPoint.x, endPoint.x);
       const minY = Math.min(startPoint.y, endPoint.y);
       const maxY = Math.max(startPoint.y, endPoint.y);
-      
+
       // Check if point is inside the rectangle (with threshold for easier selection)
-      return x >= minX - threshold && x <= maxX + threshold && 
+      return x >= minX - threshold && x <= maxX + threshold &&
              y >= minY - threshold && y <= maxY + threshold;
     }
-    
+
     return false;
-  };
+  }, []);
 
   // Helper function to get which corner is clicked (returns index 0-3 or null)
-  const getClickedCornerIndex = (x: number, y: number, stroke: BrushStroke, threshold: number = 15): number | null => {
+  const getClickedCornerIndex = useCallback((x: number, y: number, stroke: BrushStroke, threshold: number = 15): number | null => {
     if (stroke.shapeType !== 'rectangle') return null;
-    
+
     const corners = getRectangleCorners(stroke);
-    
+
     for (let i = 0; i < corners.length; i++) {
       const dist = Math.hypot(x - corners[i].x, y - corners[i].y);
       if (dist <= threshold) {
         return i;
       }
     }
-    
+
     return null;
-  };
-  
-  // Helper function to get the 4 corners of a rectangle (handles both 2-point and 4-point forms)
-  const getRectangleCorners = (stroke: BrushStroke): Array<{ x: number; y: number }> => {
-    if (stroke.isFreeForm && stroke.points.length === 4) {
-      // Free-form quadrilateral - return points as-is
-      return stroke.points;
-    }
-    
-    // Standard rectangle - calculate 4 corners from 2 points
-    const startPoint = stroke.points[0];
-    const endPoint = stroke.points[stroke.points.length - 1];
-    
-    const minX = Math.min(startPoint.x, endPoint.x);
-    const maxX = Math.max(startPoint.x, endPoint.x);
-    const minY = Math.min(startPoint.y, endPoint.y);
-    const maxY = Math.max(startPoint.y, endPoint.y);
-    
-    return [
-      { x: minX, y: minY }, // top-left (0)
-      { x: maxX, y: minY }, // top-right (1)
-      { x: maxX, y: maxY }, // bottom-right (2)
-      { x: minX, y: maxY }  // bottom-left (3)
-    ];
-  };
+  }, [getRectangleCorners]);
 
   // Helper function to detect if click is on edge or corner of rectangle
   // Returns 'corner' if on a corner (for resizing), 'edge' if on an edge (for moving), null if neither
-  const getRectangleClickType = (x: number, y: number, stroke: BrushStroke, threshold: number = 15): 'corner' | 'edge' | null => {
+  const getRectangleClickType = useCallback((x: number, y: number, stroke: BrushStroke, threshold: number = 15): 'corner' | 'edge' | null => {
     if (stroke.shapeType !== 'rectangle') return null;
-    
+
     // Check corners first
     if (getClickedCornerIndex(x, y, stroke, threshold) !== null) {
       return 'corner';
     }
-    
+
     // Check edges
     const corners = getRectangleCorners(stroke);
     const minX = Math.min(...corners.map(c => c.x));
     const maxX = Math.max(...corners.map(c => c.x));
     const minY = Math.min(...corners.map(c => c.y));
     const maxY = Math.max(...corners.map(c => c.y));
-    
+
     const onLeftEdge = Math.abs(x - minX) <= threshold && y >= minY - threshold && y <= maxY + threshold;
     const onRightEdge = Math.abs(x - maxX) <= threshold && y >= minY - threshold && y <= maxY + threshold;
     const onTopEdge = Math.abs(y - minY) <= threshold && x >= minX - threshold && x <= maxX + threshold;
     const onBottomEdge = Math.abs(y - maxY) <= threshold && x >= minX - threshold && x <= maxX + threshold;
-    
+
     if (onLeftEdge || onRightEdge || onTopEdge || onBottomEdge) {
       return 'edge';
     }
-    
+
     return null;
-  };
+  }, [getClickedCornerIndex, getRectangleCorners]);
 
   // drawArrow helper function removed (not needed for rectangles)
 

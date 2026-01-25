@@ -98,14 +98,6 @@ export function useEditSettingsPersistence({
   projectId,
   enabled = true,
 }: UseEditSettingsPersistenceProps): UseEditSettingsPersistenceReturn {
-  
-  console.log('[EDIT_DEBUG] ═══════════════════════════════════════════════════════════════');
-  console.log('[EDIT_DEBUG] 🚀 useEditSettingsPersistence HOOK CALLED');
-  console.log('[EDIT_DEBUG] 🚀 generationId:', generationId?.substring(0, 8) || 'null');
-  console.log('[EDIT_DEBUG] 🚀 projectId:', projectId?.substring(0, 8) || 'null');
-  console.log('[EDIT_DEBUG] 🚀 enabled:', enabled);
-  console.log('[EDIT_DEBUG] ═══════════════════════════════════════════════════════════════');
-  
   // Per-generation settings
   const generationSettings = useGenerationEditSettings({
     generationId,
@@ -132,44 +124,22 @@ export function useEditSettingsPersistence({
     }
   }, [generationId]);
   
+  // Extract stable references for the initialization effect
+  const { isLoading: genIsLoading, hasPersistedSettings, initializeFromLastUsed } = generationSettings;
+  const { lastUsed } = lastUsedSettings;
+
   // Initialize from "last used" when generation loads without persisted settings
   useEffect(() => {
-    if (
-      !generationSettings.isLoading && 
-      !hasInitializedRef.current &&
-      !generationSettings.hasPersistedSettings &&
-      generationId
-    ) {
+    if (!genIsLoading && !hasInitializedRef.current && !hasPersistedSettings && generationId) {
       hasInitializedRef.current = true;
-      
-      console.log('[EDIT_DEBUG] 🎯 COORDINATOR: No persisted settings, initializing from "last used"');
-      console.log('[EDIT_DEBUG] 🎯 COORDINATOR: generationId:', generationId.substring(0, 8));
-      console.log('[EDIT_DEBUG] 🎯 COORDINATOR: lastUsed.editMode:', lastUsedSettings.lastUsed.editMode);
-      console.log('[EDIT_DEBUG] 🎯 COORDINATOR: lastUsed.loraMode:', lastUsedSettings.lastUsed.loraMode);
-      console.log('[EDIT_DEBUG] 🎯 COORDINATOR: lastUsed.numGenerations:', lastUsedSettings.lastUsed.numGenerations);
-      
       // Apply "last used" settings (without prompt)
-      generationSettings.initializeFromLastUsed(lastUsedSettings.lastUsed);
-      
-      // Mark as ready - the values will be computed from lastUsed below
+      initializeFromLastUsed(lastUsed);
       setIsReady(true);
-    } else if (!generationSettings.isLoading && !hasInitializedRef.current && generationSettings.hasPersistedSettings) {
+    } else if (!genIsLoading && !hasInitializedRef.current && hasPersistedSettings) {
       hasInitializedRef.current = true;
       setIsReady(true);
-      console.log('[EDIT_DEBUG] ✅ COORDINATOR: Using persisted settings from DB');
-      console.log('[EDIT_DEBUG] ✅ COORDINATOR: generationId:', generationId?.substring(0, 8));
-      console.log('[EDIT_DEBUG] ✅ COORDINATOR: editMode:', generationSettings.settings.editMode);
-      console.log('[EDIT_DEBUG] ✅ COORDINATOR: loraMode:', generationSettings.settings.loraMode);
     }
-  }, [
-    generationId,
-    generationSettings.isLoading, 
-    generationSettings.hasPersistedSettings,
-    generationSettings.initializeFromLastUsed,
-    lastUsedSettings.lastUsed,
-    generationSettings.settings.editMode,
-    generationSettings.settings.loraMode,
-  ]);
+  }, [generationId, genIsLoading, hasPersistedSettings, initializeFromLastUsed, lastUsed]);
   
   // Compute effective values
   // editMode is ALWAYS from lastUsed (user-level, not per-generation) so it stays consistent across images/videos
@@ -223,82 +193,84 @@ export function useEditSettingsPersistence({
     lastUsedSettings.lastUsed,
   ]);
   
+  // Extract stable function references to avoid recreating callbacks on every render
+  // (the parent objects are recreated each render, but these functions are stable)
+  const { updateLastUsed } = lastUsedSettings;
+  const {
+    setLoraMode: genSetLoraMode,
+    setCustomLoraUrl: genSetCustomLoraUrl,
+    setNumGenerations: genSetNumGenerations,
+    setPrompt: genSetPrompt,
+    setQwenEditModel: genSetQwenEditModel,
+    setImg2imgPrompt: genSetImg2imgPrompt,
+    setImg2imgStrength: genSetImg2imgStrength,
+    setImg2imgEnablePromptExpansion: genSetImg2imgEnablePromptExpansion,
+    setAdvancedSettings: genSetAdvancedSettings,
+  } = generationSettings;
+
   // Wrapper setters that also update "last used" (except prompt)
-  // IMPORTANT: memoize these so downstream effects don't fire every render.
   // editMode is user-level only (not per-generation) so it stays consistent across images/videos
   const setEditMode = useCallback((mode: EditMode) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: editMode →', mode, '(user-level only)');
-    lastUsedSettings.updateLastUsed({ editMode: mode });
-  }, [lastUsedSettings]);
-  
+    updateLastUsed({ editMode: mode });
+  }, [updateLastUsed]);
+
   const setLoraMode = useCallback((mode: LoraMode) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: loraMode →', mode);
-    generationSettings.setLoraMode(mode);
-    lastUsedSettings.updateLastUsed({ loraMode: mode });
-  }, [generationSettings, lastUsedSettings]);
-  
+    genSetLoraMode(mode);
+    updateLastUsed({ loraMode: mode });
+  }, [genSetLoraMode, updateLastUsed]);
+
   const setCustomLoraUrl = useCallback((url: string) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: customLoraUrl →', url || '(empty)');
-    generationSettings.setCustomLoraUrl(url);
-    lastUsedSettings.updateLastUsed({ customLoraUrl: url });
-  }, [generationSettings, lastUsedSettings]);
-  
+    genSetCustomLoraUrl(url);
+    updateLastUsed({ customLoraUrl: url });
+  }, [genSetCustomLoraUrl, updateLastUsed]);
+
   const setNumGenerations = useCallback((num: number) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: numGenerations →', num);
-    generationSettings.setNumGenerations(num);
-    lastUsedSettings.updateLastUsed({ numGenerations: num });
-  }, [generationSettings, lastUsedSettings]);
-  
+    genSetNumGenerations(num);
+    updateLastUsed({ numGenerations: num });
+  }, [genSetNumGenerations, updateLastUsed]);
+
   // Prompt only saves to generation (never to "last used")
   const setPrompt = useCallback((prompt: string) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: prompt →', prompt ? `"${prompt.substring(0, 30)}..."` : '(empty)');
-    generationSettings.setPrompt(prompt);
-  }, [generationSettings]);
+    genSetPrompt(prompt);
+  }, [genSetPrompt]);
 
   // Model selection (saves to generation, cloud mode only)
   const setQwenEditModel = useCallback((model: QwenEditModel) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: qwenEditModel →', model);
-    generationSettings.setQwenEditModel(model);
-  }, [generationSettings]);
+    genSetQwenEditModel(model);
+  }, [genSetQwenEditModel]);
 
   // Img2Img prompt only saves to generation (never to "last used")
   const setImg2imgPrompt = useCallback((prompt: string) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: img2imgPrompt →', prompt ? `"${prompt.substring(0, 30)}..."` : '(empty)');
-    generationSettings.setImg2imgPrompt(prompt);
-  }, [generationSettings]);
+    genSetImg2imgPrompt(prompt);
+  }, [genSetImg2imgPrompt]);
 
   // Img2Img setters (save to both generation and "last used")
   const setImg2imgStrength = useCallback((strength: number) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: img2imgStrength →', strength);
-    generationSettings.setImg2imgStrength(strength);
-    lastUsedSettings.updateLastUsed({ img2imgStrength: strength });
-  }, [generationSettings, lastUsedSettings]);
-  
+    genSetImg2imgStrength(strength);
+    updateLastUsed({ img2imgStrength: strength });
+  }, [genSetImg2imgStrength, updateLastUsed]);
+
   const setImg2imgEnablePromptExpansion = useCallback((enabled: boolean) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: img2imgEnablePromptExpansion →', enabled);
-    generationSettings.setImg2imgEnablePromptExpansion(enabled);
-    lastUsedSettings.updateLastUsed({ img2imgEnablePromptExpansion: enabled });
-  }, [generationSettings, lastUsedSettings]);
-  
+    genSetImg2imgEnablePromptExpansion(enabled);
+    updateLastUsed({ img2imgEnablePromptExpansion: enabled });
+  }, [genSetImg2imgEnablePromptExpansion, updateLastUsed]);
+
   // Advanced settings setter (merges with existing, saves to both generation and "last used")
   const setAdvancedSettings = useCallback((updates: Partial<EditAdvancedSettings>) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: advancedSettings →', updates);
-    generationSettings.setAdvancedSettings(updates);
+    genSetAdvancedSettings(updates);
     // Merge updates with current advancedSettings for lastUsed
     const currentAdvanced = effectiveSettings.advancedSettings ?? DEFAULT_ADVANCED_SETTINGS;
-    lastUsedSettings.updateLastUsed({ advancedSettings: { ...currentAdvanced, ...updates } });
-  }, [generationSettings, lastUsedSettings, effectiveSettings.advancedSettings]);
+    updateLastUsed({ advancedSettings: { ...currentAdvanced, ...updates } });
+  }, [genSetAdvancedSettings, updateLastUsed, effectiveSettings.advancedSettings]);
 
   // Video/Panel mode setters (only save to "last used", not per-generation)
   const setVideoEditSubMode = useCallback((mode: VideoEditSubMode) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: videoEditSubMode →', mode);
-    lastUsedSettings.updateLastUsed({ videoEditSubMode: mode });
-  }, [lastUsedSettings]);
+    updateLastUsed({ videoEditSubMode: mode });
+  }, [updateLastUsed]);
 
   const setPanelMode = useCallback((mode: PanelMode) => {
-    console.log('[EDIT_DEBUG] 🔧 SET: panelMode →', mode);
-    lastUsedSettings.updateLastUsed({ panelMode: mode });
-  }, [lastUsedSettings]);
+    updateLastUsed({ panelMode: mode });
+  }, [updateLastUsed]);
 
   // Computed LoRAs based on mode (replaces useEditModeLoRAs logic)
   const editModeLoRAs = useMemo(() => {
@@ -324,24 +296,6 @@ export function useEditSettingsPersistence({
   const setIsInSceneBoostEnabled = (enabled: boolean) => {
     setLoraMode(enabled ? 'in-scene' : 'none');
   };
-  
-  // Log the final effective values being returned
-  console.log('[EDIT_DEBUG] ───────────────────────────────────────────────────────────────');
-  console.log('[EDIT_DEBUG] 📊 useEditSettingsPersistence RETURNING:');
-  console.log('[EDIT_DEBUG] 📊 isLoading:', generationSettings.isLoading);
-  console.log('[EDIT_DEBUG] 📊 isReady:', isReady);
-  console.log('[EDIT_DEBUG] 📊 hasPersistedSettings:', generationSettings.hasPersistedSettings);
-  console.log('[EDIT_DEBUG] 📊 editMode:', effectiveSettings.editMode);
-  console.log('[EDIT_DEBUG] 📊 loraMode:', effectiveSettings.loraMode);
-  console.log('[EDIT_DEBUG] 📊 numGenerations:', effectiveSettings.numGenerations);
-  console.log('[EDIT_DEBUG] 📊 prompt:', effectiveSettings.prompt ? `"${effectiveSettings.prompt.substring(0, 30)}..."` : '(empty)');
-  console.log('[EDIT_DEBUG] 📊 img2imgPrompt:', effectiveSettings.img2imgPrompt ? `"${effectiveSettings.img2imgPrompt.substring(0, 30)}..."` : '(empty)');
-  console.log('[EDIT_DEBUG] 📊 img2imgPromptHasBeenSet:', effectiveSettings.img2imgPromptHasBeenSet);
-  console.log('[EDIT_DEBUG] 📊 img2imgStrength:', effectiveSettings.img2imgStrength);
-  console.log('[EDIT_DEBUG] 📊 img2imgEnablePromptExpansion:', effectiveSettings.img2imgEnablePromptExpansion);
-  console.log('[EDIT_DEBUG] 📊 videoEditSubMode:', lastUsedSettings.lastUsed.videoEditSubMode);
-  console.log('[EDIT_DEBUG] 📊 panelMode:', lastUsedSettings.lastUsed.panelMode);
-  console.log('[EDIT_DEBUG] ───────────────────────────────────────────────────────────────');
 
   return {
     // Current values (using effective settings to avoid race condition)
