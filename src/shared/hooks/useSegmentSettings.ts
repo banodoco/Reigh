@@ -231,7 +231,7 @@ export function useSegmentSettings({
       return result;
     },
     enabled: !!shotId,
-    staleTime: 30000,
+    staleTime: 0, // Always refetch - shot settings can change from BatchSettingsForm
   });
 
   // Convert ShotVideoSettings to ShotBatchSettings for compatibility with existing merge logic
@@ -647,15 +647,14 @@ export function useSegmentSettings({
         resultLoraCount: result?.selectedLoras?.length ?? 0,
       });
 
-      // Invalidate and refetch query caches so changes are visible everywhere:
-      console.log(`[SetAsShotDefaults] 🔄 Invalidating and refetching query caches...`);
-      // 1. useSegmentSettings uses this key
-      await queryClient.invalidateQueries({ queryKey: ['shot-batch-settings', shotId] });
+      // Refetch query caches so changes are visible everywhere:
+      console.log(`[SetAsShotDefaults] 🔄 Refetching query caches...`);
+      // 1. useSegmentSettings uses this key - refetch to update placeholders immediately
+      await queryClient.refetchQueries({ queryKey: ['shot-batch-settings', shotId] });
       // 2. useToolSettings / useShotSettings uses 'toolSettings' (not 'tool-settings')
       //    Key format: ['toolSettings', toolId, projectId, shotId]
-      //    Use refetchQueries to force immediate refetch (invalidate alone may not trigger re-render)
       await queryClient.refetchQueries({ queryKey: ['toolSettings', 'travel-between-images'] });
-      console.log(`[SetAsShotDefaults] ✅ Query caches invalidated and refetched`);
+      console.log(`[SetAsShotDefaults] ✅ Query caches refetched`);
 
       return true;
     } catch (error) {

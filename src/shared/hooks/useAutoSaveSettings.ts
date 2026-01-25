@@ -230,6 +230,11 @@ export function useAutoSaveSettings<T extends Record<string, any>>(
               ? ['toolSettings', currentToolId, projectId, pendingForEntity]
               : ['toolSettings', currentToolId, pendingForEntity, undefined];
             queryClient.invalidateQueries({ queryKey: cacheKey });
+
+            // Also refetch shot-batch-settings used by useSegmentSettings
+            if (currentScope === 'shot' && pendingForEntity) {
+              queryClient.refetchQueries({ queryKey: ['shot-batch-settings', pendingForEntity] });
+            }
             console.log('[useAutoSaveSettings] ✅ Cleanup flush succeeded, cache invalidated');
           })
           .catch(err => {

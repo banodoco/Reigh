@@ -684,10 +684,11 @@ export function useToolSettings<T>(
         }
       );
 
-      // Also invalidate shot-batch-settings cache used by useSegmentSettings
+      // Also refetch shot-batch-settings cache used by useSegmentSettings
       // This ensures "restore defaults" in segment settings picks up latest shot settings
+      // Use refetchQueries (not just invalidate) to force immediate update
       if (shotId) {
-        queryClient.invalidateQueries({ queryKey: ['shot-batch-settings', shotId] });
+        queryClient.refetchQueries({ queryKey: ['shot-batch-settings', shotId] });
       }
     },
     onError: (error: Error) => {
