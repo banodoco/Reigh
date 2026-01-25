@@ -118,6 +118,7 @@ import { VideoPortionEditor } from '@/tools/edit-video/components/VideoPortionEd
 import { MultiPortionTimeline } from '@/shared/components/VideoPortionTimeline';
 import { useVideoEditing } from './hooks/useVideoEditing';
 import { readSegmentOverrides } from '@/shared/utils/settingsMigration';
+import { deriveInputImages } from '@/tools/travel-between-images/components/TaskDetails/taskDetailsConfig';
 
 interface ShotOption {
   id: string;
@@ -1605,16 +1606,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       }
       // Otherwise keep variantParams which may already have orchestrator_details (e.g., clip_join)
 
-      // Extract input images from effectiveParams (full task params) for segment tasks
-      // Segment tasks store images in input_image_paths_resolved or individual_segment_params
-      let variantInputImages: string[] = [];
-      if (variantParams.image) {
-        variantInputImages = [variantParams.image];
-      } else if (Array.isArray(effectiveParams?.input_image_paths_resolved)) {
-        variantInputImages = effectiveParams.input_image_paths_resolved;
-      } else if (Array.isArray(effectiveParams?.individual_segment_params?.input_image_paths_resolved)) {
-        variantInputImages = effectiveParams.individual_segment_params.input_image_paths_resolved;
-      }
+      // Extract input images using shared utility
+      // This handles segment tasks (only segment images) vs full timeline tasks
+      const variantInputImages = deriveInputImages(effectiveParams);
 
       return {
         task: {
