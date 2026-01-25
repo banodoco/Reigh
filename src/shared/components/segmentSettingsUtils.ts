@@ -374,9 +374,10 @@ export function mergeSegmentSettings(
   // When in basic mode, phaseConfig is always undefined (invariant)
 
   // LoRAs: overrides > legacy > batch > none
+  // Note: overrides.loras !== undefined means the user has explicitly set loras (even if empty array)
   let loras: ActiveLora[] = [];
-  if (overrides.loras && overrides.loras.length > 0) {
-    // Convert LoraConfig[] to ActiveLora[]
+  if (overrides.loras !== undefined) {
+    // Segment has explicit lora override (could be empty array = "no loras")
     loras = overrides.loras.map((lora) => ({
       id: lora.id || lora.path,
       name: lora.name || lora.path.split('/').pop()?.replace('.safetensors', '') || lora.path,

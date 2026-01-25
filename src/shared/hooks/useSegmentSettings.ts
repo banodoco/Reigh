@@ -168,19 +168,26 @@ export function useSegmentSettings({
         return null;
       }
       const metadata = (data?.metadata as PairMetadata) || null;
+      // Use migration utility to show actual overrides (handles both old and new format)
+      const overrides = readSegmentOverrides(metadata as Record<string, any> | null);
       console.log('[useSegmentSettings] 📦 Pair metadata loaded:', {
         pairId: pairShotGenerationId.substring(0, 8),
-        hasPrompt: !!metadata?.pair_prompt,
-        hasNegPrompt: !!metadata?.pair_negative_prompt,
-        motionMode: metadata?.pair_motion_settings?.motion_mode ?? metadata?.user_overrides?.motion_mode ?? 'not set',
-        motionAmount: metadata?.pair_motion_settings?.amount_of_motion ?? metadata?.user_overrides?.amount_of_motion ?? 'not set',
-        hasPhaseConfig: !!metadata?.pair_phase_config,
-        phaseConfigFlowShift: metadata?.pair_phase_config?.flow_shift,
-        hasLoras: !!metadata?.pair_loras?.length,
-        numFrames: metadata?.pair_num_frames ?? 'not set',
-        randomSeed: metadata?.pair_random_seed ?? 'not set',
-        seed: metadata?.pair_seed ?? 'not set',
-        selectedPhasePresetId: metadata?.pair_selected_phase_preset_id ?? 'not set',
+        hasPrompt: overrides.prompt !== undefined,
+        promptPreview: overrides.prompt?.substring(0, 30) || '(none)',
+        hasNegPrompt: overrides.negativePrompt !== undefined,
+        motionMode: overrides.motionMode ?? 'not set',
+        amountOfMotion: overrides.amountOfMotion ?? 'not set',
+        hasPhaseConfig: overrides.phaseConfig !== undefined,
+        phaseConfigFlowShift: overrides.phaseConfig?.flow_shift,
+        hasLoras: overrides.loras !== undefined,
+        loraCount: overrides.loras?.length ?? 0,
+        numFrames: overrides.numFrames ?? 'not set',
+        randomSeed: overrides.randomSeed ?? 'not set',
+        seed: overrides.seed ?? 'not set',
+        selectedPhasePresetId: overrides.selectedPhasePresetId ?? 'not set',
+        // Also show if data is in old vs new location (for migration debugging)
+        hasOldFormat: !!metadata?.pair_prompt || !!metadata?.pair_motion_settings,
+        hasNewFormat: !!metadata?.segmentOverrides,
       });
       return metadata;
     },
@@ -261,9 +268,9 @@ export function useSegmentSettings({
       // Frame count: always from timeline (source of truth)
       numFrames: defaults.numFrames ?? 25,
 
-      // Seed settings from pair metadata
-      randomSeed: pairMetadata?.pair_random_seed ?? true,
-      seed: pairMetadata?.pair_seed,
+      // Seed settings from segment overrides (via migration utility)
+      randomSeed: pairOverrides.randomSeed ?? true,
+      seed: pairOverrides.seed,
 
       // Default for regeneration behavior
       makePrimaryVariant: false,
@@ -287,12 +294,13 @@ export function useSegmentSettings({
     // Use migration utility to read pair overrides from either old or new format
     const pairOverrides = readSegmentOverrides(pairMetadata as Record<string, any> | null);
     return {
-      prompt: !!pairOverrides.prompt,
-      negativePrompt: !!pairOverrides.negativePrompt,
+      // Check for field existence (not truthiness) so empty strings/arrays are recognized as overrides
+      prompt: pairOverrides.prompt !== undefined,
+      negativePrompt: pairOverrides.negativePrompt !== undefined,
       motionMode: pairOverrides.motionMode !== undefined,
       amountOfMotion: pairOverrides.amountOfMotion !== undefined,
       phaseConfig: pairOverrides.phaseConfig !== undefined,
-      loras: pairOverrides.loras !== undefined && pairOverrides.loras.length > 0,
+      loras: pairOverrides.loras !== undefined,
       selectedPhasePresetId: pairOverrides.selectedPhasePresetId !== undefined,
       structureMotionStrength: pairOverrides.structureMotionStrength !== undefined,
       structureTreatment: pairOverrides.structureTreatment !== undefined,
@@ -373,9 +381,11 @@ export function useSegmentSettings({
 
   // Update settings (local state only)
   const updateSettings = useCallback((updates: Partial<SegmentSettings>) => {
-    console.log(`[SetAsShotDefaults] updateSettings called:`, {
+    console.log(`[SegmentSaveDebug] updateSettings called:`, {
+      pairId: pairShotGenerationId?.substring(0, 8) || '(none)',
       keys: Object.keys(updates),
-      promptUpdate: updates.prompt?.substring(0, 30),
+      promptUpdate: updates.prompt?.substring(0, 30) || '(undefined or empty)',
+      negPromptUpdate: updates.negativePrompt?.substring(0, 30) || '(undefined or empty)',
       lorasUpdate: updates.loras?.length,
     });
     setLocalSettings(prev => {
@@ -456,31 +466,51 @@ export function useSegmentSettings({
         structureUni3cEndPercent: settings.structureUni3cEndPercent,
       });
 
+      // Log the new format (segmentOverrides) since buildMetadataUpdate writes there and deletes old pair_* fields
+      const savedOverrides = newMetadata.segmentOverrides || {};
       console.log(`[useSegmentSettings:${instanceId}] 📝 Built metadata update:`, {
         pairId: pairShotGenerationId.substring(0, 8),
-        updatedFields: {
-          pair_prompt: !!newMetadata.pair_prompt,
-          pair_negative_prompt: !!newMetadata.pair_negative_prompt,
-          pair_motion_settings: newMetadata.pair_motion_settings,
-          pair_phase_config: newMetadata.pair_phase_config,
-          pair_loras: newMetadata.pair_loras?.length || 0,
-          pair_num_frames: newMetadata.pair_num_frames,
-          pair_random_seed: newMetadata.pair_random_seed,
-          pair_seed: newMetadata.pair_seed,
-          pair_selected_phase_preset_id: newMetadata.pair_selected_phase_preset_id,
+        hasSegmentOverrides: !!newMetadata.segmentOverrides,
+        segmentOverrides: {
+          prompt: savedOverrides.prompt !== undefined,
+          promptPreview: savedOverrides.prompt?.substring(0, 30) || '(none)',
+          negativePrompt: savedOverrides.negativePrompt !== undefined,
+          motionMode: savedOverrides.motionMode,
+          amountOfMotion: savedOverrides.amountOfMotion,
+          hasPhaseConfig: savedOverrides.phaseConfig !== undefined,
+          loraCount: savedOverrides.loras?.length ?? 0,
+          numFrames: savedOverrides.numFrames,
+          randomSeed: savedOverrides.randomSeed,
+          seed: savedOverrides.seed,
+          selectedPhasePresetId: savedOverrides.selectedPhasePresetId,
         },
       });
 
       // Save
-      const { error: updateError } = await supabase
+      console.log(`[SegmentSaveDebug] 🔄 Executing database UPDATE...`, {
+        pairId: pairShotGenerationId.substring(0, 8),
+        metadataToSave: JSON.stringify(newMetadata).substring(0, 200),
+      });
+      const { data: updateResult, error: updateError } = await supabase
         .from('shot_generations')
         .update({ metadata: newMetadata })
-        .eq('id', pairShotGenerationId);
+        .eq('id', pairShotGenerationId)
+        .select('metadata')
+        .single();
 
       if (updateError) {
         console.error('[useSegmentSettings] Error saving metadata:', updateError);
         return false;
       }
+
+      // Verify the save by checking the returned data
+      const savedData = updateResult?.metadata as Record<string, any> | null;
+      console.log(`[SegmentSaveDebug] ✅ Database UPDATE completed:`, {
+        pairId: pairShotGenerationId.substring(0, 8),
+        returnedSegmentOverrides: savedData?.segmentOverrides,
+        returnedPrompt: savedData?.segmentOverrides?.prompt?.substring(0, 30) || '(none)',
+        returnedLoraCount: savedData?.segmentOverrides?.loras?.length ?? 0,
+      });
 
       console.log(`[useSegmentSettings:${instanceId}] ✅ Settings saved`, {
         pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
@@ -490,14 +520,16 @@ export function useSegmentSettings({
       });
 
       // Invalidate the cache so the next read gets fresh data
-      console.log(`[PairPromptDebug] 🔄 Invalidating pair-metadata cache...`);
+      console.log(`[SegmentSaveDebug] 🔄 Invalidating pair-metadata cache for:`, pairShotGenerationId.substring(0, 8));
       await queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
+      console.log(`[SegmentSaveDebug] ✅ pair-metadata cache invalidated`);
 
       // Refetch (not just invalidate) shot generations so timeline/pairDataByIndex updates immediately
       // Using refetchQueries ensures the query is actively refetched and events are reliably emitted
       if (shotId) {
-        console.log(`[PairPromptDebug] 🔄 Refetching all-shot-generations...`, { shotId: shotId.substring(0, 8) });
+        console.log(`[SegmentSaveDebug] 🔄 Refetching all-shot-generations for:`, shotId.substring(0, 8));
         queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
+        console.log(`[SegmentSaveDebug] ✅ all-shot-generations refetch queued`);
       }
 
       setIsDirty(false);
@@ -523,7 +555,9 @@ export function useSegmentSettings({
     const effectiveAmountOfMotion = settings.amountOfMotion ?? shotDefaultsValue.amountOfMotion ?? 50;
     const effectivePhaseConfig = settings.phaseConfig ?? shotDefaultsValue.phaseConfig;
     const effectiveSelectedPhasePresetId = settings.selectedPhasePresetId ?? shotDefaultsValue.selectedPhasePresetId ?? null;
-    const effectiveLoras = (settings.loras && settings.loras.length > 0) ? settings.loras : (shotDefaultsValue.loras ?? []);
+    // Use segment loras if there's an override (even empty array), otherwise use shot defaults
+    // This respects the user's explicit choice to have no loras on this segment
+    const effectiveLoras = hasOverride?.loras ? settings.loras : (shotDefaultsValue.loras ?? []);
 
     console.log(`[useSegmentSettings:${instanceId}] 💾 Saving as shot defaults:`, shotId.substring(0, 8), {
       // Raw settings (segment overrides only)
@@ -557,10 +591,8 @@ export function useSegmentSettings({
         seed: settings.seed,
       };
 
-      // Map segment field names to shot settings field names:
-      // - segment `prompt` → shot `batchVideoPrompt`
-      // - segment `negativePrompt` → shot `steerableMotionSettings.negative_prompt`
-      // - segment `loras` → shot `selectedLoras`
+      // Use OLD field names for shot settings (useShotSettings reads raw settings with old names)
+      // The migration utility handles reading both formats, but writes need to match read expectations
       const shotPatch = {
         batchVideoPrompt: patch.prompt,
         steerableMotionSettings: {
@@ -628,11 +660,13 @@ export function useSegmentSettings({
   // Auto-save on changes (debounced)
   useEffect(() => {
     // Only auto-save if user has edited and we have a pairShotGenerationId
-    console.log(`[SetAsShotDefaults] Auto-save check:`, {
+    console.log(`[SegmentSaveDebug] Auto-save check:`, {
       hasUserEdited: hasUserEdited.current,
       pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || null,
       isDirty,
       willSave: hasUserEdited.current && pairShotGenerationId && isDirty,
+      localSettingsPrompt: localSettings?.prompt?.substring(0, 30) || '(no local)',
+      mergedSettingsPrompt: mergedSettings?.prompt?.substring(0, 30) || '(no merged)',
     });
     if (!hasUserEdited.current || !pairShotGenerationId || !isDirty) {
       return;
@@ -645,7 +679,11 @@ export function useSegmentSettings({
 
     // Debounce the save
     saveTimeoutRef.current = setTimeout(async () => {
-      console.log(`[useSegmentSettings:${instanceId}] ⏱️ Auto-save triggered (debounced)`);
+      console.log(`[SegmentSaveDebug] ⏱️ Auto-save triggered (debounced)`, {
+        pairId: pairShotGenerationId.substring(0, 8),
+        settingsPrompt: settings.prompt?.substring(0, 30) || '(none)',
+        settingsLoraCount: settings.loras?.length ?? 0,
+      });
       await saveSettings();
     }, 500);
 

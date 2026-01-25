@@ -689,7 +689,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       // In batch mode: use metadata pair_num_frames > uniform batchVideoFrames
       // In timeline mode: use actual timeline_frame differences
       const isBatchMode = effectiveGenerationMode === 'batch';
-      const pairNumFramesFromMetadata = startImage.metadata?.pair_num_frames;
+      const startImageOverrides = readSegmentOverrides(startImage.metadata as Record<string, any> | null);
+      const pairNumFramesFromMetadata = startImageOverrides.numFrames;
       const frames = isBatchMode
         ? (pairNumFramesFromMetadata ?? batchVideoFrames)
         : (endImage.timeline_frame ?? 0) - (startImage.timeline_frame ?? 0);
@@ -700,7 +701,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         ? (pairIndex + 1) * batchVideoFrames
         : (endImage.timeline_frame ?? 0);
 
-      dataMap.set(pairIndex, {
+      const pairDataEntry = {
         index: pairIndex,
         frames,
         startFrame,
@@ -719,7 +720,17 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           thumbUrl: endImage.thumbUrl || endImage.location,
           position: pairIndex + 2,
         },
-      });
+      };
+      // Debug: log if startImage.id is missing
+      if (!pairDataEntry.startImage.id) {
+        console.error('[SegmentIdDebug] ⚠️ Missing startImage.id in pairDataByIndex!', {
+          pairIndex,
+          rawStartImageId: startImage.id,
+          rawStartImageKeys: Object.keys(startImage),
+          rawStartImage: JSON.stringify(startImage).substring(0, 200),
+        });
+      }
+      dataMap.set(pairIndex, pairDataEntry);
     }
     return dataMap;
   }, [shotGenerations, effectiveGenerationMode, batchVideoFrames]);
@@ -770,6 +781,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     // Get prompts from metadata
     const shotGen = shotGenerations.find(sg => sg.id === pairData.startImage?.id);
     const overrides = readSegmentOverrides(shotGen?.metadata as Record<string, any> | null);
+
+    // Debug: log what we're passing to MediaLightbox
+    console.log('[SegmentIdDebug] Building segmentSlotModeData:', {
+      segmentSlotLightboxIndex,
+      pairDataStartImageId: pairData.startImage?.id?.substring(0, 8) || '(none)',
+      pairDataEndImageId: pairData.endImage?.id?.substring(0, 8) || '(none)',
+      hasStartImage: !!pairData.startImage,
+      startImageKeys: pairData.startImage ? Object.keys(pairData.startImage) : [],
+    });
 
     return {
       currentIndex: segmentSlotLightboxIndex,

@@ -89,6 +89,15 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Debug: log what pairShotGenerationId we received
+  console.log('[SegmentIdDebug] SegmentRegenerateForm received:', {
+    pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || '(none)',
+    shotId: shotId?.substring(0, 8) || '(none)',
+    generationId: generationId?.substring(0, 8) || '(none)',
+    childGenerationId: childGenerationId?.substring(0, 8) || '(none)',
+    segmentIndex,
+  });
+
   // Use the segment settings hook for data management
   // Settings are merged from: pair metadata > shot batch settings > defaults
   // numFrames: prefer currentFrameCount (from timeline positions - source of truth),

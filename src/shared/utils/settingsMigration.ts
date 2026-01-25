@@ -204,15 +204,15 @@ export function readSegmentOverrides(metadata: Record<string, any> | null | unde
   // Check new location first, then old location
   const newOverrides = metadata.segmentOverrides ?? {};
 
-  // Prompt
+  // Prompt - include empty strings to distinguish "explicitly empty" from "no override"
   const prompt = newOverrides.prompt ?? metadata.pair_prompt;
-  if (prompt !== undefined && prompt !== '') {
+  if (prompt !== undefined) {
     overrides.prompt = prompt;
   }
 
-  // Negative prompt
+  // Negative prompt - include empty strings to distinguish "explicitly empty" from "no override"
   const negativePrompt = newOverrides.negativePrompt ?? metadata.pair_negative_prompt;
-  if (negativePrompt !== undefined && negativePrompt !== '') {
+  if (negativePrompt !== undefined) {
     overrides.negativePrompt = negativePrompt;
   }
 
@@ -246,9 +246,9 @@ export function readSegmentOverrides(metadata: Record<string, any> | null | unde
     overrides.selectedPhasePresetId = selectedPhasePresetId;
   }
 
-  // LoRAs
+  // LoRAs - include empty arrays to distinguish "explicitly no loras" from "no override"
   const loras = newOverrides.loras ?? metadata.pair_loras;
-  if (loras !== undefined && Array.isArray(loras) && loras.length > 0) {
+  if (loras !== undefined && Array.isArray(loras)) {
     overrides.loras = migrateLoras(loras);
   }
 
@@ -324,11 +324,7 @@ export function writeSegmentOverrides(
     newOverrides.selectedPhasePresetId = overrides.selectedPhasePresetId;
   }
   if (overrides.loras !== undefined) {
-    if (overrides.loras.length > 0) {
-      newOverrides.loras = overrides.loras;
-    } else {
-      delete newOverrides.loras; // Empty array means clear
-    }
+    newOverrides.loras = overrides.loras;  // Preserve empty arrays to distinguish "no loras" from "use shot default"
   }
   if (overrides.numFrames !== undefined) {
     newOverrides.numFrames = overrides.numFrames;

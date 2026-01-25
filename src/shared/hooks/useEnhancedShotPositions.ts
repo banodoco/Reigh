@@ -1488,7 +1488,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       // Use migration utility to read from new or old format
       const overrides = readSegmentOverrides(firstItem.metadata as Record<string, any> | null);
 
-      const hasOverrides = overrides.phaseConfig || (overrides.loras && overrides.loras.length > 0) ||
+      // Check for any overrides - loras !== undefined detects empty array overrides too
+      const hasOverrides = overrides.phaseConfig || overrides.loras !== undefined ||
         overrides.motionMode !== undefined || overrides.amountOfMotion !== undefined;
 
       if (hasOverrides) {
@@ -1614,12 +1615,13 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
       // Use new format for writing - convert PairLoraConfig[] to LoraConfig[]
+      // null means clear the override, [] or [...] means set the loras
       let updatedMetadata = writeSegmentOverrides(
         generation.metadata as Record<string, any> | null,
         {
-          loras: loras && loras.length > 0
-            ? loras.map(l => ({ path: l.path, strength: l.strength }))
-            : undefined,
+          loras: loras === null
+            ? []  // null means clear the loras override (set to empty)
+            : loras?.map(l => ({ path: l.path, strength: l.strength })),
         }
       );
       // Clean up old field (migration cleanup)

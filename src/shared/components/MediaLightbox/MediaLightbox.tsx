@@ -1976,12 +1976,29 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     // This links regeneration to the specific timeline pair's settings
     // IMPORTANT: Prefer currentSegmentImages (live timeline) over stored params (may be stale)
     const orchPairIds = taskParams.orchestrator_details?.pair_shot_generation_ids;
+    // Priority: segmentSlotMode (if available) > currentSegmentImages > task params
     const pairShotGenerationId = [
-      currentSegmentImages?.startShotGenerationId,  // Live timeline (source of truth)
+      segmentSlotMode?.pairData?.startImage?.id,  // Segment slot mode (highest priority - has fresh timeline data)
+      currentSegmentImages?.startShotGenerationId,  // Live timeline prop
       taskParams.pair_shot_generation_id,
       taskParams.individual_segment_params?.pair_shot_generation_id,
       Array.isArray(orchPairIds) ? orchPairIds[segmentIndex] : undefined,
     ].find(v => typeof v === 'string') || undefined;
+
+    // Debug: log pairShotGenerationId resolution
+    console.log('[SegmentIdDebug] MediaLightbox pairShotGenerationId resolution:', {
+      result: pairShotGenerationId?.substring(0, 8) || '(none)',
+      sources: {
+        segmentSlotMode_startImage_id: segmentSlotMode?.pairData?.startImage?.id?.substring(0, 8) || '(none)',
+        currentSegmentImages_startShotGenerationId: currentSegmentImages?.startShotGenerationId?.substring(0, 8) || '(none)',
+        taskParams_pair_shot_generation_id: taskParams.pair_shot_generation_id?.substring(0, 8) || '(none)',
+        individual_segment_params: taskParams.individual_segment_params?.pair_shot_generation_id?.substring(0, 8) || '(none)',
+        orchPairIds_segmentIndex: (Array.isArray(orchPairIds) ? orchPairIds[segmentIndex] : undefined)?.substring(0, 8) || '(none)',
+      },
+      hasSegmentSlotMode: !!segmentSlotMode,
+      hasCurrentSegmentImages: !!currentSegmentImages,
+      segmentIndex,
+    });
 
     // Get the correct childGenerationId for regeneration
     // PRIMARY: Use activeChildGenerationId from slot (matched by pair_shot_generation_id in SegmentOutputStrip)
@@ -2049,7 +2066,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         structureVideoUrl={structureVideoUrl}
       />
     );
-  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId, currentSegmentImages, onSegmentFrameCountChange, currentFrameCount, variantParamsToLoad, setVariantParamsToLoad]);
+  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId, currentSegmentImages, onSegmentFrameCountChange, currentFrameCount, variantParamsToLoad, setVariantParamsToLoad, segmentSlotMode]);
 
   // Handle entering video edit mode (unified) - restores last used sub-mode
   const handleEnterVideoEditMode = useCallback(() => {

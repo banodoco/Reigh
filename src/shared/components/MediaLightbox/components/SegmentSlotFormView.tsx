@@ -38,6 +38,15 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
 
   const pairShotGenerationId = segmentSlotMode.pairData.startImage?.id;
 
+  // Debug: log what we received
+  console.log('[SegmentIdDebug] SegmentSlotFormView received:', {
+    pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || '(none)',
+    hasPairData: !!segmentSlotMode.pairData,
+    hasStartImage: !!segmentSlotMode.pairData?.startImage,
+    startImageId: segmentSlotMode.pairData?.startImage?.id?.substring(0, 8) || '(none)',
+    startImageKeys: segmentSlotMode.pairData?.startImage ? Object.keys(segmentSlotMode.pairData.startImage) : [],
+  });
+
   // Use the segment settings hook for data management
   const {
     settings,
