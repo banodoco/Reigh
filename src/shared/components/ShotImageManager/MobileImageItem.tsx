@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check, Pencil } from 'lucide-react';
+import { Trash2, Copy, Check, Pencil, Maximize2 } from 'lucide-react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
@@ -138,7 +138,23 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           size="sm"
         />
 
-        {/* Selection overlay - removed blue tick */}
+        {/* Center lightbox button - shows when selected */}
+        {isSelected && onOpenLightbox && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-12 w-12 rounded-full bg-background/90 hover:bg-background shadow-lg pointer-events-auto"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenLightbox();
+              }}
+              title="Open lightbox"
+            >
+              <Maximize2 className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
 
         {/* Bottom left - Edit Image button */}
         <div className="absolute bottom-2 left-2 flex gap-2 items-start opacity-100 transition-opacity">
