@@ -80,15 +80,6 @@ export const useImg2ImgMode = ({
   // Active variant ID for tracking source
   activeVariantId,
 }: UseImg2ImgModeProps): UseImg2ImgModeReturn => {
-  
-  console.log('[EDIT_DEBUG] ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
-  console.log('[EDIT_DEBUG] 🖼️ useImg2ImgMode HOOK CALLED');
-  console.log('[EDIT_DEBUG] 🖼️ mediaId:', media?.id?.substring(0, 8) || 'null');
-  console.log('[EDIT_DEBUG] 🖼️ PERSISTED img2imgStrength:', img2imgStrength);
-  console.log('[EDIT_DEBUG] 🖼️ PERSISTED enablePromptExpansion:', enablePromptExpansion);
-  console.log('[EDIT_DEBUG] 🖼️ PERSISTED img2imgPrompt:', img2imgPrompt ? `"${img2imgPrompt.substring(0, 30)}..."` : '(empty)');
-  console.log('[EDIT_DEBUG] 🖼️ availableLoras count:', availableLoras.length);
-  console.log('[EDIT_DEBUG] ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
   // Local state (not persisted)
   const [isGeneratingImg2Img, setIsGeneratingImg2Img] = useState(false);
   const [img2imgGenerateSuccess, setImg2imgGenerateSuccess] = useState(false);

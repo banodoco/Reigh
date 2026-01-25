@@ -31,12 +31,6 @@ export const useSourceGeneration = ({
   const [sourceGenerationData, setSourceGenerationData] = useState<GenerationRow | null>(null);
   const [sourcePrimaryVariant, setSourcePrimaryVariant] = useState<SourceVariantData | null>(null);
 
-  console.log('[VariantClickDebug] useSourceGeneration hook called:', {
-    mediaId: media.id?.substring(0, 8),
-    basedOn: (media as any).based_on?.substring(0, 8),
-    basedOnFromMetadata: (media.metadata as any)?.based_on?.substring(0, 8),
-  });
-
   useEffect(() => {
     const basedOnId = (media as any).based_on;
     const basedOnFromMetadata = (media.metadata as any)?.based_on;

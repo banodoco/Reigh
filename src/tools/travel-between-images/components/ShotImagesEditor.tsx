@@ -1688,6 +1688,90 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
   // [ShotNavPerf] Removed redundant render completion log - use STATE CHANGED log instead
 
+  // ============================================================================
+  // STABLE CALLBACK REFS FOR TIMELINE PROPS
+  // These use refs to avoid recreating callbacks when dependencies change,
+  // which would defeat React.memo on Timeline and cause cascade re-renders.
+  // ============================================================================
+
+  // Ref to hold current values for stable callbacks
+  const stableCallbackDepsRef = React.useRef({
+    loadPositions,
+    pairDataByIndex,
+    setSegmentSlotLightboxIndex,
+    shotGenerations,
+    clearEnhancedPrompt,
+    onCreateShot,
+  });
+
+  // Update ref values on each render (but don't trigger re-renders)
+  stableCallbackDepsRef.current = {
+    loadPositions,
+    pairDataByIndex,
+    setSegmentSlotLightboxIndex,
+    shotGenerations,
+    clearEnhancedPrompt,
+    onCreateShot,
+  };
+
+  // Stable callback: onTimelineChange
+  const handleTimelineChange = React.useCallback(async () => {
+    await stableCallbackDepsRef.current.loadPositions({ silent: true });
+  }, []);
+
+  // Stable callback: onPairClick
+  const handlePairClick = React.useCallback((pairIndex: number, passedPairData?: PairData) => {
+    const { pairDataByIndex, setSegmentSlotLightboxIndex } = stableCallbackDepsRef.current;
+    console.log('[SegmentClickDebug] onPairClick (Timeline) called:', {
+      pairIndex,
+      passedPairDataIndex: passedPairData?.index,
+      hasPairDataInMap: pairDataByIndex.has(pairIndex),
+      pairDataByIndexKeys: [...pairDataByIndex.keys()],
+    });
+    if (passedPairData || pairDataByIndex.has(pairIndex)) {
+      console.log('[SegmentClickDebug] Setting segmentSlotLightboxIndex to:', pairIndex);
+      setSegmentSlotLightboxIndex(pairIndex);
+    }
+  }, []);
+
+  // Stable callback: onClearEnhancedPrompt
+  const handleClearEnhancedPromptByIndex = React.useCallback(async (pairIndex: number) => {
+    const { shotGenerations, clearEnhancedPrompt } = stableCallbackDepsRef.current;
+    console.log('[ClearEnhancedPrompt-Timeline] 🔵 Starting clear for pair index:', pairIndex);
+    try {
+      // Filter out videos to match the timeline display
+      const filteredGenerations = shotGenerations.filter((sg: any) => !isVideoAny(sg));
+      const sortedGenerations = [...filteredGenerations]
+        .sort((a: any, b: any) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+
+      // Get the first item of the pair
+      const firstItem = sortedGenerations[pairIndex];
+      if (!firstItem) {
+        console.error('[ClearEnhancedPrompt-Timeline] ❌ No generation found for pair index:', pairIndex);
+        return;
+      }
+
+      const idToUse = firstItem.id;
+      console.log('[ClearEnhancedPrompt-Timeline] 📞 Calling clearEnhancedPrompt with id:', idToUse);
+      await clearEnhancedPrompt(idToUse);
+    } catch (error) {
+      console.error('[ClearEnhancedPrompt-Timeline] ❌ Error clearing enhanced prompt:', error);
+    }
+  }, []);
+
+  // Stable callback: onCreateShot adapter
+  const handleCreateShotAdapter = React.useCallback(async (shotName: string, _files: File[]) => {
+    const { onCreateShot } = stableCallbackDepsRef.current;
+    if (!onCreateShot) return { shotId: '', shotName: '' };
+    const shotId = await onCreateShot(shotName);
+    return { shotId, shotName };
+  }, []);
+
+  // Stable callback: onMagicEdit placeholder (TODO: wire through real handler)
+  const handleMagicEditPlaceholder = React.useCallback((imageUrl: string, prompt: string, numImages: number) => {
+    console.log("Magic Edit:", { imageUrl, prompt, numImages });
+  }, []);
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -1853,83 +1937,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 updateTimelineFrame={updateTimelineFrame}
                 allGenerations={preloadedImages}
                 images={imagesWithBadges}
-                onTimelineChange={async () => {
-                  await loadPositions({ silent: true });
-                }}
+                onTimelineChange={handleTimelineChange}
                 // Pass shared hook data to prevent creating duplicate instances
                 // BUT: Only pass if not using preloaded images (to avoid filtering conflict)
                 hookData={preloadedImages ? undefined : hookData}
                 onDragStateChange={handleDragStateChange}
-                onPairClick={(pairIndex, passedPairData) => {
-                  // Open MediaLightbox in segment slot mode for this pair
-                  // The pairData can be looked up from pairDataByIndex when needed
-                  console.log('[SegmentClickDebug] onPairClick (Timeline) called:', {
-                    pairIndex,
-                    passedPairDataIndex: passedPairData?.index,
-                    hasPairDataInMap: pairDataByIndex.has(pairIndex),
-                    pairDataByIndexKeys: [...pairDataByIndex.keys()],
-                  });
-                  if (passedPairData || pairDataByIndex.has(pairIndex)) {
-                    console.log('[SegmentClickDebug] Setting segmentSlotLightboxIndex to:', pairIndex);
-                    setSegmentSlotLightboxIndex(pairIndex);
-                  }
-                }}
+                onPairClick={handlePairClick}
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
-                onClearEnhancedPrompt={async (pairIndex) => {
-                  console.log('[ClearEnhancedPrompt-Timeline] 🔵 Starting clear for pair index:', pairIndex);
-                  console.log('[ClearEnhancedPrompt-Timeline] Total shotGenerations:', shotGenerations.length);
-                  if (shotGenerations.length > 0) {
-                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0] keys:', Object.keys(shotGenerations[0]));
-                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].id:', shotGenerations[0].id); // shot_generations.id
-                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].generation_id:', shotGenerations[0].generation_id);
-                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].type:', shotGenerations[0].type);
-                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].location:', shotGenerations[0].location);
-                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].generation?.type:', shotGenerations[0].generation?.type);
-                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].generation?.location:', shotGenerations[0].generation?.location);
-                  }
-                  try {
-                    // Convert pairIndex to generation ID using the same logic as pair prompts
-                    // Filter out videos to match the timeline display
-                    // Uses isVideoAny which handles both flattened and nested data structures
-                    const filteredGenerations = shotGenerations.filter((sg, idx) => {
-                      const video = isVideoAny(sg);
-                      
-                      if (idx === 0) {
-                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] isVideo:', video);
-                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] returning:', !video);
-                      }
-                      
-                      return !video;
-                    });
-                    console.log('[ClearEnhancedPrompt-Timeline] Filtered generations count:', filteredGenerations.length);
-
-                    const sortedGenerations = [...filteredGenerations]
-                      .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
-                    console.log('[ClearEnhancedPrompt-Timeline] Sorted generations count:', sortedGenerations.length);
-
-                    // Get the first item of the pair
-                    const firstItem = sortedGenerations[pairIndex];
-                    if (!firstItem) {
-                      console.error('[ClearEnhancedPrompt-Timeline] ❌ No generation found for pair index:', pairIndex);
-                      return;
-                    }
-
-                    console.log('[ClearEnhancedPrompt-Timeline] 🎯 Found generation at pairIndex:', pairIndex);
-                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.id:', firstItem.id); // shot_generations.id
-                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.generation_id:', firstItem.generation_id);
-                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.hasMetadata:', !!firstItem.metadata);
-                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.hasEnhancedPrompt:', !!firstItem.metadata?.enhanced_prompt);
-                    
-                    // firstItem.id IS the shot_generations.id (unique per entry)
-                    const idToUse = firstItem.id;
-                    console.log('[ClearEnhancedPrompt-Timeline] 📞 Calling clearEnhancedPrompt with id:', idToUse);
-                    
-                    await clearEnhancedPrompt(idToUse);
-                  } catch (error) {
-                    console.error('[ClearEnhancedPrompt-Timeline] ❌ Error:', error);
-                  }
-                }}
+                onClearEnhancedPrompt={handleClearEnhancedPromptByIndex}
                 // Structure video props
                 structureVideoPath={propStructureVideoPath}
                 structureVideoMetadata={propStructureVideoMetadata}
@@ -1958,10 +1974,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 onShotChange={onShotChange}
                 onAddToShot={onAddToShot ? handleAddToShotAdapter : undefined}
                 onAddToShotWithoutPosition={onAddToShotWithoutPosition ? handleAddToShotWithoutPositionAdapter : undefined}
-                onCreateShot={onCreateShot ? async (shotName: string, files: File[]) => {
-                  const shotId = await onCreateShot(shotName);
-                  return { shotId, shotName };
-                } : undefined}
+                onCreateShot={onCreateShot ? handleCreateShotAdapter : undefined}
                 // Single image duration endpoint
                 singleImageEndFrame={singleImageEndFrame}
                 onSingleImageEndFrameChange={handleSingleImageEndFrameChange}
@@ -2008,10 +2021,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   onImageReorder={handleReorder}
                   columns={columns}
                   generationMode={isMobile ? "batch" : generationMode}
-                  onMagicEdit={(imageUrl, prompt, numImages) => {
-                    // TODO: Wire through real magic-edit handler later.
-                    console.log("Magic Edit:", { imageUrl, prompt, numImages });
-                  }}
+                  onMagicEdit={handleMagicEditPlaceholder}
                   duplicatingImageId={duplicatingImageId}
                   duplicateSuccessImageId={duplicateSuccessImageId}
                   projectAspectRatio={projectAspectRatio}

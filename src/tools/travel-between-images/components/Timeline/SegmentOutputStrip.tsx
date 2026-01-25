@@ -421,7 +421,43 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       type: 'video',
     } as GenerationRow;
   }, [selectedParent]);
-  
+
+  // ============================================================================
+  // MEMOIZED LIGHTBOX PROPS
+  // These prevent creating new object references on every render which would
+  // cause MediaLightbox to re-render unnecessarily.
+  // ============================================================================
+
+  // Memoized media prop for segment lightbox
+  const lightboxMedia = useMemo(() => {
+    if (!currentLightboxMedia) return null;
+    return {
+      ...currentLightboxMedia,
+      // Only override parent_generation_id if selectedParentId is set
+      ...(selectedParentId ? { parent_generation_id: selectedParentId } : {}),
+    } as GenerationRow;
+  }, [currentLightboxMedia, selectedParentId]);
+
+  // Memoized currentSegmentImages prop
+  const lightboxCurrentSegmentImages = useMemo(() => {
+    const pairData = currentLightboxSlot ? pairDataByIndex?.get(currentLightboxSlot.index) : undefined;
+    const slotChildId = currentLightboxSlot?.type === 'child' ? currentLightboxSlot.child.id : undefined;
+    return {
+      startShotGenerationId: pairData?.startImage?.id || currentLightboxSlot?.pairShotGenerationId,
+      activeChildGenerationId: slotChildId,
+      startUrl: pairData?.startImage?.url,
+      endUrl: pairData?.endImage?.url,
+      startGenerationId: pairData?.startImage?.generationId,
+      endGenerationId: pairData?.endImage?.generationId,
+    };
+  }, [currentLightboxSlot, pairDataByIndex]);
+
+  // Memoized currentFrameCount prop
+  const lightboxCurrentFrameCount = useMemo(() => {
+    const pairData = currentLightboxSlot ? pairDataByIndex?.get(currentLightboxSlot.index) : undefined;
+    return pairData?.frames;
+  }, [currentLightboxSlot, pairDataByIndex]);
+
   // Calculate segment positions based on pair info
   // Uses same coordinate system as timeline for alignment
   const segmentPositions = useMemo(() => {
@@ -632,15 +668,9 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       </div>
       
       {/* Lightbox for segment videos */}
-      {currentLightboxMedia && (
+      {lightboxMedia && (
         <MediaLightbox
-          media={{
-            ...currentLightboxMedia,
-            // Only override parent_generation_id if selectedParentId is set
-            // Otherwise keep the existing parent_generation_id from the child generation row
-            // This is critical for childGenerationId calculation in MediaLightbox regenerate mode
-            ...(selectedParentId ? { parent_generation_id: selectedParentId } : {}),
-          } as GenerationRow}
+          media={lightboxMedia}
           onClose={handleLightboxClose}
           onNext={handleLightboxNext}
           onPrevious={handleLightboxPrev}
@@ -649,32 +679,14 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
           showDownload={true}
           hasNext={childSlotIndices.length > 1}
           hasPrevious={childSlotIndices.length > 1}
-          starred={(currentLightboxMedia as any).starred ?? false}
+          starred={(currentLightboxMedia as any)?.starred ?? false}
           shotId={shotId}
           showTaskDetails={true}
           showVideoTrimEditor={true}
           fetchVariantsForSelf={true}
-          currentSegmentImages={(() => {
-            // Derive currentSegmentImages from shared pairDataByIndex (same source as SegmentSettingsModal)
-            const pairData = currentLightboxSlot ? pairDataByIndex?.get(currentLightboxSlot.index) : undefined;
-            // IMPORTANT: Use the slot's child ID (matched by pair_shot_generation_id), not the viewed media ID
-            // This ensures regeneration targets the correct child after timeline rearrangements
-            const slotChildId = currentLightboxSlot?.type === 'child' ? currentLightboxSlot.child.id : undefined;
-            return {
-              startShotGenerationId: pairData?.startImage?.id || currentLightboxSlot?.pairShotGenerationId,
-              activeChildGenerationId: slotChildId,
-              startUrl: pairData?.startImage?.url,
-              endUrl: pairData?.endImage?.url,
-              startGenerationId: pairData?.startImage?.generationId,
-              endGenerationId: pairData?.endImage?.generationId,
-            };
-          })()}
+          currentSegmentImages={lightboxCurrentSegmentImages}
           onSegmentFrameCountChange={onSegmentFrameCountChange}
-          currentFrameCount={(() => {
-            // Get frame count from timeline positions (source of truth)
-            const pairData = currentLightboxSlot ? pairDataByIndex?.get(currentLightboxSlot.index) : undefined;
-            return pairData?.frames;
-          })()}
+          currentFrameCount={lightboxCurrentFrameCount}
         />
       )}
       

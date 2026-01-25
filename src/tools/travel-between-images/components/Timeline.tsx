@@ -185,6 +185,9 @@ export interface TimelineProps {
   onSegmentFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
 }
 
+// Stable empty object to avoid creating new references when enhancedPrompts is undefined
+const EMPTY_ENHANCED_PROMPTS: Record<number, string> = {};
+
 /**
  * Refactored Timeline component with extracted hooks and modular architecture
  */
@@ -906,7 +909,7 @@ const Timeline: React.FC<TimelineProps> = ({
         setIsDragInProgress={setIsDragInProgress}
         onPairClick={onPairClick}
         pairPrompts={actualPairPrompts}
-        enhancedPrompts={enhancedPrompts || {}}
+        enhancedPrompts={enhancedPrompts || EMPTY_ENHANCED_PROMPTS}
         defaultPrompt={defaultPrompt}
         defaultNegativePrompt={defaultNegativePrompt}
         onClearEnhancedPrompt={readOnly ? undefined : onClearEnhancedPrompt}
