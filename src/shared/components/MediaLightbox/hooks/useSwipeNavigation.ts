@@ -74,7 +74,7 @@ interface SwipeState {
  * Check if an element or its ancestors should block swipe gestures
  */
 function isInteractiveElement(el: HTMLElement | null): boolean {
-  const interactiveTags = ['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'A', 'VIDEO'];
+  const interactiveTags = ['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'A', 'VIDEO', 'CANVAS'];
   const interactiveRoles = ['button', 'slider', 'textbox', 'link', 'scrollbar'];
   
   let current: HTMLElement | null = el;
@@ -165,23 +165,15 @@ export function useSwipeNavigation({
   
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (disabled) return;
-    
+
     // Only handle primary pointer (first finger/mouse button)
     if (!e.isPrimary) return;
-    
+
     // Check if we should skip swipe for this target
     const target = e.target as HTMLElement;
     if (isInteractiveElement(target)) {
-      console.log('[SwipeNav] Skipping - interactive element:', target.tagName);
       return;
     }
-    
-    console.log('[SwipeNav] Pointer down:', {
-      clientX: e.clientX,
-      clientY: e.clientY,
-      pointerId: e.pointerId,
-      pointerType: e.pointerType,
-    });
     
     swipeStateRef.current = {
       startX: e.clientX,

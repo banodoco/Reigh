@@ -100,12 +100,7 @@ export function useLastUsedEditSettings({
       if (projectStored) {
         const parsed = JSON.parse(projectStored);
         const merged = { ...DEFAULT_LAST_USED, ...parsed };
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: From project localStorage');
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: projectId:', projectId.substring(0, 8));
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: editMode:', merged.editMode);
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: loraMode:', merged.loraMode);
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: videoEditSubMode:', merged.videoEditSubMode);
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: panelMode:', merged.panelMode);
+        console.log('[PanelRestore] LOADED from localStorage:', { panelMode: merged.panelMode, projectId: projectId.substring(0, 8) });
         return merged;
       }
 
@@ -114,15 +109,11 @@ export function useLastUsedEditSettings({
       if (globalStored) {
         const parsed = JSON.parse(globalStored);
         const merged = { ...DEFAULT_LAST_USED, ...parsed };
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: From GLOBAL localStorage (new project fallback)');
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: editMode:', merged.editMode);
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: loraMode:', merged.loraMode);
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: videoEditSubMode:', merged.videoEditSubMode);
-        console.log('[EDIT_DEBUG] 📥 LAST-USED LOAD: panelMode:', merged.panelMode);
+        console.log('[PanelRestore] LOADED from GLOBAL localStorage (fallback):', { panelMode: merged.panelMode });
         return merged;
       }
-      
-      console.log('[EDIT_DEBUG] ⚠️ LAST-USED LOAD: No localStorage found, using defaults');
+
+      console.log('[PanelRestore] No localStorage found, using defaults:', { panelMode: DEFAULT_LAST_USED.panelMode });
     } catch (e) {
       console.warn('[EDIT_DEBUG] ❌ LAST-USED LOAD: Failed to read localStorage:', e);
     }
@@ -153,12 +144,8 @@ export function useLastUsedEditSettings({
       // Merge DB settings (may have newer values from other device)
       const merged = { ...currentValueRef.current, ...dbSettings };
       currentValueRef.current = merged;
-      
-      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: Synced from DB to localStorage');
-      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: editMode:', merged.editMode);
-      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: loraMode:', merged.loraMode);
-      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: videoEditSubMode:', merged.videoEditSubMode);
-      console.log('[EDIT_DEBUG] 🔄 LAST-USED SYNC: panelMode:', merged.panelMode);
+
+      console.log('[PanelRestore] Synced from DB:', { panelMode: merged.panelMode });
       
       // Update localStorage with DB values
       try {
@@ -197,38 +184,25 @@ export function useLastUsedEditSettings({
 
     currentValueRef.current = merged;
 
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: Updating "last used" settings');
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: editMode:', merged.editMode);
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: loraMode:', merged.loraMode);
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: numGenerations:', merged.numGenerations);
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: customLoraUrl:', merged.customLoraUrl || '(empty)');
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: img2imgStrength:', merged.img2imgStrength);
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: img2imgEnablePromptExpansion:', merged.img2imgEnablePromptExpansion);
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: videoEditSubMode:', merged.videoEditSubMode);
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: panelMode:', merged.panelMode);
-    console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: advancedSettingsChanged:', advancedSettingsChanged);
-    
+    // Only log panelMode changes for PanelRestore debugging
+    if (prev.panelMode !== merged.panelMode) {
+      console.log('[PanelRestore] PERSISTING to localStorage:', { panelMode: merged.panelMode });
+    }
+
     // 1. Update localStorage (instant for next time)
     try {
       if (projectId) {
         localStorage.setItem(STORAGE_KEY_PROJECT(projectId), JSON.stringify(merged));
-        console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: Saved to project localStorage');
       }
       localStorage.setItem(STORAGE_KEY_GLOBAL, JSON.stringify(merged));
-      console.log('[EDIT_DEBUG] 💾 LAST-USED SAVE: Saved to global localStorage');
     } catch (e) {
-      console.warn('[EDIT_DEBUG] ❌ LAST-USED SAVE: Failed to save to localStorage:', e);
+      console.warn('[PanelRestore] Failed to save to localStorage:', e);
     }
-    
+
     // 2. Update database (cross-device sync)
     // Save at user level only - "last used" is a personal preference, not project-specific
-    // This halves the DB writes and prevents dual-scope flooding
-    void updateDbSettings('user', merged).catch((err) => {
-      // IMPORTANT: swallow to avoid "Uncaught (in promise)" spam.
-      // useToolSettings already handles user-facing errors/toasts and backs off on network exhaustion.
-      console.warn('[EDIT_DEBUG] ❌ LAST-USED SAVE: DB save failed', {
-        message: err?.message,
-      });
+    void updateDbSettings('user', merged).catch(() => {
+      // Swallow to avoid spam - useToolSettings handles errors
     });
   }, [projectId, updateDbSettings]);
   

@@ -483,9 +483,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Sub-modes: 'trim' for trimming video, 'replace' for portion replacement, 'regenerate' for full regeneration
   // Note: The persisted value is read from editSettingsPersistence and used to restore on re-entry
   // The wrapper setVideoEditSubMode is defined after editSettingsPersistence to access the persist setter
-  const [videoEditSubMode, setVideoEditSubModeLocal] = useState<'trim' | 'replace' | 'regenerate' | null>(
-    initialVideoTrimMode ? 'trim' : null
-  );
+  // Initialize from localStorage directly to prevent flash (editSettingsPersistence isn't available yet)
+  const [videoEditSubMode, setVideoEditSubModeLocal] = useState<'trim' | 'replace' | 'regenerate' | null>(() => {
+    if (initialVideoTrimMode) return 'trim';
+    // Check if this is a video (isVideo isn't computed yet, so check directly)
+    const mediaIsVideo = media.type === 'video' || (media.location?.endsWith('.mp4') || media.location?.endsWith('.webm'));
+    if (!mediaIsVideo) return null;
+    // Check if we should restore to edit mode from localStorage
+    try {
+      const projectKey = selectedProjectId ? `lightbox-edit-last-used-${selectedProjectId}` : null;
+      const stored = projectKey ? localStorage.getItem(projectKey) : localStorage.getItem('lightbox-edit-last-used-global');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.panelMode === 'edit' && parsed.videoEditSubMode) {
+          console.log('[PanelRestore] Initializing videoEditSubMode from localStorage:', parsed.videoEditSubMode);
+          return parsed.videoEditSubMode;
+        }
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+    return null;
+  });
 
   // Derived states for compatibility with existing code
   const isVideoTrimMode = videoEditSubMode === 'trim';
@@ -669,6 +688,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setActiveVariantId: rawSetActiveVariantId,
     refetch: refetchVariants,
     setPrimaryVariant,
+    deleteVariant,
   } = variantsHook;
 
   // Hook to mark variants as viewed (removes NEW badge)
@@ -930,6 +950,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     // Use activeVariant.location if available, otherwise effectiveImageUrl
     imageUrl: !isVideo ? (activeVariant?.location || effectiveImageUrl) : undefined,
     thumbnailUrl: !isVideo ? (activeVariant?.thumbnail_url || media.thumbUrl) : undefined,
+    // Pass persisted edit mode as initial value to prevent flash from 'text' default
+    initialEditMode: persistedEditMode,
   });
   const {
     isInpaintMode,
@@ -953,9 +975,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setIsAnnotateMode,
     setEditMode,
     setAnnotationMode,
-    handlePointerDown,
-    handlePointerMove,
-    handlePointerUp,
     // Konva-based handlers
     handleKonvaPointerDown,
     handleKonvaPointerMove,
@@ -969,6 +988,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleDeleteSelected,
     handleToggleFreeForm,
     getDeleteButtonPosition,
+    strokeOverlayRef,
     // Canvas-based rendering
     isImageLoaded: isInpaintImageLoaded,
     imageLoadError: inpaintImageLoadError,
@@ -1130,13 +1150,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     isSpecialEditMode
   } = magicEditHook;
 
-  // Persist panel mode for images when entering edit mode
-  // Only auto-switch TO edit mode, not back to info (let user control that)
+  // Persist panel mode for images when entering/exiting edit mode
+  // Track previous value to detect transitions
+  const prevIsSpecialEditModeRef = useRef(isSpecialEditMode);
   useEffect(() => {
-    // Only persist for images (videos have separate handling)
-    if (!isVideo && isSpecialEditMode) {
-      console.log('[EDIT_DEBUG] 🖼️ Entering edit mode → panelMode: edit');
+    // Only handle for images (videos have separate handling)
+    if (isVideo) return;
+
+    const wasInEditMode = prevIsSpecialEditModeRef.current;
+    prevIsSpecialEditModeRef.current = isSpecialEditMode;
+
+    if (isSpecialEditMode && !wasInEditMode) {
+      console.log('[PanelRestore] SAVING panelMode: edit (image entered special edit mode)');
       setPersistedPanelMode('edit');
+    } else if (!isSpecialEditMode && wasInEditMode) {
+      console.log('[PanelRestore] SAVING panelMode: info (image exited special edit mode)');
+      setPersistedPanelMode('info');
     }
   }, [isSpecialEditMode, isVideo, setPersistedPanelMode]);
 
@@ -2095,6 +2124,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     console.log('[EDIT_DEBUG] 🎬 handleEnterVideoEditMode: restoring to', restoredMode, '(persisted:', persistedVideoEditSubMode, ', canRegenerate:', canRegenerate, ')');
     setVideoEditSubMode(restoredMode);
+    console.log('[PanelRestore] SAVING panelMode: edit (video entered edit mode)');
     setPersistedPanelMode('edit');
 
     // Set the appropriate mode flags based on restored sub-mode
@@ -2124,6 +2154,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const handleExitVideoEditMode = useCallback(() => {
     console.log('[EDIT_DEBUG] 🎬 handleExitVideoEditMode: switching to Info panel');
     setVideoEditSubMode(null);
+    console.log('[PanelRestore] SAVING panelMode: info (exited video edit mode)');
     setPersistedPanelMode('info');
     resetTrim();
     videoEditing.setIsVideoEditMode(false);
@@ -2226,12 +2257,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const hasRestoredPanelModeRef = useRef(false);
 
   useEffect(() => {
+    console.log('[PanelRestore] Effect triggered', {
+      hasRestoredAlready: hasRestoredPanelModeRef.current,
+      persistedPanelMode,
+      isVideo,
+      isSpecialEditMode,
+      isInVideoEditMode,
+      initialVideoTrimMode,
+      autoEnterInpaint,
+    });
+
     // Only restore once per media (prevent loops)
-    if (hasRestoredPanelModeRef.current) return;
+    if (hasRestoredPanelModeRef.current) {
+      console.log('[PanelRestore] Skipping: already restored for this media');
+      return;
+    }
 
     // Don't restore if initialVideoTrimMode or autoEnterInpaint is set (explicit modes take precedence)
     if (initialVideoTrimMode || autoEnterInpaint) {
-      console.log('[EDIT_DEBUG] 🔄 Skipping panelMode restore: explicit mode requested', {
+      console.log('[PanelRestore] Skipping: explicit mode requested', {
         initialVideoTrimMode,
         autoEnterInpaint,
       });
@@ -2241,34 +2285,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     // Don't restore if already in edit mode
     if (isSpecialEditMode || isInVideoEditMode) {
-      console.log('[EDIT_DEBUG] 🔄 Skipping panelMode restore: already in edit mode');
+      console.log('[PanelRestore] Skipping: already in edit mode', {
+        isSpecialEditMode,
+        isInVideoEditMode,
+      });
       hasRestoredPanelModeRef.current = true;
       return;
     }
 
-    console.log('[EDIT_DEBUG] 🔄 Checking panelMode restore:', {
-      persistedPanelMode,
-      isVideo,
-      hasRestoredPanelModeRef: hasRestoredPanelModeRef.current,
-    });
-
     if (persistedPanelMode === 'edit') {
       hasRestoredPanelModeRef.current = true;
       if (isVideo) {
-        console.log('[EDIT_DEBUG] 🔄 Restoring video Edit mode from persisted panelMode');
-        // Use setTimeout to avoid state update during render
+        console.log('[PanelRestore] Restoring VIDEO to edit mode');
         setTimeout(() => handleEnterVideoEditMode(), 0);
       } else {
-        console.log('[EDIT_DEBUG] 🔄 Restoring image Edit mode from persisted panelMode');
+        console.log('[PanelRestore] Restoring IMAGE to edit mode (calling handleEnterMagicEditMode)');
         setTimeout(() => handleEnterMagicEditMode(), 0);
       }
     } else {
+      console.log('[PanelRestore] Staying in INFO mode (persistedPanelMode:', persistedPanelMode, ')');
       hasRestoredPanelModeRef.current = true;
     }
   }, [persistedPanelMode, isVideo, handleEnterVideoEditMode, handleEnterMagicEditMode, initialVideoTrimMode, autoEnterInpaint, isSpecialEditMode, isInVideoEditMode]);
 
   // Reset restore flag when media changes
   useEffect(() => {
+    console.log('[PanelRestore] Media changed, resetting restore flag', { mediaId: media.id?.substring(0, 8) });
     hasRestoredPanelModeRef.current = false;
   }, [media.id]);
 
@@ -3247,6 +3289,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onStrokePointerMove={handleKonvaPointerMove}
                       onStrokePointerUp={handleKonvaPointerUp}
                       onShapeClick={handleShapeClick}
+                      strokeOverlayRef={strokeOverlayRef}
                     />
                   )}
 
@@ -3569,6 +3612,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isLoadingVariants={isLoadingVariants}
                     onPromoteToGeneration={handlePromoteToGeneration}
                     isPromoting={promoteVariantMutation.isPending}
+                    onDeleteVariant={deleteVariant}
                     onLoadVariantSettings={setVariantParamsToLoad}
                   />
                 </div>
@@ -3669,6 +3713,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onStrokePointerMove={handleKonvaPointerMove}
                       onStrokePointerUp={handleKonvaPointerUp}
                       onShapeClick={handleShapeClick}
+                      strokeOverlayRef={strokeOverlayRef}
                     />
                     )}
 
@@ -3949,6 +3994,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isLoadingVariants={isLoadingVariants}
                     onPromoteToGeneration={handlePromoteToGeneration}
                     isPromoting={promoteVariantMutation.isPending}
+                    onDeleteVariant={deleteVariant}
                     onLoadVariantSettings={setVariantParamsToLoad}
                   />
                 </div>
@@ -4070,6 +4116,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     onStrokePointerMove={handleKonvaPointerMove}
                     onStrokePointerUp={handleKonvaPointerUp}
                     onShapeClick={handleShapeClick}
+                    strokeOverlayRef={strokeOverlayRef}
                   />
                 )}
 

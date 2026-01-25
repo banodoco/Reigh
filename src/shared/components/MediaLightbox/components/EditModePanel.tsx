@@ -95,6 +95,8 @@ export interface EditModePanelProps {
   // Variant promotion
   onPromoteToGeneration?: (variantId: string) => Promise<void>;
   isPromoting?: boolean;
+  // Variant deletion
+  onDeleteVariant?: (variantId: string) => Promise<void>;
 
   // Variant
   variant: 'desktop' | 'mobile';
@@ -183,6 +185,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   isLoadingVariants,
   onPromoteToGeneration,
   isPromoting,
+  onDeleteVariant,
   onClose,
   variant,
   hideInfoEditToggle = false,
@@ -312,6 +315,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         isLoadingVariants={isLoadingVariants}
         onPromoteToGeneration={onPromoteToGeneration}
         isPromoting={isPromoting}
+        onDeleteVariant={onDeleteVariant}
       >
           {/* Prompt Field - Hidden for img2img mode (has its own prompt field) */}
           {editMode !== 'img2img' && (

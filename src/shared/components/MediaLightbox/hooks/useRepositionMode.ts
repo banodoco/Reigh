@@ -130,6 +130,8 @@ export const useRepositionMode = ({
   // Per-variant transform cache (preserves transforms when switching variants)
   // Uses variant ID when available, falls back to generation ID
   const transformCacheRef = useRef<Map<string, ImageTransform>>(new Map());
+  // Flag to skip caching after save (transform is baked into image)
+  const skipNextCacheRef = useRef(false);
   const getCacheKey = useCallback(() => {
     // Use variant ID if available, otherwise use generation ID
     return activeVariantId || media.id;
@@ -140,15 +142,18 @@ export const useRepositionMode = ({
   useEffect(() => {
     const currentCacheKey = getCacheKey();
     if (prevCacheKeyRef.current !== currentCacheKey) {
-      // Save current transform for old variant/media
-      if (prevCacheKeyRef.current) {
+      // Save current transform for old variant/media (unless we just saved)
+      if (prevCacheKeyRef.current && !skipNextCacheRef.current) {
         transformCacheRef.current.set(prevCacheKeyRef.current, transform);
       }
+      // Reset the skip flag
+      skipNextCacheRef.current = false;
 
       // Try to load transform in order of priority:
       // 1. From session cache (user's current edits)
-      // 2. From variant params (saved transform from previous session)
+      // 2. From variant params (only if explicitly saved as restorable transform)
       // 3. Default transform
+      // Note: repositioned variants use 'transform_applied' (history only), not 'transform' (restorable)
       const cachedTransform = transformCacheRef.current.get(currentCacheKey);
       const savedTransform = activeVariantParams?.transform as ImageTransform | undefined;
 
@@ -535,35 +540,49 @@ export const useRepositionMode = ({
       });
       
       const transformedCanvas = await createTransformedCanvas();
-      
-      // Convert canvas to blob for main image
+
+      // Create a new canvas with black background, then draw transformed image on top
+      const outputCanvas = document.createElement('canvas');
+      outputCanvas.width = transformedCanvas.width;
+      outputCanvas.height = transformedCanvas.height;
+      const outputCtx = outputCanvas.getContext('2d');
+
+      if (outputCtx) {
+        // Fill with black first
+        outputCtx.fillStyle = '#000000';
+        outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+        // Draw the transformed image (with transparency) on top
+        outputCtx.drawImage(transformedCanvas, 0, 0);
+      }
+
+      // Convert canvas to blob for main image (use outputCanvas which has black background)
       const transformedBlob = await new Promise<Blob>((resolve, reject) => {
-        transformedCanvas.toBlob(blob => {
+        outputCanvas.toBlob(blob => {
           if (blob) resolve(blob);
           else reject(new Error('Failed to create transformed image blob'));
         }, 'image/png');
       });
-      
+
       // Generate thumbnail (max 300px)
       const thumbnailMaxSize = 300;
-      const aspectRatio = transformedCanvas.width / transformedCanvas.height;
+      const aspectRatio = outputCanvas.width / outputCanvas.height;
       let thumbWidth: number, thumbHeight: number;
-      
+
       if (aspectRatio > 1) {
-        thumbWidth = Math.min(transformedCanvas.width, thumbnailMaxSize);
+        thumbWidth = Math.min(outputCanvas.width, thumbnailMaxSize);
         thumbHeight = Math.round(thumbWidth / aspectRatio);
       } else {
-        thumbHeight = Math.min(transformedCanvas.height, thumbnailMaxSize);
+        thumbHeight = Math.min(outputCanvas.height, thumbnailMaxSize);
         thumbWidth = Math.round(thumbHeight * aspectRatio);
       }
-      
+
       const thumbnailCanvas = document.createElement('canvas');
       thumbnailCanvas.width = thumbWidth;
       thumbnailCanvas.height = thumbHeight;
       const thumbCtx = thumbnailCanvas.getContext('2d');
-      
+
       if (thumbCtx) {
-        thumbCtx.drawImage(transformedCanvas, 0, 0, thumbWidth, thumbHeight);
+        thumbCtx.drawImage(outputCanvas, 0, 0, thumbWidth, thumbHeight);
       }
       
       // Convert thumbnail to blob
@@ -593,7 +612,8 @@ export const useRepositionMode = ({
         // Create a new generation with based_on pointing to the source
         console.log('[Reposition] Creating as new generation (not variant)');
         const generationParams = {
-          transform: transform as any,
+          // Note: transform is baked into the image, we only save it for historical reference
+          transform_applied: transform as any,
           saved_at: new Date().toISOString(),
           tool_type: toolTypeOverride || 'edit-images',
           repositioned_from: actualGenerationId,
@@ -630,6 +650,14 @@ export const useRepositionMode = ({
         });
 
         console.log('[Reposition] ✅ Saved as new generation:', insertedGeneration?.id);
+
+        // Clear the transform cache for the current variant (we don't want to restore the editing transform)
+        const currentCacheKey = getCacheKey();
+        if (currentCacheKey) {
+          transformCacheRef.current.delete(currentCacheKey);
+        }
+        // Skip caching when the useEffect runs
+        skipNextCacheRef.current = true;
       } else {
         // Create a new variant and make it primary (displayed by default)
         const { data: insertedVariant, error: insertError } = await supabase
@@ -642,7 +670,8 @@ export const useRepositionMode = ({
             variant_type: 'repositioned',
             name: 'Repositioned',
             params: {
-              transform: transform as any,
+              // Note: transform is baked into the image, we only save it for historical reference
+              transform_applied: transform as any,
               saved_at: new Date().toISOString(),
               tool_type: toolTypeOverride || 'edit-images',
               ...(activeVariantId ? { source_variant_id: activeVariantId } : {}), // Track source variant if editing from a variant
@@ -657,7 +686,20 @@ export const useRepositionMode = ({
         }
         
         console.log('[Reposition] ✅ Saved as variant:', insertedVariant?.id);
-        
+
+        // Clear the transform cache and skip re-caching on variant switch
+        // - Old variant: we don't want to restore the transform we were editing with
+        // - New variant: transform is baked in, don't restore
+        const currentCacheKey = getCacheKey();
+        if (currentCacheKey) {
+          transformCacheRef.current.delete(currentCacheKey);
+        }
+        if (insertedVariant?.id) {
+          transformCacheRef.current.delete(insertedVariant.id);
+        }
+        // Skip caching when the useEffect runs due to variant change
+        skipNextCacheRef.current = true;
+
         // Switch to the newly created variant (only for variant mode)
         if (insertedVariant?.id && onVariantCreated) {
           onVariantCreated(insertedVariant.id);
@@ -712,7 +754,9 @@ export const useRepositionMode = ({
     createAsGeneration,
     toolTypeOverride,
     shotId,
-    queryClient
+    queryClient,
+    getCacheKey,
+    activeVariantId,
   ]);
   
   return {

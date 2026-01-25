@@ -149,6 +149,8 @@ export interface ControlsPanelProps extends ModeProps {
   // Variant promotion
   onPromoteToGeneration?: (variantId: string) => Promise<void>;
   isPromoting?: boolean;
+  // Variant deletion
+  onDeleteVariant?: (variantId: string) => Promise<void>;
 
   /** Handler to load a variant's settings into the regenerate form */
   onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
@@ -273,6 +275,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     // Variant promotion
     onPromoteToGeneration,
     isPromoting,
+    // Variant deletion
+    onDeleteVariant,
     // Load variant settings
     onLoadVariantSettings,
   } = props;
@@ -317,6 +321,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         onPromoteToGeneration={onPromoteToGeneration}
         isPromoting={isPromoting}
         onLoadVariantSettings={onLoadVariantSettings}
+        onDeleteVariant={onDeleteVariant}
       />
     );
   }
@@ -373,6 +378,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         isLoadingVariants={isLoadingVariants}
         onPromoteToGeneration={onPromoteToGeneration}
         isPromoting={isPromoting}
+        onDeleteVariant={onDeleteVariant}
         onClose={onClose}
         variant={variant}
         createAsGeneration={createAsGeneration}
@@ -442,6 +448,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
       variantsSectionRef={variantsSectionRef}
       onPromoteToGeneration={onPromoteToGeneration}
       isPromoting={isPromoting}
+      onDeleteVariant={onDeleteVariant}
     />
   );
 };

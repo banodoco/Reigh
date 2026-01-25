@@ -45,6 +45,9 @@ export interface EditPanelLayoutProps {
 
   /** Handler to load a variant's settings into the regenerate form */
   onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
+
+  /** Handler to delete a variant */
+  onDeleteVariant?: (variantId: string) => Promise<void>;
 }
 
 export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
@@ -62,6 +65,7 @@ export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
   onPromoteToGeneration,
   isPromoting,
   onLoadVariantSettings,
+  onDeleteVariant,
 }) => {
   const isMobile = variant === 'mobile';
   const hasVariants = variants && variants.length >= 1 && onVariantSelect;
@@ -127,6 +131,7 @@ export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
               onPromoteToGeneration={onPromoteToGeneration}
               isPromoting={isPromoting}
               onLoadVariantSettings={onLoadVariantSettings}
+              onDeleteVariant={onDeleteVariant}
             />
           </div>
         )}

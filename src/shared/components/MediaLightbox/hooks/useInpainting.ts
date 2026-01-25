@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { EditAdvancedSettings } from './useGenerationEditSettings';
 import { convertToHiresFixApiParams } from './useGenerationEditSettings';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import type { StrokeOverlayHandle } from '../components/StrokeOverlay';
 
 export interface BrushStroke {
   id: string;
@@ -43,6 +44,8 @@ export interface UseInpaintingProps {
   imageUrl?: string;
   // Thumbnail URL for progressive loading
   thumbnailUrl?: string;
+  // Initial edit mode from persisted settings (prevents flash from 'text' default)
+  initialEditMode?: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
 }
 
 // Canvas display size (matches image exactly with new wrapper approach)
@@ -76,9 +79,6 @@ export interface UseInpaintingReturn {
   setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img' | ((prev: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img') => 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img')) => void;
   setAnnotationMode: (mode: 'rectangle' | null | ((prev: 'rectangle' | null) => 'rectangle' | null)) => void;
   handleEnterInpaintMode: () => void;
-  handlePointerDown: (e: React.PointerEvent<HTMLCanvasElement>) => void;
-  handlePointerMove: (e: React.PointerEvent<HTMLCanvasElement>) => void;
-  handlePointerUp: (e?: React.PointerEvent<HTMLCanvasElement>) => void;
   // Konva-based handlers (receive coordinates in image space)
   handleKonvaPointerDown: (point: { x: number; y: number }, e: KonvaEventObject<PointerEvent>) => void;
   handleKonvaPointerMove: (point: { x: number; y: number }, e: KonvaEventObject<PointerEvent>) => void;
@@ -91,6 +91,8 @@ export interface UseInpaintingReturn {
   handleDeleteSelected: () => void;
   handleToggleFreeForm: () => void;
   getDeleteButtonPosition: () => { x: number; y: number } | null;
+  // Ref for StrokeOverlay to enable mask export
+  strokeOverlayRef: React.RefObject<StrokeOverlayHandle>;
   // Canvas-based rendering (single canvas approach)
   isImageLoaded: boolean;
   imageLoadError: string | null;
@@ -119,6 +121,7 @@ export const useInpainting = ({
   advancedSettings,
   imageUrl,
   thumbnailUrl,
+  initialEditMode,
 }: UseInpaintingProps): UseInpaintingReturn => {
   console.log('[InpaintDebug] 🎣 useInpainting hook received props:', {
     shotId: shotId?.substring(0, 8),
@@ -164,6 +167,9 @@ export const useInpainting = ({
   
   // Ref to latest redrawStrokes to avoid stale closures
   const redrawStrokesRef = useRef<((strokes: BrushStroke[]) => void) | null>(null);
+
+  // Ref to StrokeOverlay for mask export
+  const strokeOverlayRef = useRef<StrokeOverlayHandle>(null);
   
   // [MobileHeatDebug] Throttle canvas redraws during drag operations
   const lastRedrawTimeRef = useRef<number>(0);
@@ -269,7 +275,7 @@ export const useInpainting = ({
   const [inpaintGenerateSuccess, setInpaintGenerateSuccess] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<Array<{ x: number; y: number }>>([]);
-  const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img'>('text');
+  const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img'>(initialEditMode || 'text');
   const [annotationMode, setAnnotationModeInternal] = useState<'rectangle' | null>(null);
 
   // Canvas-based image rendering state
@@ -288,7 +294,7 @@ export const useInpainting = ({
   // Computed: current brush strokes based on mode (memoized to prevent redraw loops)
   const brushStrokes = useMemo(() => {
     const strokes = editMode === 'annotate' ? annotationStrokes : editMode === 'inpaint' ? inpaintStrokes : [];
-    console.log('[InpaintRender] 🎨 brushStrokes recomputed', {
+    console.log('[AnnotateDebug] 🎨 brushStrokes recomputed', {
       mode: editMode,
       inpaintCount: inpaintStrokes.length,
       annotationCount: annotationStrokes.length,
@@ -1015,10 +1021,8 @@ export const useInpainting = ({
 
         if (isSelected && shapeType === 'rectangle') {
           ctx.strokeStyle = 'rgba(0, 255, 100, 0.9)';
-          ctx.fillStyle = 'rgba(0, 255, 100, 0.2)';
         } else {
           ctx.strokeStyle = stroke.isErasing ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 0, 0, 0.4)';
-          ctx.fillStyle = stroke.isErasing ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 0, 0, 0.2)';
         }
 
         ctx.lineWidth = shapeType === 'rectangle' ? 8 : scaledBrushSize;
@@ -1047,7 +1051,7 @@ export const useInpainting = ({
               ctx.lineTo(canvasPoints[i].x, canvasPoints[i].y);
             }
             ctx.closePath();
-            ctx.fill();
+            // Only stroke the outline for display (no fill)
             ctx.stroke();
 
             if (maskCtx) {
@@ -1057,6 +1061,7 @@ export const useInpainting = ({
                 maskCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
               }
               maskCtx.closePath();
+              // Mask still needs fill for inpainting
               maskCtx.fill();
               maskCtx.stroke();
             }
@@ -1067,7 +1072,7 @@ export const useInpainting = ({
             const width = Math.abs(canvasPoints[1].x - canvasPoints[0].x);
             const height = Math.abs(canvasPoints[1].y - canvasPoints[0].y);
 
-            ctx.fillRect(x, y, width, height);
+            // Only stroke the outline for display (no fill)
             ctx.strokeRect(x, y, width, height);
 
             if (maskCtx) {
@@ -1210,7 +1215,7 @@ export const useInpainting = ({
         // Wait for image to have natural dimensions before initializing canvas
         // This prevents initializing with wrong dimensions during loading state
         if (!imgElement.naturalWidth || !imgElement.naturalHeight) {
-          console.log('[MobileInpaintDebug] ⏳ Image not loaded yet, waiting for natural dimensions');
+          console.log('[AnnotateDebug] ⏳ Image not loaded yet, waiting for natural dimensions');
           return;
         }
 
@@ -1227,8 +1232,8 @@ export const useInpainting = ({
         const newWidth = Math.round(rect.width);
         const newHeight = Math.round(rect.height);
 
-        // [MobileInpaintDebug] Log all dimensions for debugging
-        console.log('[MobileInpaintDebug] Canvas initialization:', {
+        // [AnnotateDebug] Log all dimensions for debugging
+        console.log('[AnnotateDebug] Canvas initialization:', {
           container: { width: containerRect.width, height: containerRect.height },
           wrapper: wrapperRect ? { width: wrapperRect.width, height: wrapperRect.height } : 'N/A',
           imgElement: { width: rect.width, height: rect.height },
@@ -1274,7 +1279,7 @@ export const useInpainting = ({
           const offsetTop = rect.top - wrapperRect.top;
           canvas.style.left = `${offsetLeft}px`;
           canvas.style.top = `${offsetTop}px`;
-          console.log('[MobileInpaintDebug] Canvas positioned at:', { offsetLeft, offsetTop });
+          console.log('[AnnotateDebug] Canvas positioned at:', { offsetLeft, offsetTop });
         }
 
         maskCanvas.width = newWidth;
@@ -1314,7 +1319,7 @@ export const useInpainting = ({
       if (img) {
         // Wait for image to have natural dimensions
         if (!img.naturalWidth || !img.naturalHeight) {
-          console.log('[MobileInpaintDebug] ⏳ handleResize: Image not loaded yet');
+          console.log('[AnnotateDebug] ⏳ handleResize: Image not loaded yet');
           return;
         }
 
@@ -1330,7 +1335,7 @@ export const useInpainting = ({
         const newWidth = rect.width;
         const newHeight = rect.height;
 
-        console.log('[MobileInpaintDebug] handleResize called:', {
+        console.log('[AnnotateDebug] handleResize called:', {
           imgRect: { width: rect.width, height: rect.height },
           imgNatural: { width: img.naturalWidth, height: img.naturalHeight },
           canvasCurrent: { width: canvas.width, height: canvas.height },
@@ -1596,12 +1601,23 @@ export const useInpainting = ({
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
     
     // Redraw all strokes using each stroke's stored brush size
+    console.log('[AnnotateDebug] 🎨 redrawStrokes called', {
+      strokeCount: strokes.length,
+      canvasSize: { width: canvas.width, height: canvas.height },
+      strokes: strokes.map(s => ({
+        id: s.id.substring(0, 8),
+        shapeType: s.shapeType,
+        pointCount: s.points.length,
+        points: s.points.slice(0, 4).map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })),
+      })),
+    });
+
     strokes.forEach((stroke, index) => {
       if (stroke.points.length < 2) {
-        console.log('[InpaintDraw] ⚠️ Skipping stroke with < 2 points', { strokeId: stroke.id });
+        console.log('[AnnotateDebug] ⚠️ Skipping stroke with < 2 points', { strokeId: stroke.id });
         return;
       }
-      
+
       // Use the stroke's stored brush size (fallback to 20 for legacy strokes)
       const strokeBrushSize = stroke.brushSize || 20;
       const shapeType = stroke.shapeType || 'line';
@@ -1610,13 +1626,11 @@ export const useInpainting = ({
       // Set up context for display canvas
       ctx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'lighten';
       
-      // Highlight selected shapes with green
+      // Highlight selected shapes with green (stroke only, no fill)
       if (isSelected && shapeType === 'rectangle') {
         ctx.strokeStyle = 'rgba(0, 255, 100, 0.9)';
-        ctx.fillStyle = 'rgba(0, 255, 100, 0.2)';
       } else {
         ctx.strokeStyle = stroke.isErasing ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 0, 0, 0.4)';
-        ctx.fillStyle = stroke.isErasing ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 0, 0, 0.2)';
       }
       
       ctx.lineWidth = strokeBrushSize;
@@ -1650,9 +1664,10 @@ export const useInpainting = ({
             ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
           }
           ctx.closePath();
-          ctx.fill(); // Fill first
-          ctx.stroke(); // Then stroke
-          
+          // Only stroke the outline for display (no fill)
+          ctx.stroke();
+
+          // Mask still needs fill for inpainting
           maskCtx.beginPath();
           maskCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
           for (let i = 1; i < 4; i++) {
@@ -1667,11 +1682,22 @@ export const useInpainting = ({
           const y = Math.min(startPoint.y, endPoint.y);
           const width = Math.abs(endPoint.x - startPoint.x);
           const height = Math.abs(endPoint.y - startPoint.y);
-          
-          // Fill and stroke rectangle (fill makes it visible even with light backgrounds)
-          ctx.fillRect(x, y, width, height);
+
+          console.log('[AnnotateDebug] 📐 Drawing rectangle', {
+            strokeId: stroke.id.substring(0, 8),
+            startPoint: { x: Math.round(startPoint.x), y: Math.round(startPoint.y) },
+            endPoint: { x: Math.round(endPoint.x), y: Math.round(endPoint.y) },
+            rect: { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) },
+            canvasSize: { width: canvas.width, height: canvas.height },
+            strokeStyle: ctx.strokeStyle,
+            lineWidth: ctx.lineWidth,
+            compositeOp: ctx.globalCompositeOperation,
+          });
+
+          // Only stroke the outline for display (no fill)
           ctx.strokeRect(x, y, width, height);
-          
+
+          // Mask still needs fill for inpainting
           maskCtx.fillRect(x, y, width, height);
           maskCtx.strokeRect(x, y, width, height);
         }
@@ -1753,618 +1779,6 @@ export const useInpainting = ({
     }
   }, [editMode, annotationMode, setAnnotationMode]);
 
-  // Handle mouse/touch drawing (canvas coordinate system)
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = displayCanvasRef.current;
-    console.log('[MobilePaintDebug] 🔧 handlePointerDown called', {
-      isInpaintMode,
-      hasCanvas: !!displayCanvasRef.current,
-      eventType: e.type,
-      pointerType: e.pointerType,
-      isAnnotateMode
-    });
-    
-    if (!isInpaintMode) {
-      console.log('[MobilePaintDebug] ❌ Not in inpaint mode, returning');
-      return;
-    }
-    
-    // Prevent drawing in text edit mode - canvas should be non-interactive
-    if (editMode === 'text') {
-      console.log('[MobilePaintDebug] ❌ In text edit mode, canvas drawing disabled');
-      
-      // Show tooltip hint to switch modes
-      setShowTextModeHint(true);
-      
-      // Clear any existing timeout
-      if (hintTimeoutRef.current) {
-        clearTimeout(hintTimeoutRef.current);
-      }
-      
-      // Auto-hide tooltip after 2 seconds
-      hintTimeoutRef.current = setTimeout(() => {
-        setShowTextModeHint(false);
-        hintTimeoutRef.current = null;
-      }, 2000);
-      
-      return;
-    }
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!canvas) {
-      console.log('[MobilePaintDebug] ❌ No canvas ref, returning');
-      return;
-    }
-    
-    const rect = canvas.getBoundingClientRect();
-    let x = e.clientX - rect.left;
-    let y = e.clientY - rect.top;
-
-    // Convert canvas coordinates to image pixel coordinates
-    // Since canvas now matches the image exactly (no offset), just scale by aspect ratio
-    if (imageDimensions && rect.width > 0 && rect.height > 0) {
-      // Scale from display size to actual image pixel size
-      const scaleX = imageDimensions.width / rect.width;
-      const scaleY = imageDimensions.height / rect.height;
-      x = x * scaleX;
-      y = y * scaleY;
-
-      console.log('[MobileInpaintDebug] Pointer down - scaled to image coords:', {
-        canvasPos: { x: e.clientX - rect.left, y: e.clientY - rect.top },
-        canvasSize: { width: rect.width, height: rect.height },
-        imageDimensions,
-        imageCoords: { x, y },
-      });
-    }
-
-    // Store drag start position for tap detection
-    dragStartPosRef.current = { x, y };
-    
-    // In annotate mode, check if clicking on existing shape
-    if (isAnnotateMode && annotationMode === 'rectangle') {
-      // Check if we clicked on an existing rectangle shape
-      for (let i = brushStrokes.length - 1; i >= 0; i--) {
-        const stroke = brushStrokes[i];
-        if (stroke.shapeType === 'rectangle' && isPointOnShape(x, y, stroke)) {
-          console.log('[DirectAction] Clicked on rectangle:', stroke.id);
-          
-          // Select it
-          setSelectedShapeId(stroke.id);
-          
-          // Check for corner click (single click if already free-form, double-click to enable)
-          const now = Date.now();
-          const cornerIndex = getClickedCornerIndex(x, y, stroke);
-          const lastClickPos = lastClickPositionRef.current;
-          const isDoubleClick = cornerIndex !== null && 
-                               now - lastClickTimeRef.current < 300 &&
-                               lastClickPos &&
-                               Math.hypot(x - lastClickPos.x, y - lastClickPos.y) < 10;
-          
-          lastClickTimeRef.current = now;
-          lastClickPositionRef.current = { x, y };
-          
-          // If already in free-form mode, single click on corner starts free-form dragging
-          if (stroke.isFreeForm && cornerIndex !== null) {
-            console.log('[Drag] Single-click on FREE-FORM corner - starting corner dragging');
-            setDraggingCornerIndex(cornerIndex);
-            setIsDraggingShape(true);
-            selectedShapeRef.current = stroke;
-            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-            return;
-          }
-          
-          // If NOT in free-form mode, double-click on corner enables free-form mode
-          if (isDoubleClick && cornerIndex !== null && !stroke.isFreeForm) {
-            console.log('[Drag] DOUBLE-CLICK on corner - enabling FREE-FORM dragging');
-            
-            // Convert to 4-point free-form
-            const corners = getRectangleCorners(stroke);
-            const updatedStroke: BrushStroke = {
-              ...stroke,
-              points: corners,
-              isFreeForm: true
-            };
-            const newStrokes = brushStrokes.map(s => s.id === stroke.id ? updatedStroke : s);
-            setBrushStrokes(newStrokes);
-            selectedShapeRef.current = updatedStroke;
-            redrawStrokes(newStrokes);
-            
-            setDraggingCornerIndex(cornerIndex);
-            setIsDraggingShape(true);
-            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-            return;
-          }
-          
-          // Determine if clicking edge (move) or corner (resize) and START IMMEDIATELY
-          // Note: For free-form shapes, corner clicks are handled above
-          const clickType = getRectangleClickType(x, y, stroke);
-          
-          if (clickType === 'edge') {
-            console.log('[Drag] IMMEDIATELY starting to MOVE rectangle (clicked edge)');
-            setDragMode('move');
-            setIsDraggingShape(true);
-            selectedShapeRef.current = stroke;
-            const startPoint = stroke.points[0];
-            setDragOffset({ x: x - startPoint.x, y: y - startPoint.y });
-            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-            return;
-          } else if (clickType === 'corner' && !stroke.isFreeForm) {
-            // Standard rectangle resize (only for non-free-form rectangles)
-            console.log('[Drag] IMMEDIATELY starting to RESIZE rectangle (clicked corner)');
-            setDragMode('resize');
-            setIsDraggingShape(true);
-            selectedShapeRef.current = stroke;
-            const startPoint = stroke.points[0];
-            setDragOffset({ x: x - startPoint.x, y: y - startPoint.y });
-            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-            return;
-          }
-          
-          // If clicked in the middle (not edge or corner), just keep it selected but don't drag
-          return;
-        }
-      }
-      
-      // Clicked on empty space, deselect any selected shape
-      if (selectedShapeId) {
-        console.log('[Selection] ❌ Clearing selection - clicked on empty space');
-        setSelectedShapeId(null);
-      }
-      
-      // Note: Don't clear existing rectangles here on click
-      // They will be cleared when a new rectangle is successfully drawn (in handlePointerUp)
-    }
-    
-    // Capture the pointer to receive events even when outside canvas
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    
-    setIsDrawing(true);
-    // Reset canvas initialization flag for new stroke
-    hasInitializedCanvasRef.current = false;
-    lastDrawnPointRef.current = null;
-    
-    console.log('[MobilePaintDebug] ✅ Starting stroke', {
-      x,
-      y,
-      canvasRect: { width: rect.width, height: rect.height, left: rect.left, top: rect.top }
-    });
-    
-    setCurrentStroke([{ x, y }]);
-  }, [isInpaintMode, isAnnotateMode, annotationMode, brushStrokes, annotationStrokes, selectedShapeId, isPointOnShape, getRectangleClickType, getClickedCornerIndex, getRectangleCorners, redrawStrokes, setBrushStrokes, imageUrl, loadedImage, imageDimensions]);
-
-  // Prevent browser scroll/zoom gestures while actively drawing (iOS Safari)
-  useEffect(() => {
-    if (!isDrawing) return;
-    const preventTouchMove = (e: TouchEvent) => {
-      // Only prevent if drawing to avoid breaking normal scroll elsewhere
-      // Check if event is cancelable before attempting to preventDefault
-      if (e.cancelable) {
-        e.preventDefault();
-      }
-    };
-    document.addEventListener('touchmove', preventTouchMove, { passive: false });
-    return () => {
-      document.removeEventListener('touchmove', preventTouchMove);
-    };
-  }, [isDrawing]);
-
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isInpaintMode) return;
-    
-    // Prevent drawing in text edit mode (but allow shape dragging for existing shapes)
-    if (editMode === 'text' && !isDraggingShape) return;
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const canvas = displayCanvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    // Get canvas coordinates first
-    let canvasX = e.clientX - rect.left;
-    let canvasY = e.clientY - rect.top;
-
-    let x: number, y: number;
-
-    // Convert canvas coordinates to image pixel coordinates
-    // Since canvas matches image exactly, just scale
-    if (imageDimensions && rect.width > 0 && rect.height > 0) {
-      // Clamp to canvas bounds
-      const clampedX = Math.max(0, Math.min(rect.width, canvasX));
-      const clampedY = Math.max(0, Math.min(rect.height, canvasY));
-
-      // Scale from display size to actual image pixel size
-      const scaleX = imageDimensions.width / rect.width;
-      const scaleY = imageDimensions.height / rect.height;
-      x = clampedX * scaleX;
-      y = clampedY * scaleY;
-    } else {
-      // Legacy: clamp to canvas boundaries
-      x = Math.max(0, Math.min(rect.width, canvasX));
-      y = Math.max(0, Math.min(rect.height, canvasY));
-    }
-
-    // Control point dragging removed (rectangles don't have control points)
-    
-    // Handle dragging selected shape
-    if (isDraggingShape && selectedShapeRef.current) {
-      const shape = selectedShapeRef.current;
-      
-      // FREE-FORM CORNER DRAGGING: Move individual corner
-      if (draggingCornerIndex !== null && shape.isFreeForm && shape.points.length === 4) {
-        console.log(`[FreeFormDrag] Dragging corner ${draggingCornerIndex}`);
-        const newPoints = [...shape.points];
-        newPoints[draggingCornerIndex] = { x, y };
-        
-        const updatedShape: BrushStroke = {
-          ...shape,
-          points: newPoints,
-          isFreeForm: true
-        };
-        
-        const newStrokes = brushStrokes.map(s => 
-          s.id === shape.id ? updatedShape : s
-        );
-        setBrushStrokes(newStrokes);
-        selectedShapeRef.current = updatedShape;
-        redrawStrokes(newStrokes);
-        return;
-      }
-      
-      // MOVE MODE: Move the entire shape (clicked on edge)
-      if (dragMode === 'move' && dragOffset) {
-        const newStartX = x - dragOffset.x;
-        const newStartY = y - dragOffset.y;
-        
-        // Calculate the offset from old position
-        const oldStartPoint = shape.points[0];
-        const deltaX = newStartX - oldStartPoint.x;
-        const deltaY = newStartY - oldStartPoint.y;
-        
-        console.log('[Drag] Moving shape', {
-          shapeId: shape.id.substring(0, 8),
-          delta: { x: deltaX, y: deltaY },
-          newPos: { x: newStartX, y: newStartY }
-        });
-        
-        // Update the shape's position
-        const updatedPoints = shape.points.map(p => ({
-          x: p.x + deltaX,
-          y: p.y + deltaY
-        }));
-        
-        const updatedShape: BrushStroke = {
-          ...shape,
-          points: updatedPoints,
-          isFreeForm: shape.isFreeForm
-        };
-        
-        // Update the shape in the strokes array
-        const newStrokes = brushStrokes.map(s => 
-          s.id === shape.id ? updatedShape : s
-        );
-        setBrushStrokes(newStrokes);
-        selectedShapeRef.current = updatedShape;
-        // Only redraw directly, don't wait for effect (prevents flicker)
-        redrawStrokes(newStrokes);
-      } else if (dragMode === 'resize' && dragOffset) {
-        // RESIZE MODE: Change the shape itself (clicked on corner)
-        const startPoint = shape.points[0];
-        
-        if (shape.shapeType === 'rectangle') {
-          // For rectangles: adjust size by changing the end point
-          const updatedShape: BrushStroke = {
-            ...shape,
-            points: [startPoint, { x, y }],
-            isFreeForm: false // Reset to regular rectangle
-          };
-          
-          const newStrokes = brushStrokes.map(s => 
-            s.id === shape.id ? updatedShape : s
-          );
-          setBrushStrokes(newStrokes);
-          selectedShapeRef.current = updatedShape;
-          redrawStrokes(newStrokes);
-        }
-      }
-      
-      return;
-    }
-    
-    if (!isDrawing) return;
-
-    // Draw current stroke on display canvas
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // When using canvas-based rendering, do full scene redraws for reliability
-    if (imageUrl && canvasSize && imageDimensions) {
-      // Calculate canvas coordinates for the new point
-      const canvasCoords = imageToCanvas(x, y);
-      const drawX = canvasCoords.x;
-      const drawY = canvasCoords.y;
-
-      // Redraw the full scene (existing strokes)
-      redrawStrokes(brushStrokes);
-
-      // Now draw the current stroke being drawn (not yet saved)
-      if (currentStroke.length > 0 || isAnnotateMode) {
-        // Get device pixel ratio for correct transform
-        const dpr = window.devicePixelRatio || 1;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-        if (isAnnotateMode && annotationMode === 'rectangle') {
-          // Draw rectangle preview
-          const startPoint = currentStroke[0];
-          if (startPoint) {
-            const startCanvasCoords = imageToCanvas(startPoint.x, startPoint.y);
-
-            ctx.strokeStyle = 'rgba(100, 200, 255, 0.8)';
-            ctx.lineWidth = 8;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.strokeRect(
-              startCanvasCoords.x,
-              startCanvasCoords.y,
-              drawX - startCanvasCoords.x,
-              drawY - startCanvasCoords.y
-            );
-          }
-        } else {
-          // Draw the current freehand stroke being drawn
-          if (currentStroke.length > 0) {
-            // Scale brush size from image coords to canvas coords
-            const scaledBrushSize = (brushSize / imageDimensions.width) * canvasSize.width;
-
-            ctx.globalCompositeOperation = isEraseMode ? 'destination-out' : 'source-over';
-            ctx.strokeStyle = isEraseMode ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 0, 0, 0.4)';
-            ctx.lineWidth = scaledBrushSize;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            ctx.beginPath();
-            // Convert first point and move to it
-            const firstCoords = imageToCanvas(currentStroke[0].x, currentStroke[0].y);
-            ctx.moveTo(firstCoords.x, firstCoords.y);
-
-            // Draw lines through all points in currentStroke
-            for (let i = 1; i < currentStroke.length; i++) {
-              const coords = imageToCanvas(currentStroke[i].x, currentStroke[i].y);
-              ctx.lineTo(coords.x, coords.y);
-            }
-
-            // Draw to current point
-            ctx.lineTo(drawX, drawY);
-            ctx.stroke();
-          }
-        }
-      }
-
-      // Update stroke state (store in image coords using authoritative dimensions)
-      setCurrentStroke(prev => [...prev, { x, y }]);
-      return;
-    }
-
-    // Legacy path (when not using canvas-based rendering)
-    // Disable image smoothing for crisp edges
-    ctx.imageSmoothingEnabled = false;
-
-    // Initialize canvas with existing strokes only once at the start of drawing
-    if (!hasInitializedCanvasRef.current) {
-      redrawStrokes(brushStrokes);
-      hasInitializedCanvasRef.current = true;
-      lastDrawnPointRef.current = null;
-    }
-
-    // In annotation mode, redraw with the updated shape preview
-    if (isAnnotateMode && annotationMode) {
-      // For rectangles, we need to redraw the preview each time
-      const startPoint = currentStroke[0];
-      if (startPoint) {
-        ctx.save();
-        redrawStrokes(brushStrokes);
-
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = 'rgba(100, 200, 255, 0.8)';
-        ctx.lineWidth = 8;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        if (annotationMode === 'rectangle') {
-          const width = x - startPoint.x;
-          const height = y - startPoint.y;
-          ctx.strokeRect(startPoint.x, startPoint.y, width, height);
-        }
-
-        ctx.restore();
-      }
-
-      setCurrentStroke(prev => [...prev, { x, y }]);
-    } else {
-      // Optimized line drawing for legacy mode
-      const lastPoint = lastDrawnPointRef.current || (currentStroke.length > 0 ? currentStroke[currentStroke.length - 1] : null);
-
-      ctx.save();
-      ctx.globalCompositeOperation = isEraseMode ? 'destination-out' : 'source-over';
-      ctx.strokeStyle = isEraseMode ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 0, 0, 0.4)';
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      if (lastPoint) {
-        ctx.beginPath();
-        ctx.moveTo(lastPoint.x, lastPoint.y);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-      } else if (currentStroke.length === 0) {
-        setCurrentStroke([{ x, y }]);
-        lastDrawnPointRef.current = { x, y };
-        ctx.restore();
-        return;
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(currentStroke[0].x, currentStroke[0].y);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-      }
-
-      ctx.restore();
-      setCurrentStroke(prev => [...prev, { x, y }]);
-      lastDrawnPointRef.current = { x, y };
-    }
-  }, [isInpaintMode, isDrawing, isEraseMode, currentStroke, brushSize, isAnnotateMode, annotationMode, brushStrokes, redrawStrokes, isDraggingShape, isDraggingControlPoint, dragOffset, dragMode, draggingCornerIndex, displayCanvasRef, maskCanvasRef, setBrushStrokes, imageUrl, canvasSize, loadedImage, imageDimensions, imageToCanvas]);
-
-  const handlePointerUp = useCallback((e?: React.PointerEvent<HTMLCanvasElement>) => {
-    console.log('[InpaintPointer] 🛑 handlePointerUp called', {
-      isDraggingShape,
-      isDrawing,
-      currentStrokeLength: currentStroke.length,
-      editMode,
-      annotationMode
-    });
-    
-    // Control point drag handling removed (rectangles don't have control points)
-    
-    // Handle finishing drag operation
-    if (isDraggingShape) {
-      console.log('[Drag] ✅ Finished dragging shape');
-      setIsDraggingShape(false);
-      setDragOffset(null);
-      setDraggingCornerIndex(null); // Reset free-form corner dragging
-      selectedShapeRef.current = null;
-      
-      // [MobileHeatDebug] Do a final immediate redraw when drag ends to ensure clean state
-      if (brushStrokes.length > 0) {
-        redrawStrokes(brushStrokes, true); // immediate=true for final render
-      }
-      
-      // Release pointer capture
-      if (e && e.target) {
-        try {
-          (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-        } catch (err) {
-          console.log('[Drag] Could not release pointer capture', err);
-        }
-        
-        // Prevent event from bubbling to overlay which might close the lightbox
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-          e.nativeEvent.stopImmediatePropagation();
-        }
-      }
-      return;
-    }
-    
-    if (!isInpaintMode || !isDrawing) return;
-    
-    // Prevent drawing in text edit mode
-    if (editMode === 'text') return;
-    
-    console.log('[MobilePaintDebug] 🛑 Finishing stroke');
-    
-    // Release pointer capture if event is provided
-    if (e && e.target) {
-      try {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch (err) {
-        // Ignore errors if pointer capture wasn't active
-        console.log('[MobilePaintDebug] ⚠️ Could not release pointer capture', err);
-      }
-      
-      // Prevent event from bubbling to overlay which might close the lightbox
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-        e.nativeEvent.stopImmediatePropagation();
-      }
-    }
-    
-    setIsDrawing(false);
-    // Reset canvas initialization flag when drawing ends
-    hasInitializedCanvasRef.current = false;
-    lastDrawnPointRef.current = null;
-    
-    if (currentStroke.length > 1) {
-      const shapeType = isAnnotateMode && annotationMode ? annotationMode : 'line';
-      
-      console.log('[InpaintPointer] 📝 Creating new stroke', {
-        shapeType,
-        pointCount: currentStroke.length,
-        isEraseMode,
-        brushSize,
-        isAnnotateMode,
-        annotationMode
-      });
-      
-      // For rectangles, require minimum drag distance (prevent accidental clicks from creating shapes)
-      if (shapeType === 'rectangle') {
-        const startPoint = currentStroke[0];
-        const endPoint = currentStroke[currentStroke.length - 1];
-        const dragDistance = Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y);
-        const MIN_DRAG_DISTANCE = 10; // pixels
-        
-        if (dragDistance < MIN_DRAG_DISTANCE) {
-          console.log('[Rectangle] ⚠️ Drag too short, not creating rectangle', { dragDistance });
-          setCurrentStroke([]);
-          return;
-        }
-      }
-      
-      // For rectangles, only store start and end points (not all intermediate drag points)
-      // The drawing code expects exactly 2 points for rectangles
-      const strokePoints = shapeType === 'rectangle'
-        ? [currentStroke[0], currentStroke[currentStroke.length - 1]]
-        : currentStroke;
-
-      const newStroke: BrushStroke = {
-        id: nanoid(),
-        points: strokePoints,
-        isErasing: isEraseMode,
-        brushSize: brushSize,
-        shapeType
-      };
-      
-      const canvas = displayCanvasRef.current;
-
-      // Note: We no longer clear the opposite mode's strokes - each mode maintains its own strokes
-
-      // LIMIT TO ONE RECTANGLE: Clear existing rectangles when successfully drawing a new one
-      if (isAnnotateMode && shapeType === 'rectangle' && annotationStrokes.length > 0) {
-        console.log('[Annotate] 🔄 Clearing existing rectangle - new one successfully drawn', {
-          oldCount: annotationStrokes.length,
-          newStrokeId: newStroke.id.substring(0, 8)
-        });
-        // Replace all existing rectangles with just the new one
-        setBrushStrokes([newStroke]);
-      } else {
-        console.log('[InpaintPointer] ➕ Adding stroke to existing', {
-          existingCount: brushStrokes.length,
-          newStrokeId: newStroke.id.substring(0, 8)
-        });
-        setBrushStrokes(prev => [...prev, newStroke]);
-      }
-      
-      // Auto-select rectangle after drawing (shows delete button immediately)
-      if (isAnnotateMode && shapeType === 'rectangle') {
-        setSelectedShapeId(newStroke.id);
-        console.log('[Selection] ✅ Auto-selecting newly drawn rectangle:', newStroke.id.substring(0, 8));
-      }
-      
-      console.log('[MobilePaintDebug] ✅ Stroke added', { 
-        strokeId: newStroke.id, 
-        pointCount: currentStroke.length, 
-        brushSize, 
-        shapeType: newStroke.shapeType
-      });
-    }
-    
-    setCurrentStroke([]);
-  }, [isInpaintMode, isDrawing, currentStroke, isEraseMode, brushSize, isAnnotateMode, annotationMode, isDraggingShape, isDraggingControlPoint, setBrushStrokes, inpaintStrokes.length, annotationStrokes.length, setInpaintStrokes, setAnnotationStrokes]);
-
   // =============================================================================
   // KONVA HANDLERS
   // These receive coordinates already converted to image space by StrokeOverlay
@@ -2373,14 +1787,16 @@ export const useInpainting = ({
   const handleKonvaPointerDown = useCallback((point: { x: number; y: number }, e: KonvaEventObject<PointerEvent>) => {
     const { x, y } = point;
 
-    console.log('[KonvaInpaint] 🔧 handleKonvaPointerDown', {
+    console.log('[AnnotateDebug] 🔧 handleKonvaPointerDown', {
       isInpaintMode,
+      isAnnotateMode,
       point,
       editMode,
       annotationMode
     });
 
-    if (!isInpaintMode) return;
+    // Allow both inpaint mode and annotate mode
+    if (!isInpaintMode && !isAnnotateMode) return;
 
     // Prevent drawing in text edit mode
     if (editMode === 'text') {
@@ -2401,7 +1817,7 @@ export const useInpainting = ({
       for (let i = brushStrokes.length - 1; i >= 0; i--) {
         const stroke = brushStrokes[i];
         if (stroke.shapeType === 'rectangle' && isPointOnShape(x, y, stroke)) {
-          console.log('[KonvaInpaint] Clicked on rectangle:', stroke.id);
+          console.log('[AnnotateDebug] Clicked on rectangle:', stroke.id);
           setSelectedShapeId(stroke.id);
 
           // Check for corner click (for free-form dragging)
@@ -2470,6 +1886,7 @@ export const useInpainting = ({
     }
 
     // Start new stroke
+    console.log('[AnnotateDebug] 🎯 STARTING NEW STROKE (Konva)', { x, y, isAnnotateMode, annotationMode });
     setIsDrawing(true);
     hasInitializedCanvasRef.current = false;
     lastDrawnPointRef.current = null;
@@ -2477,7 +1894,8 @@ export const useInpainting = ({
   }, [isInpaintMode, isAnnotateMode, annotationMode, brushStrokes, selectedShapeId, editMode, isPointOnShape, getRectangleClickType, getClickedCornerIndex, getRectangleCorners, setBrushStrokes]);
 
   const handleKonvaPointerMove = useCallback((point: { x: number; y: number }, e: KonvaEventObject<PointerEvent>) => {
-    if (!isInpaintMode) return;
+    // Allow both inpaint mode and annotate mode
+    if (!isInpaintMode && !isAnnotateMode) return;
     if (editMode === 'text' && !isDraggingShape) return;
 
     const { x, y } = point;
@@ -2547,10 +1965,10 @@ export const useInpainting = ({
     if (!isDrawing) return;
 
     setCurrentStroke(prev => [...prev, { x, y }]);
-  }, [isInpaintMode, editMode, isDrawing, isDraggingShape, dragMode, dragOffset, draggingCornerIndex, brushStrokes, setBrushStrokes]);
+  }, [isInpaintMode, isAnnotateMode, editMode, isDrawing, isDraggingShape, dragMode, dragOffset, draggingCornerIndex, brushStrokes, setBrushStrokes]);
 
   const handleKonvaPointerUp = useCallback((e: KonvaEventObject<PointerEvent>) => {
-    console.log('[KonvaInpaint] 🛑 handleKonvaPointerUp', {
+    console.log('[AnnotateDebug] 🛑 handleKonvaPointerUp', {
       isDraggingShape,
       isDrawing,
       currentStrokeLength: currentStroke.length
@@ -2565,7 +1983,8 @@ export const useInpainting = ({
       return;
     }
 
-    if (!isInpaintMode || !isDrawing) return;
+    // Allow both inpaint mode and annotate mode
+    if ((!isInpaintMode && !isAnnotateMode) || !isDrawing) return;
     if (editMode === 'text') return;
 
     setIsDrawing(false);
@@ -2599,9 +2018,12 @@ export const useInpainting = ({
       };
 
       // Limit to one rectangle in annotate mode
+      console.log('[AnnotateDebug] 💾 SAVING STROKE', { isAnnotateMode, shapeType, existingCount: annotationStrokes.length });
       if (isAnnotateMode && shapeType === 'rectangle' && annotationStrokes.length > 0) {
+        console.log('[AnnotateDebug] 💾 Replacing existing rectangle');
         setBrushStrokes([newStroke]);
       } else {
+        console.log('[AnnotateDebug] 💾 Adding new stroke');
         setBrushStrokes(prev => [...prev, newStroke]);
       }
 
@@ -2610,14 +2032,19 @@ export const useInpainting = ({
         setSelectedShapeId(newStroke.id);
       }
 
-      console.log('[KonvaInpaint] ✅ Stroke added', { strokeId: newStroke.id, shapeType });
+      console.log(isAnnotateMode ? '[AnnotateDebug] ✅ Stroke added' : '[AnnotateDebug] ✅ Stroke added', {
+        strokeId: newStroke.id,
+        shapeType,
+        points: newStroke.points.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })),
+        mode: isAnnotateMode ? 'annotate' : 'inpaint',
+      });
     }
 
     setCurrentStroke([]);
   }, [isInpaintMode, isDrawing, currentStroke, isEraseMode, brushSize, isAnnotateMode, annotationMode, isDraggingShape, editMode, setBrushStrokes, annotationStrokes.length]);
 
   const handleShapeClick = useCallback((strokeId: string, point: { x: number; y: number }) => {
-    console.log('[KonvaInpaint] Shape clicked:', strokeId);
+    console.log('[AnnotateDebug] Shape clicked:', strokeId);
     setSelectedShapeId(strokeId);
   }, []);
 
@@ -2753,390 +2180,201 @@ export const useInpainting = ({
 
   // Handle entering inpaint mode
   const handleEnterInpaintMode = useCallback(() => {
-    console.log('[MobilePaintDebug] 🚀 handleEnterInpaintMode called');
-    console.log('[MobilePaintDebug] Before setIsInpaintMode - isInpaintMode:', isInpaintMode);
+    console.log('[AnnotateDebug] 🚀 handleEnterInpaintMode called');
+    console.log('[AnnotateDebug] Before setIsInpaintMode - isInpaintMode:', isInpaintMode);
     setIsInpaintMode(true);
-    console.log('[MobilePaintDebug] ✅ Called setIsInpaintMode(true)');
+    console.log('[AnnotateDebug] ✅ Called setIsInpaintMode(true)');
   }, []);
 
   // Generate inpaint
+  // Generate inpaint - uses Konva's native export for reliable mask generation
   const handleGenerateInpaint = useCallback(async () => {
-    if (!selectedProjectId || isVideo || inpaintStrokes.length === 0 || !inpaintPrompt.trim()) {
-      toast.error('Please paint on the image and enter a prompt');
+    console.log('[Inpaint] 🚀 handleGenerateInpaint called', {
+      selectedProjectId: selectedProjectId?.substring(0, 8),
+      inpaintStrokesLength: inpaintStrokes.length,
+      hasStrokeOverlayRef: !!strokeOverlayRef.current,
+    });
+
+    // Validation
+    if (!selectedProjectId || isVideo) {
+      toast.error('Cannot generate inpaint');
       return;
     }
 
-    if (!imageDimensions) {
-      toast.error('Image dimensions not available');
+    if (inpaintStrokes.length === 0) {
+      toast.error('Please paint on the image first');
+      return;
+    }
+
+    if (!inpaintPrompt.trim()) {
+      toast.error('Please enter a prompt');
+      return;
+    }
+
+    if (!strokeOverlayRef.current) {
+      toast.error('Paint overlay not ready');
       return;
     }
 
     setIsGeneratingInpaint(true);
     try {
-      console.log('[Inpaint] Starting inpaint generation...', {
-        mediaId: media.id,
-        prompt: inpaintPrompt,
-        numGenerations: inpaintNumGenerations,
-        strokeCount: inpaintStrokes.length
-      });
+      // Export mask directly from Konva - this uses the exact same strokes being displayed
+      const maskImageData = strokeOverlayRef.current.exportMask({ pixelRatio: 1.5 });
 
-      // Scale mask to 1.5x the actual image size
-      const actualWidth = imageDimensions.width;
-      const actualHeight = imageDimensions.height;
-      const scaledWidth = Math.round(actualWidth * 1.5);
-      const scaledHeight = Math.round(actualHeight * 1.5);
-
-      console.log('[Inpaint] Scaling mask', {
-        actualSize: { width: actualWidth, height: actualHeight },
-        scaledSize: { width: scaledWidth, height: scaledHeight }
-      });
-
-      // Create a temporary canvas at 1.5x original resolution
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = scaledWidth;
-      tempCanvas.height = scaledHeight;
-
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) {
-        throw new Error('Could not create temporary canvas context');
+      if (!maskImageData) {
+        throw new Error('Failed to export mask from overlay');
       }
 
-      // Disable image smoothing for crisp, sharp mask edges
-      tempCtx.imageSmoothingEnabled = false;
+      console.log('[Inpaint] Mask exported from Konva');
 
-      // Draw strokes directly to the mask canvas at scaled resolution
-      // (strokes are stored in image coordinates, so we scale them to match)
-      const scaleX = scaledWidth / actualWidth;
-      const scaleY = scaledHeight / actualHeight;
-
-      tempCtx.fillStyle = 'black';
-      tempCtx.fillRect(0, 0, scaledWidth, scaledHeight);
-
-      inpaintStrokes.forEach(stroke => {
-        if (stroke.points.length < 2) return;
-
-        const strokeBrushSize = (stroke.brushSize || 20) * scaleX;
-
-        tempCtx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'source-over';
-        tempCtx.strokeStyle = 'white';
-        tempCtx.fillStyle = 'white';
-        tempCtx.lineWidth = strokeBrushSize;
-        tempCtx.lineCap = 'round';
-        tempCtx.lineJoin = 'round';
-
-        if (stroke.shapeType === 'rectangle') {
-          if (stroke.isFreeForm && stroke.points.length === 4) {
-            // Free-form quadrilateral
-            tempCtx.beginPath();
-            tempCtx.moveTo(stroke.points[0].x * scaleX, stroke.points[0].y * scaleY);
-            for (let i = 1; i < 4; i++) {
-              tempCtx.lineTo(stroke.points[i].x * scaleX, stroke.points[i].y * scaleY);
-            }
-            tempCtx.closePath();
-            tempCtx.fill();
-          } else {
-            // Standard rectangle
-            const x = Math.min(stroke.points[0].x, stroke.points[1].x) * scaleX;
-            const y = Math.min(stroke.points[0].y, stroke.points[1].y) * scaleY;
-            const width = Math.abs(stroke.points[1].x - stroke.points[0].x) * scaleX;
-            const height = Math.abs(stroke.points[1].y - stroke.points[0].y) * scaleY;
-            tempCtx.fillRect(x, y, width, height);
-          }
-        } else {
-          // Freehand line
-          tempCtx.beginPath();
-          tempCtx.moveTo(stroke.points[0].x * scaleX, stroke.points[0].y * scaleY);
-          for (let i = 1; i < stroke.points.length; i++) {
-            tempCtx.lineTo(stroke.points[i].x * scaleX, stroke.points[i].y * scaleY);
-          }
-          tempCtx.stroke();
-        }
-      });
-      
-      // Apply binary threshold to eliminate any anti-aliasing artifacts
-      // This ensures pure black/white mask with no gray/semi-transparent pixels
-      const imageData = tempCtx.getImageData(0, 0, scaledWidth, scaledHeight);
-      const data = imageData.data;
-      const threshold = 128; // Mid-point threshold
-      
-      for (let i = 0; i < data.length; i += 4) {
-        // Check alpha channel - if pixel has any opacity, make it fully opaque white
-        if (data[i + 3] > threshold) {
-          data[i] = 255;     // R
-          data[i + 1] = 255; // G
-          data[i + 2] = 255; // B
-          data[i + 3] = 255; // A
-        } else {
-          // Otherwise make it fully transparent black
-          data[i] = 0;
-          data[i + 1] = 0;
-          data[i + 2] = 0;
-          data[i + 3] = 0;
-        }
-      }
-      
-      tempCtx.putImageData(imageData, 0, 0);
-      
-      // Create mask image from scaled canvas
-      const maskImageData = tempCanvas.toDataURL('image/png');
-      
       // Upload mask to storage
       const maskFile = await fetch(maskImageData)
         .then(res => res.blob())
         .then(blob => new File([blob], `inpaint_mask_${media.id}_${Date.now()}.png`, { type: 'image/png' }));
-      
+
       const maskUrl = await uploadImageToStorage(maskFile);
       console.log('[Inpaint] Mask uploaded:', maskUrl);
 
-      // Get source image URL - use active variant's location if editing a variant
-      // Otherwise fall back to media's URL fields
+      // Get source image URL
       const mediaUrl = (media as any).url || media.location || media.imageUrl;
       const sourceUrl = activeVariantLocation || mediaUrl;
-      
-      console.log('[Inpaint] Source URL selection:', {
-        activeVariantLocation: activeVariantLocation?.substring(0, 50),
-        mediaUrl: mediaUrl?.substring(0, 50),
-        selectedSourceUrl: sourceUrl?.substring(0, 50),
-        isUsingVariant: !!activeVariantLocation,
-      });
 
       // Create inpaint task
-      // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
-      // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
       const actualGenerationId = (media as any).generation_id || media.id;
-      
-      console.log('[InpaintDebug] 📤 About to call createImageInpaintTask with:', {
-        project_id: selectedProjectId?.substring(0, 8),
-        shot_id: shotId?.substring(0, 8),
-        tool_type: toolTypeOverride,
+
+      console.log('[Inpaint] Creating task', {
         generation_id: actualGenerationId.substring(0, 8),
-        prompt: inpaintPrompt.substring(0, 30)
+        prompt: inpaintPrompt.substring(0, 30),
       });
-      
+
       await createImageInpaintTask({
         project_id: selectedProjectId,
         image_url: sourceUrl,
         mask_url: maskUrl,
         prompt: inpaintPrompt,
         num_generations: inpaintNumGenerations,
-        generation_id: actualGenerationId, // Must be generations.id, not shot_generations.id
-        shot_id: shotId, // Pass shot_id so complete_task can link results to the shot
-        tool_type: toolTypeOverride, // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
-        loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
-        create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
-        source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
-        hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
+        generation_id: actualGenerationId,
+        shot_id: shotId,
+        tool_type: toolTypeOverride,
+        loras: loras,
+        create_as_generation: createAsGeneration,
+        source_variant_id: activeVariantId || undefined,
+        hires_fix: convertToHiresFixApiParams(advancedSettings),
       });
 
-      console.log('[Inpaint] ✅ Inpaint tasks created successfully');
-      
+      console.log('[Inpaint] ✅ Task created successfully');
+
       // Show success state
       setInpaintGenerateSuccess(true);
-      
+
       // Wait 1 second to show success, then exit
       setTimeout(() => {
         setInpaintGenerateSuccess(false);
         handleExitInpaintMode();
       }, 1000);
-      
+
     } catch (error) {
       console.error('[Inpaint] Error creating inpaint task:', error);
       toast.error('Failed to create inpaint task');
     } finally {
       setIsGeneratingInpaint(false);
     }
-  }, [selectedProjectId, isVideo, inpaintStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, imageDimensions, displayCanvasRef, maskCanvasRef, activeVariantLocation, activeVariantId]);
+  }, [selectedProjectId, isVideo, inpaintStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, activeVariantLocation, activeVariantId, createAsGeneration, advancedSettings]);
 
-  // Generate annotated edit
+  // Generate annotated edit - uses Konva's native export for reliable mask generation
   const handleGenerateAnnotatedEdit = useCallback(async () => {
-    console.log('[AnnotatedEdit] 🚀 handleGenerateAnnotatedEdit called', {
+    console.log('[AnnotateEdit] 🚀 handleGenerateAnnotatedEdit called', {
       selectedProjectId: selectedProjectId?.substring(0, 8),
-      isVideo,
       annotationStrokesLength: annotationStrokes.length,
-      inpaintPrompt: inpaintPrompt?.substring(0, 30),
-      hasPrompt: !!inpaintPrompt?.trim()
+      hasStrokeOverlayRef: !!strokeOverlayRef.current,
     });
 
-    if (!selectedProjectId || isVideo || annotationStrokes.length === 0 || !inpaintPrompt.trim()) {
-      console.log('[AnnotatedEdit] ❌ Validation failed', {
-        noProjectId: !selectedProjectId,
-        isVideo,
-        noStrokes: annotationStrokes.length === 0,
-        noPrompt: !inpaintPrompt.trim()
-      });
-      toast.error('Please add annotations and enter a prompt');
+    // Validation
+    if (!selectedProjectId || isVideo) {
+      toast.error('Cannot generate annotated edit');
       return;
     }
 
-    if (!imageDimensions) {
-      toast.error('Image dimensions not available');
+    if (annotationStrokes.length === 0) {
+      toast.error('Please draw an annotation rectangle');
+      return;
+    }
+
+    if (!inpaintPrompt.trim()) {
+      toast.error('Please enter a prompt');
+      return;
+    }
+
+    if (!strokeOverlayRef.current) {
+      toast.error('Annotation overlay not ready');
       return;
     }
 
     setIsGeneratingInpaint(true);
     try {
-      console.log('[AnnotatedEdit] Starting annotated edit generation...', {
-        mediaId: media.id,
-        prompt: inpaintPrompt,
-        numGenerations: inpaintNumGenerations,
-        annotationCount: annotationStrokes.length
-      });
+      // Export mask directly from Konva - this uses the exact same strokes being displayed
+      // No coordinate conversion needed, eliminating potential bugs
+      const maskImageData = strokeOverlayRef.current.exportMask({ pixelRatio: 1.5 });
 
-      // Scale mask to 1.5x the actual image size
-      const actualWidth = imageDimensions.width;
-      const actualHeight = imageDimensions.height;
-      const scaledWidth = Math.round(actualWidth * 1.5);
-      const scaledHeight = Math.round(actualHeight * 1.5);
-
-      console.log('[AnnotatedEdit] Scaling mask', {
-        actualSize: { width: actualWidth, height: actualHeight },
-        scaledSize: { width: scaledWidth, height: scaledHeight }
-      });
-
-      // Create a temporary canvas at 1.5x original resolution
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = scaledWidth;
-      tempCanvas.height = scaledHeight;
-
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) {
-        throw new Error('Could not create temporary canvas context');
+      if (!maskImageData) {
+        throw new Error('Failed to export mask from overlay');
       }
 
-      // Disable image smoothing for crisp, sharp mask edges
-      tempCtx.imageSmoothingEnabled = false;
+      console.log('[AnnotateEdit] Mask exported from Konva');
 
-      // Draw strokes directly to the mask canvas at scaled resolution
-      const scaleX = scaledWidth / actualWidth;
-      const scaleY = scaledHeight / actualHeight;
-
-      tempCtx.fillStyle = 'black';
-      tempCtx.fillRect(0, 0, scaledWidth, scaledHeight);
-
-      annotationStrokes.forEach(stroke => {
-        if (stroke.points.length < 2) return;
-
-        tempCtx.globalCompositeOperation = 'source-over';
-        tempCtx.strokeStyle = 'white';
-        tempCtx.fillStyle = 'white';
-        tempCtx.lineWidth = 8 * scaleX;
-        tempCtx.lineCap = 'round';
-        tempCtx.lineJoin = 'round';
-
-        if (stroke.shapeType === 'rectangle') {
-          if (stroke.isFreeForm && stroke.points.length === 4) {
-            // Free-form quadrilateral
-            tempCtx.beginPath();
-            tempCtx.moveTo(stroke.points[0].x * scaleX, stroke.points[0].y * scaleY);
-            for (let i = 1; i < 4; i++) {
-              tempCtx.lineTo(stroke.points[i].x * scaleX, stroke.points[i].y * scaleY);
-            }
-            tempCtx.closePath();
-            tempCtx.fill();
-          } else {
-            // Standard rectangle
-            const x = Math.min(stroke.points[0].x, stroke.points[1].x) * scaleX;
-            const y = Math.min(stroke.points[0].y, stroke.points[1].y) * scaleY;
-            const width = Math.abs(stroke.points[1].x - stroke.points[0].x) * scaleX;
-            const height = Math.abs(stroke.points[1].y - stroke.points[0].y) * scaleY;
-            tempCtx.fillRect(x, y, width, height);
-          }
-        }
-      });
-      
-      // Apply binary threshold to eliminate any anti-aliasing artifacts
-      // This ensures pure black/white mask with no gray/semi-transparent pixels
-      const imageData = tempCtx.getImageData(0, 0, scaledWidth, scaledHeight);
-      const data = imageData.data;
-      const threshold = 128; // Mid-point threshold
-      
-      for (let i = 0; i < data.length; i += 4) {
-        // Check alpha channel - if pixel has any opacity, make it fully opaque white
-        if (data[i + 3] > threshold) {
-          data[i] = 255;     // R
-          data[i + 1] = 255; // G
-          data[i + 2] = 255; // B
-          data[i + 3] = 255; // A
-        } else {
-          // Otherwise make it fully transparent black
-          data[i] = 0;
-          data[i + 1] = 0;
-          data[i + 2] = 0;
-          data[i + 3] = 0;
-        }
-      }
-      
-      tempCtx.putImageData(imageData, 0, 0);
-      
-      // Create mask image from scaled canvas
-      const maskImageData = tempCanvas.toDataURL('image/png');
-      
       // Upload mask to storage
       const maskFile = await fetch(maskImageData)
         .then(res => res.blob())
         .then(blob => new File([blob], `annotated_edit_mask_${media.id}_${Date.now()}.png`, { type: 'image/png' }));
-      
-      const maskUrl = await uploadImageToStorage(maskFile);
-      console.log('[AnnotatedEdit] Mask uploaded:', maskUrl);
 
-      // Get source image URL - use active variant's location if editing a variant
-      // Otherwise fall back to media's URL fields
+      const maskUrl = await uploadImageToStorage(maskFile);
+      console.log('[AnnotateEdit] Mask uploaded:', maskUrl);
+
+      // Get source image URL
       const mediaUrl = (media as any).url || media.location || media.imageUrl;
       const sourceUrl = activeVariantLocation || mediaUrl;
-      
-      console.log('[AnnotatedEdit] Source URL selection:', {
-        activeVariantLocation: activeVariantLocation?.substring(0, 50),
-        mediaUrl: mediaUrl?.substring(0, 50),
-        selectedSourceUrl: sourceUrl?.substring(0, 50),
-        isUsingVariant: !!activeVariantLocation,
-      });
 
       // Create annotated image edit task
-      // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
-      // For ShotImageManager/Timeline images, id is shot_generations.id but generation_id is the actual generation ID
       const actualGenerationIdForAnnotate = (media as any).generation_id || media.id;
-      
-      console.log('[AnnotatedEdit] 📤 About to call createAnnotatedImageEditTask with:', {
-        project_id: selectedProjectId?.substring(0, 8),
-        shot_id: shotId?.substring(0, 8),
-        tool_type: toolTypeOverride,
+
+      console.log('[AnnotateEdit] Creating task', {
         generation_id: actualGenerationIdForAnnotate.substring(0, 8),
-        prompt: inpaintPrompt.substring(0, 30)
+        prompt: inpaintPrompt.substring(0, 30),
       });
-      
+
       await createAnnotatedImageEditTask({
         project_id: selectedProjectId,
         image_url: sourceUrl,
         mask_url: maskUrl,
         prompt: inpaintPrompt,
         num_generations: inpaintNumGenerations,
-        generation_id: actualGenerationIdForAnnotate, // Must be generations.id, not shot_generations.id
-        shot_id: shotId, // Pass shot_id so complete_task can link results to the shot
-        tool_type: toolTypeOverride, // Override tool_type if provided
-        loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
-        create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
-        source_variant_id: activeVariantId || undefined, // Track source variant if editing from a variant
-        hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
+        generation_id: actualGenerationIdForAnnotate,
+        shot_id: shotId,
+        tool_type: toolTypeOverride,
+        loras: loras,
+        create_as_generation: createAsGeneration,
+        source_variant_id: activeVariantId || undefined,
+        hires_fix: convertToHiresFixApiParams(advancedSettings),
       });
 
-      console.log('[AnnotatedEdit] ✅ Annotated edit tasks created successfully');
-      
+      console.log('[AnnotateEdit] ✅ Task created successfully');
+
       // Show success state
       setInpaintGenerateSuccess(true);
-      
+
       // Wait 1 second to show success, then exit
       setTimeout(() => {
         setInpaintGenerateSuccess(false);
         handleExitInpaintMode();
       }, 1000);
-      
+
     } catch (error) {
-      console.error('[AnnotatedEdit] Error creating annotated edit task:', error);
+      console.error('[AnnotateEdit] Error creating annotated edit task:', error);
       toast.error('Failed to create annotated edit task');
     } finally {
       setIsGeneratingInpaint(false);
     }
-  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, displayCanvasRef, maskCanvasRef, activeVariantLocation, activeVariantId, imageDimensions, createAsGeneration, advancedSettings]);
+  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, activeVariantLocation, activeVariantId, createAsGeneration, advancedSettings]);
 
   // Get delete button position for selected shape
   const getDeleteButtonPosition = useCallback((): { x: number; y: number } | null => {
@@ -3209,9 +2447,6 @@ export const useInpainting = ({
     setEditMode,
     setAnnotationMode,
     handleEnterInpaintMode,
-    handlePointerDown,
-    handlePointerMove,
-    handlePointerUp,
     // Konva-based handlers
     handleKonvaPointerDown,
     handleKonvaPointerMove,
@@ -3224,6 +2459,7 @@ export const useInpainting = ({
     handleDeleteSelected,
     handleToggleFreeForm,
     getDeleteButtonPosition,
+    strokeOverlayRef,
     redrawStrokes,
     // Canvas-based rendering
     isImageLoaded,

@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Check, Scissors, Sparkles, Film, Star, Loader2, ArrowDown, ArrowUp, X, ChevronLeft, ChevronRight, ImagePlus, Download } from 'lucide-react';
+import { Check, Scissors, Sparkles, Film, Star, Loader2, ArrowDown, ArrowUp, X, ChevronLeft, ChevronRight, ImagePlus, Download, Trash2 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -92,6 +92,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   onPromoteToGeneration,
   isPromoting = false,
   onLoadVariantSettings,
+  onDeleteVariant,
 }) => {
   const [isMakingPrimary, setIsMakingPrimary] = useState(false);
   const [localIsPromoting, setLocalIsPromoting] = useState(false);
@@ -99,6 +100,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const [relationshipFilter, setRelationshipFilter] = useState<RelationshipFilter>('all');
   const [currentPage, setCurrentPage] = useState(0);
   const [loadedSettingsVariantId, setLoadedSettingsVariantId] = useState<string | null>(null);
+  const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   // Calculate variant relationships based on source_variant_id in params
@@ -514,8 +516,29 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                 </TooltipTrigger>
                 <TooltipContent side="top" className="z-[100001] max-w-xs">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium">{label}</p>
-                    <span className="text-[10px] text-muted-foreground">{getTimeAgo(variant.created_at)}</span>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{label}</p>
+                      <span className="text-[10px] text-muted-foreground">{getTimeAgo(variant.created_at)}</span>
+                    </div>
+                    {/* Delete button - only for non-primary variants */}
+                    {onDeleteVariant && !isPrimary && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingVariantId(variant.id);
+                          onDeleteVariant(variant.id).finally(() => setDeletingVariantId(null));
+                        }}
+                        disabled={deletingVariantId === variant.id}
+                        className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                        title="Delete variant"
+                      >
+                        {deletingVariantId === variant.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    )}
                   </div>
                   {(variant.params as any)?.prompt && (
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">

@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
-import { Stage, Layer, Line, Rect, Group } from 'react-konva';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { Stage, Layer, Line, Rect } from 'react-konva';
+import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 
 export interface BrushStroke {
@@ -38,6 +39,14 @@ interface StrokeOverlayProps {
   onShapeClick?: (strokeId: string, point: { x: number; y: number }) => void;
 }
 
+export interface StrokeOverlayHandle {
+  /**
+   * Export strokes as a mask image (white shapes on black background).
+   * Returns a data URL of the mask at the specified resolution.
+   */
+  exportMask: (options?: { pixelRatio?: number }) => string | null;
+}
+
 /**
  * Konva-based stroke overlay for inpainting/annotation.
  *
@@ -45,8 +54,10 @@ interface StrokeOverlayProps {
  * - Stage is sized to display dimensions
  * - Content is scaled to match image dimensions
  * - Event coordinates are automatically converted to image space
+ *
+ * Exposes exportMask() via ref for generating mask images.
  */
-export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
+export const StrokeOverlay = forwardRef<StrokeOverlayHandle, StrokeOverlayProps>(({
   imageWidth,
   imageHeight,
   displayWidth,
@@ -62,11 +73,11 @@ export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
   onPointerMove,
   onPointerUp,
   onShapeClick,
-}) => {
-  const stageRef = useRef<any>(null);
+}, ref) => {
+
+  const stageRef = useRef<Konva.Stage>(null);
 
   // Scale factors: display coords -> image coords
-  // The Stage is sized to match the displayed image exactly
   const scaleX = displayWidth / imageWidth;
   const scaleY = displayHeight / imageHeight;
 
@@ -81,6 +92,126 @@ export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
     x: imageX * scaleX,
     y: imageY * scaleY,
   });
+
+  // Expose exportMask function via ref
+  useImperativeHandle(ref, () => ({
+    exportMask: (options?: { pixelRatio?: number }) => {
+      const pixelRatio = options?.pixelRatio ?? 1.5;
+
+      if (strokes.length === 0) {
+        console.log('[StrokeOverlay] exportMask: No strokes to export');
+        return null;
+      }
+
+      // Create an offscreen stage at image dimensions (not display dimensions)
+      // This ensures the mask matches the actual image size
+      const maskWidth = imageWidth;
+      const maskHeight = imageHeight;
+
+      // Create a container div (required by Konva)
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      document.body.appendChild(container);
+
+      try {
+        // Create offscreen stage at actual image dimensions
+        const offscreenStage = new Konva.Stage({
+          container,
+          width: maskWidth,
+          height: maskHeight,
+        });
+
+        const layer = new Konva.Layer();
+        offscreenStage.add(layer);
+
+        // Draw black background
+        const background = new Konva.Rect({
+          x: 0,
+          y: 0,
+          width: maskWidth,
+          height: maskHeight,
+          fill: 'black',
+        });
+        layer.add(background);
+
+        // Draw each stroke as WHITE outline (not filled)
+        const strokeWidth = 6; // Outline thickness for mask
+
+        strokes.forEach((stroke) => {
+          if (stroke.points.length < 2) return;
+
+          if (stroke.shapeType === 'rectangle') {
+            if (stroke.isFreeForm && stroke.points.length === 4) {
+              // Free-form quadrilateral - draw as outline
+              const flatPoints = stroke.points.flatMap(p => [p.x, p.y]);
+              const line = new Konva.Line({
+                points: flatPoints,
+                stroke: 'white',
+                strokeWidth,
+                closed: true,
+                lineCap: 'round',
+                lineJoin: 'round',
+              });
+              layer.add(line);
+            } else {
+              // Standard rectangle - draw as outline (not filled)
+              const x = Math.min(stroke.points[0].x, stroke.points[1].x);
+              const y = Math.min(stroke.points[0].y, stroke.points[1].y);
+              const width = Math.abs(stroke.points[1].x - stroke.points[0].x);
+              const height = Math.abs(stroke.points[1].y - stroke.points[0].y);
+
+              const rect = new Konva.Rect({
+                x,
+                y,
+                width,
+                height,
+                stroke: 'white',
+                strokeWidth,
+              });
+              layer.add(rect);
+            }
+          } else {
+            // Freehand line - draw as thick white stroke
+            const flatPoints = stroke.points.flatMap(p => [p.x, p.y]);
+            const line = new Konva.Line({
+              points: flatPoints,
+              stroke: 'white',
+              strokeWidth: stroke.brushSize,
+              lineCap: 'round',
+              lineJoin: 'round',
+            });
+            layer.add(line);
+          }
+        });
+
+        layer.draw();
+
+        // Export as data URL
+        const dataUrl = offscreenStage.toDataURL({
+          pixelRatio,
+          mimeType: 'image/png',
+        });
+
+        console.log('[StrokeOverlay] exportMask: Generated mask', {
+          imageSize: { width: maskWidth, height: maskHeight },
+          pixelRatio,
+          outputSize: { width: maskWidth * pixelRatio, height: maskHeight * pixelRatio },
+          strokeCount: strokes.length,
+        });
+
+        // Cleanup
+        offscreenStage.destroy();
+        document.body.removeChild(container);
+
+        return dataUrl;
+      } catch (error) {
+        console.error('[StrokeOverlay] exportMask failed:', error);
+        document.body.removeChild(container);
+        return null;
+      }
+    },
+  }), [strokes, imageWidth, imageHeight]);
 
   const handlePointerDown = (e: KonvaEventObject<PointerEvent>) => {
     const stage = e.target.getStage();
@@ -108,19 +239,16 @@ export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
     onPointerUp(e);
   };
 
-  // Render a single stroke
-  const renderStroke = (stroke: BrushStroke, isPreview = false) => {
+  // Render a single stroke for display (outlines with colors)
+  const renderStroke = (stroke: BrushStroke) => {
     const isSelected = stroke.id === selectedShapeId;
     const strokeColor = isSelected ? 'rgba(0, 255, 100, 0.9)' :
                         stroke.isErasing ? 'rgba(0, 0, 0, 0.5)' :
-                        'rgba(255, 0, 0, 0.4)';
-    const fillColor = isSelected ? 'rgba(0, 255, 100, 0.2)' :
-                      stroke.isErasing ? 'rgba(0, 0, 0, 0.3)' :
-                      'rgba(255, 0, 0, 0.2)';
+                        'rgba(255, 0, 0, 0.7)';
 
     if (stroke.shapeType === 'rectangle' && stroke.points.length >= 2) {
       if (stroke.isFreeForm && stroke.points.length === 4) {
-        // Free-form quadrilateral - render as closed line
+        // Free-form quadrilateral - render as closed line (outline only)
         const flatPoints = stroke.points.flatMap(p => {
           const stagePos = imageToStage(p.x, p.y);
           return [stagePos.x, stagePos.y];
@@ -128,16 +256,15 @@ export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
         return (
           <Line
             key={stroke.id}
-            points={[...flatPoints, flatPoints[0], flatPoints[1]]} // Close the path
+            points={[...flatPoints, flatPoints[0], flatPoints[1]]}
             stroke={strokeColor}
             strokeWidth={3}
-            fill={fillColor}
             closed
             onClick={() => onShapeClick?.(stroke.id, stroke.points[0])}
           />
         );
       } else {
-        // Standard rectangle
+        // Standard rectangle (outline only)
         const p0 = imageToStage(stroke.points[0].x, stroke.points[0].y);
         const p1 = imageToStage(stroke.points[1].x, stroke.points[1].y);
         const x = Math.min(p0.x, p1.x);
@@ -154,7 +281,6 @@ export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
             height={height}
             stroke={strokeColor}
             strokeWidth={3}
-            fill={fillColor}
             onClick={() => onShapeClick?.(stroke.id, stroke.points[0])}
           />
         );
@@ -166,9 +292,6 @@ export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
         return [stagePos.x, stagePos.y];
       });
       const scaledBrushSize = stroke.brushSize * scaleX;
-
-      // For eraser strokes using destination-out, use full opacity so it fully erases
-      // The alpha channel determines how much is erased, so 50% opacity = 50% erase
       const effectiveStrokeColor = stroke.isErasing ? 'rgba(0, 0, 0, 1)' : strokeColor;
 
       return (
@@ -192,7 +315,7 @@ export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
     const strokeColor = isEraseMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 0, 0, 0.4)';
 
     if (annotationMode === 'rectangle' && currentStroke.length >= 1) {
-      // Rectangle preview - draw from first point to current mouse position
+      // Rectangle preview
       const start = imageToStage(currentStroke[0].x, currentStroke[0].y);
       const end = imageToStage(currentStroke[currentStroke.length - 1].x, currentStroke[currentStroke.length - 1].y);
       const x = Math.min(start.x, end.x);
@@ -235,26 +358,12 @@ export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
     return null;
   }
 
-  // Debug: log dimensions when they change
-  useEffect(() => {
-    console.log('[KonvaDebug] StrokeOverlay dimensions:', {
-      displayWidth,
-      displayHeight,
-      imageWidth,
-      imageHeight,
-      scaleX,
-      scaleY
-    });
-  }, [displayWidth, displayHeight, imageWidth, imageHeight, scaleX, scaleY]);
-
   return (
     <Stage
       ref={stageRef}
       width={displayWidth}
       height={displayHeight}
       style={{
-        // Use display:block to prevent inline sizing issues, no absolute positioning
-        // The parent overlay container is already absolutely positioned with inset-0
         display: 'block',
         cursor: 'crosshair',
         touchAction: 'none',
@@ -265,14 +374,13 @@ export const StrokeOverlay: React.FC<StrokeOverlayProps> = ({
       onPointerCancel={handlePointerUp}
     >
       <Layer>
-        {/* Render saved strokes */}
         {strokes.map(stroke => renderStroke(stroke))}
-
-        {/* Render current stroke being drawn */}
         {renderCurrentStroke()}
       </Layer>
     </Stage>
   );
-};
+});
+
+StrokeOverlay.displayName = 'StrokeOverlay';
 
 export default StrokeOverlay;

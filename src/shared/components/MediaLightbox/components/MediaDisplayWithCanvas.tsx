@@ -1,6 +1,6 @@
 import React from 'react';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
-import { StrokeOverlay, BrushStroke } from './StrokeOverlay';
+import { StrokeOverlay, BrushStroke, StrokeOverlayHandle } from './StrokeOverlay';
 import type { KonvaEventObject } from 'konva/lib/Node';
 
 interface MediaDisplayWithCanvasProps {
@@ -67,6 +67,8 @@ interface MediaDisplayWithCanvasProps {
   onStrokePointerMove?: (point: { x: number; y: number }, e: KonvaEventObject<PointerEvent>) => void;
   onStrokePointerUp?: (e: KonvaEventObject<PointerEvent>) => void;
   onShapeClick?: (strokeId: string, point: { x: number; y: number }) => void;
+  // Ref for accessing StrokeOverlay's exportMask function
+  strokeOverlayRef?: React.RefObject<StrokeOverlayHandle>;
 }
 
 export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
@@ -106,7 +108,9 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   onStrokePointerMove,
   onStrokePointerUp,
   onShapeClick,
+  strokeOverlayRef,
 }) => {
+
   // Track the display size AND position of the image for Konva overlay
   const [displaySize, setDisplaySize] = React.useState({ width: 0, height: 0 });
   const [imageOffset, setImageOffset] = React.useState({ left: 0, top: 0 });
@@ -318,17 +322,9 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
         <div
           className="relative w-full h-full flex items-center justify-center"
           style={{
-            // Checkered pattern background for reposition mode
+            // Black background for reposition mode (shows where empty areas will be)
             ...(isRepositionMode ? {
-              backgroundImage: `
-                linear-gradient(45deg, #1a1a2e 25%, transparent 25%),
-                linear-gradient(-45deg, #1a1a2e 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #1a1a2e 75%),
-                linear-gradient(-45deg, transparent 75%, #1a1a2e 75%)
-              `,
-              backgroundSize: '20px 20px',
-              backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-              backgroundColor: '#252540',
+              backgroundColor: '#000000',
             } : {}),
             // Enable drag-to-move cursor in reposition mode
             cursor: isRepositionMode
@@ -424,6 +420,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
                 }}
               >
                 <StrokeOverlay
+                  ref={strokeOverlayRef}
                   imageWidth={imageDimensions.width}
                   imageHeight={imageDimensions.height}
                   displayWidth={displaySize.width}

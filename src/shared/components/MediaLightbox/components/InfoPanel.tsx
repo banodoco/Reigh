@@ -64,6 +64,8 @@ export interface InfoPanelProps {
   // Variant promotion
   onPromoteToGeneration?: (variantId: string) => Promise<void>;
   isPromoting?: boolean;
+  // Variant deletion
+  onDeleteVariant?: (variantId: string) => Promise<void>;
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -108,6 +110,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   // Variant promotion
   onPromoteToGeneration,
   isPromoting,
+  // Variant deletion
+  onDeleteVariant,
 }) => {
   const isMobile = variant === 'mobile';
   const hasVariants = variants && variants.length >= 1;
@@ -262,6 +266,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
             isLoading={isLoadingVariants}
             onPromoteToGeneration={onPromoteToGeneration}
             isPromoting={isPromoting}
+            onDeleteVariant={onDeleteVariant}
           />
         </div>
       );
@@ -281,6 +286,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
             isLoading={isLoadingVariants}
             onPromoteToGeneration={onPromoteToGeneration}
             isPromoting={isPromoting}
+            onDeleteVariant={onDeleteVariant}
           />
         </div>
       </div>

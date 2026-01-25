@@ -42,6 +42,7 @@ export interface UseVariantsReturn {
   refetch: () => void;
   setActiveVariantId: (variantId: string | null) => void;
   setPrimaryVariant: (variantId: string) => Promise<void>;
+  deleteVariant: (variantId: string) => Promise<void>;
 }
 
 /** Query key for variant queries - use this for cache consistency */
@@ -278,6 +279,58 @@ export const useVariants = ({
     [setPrimaryMutation]
   );
 
+  // Mutation to delete a variant
+  const deleteVariantMutation = useMutation({
+    mutationFn: async (variantId: string) => {
+      console.log('[useVariants] Deleting variant:', variantId.substring(0, 8));
+
+      // Check if variant is primary - don't allow deleting primary
+      const variant = variants.find(v => v.id === variantId);
+      if (variant?.is_primary) {
+        throw new Error('Cannot delete the primary variant');
+      }
+
+      const { error } = await supabase
+        .from('generation_variants')
+        .delete()
+        .eq('id', variantId);
+
+      if (error) {
+        console.error('[useVariants] Error deleting variant:', error);
+        throw error;
+      }
+
+      return variantId;
+    },
+    onSuccess: async (variantId) => {
+      console.log('[useVariants] Successfully deleted variant:', variantId.substring(0, 8));
+
+      // If deleted variant was active, switch to primary
+      if (activeVariantId === variantId) {
+        setActiveVariantId(primaryVariant?.id || null);
+      }
+
+      // Invalidate caches
+      if (generationId) {
+        await invalidateVariantChange(queryClient, {
+          generationId,
+          reason: 'delete-variant',
+        });
+      }
+    },
+    onError: (error) => {
+      console.error('[useVariants] Failed to delete variant:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete variant');
+    },
+  });
+
+  const deleteVariant = useCallback(
+    async (variantId: string) => {
+      await deleteVariantMutation.mutateAsync(variantId);
+    },
+    [deleteVariantMutation]
+  );
+
   return {
     variants,
     primaryVariant,
@@ -287,6 +340,7 @@ export const useVariants = ({
     refetch,
     setActiveVariantId,
     setPrimaryVariant,
+    deleteVariant,
   };
 };
 

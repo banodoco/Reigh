@@ -139,6 +139,8 @@ export interface VariantSelectorProps {
   isPromoting?: boolean;
   /** Handler to load a variant's settings into the regenerate form */
   onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
+  /** Handler to delete a variant (not available for primary variant) */
+  onDeleteVariant?: (variantId: string) => Promise<void>;
 }
 
 /**
