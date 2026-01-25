@@ -1540,6 +1540,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Apply initialShotId once after hydration (takes precedence over persisted value)
   // If initialShotId is explicitly null, reset to None (opened from outside shot context)
+  // IMPORTANT: Do NOT call markAsInteracted() here - initialShotId is a temporary context
+  // override (e.g., from modal opened in shot context), not a user preference to persist.
+  // The tool page's persisted shot selection should only change when explicitly changed by user.
   const hasAppliedInitialShotId = useRef(false);
   useEffect(() => {
     // Only apply once, after hydration is complete
@@ -1551,13 +1554,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         const shotExists = shots.some(shot => shot.id === initialShotId);
         if (shotExists && associatedShotId !== initialShotId) {
           setAssociatedShotId(initialShotId);
-          markAsInteracted();
+          // Don't persist - this is a temporary context override
         }
       }
       // If initialShotId is null/undefined, keep the persisted value from project settings
       hasAppliedInitialShotId.current = true;
     }
-  }, [ready, initialShotId, shots, markAsInteracted, associatedShotId]);
+  }, [ready, initialShotId, shots, associatedShotId]);
 
   // Reset associatedShotId if the selected shot no longer exists (e.g., was deleted)
   useEffect(() => {
