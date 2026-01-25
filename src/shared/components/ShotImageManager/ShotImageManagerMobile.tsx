@@ -179,13 +179,6 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     }
   }, [mobileSelectedIds, readOnly, lastSelectedIndex]);
 
-  // Cleanup any pending single-tap timeout on unmount
-  React.useEffect(() => {
-    return () => {
-      clearPendingSingleTap();
-    };
-  }, [clearPendingSingleTap]);
-
   // Mobile reordering function
   const handleMobileMoveHere = useCallback(async (targetIndex: number) => {
     if (mobileSelectedIds.length === 0) {
